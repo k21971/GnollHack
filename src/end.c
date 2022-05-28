@@ -335,7 +335,14 @@ done2()
 {
     if (iflags.debug_fuzzer)
         return 0;
-    if (!paranoid_query_ex(ATR_NONE, NO_COLOR, ParanoidQuit, (char*)0, "Really quit?")) {
+
+    boolean has_existing_save_file = check_existing_save_file();
+    char paranoidbuf[BUFSZ] = "";
+    Sprintf(paranoidbuf, "%s%s%s", 
+        !has_existing_save_file && (wizard || discover || CasualMode) ? "There is no saved game. " : "",
+        !wizard && !has_existing_save_file ? "This will end the game and delete your character! " : "", 
+        has_existing_save_file ? "Your progress will not be saved in the existing save file. Really quit?" : "Are you sure to quit?");
+    if (!paranoid_query_ex(ATR_NONE, CLR_MSG_NEGATIVE, ParanoidQuit, "Confirm Quit", paranoidbuf)) {
 #ifndef NO_SIGNAL
         (void) signal(SIGINT, (SIG_RET_TYPE) done1);
 #endif
@@ -350,7 +357,7 @@ done2()
         }
         return 0;
     }
-#if ((defined(UNIX) || defined(VMS) || defined(LATTICE)) && !defined(GNH_ANDROID))
+#if ((defined(UNIX) || defined(VMS) || defined(LATTICE)) && !defined(GNH_MOBILE))
     if (wizard) {
         int c;
 #ifdef VMS
@@ -394,7 +401,7 @@ int sig_unused UNUSED;
     return;
 }
 
-#if (defined(UNIX) || defined(VMS) || defined(__EMX__))  && !defined(GNH_ANDROID)
+#if (defined(UNIX) || defined(VMS) || defined(__EMX__))  && !defined(GNH_MOBILE)
 /* signal() handler */
 static void
 done_hangup(sig)
@@ -652,11 +659,21 @@ VA_DECL(const char *, str)
         Vsprintf(buf, str, VA_ARGS);
         raw_print(buf);
         paniclog("panic", buf);
+#ifdef GNOLLHACK_MAIN_PROGRAM
+        if (open_special_view)
+        {
+            struct special_view_info info = { 0 };
+            info.viewtype = SPECIAL_VIEW_PANIC;
+            info.text = str;
+            open_special_view(info);
+        }
+#endif
     }
 #ifdef WIN32
     interject(INTERJECT_PANIC);
 #endif
-#if defined(UNIX) || defined(VMS) || defined(LATTICE) || defined(WIN32)
+
+#if (defined(UNIX) || defined(VMS) || defined(LATTICE) || defined(WIN32)) && !defined(GNH_MOBILE)
     if (wizard)
         NH_abort(); /* generate core dump */
 #endif
@@ -1345,6 +1362,8 @@ int how;
     struct obj *corpse = (struct obj *) 0;
     time_t endtime;
     long umoney;
+    boolean has_existing_save_file = (wizard || discover || CasualMode) && check_existing_save_file();
+    boolean disclose_and_dumplog_ok = !(how < ASCENDED && CasualMode && has_existing_save_file);
     //long tmp;
 
     /*
@@ -1370,6 +1389,7 @@ int how;
     const char* endtext = 0;
     int screentextstyle = 0;
     int clr = NO_COLOR;
+
     switch (how)
     {
     case DIED:
@@ -1418,6 +1438,13 @@ int how;
         clr = CLR_MAGENTA;
         break;
     case QUIT:
+        if (!has_existing_save_file)
+        {
+            endtext = "You have quit.";
+            screentextstyle = SCREEN_TEXT_QUIT;
+            clr = CLR_RED;
+        }
+        break;
     default:
         break;
     }
@@ -1442,10 +1469,11 @@ int how;
     urealtime.realtime += (long) (endtime - urealtime.start_timing);
 
     /* Write dumplog */
-    dump_open_log(endtime);
+    if(disclose_and_dumplog_ok)
+        dump_open_log(endtime);
 
-    You("were playing on %s difficulty%s.", get_game_difficulty_text(context.game_difficulty),
-        wizard ? " in debug mode" : discover ? " in non-scoring explore mode" : ModernMode ? " in modern mode" : "");
+    You("were playing on %s difficulty in %s mode.", get_game_difficulty_text(context.game_difficulty),
+        get_game_mode_text(TRUE));
 
     /* Sometimes you die on the first move.  Life's not fair.
      * On those rare occasions you get hosed immediately, go out
@@ -1458,7 +1486,7 @@ int how;
         wait_synch(); /* flush screen output */
 #ifndef NO_SIGNAL
     (void) signal(SIGINT, (SIG_RET_TYPE) done_intr);
-#if (defined(UNIX) || defined(VMS) || defined(__EMX__)) && !defined(GNH_ANDROID)
+#if (defined(UNIX) || defined(VMS) || defined(__EMX__)) && !defined(GNH_MOBILE)
     (void) signal(SIGQUIT, (SIG_RET_TYPE) done_intr);
     sethanguphandler(done_hangup);
 #endif
@@ -1526,7 +1554,7 @@ int how;
     if (have_windows)
         display_nhwindow(WIN_MESSAGE, FALSE);
 
-    if (how != PANICKED) 
+    if (how != PANICKED && disclose_and_dumplog_ok)
     {
         struct obj *obj;
 
@@ -1564,6 +1592,12 @@ int how;
             disclose(how, taken);
 
         dump_everything(how, endtime);
+    }
+    else if (how != QUIT)
+    {
+        char ebuf[BUFSZ];
+        Sprintf(ebuf, "%s", has_existing_save_file ? "You can load the game from the point at which you last saved the game." : endtext ? endtext : "Your game is over.");
+        display_popup_text(ebuf, "Game Over", POPUP_TEXT_MESSAGE, ATR_NONE, clr, NO_GLYPH, POPUP_FLAGS_NONE);
     }
 
     /* if pets will contribute to score, populate mydogs list now
@@ -1639,7 +1673,7 @@ int how;
 #endif
     }
 
-    if (u.ugrave_arise >= LOW_PM && !done_stopprint) 
+    if (u.ugrave_arise >= LOW_PM && !done_stopprint)
     {
         /* give this feedback even if bones aren't going to be created,
            so that its presence or absence doesn't tip off the player to
@@ -1692,205 +1726,212 @@ int how;
     else
         done_stopprint = 1; /* just avoid any more output */
 
+    if (disclose_and_dumplog_ok)
+    {
+
 #ifdef DUMPLOG
-    /* 'how' reasons beyond genocide shouldn't show tombstone;
-       for normal end of game, genocide doesn't either */
-    if (how <= GENOCIDED) 
-    {
-        dump_redirect(TRUE);
-        if (iflags.in_dumplog)
-            genl_outrip(0, how, endtime);
-        dump_redirect(FALSE);
-    }
+        /* 'how' reasons beyond genocide shouldn't show tombstone;
+           for normal end of game, genocide doesn't either */
+        if (how <= GENOCIDED)
+        {
+            dump_redirect(TRUE);
+            if (iflags.in_dumplog)
+                genl_outrip(0, how, endtime);
+            dump_redirect(FALSE);
+        }
 #endif
-    if (u.uhave.amulet) 
-    {
-        Strcat(killer.name, " (with the Amulet)");
-    }
-    else if (how == ESCAPED) 
-    {
-        if (Is_astralevel(&u.uz)) /* offered Amulet to wrong deity */
-            Strcat(killer.name, " (in celestial disgrace)");
-        else if (carrying(FAKE_AMULET_OF_YENDOR))
-            Strcat(killer.name, " (with a fake Amulet)");
-        /* don't bother counting to see whether it should be plural */
-    }
+        if (u.uhave.amulet)
+        {
+            Strcat(killer.name, " (with the Amulet)");
+        }
+        else if (how == ESCAPED)
+        {
+            if (Is_astralevel(&u.uz)) /* offered Amulet to wrong deity */
+                Strcat(killer.name, " (in celestial disgrace)");
+            else if (carrying(FAKE_AMULET_OF_YENDOR))
+                Strcat(killer.name, " (with a fake Amulet)");
+            /* don't bother counting to see whether it should be plural */
+        }
 
-    Sprintf(pbuf, "%s %s the %s...", Goodbye(), plname,
+        Sprintf(pbuf, "%s %s the %s...", Goodbye(), plname,
             (how != ASCENDED)
-                ? (const char *) ((flags.female && urole.name.f)
-                    ? urole.name.f
-                    : urole.name.m)
-                : (const char *) (flags.female ? "Demigoddess" : "Demigod"));
-    dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-    dump_forward_putstr(endwin, 0, "", done_stopprint);
+            ? (const char*)((flags.female && urole.name.f)
+                ? urole.name.f
+                : urole.name.m)
+            : (const char*)(flags.female ? "Demigoddess" : "Demigod"));
+        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, 0, "", done_stopprint);
 
-    if (how == ESCAPED || how == ASCENDED) 
-    {
-        struct monst *mtmp;
+        if (how == ESCAPED || how == ASCENDED)
+        {
+            struct monst* mtmp;
 
 #if 0
-        struct obj* otmp;
-        register struct val_list* val;
-        register int i;
+            struct obj* otmp;
+            register struct val_list* val;
+            register int i;
 
-        for (val = valuables; val->list; val++)
-            for (i = 0; i < val->size; i++)
-            {
-                val->list[i].count = 0L;
-            }
-
-        get_valuables(invent);
-
-        /* add points for collected valuables */
-        for (val = valuables; val->list; val++)
-            for (i = 0; i < val->size; i++)
-                if (val->list[i].count != 0L) 
+            for (val = valuables; val->list; val++)
+                for (i = 0; i < val->size; i++)
                 {
-                    tmp = val->list[i].count
-                          * objects[val->list[i].typ].oc_cost;
-                    nowrap_add(u.u_gamescore, tmp);
+                    val->list[i].count = 0L;
                 }
 
-        /* count the points for artifacts */
-        artifact_score(invent, TRUE, endwin);
+            get_valuables(invent);
+
+            /* add points for collected valuables */
+            for (val = valuables; val->list; val++)
+                for (i = 0; i < val->size; i++)
+                    if (val->list[i].count != 0L)
+                    {
+                        tmp = val->list[i].count
+                            * objects[val->list[i].typ].oc_cost;
+                        nowrap_add(u.u_gamescore, tmp);
+                    }
+
+            /* count the points for artifacts */
+            artifact_score(invent, TRUE, endwin);
 #endif
 
-        viz_array[0][0] |= IN_SIGHT; /* need visibility for naming */
-        mtmp = mydogs;
-        Strcpy(pbuf, "You");
-        if (mtmp || Schroedingers_cat) 
-        {
-            while (mtmp) 
+            viz_array[0][0] |= IN_SIGHT; /* need visibility for naming */
+            mtmp = mydogs;
+            Strcpy(pbuf, "You");
+            if (mtmp || Schroedingers_cat)
             {
-                Sprintf(eos(pbuf), " and %s", mon_nam(mtmp));
-                //if (is_tame(mtmp))
-                //    nowrap_add(u.u_gamescore, mtmp->mhp);
-                mtmp = mtmp->nmon;
-            }
+                while (mtmp)
+                {
+                    Sprintf(eos(pbuf), " and %s", mon_nam(mtmp));
+                    //if (is_tame(mtmp))
+                    //    nowrap_add(u.u_gamescore, mtmp->mhp);
+                    mtmp = mtmp->nmon;
+                }
 
-            /* [it might be more robust to create a housecat and add it to
-               mydogs; it doesn't have to be placed on the map for that] */
-            if (Schroedingers_cat) 
-            {
-                //int mhp, m_lev = adj_lev(&mons[PM_HOUSECAT]);
-                //mhp = d(m_lev, 8);
-                //nowrap_add(u.u_gamescore, mhp);
-                Strcat(eos(pbuf), " and Schroedinger's cat");
+                /* [it might be more robust to create a housecat and add it to
+                   mydogs; it doesn't have to be placed on the map for that] */
+                if (Schroedingers_cat)
+                {
+                    //int mhp, m_lev = adj_lev(&mons[PM_HOUSECAT]);
+                    //mhp = d(m_lev, 8);
+                    //nowrap_add(u.u_gamescore, mhp);
+                    Strcat(eos(pbuf), " and Schroedinger's cat");
+                }
+                dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+                pbuf[0] = '\0';
             }
-            dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-            pbuf[0] = '\0';
-        }
-        else 
-        {
-            Strcat(pbuf, " ");
-        }
-        Sprintf(eos(pbuf), "%s with %ld point%s,",
+            else
+            {
+                Strcat(pbuf, " ");
+            }
+            Sprintf(eos(pbuf), "%s with %ld point%s,",
                 how == ASCENDED ? "went to your reward"
-                                 : "escaped from the dungeon",
+                : "escaped from the dungeon",
                 u.u_gamescore, plur(u.u_gamescore));
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+            dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
 
 #if 0
-        if (!done_stopprint)
-            artifact_score(invent, FALSE, endwin); /* list artifacts */
+            if (!done_stopprint)
+                artifact_score(invent, FALSE, endwin); /* list artifacts */
 
 #ifdef DUMPLOG
-        dump_redirect(TRUE);
-        if (iflags.in_dumplog)
-            artifact_score(invent, FALSE, 0);
-        dump_redirect(FALSE);
+            dump_redirect(TRUE);
+            if (iflags.in_dumplog)
+                artifact_score(invent, FALSE, 0);
+            dump_redirect(FALSE);
 #endif
 
-        /* list valuables here */
-        for (val = valuables; val->list; val++)
-        {
-            sort_valuables(val->list, val->size);
-            for (i = 0; i < val->size && !done_stopprint; i++)
+            /* list valuables here */
+            for (val = valuables; val->list; val++)
             {
-                int typ = val->list[i].typ;
-                long count = val->list[i].count;
-
-                if (count == 0L)
-                    continue;
-
-                if (objects[typ].oc_class != GEM_CLASS || typ <= LAST_GEM) 
+                sort_valuables(val->list, val->size);
+                for (i = 0; i < val->size && !done_stopprint; i++)
                 {
-                    otmp = mksobj(typ, FALSE, FALSE, FALSE);
-                    discover_object(otmp->otyp, TRUE, FALSE);
-                    otmp->known = 1;  /* for fake amulets */
-                    otmp->dknown = 1; /* seen it (blindness fix) */
-                    if (has_oname(otmp))
-                        free_oname(otmp);
-                    otmp->quan = count;
-                    Sprintf(pbuf, "%8ld %s (worth %ld %s),", count,
+                    int typ = val->list[i].typ;
+                    long count = val->list[i].count;
+
+                    if (count == 0L)
+                        continue;
+
+                    if (objects[typ].oc_class != GEM_CLASS || typ <= LAST_GEM)
+                    {
+                        otmp = mksobj(typ, FALSE, FALSE, FALSE);
+                        discover_object(otmp->otyp, TRUE, FALSE);
+                        otmp->known = 1;  /* for fake amulets */
+                        otmp->dknown = 1; /* seen it (blindness fix) */
+                        if (has_oname(otmp))
+                            free_oname(otmp);
+                        otmp->quan = count;
+                        Sprintf(pbuf, "%8ld %s (worth %ld %s),", count,
                             xname(otmp), count * objects[typ].oc_cost,
                             currency(2L));
-                    obfree(otmp, (struct obj *) 0);
-                }
-                else 
-                {
-                    Sprintf(pbuf, "%8ld worthless piece%s of colored glass,",
+                        obfree(otmp, (struct obj*)0);
+                    }
+                    else
+                    {
+                        Sprintf(pbuf, "%8ld worthless piece%s of colored glass,",
                             count, plur(count));
+                    }
+                    dump_forward_putstr(endwin, 0, pbuf, 0);
                 }
-                dump_forward_putstr(endwin, 0, pbuf, 0);
             }
-        }
 #endif
 
-    }
-    else 
-    {
-        /* did not escape or ascend */
-        if (u.uz.dnum == 0 && u.uz.dlevel <= 0) 
+        }
+        else
         {
-            /* level teleported out of the dungeon; `how' is DIED,
-               due to falling or to "arriving at heaven prematurely" */
-            Sprintf(pbuf, "You %s beyond the confines of the dungeon",
+            /* did not escape or ascend */
+            if (u.uz.dnum == 0 && u.uz.dlevel <= 0)
+            {
+                /* level teleported out of the dungeon; `how' is DIED,
+                   due to falling or to "arriving at heaven prematurely" */
+                Sprintf(pbuf, "You %s beyond the confines of the dungeon",
                     (u.uz.dlevel < 0) ? "passed away" : ends[how]);
-        } 
-        else 
-        {
-            /* more conventional demise */
-            const char *where = dungeons[u.uz.dnum].dname;
+            }
+            else
+            {
+                /* more conventional demise */
+                const char* where = dungeons[u.uz.dnum].dname;
 
-            if (Is_astralevel(&u.uz))
-                where = "The Astral Plane";
-            Sprintf(pbuf, "You %s in %s", ends[how], where);
-            if (!In_endgame(&u.uz) && !Is_knox(&u.uz))
-                Sprintf(eos(pbuf), " on dungeon level %d",
+                if (Is_astralevel(&u.uz))
+                    where = "The Astral Plane";
+                Sprintf(pbuf, "You %s in %s", ends[how], where);
+                if (!In_endgame(&u.uz) && !Is_knox(&u.uz))
+                    Sprintf(eos(pbuf), " on dungeon level %d",
                         In_quest(&u.uz) ? dunlev(&u.uz) : depth(&u.uz));
+            }
+
+            Sprintf(eos(pbuf), " with %ld point%s,", u.u_gamescore, plur(u.u_gamescore));
+            dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
         }
 
-        Sprintf(eos(pbuf), " with %ld point%s,", u.u_gamescore, plur(u.u_gamescore));
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-    }
-
-    Sprintf(pbuf, "and %ld piece%s of gold, after %ld move%s.", umoney,
+        Sprintf(pbuf, "and %ld piece%s of gold, after %ld move%s.", umoney,
             plur(umoney), moves, plur(moves));
-    dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-    Sprintf(pbuf, "You played on %s difficulty%s.", get_game_difficulty_text(context.game_difficulty),
-        wizard ? " in debug mode" : discover ? " in non-scoring explore mode" : ModernMode ? " in modern mode" : "");
-    dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-    Sprintf(pbuf,
+        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        Sprintf(pbuf, "You played on %s difficulty in %s mode.", get_game_difficulty_text(context.game_difficulty),
+            get_game_mode_text(TRUE));
+        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        Sprintf(pbuf,
             "You were level %d with a maximum of %d hit point%s when you %s.",
             u.ulevel, u.uhpmax, plur(u.uhpmax), ends[how]);
-    dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-    dump_forward_putstr(endwin, 0, "", done_stopprint);
+        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, 0, "", done_stopprint);
 
-    if (!done_stopprint)
-        display_nhwindow(endwin, TRUE);
-    if (endwin != WIN_ERR)
-        destroy_nhwindow(endwin);
+        if (!done_stopprint)
+            display_nhwindow(endwin, TRUE);
+        if (endwin != WIN_ERR)
+            destroy_nhwindow(endwin);
 
-    dump_close_log();
-
+        dump_close_log();
+    }
     /* "So when I die, the first thing I will see in Heaven is a
      * score list?" */
     if (have_windows && !iflags.toptenwin)
         exit_nhwindows((char*)0), have_windows = FALSE;
 
-    topten(how, endtime);
+    if((!wizard && !discover && !CasualMode) || (CasualMode && how == ASCENDED) /* || (wizard && yn_query("Write a top score entry?") == 'y') */)
+        topten(how, endtime);
+
+    if (CasualMode && how == ASCENDED && has_existing_save_file)
+        (void)delete_savefile(); /* The casual mode character gets deleted only upon ascension */
 
     if (have_windows)
         exit_nhwindows((char*)0);

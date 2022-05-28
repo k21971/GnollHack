@@ -39,6 +39,8 @@ namespace GnollHackClient
         FadeFromBlack,
         ShowGUITips,
         CrashReport,
+        Panic,
+        Message,
         DisplayConditionText,
         DisplayScreenFilter,
         SetPetMID,
@@ -101,6 +103,7 @@ namespace GnollHackClient
     public struct DisplayScreenFilterData
     {
         public int style;
+        public int attr;
         public int color;
         public ulong fflags;
     }

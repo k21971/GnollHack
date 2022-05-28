@@ -241,7 +241,7 @@ const char *fmt, *arg;
 
     newsym(u.ux, u.uy);
 
-    You(fmt, arg);
+    You_ex(ATR_NONE, CLR_MSG_ATTENTION, fmt, arg);
     /* check whether player foolishly genocided self while poly'd */
     if (ugenocided()) {
         /* intervening activity might have clobbered genocide info */
@@ -428,7 +428,7 @@ newman()
                    ? urace.individual.m
                    : urace.noun);
     if (Slimed) {
-        Your("body transforms, but there is still slime on you.");
+        Your_ex(ATR_NONE, CLR_MSG_WARNING, "body transforms, but there is still slime on you.");
         make_slimed(10L, (const char *) 0);
     }
 
@@ -466,7 +466,7 @@ int psflags;
         if (!wizard || (wizard && yn_query("You are unchanging. Force polymorph anyway?") != 'y'))
         {
             play_sfx_sound(SFX_POLYMORPH_FAIL);
-            pline("You fail to transform!");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You fail to transform!");
             return;
         }
     }
@@ -479,7 +479,7 @@ int psflags;
             if (!wizard || (wizard && yn_query("You are about to shudder. Force polymorph instead?") != 'y'))
             {
                 play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-                You1(shudder_for_moment);
+                You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
                 losehp(adjust_damage(rnd(30), (struct monst*)0, &youmonst, AD_SHOC, ADFLAGS_NONE), "system shock", KILLED_BY_AN);
                 exercise(A_CON, FALSE);
                 return;
@@ -532,7 +532,7 @@ int psflags;
                 if (!class)
                     pline("I've never heard of such monsters.");
                 else
-                    You_cant_ex(ATR_NONE, CLR_MSG_ATTENTION, "polymorph into any of those.");
+                    You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "polymorph into any of those.");
             } 
             else if (iswere && (were_beastie(mntmp) == u.ulycn
                                   || mntmp == counter_were(u.ulycn)
@@ -565,7 +565,7 @@ int psflags;
                 else if (!is_mname_proper_name(&mons[mntmp]))
                     pm_name = an(pm_name);
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_cant_ex(ATR_NONE, CLR_MSG_ATTENTION, "polymorph into %s.", pm_name);
+                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "polymorph into %s.", pm_name);
             }
             else
             {
@@ -617,7 +617,7 @@ int psflags;
                 {
                     /* dragon scales remain intact as uskin */
                     play_sfx_sound(SFX_POLYMORPH_SCALES_MERGE);
-                    You("merge with your scaly armor.");
+                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "merge with your scaly armor.");
                 } else { /* dragon scale mail */
                     /* d.scale mail first reverts to scales */
                     char *p, *dsmail;
@@ -631,7 +631,7 @@ int psflags;
                     /* tricky phrasing; dragon scale mail
                        is singular, dragon scales are plural */
                     play_sfx_sound(SFX_POLYMORPH_SCALES_REVERT);
-                    Your("%s reverts to scales as you merge with them.",
+                    Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s reverts to scales as you merge with them.",
                          dsmail);
                     /* uarm->enchantment enchantment remains unchanged;
                        re-converting scales to mail poses risk
@@ -762,7 +762,7 @@ int mntmp;
 
     if (mvitals[mntmp].mvflags & MV_GENOCIDED) { /* allow MV_EXTINCT */
         play_sfx_sound(SFX_POLYMORPH_FAIL);
-        You_feel("rather %s-ish.", pm_monster_name(&mons[mntmp], flags.female));
+        You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "rather %s-ish.", pm_monster_name(&mons[mntmp], flags.female));
         exercise(A_WIS, TRUE);
         return 0;
     }
@@ -819,7 +819,7 @@ int mntmp;
     }
     play_sfx_sound(SFX_POLYMORPH_SUCCESS);
     Strcat(buf, pm_monster_name(&mons[mntmp], flags.female));
-    You("%s %s!", (u.umonnum != mntmp) ? "turn into" : "feel like", an(buf));
+    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s!", (u.umonnum != mntmp) ? "turn into" : "feel like", an(buf));
 
     if (Stoned && poly_when_stoned(&mons[mntmp])) {
         /* poly_when_stoned already checked stone golem genocide */
@@ -865,7 +865,7 @@ int mntmp;
             make_food_poisoned(0L, (char*)0, FALSE);
         if (MummyRot)
             make_mummy_rotted(0L, (char*)0, FALSE);
-        You("no longer feel sick.");
+        You_ex(ATR_NONE, CLR_MSG_POSITIVE, "no longer feel sick.");
     }
     if (Slimed) {
         if (flaming(youmonst.data)) {
@@ -1010,24 +1010,24 @@ int mntmp;
     if (Passes_walls && u.utrap
         && (u.utraptype == TT_INFLOOR || u.utraptype == TT_BURIEDBALL)) {
         if (u.utraptype == TT_INFLOOR) {
-            pline_The("rock seems to no longer trap you.");
+            pline_The_ex(ATR_NONE, CLR_MSG_POSITIVE, "rock seems to no longer trap you.");
         } else {
-            pline_The("buried ball is no longer bound to you.");
+            pline_The_ex(ATR_NONE, CLR_MSG_POSITIVE, "buried ball is no longer bound to you.");
             buried_ball_to_freedom();
         }
         reset_utrap(TRUE);
     } else if (likes_lava(youmonst.data) && u.utrap
                && u.utraptype == TT_LAVA) {
-        pline_The("%s now feels soothing.", hliquid("lava"));
+        pline_The_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s now feels soothing.", hliquid("lava"));
         reset_utrap(TRUE);
     }
     if (amorphous(youmonst.data) || is_whirly(youmonst.data)
         || unsolid(youmonst.data) || is_incorporeal(youmonst.data)) {
         if (Punished) {
-            You("slip out of the iron chain.");
+            You_ex(ATR_NONE, CLR_MSG_POSITIVE, "slip out of the iron chain.");
             unpunish();
         } else if (u.utrap && u.utraptype == TT_BURIEDBALL) {
-            You("slip free of the buried ball and chain.");
+            You_ex(ATR_NONE, CLR_MSG_POSITIVE, "slip free of the buried ball and chain.");
             buried_ball_to_freedom();
         }
     }
@@ -1035,13 +1035,13 @@ int mntmp;
         && (amorphous(youmonst.data) || is_whirly(youmonst.data)
             || unsolid(youmonst.data) || is_incorporeal(youmonst.data) || (youmonst.data->msize <= MZ_SMALL
                                           && u.utraptype == TT_BEARTRAP))) {
-        You("are no longer stuck in the %s.",
+        You_ex(ATR_NONE, CLR_MSG_POSITIVE, "are no longer stuck in the %s.",
             u.utraptype == TT_WEB ? "web" : "bear trap");
         /* probably should burn webs too if PM_FIRE_ELEMENTAL */
         reset_utrap(TRUE);
     }
     if (webmaker(youmonst.data) && u.utrap && u.utraptype == TT_WEB) {
-        You("orient yourself on the web.");
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "orient yourself on the web.");
         reset_utrap(TRUE);
     }
     check_strangling(TRUE); /* maybe start strangling */
@@ -1499,13 +1499,13 @@ dobreathe()
 
     if (Strangled) {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        You_cant_ex(ATR_NONE, CLR_MSG_NEGATIVE, "breathe.  Sorry.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "breathe.  Sorry.");
         return 0;
     }
     if (u.uen < BREATH_WEAPON_MANA_COST)
     {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "don't have enough energy to breathe!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough energy to breathe!");
         return 0;
     }
     u.uen -= BREATH_WEAPON_MANA_COST;
@@ -1778,17 +1778,17 @@ int
 dosummon()
 {
     int placeholder;
-    if (u.uen < 10) {
-        You("lack the energy to send forth a call for help!");
+    if (u.uen < WERE_SUMMON_MANA_COST) {
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the energy to send forth a call for help!");
         return 0;
     }
-    u.uen -= 10;
+    u.uen -= WERE_SUMMON_MANA_COST;
     context.botl = 1;
 
-    You("call upon your brethren for help!");
+    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "call upon your brethren for help!");
     exercise(A_WIS, TRUE);
     if (!were_summon(youmonst.data, TRUE, &placeholder, (char *) 0))
-        pline("But none arrive.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "But none arrive.");
     return 1;
 }
 
@@ -1818,16 +1818,16 @@ dogaze()
 
     if (Blind) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant_ex(ATR_NONE, CLR_MSG_ATTENTION, "see anything to gaze at.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "see anything to gaze at.");
         return 0;
     } else if (Hallucination) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "gaze at anything you can see.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "gaze at anything you can see.");
         return 0;
     }
     if (u.uen < gazemanacost) {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "lack the energy to use your special gaze!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the energy to use your special gaze!");
         return 0;
     }
 
@@ -1837,7 +1837,7 @@ dogaze()
     if (!u.dx && !u.dy && !u.dz)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant("gaze at yourself.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "gaze at yourself.");
         return 0;
     }
     else if (!u.dx && !u.dy && u.dz > 0)
@@ -1873,7 +1873,7 @@ dogaze()
                 }
                 else if (is_invisible(mtmp) && !See_invisible)
                 {
-                    You_cant_ex(ATR_NONE, CLR_MSG_ATTENTION, "see where to gaze at %s.", Monnam(mtmp));
+                    You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "see where to gaze at %s.", Monnam(mtmp));
                 }
                 else if (M_AP_TYPE(mtmp) == M_AP_FURNITURE
                            || M_AP_TYPE(mtmp) == M_AP_OBJECT)
@@ -2060,17 +2060,17 @@ int
 doeyestalk()
 {
     if (Blind) {
-        You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "see anything to gaze at.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "see anything to gaze at.");
         return 0;
     }
     else if (Cancelled) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "are cancelled and cannot use your eyestalks!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are cancelled and cannot use your eyestalks!");
         return 0;
     }
     else if (Hallucination) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "gaze at anything you can see.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "gaze at anything you can see.");
         return 0;
     }
 
@@ -2080,7 +2080,7 @@ doeyestalk()
     if (!u.dx && !u.dy && !u.dz)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant("gaze at yourself.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "gaze at yourself.");
         return 0;
     }
 
@@ -2100,7 +2100,7 @@ doeyestalk()
 
         if (u.uen < EYE_STALK_MANA_COST) {
             play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "lack the energy to use your eyestalks%s!", attacksperformed > 0 ? " any further" : "");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the energy to use your eyestalks%s!", attacksperformed > 0 ? " any further" : "");
             return (attacksperformed > 0 ? 1 : 0);
         }
         u.uen -= EYE_STALK_MANA_COST;
@@ -2132,7 +2132,7 @@ dohide()
     /* can't hide while being held (or holding) or while trapped
        (except for floor hiders [trapper or mimic] in pits) */
     if (u.ustuck || (u.utrap && (u.utraptype != TT_PIT || on_ceiling))) {
-        You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "hide while you're %s.",
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "hide while you're %s.",
                  !u.ustuck ? "trapped"
                    : u.uswallow ? (is_animal(u.ustuck->data) ? "swallowed"
                                                              : "engulfed")
@@ -2228,7 +2228,7 @@ douseunicornhorn()
 {
     if (u.uen < UNICORN_HORN_MANA_COST) {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "lack the energy to use your horn!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the energy to use your horn!");
         return 1;
     }
     u.uen -= UNICORN_HORN_MANA_COST;
@@ -2262,7 +2262,7 @@ dolayegg()
     if (!flags.female)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s can't lay eggs!",
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s can't lay eggs!",
             Hallucination
             ? "You may think you are a platypus, but a male still"
             : "Males");
@@ -2271,7 +2271,7 @@ dolayegg()
     else if (u.uhunger < (int)objects[EGG].oc_nutrition)
     {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "don't have enough energy to lay an egg.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough energy to lay an egg.");
         return 0;
     }
     else if (eggs_in_water(youmonst.data))
@@ -2311,14 +2311,14 @@ domindblast()
 
     if (u.uen < MIND_BLAST_MANA_COST) {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        You("concentrate but lack the energy to maintain doing so.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "concentrate but lack the energy to maintain doing so.");
         return 0;
     }
     u.uen -= MIND_BLAST_MANA_COST;
     context.botl = 1;
 
-    You("concentrate.");
-    pline("A wave of psychic energy pours out.");
+    You_ex(ATR_NONE, CLR_MSG_SPELL, "concentrate.");
+    pline_ex(ATR_NONE, CLR_MSG_SPELL, "A wave of psychic energy pours out.");
     for (mtmp = fmon; mtmp; mtmp = nmon) {
         int u_sen;
 
@@ -2331,7 +2331,7 @@ domindblast()
             continue;
         u_sen = (has_telepathy(mtmp)) && is_blinded(mtmp);
         if (u_sen || (has_telepathy(mtmp) && rn2(2)) || !rn2(10)) {
-            You("lock in on %s %s.", s_suffix(mon_nam(mtmp)),
+            You_ex(ATR_NONE, CLR_MSG_SPELL, "lock in on %s %s.", s_suffix(mon_nam(mtmp)),
                 u_sen ? "telepathy"
                       : has_telepathy(mtmp) ? "latent telepathy" : "mind");
             deduct_monster_hp(mtmp, adjust_damage(rnd(15), &youmonst, mtmp, AD_PSIO, ADFLAGS_NONE));

@@ -111,7 +111,7 @@ const char *msg;
     for (otmp = level.objects[x][y]; otmp; otmp = otmp2) 
     {
         otmp2 = otmp->nexthere;
-        if (otmp->otyp == CORPSE
+        if (otmp->otyp == CORPSE && otmp->corpsenm >= LOW_PM
             && (is_rider(&mons[otmp->corpsenm])
                 || otmp->corpsenm == PM_WIZARD_OF_YENDOR)) 
         {
@@ -164,7 +164,7 @@ moverock()
             if (Blind)
                 feel_location(sx, sy);
             play_sfx_sound(SFX_GENERAL_NOT_ENOUGH_LEVERAGE);
-            You("don't have enough leverage to push %s.", the(xname(otmp)));
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough leverage to push %s.", the(xname(otmp)));
             /* Give them a chance to climb over it? */
             return -1;
         }
@@ -295,10 +295,10 @@ moverock()
                             goto dopush;
                     }
                     if (u.usteed)
-                        pline("%s pushes %s and suddenly it disappears!",
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s pushes %s and suddenly it disappears!",
                               upstart(y_monnam(u.usteed)), the(xname(otmp)));
                     else
-                        You("push %s and suddenly it disappears!",
+                        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "push %s and suddenly it disappears!",
                             the(xname(otmp)));
                     if (ttmp->ttyp == TELEP_TRAP)
                     {
@@ -394,7 +394,7 @@ moverock()
                 if (u.usteed && P_SKILL_LEVEL(P_RIDING) < P_BASIC) 
                 {
                     play_sfx_sound(SFX_GENERAL_NOT_SKILLED_ENOUGH);
-                    You("aren't skilled enough to %s %s from %s.",
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "aren't skilled enough to %s %s from %s.",
                         willpickup ? "pick up" : "push aside",
                         the(xname(otmp)), y_monnam(u.usteed));
                 } 
@@ -1040,7 +1040,7 @@ int mode;
                     if (Underwater || iflags.mention_walls)
                     {
                         play_sfx_sound(SFX_SOMETHING_IN_WAY);
-                        You_cant("move diagonally into an intact doorway.");
+                        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "move diagonally into an intact doorway.");
                     }
                 }
                 return FALSE;
@@ -1117,7 +1117,7 @@ int mode;
         if (mode == DO_MOVE && iflags.mention_walls)
         {
             play_sfx_sound(SFX_SOMETHING_IN_WAY);
-            You_cant("move diagonally out of an intact doorway.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "move diagonally out of an intact doorway.");
         }
         return FALSE;
     }
@@ -1688,13 +1688,13 @@ domove_core()
         if (wtcap < OVERLOADED) 
         {
             play_sfx_sound(SFX_GENERAL_NOT_ENOUGH_STAMINA);
-            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "don't have enough stamina to move.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough stamina to move.");
             exercise(A_CON, FALSE);
         }
         else
         {
             play_sfx_sound(SFX_GENERAL_TOO_MUCH_ENCUMBRANCE);
-            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "collapse under your load.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "collapse under your load.");
         }
         nomul(0);
         return;
@@ -2425,7 +2425,7 @@ overexertion()
         if (*hp > 1) {
             *hp -= 1;
         } else {
-            You("pass out from exertion!");
+            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "pass out from exertion!");
             exercise(A_CON, FALSE);
             fall_asleep(-10, FALSE);
         }
@@ -2690,7 +2690,7 @@ boolean pick;
         long time_left = spot_time_left(u.ux, u.uy, MELT_ICE_AWAY);
 
         if (time_left && time_left < 15L)
-            pline("%s", icewarnings[(time_left < 5L) ? 2
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s", icewarnings[(time_left < 5L) ? 2
                                     : (time_left < 10L) ? 1
                                       : 0]);
     }
@@ -2706,7 +2706,7 @@ boolean pick;
             update_m_action_core(mtmp, ACTION_TILE_SPECIAL_ATTACK, 2, NEWSYM_FLAGS_KEEP_OLD_FLAGS | NEWSYM_FLAGS_SHOW_DROPPING_PIERCER);
             play_sfx_sound(SFX_PIERCER_DROPS);
             m_wait_until_action();
-            pline("%s suddenly drops from the %s!", Amonnam(mtmp),
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s suddenly drops from the %s!", Amonnam(mtmp),
                   ceiling(u.ux, u.uy));
 
             if (is_tame(mtmp)) 
@@ -2750,7 +2750,7 @@ boolean pick;
             else if (is_peaceful(mtmp)) 
             {
                 play_sfx_sound(SFX_YOU_SURPRISE_MONSTER);
-                You("surprise %s!",
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "surprise %s!",
                     Blind && !sensemon(mtmp) ? something : a_monnam(mtmp));
                 mtmp->mpeaceful = 0;
                 newsym(mtmp->mx, mtmp->my);
@@ -2761,7 +2761,7 @@ boolean pick;
                 update_m_action_core(mtmp, ACTION_TILE_SPECIAL_ATTACK, 2, NEWSYM_FLAGS_SHOW_DROPPING_PIERCER);
                 play_sfx_sound(SFX_SURPRISE_ATTACK);
                 m_wait_until_action();
-                pline("%s attacks you by surprise!", Amonnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s attacks you by surprise!", Amonnam(mtmp));
 
             }
             break;
@@ -2967,44 +2967,60 @@ register boolean newlev;
          * but everything else gives a message only the first time */
         switch (rt) {
         case ZOO:
+            play_sfx_sound(SFX_ENTER_ZOO);
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Welcome to David's treasure zoo!");
             break;
         case SWAMP:
+            play_sfx_sound(SFX_ENTER_SWAMP);
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "It %s rather %s down here.", Blind ? "feels" : "looks",
                   Blind ? "humid" : "muddy");
             break;
         case COURT:
+            play_sfx_sound(SFX_ENTER_COURT);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an opulent throne room!");
             break;
         case LEPREHALL:
+            play_sfx_sound(SFX_ENTER_LEPRECHAUN_HALL);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a leprechaun hall!");
             break;
         case MORGUE:
             if (midnight()) {
+                play_sfx_sound(SFX_ENTER_MORGUE_MIDNIGHT);
                 const char *run = locomotion(youmonst.data, "Run");
                 pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s away!  %s away!", run, run);
-            } else
-                You_ex(ATR_NONE, CLR_MSG_WARNING, "have an uncanny feeling...");
+            }
+            else
+            {
+                play_sfx_sound(SFX_ENTER_MORGUE);
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "have an uncanny feeling...");
+            }
             break;
         case BEEHIVE:
+            play_sfx_sound(SFX_ENTER_BEEHIVE);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a giant beehive!");
             break;
         case GARDEN:
+            play_sfx_sound(SFX_ENTER_GARDEN);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a lovely underground garden!");
             break;
         case DESERTEDSHOP:
+            play_sfx_sound(SFX_ENTER_DESERTED_SHOP);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a shop that has been deserted a long time ago!");
             break;
         case LIBRARY:
+            play_sfx_sound(SFX_ENTER_LIBRARY);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a library!");
             break;
         case DRAGONLAIR:
+            play_sfx_sound(SFX_ENTER_DRAGON_LAIR);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a dragon lair!");
             break;
         case COCKNEST:
+            play_sfx_sound(SFX_ENTER_COCKATRICE_NEST);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a disgusting nest!");
             break;
         case ANTHOLE:
+            play_sfx_sound(SFX_ENTER_ANTHOLE);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an anthole!");
             break;
         case BARRACKS:
@@ -3012,11 +3028,18 @@ register boolean newlev;
                 || monstinroom(&mons[PM_SERGEANT], roomno)
                 || monstinroom(&mons[PM_LIEUTENANT], roomno)
                 || monstinroom(&mons[PM_CAPTAIN], roomno))
+            {
+                play_sfx_sound(SFX_ENTER_BARRACKS);
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a military barracks!");
+            }
             else
+            {
+                play_sfx_sound(SFX_ENTER_ABANDONED_BARRACKS);
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an abandoned barracks.");
+            }
             break;
         case ARMORY:
+            play_sfx_sound(SFX_ENTER_ARMORY);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an armory!");
             break;
         case DELPHI: {
@@ -3159,12 +3182,12 @@ pickup_checks()
         if (Wwalking || is_floater(youmonst.data) || is_clinger(youmonst.data)
             || (Flying && !Breathless)) {
             play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-            You("cannot dive into the %s to pick things up.",
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot dive into the %s to pick things up.",
                 hliquid("water"));
             return 0;
         } else if (!Underwater) {
             play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-            You_cant("even see the bottom, let alone pick up %s.", something);
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "even see the bottom, let alone pick up %s.", something);
             return 0;
         }
     }
@@ -3172,11 +3195,11 @@ pickup_checks()
         if (Wwalking || is_floater(youmonst.data) || is_clinger(youmonst.data)
             || (Flying && !Breathless)) {
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
-            You_cant("reach the bottom to pick things up.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "reach the bottom to pick things up.");
             return 0;
         } else if (!likes_lava(youmonst.data)) {
             play_sfx_sound(SFX_GENERAL_NOT_A_GOOD_IDEA);
-            You("would burn to a crisp trying to pick things up.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "would burn to a crisp trying to pick things up.");
             return 0;
         }
     }
@@ -3245,13 +3268,13 @@ pickup_checks()
         play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
         struct trap *traphere = t_at(u.ux, u.uy);
         if (traphere && uteetering_at_seen_pit(traphere))
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot reach the bottom of the pit.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot reach the bottom of the pit.");
         else if (u.usteed && P_SKILL_LEVEL(P_RIDING) < P_BASIC)
             rider_cant_reach();
         else if (Blind && !can_reach_floor(TRUE))
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot reach anything here.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot reach anything here.");
         else
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot reach the %s.", surface(u.ux, u.uy));
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot reach the %s.", surface(u.ux, u.uy));
         return 0;
     }
     return -1; /* can do normal pickup */
@@ -3784,9 +3807,9 @@ const char *str;
     if (near_capacity() >= EXT_ENCUMBER) {
         play_sfx_sound(SFX_GENERAL_TOO_MUCH_ENCUMBRANCE);
         if (str)
-            pline_ex1(ATR_NONE, CLR_MSG_WARNING, str);
+            pline_ex1(ATR_NONE, CLR_MSG_FAIL, str);
         else
-            You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "do that while carrying so much stuff.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "do that while carrying so much stuff.");
         return 1;
     }
     return 0;

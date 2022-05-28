@@ -31,6 +31,8 @@
 #define CLR_WHITE 15
 #define CLR_MAX 16
 
+#define CLR_ALT_GOLD 3 /* Gold instead of brown */
+
 /* The "half-way" point for tty based color systems.  This is used in */
 /* the tty color setup code.  (IMHO, it should be removed - dean).    */
 #define BRIGHT 8
@@ -57,8 +59,11 @@
 #define CLR_MSG_ATTENTION     CLR_YELLOW
 #define CLR_MSG_HALLUCINATED  CLR_BRIGHT_MAGENTA
 #define CLR_MSG_GOD           CLR_MAGENTA
+#define CLR_MSG_SPELL         CLR_BRIGHT_BLUE /* The same as HI_ZAP */
 #define CLR_MSG_MYSTICAL      CLR_CYAN
-#define CLR_MSG_SUCCESSFUL    CLR_BRIGHT_GREEN
+#define CLR_MSG_SUCCESS       CLR_BRIGHT_GREEN
+#define CLR_MSG_FAIL          CLR_BROWN
+#define CLR_MSG_HINT          CLR_BRIGHT_CYAN
 
 struct menucoloring {
     struct nhregex *match;

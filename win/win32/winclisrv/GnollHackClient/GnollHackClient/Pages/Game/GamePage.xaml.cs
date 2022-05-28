@@ -34,9 +34,9 @@ namespace GnollHackClient.Pages.Game
         private const float _statusbar_hmargin = 5.0f;
         private const float _statusbar_vmargin = 5.0f;
         private const float _statusbar_rowmargin = 5.0f;
-        private const float _statusbar_basefontsize = 42f;
-        private const float _statusbar_shieldfontsize = 32f;
-        private const float _statusbar_diffontsize = 24f;
+        private const float _statusbar_basefontsize = 14f;
+        private const float _statusbar_shieldfontsize = _statusbar_basefontsize * 32f / 42f;
+        private const float _statusbar_diffontsize = _statusbar_basefontsize * 24f / 42f;
 
         public List<string> ExtendedCommands { get; set; }
 
@@ -126,7 +126,11 @@ namespace GnollHackClient.Pages.Game
             "Hostile townguard",
         };
 
+        private object _isSizeAllocatedProcessedLock = new object();
+        private bool _isSizeAllocatedProcessed = false;
+        public bool IsSizeAllocatedProcessed { get { lock (_isSizeAllocatedProcessedLock) { return _isSizeAllocatedProcessed; } } set { lock (_isSizeAllocatedProcessedLock) { _isSizeAllocatedProcessed = value; } } }
 
+        
         private object _forceAsciiLock = new object();
         private bool _forceAscii = false;
         public bool ForceAscii { get { lock (_forceAsciiLock) { return _forceAscii; } } set { lock (_forceAsciiLock) { _forceAscii = value; } } }
@@ -170,12 +174,35 @@ namespace GnollHackClient.Pages.Game
 
         public TTYCursorStyle CursorStyle { get; set; }
         public GHGraphicsStyle GraphicsStyle { get; set; }
+        private MapRefreshRateStyle _mapRefreshRate = MapRefreshRateStyle.MapFPS60;
+        public MapRefreshRateStyle MapRefreshRate
+        {
+            get
+            {
+                return _mapRefreshRate;
+            }
+            set
+            {
+                if (_mapRefreshRate == value)
+                    return;
+
+                _mapRefreshRate = value;
+
+                if(canvasView.AnimationIsRunning("GeneralAnimationCounter"))
+                    canvasView.AbortAnimation("GeneralAnimationCounter");
+
+                if(!LoadingGrid.IsVisible)
+                    StartMainCanvasAnimation();
+            }
+        }
+
         public bool ShowMemoryUsage { get; set; }
         public bool UseMainGLCanvas { get { return canvasView.UseGL; } set { canvasView.UseGL = value; } }
         public bool ShowFPS { get; set; }
         private double _fps;
         private long _counterValueDiff;
-        private long _previousCounterValue;
+        private long _previousMainFPSCounterValue = 0L;
+        private long _previousCommandFPSCounterValue = 0L;
         private object _fpslock = new object();
         private Stopwatch _stopWatch = new Stopwatch();
 
@@ -239,6 +266,8 @@ namespace GnollHackClient.Pages.Game
         private SKBitmap _orbGlassBitmap;
 
         private SKBitmap _statusWizardBitmap;
+        private SKBitmap _statusCasualBitmap;
+        private SKBitmap _statusCasualClassicBitmap;
         private SKBitmap _statusModernBitmap;
 
         private SKBitmap _statusDifficultyBitmap;
@@ -321,10 +350,24 @@ namespace GnollHackClient.Pages.Game
         private int _clipX;
         private int _clipY;
         public object ClipLock = new object();
-        public int ClipX { get { return _clipX; } set { _clipX = value; lock (MapOffsetLock) { _mapOffsetX = 0; } } }
-        public int ClipY { get { return _clipY; } set { _clipY = value; lock (MapOffsetLock) { _mapOffsetY = 0; } } }
-        public bool MapNoClipMode { get; set; }
-        public bool MapLookMode { get; set; }
+        public int ClipX { get { return _clipX; } set { _clipX = value; lock (_mapOffsetLock) { _mapOffsetX = 0; } } }
+        public int ClipY { get { return _clipY; } set { _clipY = value; lock (_mapOffsetLock) { _mapOffsetY = 0; } } }
+        
+        private object _mapNoClipModeLock = new object();
+        private bool _mapNoClipMode = false;
+        public bool MapNoClipMode { get { lock (_mapNoClipModeLock) { return _mapNoClipMode; } } set { lock (_mapNoClipModeLock) { _mapNoClipMode = value; } } }
+
+        //private object _mapAlternateNoClipModeLock = new object();
+        //private bool _mapAlternateNoClipMode = false;
+        //public bool MapAlternateNoClipMode { get { lock (_mapAlternateNoClipModeLock) { return _mapAlternateNoClipMode; } } set { lock (_mapAlternateNoClipModeLock) { _mapAlternateNoClipMode = value; } } }
+
+        //private object _zoomChangeCenterModeLock = new object();
+        //private bool _zoomChangeCenterMode = false;
+        //public bool ZoomChangeCenterMode { get { lock (_zoomChangeCenterModeLock) { return _zoomChangeCenterMode; } } set { lock (_zoomChangeCenterModeLock) { _zoomChangeCenterMode = value; } } }
+
+        private object _mapLookModeLock = new object();
+        private bool _mapLookMode = false;
+        public bool MapLookMode { get { lock (_mapLookModeLock) { return _mapLookMode; } } set { lock (_mapLookModeLock) { _mapLookMode = value; } } }
 
         private bool _savedMapTravelMode = false;
         private object _mapTravelModeLock = new object();
@@ -338,9 +381,11 @@ namespace GnollHackClient.Pages.Game
 
         private float _mapFontSize = GHConstants.MapFontDefaultSize;
         private float _mapFontAlternateSize = GHConstants.MapFontDefaultSize * GHConstants.MapFontRelativeAlternateSize;
+        private float _mapFontMiniRelativeSize = 1.0f;
         private object _mapFontSizeLock = new object();
         public float MapFontSize { get { lock (_mapFontSizeLock) { return _mapFontSize; } } set { lock (_mapFontSizeLock) { _mapFontSize = value; } } }
         public float MapFontAlternateSize { get { lock (_mapFontSizeLock) { return _mapFontAlternateSize; } } set { lock (_mapFontSizeLock) { _mapFontAlternateSize = value; } } }
+        public float MapFontMiniRelativeSize { get { lock (_mapFontSizeLock) { return _mapFontMiniRelativeSize; } } set { lock (_mapFontSizeLock) { _mapFontMiniRelativeSize = value; } } }
 
         private float _tileWidth;
         private float _tileHeight;
@@ -406,6 +451,14 @@ namespace GnollHackClient.Pages.Game
         private bool _enableWizardMode = false;
         public bool EnableWizardMode { get { lock (_enableWizardModeLock) { return _enableWizardMode; } } set { lock (_enableWizardModeLock) { _enableWizardMode = value; } } }
 
+        private object _enableCasualModeLock = new object();
+        private bool _enableCasualMode = false;
+        public bool EnableCasualMode { get { lock (_enableCasualModeLock) { return _enableCasualMode; } } set { lock (_enableCasualModeLock) { _enableCasualMode = value; } } }
+
+        private object _enableModernModeLock = new object();
+        private bool _enableModernMode = false;
+        public bool EnableModernMode { get { lock (_enableModernModeLock) { return _enableModernMode; } } set { lock (_enableModernModeLock) { _enableModernMode = value; } } }
+
         private List<AddContextMenuData> _contextMenuData = new List<AddContextMenuData>();
 
         private bool _useMapBitmap = false;
@@ -419,6 +472,7 @@ namespace GnollHackClient.Pages.Game
 
             CursorStyle = (TTYCursorStyle)Preferences.Get("CursorStyle", 1);
             GraphicsStyle = (GHGraphicsStyle)Preferences.Get("GraphicsStyle", 1);
+            MapRefreshRate = (MapRefreshRateStyle)Preferences.Get("MapRefreshRate", (int)ClientUtils.GetDefaultMapFPS());
             ShowFPS = Preferences.Get("ShowFPS", false);
             UseMainGLCanvas = Preferences.Get("UseMainGLCanvas", GHConstants.IsGPUDefault);
             ShowMemoryUsage = Preferences.Get("ShowMemoryUsage", false);
@@ -434,12 +488,23 @@ namespace GnollHackClient.Pages.Game
             float deffontsize = GetDefaultMapFontSize();
             MapFontSize = Preferences.Get("MapFontSize", deffontsize);
             MapFontAlternateSize = Preferences.Get("MapFontAlternateSize", deffontsize * GHConstants.MapFontRelativeAlternateSize);
+            MapFontMiniRelativeSize = Preferences.Get("MapFontMiniRelativeSize", 1.0f);
+            lock(_mapOffsetLock)
+            {
+                _mapMiniOffsetX = Preferences.Get("MapMiniOffsetX", 0.0f);
+                _mapMiniOffsetY = Preferences.Get("MapMiniOffsetY", 0.0f);
+            }
+            MapNoClipMode = Preferences.Get("DefaultMapNoClipMode", GHConstants.DefaultMapNoClipMode);
+            //MapAlternateNoClipMode = Preferences.Get("MapAlternateNoClipMode", GHConstants.DefaultMapAlternateNoClipMode);
+            //ZoomChangeCenterMode = Preferences.Get("ZoomChangeCenterMode", GHConstants.DefaultZoomChangeCenterMode);
 
-            ToggleModeButton_Clicked(null, null);
+            ToggleTravelModeButton_Clicked(null, null);
             ZoomMiniMode = true;
             ZoomAlternateMode = true;
             ToggleZoomMiniButton_Clicked(null, null);
             ToggleZoomAlternateButton_Clicked(null, null);
+            MapNoClipMode = !MapNoClipMode;
+            ToggleAutoCenterModeButton_Clicked(null, null);
         }
 
         private float GetDefaultMapFontSize()
@@ -612,11 +677,10 @@ namespace GnollHackClient.Pages.Game
             }
 
             _stopWatch.Start();
-            lock (AnimationTimerLock)
-            {
-                _previousCounterValue = AnimationTimers.general_animation_counter;
-            }
-
+            //lock (AnimationTimerLock)
+            //{
+            //    _previousCounterValue = AnimationTimers.general_animation_counter;
+            //}
             //lock(_mapBitmapLock)
             //{
             //    _mapBitmap = new SKBitmap(GHConstants.MapCols * GHConstants.TileWidth, GHConstants.MapRows * GHConstants.TileHeight, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
@@ -641,7 +705,7 @@ namespace GnollHackClient.Pages.Game
 
             Device.StartTimer(TimeSpan.FromSeconds(1.0 / GHConstants.PollingFrequency), () =>
             {
-                if(!StartingPositionsSet && !canvasView.CanvasSize.IsEmpty)
+                if(!StartingPositionsSet && !canvasView.CanvasSize.IsEmpty && IsSizeAllocatedProcessed && lAbilitiesButton.Width > 0)
                 {
                     double statusbarheight = GetStatusBarHeight();
                     lAbilitiesButton.HeightRequest = statusbarheight;
@@ -674,25 +738,28 @@ namespace GnollHackClient.Pages.Game
                         TimeSpan ts = _stopWatch.Elapsed;
                         lock (_fpslock)
                         {
-                            long currentCounterValue = 0L;
                             if(MoreCommandsGrid.IsVisible)
                             {
-                                lock(_commandCounterLock)
+                                lock(_commandFPSCounterLock)
                                 {
-                                    currentCounterValue = _commandCounterValue;
+                                    _counterValueDiff = _commandFPSCounterValue - _previousCommandFPSCounterValue;
+                                    _previousCommandFPSCounterValue = _commandFPSCounterValue;
                                 }
                             }
                             else
                             {
-                                lock (AnimationTimerLock)
+                                lock (_mainFPSCounterLock)
                                 {
-                                    currentCounterValue = AnimationTimers.general_animation_counter;
+                                    _counterValueDiff = _mainFPSCounterValue - _previousMainFPSCounterValue;
+                                    _previousMainFPSCounterValue = _mainFPSCounterValue;
                                 }
+                                //lock (AnimationTimerLock)
+                                //{
+                                //    currentCounterValue = AnimationTimers.general_animation_counter;
+                                //}
                             }
-                            _counterValueDiff = currentCounterValue - _previousCounterValue;
-                            _previousCounterValue = currentCounterValue;
                             _fps = ts.TotalMilliseconds == 0.0 ? 0.0 : _counterValueDiff / (ts.TotalMilliseconds / 1000.0);
-                            if (_fps < 0.0f || _fps > 500.0f) /* Counter value may be temporarily off due to changing between counters */
+                            if (_fps < 0.0f || _fps > 500.0f) /* Just in case if it is off somehow */
                             {
                                 _fps = 0.0;
                                 _counterValueDiff = 0;
@@ -754,40 +821,71 @@ namespace GnollHackClient.Pages.Game
             }
         }
 
-        private uint _mainAnimationLength = GHConstants.MainCanvasAnimationTime / ClientUtils.GetMainCanvasAnimationInterval();
         private uint _auxAnimationLength = GHConstants.AuxiliaryCanvasAnimationTime / ClientUtils.GetAuxiliaryCanvasAnimationInterval();
         private void StartMainCanvasAnimation()
         {
-            Animation canvasAnimation = new Animation(v => canvasView.GeneralAnimationCounter = (long)v, 1, _mainAnimationLength);
+            uint mainAnimationLength = 20; // GHConstants.MainCanvasAnimationTime / ClientUtils.GetMainCanvasAnimationInterval(MapRefreshRate);
+            Animation canvasAnimation = new Animation(v => canvasView.GeneralAnimationCounter = (long)v, 1, mainAnimationLength);
             canvasAnimation.Commit(canvasView, "GeneralAnimationCounter", length: GHConstants.MainCanvasAnimationTime, 
-                rate: ClientUtils.GetMainCanvasAnimationInterval(), repeat: () => MainGrid.IsVisible);
+                rate: ClientUtils.GetMainCanvasAnimationInterval(MapRefreshRate), repeat: () => true /* MainGrid.IsVisible */);
         }
 
         private void StartCommandCanvasAnimation()
         {
             Animation commandAnimation = new Animation(v => CommandCanvas.GeneralAnimationCounter = (long)v, 1, _auxAnimationLength);
             commandAnimation.Commit(CommandCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime, 
-                rate: ClientUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => MoreCommandsGrid.IsVisible);
+                rate: ClientUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => true /* MoreCommandsGrid.IsVisible */);
         }
 
         private void StartMenuCanvasAnimation()
         {
             Animation commandAnimation = new Animation(v => MenuCanvas.GeneralAnimationCounter = (long)v, 1, _auxAnimationLength);
             commandAnimation.Commit(MenuCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime, 
-                rate: ClientUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => MenuGrid.IsVisible);
+                rate: ClientUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => true /* MenuGrid.IsVisible */);
         }
         private void StartTextCanvasAnimation()
         {
             Animation commandAnimation = new Animation(v => TextCanvas.GeneralAnimationCounter = (long)v, 1, _auxAnimationLength);
             commandAnimation.Commit(TextCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime, 
-                rate: ClientUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => TextGrid.IsVisible);
+                rate: ClientUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => true /* TextGrid.IsVisible */);
         }
 
         private bool StartingPositionsSet { get; set; }
         private bool _useUnifromAnimationInterval = false;
+        private int _subCounter = 0;
         public long GetAnimationCounterIncrement()
         {
             long counter_increment = 1;
+            int subCounterMax = 0;
+            switch (MapRefreshRate)
+            {
+                case MapRefreshRateStyle.MapFPS20:
+                    counter_increment = 2; /* Animations skip at every other frame at 20fps to get 40fps */
+                    break;
+                case MapRefreshRateStyle.MapFPS30:
+                    break;
+                case MapRefreshRateStyle.MapFPS40:
+                    break;
+                case MapRefreshRateStyle.MapFPS60:
+                    subCounterMax = 1; /* Animations proceed at every other frame at 60fps to get 30fps */
+                    break;
+                case MapRefreshRateStyle.MapFPS80:
+                    subCounterMax = 1; /* Animations proceed at every other frame at 80fps to get 40fps */
+                    break;
+                case MapRefreshRateStyle.MapFPS90:
+                    subCounterMax = 2; /* Animations proceed at every third frame at 90fps to get 30fps */
+                    break;
+                case MapRefreshRateStyle.MapFPS120:
+                    subCounterMax = 2; /* Animations proceed at every third frame at 120fps to get 40fps */
+                    break;
+            }
+            if(subCounterMax > 0)
+            {
+                if (_subCounter != subCounterMax)
+                    counter_increment = 0; /* otherwise 1 */
+                _subCounter++;
+                _subCounter = _subCounter % (subCounterMax + 1);
+            }
             if (_useUnifromAnimationInterval)
             {
                 _animationStopwatch.Stop();
@@ -810,7 +908,7 @@ namespace GnollHackClient.Pages.Game
         {
             int i;
             long counter_increment = GetAnimationCounterIncrement();
-            long generalcountervalue;
+            long generalcountervalue, maincountervalue;
             lock (AnimationTimerLock)
             {
                 AnimationTimers.general_animation_counter += counter_increment;
@@ -861,11 +959,20 @@ namespace GnollHackClient.Pages.Game
                 generalcountervalue = AnimationTimers.general_animation_counter;
             }
 
+            lock (_mainCounterLock)
+            {
+                _mainCounterValue++;
+                if (_mainCounterValue < 0)
+                    _mainCounterValue = 0;
+
+                maincountervalue = _mainCounterValue;
+            }
+
             lock (_floatingTextLock)
             {
                 for (i = _floatingTexts.Count - 1; i >= 0; i--)
                 {
-                    if (_floatingTexts[i].IsFinished(generalcountervalue))
+                    if (_floatingTexts[i].IsFinished(maincountervalue))
                         _floatingTexts.RemoveAt(i);
                 }
             }
@@ -874,7 +981,7 @@ namespace GnollHackClient.Pages.Game
             {
                 for (i = _conditionTexts.Count - 1; i >= 0; i--)
                 {
-                    if (_conditionTexts[i].IsFinished(generalcountervalue))
+                    if (_conditionTexts[i].IsFinished(maincountervalue))
                         _conditionTexts.RemoveAt(i);
                 }
             }
@@ -883,7 +990,7 @@ namespace GnollHackClient.Pages.Game
             {
                 for (i = _screenFilters.Count - 1; i >= 0; i--)
                 {
-                    if (_screenFilters[i].IsFinished(generalcountervalue))
+                    if (_screenFilters[i].IsFinished(maincountervalue))
                         _screenFilters.RemoveAt(i);
                 }
             }
@@ -892,30 +999,29 @@ namespace GnollHackClient.Pages.Game
             {
                 for (i = _guiEffects.Count - 1; i >= 0; i--)
                 {
-                    if (_guiEffects[i].IsFinished(generalcountervalue))
+                    if (_guiEffects[i].IsFinished(maincountervalue))
                         _guiEffects.RemoveAt(i);
                 }
             }
 
-
             lock (_screenTextLock)
             {
-                if (_screenText != null && _screenText.IsFinished(generalcountervalue))
+                if (_screenText != null && _screenText.IsFinished(maincountervalue))
                     _screenText = null;
             }
 
             lock (TargetClipLock)
             {
-                if (generalcountervalue < _targetClipStartCounterValue
-                    || generalcountervalue > _targetClipStartCounterValue + _targetClipPanTime)
+                if (maincountervalue < _targetClipStartCounterValue
+                    || maincountervalue > _targetClipStartCounterValue + _targetClipPanTime)
                     _targetClipOn = false;
 
                 if (_targetClipOn)
                 {
-                    lock (MapOffsetLock)
+                    lock (_mapOffsetLock)
                     {
-                        _mapOffsetX = _originMapOffsetWithNewClipX * Math.Max(0.0f, 1.0f - (float)(generalcountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
-                        _mapOffsetY = _originMapOffsetWithNewClipY * Math.Max(0.0f, 1.0f - (float)(generalcountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
+                        _mapOffsetX = _originMapOffsetWithNewClipX * Math.Max(0.0f, 1.0f - (float)(maincountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
+                        _mapOffsetY = _originMapOffsetWithNewClipY * Math.Max(0.0f, 1.0f - (float)(maincountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
                     }
                 }
             }
@@ -1047,6 +1153,17 @@ namespace GnollHackClient.Pages.Game
                             break;
                     }
                     break;
+                case (char)27:
+                    switch (data.style)
+                    {
+                        case (int)context_menu_styles.CONTEXT_MENU_STYLE_CLOSE_DISPLAY:
+                            icon_string = "GnollHackClient.Assets.UI.exit-to-map.png";
+                            break;
+                        default:
+                            icon_string = "GnollHackClient.Assets.UI.no.png";
+                            break;
+                    }
+                    break;
                 default:
                     if (data.cmd_def_char == LastPickedCmd)
                         icon_string = "GnollHackClient.Assets.UI.lastitem.png";
@@ -1098,36 +1215,44 @@ namespace GnollHackClient.Pages.Game
                 }
 
                 long counter = 0;
-                lock (AnimationTimerLock)
+                //lock (AnimationTimerLock)
+                //{
+                //    counter = AnimationTimers.general_animation_counter;
+                //}
+                lock (_mainCounterLock)
                 {
-                    counter = AnimationTimers.general_animation_counter;
+                    counter = _mainCounterValue;
                 }
 
                 if (foundanother)
                 {
                     float YSpeed = Math.Abs(speedvector.Y);
                     float secs = 0.5f / YSpeed;
-                    long ticks = (long)(secs * 40);
+                    long ticks = (long)(secs * ClientUtils.GetMainCanvasAnimationFrequency(MapRefreshRate));
                     if (counter - highestcounter >= -ticks * 10 && counter - highestcounter < ticks)
                     {
                         counter += ticks - (counter - highestcounter);
                     }
                 }
 
-                _floatingTexts.Add(new GHFloatingText(data, counter));
+                _floatingTexts.Add(new GHFloatingText(data, counter, this));
             }
         }
 
         public void DisplayScreenText(DisplayScreenTextData data)
         {
             long countervalue;
-            lock (AnimationTimerLock)
+            //lock (AnimationTimerLock)
+            //{
+            //    countervalue = AnimationTimers.general_animation_counter;
+            //}
+            lock (_mainCounterLock)
             {
-                countervalue = AnimationTimers.general_animation_counter;
+                countervalue = _mainCounterValue;
             }
             lock (_screenTextLock)
             {
-                _screenText = new GHScreenText(data, countervalue);
+                _screenText = new GHScreenText(data, countervalue, this);
             }
 
             if (_clientGame != null)
@@ -1155,9 +1280,13 @@ namespace GnollHackClient.Pages.Game
                 }
 
                 long counter = 0;
-                lock (AnimationTimerLock)
+                //lock (AnimationTimerLock)
+                //{
+                //    counter = AnimationTimers.general_animation_counter;
+                //}
+                lock (_mainCounterLock)
                 {
-                    counter = AnimationTimers.general_animation_counter;
+                    counter = _mainCounterValue;
                 }
 
                 if (highestcounter > 0 && highestcounter > counter)
@@ -1165,7 +1294,7 @@ namespace GnollHackClient.Pages.Game
                     counter = highestcounter;
                 }
 
-                _conditionTexts.Add(new GHConditionText(data, counter));
+                _conditionTexts.Add(new GHConditionText(data, counter, this));
             }
         }
 
@@ -1184,9 +1313,13 @@ namespace GnollHackClient.Pages.Game
                 }
 
                 long counter = 0;
-                lock (AnimationTimerLock)
+                //lock (AnimationTimerLock)
+                //{
+                //    counter = AnimationTimers.general_animation_counter;
+                //}
+                lock (_mainCounterLock)
                 {
-                    counter = AnimationTimers.general_animation_counter;
+                    counter = _mainCounterValue;
                 }
 
                 if (highestcounter > 0 && highestcounter > counter)
@@ -1194,7 +1327,7 @@ namespace GnollHackClient.Pages.Game
                     counter = highestcounter;
                 }
 
-                _screenFilters.Add(new GHScreenFilter(data, counter));
+                _screenFilters.Add(new GHScreenFilter(data, counter, this));
             }
         }
 
@@ -1212,12 +1345,16 @@ namespace GnollHackClient.Pages.Game
                 }
 
                 long counter = 0;
-                lock (AnimationTimerLock)
+                //lock (AnimationTimerLock)
+                //{
+                //    counter = AnimationTimers.general_animation_counter;
+                //}
+                lock (_mainCounterLock)
                 {
-                    counter = AnimationTimers.general_animation_counter;
+                    counter = _mainCounterValue;
                 }
 
-                _guiEffects.Add(new GHGUIEffect(data, counter));
+                _guiEffects.Add(new GHGUIEffect(data, counter, this));
             }
         }
 
@@ -1257,7 +1394,7 @@ namespace GnollHackClient.Pages.Game
             }
             else
             {
-                PopupTitleLabel.TextColor = ClientUtils.NHColor2XColor(data.color, false, true);
+                PopupTitleLabel.TextColor = ClientUtils.NHColor2XColor(data.color, data.attr, false, true);
                 PopupGrid.BackgroundColor = _popupTransparentBlackColor;
                 PopupFrame.BackgroundColor = _popupTransparentBlackColor;
                 PopupTitleLayout.HorizontalOptions = LayoutOptions.CenterAndExpand;
@@ -1327,7 +1464,7 @@ namespace GnollHackClient.Pages.Game
 
         protected void GNHThreadProc()
         {
-            _clientGame = new ClientGame(this, EnableWizardMode);
+            _clientGame = new ClientGame(this);
             _gnollHackService.StartGnollHack(_clientGame);
         }
 
@@ -1436,6 +1573,12 @@ namespace GnollHackClient.Pages.Game
                             case GHRequestType.CrashReport:
                                 ReportCrashDetected();
                                 break;
+                            case GHRequestType.Panic:
+                                ReportPanic(req.RequestString);
+                                break;
+                            case GHRequestType.Message:
+                                ShowMessage(req.RequestString);
+                                break;
                             case GHRequestType.DisplayConditionText:
                                 DisplayConditionText(req.ConditionTextData);
                                 break;
@@ -1445,11 +1588,11 @@ namespace GnollHackClient.Pages.Game
                             case GHRequestType.SaveAndDisableTravelMode:
                                 _savedMapTravelMode = MapTravelMode;
                                 if (MapTravelMode)
-                                    ToggleModeButton_Clicked(ToggleModeButton, new EventArgs());
+                                    ToggleTravelModeButton_Clicked(ToggleTravelModeButton, new EventArgs());
                                 break;
                             case GHRequestType.RestoreTravelMode:
                                 if (MapTravelMode != _savedMapTravelMode)
-                                    ToggleModeButton_Clicked(ToggleModeButton, new EventArgs());
+                                    ToggleTravelModeButton_Clicked(ToggleTravelModeButton, new EventArgs());
                                 break;
                         }
                     }
@@ -1545,6 +1688,8 @@ namespace GnollHackClient.Pages.Game
 
             TextGrid.IsVisible = true;
             MainGrid.IsVisible = false;
+            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
+                canvasView.AbortAnimation("GeneralAnimationCounter");
             StartTextCanvasAnimation();
         }
 
@@ -1601,7 +1746,7 @@ namespace GnollHackClient.Pages.Game
                 }
                 else
                 {
-                    YnTitleLabel.TextColor = ClientUtils.NHColor2XColor(color, false, true);
+                    YnTitleLabel.TextColor = ClientUtils.NHColor2XColor(color, attr, false, true);
                 }
             }
 
@@ -1749,7 +1894,7 @@ namespace GnollHackClient.Pages.Game
         private int _getLineStyle = 0;
         private void GetLine(string query, string placeholder, string linesuffix, int style, int attr, int color)
         {
-            Color clr = ClientUtils.NHColor2XColor(color, false, false); /* Non-title / white coloring works better here */
+            Color clr = ClientUtils.NHColor2XColor(color, attr, false, false); /* Non-title / white coloring works better here */
             string PlaceHolderText = null;
             if (!string.IsNullOrWhiteSpace(placeholder) && placeholder.Length > 0)
             {
@@ -2025,6 +2170,8 @@ namespace GnollHackClient.Pages.Game
 
             MenuGrid.IsVisible = true;
             MainGrid.IsVisible = false;
+            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
+                canvasView.AbortAnimation("GeneralAnimationCounter");
             StartMenuCanvasAnimation();
             App.DebugWriteProfilingStopwatchTimeAndStart("ShowMenuCanvas End");
         }
@@ -2041,6 +2188,8 @@ namespace GnollHackClient.Pages.Game
             {
                 MoreCommandsGrid.IsVisible = false;
                 MainGrid.IsVisible = true;
+                if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                    CommandCanvas.AbortAnimation("GeneralAnimationCounter");
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -2075,6 +2224,8 @@ namespace GnollHackClient.Pages.Game
                 GenericButton_Clicked(sender, e, 27);
                 TextGrid.IsVisible = false;
                 MainGrid.IsVisible = true;
+                if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                    TextCanvas.AbortAnimation("GeneralAnimationCounter");
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -2090,6 +2241,8 @@ namespace GnollHackClient.Pages.Game
                 }
                 MenuGrid.IsVisible = false;
                 MainGrid.IsVisible = true;
+                if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                    MenuCanvas.AbortAnimation("GeneralAnimationCounter");
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -2120,6 +2273,12 @@ namespace GnollHackClient.Pages.Game
 
             Preferences.Set("MapFontSize", Math.Max(GHConstants.MinimumMapFontSize, MapFontSize));
             Preferences.Set("MapFontAlternateSize", Math.Max(GHConstants.MinimumMapFontSize, MapFontAlternateSize));
+            Preferences.Set("MapFontMiniRelativeSize", Math.Min(GHConstants.MaximumMapMiniRelativeFontSize, Math.Max(GHConstants.MinimumMapMiniRelativeFontSize, MapFontMiniRelativeSize)));
+            lock(_mapOffsetLock)
+            {
+                Preferences.Set("MapMiniOffsetX", _mapMiniOffsetX);
+                Preferences.Set("MapMiniOffsetY", _mapMiniOffsetY);
+            }
         }
 
 
@@ -2254,14 +2413,28 @@ namespace GnollHackClient.Pages.Game
                 }
             }
 
+            lock (_mainFPSCounterLock)
+            {
+                _mainFPSCounterValue++;
+                if (_mainFPSCounterValue < 0)
+                    _mainFPSCounterValue = 0;
+            }
+
             /* Finally, flush */
             canvas.Flush();
         }
 
         private float[] _gridIntervals = { 2.0f, 2.0f };
 
+        public float GetTextScale()
+        {
+            return (float)((lAbilitiesButton.Width <= 0 ? lAbilitiesButton.WidthRequest : lAbilitiesButton.Width) / 50.0f) / (float)GetCanvasScale();
+        }
+
         private void PaintMainGamePage(object sender, SKPaintSurfaceEventArgs e)
         {
+            if (!MainGrid.IsVisible)
+                return;
 
             SKImageInfo info = e.Info;
             SKSurface surface = e.Surface;
@@ -2270,11 +2443,16 @@ namespace GnollHackClient.Pages.Game
             canvas.Clear(SKColors.Black);
             double canvas_scale = GetCanvasScale();
             float inverse_canvas_scale = canvas_scale == 0 ? 0.0f : 1.0f / (float)canvas_scale;
-            long generalcountervalue;
+            long generalcountervalue, maincountervalue;
             lock (AnimationTimerLock)
             {
                 generalcountervalue = AnimationTimers.general_animation_counter;
             }
+            lock (_mainCounterLock)
+            {
+                maincountervalue = _mainCounterValue;
+            }
+            long moveIntervals = Math.Max(2, (long)Math.Ceiling((double)ClientUtils.GetMainCanvasAnimationFrequency(MapRefreshRate) / 10.0));
 
             using (SKPaint textPaint = new SKPaint())
             {
@@ -2352,6 +2530,7 @@ namespace GnollHackClient.Pages.Game
                 /* Map */
                 float canvaswidth = canvasView.CanvasSize.Width;
                 float canvasheight = canvasView.CanvasSize.Height;
+                float textscale = GetTextScale();
                 float UsedFontSize = ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
                 textPaint.Typeface = App.DejaVuSansMonoTypeface;
                 textPaint.TextSize = UsedFontSize;
@@ -2370,6 +2549,7 @@ namespace GnollHackClient.Pages.Game
                     float yscale = tmpmapheight > 0 ? canvasheight / tmpmapheight : 0;
                     float cscale = Math.Min(xscale, yscale);
                     UsedFontSize = Math.Max(2.0f, UsedFontSize * cscale);
+                    UsedFontSize = UsedFontSize * MapFontMiniRelativeSize;
                     textPaint.TextSize = UsedFontSize;
                 }
                 float width = textPaint.FontMetrics.AverageCharacterWidth;
@@ -2401,7 +2581,7 @@ namespace GnollHackClient.Pages.Game
 
                 float usedOffsetX = 0;
                 float usedOffsetY = 0;
-                lock (MapOffsetLock)
+                lock (_mapOffsetLock)
                 {
                     usedOffsetX = _mapOffsetX;
                     usedOffsetY = _mapOffsetY;
@@ -2411,6 +2591,11 @@ namespace GnollHackClient.Pages.Game
                 {
                     offsetX -= usedOffsetX;
                     offsetY -= usedOffsetY;
+                    lock (_mapOffsetLock)
+                    {
+                        usedOffsetX += _mapMiniOffsetX;
+                        usedOffsetY += _mapMiniOffsetY;
+                    }
                 }
                 else
                 {
@@ -2552,20 +2737,22 @@ namespace GnollHackClient.Pages.Game
                                                         float scaled_y_height_change = 0;
                                                         sbyte monster_origin_x = _mapData[mapx, mapy].Layers.monster_origin_x;
                                                         sbyte monster_origin_y = _mapData[mapx, mapy].Layers.monster_origin_y;
-                                                        long glyphprintcountervalue = _mapData[mapx, mapy].GlyphPrintCounterValue;
+                                                        //long glyphprintanimcountervalue = _mapData[mapx, mapy].GlyphPrintAnimationCounterValue;
+                                                        long glyphprintmaincountervalue = _mapData[mapx, mapy].GlyphPrintMainCounterValue;
                                                         float base_move_offset_x = 0, base_move_offset_y = 0;
                                                         int movediffx = (int)monster_origin_x - mapx;
                                                         int movediffy = (int)monster_origin_y - mapy;
-                                                        long counterdiff = currentcountervalue - glyphprintcountervalue;
+                                                        //long animcounterdiff = currentcountervalue - glyphprintanimcountervalue;
+                                                        long maincounterdiff = maincountervalue - glyphprintmaincountervalue;
                                                         //if (GHUtils.isok(monster_origin_x, monster_origin_y) && layer_idx == (int)layer_types.LAYER_MONSTER)
                                                         //    mapx = mapx;
 
                                                         if (GHUtils.isok(monster_origin_x, monster_origin_y)
                                                             && (movediffx != 0 || movediffy != 0)
-                                                            && counterdiff >= 0 && counterdiff < GHConstants.MoveIntervals)
+                                                            && maincounterdiff >= 0 && maincounterdiff < moveIntervals)
                                                         {
-                                                            base_move_offset_x = width * (float)movediffx * (float)(GHConstants.MoveIntervals - counterdiff) / (float)GHConstants.MoveIntervals;
-                                                            base_move_offset_y = height * (float)movediffy * (float)(GHConstants.MoveIntervals - counterdiff) / (float)GHConstants.MoveIntervals;
+                                                            base_move_offset_x = width * (float)movediffx * (float)(moveIntervals - maincounterdiff) / (float)moveIntervals;
+                                                            base_move_offset_y = height * (float)movediffy * (float)(moveIntervals - maincounterdiff) / (float)moveIntervals;
                                                         }
 
                                                         if (layer_idx == (int)layer_types.MAX_LAYERS + 1)
@@ -2941,8 +3128,9 @@ namespace GnollHackClient.Pages.Game
                                                                     int signed_glyph = NoGlyph;
                                                                     short obj_height = _mapData[mapx, mapy].Layers.object_height;
 
-                                                                    long glyphobjectprintcountervalue = _mapData[mapx, mapy].GlyphObjectPrintCounterValue;
-                                                                    long objectcounterdiff = currentcountervalue - glyphobjectprintcountervalue;
+                                                                    //long glyphobjectprintanimcountervalue = _mapData[mapx, mapy].GlyphObjectPrintAnimationCounterValue;
+                                                                    long glyphobjectprintmaincountervalue = _mapData[mapx, mapy].GlyphObjectPrintMainCounterValue;
+                                                                    long objectcounterdiff = maincountervalue - glyphobjectprintmaincountervalue;
                                                                     sbyte object_origin_x = 0;
                                                                     sbyte object_origin_y = 0;
 
@@ -3220,10 +3408,10 @@ namespace GnollHackClient.Pages.Game
 
                                                                         if (GHUtils.isok(object_origin_x, object_origin_y)
                                                                             && (objectmovediffx != 0 || objectmovediffy != 0)
-                                                                            && objectcounterdiff >= 0 && objectcounterdiff < GHConstants.MoveIntervals)
+                                                                            && objectcounterdiff >= 0 && objectcounterdiff < moveIntervals)
                                                                         {
-                                                                            object_move_offset_x = width * (float)objectmovediffx * (float)(GHConstants.MoveIntervals - objectcounterdiff) / (float)GHConstants.MoveIntervals;
-                                                                            object_move_offset_y = height * (float)objectmovediffy * (float)(GHConstants.MoveIntervals - objectcounterdiff) / (float)GHConstants.MoveIntervals;
+                                                                            object_move_offset_x = width * (float)objectmovediffx * (float)(moveIntervals - objectcounterdiff) / (float)moveIntervals;
+                                                                            object_move_offset_y = height * (float)objectmovediffy * (float)(moveIntervals - objectcounterdiff) / (float)moveIntervals;
                                                                         }
 
 
@@ -3767,13 +3955,13 @@ namespace GnollHackClient.Pages.Game
                             float relativestrokewidth = 0.0f;
                             SKColor strokecolor = SKColors.White;
                             SKColor fillcolor = SKColors.White;
-                            p = ft.GetPosition(generalcountervalue);
-                            fillcolor = ft.GetColor(generalcountervalue);
-                            textPaint.Typeface = ft.GetTypeface(generalcountervalue);
-                            textPaint.TextSize = UsedFontSize * ft.GetRelativeTextSize(generalcountervalue);
-                            relativestrokewidth = ft.GetRelativeOutlineWidth(generalcountervalue);
-                            strokecolor = ft.GetOutlineColor(generalcountervalue);
-                            str = ft.GetText(generalcountervalue);
+                            p = ft.GetPosition(maincountervalue);
+                            fillcolor = ft.GetColor(maincountervalue);
+                            textPaint.Typeface = ft.GetTypeface(maincountervalue);
+                            textPaint.TextSize = UsedFontSize * ft.GetRelativeTextSize(maincountervalue);
+                            relativestrokewidth = ft.GetRelativeOutlineWidth(maincountervalue);
+                            strokecolor = ft.GetOutlineColor(maincountervalue);
+                            str = ft.GetText(maincountervalue);
                             textPaint.MeasureText(str, ref textBounds);
                             tx = (offsetX + usedOffsetX + width * p.X - textBounds.Width / 2);
                             ty = (offsetY + usedOffsetY + height * p.Y - textBounds.Height / 2);
@@ -3798,14 +3986,14 @@ namespace GnollHackClient.Pages.Game
                             SKColor fillcolor = SKColors.White;
                             float maxfontsize = 9999.0f;
                             double canvasheightscale = this.Height / canvasView.Height;
-                            fillcolor = _screenText.GetTextColor(generalcountervalue);
-                            textPaint.Typeface = _screenText.GetTextTypeface(generalcountervalue);
-                            targetwidth = Math.Min(canvaswidth, canvasheight * (float)canvasheightscale) * _screenText.GetMainTextSizeRelativeToScreenWidth(generalcountervalue);
-                            maxfontsize = _screenText.GetMainTextMaxFontSize(generalcountervalue);
-                            yoffsetpct = _screenText.GetYOffsetPctOfScreen(generalcountervalue);
-                            relativestrokewidth = _screenText.GetRelativeTextOutlineWidth(generalcountervalue);
-                            strokecolor = _screenText.GetTextOutlineColor(generalcountervalue);
-                            str = _screenText.GetText(generalcountervalue);
+                            fillcolor = _screenText.GetTextColor(maincountervalue);
+                            textPaint.Typeface = _screenText.GetTextTypeface(maincountervalue);
+                            targetwidth = Math.Min(canvaswidth, canvasheight * (float)canvasheightscale) * _screenText.GetMainTextSizeRelativeToScreenWidth(maincountervalue);
+                            maxfontsize = _screenText.GetMainTextMaxFontSize(maincountervalue);
+                            yoffsetpct = _screenText.GetYOffsetPctOfScreen(maincountervalue);
+                            relativestrokewidth = _screenText.GetRelativeTextOutlineWidth(maincountervalue);
+                            strokecolor = _screenText.GetTextOutlineColor(maincountervalue);
+                            str = _screenText.GetText(maincountervalue);
                             textPaint.TextSize = UsedFontSize;
                             textPaint.MeasureText(str, ref textBounds);
                             if (textBounds.Width > 0)
@@ -3850,12 +4038,12 @@ namespace GnollHackClient.Pages.Game
 
                             if (_screenText.HasSuperText)
                             {
-                                fillcolor = _screenText.GetSuperTextColor(generalcountervalue);
-                                textPaint.Typeface = _screenText.GetSuperTextTypeface(generalcountervalue);
-                                textPaint.TextSize = maintextsize * _screenText.GetSuperTextSizeRelativeToMainText(generalcountervalue);
-                                relativesuperstrokewidth = _screenText.GetRelativeSuperTextOutlineWidth(generalcountervalue);
-                                superstrokecolor = _screenText.GetSuperTextOutlineColor(generalcountervalue);
-                                str = _screenText.GetSuperText(generalcountervalue);
+                                fillcolor = _screenText.GetSuperTextColor(maincountervalue);
+                                textPaint.Typeface = _screenText.GetSuperTextTypeface(maincountervalue);
+                                textPaint.TextSize = maintextsize * _screenText.GetSuperTextSizeRelativeToMainText(maincountervalue);
+                                relativesuperstrokewidth = _screenText.GetRelativeSuperTextOutlineWidth(maincountervalue);
+                                superstrokecolor = _screenText.GetSuperTextOutlineColor(maincountervalue);
+                                str = _screenText.GetSuperText(maincountervalue);
                                 textPaint.MeasureText(str, ref textBounds);
                                 tx = (canvaswidth / 2 - textBounds.Width / 2);
                                 ty = maintexty + maintextascent - textPaint.FontMetrics.Descent;
@@ -3885,12 +4073,12 @@ namespace GnollHackClient.Pages.Game
 
                             if (_screenText.HasSubText)
                             {
-                                fillcolor = _screenText.GetSubTextColor(generalcountervalue);
-                                textPaint.Typeface = _screenText.GetSubTextTypeface(generalcountervalue);
-                                textPaint.TextSize = maintextsize * _screenText.GetSubTextSizeRelativeToMainText(generalcountervalue);
-                                relativesubstrokewidth = _screenText.GetRelativeSubTextOutlineWidth(generalcountervalue);
-                                substrokecolor = _screenText.GetSubTextOutlineColor(generalcountervalue);
-                                str = _screenText.GetSubText(generalcountervalue);
+                                fillcolor = _screenText.GetSubTextColor(maincountervalue);
+                                textPaint.Typeface = _screenText.GetSubTextTypeface(maincountervalue);
+                                textPaint.TextSize = maintextsize * _screenText.GetSubTextSizeRelativeToMainText(maincountervalue);
+                                relativesubstrokewidth = _screenText.GetRelativeSubTextOutlineWidth(maincountervalue);
+                                substrokecolor = _screenText.GetSubTextOutlineColor(maincountervalue);
+                                str = _screenText.GetSubText(maincountervalue);
                                 textPaint.MeasureText(str, ref textBounds);
                                 tx = (canvaswidth / 2 - textBounds.Width / 2);
                                 ty = maintexty + maintextdescent - textPaint.FontMetrics.Ascent;
@@ -3929,12 +4117,12 @@ namespace GnollHackClient.Pages.Game
                             SKColor fillcolor = SKColors.White;
                             float relativetoscreenwidth = 0.0f;
                             string sampletext = "";
-                            fillcolor = ft.GetColor(generalcountervalue);
-                            textPaint.Typeface = ft.GetTypeface(generalcountervalue);
-                            relativetoscreenwidth = ft.GetRelativeSampleTextSize(generalcountervalue);
-                            relativestrokewidth = ft.GetRelativeOutlineWidth(generalcountervalue);
-                            strokecolor = ft.GetOutlineColor(generalcountervalue);
-                            str = ft.GetText(generalcountervalue);
+                            fillcolor = ft.GetColor(maincountervalue);
+                            textPaint.Typeface = ft.GetTypeface(maincountervalue);
+                            relativetoscreenwidth = ft.GetRelativeSampleTextSize(maincountervalue);
+                            relativestrokewidth = ft.GetRelativeOutlineWidth(maincountervalue);
+                            strokecolor = ft.GetOutlineColor(maincountervalue);
+                            str = ft.GetText(maincountervalue);
 
                             textPaint.TextSize = UsedFontSize;
                             sampletext = ft.GetSampleText();
@@ -3967,8 +4155,8 @@ namespace GnollHackClient.Pages.Game
                         {
                             SKPoint p;
                             SKColor effcolor;
-                            p = eff.GetPosition(generalcountervalue);
-                            effcolor = eff.GetColor(generalcountervalue);
+                            p = eff.GetPosition(maincountervalue);
+                            effcolor = eff.GetColor(maincountervalue);
                             tx = offsetX + usedOffsetX + width * p.X;
                             ty = offsetY + usedOffsetY + height * p.Y + _mapFontAscent;
                             textPaint.Color = effcolor;
@@ -4055,7 +4243,7 @@ namespace GnollHackClient.Pages.Game
                                     continue;
 
                                 textPaint.Typeface = _clientGame.Windows[i].Typeface;
-                                textPaint.TextSize = _clientGame.Windows[i].TextSize;
+                                textPaint.TextSize = _clientGame.Windows[i].TextSize * textscale;
                                 textPaint.Color = _clientGame.Windows[i].TextColor;
                                 width = textPaint.FontMetrics.AverageCharacterWidth;
                                 height = textPaint.FontSpacing; // textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
@@ -4073,7 +4261,7 @@ namespace GnollHackClient.Pages.Game
                                     {
                                         float newleft = 0;
                                         float messagetop = _clientGame.Windows[_clientGame.MessageWindowId].Top;
-                                        float newtop = messagetop - _clientGame.Windows[i].Height - 30;
+                                        float newtop = messagetop - _clientGame.Windows[i].Height - 10 * textscale;
                                         _clientGame.Windows[i].Left = newleft;
                                         _clientGame.Windows[i].Top = newtop;
                                     }
@@ -4146,12 +4334,12 @@ namespace GnollHackClient.Pages.Game
                                                 if (_clientGame.Windows[i].StrokeWidth > 0)
                                                 {
                                                     textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = _clientGame.Windows[i].StrokeWidth;
+                                                    textPaint.StrokeWidth = _clientGame.Windows[i].StrokeWidth * textscale;
                                                     textPaint.Color = SKColors.Black;
                                                     canvas.DrawText(str, tx, ty, textPaint);
                                                 }
                                                 textPaint.Style = SKPaintStyle.Fill;
-                                                textPaint.Color = ClientUtils.NHColor2SKColor(instr.Color < (int)nhcolor.CLR_MAX ? instr.Color : (int)nhcolor.CLR_WHITE);
+                                                textPaint.Color = ClientUtils.NHColor2SKColor(instr.Color < (int)nhcolor.CLR_MAX ? instr.Color : (int)nhcolor.CLR_WHITE, instr.Attributes);
                                                 canvas.DrawText(str, tx, ty, textPaint);
                                                 textPaint.Style = SKPaintStyle.Fill;
                                                 xpos += totwidth;
@@ -4169,7 +4357,7 @@ namespace GnollHackClient.Pages.Game
 
                                 if (_clientGame.Windows[i].WindowType == GHWinType.Message)
                                 {
-                                    lock(MapOffsetLock)
+                                    lock(_mapOffsetLock)
                                     {
                                         _messageSmallestTop = canvasheight;
                                     }
@@ -4184,7 +4372,7 @@ namespace GnollHackClient.Pages.Game
                                             {
                                                 GHMsgHistoryItem msgHistoryItem = _msgHistory[idx];
                                                 longLine = msgHistoryItem.Text;
-                                                SKColor printColor = ClientUtils.NHColor2SKColor(msgHistoryItem.NHColor < (int)nhcolor.CLR_MAX ? msgHistoryItem.NHColor : (int)nhcolor.CLR_WHITE);
+                                                SKColor printColor = ClientUtils.NHColor2SKColor(msgHistoryItem.NHColor < (int)nhcolor.CLR_MAX ? msgHistoryItem.NHColor : (int)nhcolor.CLR_WHITE, msgHistoryItem.Attributes);
 
                                                 /* attributes */
                                                 wrappedLines.Clear();
@@ -4219,7 +4407,7 @@ namespace GnollHackClient.Pages.Game
                                                     ty = winRect.Top + _clientGame.Windows[i].Padding.Top - textPaint.FontMetrics.Ascent + window_row_idx * height;
                                                     if (ForceAllMessages)
                                                     {
-                                                        lock(MapOffsetLock)
+                                                        lock(_mapOffsetLock)
                                                         {
                                                             ty += _messageOffsetY;
                                                             if(ty + textPaint.FontMetrics.Ascent < _messageSmallestTop)
@@ -4231,7 +4419,7 @@ namespace GnollHackClient.Pages.Game
                                                     if (ty - textPaint.FontMetrics.Ascent > canvasheight)
                                                         continue;
                                                     textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = _clientGame.Windows[i].StrokeWidth;
+                                                    textPaint.StrokeWidth = _clientGame.Windows[i].StrokeWidth * textscale;
                                                     textPaint.Color = SKColors.Black;
                                                     canvas.DrawText(wrappedLine, tx, ty, textPaint);
                                                     textPaint.Style = SKPaintStyle.Fill;
@@ -4279,9 +4467,9 @@ namespace GnollHackClient.Pages.Game
                         float hmargin = _statusbar_hmargin;
                         float vmargin = _statusbar_vmargin;
                         float rowmargin = _statusbar_rowmargin;
-                        float basefontsize = _statusbar_basefontsize;
-                        float shieldfontsize = _statusbar_shieldfontsize;
-                        float diffontsize = _statusbar_diffontsize;
+                        float basefontsize = _statusbar_basefontsize * textscale;
+                        float shieldfontsize = _statusbar_shieldfontsize * textscale;
+                        float diffontsize = _statusbar_diffontsize * textscale;
 
                         float curx = hmargin;
                         float cury = vmargin;
@@ -4322,6 +4510,24 @@ namespace GnollHackClient.Pages.Game
                             target_height = target_scale * _statusWizardBitmap.Height;
                             statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
                             canvas.DrawBitmap(_statusWizardBitmap, statusDest, textPaint);
+                            curx += target_width;
+                            curx += innerspacing;
+                        }
+                        else if (valtext.StartsWith("C"))
+                        {
+                            target_width = target_scale * _statusCasualBitmap.Width;
+                            target_height = target_scale * _statusCasualBitmap.Height;
+                            statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                            canvas.DrawBitmap(_statusCasualBitmap, statusDest, textPaint);
+                            curx += target_width;
+                            curx += innerspacing;
+                        }
+                        else if (valtext.StartsWith("S"))
+                        {
+                            target_width = target_scale * _statusCasualClassicBitmap.Width;
+                            target_height = target_scale * _statusCasualClassicBitmap.Height;
+                            statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                            canvas.DrawBitmap(_statusCasualClassicBitmap, statusDest, textPaint);
                             curx += target_width;
                             curx += innerspacing;
                         }
@@ -4794,7 +5000,7 @@ namespace GnollHackClient.Pages.Game
                                 }
                                 if (colorfound)
                                 {
-                                    SKColor dotcolor = ClientUtils.NHColor2SKColorCore(i, true);
+                                    SKColor dotcolor = ClientUtils.NHColor2SKColorCore(i, 0, true);
                                     SKPoint dotpoint = new SKPoint(curx + marksize / 4, cury + (rowheight - marksize) / 2 + marksize / 2);
                                     float dotradius = marksize / 8;
                                     textPaint.Color = dotcolor;
@@ -5415,7 +5621,7 @@ namespace GnollHackClient.Pages.Game
                         ty += _statusOffsetY;
                         base_ty = ty;
 
-                        lock (MapOffsetLock)
+                        lock (_mapOffsetLock)
                         {
                             _statusClipBottom = cliprect.Bottom;
                         }
@@ -5435,7 +5641,7 @@ namespace GnollHackClient.Pages.Game
                                 string[] statstring = new string[6] { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma" };
                                 string printtext = statstring[i] + ":";
                                 canvas.DrawText(printtext, tx, ty, textPaint);
-                                textPaint.Color = ClientUtils.NHColor2SKColorCore(valcolor, true);
+                                textPaint.Color = ClientUtils.NHColor2SKColorCore(valcolor, 0, true);
                                 canvas.DrawText(valtext, tx + indentation, ty, textPaint);
                                 textPaint.Color = SKColors.Black;
                                 ty += textPaint.FontSpacing;
@@ -5540,7 +5746,7 @@ namespace GnollHackClient.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (MapOffsetLock)
+                            lock (_mapOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -5569,7 +5775,7 @@ namespace GnollHackClient.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (MapOffsetLock)
+                            lock (_mapOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -5594,7 +5800,7 @@ namespace GnollHackClient.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (MapOffsetLock)
+                            lock (_mapOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -5623,7 +5829,7 @@ namespace GnollHackClient.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (MapOffsetLock)
+                            lock (_mapOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -5650,7 +5856,7 @@ namespace GnollHackClient.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (MapOffsetLock)
+                            lock (_mapOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -5680,7 +5886,7 @@ namespace GnollHackClient.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock(MapOffsetLock)
+                            lock(_mapOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -5743,7 +5949,7 @@ namespace GnollHackClient.Pages.Game
 
                                     canvas.DrawBitmap(TileMap[sheet_idx], source_rt, target_rt);
                                     canvas.DrawText(statusname, tx + marksize + markpadding, ty, textPaint);
-                                    lock (MapOffsetLock)
+                                    lock (_mapOffsetLock)
                                     {
                                         _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                                     }
@@ -5790,7 +5996,7 @@ namespace GnollHackClient.Pages.Game
 
                                     canvas.DrawBitmap(TileMap[sheet_idx], source_rt, target_rt);
                                     canvas.DrawText(conditionname, tx + marksize + markpadding, ty, textPaint);
-                                    lock (MapOffsetLock)
+                                    lock (_mapOffsetLock)
                                     {
                                         _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                                     }
@@ -5848,7 +6054,7 @@ namespace GnollHackClient.Pages.Game
                                         canvas.DrawBitmap(TileMap[sheet_idx], source_rt, target_rt);
                                         if (propname != null)
                                             canvas.DrawText(propname, tx + marksize + markpadding, ty, textPaint);
-                                        lock (MapOffsetLock)
+                                        lock (_mapOffsetLock)
                                         {
                                             _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                                         }
@@ -6697,8 +6903,9 @@ namespace GnollHackClient.Pages.Game
 
                 GameMenuButton.SetSideSize(width, height);
                 ESCButton.SetSideSize(width, height);
+                ToggleAutoCenterModeButton.SetSideSize(width, height);
                 LookModeButton.SetSideSize(width, height);
-                ToggleModeButton.SetSideSize(width, height);
+                ToggleTravelModeButton.SetSideSize(width, height);
                 ToggleZoomMiniButton.SetSideSize(width, height);
                 ToggleZoomAlternateButton.SetSideSize(width, height);
 
@@ -6708,10 +6915,10 @@ namespace GnollHackClient.Pages.Game
                 ThirdButton.SetSideSize(width, height);
                 FourthButton.SetSideSize(width, height);
 
-                double statusbarheight = GetStatusBarHeight();
                 lAbilitiesButton.SetSideSize(width, height);
-                lAbilitiesButton.HeightRequest = statusbarheight;
                 lWornItemsButton.SetSideSize(width, height);
+                double statusbarheight = GetStatusBarHeight();
+                lAbilitiesButton.HeightRequest = statusbarheight;
                 lWornItemsButton.HeightRequest = statusbarheight;
                 //lSkillButton.SetSideSize(width, height);
                 UpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
@@ -6745,7 +6952,7 @@ namespace GnollHackClient.Pages.Game
                 glyphthick.Bottom = MenuWindowGlyphImage.Margin.Bottom;
                 MenuWindowGlyphImage.Margin = glyphthick;
 
-                lock (MapOffsetLock)
+                lock (_mapOffsetLock)
                 {
                     _messageOffsetY = 0;
                     _statusOffsetY = 0;
@@ -6755,24 +6962,24 @@ namespace GnollHackClient.Pages.Game
                 {
                     /* Landscape */
                     ButtonRowStack.Orientation = StackOrientation.Horizontal;
-                    //ButtonRowStack.HeightRequest = gridsideheight;
                     ModeLayout.Orientation = StackOrientation.Vertical;
                     ModeSubLayout1.Orientation = StackOrientation.Horizontal;
                     ModeSubLayout2.Orientation = StackOrientation.Horizontal;
-                    ZoomLayout.Orientation = StackOrientation.Horizontal;
-                    UpperCmdLayout.Orientation = StackOrientation.Vertical;
+                    GameMenuLayout.Orientation = StackOrientation.Horizontal;
+                    //UpperCmdLayout.Orientation = StackOrientation.Vertical;
                 }
                 else
                 {
                     /* Portrait */
                     ButtonRowStack.Orientation = StackOrientation.Vertical;
-                    //ButtonRowStack.HeightRequest = 2 * gridsideheight;
                     ModeLayout.Orientation = StackOrientation.Vertical;
                     ModeSubLayout1.Orientation = StackOrientation.Vertical;
                     ModeSubLayout2.Orientation = StackOrientation.Vertical;
-                    ZoomLayout.Orientation = StackOrientation.Horizontal;
-                    UpperCmdLayout.Orientation = StackOrientation.Horizontal;
+                    GameMenuLayout.Orientation = StackOrientation.Horizontal;
+                    //UpperCmdLayout.Orientation = StackOrientation.Horizontal;
                 }
+
+                IsSizeAllocatedProcessed = true;
             }
         }
 
@@ -6782,7 +6989,7 @@ namespace GnollHackClient.Pages.Game
             using (SKPaint textPaint = new SKPaint())
             {
                 textPaint.Typeface = App.LatoRegular;
-                textPaint.TextSize = _statusbar_basefontsize;
+                textPaint.TextSize = _statusbar_basefontsize * GetTextScale();
                 float rowheight = textPaint.FontSpacing;
                 statusbarheight = rowheight * 2 + _statusbar_vmargin * 2 + _statusbar_rowmargin;
             }
@@ -6791,9 +6998,10 @@ namespace GnollHackClient.Pages.Game
         public double GetCanvasScale()
         {
             if (canvasView.CanvasSize.Width <= 0 || canvasView.CanvasSize.Height <= 0)
-                return 0;
+                return 1.0;
             return Math.Sqrt(canvasView.Width / (double)canvasView.CanvasSize.Width * canvasView.Height / (double)canvasView.CanvasSize.Height);
         }
+
         public double GetStatusBarHeight()
         {
             double sb_xheight;
@@ -6854,7 +7062,7 @@ namespace GnollHackClient.Pages.Game
             _connection.On<int>("AddNewGameResult", (result) =>
             {
                 _message3 = "New Game Added: " + result;
-                _clientGame = new ClientGame(this, EnableWizardMode);
+                _clientGame = new ClientGame(this);
             });
 
             _connection.On<bool>("GameAliveResult", (result) =>
@@ -6899,9 +7107,11 @@ namespace GnollHackClient.Pages.Game
         }
 
         private Dictionary<long, TouchEntry> TouchDictionary = new Dictionary<long, TouchEntry>();
-        public object MapOffsetLock = new object();
+        private object _mapOffsetLock = new object();
         public float _mapOffsetX = 0;
         public float _mapOffsetY = 0;
+        public float _mapMiniOffsetX = 0;
+        public float _mapMiniOffsetY = 0;
         public float _messageOffsetY = 0;
         public float _messageSmallestTop = 0;
         public float _statusOffsetY = 0;
@@ -7037,14 +7247,14 @@ namespace GnollHackClient.Pages.Game
                                         _savedSender = sender;
                                         _savedEventArgs = e;
                                     }
-                                    else if (!ZoomMiniMode && (dist > GHConstants.MoveDistanceThreshold ||
+                                    else if (/*!ZoomMiniMode && */ (dist > GHConstants.MoveDistanceThreshold ||
                                         (DateTime.Now.Ticks - entry.PressTime.Ticks) / TimeSpan.TicksPerMillisecond > GHConstants.MoveOrPressTimeThreshold
                                            ))
                                     {
                                         /* Just one finger => Move the map */
                                         if (diffX != 0 || diffY != 0)
                                         {
-                                            lock (MapOffsetLock)
+                                            lock (_mapOffsetLock)
                                             {
                                                 if (ShowExtendedStatusBar)
                                                 {
@@ -7082,15 +7292,31 @@ namespace GnollHackClient.Pages.Game
                                                 }
                                                 else
                                                 {
-                                                    _mapOffsetX += diffX;
-                                                    _mapOffsetY += diffY;
-                                                    if (_mapWidth > 0 && Math.Abs(_mapOffsetX) > 10 * _mapWidth)
+                                                    if(ZoomMiniMode)
                                                     {
-                                                        _mapOffsetX = 10 * _mapWidth * Math.Sign(_mapOffsetX);
+                                                        _mapMiniOffsetX += diffX;
+                                                        _mapMiniOffsetY += diffY;
+                                                        if (_mapWidth > 0 && Math.Abs(_mapMiniOffsetX) > 1 * _mapWidth)
+                                                        {
+                                                            _mapMiniOffsetX = 1 * _mapWidth * Math.Sign(_mapMiniOffsetX);
+                                                        }
+                                                        if (_mapHeight > 0 && Math.Abs(_mapMiniOffsetY) > 1 * _mapHeight)
+                                                        {
+                                                            _mapMiniOffsetY = 1 * _mapHeight * Math.Sign(_mapMiniOffsetY);
+                                                        }
                                                     }
-                                                    if (_mapHeight > 0 && Math.Abs(_mapOffsetY) > 10 * _mapHeight)
+                                                    else
                                                     {
-                                                        _mapOffsetY = 10 * _mapHeight * Math.Sign(_mapOffsetY);
+                                                        _mapOffsetX += diffX;
+                                                        _mapOffsetY += diffY;
+                                                        if (_mapWidth > 0 && Math.Abs(_mapOffsetX) > 10 * _mapWidth)
+                                                        {
+                                                            _mapOffsetX = 10 * _mapWidth * Math.Sign(_mapOffsetX);
+                                                        }
+                                                        if (_mapHeight > 0 && Math.Abs(_mapOffsetY) > 10 * _mapHeight)
+                                                        {
+                                                            _mapOffsetY = 10 * _mapHeight * Math.Sign(_mapOffsetY);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -7126,7 +7352,7 @@ namespace GnollHackClient.Pages.Game
                                         }
                                     }
 
-                                    if (other_key != 0 && !ZoomMiniMode)
+                                    if (other_key != 0 /* && !ZoomMiniMode */)
                                     {
                                         otherloc = TouchDictionary[other_key].Location;
                                         float prevdist = (float)Math.Sqrt((Math.Pow((double)otherloc.X - (double)prevloc.X, 2) + Math.Pow((double)otherloc.Y - (double)prevloc.Y, 2)));
@@ -7134,14 +7360,26 @@ namespace GnollHackClient.Pages.Game
                                         if (prevdist > 0 && curdist > 0)
                                         {
                                             float ratio = curdist / prevdist;
-                                            float curfontsize = ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
+                                            float curfontsize = ZoomMiniMode ? MapFontMiniRelativeSize : ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
                                             float newfontsize = curfontsize * ratio;
-                                            if (newfontsize > 500)
-                                                newfontsize = 500;
-                                            if (newfontsize < 4)
-                                                newfontsize = 4;
+                                            if(ZoomMiniMode)
+                                            {
+                                                if (newfontsize > GHConstants.MaximumMapMiniRelativeFontSize)
+                                                    newfontsize = GHConstants.MaximumMapMiniRelativeFontSize;
+                                                if (newfontsize < GHConstants.MinimumMapMiniRelativeFontSize)
+                                                    newfontsize = GHConstants.MinimumMapMiniRelativeFontSize;
+                                            }
+                                            else
+                                            {
+                                                if (newfontsize > GHConstants.MaximumMapFontSize)
+                                                    newfontsize = GHConstants.MaximumMapFontSize;
+                                                if (newfontsize < GHConstants.MinimumMapFontSize)
+                                                    newfontsize = GHConstants.MinimumMapFontSize;
+                                            }
 
-                                            if (ZoomAlternateMode)
+                                            if (ZoomMiniMode)
+                                                MapFontMiniRelativeSize = newfontsize;
+                                            else if (ZoomAlternateMode)
                                                 MapFontAlternateSize = newfontsize;
                                             else
                                                 MapFontSize = newfontsize;
@@ -7175,7 +7413,7 @@ namespace GnollHackClient.Pages.Game
                             else if (_touchWithinStatusBar)
                             {
                                 ShowExtendedStatusBar = !ShowExtendedStatusBar;
-                                lock (MapOffsetLock)
+                                lock (_mapOffsetLock)
                                 {
                                     _statusOffsetY = 0.0f;
                                 }
@@ -7207,7 +7445,7 @@ namespace GnollHackClient.Pages.Game
                                         if (ShowExtendedStatusBar)
                                         {
                                             ShowExtendedStatusBar = false;
-                                            lock (MapOffsetLock)
+                                            lock (_mapOffsetLock)
                                             {
                                                 _statusOffsetY = 0.0f;
                                             }
@@ -7217,12 +7455,12 @@ namespace GnollHackClient.Pages.Game
                                         else
                                             IssueNHCommandViaTouch(sender, e);
                                     }
-                                    if (TouchDictionary.ContainsKey(e.Id))
-                                        TouchDictionary.Remove(e.Id);
-                                    if (TouchDictionary.Count == 0)
-                                        _touchMoved = false;
                                 }
                             }
+                            if (TouchDictionary.ContainsKey(e.Id))
+                                TouchDictionary.Remove(e.Id);
+                            if (TouchDictionary.Count == 0)
+                                _touchMoved = false;
                             e.Handled = true;
                         }
                         break;
@@ -7261,10 +7499,12 @@ namespace GnollHackClient.Pages.Game
 
             if (ZoomMiniMode)
             {
-                lock (MapOffsetLock)
+                lock (_mapOffsetLock)
                 {
                     offsetX -= _mapOffsetX;
                     offsetY -= _mapOffsetY;
+                    offsetX += _mapMiniOffsetX;
+                    offsetY += _mapMiniOffsetY;
                 }
             }
             else
@@ -7278,7 +7518,7 @@ namespace GnollHackClient.Pages.Game
                     }
                 }
             }
-            lock (MapOffsetLock)
+            lock (_mapOffsetLock)
             {
                 offsetX += _mapOffsetX;
                 offsetY += _mapOffsetY + _mapFontAscent;
@@ -7389,7 +7629,11 @@ namespace GnollHackClient.Pages.Game
                      */
                     lock (AnimationTimerLock)
                     {
-                        _mapData[x, y].GlyphPrintCounterValue = AnimationTimers.general_animation_counter;
+                        _mapData[x, y].GlyphPrintAnimationCounterValue = AnimationTimers.general_animation_counter;
+                    }
+                    lock (_mainCounterLock)
+                    {
+                        _mapData[x, y].GlyphPrintMainCounterValue = _mainCounterValue;
                     }
                 }
                 if ((layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0)
@@ -7416,13 +7660,17 @@ namespace GnollHackClient.Pages.Game
                      */
                     lock (AnimationTimerLock)
                     {
-                        _mapData[x, y].GlyphObjectPrintCounterValue = AnimationTimers.general_animation_counter;
+                        _mapData[x, y].GlyphObjectPrintAnimationCounterValue = AnimationTimers.general_animation_counter;
+                    }
+                    lock (_mainCounterLock)
+                    {
+                        _mapData[x, y].GlyphObjectPrintMainCounterValue = _mainCounterValue;
                     }
                 }
                 _mapData[x, y].Glyph = glyph;
                 _mapData[x, y].BkGlyph = bkglyph;
                 _mapData[x, y].Symbol = Char.ConvertFromUtf32(c);
-                _mapData[x, y].Color = ClientUtils.NHColor2SKColor(color);
+                _mapData[x, y].Color = ClientUtils.NHColor2SKColor(color, (special & 0x00002000UL) != 0 ? (int)MenuItemAttributes.AltColors : 0);
                 _mapData[x, y].Special = special;
                 _mapData[x, y].Layers = layers;
 
@@ -7461,8 +7709,10 @@ namespace GnollHackClient.Pages.Game
                         _mapData[x, y].Color = SKColors.Black;// default(MapData);
                         _mapData[x, y].Special = 0;
                         _mapData[x, y].NeedsUpdate = true;
-                        _mapData[x, y].GlyphPrintCounterValue = 0;
-                        _mapData[x, y].GlyphObjectPrintCounterValue = 0;
+                        _mapData[x, y].GlyphPrintAnimationCounterValue = 0;
+                        _mapData[x, y].GlyphPrintMainCounterValue = 0;
+                        _mapData[x, y].GlyphObjectPrintAnimationCounterValue = 0;
+                        _mapData[x, y].GlyphObjectPrintMainCounterValue = 0;
 
                         _mapData[x, y].Layers = new LayerInfo();
                         _mapData[x, y].Layers.layer_glyphs = new int[(int)layer_types.MAX_LAYERS];
@@ -7489,9 +7739,14 @@ namespace GnollHackClient.Pages.Game
         public void SetTargetClip(int x, int y, bool immediate_pan)
         {
             long curtimervalue = 0;
-            lock (AnimationTimerLock)
+            long pantime = Math.Max(2, (long)Math.Ceiling((double)ClientUtils.GetMainCanvasAnimationFrequency(MapRefreshRate) / 8.0));
+            //lock (AnimationTimerLock)
+            //{
+            //    curtimervalue = AnimationTimers.general_animation_counter;
+            //}
+            lock (_mainCounterLock)
             {
-                curtimervalue = AnimationTimers.general_animation_counter;
+                curtimervalue = _mainCounterValue;
             }
 
             lock (TargetClipLock)
@@ -7505,13 +7760,13 @@ namespace GnollHackClient.Pages.Game
                 else
                 {
                     _targetClipOn = true;
-                    lock (MapOffsetLock)
+                    lock (_mapOffsetLock)
                     {
                         _originMapOffsetWithNewClipX = _mapOffsetX + (float)(x - ClipX) * _tileWidth;
                         _originMapOffsetWithNewClipY = _mapOffsetY + (float)(y - ClipY) * _tileHeight;
                     }
                     _targetClipStartCounterValue = curtimervalue;
-                    _targetClipPanTime = GHConstants.DefaultPanTime;
+                    _targetClipPanTime = pantime; // GHConstants.DefaultPanTime;
                 }
             }
             lock (ClipLock)
@@ -7519,7 +7774,7 @@ namespace GnollHackClient.Pages.Game
                 _clipX = x;
                 _clipY = y;
             }
-            lock (MapOffsetLock)
+            lock (_mapOffsetLock)
             {
                 _mapOffsetX = _originMapOffsetWithNewClipX;
                 _mapOffsetY = _originMapOffsetWithNewClipY;
@@ -7696,7 +7951,8 @@ namespace GnollHackClient.Pages.Game
 
             MoreCommandsGrid.IsVisible = true;
             MainGrid.IsVisible = false;
-
+            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
+                canvasView.AbortAnimation("GeneralAnimationCounter");
             StartCommandCanvasAnimation();
         }
 
@@ -7741,21 +7997,42 @@ namespace GnollHackClient.Pages.Game
             App.PlayButtonClickedSound();
             GenericButton_Clicked(sender, e, 27);
         }
+        public void ToggleAutoCenterMode()
+        {
+            ToggleAutoCenterModeButton_Clicked(ToggleAutoCenterModeButton, new EventArgs());
+        }
 
+        private void ToggleAutoCenterModeButton_Clicked(object sender, EventArgs e)
+        {
+            App.PlayMenuSelectSound();
+            MapNoClipMode = !MapNoClipMode;
+            if (MapNoClipMode)
+            {
+                ToggleAutoCenterModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-autocenter-off.png";
+            }
+            else
+            {
+                ToggleAutoCenterModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-autocenter-on.png";
+                if (sender != null && GHUtils.isok(_ux, _uy))
+                {
+                    SetTargetClip(_ux, _uy, false);
+                }
+            }
+        }
         private EmbeddedResourceImageSource travelmode_on_source = new EmbeddedResourceImageSource(new Uri("resource://GnollHackClient.Assets.UI.stone-travel-on.png"));
         private EmbeddedResourceImageSource travelmode_off_source = new EmbeddedResourceImageSource(new Uri("resource://GnollHackClient.Assets.UI.stone-travel-off.png"));
-        private void ToggleModeButton_Clicked(object sender, EventArgs e)
+        private void ToggleTravelModeButton_Clicked(object sender, EventArgs e)
         {
             App.PlayMenuSelectSound();
             MapTravelMode = !MapTravelMode;
             if (MapTravelMode)
             {
-                ToggleModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-travel-on.png";
+                ToggleTravelModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-travel-on.png";
                 //ToggleModeImg.Source = travelmode_on_source;
             }
             else
             {
-                ToggleModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-travel-off.png";
+                ToggleTravelModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-travel-off.png";
                 //ToggleModeImg.Source = travelmode_off_source;
             }
         }
@@ -7775,84 +8052,6 @@ namespace GnollHackClient.Pages.Game
                 LookModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-look-off.png";
                 //LookModeImg.Source = lookmode_off_source;
             }
-        }
-        private void NoClipButton_Clicked(object sender, EventArgs e)
-        {
-            App.PlayMenuSelectSound();
-            MapNoClipMode = !MapNoClipMode;
-            if (MapNoClipMode)
-            {
-                //NoClipButton.BackgroundColor = Color.Green;
-            }
-            else
-            {
-                //NoClipButton.BackgroundColor = Color.DarkBlue;
-            }
-
-        }
-
-        private void ChatButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'C');
-        }
-
-        private void ThrowQuiveredButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 't');
-        }
-
-        private void ApplyWieldedButton_Clicked(object sender, EventArgs e)
-        {
-            App.DebugWriteRestart("Apply");
-            GenericButton_Clicked(sender, e, 'a');
-        }
-
-        private void ZapButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'z');
-        }
-
-        private void SwapWeaponButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'x');
-        }
-
-        private void LootContextButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'l');
-        }
-
-        private void EatContextButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'e');
-        }
-
-        private void DropAllContextButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'D');
-        }
-
-        private void SacrificeContextButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, GHUtils.Meta('o'));
-        }
-
-        private void SkillButton_Clicked(object sender, EventArgs e)
-        {
-            App.DebugWriteRestart("Skill");
-            GenericButton_Clicked(sender, e, 'S');
-        }
-
-        private void AbilitiesButton_Clicked(object sender, EventArgs e)
-        {
-            App.DebugWriteRestart("Abilities");
-            GenericButton_Clicked(sender, e, 'A');
-        }
-
-        private void DropManyButton_Clicked(object sender, EventArgs e)
-        {
-            App.DebugWriteRestart("Drop Many");
-            GenericButton_Clicked(sender, e, '%');
         }
 
         private EmbeddedResourceImageSource minimap_on_source = new EmbeddedResourceImageSource(new Uri("resource://GnollHackClient.Assets.UI.stone-minimap-on.png"));
@@ -7886,12 +8085,38 @@ namespace GnollHackClient.Pages.Game
                 ToggleZoomAlternateButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-altmap-on.png";
                 //ToggleZoomAlternateImg.Source = altmap_on_source;
                 //ToggleZoomAlternateButton.BackgroundColor = Color.Green;
+                lock(_mapOffsetLock)
+                {
+                    if(MapFontSize > 0)
+                    {
+                        _mapOffsetX = _mapOffsetX * MapFontAlternateSize / MapFontSize;
+                        _mapOffsetY = _mapOffsetY * MapFontAlternateSize / MapFontSize;
+                    }
+                }
+
+                //if (ZoomChangeCenterMode && !MapAlternateNoClipMode && MapNoClipMode && GHUtils.isok(_ux, _uy))
+                //{
+                //    SetTargetClip(_ux, _uy, true);
+                //}
             }
             else
             {
                 ToggleZoomAlternateButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-altmap-off.png";
                 //ToggleZoomAlternateImg.Source = altmap_off_source;
                 //ToggleZoomAlternateButton.BackgroundColor = Color.DarkBlue;
+                lock (_mapOffsetLock)
+                {
+                    if (MapFontAlternateSize > 0)
+                    {
+                        _mapOffsetX = _mapOffsetX * MapFontSize / MapFontAlternateSize;
+                        _mapOffsetY = _mapOffsetY * MapFontSize / MapFontAlternateSize;
+                    }
+                }
+
+                //if (ZoomChangeCenterMode && !MapNoClipMode && MapAlternateNoClipMode && GHUtils.isok(_ux, _uy))
+                //{
+                //    SetTargetClip(_ux, _uy, true);
+                //}
             }
 
         }
@@ -8142,7 +8367,7 @@ namespace GnollHackClient.Pages.Game
                         }
 
                         /* Main text */
-                        SKColor maincolor = ClientUtils.NHColor2SKColorCore(mi.NHColor, MenuCanvas.RevertBlackAndWhite);
+                        SKColor maincolor = ClientUtils.NHColor2SKColorCore(mi.NHColor, mi.Attributes, MenuCanvas.RevertBlackAndWhite);
                         textPaint.Color = maincolor;
                         //int split_idx_on_row = -1;
                         float start_x = x;
@@ -8737,7 +8962,7 @@ namespace GnollHackClient.Pages.Game
                 _menuHideCancelled = false;
                 _menuHideOn = true;
             }
-            Device.StartTimer(TimeSpan.FromSeconds(GHConstants.WindowHideIntervals / GHConstants.GameAnimationRefreshRate), () =>
+            Device.StartTimer(TimeSpan.FromSeconds(GHConstants.WindowHideIntervals / GHConstants.MainCanvasAnimationFrequency), () =>
             {
                 lock (_menuHideCancelledLock)
                 {
@@ -8751,6 +8976,8 @@ namespace GnollHackClient.Pages.Game
 
                 MenuGrid.IsVisible = false;
                 MainGrid.IsVisible = true;
+                if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                    MenuCanvas.AbortAnimation("GeneralAnimationCounter");
 
                 lock (_canvasPageLock)
                 {
@@ -8776,7 +9003,7 @@ namespace GnollHackClient.Pages.Game
                 _delayedTextHideOn = true;
                 _delayedTextHideCancelled = false;
             }
-            Device.StartTimer(TimeSpan.FromSeconds(GHConstants.WindowHideIntervals / GHConstants.GameAnimationRefreshRate), () =>
+            Device.StartTimer(TimeSpan.FromSeconds(GHConstants.WindowHideIntervals / GHConstants.MainCanvasAnimationFrequency), () =>
             {
                 lock(_delayedTextHideLock)
                 {
@@ -8789,6 +9016,8 @@ namespace GnollHackClient.Pages.Game
                 }
                 TextGrid.IsVisible = false;
                 MainGrid.IsVisible = true;
+                if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                    TextCanvas.AbortAnimation("GeneralAnimationCounter");
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -9026,6 +9255,7 @@ namespace GnollHackClient.Pages.Game
 
                             textPaint.Color = ClientUtils.NHColor2SKColorCore(
                                 instr.Color < (int)nhcolor.CLR_MAX ? instr.Color : TextCanvas.RevertBlackAndWhite ? (int)nhcolor.CLR_BLACK : (int)nhcolor.CLR_WHITE, 
+                                instr.Attributes,
                                 TextCanvas.RevertBlackAndWhite);
 
                             string[] split = str.Split(' ');
@@ -9280,6 +9510,14 @@ namespace GnollHackClient.Pages.Game
             using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.status-wizard-mode.png"))
             {
                 _statusWizardBitmap = SKBitmap.Decode(stream);
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.status-casual-mode.png"))
+            {
+                _statusCasualBitmap = SKBitmap.Decode(stream);
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.status-casual-classic-mode.png"))
+            {
+                _statusCasualClassicBitmap = SKBitmap.Decode(stream);
             }
             using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.status-modern-mode.png"))
             {
@@ -9588,8 +9826,15 @@ namespace GnollHackClient.Pages.Game
         private SKRect _cmdBtnMatrixRect = new SKRect();
         public SKRect CmdBtnMatrixRect { get { SKRect val; lock (_cmdBtnMatrixRectLock) { val = _cmdBtnMatrixRect; } return val; } set { lock (_cmdBtnMatrixRectLock) { _cmdBtnMatrixRect = value; } } }
 
-        private object _commandCounterLock = new object();
-        private long _commandCounterValue = 0;
+        private object _mainCounterLock = new object();
+        private long _mainCounterValue = 0;
+        public long MainCounterValue { get { lock (_mainCounterLock) { return _mainCounterValue; } } }
+
+        private object _mainFPSCounterLock = new object();
+        private long _mainFPSCounterValue = 0;
+
+        private object _commandFPSCounterLock = new object();
+        private long _commandFPSCounterValue = 0;
 
         private void CommandCanvas_PaintSurface(object sender, SKPaintSurfaceEventArgs e)
         {
@@ -9717,11 +9962,11 @@ namespace GnollHackClient.Pages.Game
                 }
 
             }
-            lock (_commandCounterLock)
+            lock (_commandFPSCounterLock)
             {
-                _commandCounterValue++;
-                if (_commandCounterValue >= 0xFFFFFFFC)
-                    _commandCounterValue = 0;
+                _commandFPSCounterValue++;
+                if (_commandFPSCounterValue < 0)
+                    _commandFPSCounterValue = 0;
             }
         }
 
@@ -9895,6 +10140,8 @@ namespace GnollHackClient.Pages.Game
                                             /* Hide the canvas */
                                             MoreCommandsGrid.IsVisible = false;
                                             MainGrid.IsVisible = true;
+                                            if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                                                CommandCanvas.AbortAnimation("GeneralAnimationCounter");
                                             lock (RefreshScreenLock)
                                             {
                                                 RefreshScreen = true;
@@ -9974,7 +10221,7 @@ namespace GnollHackClient.Pages.Game
 
         private void ToggleMessageNumberButton_Clicked(object sender, EventArgs e)
         {
-            lock(MapOffsetLock)
+            lock(_mapOffsetLock)
             {
                 _messageOffsetY = 0.0f;
             }
@@ -10006,13 +10253,13 @@ namespace GnollHackClient.Pages.Game
                 textPaint.Typeface = App.LatoRegular;
                 textPaint.TextSize = 36;
                 textPaint.MeasureText(str, ref bounds);
-                float fontsize = Math.Min(48, 36 * 0.2f / (bounds.Width / canvaswidth));
+                float fontsize = Math.Min(48, 36 * 0.18f / Math.Max(0.01f, (bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)))));
 
                 str = "This is an explanation.";
                 textPaint.Typeface = App.UnderwoodTypeface;
                 textPaint.TextSize = 36;
                 textPaint.MeasureText(str, ref bounds);
-                float centerfontsize = Math.Min(72, 36 * 0.62f / (bounds.Width / canvaswidth));
+                float centerfontsize = Math.Min(72, 36 * 0.62f / Math.Max(0.01f, (bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)))));
 
                 float scale_canvas = 1.0f;
                 float target_scale_canvas = 1.0f;
@@ -10028,7 +10275,7 @@ namespace GnollHackClient.Pages.Game
                         textPaint.Typeface = App.ARChristyTypeface;
                         str = "Welcome to GnollHack";
                         textPaint.MeasureText(str, ref bounds);
-                        scale_canvas = Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
+                        scale_canvas = bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)); //Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
                         target_scale_canvas = 0.8f;
                         mult_canvas = target_scale_canvas / scale_canvas;
                         textPaint.TextSize = textPaint.TextSize * mult_canvas;
@@ -10050,7 +10297,7 @@ namespace GnollHackClient.Pages.Game
                         textPaint.Typeface = App.UnderwoodTypeface;
                         str = "Let's review the user interface";
                         textPaint.MeasureText(str, ref bounds);
-                        scale_canvas = Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
+                        scale_canvas = bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)); //Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
                         target_scale_canvas = 0.8f;
                         mult_canvas = target_scale_canvas / scale_canvas;
                         textPaint.TextSize = textPaint.TextSize * mult_canvas;
@@ -10073,47 +10320,50 @@ namespace GnollHackClient.Pages.Game
                         PaintTipButton(canvas, textPaint, ESCButton, "This cancels any command.", "Escape Button", 1.5f, centerfontsize, fontsize, false, -1.5f, 0);
                         break;
                     case 3:
-                        PaintTipButton(canvas, textPaint, ToggleZoomMiniButton, "This zoom shows the entire level.", "Minimap", 1.5f, centerfontsize, fontsize, false, landscape ? -0.15f : -0.5f, landscape ? 0 : 1.5f);
+                        PaintTipButton(canvas, textPaint, ToggleAutoCenterModeButton, "This toggles auto-center on player.", "Map Auto-Center", 1.5f, centerfontsize, fontsize, false, -1.5f, 0);
                         break;
                     case 4:
-                        PaintTipButton(canvas, textPaint, ToggleZoomAlternateButton, "This is the secondary zoom.", "Alternative Zoom", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, 0);
+                        PaintTipButton(canvas, textPaint, ToggleZoomMiniButton, "This zoom shows the entire level.", "Minimap", 1.5f, centerfontsize, fontsize, false, landscape ? -0.15f : -0.5f, landscape ? 0 : 1.5f);
                         break;
                     case 5:
-                        PaintTipButton(canvas, textPaint, LookModeButton, "This allows you to inspect the map.", "Look Mode", 1.5f, centerfontsize, fontsize, false, -0.15f, landscape ? -0.5f : 0);
+                        PaintTipButton(canvas, textPaint, ToggleZoomAlternateButton, "This is the secondary zoom.", "Alternative Zoom", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, 0);
                         break;
                     case 6:
-                        PaintTipButton(canvas, textPaint, ToggleModeButton, "Use this to set how you move around.", "Travel Mode", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, landscape ? -0.5f : 0);
+                        PaintTipButton(canvas, textPaint, LookModeButton, "This allows you to inspect the map.", "Look Mode", 1.5f, centerfontsize, fontsize, false, -0.15f, landscape ? -0.5f : 0);
                         break;
                     case 7:
-                        PaintTipButtonByRect(canvas, textPaint, statusBarCenterRect, "You can tap the status bar.", "Open status screen", 1.0f, centerfontsize, fontsize, false, -0.15f, 1.0f);
+                        PaintTipButton(canvas, textPaint, ToggleTravelModeButton, "Use this to set how you move around.", "Travel Mode", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, landscape ? -0.5f : 0);
                         break;
                     case 8:
-                        PaintTipButton(canvas, textPaint, lAbilitiesButton, "Some commands do not have buttons.", "Tap here for character and game status", 1.0f, centerfontsize, fontsize, true, 0.15f, 1.0f);
+                        PaintTipButtonByRect(canvas, textPaint, statusBarCenterRect, "You can tap the status bar.", "Open status screen", 1.0f, centerfontsize, fontsize, false, -0.15f, 1.0f);
                         break;
                     case 9:
-                        PaintTipButton(canvas, textPaint, lWornItemsButton, "", "Tap here to access worn items", 1.0f, centerfontsize, fontsize, false, landscape ? -2.0f : -0.5f, 2.0f);
+                        PaintTipButton(canvas, textPaint, lAbilitiesButton, "Some commands do not have buttons.", "Character and game status", 1.0f, centerfontsize, fontsize, true, 0.15f, 1.0f);
                         break;
                     case 10:
-                        PaintTipButton(canvas, textPaint, ToggleMessageNumberButton, "", "Tap here to see more messages", 1.0f, centerfontsize, fontsize, true, 0.5f, -1.0f);
+                        PaintTipButton(canvas, textPaint, lWornItemsButton, "", "Tap here to access worn items", 1.0f, centerfontsize, fontsize, false, landscape ? -2.0f : -0.5f, 2.0f);
                         break;
                     case 11:
+                        PaintTipButton(canvas, textPaint, ToggleMessageNumberButton, "", "Tap here to see more messages", 1.0f, centerfontsize, fontsize, true, 0.5f, -1.0f);
+                        break;
+                    case 12:
                         lock(_rectLock)
                         {
                             PaintTipButtonByRect(canvas, textPaint, HealthRect, "This orb shows your hit points.", "Health Orb", 1.1f, centerfontsize, fontsize, true, 0.15f, 0.0f);
                         }
                         break;
-                    case 12:
+                    case 13:
                         lock (_rectLock)
                         {
                             PaintTipButtonByRect(canvas, textPaint, ManaRect, "And this one your mana.", "Mana Orb", 1.1f, centerfontsize, fontsize, true, 0.15f, 0.0f);
                         }
                         break;
-                    case 13:
+                    case 14:
                         textPaint.TextSize = 36;
                         textPaint.Typeface = App.ARChristyTypeface;
                         str = "You are all set";
                         textPaint.MeasureText(str, ref bounds);
-                        scale_canvas = Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
+                        scale_canvas = bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)); //Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
                         target_scale_canvas = 0.8f;
                         mult_canvas = target_scale_canvas / scale_canvas;
                         textPaint.TextSize = textPaint.TextSize * mult_canvas;
@@ -10135,7 +10385,7 @@ namespace GnollHackClient.Pages.Game
                         textPaint.Typeface = App.UnderwoodTypeface;
                         str = "Tap to start playing";
                         textPaint.MeasureText(str, ref bounds);
-                        scale_canvas = Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
+                        scale_canvas = bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)); //Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
                         target_scale_canvas = 0.8f;
                         mult_canvas = target_scale_canvas / scale_canvas;
                         textPaint.TextSize = textPaint.TextSize * mult_canvas;
@@ -10174,12 +10424,12 @@ namespace GnollHackClient.Pages.Game
                     break;
                 case SKTouchAction.Released:
                     ShownTip++;
-                    if(ShownTip == 11 && HealthRect.Width == 0)
+                    if(ShownTip == 12 && HealthRect.Width == 0)
                         ShownTip++;
-                    if (ShownTip == 12 && ManaRect.Width == 0)
+                    if (ShownTip == 13 && ManaRect.Width == 0)
                         ShownTip++;
                     TipView.InvalidateSurface();
-                    if (ShownTip >= 14 - (_blockingTipView ? 0 : 1))
+                    if (ShownTip >= 15 - (_blockingTipView ? 0 : 1))
                     {
                         TipView.IsVisible = false;
                         ShownTip = -1;
@@ -10400,6 +10650,28 @@ namespace GnollHackClient.Pages.Game
             Weapon,
             DungeonLevel,
             XPLevel
+        }
+
+        public async void ReportPanic(string text)
+        {
+            await DisplayAlert("Panic", text != null ? text : "GnollHack has panicked. See the Panic Log.", "OK");
+
+            ConcurrentQueue<GHResponse> queue;
+            if (ClientGame.ResponseDictionary.TryGetValue(_clientGame, out queue))
+            {
+                queue.Enqueue(new GHResponse(_clientGame, GHRequestType.Panic));
+            }
+        }
+
+        public async void ShowMessage(string text)
+        {
+            await DisplayAlert("Message", text != null ? text : "No message.", "OK");
+
+            ConcurrentQueue<GHResponse> queue;
+            if (ClientGame.ResponseDictionary.TryGetValue(_clientGame, out queue))
+            {
+                queue.Enqueue(new GHResponse(_clientGame, GHRequestType.Message));
+            }
         }
 
         public async void ReportCrashDetected()

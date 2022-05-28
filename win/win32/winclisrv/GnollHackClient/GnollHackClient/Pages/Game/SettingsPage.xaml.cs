@@ -20,6 +20,19 @@ namespace GnollHackClient.Pages.Game
         {
             InitializeComponent();
             _gamePage = gamePage;
+            List<string> list = new List<string>();
+            list.Add("20 fps");
+            list.Add("30 fps");
+            list.Add("40 fps");
+            if (App.DisplayRefreshRate >= 60.0f)
+                list.Add("60 fps");
+            if (App.DisplayRefreshRate >= 80.0f)
+                list.Add("80 fps");
+            if (App.DisplayRefreshRate >= 90.0f)
+                list.Add("90 fps");
+            if (App.DisplayRefreshRate >= 120.0f)
+                list.Add("120 fps");
+            RefreshRatePicker.ItemsSource = list;
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
@@ -27,13 +40,26 @@ namespace GnollHackClient.Pages.Game
             App.BackButtonPressed -= BackButtonPressed;
             _doChangeVolume = false;
 
-            if (_gamePage != null)
-                _gamePage.CursorStyle = (TTYCursorStyle)CursorPicker.SelectedIndex;
-            Preferences.Set("CursorStyle", CursorPicker.SelectedIndex);
+            if (CursorPicker.SelectedIndex > -1)
+            {
+                if (_gamePage != null)
+                    _gamePage.CursorStyle = (TTYCursorStyle)CursorPicker.SelectedIndex;
+                Preferences.Set("CursorStyle", CursorPicker.SelectedIndex);
+            }
 
-            if (_gamePage != null)
-                _gamePage.GraphicsStyle = (GHGraphicsStyle)GraphicsPicker.SelectedIndex;
-            Preferences.Set("GraphicsStyle", GraphicsPicker.SelectedIndex);
+            if (GraphicsPicker.SelectedIndex > -1)
+            {
+                if (_gamePage != null)
+                    _gamePage.GraphicsStyle = (GHGraphicsStyle)GraphicsPicker.SelectedIndex;
+                Preferences.Set("GraphicsStyle", GraphicsPicker.SelectedIndex);
+            }
+
+            if(RefreshRatePicker.SelectedIndex > -1)
+            {
+                if (_gamePage != null)
+                    _gamePage.MapRefreshRate = (MapRefreshRateStyle)RefreshRatePicker.SelectedIndex;
+                Preferences.Set("MapRefreshRate", RefreshRatePicker.SelectedIndex);
+            }
 
             if (_gamePage != null)
                 _gamePage.ShowMemoryUsage = MemorySwitch.IsToggled;
@@ -87,6 +113,18 @@ namespace GnollHackClient.Pages.Game
                 _gamePage.WalkArrows = WalkArrowSwitch.IsToggled;
             Preferences.Set("WalkArrows", WalkArrowSwitch.IsToggled);
 
+            //if (_gamePage != null)
+            //    _gamePage.MapNoClipMode = !YesClipAlternateSwitch.IsToggled;
+            //Preferences.Set("MapNoClipMode", !YesClipNormalSwitch.IsToggled);
+
+            //if (_gamePage != null)
+            //    _gamePage.MapAlternateNoClipMode = !YesClipAlternateSwitch.IsToggled;
+            //Preferences.Set("MapAlternateNoClipMode", !YesClipAlternateSwitch.IsToggled);
+
+            //if (_gamePage != null)
+            //    _gamePage.ZoomChangeCenterMode = ZoomChangeCenterSwitch.IsToggled;
+            //Preferences.Set("ZoomChangeCenterMode", ZoomChangeCenterSwitch.IsToggled);
+
 
             App.HideAndroidNavigatioBar = NavBarSwitch.IsToggled;
             Preferences.Set("HideAndroidNavigationBar", App.HideAndroidNavigatioBar);
@@ -94,6 +132,7 @@ namespace GnollHackClient.Pages.Game
             App.DeveloperMode = DeveloperSwitch.IsToggled;
             Preferences.Set("DeveloperMode", App.DeveloperMode);
 
+            Preferences.Set("DefaultMapNoClipMode", !YesClipNormalSwitch.IsToggled);
             Preferences.Set("GeneralVolume", (float)GeneralVolumeSlider.Value);
             Preferences.Set("MusicVolume", (float)MusicVolumeSlider.Value);
             Preferences.Set("AmbientVolume", (float)AmbientVolumeSlider.Value);
@@ -144,10 +183,12 @@ namespace GnollHackClient.Pages.Game
         {
             App.BackButtonPressed += BackButtonPressed;
 
-            int cursor = 0, graphics = 0, msgnum = 0, petrows = 0;
-            bool mem = false, fps = false, gpu = GHConstants.IsGPUDefault, navbar = false, devmode = false, hpbars = false, statusbar = GHConstants.IsDefaultStatusBarClassic, pets = true, orbs = true, orbmaxhp = false, orbmaxmana = false, mapgrid = false, playermark = false, monstertargeting = false, walkarrows = true;
-            bool forcemaxmsg = false, showexstatus = false;
+            int cursor = 0, graphics = 0, maprefresh = (int)ClientUtils.GetDefaultMapFPS(), msgnum = 0, petrows = 0;
+            bool mem = false, fps = false, gpu = GHConstants.IsGPUDefault, navbar = GHConstants.DefaultHideNavigation, devmode = false, hpbars = false, statusbar = GHConstants.IsDefaultStatusBarClassic, pets = true, orbs = true, orbmaxhp = false, orbmaxmana = false, mapgrid = false, playermark = false, monstertargeting = false, walkarrows = true;
+            bool forcemaxmsg = false, showexstatus = false, noclipmode = GHConstants.DefaultMapNoClipMode;
+            //bool altnoclipmode = GHConstants.DefaultMapAlternateNoClipMode, zoomchangecenter = GHConstants.DefaultZoomChangeCenterMode;
             float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
+
             generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
             musicVolume = Preferences.Get("MusicVolume", GHConstants.DefaultMusicVolume);
             ambientVolume = Preferences.Get("AmbientVolume", GHConstants.DefaultAmbientVolume);
@@ -156,11 +197,16 @@ namespace GnollHackClient.Pages.Game
             UIVolume = Preferences.Get("UIVolume", GHConstants.DefaultUIVolume);
             navbar = App.HideAndroidNavigatioBar;
             devmode = App.DeveloperMode;
+            noclipmode = Preferences.Get("DefaultMapNoClipMode", GHConstants.DefaultMapNoClipMode);
             if (_gamePage == null)
             {
                 cursor = Preferences.Get("CursorStyle", 1);
                 graphics = Preferences.Get("GraphicsStyle", 1);
+                maprefresh = Preferences.Get("MapRefreshRate", (int)ClientUtils.GetDefaultMapFPS());
                 mapgrid = Preferences.Get("MapGrid", false);
+                //noclipmode = Preferences.Get("MapNoClipMode", GHConstants.DefaultMapNoClipMode);
+                //altnoclipmode = Preferences.Get("MapAlternateNoClipMode", GHConstants.DefaultMapAlternateNoClipMode);
+                //zoomchangecenter = Preferences.Get("ZoomChangeCenterMode", GHConstants.DefaultZoomChangeCenterMode);
 
                 forcemaxmsg = false; /* Always starts as false */
                 ForceMaxMessageSwitch.IsEnabled = false;
@@ -187,6 +233,7 @@ namespace GnollHackClient.Pages.Game
             {
                 cursor = (int)_gamePage.CursorStyle;
                 graphics = (int)_gamePage.GraphicsStyle;
+                maprefresh = (int)_gamePage.MapRefreshRate;
                 mapgrid = _gamePage.MapGrid;
                 forcemaxmsg = _gamePage.ForceAllMessages;
                 ForceMaxMessageSwitch.IsEnabled = true;
@@ -208,9 +255,13 @@ namespace GnollHackClient.Pages.Game
                 gpu = _gamePage.UseMainGLCanvas;
                 msgnum = _gamePage.NumDisplayedMessages;
                 petrows = _gamePage.NumDisplayedPetRows;
+                //noclipmode = _gamePage.MapNoClipMode;
+                //altnoclipmode = _gamePage.MapAlternateNoClipMode;
+                //zoomchangecenter = _gamePage.ZoomChangeCenterMode;
             }
             CursorPicker.SelectedIndex = cursor;
             GraphicsPicker.SelectedIndex = graphics;
+            RefreshRatePicker.SelectedIndex = Math.Min(RefreshRatePicker.Items.Count - 1, maprefresh);
             GridSwitch.IsToggled = mapgrid;
             HitPointBarSwitch.IsToggled = hpbars;
             ClassicStatusBarSwitch.IsToggled = statusbar;
@@ -221,6 +272,9 @@ namespace GnollHackClient.Pages.Game
             PlayerMarkSwitch.IsToggled = playermark;
             MonsterTargetingSwitch.IsToggled = monstertargeting;
             WalkArrowSwitch.IsToggled = walkarrows;
+            YesClipNormalSwitch.IsToggled = !noclipmode;
+            //YesClipAlternateSwitch.IsToggled = !altnoclipmode;
+            //ZoomChangeCenterSwitch.IsToggled = zoomchangecenter;
             MemorySwitch.IsToggled = mem;
             FPSSwitch.IsToggled = fps;
             GPUSwitch.IsToggled = gpu;

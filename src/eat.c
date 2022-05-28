@@ -344,11 +344,15 @@ unsigned
 obj_nutrition(otmp)
 struct obj *otmp;
 {
+    if (!otmp || (otmp->otyp == CORPSE && otmp->corpsenm < LOW_PM))
+        return 0;
+
     unsigned nut = (otmp->otyp == CORPSE) ? mons[otmp->corpsenm].cnutrit
                       : otmp->globby ? otmp->owt
                          : (unsigned) objects[otmp->otyp].oc_nutrition;
 
-    if (otmp->otyp == ELVEN_WAYBREAD) {
+    if (otmp->otyp == ELVEN_WAYBREAD) 
+    {
         if (maybe_polyd(is_elf(youmonst.data), Race_if(PM_ELF)))
             nut += nut / 4; /* 800 -> 1000 */
         else if (maybe_polyd(is_orc(youmonst.data), Race_if(PM_ORC)))
@@ -358,11 +362,14 @@ struct obj *otmp;
         if (otmp->oeaten >= nut)
             otmp->oeaten = (otmp->oeaten < objects[ELVEN_WAYBREAD].oc_nutrition)
                               ? (nut - 1) : nut;
-    } else if (otmp->otyp == CRAM_RATION) {
+    } 
+    else if (otmp->otyp == CRAM_RATION) 
+    {
         if (maybe_polyd(is_dwarf(youmonst.data), Race_if(PM_DWARF)))
             nut += nut / 6; /* 600 -> 700 */
     }
-    else if (otmp->otyp == TRIPE_RATION) {
+    else if (otmp->otyp == TRIPE_RATION) 
+    {
         if (maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)))
             nut += nut * 2; /* 200 -> 600 */
     }
@@ -505,7 +512,7 @@ boolean message;
         occtyp = 0;
     }
 
-    if (piece->otyp == CORPSE || piece->globby)
+    if (is_obj_rotting_corpse(piece))
         corpse_after_effect(piece->corpsenm);
     else
         food_after_effect(piece);
@@ -1327,7 +1334,7 @@ int pm;
             char buf[BUFSZ];
 
             u.uconduct.polyselfs++; /* you're changing form */
-            You_cant("resist the temptation to mimic %s.",
+            You_cant_ex(ATR_NONE, CLR_MSG_NEGATIVE, "resist the temptation to mimic %s.",
                      Hallucination ? "an orange" : "a pile of gold");
             /* A pile of gold can't ride. */
             if (u.usteed)
@@ -1348,7 +1355,9 @@ int pm;
             newsym(u.ux, u.uy);
             curs_on_u();
             /* make gold symbol show up now */
+            create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
             display_nhwindow(WIN_MAP, TRUE);
+            create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
         }
         break;
     case PM_QUANTUM_MECHANIC:
@@ -1784,7 +1793,7 @@ const char *mesg;
         char buf[BUFSZ], smellsbuf[BUFSZ];
         const char* eatit = "Eat it?";
         Sprintf(smellsbuf, "It smells like %s.", what);
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
         Sprintf(buf, "%s %s", smellsbuf, eatit);
 #else
         pline1(smellsbuf);
@@ -1833,7 +1842,7 @@ const char *mesg;
             /* Assume !Glib, because you can't open tins when Glib. */
             incr_itimeout(&Glib, rnd(15));
             refresh_u_tile_gui_info(TRUE);
-            pline("Eating %s food made your %s very slippery.",
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Eating %s food made your %s very slippery.",
                   tintxts[r].txt, makeplural(body_part(FINGER)));
         }
 
@@ -1853,7 +1862,7 @@ const char *mesg;
             tin->dknown = tin->known = 1;
         }
 
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
         Sprintf(buf, "%s %s", containsbuf, eatit);
 #else
         pline1(containsbuf);
@@ -1918,7 +1927,8 @@ opentin(VOID_ARGS)
         && (!obj_here(context.tin.tin, u.ux, u.uy) || !can_reach_floor(TRUE)))
         return 0; /* %% probably we should use tinoid */
     if (context.tin.usedtime++ >= 50) {
-        You("give up your attempt to open the tin.");
+        play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "give up your attempt to open the tin.");
         return 0;
     }
     if (context.tin.usedtime < context.tin.reqtime)
@@ -1944,7 +1954,7 @@ struct obj *otmp;
     else if (!can_operate_objects(youmonst.data)) 
     { /* nohands || verysmall */
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot handle the tin properly to open it.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot handle the tin properly to open it.");
         return;
     } 
     else if (otmp->blessed) 
@@ -2092,7 +2102,6 @@ eatcorpse(otmp)
 struct obj *otmp;
 {
     int retcode = 0, tp = 0, mnum = otmp->corpsenm;
-    long rotted = 0L;
 
     if (mnum < LOW_PM)
         return retcode; /* Should not happen, but just in case to avoid out of bounds errors */
@@ -2103,21 +2112,23 @@ struct obj *otmp;
                          && !slimeproof(youmonst.data)),
             glob = otmp->globby ? TRUE : FALSE;
 
+    long rotted = get_rotted_status(otmp);
+
     /* KMH, conduct */
     if (!vegan(&mons[mnum]))
         u.uconduct.unvegan++;
     if (!vegetarian(&mons[mnum]))
         violated_vegetarian();
 
-    if (!nonrotting_corpse(mnum)) {
-        long age = peek_at_iced_corpse_age(otmp);
+    //if (!nonrotting_corpse(mnum)) {
+    //    long age = peek_at_iced_corpse_age(otmp);
 
-        rotted = (monstermoves - age) / (CORPSE_ROTTING_SPEED + rn2(CORPSE_ROTTING_SPEED_VARIATION));
-        if (otmp->cursed)
-            rotted += 2L;
-        else if (otmp->blessed)
-            rotted -= 2L;
-    }
+    //    rotted = (monstermoves - age) / (CORPSE_ROTTING_SPEED + 0 /*rn2(CORPSE_ROTTING_SPEED_VARIATION)*/);
+    //    if (otmp->cursed)
+    //        rotted += 2L;
+    //    else if (otmp->blessed)
+    //        rotted -= 2L;
+    //}
 
     if (mnum != PM_ACID_BLOB && !stoneable && !slimeable && rotted > 5L)
     {
@@ -2260,7 +2271,7 @@ struct obj *otmp;
                && (Stone_resistance || Hallucination)) {
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "This tastes just like chicken!");
     } else if (mnum == PM_FLOATING_EYE && u.umonnum == PM_RAVEN) {
-        You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "peck the eyeball with delight.");
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "peck the eyeball with delight.");
     } else {
         /* yummy is always False for omnivores, palatable always True */
         boolean yummy = (vegan(&mons[mnum])
@@ -2317,7 +2328,7 @@ boolean resume;
     context.victual.eating = TRUE;
     context.victual.total_nutrition = otmp->oeaten;
 
-    if (otmp->otyp == CORPSE || otmp->globby) {
+    if (is_obj_rotting_corpse(otmp)) {
         corpse_pre_effect(context.victual.piece->corpsenm);
         if (!context.victual.piece || !context.victual.eating) {
             /* rider revived, or died and lifesaved */
@@ -3071,6 +3082,30 @@ struct obj *otmp;
 }
 #endif
 
+long
+get_rotted_status(obj)
+struct obj* obj;
+{
+    if (!obj || !is_obj_rotting_corpse(obj) || obj->corpsenm < LOW_PM || obj->corpsenm >= NUM_MONSTERS)
+        return 0;
+
+    long rotted = 0L;
+    int mnum = obj->corpsenm;
+    if (!nonrotting_corpse(mnum))
+    {
+        long age = peek_at_iced_corpse_age(obj);
+
+        /* worst case rather than random
+            in this calculation to force prompt */
+        rotted = (monstermoves - age) / (CORPSE_ROTTING_SPEED + 0 /* was rn2(CORPSE_ROTTING_SPEED_VARIATION) */);
+        if (obj->cursed)
+            rotted += 2L;
+        else if (obj->blessed)
+            rotted -= 2L;
+    }
+
+    return rotted;
+}
 /*
  * return 0 if the food was not dangerous.
  * return 1 if the food was dangerous and you chose to stop.
@@ -3086,7 +3121,7 @@ struct obj *otmp;
      */
     char buf[BUFSZ], foodsmell[BUFSZ],
          it_or_they[QBUFSZ], eat_it_anyway[QBUFSZ];
-    boolean cadaver = (otmp->otyp == CORPSE || otmp->globby),
+    boolean cadaver = is_obj_rotting_corpse(otmp), // (otmp->otyp == CORPSE || otmp->globby),
             stoneorslime = FALSE;
     int material = objects[otmp->otyp].oc_material, mnum = otmp->corpsenm;
     long rotted = 0L;
@@ -3107,15 +3142,17 @@ struct obj *otmp;
 
         if (cadaver && mnum >= LOW_PM && !nonrotting_corpse(mnum))
         {
-            long age = peek_at_iced_corpse_age(otmp);
+            rotted = get_rotted_status(otmp);
+            otmp->speflags |= SPEFLAGS_ROTTING_STATUS_KNOWN;
+            //long age = peek_at_iced_corpse_age(otmp);
 
-            /* worst case rather than random
-               in this calculation to force prompt */
-            rotted = (monstermoves - age) / (CORPSE_ROTTING_SPEED + 0 /* was rn2(CORPSE_ROTTING_SPEED_VARIATION) */);
-            if (otmp->cursed)
-                rotted += 2L;
-            else if (otmp->blessed)
-                rotted -= 2L;
+            ///* worst case rather than random
+            //   in this calculation to force prompt */
+            //rotted = (monstermoves - age) / (CORPSE_ROTTING_SPEED + 0 /* was rn2(CORPSE_ROTTING_SPEED_VARIATION) */);
+            //if (otmp->cursed)
+            //    rotted += 2L;
+            //else if (otmp->blessed)
+            //    rotted -= 2L;
         }
     }
 
@@ -3259,6 +3296,7 @@ doeat()
 
     if (Strangled) 
     {
+        play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "If you can't breathe air, how can you consume solids?");
         return 0;
     }
@@ -3307,14 +3345,14 @@ doeat()
     if (!is_edible(otmp))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot eat that!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot eat that!");
         return 0;
     }
     else if ((otmp->owornmask & (W_ARMOR | W_BLINDFOLD | W_AMUL | W_SADDLE)) != 0) 
     {
         /* let them eat rings */
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant("eat %s you're wearing.", something);
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "eat %s you're wearing.", something);
         return 0;
     }
     else if (!(carried(otmp) ? retouch_object(&otmp, FALSE)
@@ -3392,7 +3430,7 @@ doeat()
         context.victual.o_id = otmp->o_id;
         /* Don't split it, we don't need to if it's 1 move */
         context.victual.usedtime = 0;
-        context.victual.canchoke = (u.uhs == SATIATED);
+        context.victual.canchoke = (u.uhs == SATIATED) && can_obj_cause_choking(otmp);
         /* Note: gold weighs 1 pt. for each 1000 pieces (see
            pickup.c) so gold and non-gold is consistent. */
         if (otmp->oclass == COIN_CLASS)
@@ -3506,7 +3544,8 @@ doeat()
      * for normal vs. rotten food.  The reqtime and nutrit values are
      * then adjusted in accordance with the amount of food left.
      */
-    if (otmp->otyp == CORPSE || otmp->globby) 
+    int identifycolor = CLR_MSG_ATTENTION;
+    if (is_obj_rotting_corpse(otmp))
     {
         int tmp = eatcorpse(otmp);
 
@@ -3561,8 +3600,8 @@ doeat()
             }
             else 
             {
+                identifycolor = CLR_MSG_NEGATIVE;
                 long sick_time;
-
                 sick_time = (long)rn1(10, 10);
                 /* make sure new ill doesn't result in improvement */
                 if (FoodPoisoned && (sick_time > FoodPoisoned))
@@ -3588,6 +3627,7 @@ doeat()
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_POISONOUS)
         {
+            identifycolor = CLR_MSG_NEGATIVE;
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Ecch - that must have been poisonous!");
             if (!Poison_resistance) 
             {
@@ -3604,6 +3644,7 @@ doeat()
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_DEADLY_POISONOUS)
         {
+            identifycolor = CLR_MSG_NEGATIVE;
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Ecch - that must have been terribly poisonous!");
             if (!Poison_resistance) 
             {
@@ -3620,12 +3661,14 @@ doeat()
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_SICKENING && !Sick_resistance)
         {
+            identifycolor = CLR_MSG_NEGATIVE;
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%ssick.", (FoodPoisoned) ? "very " : "");
             losehp(adjust_damage(rnd(8), (struct monst*)0, &youmonst, AD_DISE, ADFLAGS_NONE), "sickening food", KILLED_BY_AN);
             consume_oeaten(otmp, 2); /* oeaten >>= 2 */
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_HALLUCINATING && !Halluc_resistance)
         {
+            identifycolor = CLR_MSG_NEGATIVE;
             int duration = d(objects[otmp->otyp].oc_spell_dur_dice, objects[otmp->otyp].oc_spell_dur_diesize) + objects[otmp->otyp].oc_spell_dur_plus;
 
             if(duration > 0)
@@ -3650,8 +3693,9 @@ doeat()
                 play_occupation_immediate_sound(objects[otmp->otyp].oc_soundset, OCCUPATION_EATING, OCCUPATION_SOUND_TYPE_START);
             }
             consume_oeaten(otmp, 1); /* oeaten >>= 1 */
-        } else
-                food_pre_effect(otmp);
+        } 
+        else
+            food_pre_effect(otmp);
     }
 
     /* re-calc the nutrition */
@@ -3661,7 +3705,7 @@ doeat()
     {
         makeknown(otmp->otyp);
         //if(objects[otmp->otyp].oc_edible_subtype != EDIBLETYPE_NORMAL)
-        pline("That was %s!", an(cxname_singular(otmp)));
+        pline_ex(ATR_NONE, identifycolor, "That was %s!", an(cxname_singular(otmp)));
     }
 
     debugpline3(
@@ -3687,7 +3731,7 @@ doeat()
                                  / context.victual.reqtime);
     else
         context.victual.nmod = context.victual.reqtime % otmp->oeaten;
-    context.victual.canchoke = (u.uhs == SATIATED);
+    context.victual.canchoke = (u.uhs == SATIATED) && can_obj_cause_choking(otmp);
 
     if (!dont_start)
         start_eating(otmp, FALSE);
@@ -3877,6 +3921,7 @@ int num;
 
     debugpline1("lesshungry(%d)", num);
     u.uhunger += num;
+
     if (u.uhunger >= 2000)
     {
         if (!iseating || context.victual.canchoke) 
@@ -3917,7 +3962,7 @@ int num;
                     {
                         const char* conteattxt = "Continue eating?";
                         char buf[BUFSZ];
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
                         Sprintf(buf, "%s %s", hardtimetxt, conteattxt);
 #else
                         pline1(hardtimetxt);
@@ -4245,7 +4290,7 @@ skipfloor:
         if (otmp->otyp != CORPSE || (corpsecheck == 2 && !tinnable(otmp)))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You_cant("%s that!", verb);
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "%s that!", verb);
             return (struct obj *) 0;
         }
     return otmp;

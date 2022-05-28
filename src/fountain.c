@@ -28,7 +28,8 @@ const char *what;
         umsg = "are trapped in the %s.";
         what = surface(u.ux, u.uy); /* probably redundant */
     }
-    You(umsg, what);
+    play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
+    You_ex(ATR_NONE, CLR_MSG_FAIL, umsg, what);
 }
 
 /* Fountain of snakes! */
@@ -265,7 +266,7 @@ drinkfountain()
             pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "The water makes you feel better.");
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of healing.");
+                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That was a fountain of healing.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -297,7 +298,7 @@ drinkfountain()
             pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "The water makes magical energies course through your body.");
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of mana.");
+                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That was a fountain of mana.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -308,7 +309,7 @@ drinkfountain()
         pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "The water fills your body with new energy.");
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of power.");
+            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That was a fountain of power.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
     }
@@ -332,7 +333,7 @@ drinkfountain()
         update_hunger_status(FALSE);
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline("That was a natural spring.");
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a natural spring.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
     }
@@ -353,7 +354,7 @@ drinkfountain()
         }
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of poison.");
+            pline_ex(ATR_NONE, Poison_resistance ? CLR_MSG_ATTENTION : CLR_MSG_NEGATIVE, "That was a fountain of poison.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
     }
@@ -392,7 +393,7 @@ drinkfountain()
         levl[u.ux][u.uy].blessedftn = 0;
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline("That was an enchanted magic fountain.");
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "That was an enchanted magic fountain.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
         return;
@@ -411,20 +412,20 @@ drinkfountain()
         switch (fate) 
         {
         case 19: /* Self-knowledge */
-            pline_The("water tingles in your mouth.");
-            You_feel("self-knowledgeable...");
+            pline_The_ex(ATR_NONE, CLR_MSG_POSITIVE, "water tingles in your mouth.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "self-knowledgeable...");
             display_nhwindow(WIN_MESSAGE, FALSE);
             enlightenment(MAGICENLIGHTENMENT, ENL_GAMEINPROGRESS);
             exercise(A_WIS, TRUE);
             pline_The("feeling subsides.");
             break;
         case 20: /* Foul water */
-            pline_The("water is foul!  You gag and vomit.");
+            pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "water is foul!  You gag and vomit.");
             morehungry(rn1(20, 11));
             vomit();
             break;
         case 21: /* Poisonous */
-            pline_The("water is contaminated!");
+            pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "water is contaminated!");
             if (Poison_resistance) {
                 pline("Perhaps it is runoff from the nearby %s farm.",
                       fruitname(FALSE));
@@ -436,21 +437,21 @@ drinkfountain()
             exercise(A_CON, FALSE);
             break;
         case 22: /* Fountain of snakes! */
-            pline_The("water tastes a bit slimy.");
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "water tastes a bit slimy.");
             if (zlevel > 8) {
                 dowatersnakes();
             }
             else
             {
-                You_hear("a snake hissing.");
+                You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a snake hissing.");
             }
             break;
         case 23: /* Water demon */
-            pline_The("water tastes bitter.");
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "water tastes bitter.");
             if (zlevel > 12) {
                 if (item_prevents_summoning(PM_WATER_DEMON)) 
                 {
-                    pline("You have a passing sensation of relief.");
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "You have a passing sensation of relief.");
                 }
                 else
                 {
@@ -459,14 +460,14 @@ drinkfountain()
             }
             else
             {
-                You("feel as if something evil is watching you.");
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel as if something evil is watching you.");
             }
             break;
         case 24: /* Curse an item */
         {
             register struct obj *obj;
 
-            pline("This water's no good!");
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "This water's no good!");
             morehungry(rn1(20, 11));
             exercise(A_CON, FALSE);
             for (obj = invent; obj; obj = obj->nobj)
@@ -475,16 +476,16 @@ drinkfountain()
             break;
         }
         case 25: /* See invisible */
-            pline_The("water is tasteless.");
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "water is tasteless.");
             if (Blind) {
                 if (Invisib) {
-                    You("feel transparent.");
+                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel transparent.");
                 } else {
-                    You("feel very self-conscious.");
+                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel very self-conscious.");
                     pline("Then it passes.");
                 }
             } else {
-                You_see("an image of someone stalking you.");
+                You_see_ex(ATR_NONE, CLR_MSG_ATTENTION, "an image of someone stalking you.");
                 pline("But it disappears.");
             }
             HSee_invisible |= FROM_ACQUIRED;
@@ -492,30 +493,30 @@ drinkfountain()
             exercise(A_WIS, TRUE);
             break;
         case 26: /* See Monsters */
-            pline_The("water tingles in your mouth.");
+            pline_The_ex(ATR_NONE, CLR_MSG_POSITIVE, "water tingles in your mouth.");
             (void) monster_detect((struct obj *) 0, 0);
             exercise(A_WIS, TRUE);
             break;
         case 27: /* Find a gem in the sparkling waters. */
-            pline_The("water is hard.");
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "water is hard.");
             if (!FOUNTAIN_IS_LOOTED(u.ux, u.uy)) {
                 dofindgem();
                 break;
             }
             /*FALLTHRU*/
         case 28: /* Water Nymph */
-            pline_The("water tastes very sweet.");
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "water tastes very sweet.");
             if (zlevel > 4) {
                 dowaternymph();
             }
             else
             {
                 if (Blind) {
-                    You("feel as if somebody is watching you.");
+                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel as if somebody is watching you.");
                     pline("But then it passes disappears.");
                 }
                 else {
-                    You_see("an image of someone stalking you.");
+                    You_see_ex(ATR_NONE, CLR_MSG_ATTENTION, "an image of someone stalking you.");
                     pline("But it disappears.");
                 }
             }
@@ -524,7 +525,7 @@ drinkfountain()
         {
             register struct monst *mtmp;
 
-            pline("This %s gives you bad breath!",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "This %s gives you bad breath!",
                   hliquid("water"));
             for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
                 if (DEADMONSTER(mtmp))
@@ -534,18 +535,18 @@ drinkfountain()
             break;
         }
         case 30: /* Gushing forth in this room */
-            pline_The("water suddenly starts bubbling.");
+            pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "water suddenly starts bubbling.");
             dogushforth(TRUE);
             break;
         default:
-            pline("This tepid %s is tasteless.",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "This tepid %s is tasteless.",
                   hliquid("water"));
             break;
         }
 
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline("That was a magic fountain.");
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "That was a magic fountain.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
 
@@ -697,7 +698,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of healing.");
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "That was a fountain of healing.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -767,7 +768,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of mana.");
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "That was a fountain of mana.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -850,7 +851,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of power.");
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "That was a fountain of power.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -919,7 +920,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of poison.");
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "That was a fountain of poison.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }

@@ -38,10 +38,11 @@ namespace GnollHackClient
             var mainPage = new MainPage();
             var navPage = new NavigationPage(mainPage);
             MainPage = navPage;
-            App.HideAndroidNavigatioBar = Preferences.Get("HideAndroidNavigationBar", false);
+            App.HideAndroidNavigatioBar = Preferences.Get("HideAndroidNavigationBar", GHConstants.DefaultHideNavigation);
             App.DeveloperMode = Preferences.Get("DeveloperMode", GHConstants.DefaultDeveloperMode);
             App.FullVersionMode = true; // Preferences.Get("FullVersion", true);
             App.ClassicMode = Preferences.Get("ClassicMode", false);
+            App.CasualMode = Preferences.Get("CasualMode", false);
             App.SponsorButtonVisited = Preferences.Get("SponsorButtonVisited", false);
             App.ShowSpecialEffect = Preferences.Get("ShowSpecialEffect", false);
             App.ReadSecrets();
@@ -81,14 +82,20 @@ namespace GnollHackClient
 
         protected override void OnStart()
         {
+            if(PlatformService != null)
+                PlatformService.OverrideAnimationDuration();
         }
 
         protected override void OnSleep()
         {
+            if (PlatformService != null)
+                PlatformService.RevertAnimationDuration();
         }
 
         protected override void OnResume()
         {
+            if (PlatformService != null)
+                PlatformService.OverrideAnimationDuration();
         }
 
         public static void LoadServices()
@@ -116,9 +123,9 @@ namespace GnollHackClient
                 _fmodService.InitializeFmod();
                 _fmodService.LoadBanks();
             }
-            catch
+            catch(Exception ex)
             {
-
+                Console.WriteLine(ex.Message);
             }
         }
 
@@ -171,6 +178,7 @@ namespace GnollHackClient
         public static bool DeveloperMode { get; set; }
         public static bool FullVersionMode { get; set; }
         public static bool ClassicMode { get; set; }
+        public static bool CasualMode { get; set; }
         public static bool ServerGameAvailable { get; set; }
 
         public static string GHVersionId { get; set; }
@@ -194,6 +202,11 @@ namespace GnollHackClient
         public static IFmodService FmodService { get { return _fmodService; } }
         private static IPlatformService _platformService = null;
         public static IPlatformService PlatformService { get { return _platformService; } }
+
+        public static readonly float DisplayRefreshRate = Math.Max(30.0f, DeviceDisplay.MainDisplayInfo.RefreshRate);
+        public static readonly bool IsAndroid = (Device.RuntimePlatform == Device.Android);
+        public static readonly bool IsiOS = (Device.RuntimePlatform == Device.iOS);
+        public static readonly bool IsUWP = (Device.RuntimePlatform == Device.UWP);
 
         public static async Task<bool> OnBackButtonPressed()
         {
@@ -599,6 +612,15 @@ namespace GnollHackClient
             if (!Directory.Exists(targetpath))
                 Directory.CreateDirectory(targetpath);
 
+            try
+            {
+                GnollHackService.Chmod(targetpath, (uint)ChmodPermissions.S_IALL);
+            }
+            catch
+            {
+
+            }
+
             //DirectoryInfo dinfo = new DirectoryInfo(targetpath);
             bool writesuccessful = false;
             string testfilepath = Path.Combine(targetpath, "test.txt");
@@ -628,6 +650,7 @@ namespace GnollHackClient
 
             if (!writesuccessful)
             {
+                
                 try
                 {
                     if (Directory.Exists(targetpath))
@@ -641,6 +664,8 @@ namespace GnollHackClient
                     }
                     if (!Directory.Exists(targetpath))
                         Directory.CreateDirectory(targetpath);
+
+                    GnollHackService.Chmod(targetpath, (uint)ChmodPermissions.S_IALL);
                 }
                 catch
                 {

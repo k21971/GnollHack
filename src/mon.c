@@ -180,6 +180,10 @@ int mndx;
     case PM_HUMAN_MUMMY:
         mndx = PM_HUMAN;
         break;
+    case PM_GNOLL_ZOMBIE:
+    case PM_GNOLL_MUMMY:
+        mndx = PM_GNOLL;
+        break;
     case PM_GIANT_ZOMBIE:
     case PM_GIANT_MUMMY:
         mndx = PM_GIANT;
@@ -577,7 +581,7 @@ boolean createcorpse;
         num = undead_to_corpse(mndx);
         corpstatflags |= CORPSTAT_INIT;
         obj = mkcorpstat(CORPSE, mtmp, &mons[num], x, y, corpstatflags);
-        obj->age -= 100; /* this is an *OLD* corpse */
+        obj->age -= CORPSE_ROTTING_SPEED * 10L; /* this is an *OLD* corpse */
         break;
     case PM_KOBOLD_MUMMY:
     case PM_DWARF_MUMMY:
@@ -585,6 +589,7 @@ boolean createcorpse;
     case PM_ORC_MUMMY:
     case PM_ELF_MUMMY:
     case PM_HUMAN_MUMMY:
+    case PM_GNOLL_MUMMY:
     case PM_GIANT_MUMMY:
     case PM_ETTIN_MUMMY:
     case PM_KOBOLD_ZOMBIE:
@@ -593,12 +598,13 @@ boolean createcorpse;
     case PM_ORC_ZOMBIE:
     case PM_ELF_ZOMBIE:
     case PM_HUMAN_ZOMBIE:
+    case PM_GNOLL_ZOMBIE:
     case PM_GIANT_ZOMBIE:
     case PM_ETTIN_ZOMBIE:
         num = undead_to_corpse(mndx);
         corpstatflags |= CORPSTAT_INIT;
         obj = mkcorpstat(CORPSE, mtmp, &mons[num], x, y, corpstatflags);
-        obj->age -= 100; /* this is an *OLD* corpse */
+        obj->age -= CORPSE_ROTTING_SPEED * 10L; /* this is an *OLD* corpse */
         break;
     case PM_IRON_GOLEM:
     {
@@ -1247,7 +1253,7 @@ update_monster_timeouts()
             mtmp->heads_left++;
             if (canseemon(mtmp))
             {
-                pline("%s grows a new head!", Monnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s grows a new head!", Monnam(mtmp));
             }
         }
 
@@ -1281,25 +1287,25 @@ update_monster_timeouts()
                     case STRANGLED:
                         if (canseemon(mtmp) && !is_breathless(mtmp))
                         {
-                            pline("%s is gasping for air!", Monnam(mtmp));
+                            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is gasping for air!", Monnam(mtmp));
                         }
                         break;
                     case AIRLESS_ENVIRONMENT:
                         if (canseemon(mtmp) && !is_breathless(mtmp) && !(is_pool(mtmp->mx, mtmp->my) && amphibious(mtmp->data)))
                         {
-                            pline("%s is gasping for air!", Monnam(mtmp));
+                            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is gasping for air!", Monnam(mtmp));
                         }
                         break;
                     case SICK:
                         if (canseemon(mtmp) && is_living(mtmp->data))
                         {
                             if(has_head(mtmp->data) && !rn2(3))
-                                pline("%s coughs%s%s!", Monnam(mtmp),
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s coughs%s%s!", Monnam(mtmp),
                                     duration >= 10 ? (!rn2(2) ? " roughly" : "") : duration >= 5 ? " feverishly" : " morbidly",
                                     !is_tame(mtmp) ? " at your general direction" : "");
                             else if (duration < 9)
                             {
-                                pline("%s looks %s!", Monnam(mtmp), duration >= 6 ? "very feverish" : duration >= 4 ? "gravely ill" : "deathly sick");
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks %s!", Monnam(mtmp), duration >= 6 ? "very feverish" : duration >= 4 ? "gravely ill" : "deathly sick");
                             }
                             if (duration <= 8)
                                 (void)nonadditive_increase_mon_property_verbosely(mtmp, CONFUSION, duration + 1);
@@ -4046,7 +4052,7 @@ boolean has_effects;
     if (!in_mklev && (mtmp->mstrategy & STRAT_APPEARMSG)) {
         mtmp->mstrategy &= ~STRAT_APPEARMSG; /* one chance only */
         if (!couldspot && canspotmon(mtmp))
-            pline("%s suddenly %s!", Amonnam(mtmp),
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s suddenly %s!", Amonnam(mtmp),
                   !Blind ? "appears" : "arrives");
     }
     return;
@@ -4245,7 +4251,7 @@ boolean via_attack;
         if (humanoid(mtmp->data) || mtmp->isshk || mtmp->isgd)
         {
             play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_GET_ANGRY);
-            pline("%s gets angry!", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s gets angry!", Monnam(mtmp));
         }
         else if (flags.verbose && !Deaf)
             growl(mtmp);
@@ -4279,7 +4285,7 @@ boolean via_attack;
 
             if (got_mad > 1)
                 who = makeplural(who);
-            pline_The("%s %s to be angry too...",
+            pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s %s to be angry too...",
                       who, vtense(who, "appear"));
         }
     }
@@ -4334,7 +4340,7 @@ boolean via_attack;
                             if (!exclaimed)
                             {
                                 play_simple_monster_sound(mon, MONSTER_SOUND_TYPE_GET_ANGRY);
-                                pline("%s gets angry!", Monnam(mon));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s gets angry!", Monnam(mon));
                             }
                         }
                     }
@@ -5513,14 +5519,14 @@ boolean silent;
     if (ct) {
         if (!silent) { /* do we want pline msgs? */
             if (slct)
-                pline_The("guard%s wake%s up!", slct > 1 ? "s" : "",
+                pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "guard%s wake%s up!", slct > 1 ? "s" : "",
                           slct == 1 ? "s" : "");
             if (nct || sct) {
                 if (nct)
-                    pline_The("guard%s get%s angry!", nct == 1 ? "" : "s",
+                    pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "guard%s get%s angry!", nct == 1 ? "" : "s",
                               nct == 1 ? "s" : "");
                 else if (!Blind)
-                    You_see("%sangry guard%s approaching!",
+                    You_see_ex(ATR_NONE, CLR_MSG_WARNING, "%sangry guard%s approaching!",
                             sct == 1 ? "an " : "", sct > 1 ? "s" : "");
             } else
                 You_hear("the shrill sound of a guard's whistle.");

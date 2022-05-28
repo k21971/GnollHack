@@ -797,6 +797,7 @@ BRAZIER: (31,01), brazier_normal, lit
 BRAZIER: (31,03), brazier_normal, lit
 SIGNPOST: (15,02), signpost_normal,"Uninvited Visitors Not Welcome"
 
+MONSTER:('d',"Cerberus"),(07,02)
 MONSTER:'&',random
 MONSTER:'&',random
 MONSTER:'&',random {
@@ -817,6 +818,8 @@ NAMING:"A hellish mansion", name_revealed_seeing_monster, montype:"Baalzebub"
 GEOMETRY:right,center
 # the two pools are fakes used to mark spots which need special wall fixups
 # the two iron bars are eyes and spots to their left will be made diggable
+#         1         2         3         4         5
+#12345678901234567890123456789012345678901234567890
 MAP
           LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL    
           LLLLLLLLLL----LLLLLLLLLLLLLLL----LL    
@@ -839,6 +842,11 @@ TELEPORT_REGION:levregion(01,00,15,20),levregion(15,1,70,16)
 NON_DIGGABLE:(00,00,47,12)
 SPECIAL_REGION:(00,00,47,12),region_special_level_seen
 
+MONSTER_GENERATION: 24, '&' 
+MONSTER_GENERATION: 8, ('m',"chaos mimic") 
+MONSTER_GENERATION: 8, ('&',"sandestin") 
+MONSTER_GENERATION: 8, ('i',"lemure") 
+
 MAZEWALK:(00,06),west
 STAIR:(44,06),down
 DOOR:locked,(00,06),subtype:door_black_gate
@@ -848,12 +856,28 @@ IF [50%] {
    TERRAIN:(29,05),'|'
    TERRAIN:(29,07),'S'
 }
+
+BRAZIER:(03,04)
+BRAZIER:(03,08)
+BRAZIER:(06,04)
+BRAZIER:(06,08)
+BRAZIER:(11,05)
+BRAZIER:(11,07)
+BRAZIER:(18,04)
+BRAZIER:(18,08)
+BRAZIER:(27,03)
+BRAZIER:(27,09)
+BRAZIER:(35,03)
+BRAZIER:(35,09)
+BRAZIER:(30,06)
+BRAZIER:(41,06)
+
 # The fellow in residence
 MONSTER:('&',"Baalzebub"),(35,06) {
   OBJECT:('(',"ornamental key"),special_quality:5
 }
 CONTAINER:('(',"chest"),trapped,locked,(35,06),keytype:('(',"ornamental key"),special_quality:5,no_pickup {
-   OBJECT:('$',"gold piece"), quantity:(3500+(3d1000))
+   OBJECT:('$',"gold piece"), quantity:(1000+(1d1000))
    [25%]:OBJECT:artifact
    OBJECT:random_contents
    OBJECT:random_contents
@@ -885,15 +909,76 @@ TRAP:"anti magic", random
 TRAP:"fire", random
 TRAP:"magic", random
 TRAP:"magic", random
+
+# Guardian mimic
+MONSTER:('m',"chaos mimic"),(07,06)
+
+# Baalzebub's court
+MONSTER:('&',"pit fiend"),(32,05),hostile
+MONSTER:('&',"sandestin"),(33,05),hostile
+MONSTER:('&',"pit fiend"),(38,07),hostile
+MONSTER:('&',"sandestin"),(33,07),hostile
+
+# Corrupted kings of each player race
+MONSTER:('@',"Elvenking"),random,hostile,male,"Orodhuil the Black-Hearted" {
+   OBJECT:(')', "elven broadsword"),cursed,exceptionality:elite,enchantment:(1d4),legendary
+   OBJECT:('[', "elven mithril-coat"),cursed,enchantment:(2 + (1d4)),legendary
+   OBJECT:('[', "elven shield"),enchantment:(1d4)
+   OBJECT:('[', "royal crown"),cursed,enchantment:(1d4)
+   OBJECT:('$',"gold piece"), quantity:(500+(1d500))
+}
+MONSTER:('h',"dwarf king"),random,hostile,male,"Burin the Wicked" {
+   OBJECT:('[', "helm of opposite alignment"),enchantment:(1d4)
+   OBJECT:(')', "dwarvish axe"),cursed,exceptionality:elite,enchantment:(1d4),legendary
+   OBJECT:('[', "dwarvish mithril-coat"),cursed,enchantment:(1d4),legendary
+   OBJECT:('[', "dwarvish roundshield"),enchantment:(1d4)
+   OBJECT:('$',"gold piece"), quantity:(500+(1d500))
+}
+MONSTER:('G',"gnoll king"),random,hostile,male,"Hoggen II"
+MONSTER:('@',"human king"),random,hostile,male,"Varamir the Terrible" {
+   OBJECT:('[', "royal crown"),cursed,enchantment:(1d4)
+   OBJECT:(')', "long sword"),cursed,exceptionality:elite,enchantment:3,legendary
+   OBJECT:('[', "full plate mail"),cursed,enchantment:(2 + (1d4)),legendary
+   OBJECT:('[', "large shield"),enchantment:(1d4)
+   OBJECT:('$',"gold piece"), quantity:(500+(1d500))
+}
+MONSTER:('o',"orc king"),random,hostile,male,"Obuld I Longfangs" {
+   OBJECT:('[', "royal crown"),cursed,enchantment:(1d4)
+   OBJECT:(')', "sword of unholy desecration"),cursed,enchantment:(2 + (1d4))
+   OBJECT:('[', "orcish chain mail"),cursed,enchantment:(2 + (1d4)),legendary
+   OBJECT:('[', "great orcish shield"),enchantment:(1d4)
+   OBJECT:('$',"gold piece"), quantity:(500+(1d500))
+}
+
 # Random monsters.
-MONSTER:(' ',"ghost"),(37,07)
-MONSTER:('&',"horned devil"),(32,05)
-MONSTER:('&',"barbed devil"),(38,07)
-MONSTER:'L',random
-# Some Vampires for good measure
-MONSTER:'V',random
-MONSTER:'V',random
-MONSTER:'V',random
+MONSTER:('&',"sandestin"),random,hostile
+MONSTER:('&',"sandestin"),random,hostile
+MONSTER:('&',"sandestin"),random,hostile
+MONSTER:('&',"sandestin"),random,hostile
+MONSTER:('m',"chaos mimic"),random
+MONSTER:('m',"chaos mimic"),random
+MONSTER:('m',"chaos mimic"),random
+MONSTER:('m',"chaos mimic"),random
+MONSTER:('&',"pit fiend"),(22,04)
+MONSTER:('&',"pit fiend"),(23,04)
+MONSTER:('&',"pit fiend"),(22,08)
+MONSTER:('&',"pit fiend"),(23,08)
+MONSTER:('&',"erinys"),(22,05)
+MONSTER:('&',"erinys"),(23,05)
+MONSTER:('&',"erinys"),(22,07)
+MONSTER:('&',"erinys"),(23,07)
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
+MONSTER:('i',"lemure"),random
 
 ########################
 #

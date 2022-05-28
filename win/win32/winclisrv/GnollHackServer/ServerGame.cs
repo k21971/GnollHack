@@ -74,8 +74,8 @@ namespace GnollHackServer
             VoidVoidCallback callback_end_screen,
             OutRipCallback callback_outrip,
             VoidConstCharCallback callback_preference_update,
-            CharPtrBooleanCallback callback_getmsghistory,
-            VoidConstCharBooleanCallback callback_putmsghistory,
+            GetMsgHistoryCallback callback_getmsghistory,
+            PutMsgHistoryCallback callback_putmsghistory,
             VoidVoidCallback callback_status_init,
             VoidVoidCallback callback_status_finish,
             VoidIntConstCharPtrConstCharPtrBooleanCallback callback_status_enablefield,
@@ -235,8 +235,8 @@ namespace GnollHackServer
                 GameCallback_VoidVoidDummy,
                 GameCallback_OutRip,
                 GameCallback_VoidConstCharDummy,
-                GameCallback_CharPtrBooleanDummy,
-                GameCallback_VoidConstCharBooleanDummy,
+                GameCallback_GetMsgHistory,
+                GameCallback_PutMsgHistory,
                 GameCallback_VoidVoidDummy,
                 GameCallback_VoidVoidDummy,
                 GameCallback_VoidIntConstCharPtrConstCharPtrBooleanDummy,
@@ -359,7 +359,7 @@ namespace GnollHackServer
         }
 
         protected void GameCallback_AddExtendedMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, string text, byte presel, int color, int maxcount,
-            UInt64 oid, UInt64 mid, char heading_group_accel, char special_mark, ulong menu_flags, byte dataflags, int style, obj otmpdata, objclassdata otypdata)
+            UInt64 oid, UInt64 mid, char heading_group_accel, char special_mark, ulong menu_flags, byte dataflags, int style, IntPtr otmpdata_ptr, IntPtr otypdata_ptr)
         {
 
         }
@@ -367,6 +367,19 @@ namespace GnollHackServer
         protected void GameCallback_EndMenu(int value1, string value2, string value3)
         {
 
+        }
+
+        public string GameCallback_GetMsgHistory(IntPtr attr, IntPtr color, byte init)
+        {
+            if(attr != IntPtr.Zero)
+                Marshal.WriteInt32(attr, 0);
+            if (color != IntPtr.Zero)
+                Marshal.WriteInt32(color, (int)nhcolor.NO_COLOR);
+            return null;
+        }
+
+        public void GameCallback_PutMsgHistory(string msg, int attr, int color, byte is_restoring)
+        {
         }
 
         protected void GameCallback_FreeMemory(ref IntPtr ptr)
@@ -379,11 +392,11 @@ namespace GnollHackServer
 
         }
 
-        public void GameCallback_SendObjectData(int x, int y, obj otmp, int cmdtype, int where, objclassdata otypdata, ulong oflags)
+        public void GameCallback_SendObjectData(int x, int y, IntPtr otmp_ptr, int cmdtype, int where, IntPtr otypdata_ptr, ulong oflags)
         {
 
         }
-        public void GameCallback_SendMonsterData(int cmdtype, int x, int y, monst_info monster_data, ulong oflags)
+        public void GameCallback_SendMonsterData(int cmdtype, int x, int y, IntPtr monster_data_ptr, ulong oflags)
         {
 
         }
@@ -441,7 +454,7 @@ namespace GnollHackServer
             return 0;
         }
 
-        protected int GameCallback_CreateGHWindow(int widid, int style, int glyph, byte dataflags, obj objdata, objclassdata otypdata)
+        protected int GameCallback_CreateGHWindow(int widid, int style, int glyph, byte dataflags, IntPtr objdata, IntPtr otypdata)
         {
             return 0;
         }
@@ -593,7 +606,7 @@ namespace GnollHackServer
         {
             return "";
         }
-        protected void GameCallback_PrintGlyph(int value1, int value2, int value3, int value4, int value5, int value6, int value7, uint value8, LayerInfo layers)
+        protected void GameCallback_PrintGlyph(int value1, int value2, int value3, int value4, int value5, int value6, int value7, uint value8, IntPtr layers_ptr)
         {
             return;
         }

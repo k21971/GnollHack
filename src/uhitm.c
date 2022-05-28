@@ -252,12 +252,12 @@ struct monst *mtmp;
         && (!mon_can_move(mtmp)
             || (is_fleeing(mtmp) && !mtmp->mavenge))) {
         play_sfx_sound(SFX_CAITIFF);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "caitiff!");
+        You_ex(ATR_NONE, CLR_MSG_WARNING, "caitiff!");
         adjalign(-1);
     } else if (Role_if(PM_SAMURAI) && is_peaceful(mtmp)) {
         /* attacking peaceful creatures is bad for the samurai's giri */
         play_sfx_sound(SFX_CAITIFF);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "dishonorably attack the innocent!");
+        You_ex(ATR_NONE, CLR_MSG_WARNING, "dishonorably attack the innocent!");
         adjalign(-1);
     }
 }
@@ -345,7 +345,7 @@ int *attk_count, *role_roll_penalty;
     {
         if (weapon && nonmelee_throwing_weapon(weapon))
         {
-            pline("It is complicated to hit with %s in melee combat.", the(cxname(weapon)));
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "It is complicated to hit with %s in melee combat.", the(cxname(weapon)));
             tmp -= THROWING_WEAPON_TO_HIT_MELEE_PENALTY_WHEN_USED_AS_MELEE_WEAPON;
         }
 
@@ -1339,7 +1339,7 @@ boolean* obj_destroyed;
                     if (breaktest(obj)) 
                     {
                         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_BREAK);
-                        You("break %s.  That's bad luck!", ysimple_name(obj));
+                        You_ex(ATR_NONE, CLR_MSG_WARNING, "break %s.  That's bad luck!", ysimple_name(obj));
                         change_luck(-2, TRUE);
                         useup(obj);
                         obj = (struct obj*) 0;
@@ -1358,13 +1358,13 @@ boolean* obj_destroyed;
                     
                     play_simple_object_sound(obj, OBJECT_SOUND_TYPE_BREAK);
 
-                    You("succeed in destroying %s.  Congratulations!",
+                    You_ex(ATR_NONE, CLR_MSG_WARNING, "succeed in destroying %s.  Congratulations!",
                         ysimple_name(obj));
                     release_camera_demon(obj, u.ux, u.uy);
                     useup(obj);
                     return TRUE;
                 case CORPSE: /* fixed by polder@cs.vu.nl */
-                    if (touch_petrifies(&mons[obj->corpsenm])) 
+                    if (obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]))
                     {
                         damage = 1;
                         hittxt = TRUE;
@@ -1501,6 +1501,7 @@ boolean* obj_destroyed;
                 case CLOVE_OF_GARLIC: /* no effect against demons */
                     if (is_undead(mdat) || is_vampshifter(mon)) 
                     {
+                        play_sfx_sound_at_location(SFX_ACQUIRE_FEAR, mon->mx, mon->my);
                         monflee(mon, d(2, 4), FALSE, TRUE);
                     }
                     damage = 1;
@@ -2131,7 +2132,7 @@ boolean* obj_destroyed;
         }
 
         if (has_obj_mythic_wounding(obj))
-            extradmg += mythic_wounding_amount();
+            extradmg += mythic_wounding_amount(obj);
 
         if (extradmg > 0)
         {
@@ -2155,7 +2156,7 @@ boolean* obj_destroyed;
     }
 
     /* Life leech */
-    if (obj && !is_not_living(mon->data) && !is_rider(mon->data))
+    if (obj && !resists_life_leech(mon))
     {
         int extradmg = 0;
         if (
@@ -2183,7 +2184,7 @@ boolean* obj_destroyed;
         }
 
         if (has_obj_mythic_life_draining(obj))
-            extradmg += mythic_life_draining_amount();
+            extradmg += mythic_life_draining_amount(obj);
 
         if (extradmg > 0)
         {
@@ -2635,7 +2636,7 @@ STATIC_OVL boolean
 theft_petrifies(otmp)
 struct obj *otmp;
 {
-    if (uarmg || otmp->otyp != CORPSE
+    if (uarmg || otmp->otyp != CORPSE || otmp->corpsenm < LOW_PM
         || !touch_petrifies(&mons[otmp->corpsenm]) || Stone_resistance)
         return FALSE;
 
@@ -2974,10 +2975,10 @@ int specialdmg; /* blessed and/or silver bonus against various things */
             obj_extract_self(mongold);
             if (merge_choice(invent, mongold) || inv_cnt(FALSE) < 52) {
                 addinv(mongold);
-                Your_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "purse feels heavier.");
+                Your_ex(ATR_NONE, CLR_MSG_SUCCESS, "purse feels heavier.");
             } else {
                 play_ui_sound(UI_SOUND_KNAPSACK_FULL);
-                You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "grab %s's gold, but find no room in your knapsack.",
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "grab %s's gold, but find no room in your knapsack.",
                     mon_nam(mdef));
                 dropy(mongold);
             }
@@ -3013,7 +3014,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         if (can_blnd(&youmonst, mdef, mattk->aatyp, (struct obj *) 0)) 
         {
             if (!Blind && !is_blinded(mdef))
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s is blinded.", Monnam(mdef));
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is blinded.", Monnam(mdef));
             nonadditive_increase_mon_property(mdef, BLINDED, 1 + (int)ceil(damage));
         }
         damage = 0;
@@ -3022,13 +3023,13 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         if (night() && !rn2(10) && !is_cancelled(mdef)) {
             if (pd == &mons[PM_CLAY_GOLEM]) {
                 if (!Blind)
-                    pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "Some writing vanishes from %s head!",
+                    pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Some writing vanishes from %s head!",
                           s_suffix(mon_nam(mdef)));
                 xkilled(mdef, XKILL_NOMSG);
                 /* Don't return yet; keep hp<1 and damage=0 for pet msg */
             } else {
                 mdef->mprops[CANCELLED] = 100 + rnd(50);
-                You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "chuckle.");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "chuckle.");
             }
         }
         damage = 0;
@@ -3039,7 +3040,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
             hit_tile = HIT_DRAIN_LEVEL;
             int xtmp = d(2, 6);
 
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s suddenly seems weaker!", Monnam(mdef));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s suddenly seems weaker!", Monnam(mdef));
             mdef->mbasehpmax -= xtmp;
             update_mon_maxhp(mdef);
             deduct_monster_hp(mdef, adjust_damage(xtmp, &youmonst, mdef, mattk->adtyp, ADFLAGS_NONE));
@@ -3059,7 +3060,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
     case AD_RUST:
         if (is_iron(pd)) 
         {
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s falls to pieces!", Monnam(mdef));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s falls to pieces!", Monnam(mdef));
             xkilled(mdef, XKILL_NOMSG);
         }
         erode_armor(mdef, ERODE_RUST);
@@ -3071,7 +3072,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         break;
     case AD_DCAY:
         if (pd == &mons[PM_WOOD_GOLEM] || pd == &mons[PM_LEATHER_GOLEM]) {
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s falls to pieces!", Monnam(mdef));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s falls to pieces!", Monnam(mdef));
             xkilled(mdef, XKILL_NOMSG);
         }
         erode_armor(mdef, ERODE_ROT);
@@ -3144,17 +3145,17 @@ int specialdmg; /* blessed and/or silver bonus against various things */
                     damage = 0;
                 } else {
                     play_sfx_sound(SFX_ACQUIRE_GRAB);
-                    You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "swing yourself around %s!", mon_nam(mdef));
+                    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "swing yourself around %s!", mon_nam(mdef));
                     u.ustuck = mdef;
                 }
             } else if (u.ustuck == mdef) {
                 /* Monsters don't wear amulets of magical breathing */
                 if (is_pool(u.ux, u.uy) && !is_swimmer(pd)
                     && !amphibious(pd)) {
-                    You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "drown %s...", mon_nam(mdef));
+                    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "drown %s...", mon_nam(mdef));
                     damage = mdef->mhp;
                 } else if (mattk->aatyp == AT_HUGS)
-                    pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s is being crushed.", Monnam(mdef));
+                    pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is being crushed.", Monnam(mdef));
             } else {
                 damage = 0;
                 if (flags.verbose)
@@ -3169,7 +3170,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         {
             hit_tile = HIT_PARALYZED;
             if (!Blind)
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s is frozen by you!", Monnam(mdef));
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is frozen by you!", Monnam(mdef));
             paralyze_monst(mdef, 2 + rnd(8), FALSE);
         }
         break;
@@ -3185,7 +3186,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         {
             hit_tile = HIT_SLEEP;
             if (!Blind)
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s is put to sleep by you!", Monnam(mdef));
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is put to sleep by you!", Monnam(mdef));
             slept_monst(mdef);
         }
         break;
@@ -3198,7 +3199,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
             if (!munslime(mdef, TRUE) && !DEADMONSTER(mdef)) {
                 /* this assumes newcham() won't fail; since hero has
                    a slime attack, green slimes haven't been geno'd */
-                You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "turn %s into slime.", mon_nam(mdef));
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "turn %s into slime.", mon_nam(mdef));
                 if (newcham(mdef, &mons[PM_GREEN_SLIME], FALSE, FALSE))
                     pd = mdef->data;
             }
@@ -3231,7 +3232,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         if(chance > 0 && !Summon_forbidden)
         {
             if (rn2(100) < chance) {
-                You_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "gate in some help!");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "gate in some help!");
                 demonpet();
                 return 0;
             }
@@ -3276,7 +3277,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
     if (DEADMONSTER(mdef)) 
     {
         if(poisondamage > 0 && ((double)mdef->mhp + ((double)mdef->mhp_fraction)/10000 - 1) > -poisondamage)
-            Your_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "poison was deadly...");
+            Your_ex(ATR_NONE, CLR_MSG_SUCCESS, "poison was deadly...");
         
         if (is_tame(mdef) && !cansee(mdef->mx, mdef->my)) 
         {
@@ -3395,14 +3396,14 @@ register struct attack *mattk;
     case AD_BLND:
         if (!resists_blnd(mdef)) 
         {
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s is blinded by your flash of light!", Monnam(mdef));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is blinded by your flash of light!", Monnam(mdef));
             increase_mon_property(mdef, BLINDED, 1 + (int)ceil(damage));
         }
         break;
     case AD_HALU:
         if (haseyes(mdef->data) && !is_blinded(mdef)) 
         {
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s is affected by your flash of light!", Monnam(mdef));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is affected by your flash of light!", Monnam(mdef));
             increase_mon_property_verbosely(mdef, HALLUC, 100 + rnd(100));
         }
         break;
@@ -3417,7 +3418,7 @@ register struct attack *mattk;
  common:
         if (!resistance) 
         {
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s gets blasted!", Monnam(mdef));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s gets blasted!", Monnam(mdef));
             deduct_monster_hp(mdef, damage);
             if (DEADMONSTER(mdef)) 
             {
@@ -3615,7 +3616,7 @@ register struct attack *mattk;
                         nomovemsg = msgbuf;
                     }
                     else
-                        pline_ex1(ATR_NONE, CLR_MSG_SUCCESSFUL, msgbuf);
+                        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, msgbuf);
 
                     if (pd == &mons[PM_GREEN_SLIME]) 
                     {
@@ -4704,7 +4705,10 @@ struct obj *otmp; /* source of flash */
                 if (!context.mon_moving)
                     setmangry(mtmp, TRUE);
                 if (tmp < 9 && !mtmp->isshk && rn2(4))
+                {
+                    play_sfx_sound_at_location(SFX_ACQUIRE_FEAR, mtmp->mx, mtmp->my);
                     monflee(mtmp, rn2(4) ? rnd(100) : 0, FALSE, TRUE);
+                }
 
                 if (tmp < 3)
                     increase_mon_property(mtmp, BLINDED, rnd(1 + 50 / tmp));

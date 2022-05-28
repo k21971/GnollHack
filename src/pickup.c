@@ -290,7 +290,7 @@ boolean remotely;
     if (!obj || obj->otyp != CORPSE || !is_rider(&mons[obj->corpsenm]))
         return FALSE;
 
-    pline("At your %s, the corpse suddenly moves...",
+    pline_ex(ATR_NONE, CLR_MSG_WARNING, "At your %s, the corpse suddenly moves...",
           remotely ? "attempted acquisition" : "touch");
     (void) revive_corpse(obj);
     exercise(A_WIS, FALSE);
@@ -2184,7 +2184,7 @@ doloot()
                 if (mtmp)
                 {
                     play_sfx_sound(SFX_SOMETHING_IN_WAY);
-                    You_cant_ex(ATR_NONE, CLR_MSG_ATTENTION, "loot anything %sthere with %s in the way.",
+                    You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "loot anything %sthere with %s in the way.",
                              prev_inquiry ? "else " : "", mon_nam(mtmp));
                     return timepassed;
                 } 
@@ -2330,12 +2330,12 @@ boolean *prev_loot;
             if (nolimbs(youmonst.data)) 
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "do that without limbs."); /* not body_part(HAND) */
+                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "do that without limbs."); /* not body_part(HAND) */
                 return 0;
             }
             if (otmp->cursed)
             {
-                You_ex(ATR_NONE, CLR_MSG_WARNING, "can't.  The saddle seems to be stuck to %s.",
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "can't.  The saddle seems to be stuck to %s.",
                     x_monnam(mtmp, ARTICLE_THE, (char *) 0,
                              SUPPRESS_SADDLE, FALSE));
                 /* the attempt costs you time */
@@ -2438,6 +2438,16 @@ int held;
         return loss;
     }
     return 0;
+}
+
+/* Returns: -1 to stop, 1 item was inserted, 0 item was not inserted. */
+int
+stash_obj_in_container(obj, container)
+struct obj* obj, *container;
+{
+
+    current_container = container;
+    return in_container(obj);
 }
 
 /* Returns: -1 to stop, 1 item was inserted, 0 item was not inserted. */
@@ -2621,7 +2631,7 @@ register struct obj *obj;
         int saved_oclass = obj->oclass;
 
         /* explicitly mention what item is triggering the explosion */
-        pline("As you put %s inside, you are blasted by a magical explosion!",
+        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "As you put %s inside, you are blasted by a magical explosion!",
               doname(obj));
         /* did not actually insert obj yet */
         if (was_unpaid)
@@ -3565,11 +3575,26 @@ struct obj* other_container;
                            mflags, &pick_list, PICK_ANY);
         if (!n)
             return 0;
-        for (i = 0; i < n; i++) {
+
+        for (i = 0; i < n; i++) 
+        {
             if (pick_list[i].item.a_int == 'A')
+            {
+                if (ParanoidAutoSelectAll)
+                {
+                    if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "All Items Selected", "Are you sure to select all items?") != 'y')
+                    {
+                        free((genericptr_t)pick_list);
+                        return 0;
+                    }
+                }
+
                 loot_everything = TRUE;
+            }
             else if (pick_list[i].item.a_int == ALL_TYPES_SELECTED)
+            {
                 all_categories = TRUE;
+            }
             else
                 add_valid_menu_class(pick_list[i].item.a_int);
         }
@@ -4166,6 +4191,77 @@ struct obj *box; /* or bag */
         if (held)
             (void) encumber_msg();
     }
+}
+
+boolean
+can_stash_objs()
+{
+    struct obj* otmp;
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+    {
+        if (Is_container(otmp) && !(otmp->dknown && objects[otmp->otyp].oc_name_known && (!Is_proper_container(otmp) || otmp->olocked)))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static struct obj dummy_container = { 0 };
+
+void
+set_current_container_to_dummyobj()
+{
+    current_container = &dummy_container;
+}
+
+
+void
+set_current_container_to_null()
+{
+    current_container = 0;
+}
+
+/* the stash command */
+int
+dostash()
+{
+    struct obj* otmp = (struct obj*)0;
+
+    if (!can_stash_objs()) {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You1("do not have any containers to stash items into.");
+        return 0;
+    }
+
+    current_container = &dummy_container; /* dummy for getobj with stash */
+    otmp = getobj(getobj_stash_objs, "stash", 0, "");
+    current_container = 0;
+    if (!otmp)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (Is_container(otmp)) {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You1("cannot stash that.");
+        return 0;
+    }
+
+    struct obj* container = select_other_container(invent, (struct obj*)0, FALSE);
+
+    if (!container)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (!stash_obj_in_container(otmp, container))
+    {
+        /* couldn't put selected item into container for some
+           reason; might need to undo splitobj() */
+        (void)unsplitobj(otmp);
+    }
+    return 1;
 }
 
 /*pickup.c*/

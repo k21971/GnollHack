@@ -120,7 +120,7 @@ static struct Bool_Opt {
     { "classic_colors", &flags.classic_colors, FALSE, SET_IN_GAME },
     { "clicklook", &iflags.clicklook, TRUE, SET_IN_GAME },
     { "cmdassist", &iflags.cmdassist, TRUE, SET_IN_GAME },
-#if defined(MICRO) || defined(WIN32) || defined(ANDROID) ||  defined(GNH_ANDROID) || defined(CURSES_GRAPHICS)
+#if defined(MICRO) || defined(WIN32) || defined(ANDROID) ||  defined(GNH_MOBILE) || defined(CURSES_GRAPHICS)
     { "color", &iflags.wc_color, TRUE, SET_IN_GAME }, /*WC*/
 #else /* systems that support multiple terminals, many monochrome */
     { "color", &iflags.wc_color, FALSE, SET_IN_GAME }, /*WC*/
@@ -133,7 +133,7 @@ static struct Bool_Opt {
     {"dumplog", &iflags.dumplog, FALSE, SET_IN_FILE },
 #endif
     { "eight_bit_tty", &iflags.wc_eight_bit_input, FALSE, SET_IN_GAME }, /*WC*/
-#if defined(UNIX) && !defined(GNH_ANDROID) 
+#if defined(UNIX) && !defined(GNH_MOBILE) 
     { "enablettyarrowkeys", &iflags.enablettyarrowkeys, FALSE, SET_IN_GAME }, 
 #endif
     { "exchange_prompt", &flags.exchange_prompt, TRUE, SET_IN_GAME },
@@ -435,7 +435,7 @@ static struct Comp_Opt {
       MAX_OBJECT_CLASSES, SET_IN_GAME },
     { "pile_limit", "threshold for \"there are many objects here\"", 24,
       SET_IN_GAME },
-    { "playmode", "normal play, non-scoring explore mode, or debug mode", 8,
+    { "playmode", "classic or modern play, non-scoring explore or casual mode, or debug mode", 8,
       DISP_IN_GAME },
     { "player_selection", "choose character via dialog or prompts", 12,
       DISP_IN_GAME },
@@ -829,7 +829,7 @@ initoptions_init()
     flags.end_own = FALSE;
     flags.end_top = 3;
     flags.end_around = 2;
-    flags.paranoia_bits = PARANOID_PRAY; /* old prayconfirm=TRUE */
+    flags.paranoia_bits = PARANOID_PRAY | PARANOID_AUTOALL; /* old prayconfirm=TRUE */
     flags.runmode = RUN_LEAP;
     iflags.msg_history = 20;
     /* msg_window has conflicting defaults for multi-interface binary */
@@ -1472,18 +1472,20 @@ STATIC_VAR const struct paranoia_opts {
       "yes vs y to save bones data when dying in debug mode" },
     { PARANOID_HIT, "attack", 1, "hit", 1,
       "yes vs y to attack a peaceful monster" },
-    { PARANOID_BREAKWAND, "wand-break", 2, "break-wand", 2,
-      "yes vs y to break a wand via (a)pply" },
+    { PARANOID_BREAK, "Break", 2, (const char*)0, 0,
+      "yes vs y to break an item" },
     { PARANOID_WERECHANGE, "Were-change", 2, (const char *) 0, 0,
       "yes vs y to change form when lycanthropy is controllable" },
     { PARANOID_PRAY, "pray", 1, 0, 0,
       "y to pray (supersedes old \"prayconfirm\" option)" },
     { PARANOID_REMOVE, "Remove", 1, "Takeoff", 1,
       "always pick from inventory for Remove and Takeoff" },
-    { PARANOID_WATER, "enter-water", 2, "water", 2,
+    { PARANOID_WATER, "water", 2, (const char*)0, 0,
       "yes vs y to enter a pool of water or lava" },
     { PARANOID_TRAP, "trap", 2, (const char*)0, 0,
       "yes vs y to enter into a trap" },
+    { PARANOID_AUTOALL, "Autoall", 1, (const char*)0, 0,
+      "y to select all items" },
       /* for config file parsing; interactive menu skips these */
     { 0, "none", 4, 0, 0, 0 }, /* require full word match */
     { ~0, "all", 3, 0, 0, 0 }, /* ditto */
@@ -3360,15 +3362,19 @@ boolean tinitial, tfrom_file;
         op = string_for_opt(opts, FALSE);
         if (!op)
             return FALSE;
-        if (!strncmpi(op, "normal", 6) || !strcmpi(op, "play")) {
-            wizard = discover = FALSE;
+        if (!strncmpi(op, "normal", 6) || !strncmpi(op, "classic", 7) || !strcmpi(op, "play")) {
+            wizard = discover = CasualMode = ModernMode = FALSE;
         } else if (!strncmpi(op, "explore", 6)
                    || !strncmpi(op, "discovery", 6)) {
-            wizard = FALSE, discover = TRUE;
+            wizard = CasualMode = ModernMode = FALSE, discover = TRUE;
         } else if (!strncmpi(op, "debug", 5) || !strncmpi(op, "wizard", 6)) {
-            wizard = TRUE, discover = FALSE;
+            wizard = TRUE, discover = CasualMode = ModernMode = FALSE;
+        } else if (!strncmpi(op, "casual", 6)) {
+            CasualMode = TRUE, ModernMode = TRUE, wizard = FALSE, discover = FALSE;
         } else if (!strncmpi(op, "modern", 6)) {
-            ModernMode = TRUE, wizard = FALSE, discover = FALSE;
+            CasualMode = FALSE, ModernMode = TRUE, wizard = FALSE, discover = FALSE;
+        } else if (!strncmpi(op, "casual-classic", 14)) {
+            CasualMode = TRUE, ModernMode = FALSE, wizard = FALSE, discover = FALSE;
         } else {
             config_error_add("Invalid value for \"%s\":%s", fullname, op);
             return FALSE;
@@ -6616,7 +6622,7 @@ char *buf;
     } else if (!strcmp(optname, "pile_limit")) {
         Sprintf(buf, "%d", flags.pile_limit);
     } else if (!strcmp(optname, "playmode")) {
-        Strcpy(buf, wizard ? "debug" : discover ? "explore" : ModernMode ? "modern" : "normal");
+        Strcpy(buf, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "casual-classic") : ModernMode ? "modern" : "normal");
     } else if (!strcmp(optname, "preferred_screen_scale")) {
         if (flags.preferred_screen_scale)
             Sprintf(buf, "%d", flags.preferred_screen_scale);

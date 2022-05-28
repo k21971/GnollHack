@@ -616,20 +616,20 @@ boolean fleemsg;
             if (!mon_can_move(mtmp) || !mtmp->data->mmove)
             {
                 if(is_sleeping(mtmp) && !is_paralyzed(mtmp))
-                    pline("%s seems to flinch.", Adjmonnam(mtmp, "sleeping"));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems to flinch.", Adjmonnam(mtmp, "sleeping"));
                 else if (is_paralyzed(mtmp) && mtmp->mcanmove)
-                    pline("%s seems to flinch.", Adjmonnam(mtmp, "paralyzed"));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems to flinch.", Adjmonnam(mtmp, "paralyzed"));
                 else
-                    pline("%s seems to flinch.", Adjmonnam(mtmp, "immobile"));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems to flinch.", Adjmonnam(mtmp, "immobile"));
             } 
             else if (flees_light(mtmp)) {
                 if (rn2(10) || Deaf)
-                    pline("%s flees from the painful light of %s.",
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s flees from the painful light of %s.",
                           Monnam(mtmp), bare_artifactname(uwep));
                 else
-                    verbalize("Bright light!");
+                    verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Bright light!");
             } else
-                pline("%s turns to flee.", Monnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns to flee.", Monnam(mtmp));
         }
         mtmp->mflee = 1;
     }
@@ -855,7 +855,7 @@ register struct monst *mtmp;
 
                 /* Why?  For the same reason in real demon talk */
                 play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_GET_ANGRY);
-                pline("%s gets angry!", Amonnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s gets angry!", Amonnam(mtmp));
                 mtmp->mpeaceful = 0;
                 newsym(mtmp->mx, mtmp->my);
                 set_malign(mtmp);
@@ -883,10 +883,10 @@ register struct monst *mtmp;
         if (distu(mtmp->mx, mtmp->my) > TELEPATHY_RANGE * TELEPATHY_RANGE)
         {
             play_sfx_sound(SFX_FAINT_WAVE_OF_PSYCHIC_ENERGY);
-            You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "sense a faint wave of psychic energy.");
+            You_ex(ATR_NONE, CLR_MSG_SPELL, "sense a faint wave of psychic energy.");
             goto toofar;
         }
-        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "A wave of psychic energy pours over you!");
+        pline_ex(ATR_NONE, CLR_MSG_SPELL, "A wave of psychic energy pours over you!");
         if (is_peaceful(mtmp)
             && !(is_crazed(mtmp) || (Conflict && !check_ability_resistance_success(mtmp, A_WIS, 0))))
         {
@@ -1096,6 +1096,7 @@ struct monst* mtmp;
     if ((windowprocs.wincap2 & WC2_SCREEN_TEXT) && is_boss_monster(mtmp->data) && !mtmp->boss_fight_started && !DEADMONSTER(mtmp) && !is_peaceful(mtmp) && canspotmon(mtmp) && couldsee(mtmp->mx, mtmp->my) && !(mtmp->mstrategy & STRAT_WAITFORU) && !mtmp->msleeping && !(mtmp->mon_flags & MON_FLAGS_CLONED_WIZ))
     {
         mtmp->boss_fight_started = 1;
+        newsym(mtmp->mx, mtmp->my);
         flush_screen(1);
         cliparound(mtmp->mx, mtmp->my, 2);
         play_sfx_sound(SFX_BOSS_FIGHT);

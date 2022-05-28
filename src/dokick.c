@@ -788,7 +788,7 @@ boolean is_golf_swing;
                 find_trap(trap);
 
             play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-            You_cant("%s %s that's in a %s!", 
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s that's in a %s!", 
                 verb,
                 something,
                 Hallucination ? "tizzy" : (trap->ttyp == WEB) ? "web" : "pit");
@@ -945,14 +945,14 @@ boolean is_golf_swing;
                 if (kickedobj->keyotyp == STRANGE_OBJECT || kickedobj->keyotyp == NON_PM || kickedobj->keyotyp == SKELETON_KEY)
                 {
                     play_simple_container_sound(kickedobj, CONTAINER_SOUND_TYPE_BREAK_LOCK);
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "break open the lock!");
+                    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "break open the lock!");
                     breakchestlock(kickedobj, FALSE);
                     if (otrp)
                         (void) chest_trap(kickedobj, LEG, FALSE);
                 }
                 else
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "It feels that the lock of %s cannot be broken by kicking.", the(cxname(kickedobj)));
+                    pline_ex(ATR_NONE, CLR_MSG_HINT, "It feels that the lock of %s cannot be broken by kicking.", the(cxname(kickedobj)));
                 }
                 return 1;
             }
@@ -1175,13 +1175,13 @@ dokick() {
     if (nolimbs(youmonst.data) || slithy(youmonst.data)) 
     {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "have no legs to kick with.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "have no legs to kick with.");
         no_kick = TRUE;
     }
     else if (verysmall(youmonst.data))
     {
         play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "are too small to do any kicking.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are too small to do any kicking.");
         no_kick = TRUE;
     } 
     else if (u.usteed) 
@@ -1206,7 +1206,7 @@ dokick() {
         if (wl == BOTH_SIDES)
             bp = makeplural(bp);
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s in no shape for kicking.",
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "%s%s %s in no shape for kicking.",
              (wl == LEFT_SIDE) ? "left " : (wl == RIGHT_SIDE) ? "right " : "",
              bp, (wl == BOTH_SIDES) ? "are" : "is");
         no_kick = TRUE;
@@ -1214,13 +1214,13 @@ dokick() {
     else if (near_capacity() > SLT_ENCUMBER)
     {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        Your_ex(ATR_NONE, CLR_MSG_WARNING, "load is too heavy to balance yourself for a kick.");
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "load is too heavy to balance yourself for a kick.");
         no_kick = TRUE;
     }
     else if (youmonst.data->mlet == S_LIZARD) 
     {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        Your_ex(ATR_NONE, CLR_MSG_WARNING, "legs cannot kick effectively.");
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "legs cannot kick effectively.");
         no_kick = TRUE;
     } 
     else if (u.uinwater && !rn2(2)) 
@@ -1238,7 +1238,7 @@ dokick() {
             if (!Passes_walls)
             {
                 play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-                pline("There's not enough room to kick down here.");
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "There's not enough room to kick down here.");
             }
             else
                 no_kick = FALSE;
@@ -1246,7 +1246,7 @@ dokick() {
         case TT_WEB:
         case TT_BEARTRAP:
             play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-            You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "move your %s!", body_part(LEG));
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "move your %s!", body_part(LEG));
             break;
         default:
             break;
@@ -1292,7 +1292,7 @@ dokick() {
         {
         case 0:
             play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-            You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "move your %s!", body_part(LEG));
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "move your %s!", body_part(LEG));
             break;
         case 1:
             if (is_animal(u.ustuck->data))
@@ -1945,7 +1945,7 @@ dokick() {
         play_simple_location_sound(x, y, LOCATION_SOUND_TYPE_WHAM);
         pline("WHAMMM!!!");
         if(roll_success)
-            pline("The %s feels too hard to be broken by kicking.", get_door_name_at(x, y));
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "The %s feels too hard to be broken by kicking.", get_door_name_at(x, y));
         if (in_town(x, y))
             for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
             {

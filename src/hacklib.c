@@ -946,8 +946,8 @@ int FDECL((*fn), (int)) UNUSED;
 # ifdef RANDOM /* srandom() from sys/share/random.c */
     srandom((unsigned int) seed);
 # else
-#  if defined(__APPLE__) || defined(BSD) || defined(LINUX) || defined(ULTRIX) \
-    || defined(CYGWIN32) /* system srandom() */
+#  if (defined(__APPLE__) || defined(BSD) || defined(LINUX) || defined(ULTRIX) \
+    || defined(CYGWIN32)) /* system srandom() */
 #   if defined(BSD) && !defined(POSIX_TYPES) && defined(SUNOS4)
     (void)
 #   endif
@@ -1587,7 +1587,7 @@ use_utf8_encoding()
 
 
 
-#if defined(UNIX) && !defined(GNH_ANDROID) 
+#if defined(UNIX) && !defined(GNH_MOBILE) 
 extern int unix_is_stdin_empty(); /* From unixmain.c */
 #endif
 
@@ -1674,6 +1674,19 @@ const char* text;
         tp++;
     }
     *bp = '\0';
+}
+
+void
+write_gui_debuglog(str)
+const char* str;
+{
+    if (!str || open_special_view == 0)
+        return;
+
+    struct special_view_info info = { 0 };
+    info.viewtype = SPECIAL_VIEW_DEBUGLOG;
+    info.text = str;
+    open_special_view(info);
 }
 
 /*hacklib.c*/

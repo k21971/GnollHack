@@ -86,6 +86,7 @@ struct obj {
 #define SPEFLAGS_CLONED_ITEM                   0x00400000UL
 #define SPEFLAGS_INSCRIPTION_REVEALED          0x00800000UL
 #define SPEFLAGS_ALTERNATIVE_APPEARANCE        0x01000000UL /* Alternative glyph is used for the object */
+#define SPEFLAGS_ROTTING_STATUS_KNOWN          0x02000000UL
 
     char oclass;    /* object class */
     char invlet;    /* designation in inventory */
@@ -585,6 +586,8 @@ struct obj {
 #define nonrotting_food(otyp) \
     ((objects[(otyp)].oc_flags3 & O3_NONROTTING_FOOD) != 0)
 
+#define is_obj_rotting_corpse(o) ((o)->otyp == CORPSE || (o)->globby)
+
 #define has_otyp_double_digging_effort(otyp) \
     ((objects[(otyp)].oc_flags3 & O3_DOUBLE_DIGGING_EFFORT) != 0)
 #define is_otyp_buried_searchable(otyp) \
@@ -631,6 +634,8 @@ struct obj {
 
 #define does_obj_drain_instead_of_explode(obj) \
     (does_otyp_drain_instead_of_explode((obj)->otyp))
+
+#define can_obj_cause_choking(o) (obj_nutrition(o) > 50)
 
 /* 'PRIZE' values override obj->corpsenm so prizes mustn't be object types
    which use that field for monster type (or other overloaded purpose) */
@@ -923,11 +928,11 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
 #define has_obj_mythic_mana_gain_25(o)          has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN_25)
 #define has_obj_mythic_hp_gain_25(o)            has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_HP_GAIN_25)
 #define has_obj_mythic_wounding(o)              has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_WOUNDING)
-#define mythic_wounding_amount()                d(1, 4)
+#define mythic_wounding_amount(o)               (d(1, 4) + (o)->enchantment)
 #define has_obj_mythic_defense(o)               has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_DEFENSE)
 #define has_obj_mythic_sharpness(o)             has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_SHARPNESS)
 #define has_obj_mythic_life_draining(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_LIFE_DRAINING)
-#define mythic_life_draining_amount()           d(2, 6)
+#define mythic_life_draining_amount(o)          (d(2, 6) + (o)->enchantment) 
 #define has_obj_mythic_magical_light(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_SHINES_LIGHT)
 #define has_obj_mythic_reach(o)                 has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_REACH)
 #define has_obj_mythic_luck(o)                  has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_LUCK)

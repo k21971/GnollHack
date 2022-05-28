@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Text;
-using GnollHackClient.Pages.Game;
+﻿using GnollHackClient.Pages.Game;
 using GnollHackCommon;
 using SkiaSharp;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace GnollHackClient
 {
@@ -210,43 +209,43 @@ namespace GnollHackClient
         {
             Typeface = App.LatoRegular;
             TextColor = SKColors.White;
-            TextSize = 42;
+            TextSize = 14.0f;
             BackgroundColor = SKColors.Transparent;
             switch (_winType)
             {
                 case GHWinType.None:
                     break;
                 case GHWinType.Message:
-                    TextSize = 32;
+                    TextSize = TextSize * 32.0f / 42f;
                     Typeface = App.DejaVuSansMonoTypeface;
-                    StrokeWidth = 8.0f;
+                    StrokeWidth = TextSize / 4.0f;
                     AutoPlacement = true;
                     break;
                 case GHWinType.Status:
                     //BackgroundColor = TransparentBlack;
-                    TextSize = 30;
+                    TextSize = TextSize * 30.0f / 42.0f;
                     Typeface = App.LatoRegular;
-                    StrokeWidth = 3.0f;
+                    StrokeWidth = TextSize / 4.0f;
                     HasShadow = true;
                     Left = 0;
                     Top = 0;
                     break;
                 case GHWinType.Map:
-                    TextSize = 30;
+                    TextSize = TextSize * 30.0f / 42.0f;
                     Typeface = App.LatoRegular;
                     Left = 0;
                     Top = 120;
                     break;
                 case GHWinType.Menu:
                     Typeface = App.UnderwoodTypeface;
-                    TextSize = 42;
+                    TextSize = TextSize * 42.0f / 42.0f;
                     Left = 0;
                     Top = 150;
                     CenterHorizontally = true;
                     break;
                 case GHWinType.Text:
                     Typeface = App.EndorTypeface;
-                    TextSize = 42;
+                    TextSize = TextSize * 42.0f / 42.0f;
                     Left = 0;
                     Top = 150;
                     CenterHorizontally = true;
@@ -254,9 +253,9 @@ namespace GnollHackClient
                 case GHWinType.Base:
                     break;
                 case GHWinType.Here:
-                    TextSize = 32;
+                    TextSize = TextSize * 32.0f / 42.0f;
                     Typeface = App.DejaVuSansMonoTypeface;
-                    StrokeWidth = 8.0f;
+                    StrokeWidth = TextSize / 4.0f;
                     AutoPlacement = true;
                     break;
                 case GHWinType.Inventory:
@@ -367,7 +366,7 @@ namespace GnollHackClient
                 SKPaint textPaint = new SKPaint()
                 {
                     Typeface = Typeface,
-                    TextSize = TextSize
+                    TextSize = TextSize * _gamePage.GetTextScale()
                 };
 
                 if (CursY >= PutStrs.Count)

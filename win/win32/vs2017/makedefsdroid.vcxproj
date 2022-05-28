@@ -98,7 +98,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(IncDir);$(LibDroidDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;GNH_ANDROID;USE_TILES;DLB;LIB_GRAPHICS;NOMAIL;SAFEPROCS;NOTTYGRAPHICS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;GNH_MOBILE;GNH_ANDROID;USE_TILES;DLB;LIB_GRAPHICS;NOMAIL;SAFEPROCS;NOTTYGRAPHICS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <OutputFile>$(TargetPath)</OutputFile>
@@ -164,8 +164,8 @@
     <GnhDataFiles Include="$(DatDir)credits" />
     <GnhDataFiles Include="$(DatDir)xcredits" />
     <GnhDataFiles Include="$(DatDir)license" />
-    <GnhDataFiles Include="$(LibDroidDir)defaults.gnh" />
-    <GnhDataFiles Include="$(LibDroidDir)sysconf" />
+    <GnhDataFiles Include="$(LibShareDir)defaults.gnh" />
+    <GnhDataFiles Include="$(LibShareDir)sysconf" />
     <GnhDataFiles Include="$(GooglePlayDir)createassetpack.sh" />
     <GnhDataFiles Include="$(GooglePlayDir)AndroidManifest.xml" />
     <DataFilesToCopyRemotely Include="@(GnhDataFiles)" />

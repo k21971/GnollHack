@@ -813,7 +813,11 @@ int class;            /* an object class, 0 for all */
         play_simple_object_sound(detector, OBJECT_SOUND_TYPE_GENERAL_EFFECT);
 
     if (!ct)
+    {
+        create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
         display_nhwindow(WIN_MAP, TRUE);
+        create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
+    }
     else
         browse_map(ter_typ, "object");
 
@@ -902,7 +906,9 @@ int mclass;                /* monster class, 0 for all */
 
         if ((otmp && otmp->blessed) && !unconstrained) {
             /* persistent detection--just show updated map */
+            create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
             display_nhwindow(WIN_MAP, TRUE);
+            create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
         } else {
             /* one-shot detection--allow player to move cursor around and
                get autodescribe feedback */
@@ -1891,10 +1897,12 @@ struct trap *trap;
     }
 
     play_sfx_sound(SFX_TRAP_FOUND);
-    You("find %s.", an(get_trap_explanation(trap)));
+    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find %s.", an(get_trap_explanation(trap)));
 
     if (cleared) {
+        create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
         display_nhwindow(WIN_MAP, TRUE); /* wait */
+        create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
         docrt();
     }
 }
@@ -1947,7 +1955,7 @@ boolean via_warning;
         }
         else if (!sensemon(mtmp))
         {
-            You("find %s.", is_tame(mtmp) ? y_monnam(mtmp) : a_monnam(mtmp));
+            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find %s.", is_tame(mtmp) ? y_monnam(mtmp) : a_monnam(mtmp));
         }
         return 1;
     }
@@ -2029,7 +2037,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                         nomul(0);
                         feel_location(x, y); /* make sure it shows up */
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
-                        You("find a hidden door.");
+                        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find a hidden door.");
                     } 
                     else if (levl[x][y].typ == SCORR) 
                     {
@@ -2041,7 +2049,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                         nomul(0);
                         feel_newsym(x, y); /* make sure it shows up */
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
-                        You("find a hidden passage.");
+                        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find a hidden passage.");
                     }
                     else
                     {

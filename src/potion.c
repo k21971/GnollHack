@@ -110,12 +110,14 @@ boolean talk;
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s...", stagger(youmonst.data, "stagger"));
         }
     }
+
+    set_itimeout(&HStun, xtime);
+
     if ((!xtime && old) || (xtime && !old))
     {
         context.botl = context.botlx = TRUE;
         refresh_u_tile_gui_info(TRUE);
     }
-    set_itimeout(&HStun, xtime);
 }
 
 
@@ -665,6 +667,7 @@ ghost_from_bottle()
         pline("This bottle turns out to be empty.");
         return;
     }
+    play_sfx_sound(SFX_SURPRISE_ATTACK);
     if (Blind) {
         pline_ex(ATR_NONE, CLR_MSG_WARNING, "As you open the bottle, %s emerges.", something);
         return;
@@ -2766,7 +2769,7 @@ struct obj *obj;
         {
             kn++;
             play_sfx_sound(SFX_ACQUIRE_BLINDNESS);
-            pline("It suddenly gets dark.");
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "It suddenly gets dark.");
         }
         //if (!Blind && !Unaware)
         //    Your1(vision_clears);

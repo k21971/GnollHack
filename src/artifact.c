@@ -743,7 +743,8 @@ struct monst *mon;
 
             if (!obj->nknown && (oart->aflags & (AF_FAMOUS | AF_NAME_KNOWN_WHEN_PICKED_UP)))
             {
-                pline("As you touch %s, you become aware that it is called %s!", the(cxname(obj)), bare_artifactname(obj));
+                play_sfx_sound(SFX_ARTIFACT_NAME_KNOWN);
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "As you touch %s, you become aware that it is called %s!", the(cxname(obj)), bare_artifactname(obj));
                 obj->nknown = TRUE;
             }
         }
@@ -783,9 +784,9 @@ struct monst *mon;
 
             play_sfx_sound(SFX_BLASTED_BY_POWER);
             if(oart)
-                You("are blasted by %s power!", s_suffix(the(xname(obj))));
+                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are blasted by %s power!", s_suffix(the(xname(obj))));
             else
-                You("are shocked by %s enchantment!", s_suffix(the(xname(obj))));
+                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are shocked by %s enchantment!", s_suffix(the(xname(obj))));
 
             touch_blasted = TRUE;
             if (badappropriate || badexceptional)
@@ -2500,7 +2501,7 @@ struct obj *obj;
     else if (u.uen < artilist[obj->oartifact].inv_mana_cost)
     {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        pline("You do not have enough mana to invoke %s.", the(cxname(obj)));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You do not have enough mana to invoke %s.", the(cxname(obj)));
         return 0;
     }
 
@@ -2545,6 +2546,8 @@ struct obj *obj;
             int healamt = (u.uhpmax + 1 - u.uhp) / 2;
             long creamed = (long) u.ucreamed;
             play_sfx_sound(SFX_HEALING);
+            play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
+            special_effect_wait_until_action(0);
 
             if (Upolyd)
                 healamt = (u.mhmax + 1 - u.mh) / 2;
@@ -2552,22 +2555,24 @@ struct obj *obj;
                 You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "better.");
             else
                 goto nothing_special;
-            if (healamt > 0) {
-                if (Upolyd)
-                    u.mh += healamt;
-                else
-                    u.uhp += healamt;
-            }
-            if (Sick)
-                make_sick(0L, (char *) 0, FALSE);
-            if (FoodPoisoned)
-                make_food_poisoned(0L, (char*)0, FALSE);
-            if (MummyRot)
-                make_mummy_rotted(0L, (char*)0, FALSE);
+            healup(healamt, 0, TRUE, FALSE, FALSE, FALSE, FALSE);
+            //if (healamt > 0) {
+            //    if (Upolyd)
+            //        u.mh += healamt;
+            //    else
+            //        u.uhp += healamt;
+            //}
+            //if (Sick)
+            //    make_sick(0L, (char *) 0, FALSE);
+            //if (FoodPoisoned)
+            //    make_food_poisoned(0L, (char*)0, FALSE);
+            //if (MummyRot)
+            //    make_mummy_rotted(0L, (char*)0, FALSE);
             if (Slimed)
                 make_slimed(0L, (char *) 0);
             if (Blinded > creamed)
                 make_blinded(creamed, FALSE);
+            special_effect_wait_until_end(0);
             context.botl = TRUE;
             break;
         }
@@ -2580,10 +2585,23 @@ struct obj *obj;
             else if (epboost < 12)
                 epboost = u.uenmax - u.uen;
             if (epboost) {
-                u.uen += epboost;
-                context.botl = TRUE;
                 play_sfx_sound(SFX_GAIN_ENERGY);
+                play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
+                special_effect_wait_until_action(0);
+
+                int mana_before = u.uen;
+                u.uen += epboost;
+                int mana_after = u.uen;
+                int mana_gain = mana_after - mana_before;
+                if (mana_gain > 0)
+                {
+                    char fbuf[BUFSZ];
+                    Sprintf(fbuf, "+%d", mana_gain);
+                    display_floating_text(u.ux, u.uy, fbuf, FLOATING_TEXT_MANA_GAIN, ATR_NONE, NO_COLOR, 0UL);
+                }
                 You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "re-energized.");
+                special_effect_wait_until_end(0);
+                context.botl = TRUE;
             } else
                 goto nothing_special;
             break;
@@ -2779,7 +2797,7 @@ struct obj *obj;
                 mon->mprops[SUMMON_FORBIDDEN] |= M_INTRINSIC_ACQUIRED;
 
                 play_sfx_sound_at_location(SFX_SUMMON_DEMON, mon->mx, mon->my);
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s appears in a puff of smoke!", Amonnam(mon));
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s appears in a puff of smoke!", Amonnam(mon));
             }
             else
             {
@@ -2806,7 +2824,7 @@ struct obj *obj;
                 }
                 mon->mprops[SUMMON_FORBIDDEN] |= M_INTRINSIC_ACQUIRED;
 
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "The air around you starts to swirl and forms into %s!", a_monnam(mon));
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "The air around you starts to swirl and forms into %s!", a_monnam(mon));
             }
             else
             {
@@ -2910,14 +2928,14 @@ struct obj *obj;
             if (obj->oartifact == ART_MAGIC_MIRROR_OF_MERLIN)
             {
                 if ((!temporary_effect && switch_on) || temporary_effect)
-                    pline_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "%s an illusionary image of yourself near you.", Tobjnam(obj, "project"));
+                    pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s an illusionary image of yourself near you.", Tobjnam(obj, "project"));
                 else
                     Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "illusionary double disappears.");
             }
             else
             {
                 if ((!temporary_effect && switch_on) || temporary_effect)
-                    You_feel_ex(ATR_NONE, CLR_MSG_SUCCESSFUL, "your image becomes displaced.");
+                    You_feel_ex(ATR_NONE, CLR_MSG_SUCCESS, "your image becomes displaced.");
                 else
                     You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "your image is in its right place again.");
             }
@@ -2972,7 +2990,8 @@ struct obj* obj;
 {
     if (obj && obj->oartifact && !obj->nknown && (artilist[obj->oartifact].aflags & (AF_FAMOUS | AF_NAME_KNOWN_WHEN_INVOKED)))
     {
-        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As you invoke %s, %syou become aware that %s named %s!", the(cxname(obj)),
+        play_sfx_sound(SFX_ARTIFACT_NAME_KNOWN);
+        pline_ex(ATR_NONE, CLR_MSG_HINT, "As you invoke %s, %syou become aware that %s named %s!", the(cxname(obj)),
             obj->oartifact == ART_HOWLING_FLAIL ? "it lets loose a majestic howl and " : "",
             (pair_of(obj) || obj->quan > 1) ? "they are" : "it is", bare_artifactname(obj));
         obj->nknown = TRUE;

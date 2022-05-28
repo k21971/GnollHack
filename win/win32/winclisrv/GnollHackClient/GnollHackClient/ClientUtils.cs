@@ -23,94 +23,92 @@ namespace GnollHackClient
     {
         private static SKColor GHDarkGray = new SKColor(96, 96, 96);
         private static SKColor GHTitleGold = new SKColor(0xD4, 0xA0, 0x17);
-        private static SKColor GHGreen = new SKColor(0, 255, 0);
         private static SKColor GHRed = new SKColor(255, 32, 32);
+        private static SKColor GHGreen = new SKColor(0, 255, 0);
+        private static SKColor GHBlue = new SKColor(112, 112, 255);
+        private static SKColor GHBrown = new SKColor(210, 128, 32);
+        private static SKColor GHBrightBlue = new SKColor(180, 200, 255);
+        private static SKColor GHBrightCyan = new SKColor(165, 255, 255);
 
-        public static SKColor NHColor2SKColor(int nhclr)
+        public static SKColor NHColor2SKColor(int nhclr, int attr)
         {
-            return NHColor2SKColorCore(nhclr, false);
+            return NHColor2SKColorCore(nhclr, attr, false);
         }
-        public static SKColor NHColor2SKColorCore(int nhclr, bool revertblackwhite)
+        public static SKColor NHColor2SKColorCore(int nhclr, int attr, bool revertblackwhite)
         {
             SKColor res = revertblackwhite ? SKColors.Black : SKColors.White;
-            if(nhclr < 0)
+            bool usealtcolors = (attr & (int)MenuItemAttributes.AltColors) != 0;
+            switch ((nhcolor)nhclr)
             {
-                switch (nhclr)
-                {
-                    case -1:
+                case nhcolor.CLR_BLACK:
+                    res = revertblackwhite ? SKColors.White : GHDarkGray;
+                    break;
+                case nhcolor.CLR_RED:
+                    res = revertblackwhite ? SKColors.Red : GHRed;
+                    break;
+                case nhcolor.CLR_GREEN:
+                    res = revertblackwhite ? SKColors.Green : GHGreen;
+                    break;
+                case nhcolor.CLR_BROWN:
+                    if(usealtcolors)
                         res = GHTitleGold;
-                        break;
-                    default:
-                        break;
-                }
+                    else
+                        res = revertblackwhite ? SKColors.Brown : GHBrown;
+                    break;
+                case nhcolor.CLR_BLUE:
+                    res = revertblackwhite ? SKColors.Blue : GHBlue;
+                    break;
+                case nhcolor.CLR_MAGENTA:
+                    res = SKColors.Magenta;
+                    break;
+                case nhcolor.CLR_CYAN:
+                    res = SKColors.Cyan;
+                    break;
+                case nhcolor.CLR_GRAY:
+                    res = revertblackwhite ? GHDarkGray : SKColors.LightGray;
+                    break;
+                case nhcolor.NO_COLOR:
+                    break;
+                case nhcolor.CLR_ORANGE:
+                    res = SKColors.Orange;
+                    break;
+                case nhcolor.CLR_BRIGHT_GREEN:
+                    res = SKColors.LightGreen;
+                    break;
+                case nhcolor.CLR_YELLOW:
+                    res = SKColors.Yellow;
+                    break;
+                case nhcolor.CLR_BRIGHT_BLUE:
+                    res = revertblackwhite ? SKColors.LightBlue : GHBrightBlue;
+                    break;
+                case nhcolor.CLR_BRIGHT_MAGENTA:
+                    res = SKColors.LightPink;
+                    break;
+                case nhcolor.CLR_BRIGHT_CYAN:
+                    res = revertblackwhite ? SKColors.LightCyan : GHBrightCyan;
+                    break;
+                case nhcolor.CLR_WHITE:
+                    res = revertblackwhite ? SKColors.Black : SKColors.White;
+                    break;
+                case nhcolor.CLR_MAX:
+                    break;
+                default:
+                    break;
             }
-            else
-            {
-                switch ((nhcolor)nhclr)
-                {
-                    case nhcolor.CLR_BLACK:
-                        res = revertblackwhite ? SKColors.White : GHDarkGray;
-                        break;
-                    case nhcolor.CLR_RED:
-                        res = revertblackwhite ? SKColors.Red : GHRed;
-                        break;
-                    case nhcolor.CLR_GREEN:
-                        res = revertblackwhite ? SKColors.Green : GHGreen;
-                        break;
-                    case nhcolor.CLR_BROWN:
-                        res = SKColors.Brown;
-                        break;
-                    case nhcolor.CLR_BLUE:
-                        res = SKColors.Blue;
-                        break;
-                    case nhcolor.CLR_MAGENTA:
-                        res = SKColors.Magenta;
-                        break;
-                    case nhcolor.CLR_CYAN:
-                        res = SKColors.Cyan;
-                        break;
-                    case nhcolor.CLR_GRAY:
-                        res = revertblackwhite ? GHDarkGray : SKColors.LightGray;
-                        break;
-                    case nhcolor.NO_COLOR:
-                        break;
-                    case nhcolor.CLR_ORANGE:
-                        res = SKColors.Orange;
-                        break;
-                    case nhcolor.CLR_BRIGHT_GREEN:
-                        res = SKColors.LightGreen;
-                        break;
-                    case nhcolor.CLR_YELLOW:
-                        res = SKColors.Yellow;
-                        break;
-                    case nhcolor.CLR_BRIGHT_BLUE:
-                        res = SKColors.LightBlue;
-                        break;
-                    case nhcolor.CLR_BRIGHT_MAGENTA:
-                        res = SKColors.LightPink;
-                        break;
-                    case nhcolor.CLR_BRIGHT_CYAN:
-                        res = SKColors.LightCyan;
-                        break;
-                    case nhcolor.CLR_WHITE:
-                        res = revertblackwhite ? SKColors.Black : SKColors.White;
-                        break;
-                    case nhcolor.CLR_MAX:
-                        break;
-                    default:
-                        break;
-                }
-            }
-
             return res;
         }
 
         private static Color XRed = new Color((double)0xFF / 255.0, 32.0 / 255.0, 32.0 / 255.0);
         private static Color XGreen = new Color(0, (double)0xFF / 255, 0);
+        private static Color XBlue = new Color(112.0 / 255.0, 112.0 / 255.0, (double)0xFF / 255.0);
+        private static Color XBrown = new Color(210.0 / 255.0, 128.0 / 255.0, 32.0 / 255.0);
+        private static Color XBrightBlue = new Color(180.0 / 255.0, 200.0 / 255.0, (double)0xFF / 255.0);
+        private static Color XBrightCyan = new Color(165.0 / 255.0, 255.0 / 255.0, (double)0xFF / 255.0);
         private static Color XTitleGoldColor = new Color((double)0xD4 / 255, (double)0xA0 / 255, (double)0x17 / 255);
-        public static Color NHColor2XColor(int nhclr, bool revertblackandwhite, bool istitle)
+        public static Color NHColor2XColor(int nhclr, int attr, bool revertblackandwhite, bool istitle)
         {
             Color res = istitle ? XTitleGoldColor : revertblackandwhite ? Color.Black : Color.White;
+            bool usealtcolors = (attr & (int)MenuItemAttributes.AltColors) != 0;
             switch ((nhcolor)nhclr)
             {
                 case nhcolor.CLR_BLACK:
@@ -123,10 +121,13 @@ namespace GnollHackClient
                     res = revertblackandwhite ? Color.Green : XGreen;
                     break;
                 case nhcolor.CLR_BROWN:
-                    res = Color.Brown;
+                    if(usealtcolors)
+                        res = XTitleGoldColor;
+                    else
+                        res = revertblackandwhite ? Color.Brown : XBrown;
                     break;
                 case nhcolor.CLR_BLUE:
-                    res = Color.Blue;
+                    res = revertblackandwhite ? Color.Blue : XBlue;
                     break;
                 case nhcolor.CLR_MAGENTA:
                     res = Color.Magenta;
@@ -149,13 +150,13 @@ namespace GnollHackClient
                     res = Color.Yellow;
                     break;
                 case nhcolor.CLR_BRIGHT_BLUE:
-                    res = Color.LightBlue;
+                    res = revertblackandwhite ? Color.LightBlue : XBrightBlue;
                     break;
                 case nhcolor.CLR_BRIGHT_MAGENTA:
                     res = Color.LightPink;
                     break;
                 case nhcolor.CLR_BRIGHT_CYAN:
-                    res = Color.LightCyan;
+                    res = revertblackandwhite ? Color.LightCyan : XBrightCyan;
                     break;
                 case nhcolor.CLR_WHITE:
                     res = revertblackandwhite ? Color.Black : Color.White;
@@ -167,9 +168,9 @@ namespace GnollHackClient
             }
             return res;
         }
-        public static Color NHColor2GrayedXColor(int color, bool revertblackandwhite, bool istitle)
+        public static Color NHColor2GrayedXColor(int color, int attr, bool revertblackandwhite, bool istitle)
         {
-            Color basecolor = NHColor2XColor(color, revertblackandwhite, istitle);
+            Color basecolor = NHColor2XColor(color, attr, revertblackandwhite, istitle);
             Color bgcolor = revertblackandwhite ? Color.White : Color.Black;
             Color grayedcolor;
             if (color == (int)nhcolor.NO_COLOR || color == (revertblackandwhite ? (int)nhcolor.CLR_BLACK : (int)nhcolor.CLR_WHITE))
@@ -643,29 +644,71 @@ namespace GnollHackClient
             return App.SimpleFrameLeftVerticalBitmap.Width * scale;
         }
 
-        public static uint GetMainCanvasAnimationInterval()
+        public static uint GetMainCanvasAnimationInterval(MapRefreshRateStyle mapRefreshRate)
         {
-            return GHConstants.MainCanvasAnimationInterval;
+            if (App.DisplayRefreshRate >= 120.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS120)
+                return 8;
+            else if (App.DisplayRefreshRate >= 90.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS90)
+                return 11;
+            else if (App.DisplayRefreshRate >= 80.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS80)
+                return 13;
+            else if (App.DisplayRefreshRate >= 60.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS60)
+                return 16;
+            else if (App.DisplayRefreshRate >= 40.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS40)
+                return 25;
+            else if (App.DisplayRefreshRate >= 30.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS30)
+                return 33;
+            else if (App.DisplayRefreshRate >= 20.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS20)
+                return 50;
+            else
+                return 100;
+
+            //return GHConstants.MainCanvasAnimationInterval;
         }
-        public static int GetMainCanvasAnimationFrequency()
+        public static int GetMainCanvasAnimationFrequency(MapRefreshRateStyle mapRefreshRate)
         {
-            return GHConstants.MainCanvasAnimationFrequency;
+            if (App.DisplayRefreshRate >= 120.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS120)
+                return 120;
+            else if (App.DisplayRefreshRate >= 90.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS90)
+                return 90;
+            else if (App.DisplayRefreshRate >= 80.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS80)
+                return 80;
+            else if (App.DisplayRefreshRate >= 60.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS60)
+                return 60;
+            else if (App.DisplayRefreshRate >= 40.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS40)
+                return 40;
+            else if (App.DisplayRefreshRate >= 30.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS30)
+                return 30;
+            else if (App.DisplayRefreshRate >= 20.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS20)
+                return 20;
+            else
+                return GHConstants.MainCanvasAnimationFrequency;
+        }
+
+        public static MapRefreshRateStyle GetDefaultMapFPS()
+        {
+            if (App.DisplayRefreshRate >= 60f)
+                return MapRefreshRateStyle.MapFPS60;
+            else if (App.DisplayRefreshRate >= 40f)
+                return MapRefreshRateStyle.MapFPS40;
+            else
+                return MapRefreshRateStyle.MapFPS30;
         }
 
         public static uint GetAuxiliaryCanvasAnimationInterval()
         {
-            if (DeviceDisplay.MainDisplayInfo.RefreshRate >= 120.0f)
+            if (App.DisplayRefreshRate >= 120.0f)
                 return 8;
-            else if (DeviceDisplay.MainDisplayInfo.RefreshRate >= 90.0f)
-                return 12;
+            else if (App.DisplayRefreshRate >= 90.0f)
+                return 11;
             else
                 return 16;
         }
         public static int GetAuxiliaryCanvasAnimationFrequency()
         {
-            if (DeviceDisplay.MainDisplayInfo.RefreshRate >= 120.0f)
+            if (App.DisplayRefreshRate >= 120.0f)
                 return 120;
-            else if (DeviceDisplay.MainDisplayInfo.RefreshRate >= 90.0f)
+            else if (App.DisplayRefreshRate >= 90.0f)
                 return 90;
             else
                 return 60;

@@ -77,13 +77,14 @@ boolean firing;
     if (!canletgo(obj, firing ? "fire" : "throw"))
         return 0;
     if ((objects[obj->otyp].oc_flags & O1_CAN_BE_THROWN_ONLY_IF_WIELDED) && obj != uwep) {
-        pline("%s must be wielded before it can be thrown.", The(xname(obj)));
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s must be wielded before it can be thrown.", The(xname(obj)));
         return 0;
     }
     if (//(obj->oartifact == ART_MJOLLNIR && ACURR(A_STR) < STR18(100)) //STR19(25)
         (obj->otyp == BOULDER && !(throws_rocks(youmonst.data))))  // || (int)obj->owt <= enclevelmaximumweight(UNENCUMBERED))))
     {
-        pline("It's too heavy.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "It's too heavy.");
         return 1;
     }
     if (!u.dx && !u.dy && !u.dz) {
@@ -473,11 +474,11 @@ int *shotlimit_p; /* (see dothrow()) */
 
     if (notake(youmonst.data)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("are physically incapable of throwing or shooting anything.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are physically incapable of throwing or shooting anything.");
         return FALSE;
     } else if (nohands(youmonst.data)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "throw or shoot without hands."); /* not body_part(HAND) */
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "throw or shoot without hands."); /* not body_part(HAND) */
         return FALSE;
         /*[what about !freehand(), aside from cursed missile launcher?]*/
     }
@@ -986,7 +987,7 @@ int x, y;
 
         play_simple_monster_sound(mon, MONSTER_SOUND_TYPE_BUMP_INTO);
         if (!glyph_is_monster(glyph) && !glyph_is_invisible(glyph))
-            You("find %s by bumping into %s.", mnam, pronoun);
+            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find %s by bumping into %s.", mnam, pronoun);
         else
             You("bump into %s.", mnam);
 
@@ -2006,7 +2007,7 @@ uchar* hitres_ptr;
                     break;
                 }
                 if(!context.hide_melee_range_warning)
-                    You("find it very hard to hit with %s at melee range.", an(cxname(uwep)));
+                    You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit with %s at melee range.", an(cxname(uwep)));
 
                 context.hide_melee_range_warning = TRUE;
         }
@@ -2014,7 +2015,7 @@ uchar* hitres_ptr;
         {
             tmp -= THROWN_WEAPON_TO_HIT_MELEE_PENALTY;
             if (!context.hide_melee_range_warning && !is_obj_normally_edible(obj))
-                You("find it very hard to hit by throwing %s at melee range.", an(cxname(obj)));
+                You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit by throwing %s at melee range.", an(cxname(obj)));
 
             context.hide_melee_range_warning = TRUE;
         }

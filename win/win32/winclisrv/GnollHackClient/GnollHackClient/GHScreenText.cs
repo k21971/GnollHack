@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using GnollHackClient.Pages.Game;
 using GnollHackCommon;
 using SkiaSharp;
 
@@ -10,14 +11,17 @@ namespace GnollHackClient
     {
         private DisplayScreenTextData _data;
         public long _created_at_count;
-
+        private GamePage _gamePage;
+        private int _animationFrequency = GHConstants.MainCanvasAnimationFrequency;
         public bool HasSuperText { get { return _data.supertext != null; } }
         public bool HasSubText { get { return _data.subtext != null; } }
 
-        public GHScreenText(DisplayScreenTextData data, long created_at_count)
+        public GHScreenText(DisplayScreenTextData data, long created_at_count, GamePage gamePage)
         {
             _data = data;
             _created_at_count = created_at_count;
+            _gamePage = gamePage;
+            _animationFrequency = Math.Max(1, ClientUtils.GetMainCanvasAnimationFrequency(_gamePage.MapRefreshRate));
         }
 
         public float GetFinishTime()
@@ -56,7 +60,7 @@ namespace GnollHackClient
             if (counter_value < _created_at_count)
                 return 999.0f;
 
-            return ((float)(counter_value - _created_at_count)) / 40.0f;
+            return ((float)(counter_value - _created_at_count)) / (float)_animationFrequency;
         }
 
         public bool IsFinished(long counter_value)
@@ -88,13 +92,18 @@ namespace GnollHackClient
         {
             switch(_data.style)
             {
-                case 0:
+                case (int)screen_text_types.SCREEN_TEXT_GENERAL:
                 case (int)screen_text_types.SCREEN_TEXT_ENTER_DUNGEON_LEVEL:
                 case (int)screen_text_types.SCREEN_TEXT_BOSS_FIGHT:
                     return 0.65f;
-                case 2:
+                case (int)screen_text_types.SCREEN_TEXT_GAIN_LEVEL:
                     return 0.70f;
-                case 3:
+                case (int)screen_text_types.SCREEN_TEXT_SAVING:
+                    return 0.60f;
+                case (int)screen_text_types.SCREEN_TEXT_DEAD:
+                case (int)screen_text_types.SCREEN_TEXT_ESCAPED:
+                case (int)screen_text_types.SCREEN_TEXT_ASCENDED:
+                case (int)screen_text_types.SCREEN_TEXT_QUIT:
                     return 0.60f;
                 default:
                     return 0.70f;
@@ -104,14 +113,19 @@ namespace GnollHackClient
         {
             switch (_data.style)
             {
-                case 0:
-                case 1:
-                case 2:
+                case (int)screen_text_types.SCREEN_TEXT_GENERAL:
+                case (int)screen_text_types.SCREEN_TEXT_ENTER_DUNGEON_LEVEL:
+                case (int)screen_text_types.SCREEN_TEXT_GAIN_LEVEL:
                     return 0.0f;
-                case 3:
+                case (int)screen_text_types.SCREEN_TEXT_SAVING:
                     return 0.0f;
+                case (int)screen_text_types.SCREEN_TEXT_DEAD:
+                case (int)screen_text_types.SCREEN_TEXT_ESCAPED:
+                case (int)screen_text_types.SCREEN_TEXT_ASCENDED:
+                case (int)screen_text_types.SCREEN_TEXT_QUIT:
+                    return -0.20f;
                 case (int)screen_text_types.SCREEN_TEXT_BOSS_FIGHT:
-                    return -0.10f;
+                    return -0.20f;
                 default:
                     return -0.02f;
             }
@@ -163,21 +177,22 @@ namespace GnollHackClient
         {
             switch(_data.style)
             {
-                case 0:
-                    return ClientUtils.NHColor2SKColor(_data.color);
+                case (int)screen_text_types.SCREEN_TEXT_GENERAL:
+                    return ClientUtils.NHColor2SKColor(_data.color, _data.attr);
                 case (int)screen_text_types.SCREEN_TEXT_ENTER_DUNGEON_LEVEL:
                     return TransparentGold;
-                case 2:
+                case (int)screen_text_types.SCREEN_TEXT_GAIN_LEVEL:
                     return TransparentGold;
-                case 3:
+                case (int)screen_text_types.SCREEN_TEXT_SAVING:
                     return SKColors.Beige;
-                case 4:
+                case (int)screen_text_types.SCREEN_TEXT_QUIT:
+                case (int)screen_text_types.SCREEN_TEXT_DEAD:
                     return SKColors.Red;
-                case 5:
+                case (int)screen_text_types.SCREEN_TEXT_ESCAPED:
                     return SKColors.White;
-                case 6:
+                case (int)screen_text_types.SCREEN_TEXT_ASCENDED:
                     return SKColors.LightBlue;
-                case 7:
+                case (int)screen_text_types.SCREEN_TEXT_SPECIAL_END:
                     return SKColors.Pink;
                 case (int)screen_text_types.SCREEN_TEXT_BOSS_FIGHT:
                     return SKColors.Yellow;

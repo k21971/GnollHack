@@ -27,6 +27,27 @@ namespace GnollHackCommon
         CLR_MAX
     }
 
+    public enum nhaltcolor
+    {
+        CLR_ALT_BLACK = 0,
+        CLR_ALT_RED,
+        CLR_ALT_GREEN,
+        CLR_ALT_GOLD,   /* Gold instead of brown */
+        CLR_ALT_BLUE,
+        CLR_ALT_MAGENTA,
+        CLR_ALT_CYAN,
+        CLR_ALT_GRAY,
+        NO_ALT_COLOR,
+        CLR_ALT_ORANGE,
+        CLR_ALT_BRIGHT_GREEN,
+        CLR_ALT_YELLOW,
+        CLR_ALT_BRIGHT_BLUE,
+        CLR_ALT_BRIGHT_MAGENTA,
+        CLR_ALT_BRIGHT_CYAN,
+        CLR_ALT_WHITE,
+        CLR_ALT_MAX
+    }
+
     public enum GHWindowPrintLocations
     {
         PrintToMap = 0,
@@ -62,6 +83,7 @@ namespace GnollHackCommon
         AlignRight = 0x00020000,
         Inactive = 0x00040000,
         HalfSize = 0x00080000,
+        AltColors = 0x00100000,
     }
 
     [Flags]
@@ -119,6 +141,17 @@ namespace GnollHackCommon
         ASCII = 0,
         Tiles
     }
+    public enum MapRefreshRateStyle
+    {
+        MapFPS20 = 0,
+        MapFPS30,
+        MapFPS40,
+        MapFPS60,
+        MapFPS80,
+        MapFPS90,
+        MapFPS120,
+    }
+
     public enum GHMapMode
     {
         Normal = 0,
@@ -135,13 +168,35 @@ namespace GnollHackCommon
     }
 
     [Flags]
+    public enum ChmodPermissions : uint
+    {
+        // user permissions
+        S_IRUSR = 0x100U,
+        S_IWUSR = 0x80U,
+        S_IXUSR = 0x40U,
+
+        // group permission
+        S_IRGRP = 0x20U,
+        S_IWGRP = 0x10U,
+        S_IXGRP = 0x8U,
+
+        // other permissions
+        S_IROTH = 0x4U,
+        S_IWOTH = 0x2U,
+        S_IXOTH = 0x1U,
+
+        S_IALL = 0x1FFU,
+    }
+
+    [Flags]
     public enum RunGnollHackFlags: ulong
     {
         None =          0x00000000,
         SetWinCaps =    0x00000001,
         WizardMode =    0x00000002,
         FullVersion =   0x00000004,
-        ModernMode =  0x00000008,
+        ModernMode =    0x00000008, /* Upon death, the character teleports back to starting altar */
+        CasualMode =    0x00000010, /* Save games are preserved */
     }
 
     [Flags]
@@ -367,8 +422,10 @@ namespace GnollHackCommon
         public int rider_gui_glyph;
         public ulong status_bits;
         public ulong condition_bits;
+
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = GHConstants.NUM_BUFF_BIT_ULONGS)]
         public ulong[] buff_bits;
+
         public sbyte wsegdir;
         public sbyte reverse_prev_wsegdir;
         public ulong monster_flags;
@@ -391,6 +448,16 @@ namespace GnollHackCommon
         public sbyte[] leash_mon_x; /* the last coordinate is the other end of the leash, i.e., u.ux at the time */
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = GHConstants.MaxLeashed + 1)]
         public sbyte[] leash_mon_y; /* the last coordinate is the other end of the leash, i.e., u.uy at the time */
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct simple_layer_info
+    {
+        public int glyph; /* For ascii compatibility */
+        public int bkglyph; /* For ascii compatibility */
+        public ulong layer_flags;
+        public uint m_id;  /* check that the monster found at the square is the one that is supposed to be drawn by comparing their m_ids */
+        public uint o_id;  /* this is the o_id of the possibly moving boulder */
     }
 
     public enum animation_play_types
@@ -514,6 +581,7 @@ namespace GnollHackCommon
         SCREEN_TEXT_DEAD,
         SCREEN_TEXT_ESCAPED,
         SCREEN_TEXT_ASCENDED,
+        SCREEN_TEXT_QUIT,
         SCREEN_TEXT_SPECIAL_END,
         SCREEN_TEXT_BOSS_FIGHT,
         SCREEN_TEXT_EXTRA_LIFE_SPENT,
@@ -954,6 +1022,7 @@ namespace GnollHackCommon
         GUI_CMD_ACTIVATE_QUIETER_MODE,
         GUI_CMD_DEACTIVATE_QUIETER_MODE,
         GUI_CMD_ENABLE_WIZARD_MODE,
+        GUI_CMD_ENABLE_CASUAL_MODE,
         GUI_CMD_PETS,
         GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE,
         GUI_CMD_RESTORE_TRAVEL_MODE,
@@ -993,6 +1062,9 @@ namespace GnollHackCommon
         SPECIAL_VIEW_SHOW_SPECIAL_EFFECT,
         SPECIAL_VIEW_GUI_TIPS,
         SPECIAL_VIEW_CRASH_DETECTED,
+        SPECIAL_VIEW_PANIC,
+        SPECIAL_VIEW_DEBUGLOG,
+        SPECIAL_VIEW_MESSAGE,
         MAX_SPECIAL_VIEW_TYPES
     }
 
@@ -1001,6 +1073,7 @@ namespace GnollHackCommon
         CONTEXT_MENU_STYLE_GENERAL = 0,
         CONTEXT_MENU_STYLE_GETDIR,
         CONTEXT_MENU_STYLE_GETPOS,
+        CONTEXT_MENU_STYLE_CLOSE_DISPLAY,
     }
 
     public enum getline_types
@@ -1073,12 +1146,12 @@ namespace GnollHackCommon
         public const int MaxPlayedZapAnimations = 16;
         public const int MaxNormalImmediateSoundInstances = 64;
         public const int MaxLongImmediateSoundInstances = 64;
-        public const int DefaultPanTime = 5;
+        //public const int DefaultPanTime = 5;
         public const int PIT_BOTTOM_BORDER = 2;
         public const int SPECIAL_HEIGHT_IN_PIT = -32;
         public const int SPECIAL_HEIGHT_LEVITATION = 32;
         public const float OBJECT_PIT_SCALING_FACTOR = 0.75f;
-        public const long MoveIntervals = 3;
+        //public const long MoveIntervals = 3;
         public const int NUM_BUFF_BIT_ULONGS = 7;
         public const int BUFFS_PER_TILE = 24;
         public const int MAX_PROPS = 167;
@@ -1086,7 +1159,10 @@ namespace GnollHackCommon
         public const int MaxObjectsDrawn = 12;
         public const int OBJECT_PILE_START_HEIGHT = 2;
         public const int OBJECT_PILE_HEIGHT_DIFFERENCE = 2;
+        public const float MinimumMapMiniRelativeFontSize = 0.5f;
+        public const float MaximumMapMiniRelativeFontSize = 2.0f;
         public const float MinimumMapFontSize = 4.0f;
+        public const float MaximumMapFontSize = 500.0f;
         public const float MapFontDefaultSize = 72.0f;
         public const float MapFontRelativeAlternateSize = 7.0f / 16.0f;
         public const int DefaultMessageRows = 5;
@@ -1145,6 +1221,10 @@ namespace GnollHackCommon
         public const float DefaultDialogueVolume = 0.5f;
         public const float DefaultEffectsVolume = 0.5f;
         public const float DefaultUIVolume = 0.5f;
+        public const bool DefaultMapNoClipMode = false;
+        public const bool DefaultMapAlternateNoClipMode = false;
+        public const bool DefaultZoomChangeCenterMode = false;
+        public const bool DefaultHideNavigation = true;
     }
 
 

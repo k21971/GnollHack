@@ -145,6 +145,7 @@ DLL int RunGnollHack(
     ReportPlayerNameCallback callback_report_player_name,
     SendObjectDataCallback callback_send_object_data,
     SendMonsterDataCallback callback_send_monster_data
+
 );
 
 DLL int RunGnollHackSimple(

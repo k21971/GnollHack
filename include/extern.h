@@ -33,6 +33,7 @@ E void NDECL(newgame);
 E void NDECL(choose_game_difficulty);
 E const char* FDECL(get_game_difficulty_text, (int));
 E const char* FDECL(get_game_difficulty_symbol, (int));
+E const char* FDECL(get_game_mode_text, (BOOLEAN_P));
 E void NDECL(show_gui_tips);
 E void FDECL(welcome, (BOOLEAN_P));
 E time_t NDECL(get_realtime);
@@ -285,6 +286,7 @@ E void FDECL(get_m_buff_bits, (struct monst*, unsigned long*, BOOLEAN_P));
 E char NDECL(randomkey);
 E void FDECL(random_response, (char *, int));
 E int NDECL(rnd_extcmd_idx);
+E int NDECL(dodeletesavedgame);
 E int NDECL(doconduct);
 E int NDECL(domonsterability);
 E int NDECL(domonability);
@@ -566,6 +568,7 @@ E void FDECL(update_tile_gui_info, (BOOLEAN_P, struct monst*, int, int, unsigned
 E void FDECL(refresh_u_tile_gui_info, (BOOLEAN_P));
 E void FDECL(refresh_m_tile_gui_info, (struct monst*, BOOLEAN_P));
 E void FDECL(set_obj_glyph, (struct obj*));
+E int FDECL(get_seen_monster_glyph, (struct monst*));
 
 /* ### do.c ### */
 
@@ -665,8 +668,10 @@ E char *FDECL(x_monnam, (struct monst *, int, const char *, int, BOOLEAN_P));
 E char *FDECL(l_monnam, (struct monst *));
 E char *FDECL(mon_nam, (struct monst *));
 E char *FDECL(noit_mon_nam, (struct monst *));
+E char* FDECL(noittame_mon_nam, (struct monst*));
 E char *FDECL(Monnam, (struct monst *));
 E char *FDECL(noit_Monnam, (struct monst *));
+E char* FDECL(noittame_Monnam, (struct monst*));
 E char *FDECL(noname_monnam, (struct monst *, int));
 E char *FDECL(m_monnam, (struct monst *));
 E char *FDECL(y_monnam, (struct monst *));
@@ -867,19 +872,19 @@ E const char* FDECL(get_cmap_tilename, (int));
 
 /* ### droidmain.c ### */
 
-#if defined(UNIX) && defined(GNH_ANDROID)
+#if defined(UNIX) && defined(GNH_MOBILE)
 #ifdef PORT_HELP
 E void NDECL(port_help);
 #endif
 E boolean NDECL(authorize_wizard_mode);
-#endif /* UNIX && GNH_ANDROID */
+#endif /* UNIX && GNH_MOBILE */
 
 /* ### unixunix.c ### */
 
-#if defined(UNIX) && defined(GNH_ANDROID)
+#if defined(UNIX) && defined(GNH_MOBILE)
 E void NDECL(getlock);
 E void NDECL(check_crash);
-#endif /* UNIX && GNH_ANDROID */
+#endif /* UNIX && GNH_MOBILE */
 
 /* ### dungeon.c ### */
 
@@ -992,7 +997,7 @@ E boolean FDECL(Popeye, (int));
 E unsigned FDECL(obj_nutrition, (struct obj*));
 E void FDECL(display_nutrition_floating_text, (int, int, int));
 E void FDECL(display_famine_floating_text, (int, int, int));
-
+E long FDECL(get_rotted_status, (struct obj*));
 
 /* ### encounter.c ### */
 
@@ -1318,6 +1323,7 @@ E int NDECL(tty_arrow_key_support_enabled);
 E void FDECL(write_nhsym_utf8, (char**, nhsym, BOOLEAN_P));
 E void FDECL(write_text2buf_utf8, (char*, size_t, const char*));
 E void FDECL(write_CP437_to_buf_unicode, (char*, size_t, const char*));
+E void FDECL(write_gui_debuglog, (const char*));
 
 /* ### invent.c ### */
 
@@ -2076,7 +2082,7 @@ E int FDECL(_copyfile, (char *, char *));
 E int NDECL(kbhit);
 E void NDECL(set_colors);
 E void NDECL(restore_colors);
-#if defined(SUSPEND) && !defined(GNH_ANDROID)
+#if defined(SUSPEND) && !defined(GNH_MOBILE)
 E int NDECL(dosuspend);
 #endif
 #endif /* TOS */
@@ -2410,6 +2416,7 @@ E boolean FDECL(allow_all, (struct obj *));
 E boolean FDECL(allow_category, (struct obj *));
 E boolean FDECL(is_worn_by_type, (struct obj *));
 E int FDECL(ck_bag, (struct obj *));
+E int FDECL(stash_obj_in_container, (struct obj*, struct obj*));
 #ifdef USE_TRAMPOLI
 E int FDECL(in_container, (struct obj *));
 E int FDECL(out_container, (struct obj *));
@@ -2438,7 +2445,10 @@ E boolean FDECL(is_autopickup_exception, (struct obj *, BOOLEAN_P));
 E boolean FDECL(autopick_testobj, (struct obj *, BOOLEAN_P));
 E boolean FDECL(maybe_disturb_container_monster, (struct obj* ));
 E int NDECL(handle_knapsack_full);
-
+E int NDECL(dostash);
+E boolean NDECL(can_stash_objs);
+E void NDECL(set_current_container_to_dummyobj);
+E void NDECL(set_current_container_to_null);
 
 /* ### pline.c ### */
 
@@ -2879,6 +2889,7 @@ E void NDECL(rumor_check);
 
 E int NDECL(dosave);
 E int NDECL(dosave0);
+E int NDECL(check_existing_save_file);
 E boolean FDECL(tricked_fileremoved, (int, char *));
 #ifdef INSURANCE
 E void NDECL(savestateinlock);
@@ -3130,6 +3141,7 @@ E float FDECL(get_monster_ambient_sound_volume, (enum monster_soundset_types));
 E void FDECL(get_god_indices, (int*, int*));
 E void NDECL(play_intro_text);
 E void NDECL(stop_all_immediate_sounds);
+E void NDECL(stop_all_long_immediate_sounds);
 E void FDECL(stop_all_dialogue_of_mon, (struct monst*));
 E void FDECL(play_voice_shopkeeper_welcome, (struct monst*, int));
 E void FDECL(play_voice_shopkeeper_simple_line, (struct monst*, enum shopkeeper_lines));
@@ -3332,6 +3344,7 @@ E void FDECL(attach_fig_transform_timeout, (struct obj *));
 E void FDECL(kill_egg, (struct obj *));
 E void FDECL(hatch_egg, (ANY_P *, long));
 E void FDECL(learn_egg_type, (int));
+E void FDECL(learn_corpse_type, (int));
 E void FDECL(burn_object, (ANY_P *, long));
 E void FDECL(begin_burn, (struct obj *, BOOLEAN_P));
 E void FDECL(end_burn, (struct obj *, BOOLEAN_P));
@@ -3498,7 +3511,7 @@ E void FDECL(remove_monster_and_nearby_waitforu, (struct monst*));
 
 /* ### unixmain.c ### */
 
-#if defined(UNIX) && !defined(GNH_ANDROID)
+#if defined(UNIX) && !defined(GNH_MOBILE)
 #ifdef PORT_HELP
 E void NDECL(port_help);
 #endif
@@ -3521,7 +3534,8 @@ E void VDECL(error, (const char *, ...)) PRINTF_F(1, 2);
 
 /* ### unixunix.c ### */
 
-#if defined(UNIX) && !defined(GNH_ANDROID)
+#if defined(UNIX)
+#if !defined(GNH_MOBILE)
 E void NDECL(getlock);
 E void FDECL(regularize, (char *));
 #if defined(TIMED_DELAY) && !defined(msleep) && defined(SYSV)
@@ -3536,6 +3550,9 @@ E int FDECL(child, (int));
 #ifdef PANICTRACE
 E boolean FDECL(file_exists, (const char *));
 #endif
+#else
+E void FDECL(regularize, (char*));
+#endif /* GNH_MOBILE */
 #endif /* UNIX */
 
 /* ### unixres.c ### */
@@ -3691,7 +3708,7 @@ E int NDECL(dosh);
 #if defined(SHELL) || defined(MAIL)
 E int FDECL(vms_doshell, (const char *, BOOLEAN_P));
 #endif
-#if defined(SUSPEND) && !defined(GNH_ANDROID)
+#if defined(SUSPEND) && !defined(GNH_MOBILE)
 E int NDECL(dosuspend);
 #endif
 #ifdef SELECTSAVED
@@ -3821,8 +3838,8 @@ E boolean NDECL(genl_can_suspend_no);
 E boolean NDECL(genl_can_suspend_yes);
 E char FDECL(genl_message_menu, (CHAR_P, int, const char *));
 E void FDECL(genl_preference_update, (const char *));
-E char *FDECL(genl_getmsghistory, (BOOLEAN_P));
-E void FDECL(genl_putmsghistory, (const char *, BOOLEAN_P));
+E char *FDECL(genl_getmsghistory_ex, (int*, int*, BOOLEAN_P));
+E void FDECL(genl_putmsghistory_ex, (const char *, int, int, BOOLEAN_P));
 #ifdef HANGUPHANDLING
 E void NDECL(nhwindows_hangup);
 #endif

@@ -3135,7 +3135,7 @@ register struct obj* omonwep;
         }
 
         if (has_obj_mythic_wounding(omonwep))
-            permdmg2 += mythic_wounding_amount();
+            permdmg2 += mythic_wounding_amount(omonwep);
 
         if (permdmg2 > 0)
         {
@@ -3144,7 +3144,7 @@ register struct obj* omonwep;
     }
 
     /* Life leech */
-    if (mattk->aatyp == AT_WEAP && omonwep && !is_not_living(youmonst.data) && !is_rider(youmonst.data))
+    if (mattk->aatyp == AT_WEAP && omonwep && !is_immune_to_life_leech(youmonst.data))
     {
         int life_leech = 0;
         if (!uses_spell_flags && (objects[omonwep->otyp].oc_aflags & A1_LIFE_LEECH) && eligible_for_extra_damage(omonwep, &youmonst, mtmp)
@@ -3170,7 +3170,7 @@ register struct obj* omonwep;
         }
 
         if (has_obj_mythic_life_draining(omonwep))
-            life_leech += mythic_life_draining_amount();
+            life_leech += mythic_life_draining_amount(omonwep);
 
         if (life_leech > 0)
         {

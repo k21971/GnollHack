@@ -129,7 +129,7 @@ dosave0()
         return 0;
     fq_save = fqname(SAVEF, SAVEPREFIX, 1); /* level files take 0 */
 
-#if !defined(ANDROID) && !defined(GNH_ANDROID)
+#if !defined(ANDROID) && !defined(GNH_MOBILE)
 #if defined(UNIX) || defined(VMS)
     sethanguphandler((void FDECL((*), (int))) SIG_IGN);
 #endif
@@ -151,10 +151,13 @@ dosave0()
         if (fd > 0) {
             (void) nhclose(fd);
             clear_nhwindow(WIN_MESSAGE);
-            There("seems to be an old save file.");
-            if (yn_query("Overwrite the old file?") == 'n') {
-                nh_compress(fq_save);
-                return 0;
+            if (!CasualMode)
+            {
+                There("seems to be an old save file.");
+                if (yn_query("Overwrite the old file?") == 'n') {
+                    nh_compress(fq_save);
+                    return 0;
+                }
             }
         }
     }
@@ -355,6 +358,30 @@ register int fd, mode;
     save_waterlevel(fd, mode);
     save_msghistory(fd, mode);
     bflush(fd);
+}
+
+/* returns 1 if save file exists, otherwise 0 */
+int
+check_existing_save_file()
+{
+    const char* fq_save;
+    register int fd;
+    fq_save = fqname(SAVEF, SAVEPREFIX, 1); /* level files take 0 */
+
+#if defined(MICRO) && defined(MFLOPPY)
+    if (!saveDiskPrompt(0))
+        return 0;
+#endif
+
+    nh_uncompress(fq_save);
+    fd = open_savefile();
+    if (fd > 0) {
+        (void)nhclose(fd);
+        /* There is an old save file, let's compress it back */
+        nh_compress(fq_save);
+        return 1;
+    }
+    return 0;
 }
 
 boolean
@@ -1287,13 +1314,13 @@ int fd, mode;
 {
     char *msg;
     int msgcount = 0;
-    int msglen = 0;
+    int msglen = 0, attr = ATR_NONE, color = NO_COLOR;
     int minusone = -1;
     boolean init = TRUE;
 
     if (perform_bwrite(mode)) {
         /* ask window port for each message in sequence */
-        while ((msg = getmsghistory(init)) != 0) {
+        while ((msg = getmsghistory_ex(&attr, &color, init)) != 0) {
             init = FALSE;
             msglen = strlen(msg);
             if (msglen < 1)
@@ -1304,7 +1331,10 @@ int fd, mode;
                 msglen = BUFSZ - 1;
             bwrite(fd, (genericptr_t) &msglen, sizeof(msglen));
             bwrite(fd, (genericptr_t) msg, msglen);
+            bwrite(fd, (genericptr_t) &attr, sizeof(attr));
+            bwrite(fd, (genericptr_t) &color, sizeof(color));
             ++msgcount;
+            attr = ATR_NONE, color = NO_COLOR;
         }
         bwrite(fd, (genericptr_t) &minusone, sizeof(int));
     }

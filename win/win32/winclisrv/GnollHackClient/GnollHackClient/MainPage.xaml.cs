@@ -58,6 +58,8 @@ namespace GnollHackClient
             StartLocalGameButton.TextColor = Color.Gray;
             var gamePage = new GamePage(this);
             gamePage.EnableWizardMode = wizardModeSwitch.IsToggled;
+            gamePage.EnableCasualMode = casualModeSwitch.IsToggled;
+            gamePage.EnableModernMode = !classicModeSwitch.IsToggled;
             await App.Current.MainPage.Navigation.PushModalAsync(gamePage);
             gamePage.StartGame();
         }
@@ -81,6 +83,7 @@ namespace GnollHackClient
 
         private Animation _sponsorAnimation = null;
         private bool _firsttime = true;
+        private bool _mainScreenMusicStarted = false;
         private async void ContentPage_Appearing(object sender, EventArgs e)
         {
             wizardModeGrid.IsVisible = App.DeveloperMode;
@@ -91,8 +94,9 @@ namespace GnollHackClient
             StartServerGrid.IsVisible = App.ServerGameAvailable;
 
             classicModeSwitch.IsToggled = App.ClassicMode;
+            casualModeSwitch.IsToggled = App.CasualMode;
 
-            UpdateSponsor();
+            UpdateMobileVersionLabel();
 
             if (_firsttime)
             {
@@ -108,9 +112,10 @@ namespace GnollHackClient
                 StartLogoImage.IsVisible = false;
                 FmodLogoImage.IsVisible = false;
             }
-            else if (!GameStarted && videoView.IsVisible == false)
+            else if (!GameStarted)
             {
-                PlayMainScreenVideoAndMusic();
+                if ((App.IsAndroid && !videoView.IsVisible) || (App.IsiOS && !_mainScreenMusicStarted))
+                    PlayMainScreenVideoAndMusic();
             }
 
             StartServerGrid.IsEnabled = true;
@@ -272,16 +277,21 @@ namespace GnollHackClient
 
         public void PlayMainScreenVideoAndMusic()
         {
-            videoView.IsVisible = true;
-            videoView.Play();
-            StillImage.IsVisible = false;
+            if (App.IsAndroid)
+            {
+                videoView.IsVisible = true;
+                videoView.Play();
+                StillImage.IsVisible = false;
+            }
+
             try
             {
                 App.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, 0.5f, 1.0f);
+                _mainScreenMusicStarted = true;
             }
-            catch
+            catch(Exception ex)
             {
-
+                Console.WriteLine(ex.Message);
             }
         }
 
@@ -300,9 +310,17 @@ namespace GnollHackClient
             //Task[] tasklist1 = new Task[2] { t1, t2 };
             //Task.WaitAll(tasklist1);
 
-            videoView.IsVisible = true;
-            await videoView.FadeTo(1, 250);
-            videoView.Play();
+            if (App.IsAndroid)
+            {
+                videoView.IsVisible = true;
+                await videoView.FadeTo(1, 250);
+                videoView.Play();
+            }
+            else
+            {
+                StillImage.IsVisible = true;
+                await StillImage.FadeTo(1, 250);
+            }
 
             UpperButtonGrid.IsVisible = true;
             await UpperButtonGrid.FadeTo(1, 250);
@@ -453,9 +471,12 @@ namespace GnollHackClient
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
-            StillImage.IsVisible = true;
-            videoView.Stop();
-            videoView.IsVisible = false;
+            if (App.IsAndroid)
+            {
+                StillImage.IsVisible = true;
+                videoView.Stop();
+                videoView.IsVisible = false;
+            }
         }
 
         private double _currentPageWidth = 0;
@@ -467,25 +488,29 @@ namespace GnollHackClient
             {
                 _currentPageWidth = width;
                 _currentPageHeight = height;
-                videoView.Stop();
-                videoView.Source = null;
-                if(width > height)
+
+                if (App.IsAndroid)
                 {
-                    if (Device.RuntimePlatform == Device.UWP)
-                        videoView.Source = new Uri($"ms-appx:///Assets/mainmenulandscape.mp4");
+                    videoView.Stop();
+                    videoView.Source = null;
+                    if (width > height)
+                    {
+                        if (Device.RuntimePlatform == Device.UWP)
+                            videoView.Source = new Uri($"ms-appx:///Assets/mainmenulandscape.mp4");
+                        else
+                            videoView.Source = new Uri($"ms-appx:///mainmenulandscape.mp4");
+                    }
                     else
-                        videoView.Source = new Uri($"ms-appx:///mainmenulandscape.mp4");
+                    {
+                        if (Device.RuntimePlatform == Device.UWP)
+                            videoView.Source = new Uri($"ms-appx:///Assets/mainmenuportrait.mp4");
+                        else
+                            videoView.Source = new Uri($"ms-appx:///mainmenuportrait.mp4");
+                    }
+                    videoView.WidthRequest = width;
+                    videoView.HeightRequest = height;
+                    videoView.Play();
                 }
-                else
-                {
-                    if (Device.RuntimePlatform == Device.UWP)
-                        videoView.Source = new Uri($"ms-appx:///Assets/mainmenuportrait.mp4");
-                    else
-                        videoView.Source = new Uri($"ms-appx:///mainmenuportrait.mp4");
-                }
-                videoView.WidthRequest = width;
-                videoView.HeightRequest = height;
-                videoView.Play();
             }
         }
 
@@ -1053,9 +1078,9 @@ namespace GnollHackClient
         //    return res;
         //}
 
-        private void UpdateSponsor()
+        private void UpdateMobileVersionLabel()
         {
-            AndroidLabel.Text = "Android Version";
+            MobileVersionLabel.Text = Device.RuntimePlatform + " Version";
         }
 
         private void ClassicModeSwitch_Toggled(object sender, ToggledEventArgs e)
@@ -1069,6 +1094,20 @@ namespace GnollHackClient
             else
             {
                 wizardModeSwitch.IsToggled = false;
+            }
+        }
+
+        private void CasualModeSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            App.CasualMode = casualModeSwitch.IsToggled;
+            Preferences.Set("CasualMode", App.CasualMode);
+            if (casualModeSwitch.IsToggled)
+            {
+                wizardModeSwitch.IsToggled = false;
+            }
+            else
+            {
+
             }
         }
 
@@ -1098,9 +1137,19 @@ namespace GnollHackClient
         {
             _popupStyle = popup_style.GeneralDialog;
             PopupCheckBoxLayout.IsVisible = false;
-            PopupTitleLabel.TextColor = Color.White;
+            PopupTitleLabel.TextColor = ClientUtils.NHColor2XColor((int)nhcolor.NO_COLOR, 0, false, true);
             PopupTitleLabel.Text = "Classic Mode";
-            PopupLabel.Text = "In the Classic Mode, death is permanent. Otherwise, your god will revive you at the starting altar, or at another special location.";
+            PopupLabel.Text = "In the Classic Mode, death is permanent. Otherwise, your god will revive you at the starting altar, or at another special location. Each such revival will reduce your game score.";
+            PopupGrid.IsVisible = true;
+        }
+
+        private void CasualTapGestureRecognizer_Tapped(object sender, EventArgs e)
+        {
+            _popupStyle = popup_style.GeneralDialog;
+            PopupCheckBoxLayout.IsVisible = false;
+            PopupTitleLabel.TextColor = ClientUtils.NHColor2XColor((int)nhcolor.NO_COLOR, 0, false, true);
+            PopupTitleLabel.Text = "Casual Mode";
+            PopupLabel.Text = "Casual Mode is a non-scoring game mode in which your saved games will not be deleted after loading, enabling you to load them again after quitting or dying.";
             PopupGrid.IsVisible = true;
         }
 
@@ -1108,7 +1157,7 @@ namespace GnollHackClient
         {
             _popupStyle = popup_style.GeneralDialog;
             PopupCheckBoxLayout.IsVisible = false;
-            PopupTitleLabel.TextColor = Color.White;
+            PopupTitleLabel.TextColor = Color.LightBlue;
             PopupTitleLabel.Text = "Wizard Mode";
             PopupLabel.Text = "Wizard Mode is a debug mode that makes you immortal and enables you to issue special wizard mode commands.";
             PopupGrid.IsVisible = true;
@@ -1119,6 +1168,7 @@ namespace GnollHackClient
             if (wizardModeSwitch.IsToggled)
             {
                 classicModeSwitch.IsToggled = true;
+                casualModeSwitch.IsToggled = false;
             }
             else
             {

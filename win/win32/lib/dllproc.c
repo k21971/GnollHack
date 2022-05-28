@@ -92,7 +92,7 @@ struct window_procs dll_procs = {
 #endif
     /* other defs that really should go away (they're tty specific) */
     dll_start_screen, dll_end_screen, dll_outrip,
-    dll_preference_update, dll_getmsghistory, dll_putmsghistory,
+    dll_preference_update, dll_getmsghistory_ex, dll_putmsghistory_ex,
     dll_status_init, dll_status_finish, dll_status_enablefield,
     dll_status_update,
     genl_can_suspend_yes,
@@ -820,7 +820,8 @@ dll_create_nhwindow_ex(int type, int style, int glyph, struct extended_create_wi
 {
     winid i = 0;
     dll_logDebug("dll_create_nhwindow_ex(%d)\n", type);
-    i = dll_callbacks.callback_create_nhwindow_ex(type, style, glyph, (info.object ? 1 : 0) | (info.monster ? 2 : 0) | (Hallucination ? 4 : 0), info.object ? *(info.object) : zeroobj, get_objclassdata(info.object));
+    struct objclassdata ocdata = get_objclassdata(info.object);
+    i = dll_callbacks.callback_create_nhwindow_ex(type, style, glyph, (info.object ? 1 : 0) | (info.monster ? 2 : 0) | (Hallucination ? 4 : 0), info.object, &ocdata);
 
 #if 0
     /* Return the next available winid
@@ -1188,10 +1189,11 @@ dll_add_extended_menu(winid wid, int glyph, const ANY_P *identifier, struct exte
     get_menu_coloring(str, &color, &attr);
 #endif
 
+    struct objclassdata ocdata = get_objclassdata(info.object);
     dll_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr,
         str, presel, color, info.object ? info.object->quan : 0, info.object ? info.object->o_id : 0, 
         info.monster ? info.monster->m_id : 0, info.heading_for_group_accelerator, info.special_mark, info.menu_flags, 1, info.style, 
-        info.object ? *(info.object) : zeroobj, get_objclassdata(info.object));
+        info.object, &ocdata);
 }
 
 void
@@ -1380,7 +1382,7 @@ dll_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
     (void)mapglyph(layers, &sym, &ocolor, &special, 0, 0);
     symbol = (long)sym;
 
-    dll_callbacks.callback_print_glyph(wid, (int)x, (int)y, glyph, bkglyph, symbol, ocolor, special, layers);
+    dll_callbacks.callback_print_glyph(wid, (int)x, (int)y, glyph, bkglyph, symbol, ocolor, special, &layers);
 
 #if 0
     if ((wid >= 0) && (wid < MAXWINDOWS)
@@ -1906,6 +1908,7 @@ dll_get_ext_cmd()
                          oindex++) {
                         if ((extcmdlist[oindex].flags & AUTOCOMPLETE)
                             && !(!wizard && (extcmdlist[oindex].flags & WIZMODECMD))
+                            && !(!wizard && !discover && !CasualMode && (extcmdlist[oindex].flags & CASUALMODECMD))
                             && !strncmpi(cmd, extcmdlist[oindex].ef_txt, len)) {
                             if (com_index == -1) /* no matches yet */
                                 com_index = oindex;
@@ -2187,8 +2190,13 @@ dll_preference_update(const char *pref)
 
 #define TEXT_BUFFER_SIZE 4096
 char *
-dll_getmsghistory(BOOLEAN_P init)
+dll_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
 {
+    if (attr_ptr)
+        *attr_ptr = ATR_NONE;
+    if (color_ptr)
+        *color_ptr = NO_COLOR;
+
     return (char*)0; // dll_callbacks.callback_getmsghistory(init);
 
 #if 0
@@ -2232,9 +2240,9 @@ dll_getmsghistory(BOOLEAN_P init)
 }
 
 void
-dll_putmsghistory(const char *msg, BOOLEAN_P restoring)
+dll_putmsghistory_ex(const char *msg, int attr, int color, BOOLEAN_P restoring)
 {
-    dll_callbacks.callback_putmsghistory(msg, restoring);
+    dll_callbacks.callback_putmsghistory(msg, attr, color, restoring);
 #if 0
     BOOL save_sound_opt;
 

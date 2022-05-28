@@ -700,7 +700,7 @@ unsigned int *stuckid, *steedid;
 #endif
     if (u.uhp <= 0 && (!Upolyd || u.mh <= 0)) {
         u.ux = u.uy = 0; /* affects pline() [hence You()] */
-        You("were not healthy enough to survive restoration.");
+        You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "were not healthy enough to survive restoration.");
         /* wiz1_level.dlevel is used by mklev.c to see if lots of stuff is
          * uninitialized, so we only have to set it and not the other stuff.
          */
@@ -996,7 +996,7 @@ register int fd;
     restlevelstate(stuckid, steedid);
     program_state.something_worth_saving = 1; /* useful data now exists */
 
-    if (!wizard && !discover)
+    if (!wizard && !discover && !CasualMode)
         (void) delete_savefile();
     if (Is_really_rogue_level(&u.uz))
         assign_graphics(ROGUESET);
@@ -1326,7 +1326,7 @@ STATIC_OVL void
 restore_msghistory(fd)
 register int fd;
 {
-    int msgsize, msgcount = 0;
+    int msgsize, msgcount = 0, attr, color;
     char msg[BUFSZ];
 
     while (1) {
@@ -1340,7 +1340,9 @@ register int fd;
         }
         mread(fd, (genericptr_t) msg, msgsize);
         msg[msgsize] = '\0';
-        putmsghistory(msg, TRUE);
+        mread(fd, (genericptr_t) &attr, sizeof(attr));
+        mread(fd, (genericptr_t) &color, sizeof(color));
+        putmsghistory_ex(msg, attr, color, TRUE);
         ++msgcount;
     }
     if (msgcount)
@@ -1482,7 +1484,7 @@ winid bannerwin; /* if not WIN_ERR, clear window and show copyright in menu */
                      MENU_UNSELECTED);
         }
 
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
         add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE,
                  "Select one of your saved games", MENU_UNSELECTED);
 #endif
@@ -1503,7 +1505,7 @@ winid bannerwin; /* if not WIN_ERR, clear window and show copyright in menu */
         add_menu(tmpwin, NO_GLYPH, &any, clet, 0, ATR_NONE,
                  "Never mind (quit)", MENU_SELECTED);
 
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
         end_menu(tmpwin, "Select one of your saved games");
 #else
         /* no prompt on end_menu, as we've done our own at the top */

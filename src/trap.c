@@ -1086,7 +1086,7 @@ unsigned short trflags;
          * reason why the player cannot escape the trap with a dexterity
          * check, clinging to the ceiling, etc.
          */
-        pline("Air currents pull you down into %s %s!",
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "Air currents pull you down into %s %s!",
               a_your[trap->madeby_u],
               trapdesc);
         /* then proceed to normal trap effect */
@@ -1333,7 +1333,7 @@ unsigned short trflags;
         if (amorphous(youmonst.data) || is_whirly(youmonst.data)
             || unsolid(youmonst.data) || is_incorporeal(youmonst.data))
         {
-            pline("%s bear trap closes harmlessly through you.",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s bear trap closes harmlessly through you.",
                   A_Your[trap->madeby_u]);
 
             special_effect_wait_until_end(0);
@@ -1348,7 +1348,7 @@ unsigned short trflags;
 
         if (!u.usteed && youmonst.data->msize <= MZ_SMALL) 
         {
-            pline("%s bear trap closes harmlessly over you.",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s bear trap closes harmlessly over you.",
                   A_Your[trap->madeby_u]);
 
             special_effect_wait_until_end(0);
@@ -1401,7 +1401,7 @@ unsigned short trflags;
         special_effect_wait_until_action(0);
         if (Sleep_resistance || has_innate_breathless(youmonst.data))
         {
-            You("are enveloped in a cloud of gas!");
+            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are enveloped in a cloud of gas!");
         } 
         else 
         {
@@ -1505,7 +1505,7 @@ unsigned short trflags;
             else 
             {
                 play_sfx_sound(SFX_TRAP_FOUND);
-                pline("%s pit %sopens up under you!", A_Your[trap->madeby_u],
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s pit %sopens up under you!", A_Your[trap->madeby_u],
                       ttype == SPIKED_PIT ? "full of spikes " : "");
                 You("don't fall in!");
             }
@@ -1878,7 +1878,7 @@ unsigned short trflags;
             if (!already_seen && rn2(3))
                 break;
             feeltrap(trap);
-            pline("%s %s in a pile of soil below you.",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s in a pile of soil below you.",
                   already_seen ? "There is" : "You discover",
                   trap->madeby_u ? "the trigger of your mine" : "a trigger");
 
@@ -1956,7 +1956,7 @@ unsigned short trflags;
             if (!already_seen && rn2(3))
                 break;
             feeltrap(trap);
-            pline("%s %s hidden in the floor below you.",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s hidden in the floor below you.",
                 already_seen ? "There is" : "You discover",
                 trap->madeby_u ? "your rolling boulder trap" : "a rolling boulder trap");
         }
@@ -2064,7 +2064,7 @@ struct obj *otmp;
             && mon_can_move(steed)) {
             if (sleep_monst(steed, (struct obj*)0, (struct monst*)0, rn1(7,8), -100, FALSE))
                 /* no in_sight check here; you can feel it even if blind */
-                pline("%s suddenly falls asleep!", Monnam(steed));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s suddenly falls asleep!", Monnam(steed));
         }
         steedhit = TRUE;
         special_effect_wait_until_end(0);
@@ -2688,7 +2688,7 @@ register struct monst *mtmp;
                 {
                     mtmp->mtrapped = 0;
                     if (canseemon(mtmp))
-                        pline("%s rises from the pit...", Monnam(mtmp));
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s rises from the pit...", Monnam(mtmp));
                     fill_pit(mtmp->mx, mtmp->my);
                 }
             } 
@@ -2702,7 +2702,7 @@ register struct monst *mtmp;
             if (trap->ttyp == BEAR_TRAP) 
             {
                 if (canseemon(mtmp))
-                    pline("%s eats a bear trap!", Monnam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s eats a bear trap!", Monnam(mtmp));
                 deltrap(trap);
                 mtmp->meating = 5;
                 mtmp->mtrapped = 0;
@@ -2710,7 +2710,7 @@ register struct monst *mtmp;
             else if (trap->ttyp == SPIKED_PIT)
             {
                 if (canseemon(mtmp))
-                    pline("%s munches on some spikes!", Monnam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s munches on some spikes!", Monnam(mtmp));
                 trap->ttyp = PIT;
                 trap->tsubtyp = 0;
                 trap->tflags = 0;
@@ -2765,7 +2765,7 @@ register struct monst *mtmp;
             if (trap->once && trap->tseen && !rn2(15)) {
                 play_sfx_sound_at_location(SFX_GENERIC_PHYSICAL_TRAP_ACTIVATE, mtmp->mx, mtmp->my);
                 if (in_sight && see_it)
-                    pline("%s triggers a trap but nothing happens.",
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s triggers a trap but nothing happens.",
                           Monnam(mtmp));
                 deltrap(trap);
                 newsym(mtmp->mx, mtmp->my);
@@ -2783,7 +2783,7 @@ register struct monst *mtmp;
             if (trap->once && trap->tseen && !rn2(15)) {
                 play_sfx_sound_at_location(SFX_GENERIC_PHYSICAL_TRAP_ACTIVATE, mtmp->mx, mtmp->my);
                 if (in_sight && see_it)
-                    pline("%s triggers a trap but nothing happens.",
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s triggers a trap but nothing happens.",
                           Monnam(mtmp));
                 deltrap(trap);
                 newsym(mtmp->mx, mtmp->my);
@@ -2817,9 +2817,9 @@ register struct monst *mtmp;
                 if (in_sight)
                 {
                     if(see_it)
-                        pline("A trap door above %s opens, but nothing falls out!", mon_nam(mtmp));
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A trap door above %s opens, but nothing falls out!", mon_nam(mtmp));
                     else
-                        You_see("a trap door open at a distance, but nothing falls out!");
+                        You_see_ex(ATR_NONE, CLR_MSG_ATTENTION, "a trap door open at a distance, but nothing falls out!");
                 }
                 deltrap(trap);
                 newsym(mtmp->mx, mtmp->my);
@@ -2866,11 +2866,11 @@ register struct monst *mtmp;
             play_sfx_sound_at_location_with_minimum_volume(SFX_SQUEAKY_BOARD, mtmp->mx, mtmp->my, 0.15);
             if (in_sight) {
                 if (!Deaf) {
-                    pline("A board beneath %s squeaks %s loudly.",
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A board beneath %s squeaks %s loudly.",
                           mon_nam(mtmp), trapnote(trap, 0));
                     seetrap(trap);
                 } else {
-                    pline("%s stops momentarily and appears to cringe.",
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s stops momentarily and appears to cringe.",
                           Monnam(mtmp));
                 }
             } else {
@@ -2878,7 +2878,7 @@ register struct monst *mtmp;
                 int range = couldsee(mtmp->mx, mtmp->my) /* 9 or 5 */
                                ? NEARBY_CUTOFF_RANGE_CAN_SEE : NEARBY_CUTOFF_RANGE_CANNOT_SEE;
 
-                You_hear("a %s squeak %s.", trapnote(trap, 1),
+                You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a %s squeak %s.", trapnote(trap, 1),
                          (distu(mtmp->mx, mtmp->my) <= range * range)
                             ? "nearby" : "in the distance");
             }
@@ -2905,7 +2905,7 @@ register struct monst *mtmp;
                     play_special_effect_at(SPECIAL_EFFECT_BEAR_TRAP_CLOSE, 0, trap->tx, trap->ty, FALSE);
                     play_sfx_sound_at_location(SFX_BEAR_TRAP_CLOSES, trap->tx, trap->ty);
                     special_effect_wait_until_action(0);
-                    pline("%s is caught in %s bear trap!", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is caught in %s bear trap!", Monnam(mtmp),
                           a_your[trap->madeby_u]);
                     seetrap(trap);
                     special_effect_wait_until_end(0);
@@ -2919,7 +2919,7 @@ register struct monst *mtmp;
                     if (is_bear(mptr))
                     {
                         play_monster_unhappy_sound(mtmp, MONSTER_UNHAPPY_SOUND_HOWL_IN_ANGER);
-                        You_hear("the roaring of an angry bear!");
+                        You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "the roaring of an angry bear!");
                     }
                 }
             }
@@ -2927,7 +2927,7 @@ register struct monst *mtmp;
             {
                 if (in_sight)
                 {
-                    pline("%s evades %s bear trap!", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s evades %s bear trap!", Monnam(mtmp),
                           a_your[trap->madeby_u]);
                     seetrap(trap);
                 }
@@ -2977,12 +2977,12 @@ register struct monst *mtmp;
             if (!resists_sleep(mtmp) && !has_innate_breathless(mptr) && mon_can_move(mtmp) && sleep_monst(mtmp, (struct obj*)0, (struct monst*)0, rn1(7, 8), -100, FALSE))
             {
                 if(in_sight || see_it)
-                    pline("%s suddenly falls asleep!", Monnam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s suddenly falls asleep!", Monnam(mtmp));
             }
             else
             {
                 if (in_sight || see_it)
-                    pline("%s is enveloped in a cloud of gas!", Monnam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is enveloped in a cloud of gas!", Monnam(mtmp));
             }
 
             if (can_see_trap)
@@ -3008,14 +3008,14 @@ register struct monst *mtmp;
             {
             case 0:
                 if (in_sight)
-                    pline("%s %s on the %s!", A_gush_of_water_hits,
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s on the %s!", A_gush_of_water_hits,
                           mon_nam(mtmp), mbodypart(mtmp, HEAD));
                 target = which_armor(mtmp, W_ARMH);
                 (void) water_damage(target, helm_simple_name(target), TRUE);
                 break;
             case 1:
                 if (in_sight)
-                    pline("%s %s's left %s!", A_gush_of_water_hits,
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s's left %s!", A_gush_of_water_hits,
                           mon_nam(mtmp), mbodypart(mtmp, ARM));
                 target = which_armor(mtmp, W_ARMS);
                 if (water_damage(target, (target && (target->oclass == ARMOR_CLASS && objects[target->otyp].oc_armor_category == ARM_SHIELD) ? "shield" : "secondary weapon"), TRUE) != ER_NOTHING)
@@ -3029,13 +3029,13 @@ register struct monst *mtmp;
                 break;
             case 2:
                 if (in_sight)
-                    pline("%s %s's right %s!", A_gush_of_water_hits,
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s's right %s!", A_gush_of_water_hits,
                           mon_nam(mtmp), mbodypart(mtmp, ARM));
                 (void) water_damage(MON_WEP(mtmp), 0, TRUE);
                 goto glovecheck;
             default:
                 if (in_sight)
-                    pline("%s %s!", A_gush_of_water_hits, mon_nam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s!", A_gush_of_water_hits, mon_nam(mtmp));
                 for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
                     if (otmp->lamplit
                         && (otmp->owornmask & (W_WEP | W_SWAPWEP)) == 0)
@@ -3053,9 +3053,9 @@ register struct monst *mtmp;
             if (is_iron(mptr)) 
             {
                 if (in_sight)
-                    pline("%s falls to pieces!", Monnam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s falls to pieces!", Monnam(mtmp));
                 else if (is_tame(mtmp))
-                    pline("May %s rust in peace.", mon_nam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "May %s rust in peace.", mon_nam(mtmp));
                 mondied(mtmp);
                 if (DEADMONSTER(mtmp))
                     trapkilled = TRUE;
@@ -3676,7 +3676,7 @@ const char *arg;
 {
     char kbuf[BUFSZ];
 
-    if (uwep && uwep->otyp == CORPSE && touch_petrifies(&mons[uwep->corpsenm])
+    if (uwep && uwep->otyp == CORPSE && uwep->corpsenm >= LOW_PM && touch_petrifies(&mons[uwep->corpsenm])
         && !Stone_resistance) {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s touch the %s corpse.", arg, corpse_monster_name(uwep));
         Sprintf(kbuf, "%s corpse", an(corpse_monster_name(uwep)));
@@ -3903,6 +3903,7 @@ long hmask, emask; /* might cancel timeout */
     if (!trap) {
         trap = t_at(u.ux, u.uy);
         if (Is_airlevel(&u.uz)) {
+            play_sfx_sound(SFX_TUMBLE_IN_AIR);
             You("begin to tumble in place.");
         } else if (Is_waterlevel(&u.uz) && !no_msg) {
             You_feel("heavier.");
@@ -4924,13 +4925,13 @@ drown()
 
     if ((Teleportation || has_innate_teleportation(youmonst.data)) && !Unaware
         && (Teleport_control || rn2(3) < Luck + 2)) {
-        You("attempt a teleport spell."); /* utcsri!carroll */
+        You_ex(ATR_NONE, CLR_MSG_SPELL, "attempt a teleport spell."); /* utcsri!carroll */
         if (!level.flags.noteleport) {
             (void) dotele(FALSE);
             if (!is_pool(u.ux, u.uy))
                 return TRUE;
         } else
-            pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "attempted teleport spell fails.");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "attempted teleport spell fails.");
     }
     if (u.usteed) {
         dismount_steed(DISMOUNT_GENERIC);
@@ -5003,7 +5004,7 @@ crawl:
     }
     if (u.uinwater) {
         u.uinwater = 0;
-        You("find yourself back %s.",
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find yourself back %s.",
             Is_waterlevel(&u.uz) ? "in an air bubble" : "on land");
     }
     play_environment_ambient_sounds();
@@ -5335,6 +5336,7 @@ boolean force_failure;
     /* Test for monster first, monsters are displayed instead of trap. */
     if (mtmp && (!mtmp->mtrapped || !holdingtrap)) 
     {
+        play_sfx_sound(SFX_SOMETHING_IN_WAY);
         pline("%s is in the way.", Monnam(mtmp));
         return 0;
     }
@@ -5342,6 +5344,7 @@ boolean force_failure;
     /* We might be forced to move onto the trap's location. */
     if (sobj_at(BOULDER, ttmp->tx, ttmp->ty) && !Passes_walls && !under_u) 
     {
+        play_sfx_sound(SFX_SOMETHING_IN_WAY);
         There("is a boulder in your way.");
         return 0;
     }
@@ -5354,7 +5357,7 @@ boolean force_failure;
             || bigmonst(youmonst.data)) {
             /* don't allow untrap if they can't get thru to it */
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
-            You("are unable to reach the %s!",
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "are unable to reach the %s!",
                 trapdesc);
             return 0;
         }
@@ -5368,7 +5371,7 @@ boolean force_failure;
         else
         {
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
-            You("are unable to reach the %s!",
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "are unable to reach the %s!",
                 trapdesc);
         }
         return 0;
@@ -5377,6 +5380,7 @@ boolean force_failure;
     /* Will our hero succeed? */
     if (force_failure || !succeed_untrap(ttmp))
     {
+        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         if (rnl(5))
         {
             pline("Whoops...");
@@ -5426,7 +5430,7 @@ boolean force_failure;
         } 
         else
         {
-            pline("%s %s is difficult to %s.",
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s is difficult to %s.",
                   ttmp->madeby_u ? "Your" : under_u ? "This" : "That",
                   trapdesc,
                   (ttype == WEB) ? "remove" : "disarm");
@@ -5449,7 +5453,7 @@ struct monst *mtmp;
             mtmp->mpeaceful = 1;
             set_malign(mtmp); /* reset alignment */
             newsym(mtmp->mx, mtmp->my);
-            pline("%s is grateful.", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s is grateful.", Monnam(mtmp));
         }
 
         /* Helping someone out of a trap is a nice thing to do,
@@ -5457,7 +5461,7 @@ struct monst *mtmp;
         if (!rn2(3) && !rnl(8) && u.ualign.type == A_LAWFUL)
         {
             adjalign(1);
-            You_feel("that you did the right thing.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "that you did the right thing.");
         }
     }
 }
@@ -5471,7 +5475,6 @@ struct trap *ttmp;
 
     if (fails < 2)
     {
-        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         return fails;
     }
 
@@ -5484,7 +5487,7 @@ struct trap *ttmp;
     if ((mtmp = m_at(ttmp->tx, ttmp->ty)) != 0) 
     {
         mtmp->mtrapped = 0;
-        You("remove %s %s from %s.", the_your[ttmp->madeby_u ? 1 : 0],
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "remove %s %s from %s.", the_your[ttmp->madeby_u ? 1 : 0],
             (ttmp->ttyp == BEAR_TRAP) ? "bear trap" : "webbing",
             mon_nam(mtmp));
         reward_untrap(ttmp, mtmp);
@@ -5493,12 +5496,12 @@ struct trap *ttmp;
     {
         if (ttmp->ttyp == BEAR_TRAP)
         {
-            You("disarm %s bear trap.", the_your[ttmp->madeby_u ? 1 : 0]);
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s bear trap.", the_your[ttmp->madeby_u ? 1 : 0]);
             cnv_trap_obj(BEARTRAP, 1, ttmp, FALSE);
         }
         else /* if (ttmp->ttyp == WEB) */
         {
-            You("succeed in removing %s web.", the_your[ttmp->madeby_u ? 1 : 0]);
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "succeed in removing %s web.", the_your[ttmp->madeby_u ? 1 : 0]);
             deltrap(ttmp);
         }
     }
@@ -5518,12 +5521,11 @@ struct trap* ttmp;
 
     if (fails < 2)
     {
-        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         return fails;
     }
 
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
-    You("disarm %s %s.", the_your[ttmp->madeby_u], get_trap_explanation(ttmp));
+    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s %s.", the_your[ttmp->madeby_u], get_trap_explanation(ttmp));
     
     /* Skills gained */
     int skillgained = 5;
@@ -5652,12 +5654,13 @@ struct trap *ttmp;
 
     if (fails < 2)
     {
-        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
+        if (fails == 1)
+            play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         return fails;
     }
 
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
-    You("disarm %s land mine.", the_your[ttmp->madeby_u]);
+    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s land mine.", the_your[ttmp->madeby_u]);
     cnv_trap_obj(LAND_MINE, 1, ttmp, FALSE);
 
     /* gain skill for untrap */
@@ -5708,7 +5711,6 @@ struct trap *ttmp;
     fails = try_disarm(ttmp, FALSE);
     if (fails < 2)
     {
-        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         return fails;
     }
 
@@ -5735,12 +5737,11 @@ int otyp;
 
     if (fails < 2)
     {
-        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         return fails;
     }
 
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
-    You("disarm %s %s.", the_your[ttmp->madeby_u], get_trap_explanation(ttmp));
+    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s %s.", the_your[ttmp->madeby_u], get_trap_explanation(ttmp));
 
     int skill_level = P_SKILL_LEVEL(P_DISARM_TRAP);
     int getitem = (skill_level <= P_UNSKILLED ? !rn2(3) :
@@ -5771,7 +5772,8 @@ boolean stuff;
 
     if (((wt * 2) / wc) >= HVY_ENCUMBER) 
     {
-        pline("%s is %s for you to lift.", Monnam(mtmp),
+        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is %s for you to lift.", Monnam(mtmp),
               stuff ? "carrying too much" : "too heavy");
         if (!ttmp->madeby_u && !is_peaceful(mtmp) && mon_can_move(mtmp)
             && !mindless(mtmp->data) && mtmp->data->mlet != S_HUMAN
@@ -5780,7 +5782,7 @@ boolean stuff;
             mtmp->mpeaceful = 1;
             set_malign(mtmp); /* reset alignment */
             newsym(mtmp->mx, mtmp->my);
-            pline("%s thinks it was nice of you to try.", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s thinks it was nice of you to try.", Monnam(mtmp));
         }
         return 0;
     }
@@ -5808,6 +5810,7 @@ struct trap *ttmp;
      */
     if (!mtmp->mtrapped)
     {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
         pline("%s isn't trapped.", Monnam(mtmp));
         return 0;
     }
@@ -5816,10 +5819,11 @@ struct trap *ttmp;
         return 1;
 
     /* Will our hero succeed? */
-    if ((untrap_ok = succeed_untrap(ttmp)) && mon_can_move(mtmp))
+    untrap_ok = succeed_untrap(ttmp);
+    if (untrap_ok && mon_can_move(mtmp) && !is_tame(mtmp) && !is_peaceful(mtmp) && rn2(3))
     {
         play_sfx_sound(SFX_MONSTER_DOES_NOT_ALLOW);
-        You("try to reach out your %s, but %s backs away skeptically.",
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "try to reach out your %s, but %s backs away skeptically.",
             makeplural(body_part(ARM)), mon_nam(mtmp));
         return 1;
     }
@@ -5827,7 +5831,7 @@ struct trap *ttmp;
     /* is it a cockatrice?... */
     if (touch_petrifies(mtmp->data) && !uarmg && !Stone_resistance)
     {
-        You("grab the trapped %s using your bare %s.", mon_monster_name(mtmp),
+        You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "grab the trapped %s using your bare %s.", mon_monster_name(mtmp),
             makeplural(body_part(HAND)));
 
         if (poly_when_stoned(youmonst.data) && polymon(PM_STONE_GOLEM)) 
@@ -5848,12 +5852,13 @@ struct trap *ttmp;
     /* need to do cockatrice check first if sleeping or paralyzed */
     if (!untrap_ok)
     {
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "try to grab %s, but cannot get a firm grasp.", mon_nam(mtmp));
+        play_sfx_sound(SFX_DISARM_TRAP_FAIL);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "try to grab %s, but cannot get a firm grasp.", mon_nam(mtmp));
         if (mtmp->msleeping)
         {
             mtmp->msleeping = 0;
             refresh_m_tile_gui_info(mtmp, TRUE);
-            pline("%s awakens.", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s awakens.", Monnam(mtmp));
         }
         return 1;
     }
@@ -5865,14 +5870,14 @@ struct trap *ttmp;
     {
         mtmp->msleeping = 0;
         refresh_m_tile_gui_info(mtmp, TRUE);
-        pline("%s awakens.", Monnam(mtmp));
+        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s awakens.", Monnam(mtmp));
     }
     else if (mtmp->mfrozen && !rn2(mtmp->mfrozen))
     {
         /* After such manhandling, perhaps the effect wears off */
         mtmp->mcanmove = 1;
         mtmp->mfrozen = 0;
-        pline("%s stirs.", Monnam(mtmp));
+        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s stirs.", Monnam(mtmp));
     }
 
     /* is the monster too heavy? */
@@ -5886,7 +5891,8 @@ struct trap *ttmp;
     if (!try_lift(mtmp, ttmp, wt, TRUE))
         return 1;
 
-    You("pull %s out of the pit.", mon_nam(mtmp));
+    play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
+    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "pull %s out of the pit.", mon_nam(mtmp));
     mtmp->mtrapped = 0;
     fill_pit(mtmp->mx, mtmp->my);
     reward_untrap(ttmp, mtmp);
@@ -5919,6 +5925,7 @@ boolean force;
 
     if (!isok(x, y)) 
     {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
         pline_The("perils lurking there are beyond your grasp.");
         return 0;
     }
@@ -5959,7 +5966,7 @@ boolean force;
         if (ttmp || boxcnt)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
-            There("%s %s %s but you can't reach %s%s.",
+            There_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s %s but you can't reach %s%s.",
                 useplural ? "are" : "is", the_trap, here ? "here" : "there",
                 useplural ? "them" : "it",
                 u.usteed ? " while mounted" : "");
@@ -5976,7 +5983,8 @@ boolean force;
             {
                 if (is_pit(ttmp->ttyp)) 
                 {
-                    You_cant("do much about %s%s.", the_trap,
+                    play_sfx_sound(SFX_GENERAL_CANNOT);
+                    You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "do much about %s%s.", the_trap,
                              u.utrap ? " that you're stuck in"
                                      : " while standing on the edge of it");
                     trap_skipped = TRUE;
@@ -6006,7 +6014,7 @@ boolean force;
             {
                 if (u.utrap) 
                 {
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot deal with %s while trapped%s!", the_trap,
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot deal with %s while trapped%s!", the_trap,
                         (x == u.ux && y == u.uy) ? " in it" : "");
                     return 1;
                 }
@@ -6027,7 +6035,7 @@ boolean force;
                 else if (trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_DISARMABLE)
                 {
                     play_sfx_sound(SFX_CANNOT_DISARM_TRAP);
-                    You("cannot disarm %s.", an(trap_type_definitions[ttmp->ttyp].name));
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot disarm %s.", an(trap_type_definitions[ttmp->ttyp].name));
                     return 0;
                 }
                 else
@@ -6062,21 +6070,21 @@ boolean force;
                         if (here)
                         {
                             play_sfx_sound(SFX_CANNOT_DISARM_TRAP);
-                            You("are already on the edge of the pit.");
+                            You_ex(ATR_NONE, CLR_MSG_FAIL, "are already on the edge of the pit.");
                             return 0;
                         }
 
                         if (!mtmp)
                         {
                             play_sfx_sound(SFX_CANNOT_DISARM_TRAP);
-                            pline("Try filling the pit instead.");
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Try filling the pit instead.");
                             return 0;
                         }
 
                         return help_monster_out(mtmp, ttmp);
                     default:
                         play_sfx_sound(SFX_CANNOT_DISARM_TRAP);
-                        You("cannot disable %s trap.", !here ? "that" : "this");
+                        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot disable %s trap.", !here ? "that" : "this");
                         return 0;
                     }
                 }
@@ -6162,10 +6170,10 @@ boolean force;
         || (!force && confused && !rn2(3)))
     {
         play_sfx_sound(SFX_TRAP_FOUND);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find a trap on the door!");
+        You_ex(ATR_NONE, CLR_MSG_WARNING, "find a trap on the door!");
         exercise(A_WIS, TRUE);
 
-        if (yn_query_ex(ATR_NONE, CLR_MSG_ATTENTION, "Trap Found", "Disarm it?") != 'y')
+        if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "Trap Found", "Disarm it?") != 'y')
             return 1;
 
         if (levl[x][y].doormask & D_TRAPPED) 
@@ -6193,7 +6201,7 @@ boolean force;
             else 
             {
                 play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
-                You_ex(ATR_NONE, CLR_MSG_POSITIVE, "disarm it!");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm it!");
                 levl[x][y].doormask &= ~D_TRAPPED;
                 use_skill(P_DISARM_TRAP, 10);
             }
@@ -6242,7 +6250,7 @@ boolean force;
         if (boxcnt)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
-            There("%s %s %s but you can't reach %s%s.",
+            There_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s %s but you can't reach %s%s.",
                 useplural ? "are" : "is", the_trap, "here",
                 useplural ? "them" : "it",
                 u.usteed ? " while mounted" : "");
@@ -6311,11 +6319,11 @@ boolean force;
         play_sfx_sound(SFX_TRAP_FOUND);
         if (otmp->tknown)
         {
-            pline("You confirm that there is an elaborately constructed trap on %s.", the(xname(otmp)));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "You confirm that there is an elaborately constructed trap on %s.", the(xname(otmp)));
         }
         else
         {
-            You("find a trap on %s!", the(xname(otmp)));
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "find a trap on %s!", the(xname(otmp)));
             otmp->tknown = 1;
         }
         if (!confused)
@@ -6347,7 +6355,7 @@ boolean force;
             else
             {
                 play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
-                You("disarm it!");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm it!");
                 otmp->otrapped = 0;
                 use_skill(P_DISARM_TRAP, 10);
             }
@@ -6629,7 +6637,7 @@ boolean disarm;
     otmp->otrapped = 0; /* trap is one-shot; clear flag first in case
                            chest kills you and ends up in bones file */
     play_sfx_sound(SFX_CHEST_TRAP_TRIGGER);
-    You(disarm ? "set it off!" : "trigger a trap!");
+    You_ex(ATR_NONE, CLR_MSG_WARNING, disarm ? "set it off!" : "trigger a trap!");
     if (iflags.using_gui_sounds)
         delay_output_milliseconds(100);
 
@@ -6718,7 +6726,7 @@ boolean disarm;
             play_sfx_sound_at_location(SFX_EXPLOSION_FIERY, ox, oy);
             special_effect_wait_until_action(0);
             context.global_newsym_flags = NEWSYM_FLAGS_KEEP_OLD_EFFECT_GLYPHS;
-            pline("%s!", Tobjnam(obj, "explode"));
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s!", Tobjnam(obj, "explode"));
             Sprintf(buf, "exploding %s", xname(obj));
 
             if (costly)
@@ -6767,7 +6775,7 @@ boolean disarm;
             play_special_effect_at(SPECIAL_EFFECT_TRAP_SLEEP_GAS, 0, obj->ox, obj->oy, FALSE);
             play_sfx_sound(SFX_ENVELOPED_IN_CLOUD_OF_GAS);
             special_effect_wait_until_action(0);
-            pline("A cloud of noxious gas billows from %s.", the(xname(obj)));
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "A cloud of noxious gas billows from %s.", the(xname(obj)));
             poisoned("gas cloud", A_STR, "cloud of poison gas", 0, FALSE, 2);
             exercise(A_CON, FALSE);
             special_effect_wait_until_end(0);
@@ -6779,7 +6787,7 @@ boolean disarm;
             play_special_effect_at(SPECIAL_EFFECT_TRAP_NEEDLE, 0, obj->ox, obj->oy, FALSE);
             play_sfx_sound_at_location(SFX_TRAP_NEEDLE_PRICKS, obj->ox, obj->oy);
             special_effect_wait_until_action(0);
-            You_feel("a needle prick your %s.", body_part(bodypart));
+            You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "a needle prick your %s.", body_part(bodypart));
             if (iflags.using_gui_sounds)
             {
                 delay_output_milliseconds(100);
@@ -6808,7 +6816,7 @@ boolean disarm;
             int dmg;
 
             play_sfx_sound(SFX_ELECTRIC_SHOCK);
-            You("are jolted by a surge of electricity!");
+            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are jolted by a surge of electricity!");
             display_u_being_hit(HIT_ELECTROCUTED, 0, 0UL);
             if (Shock_immunity)
             {
@@ -6866,14 +6874,14 @@ boolean disarm;
             play_special_effect_at(SPECIAL_EFFECT_TRAP_SLEEP_GAS, 0, obj->ox, obj->oy, FALSE);
             play_sfx_sound(SFX_ENVELOPED_IN_CLOUD_OF_GAS);
             special_effect_wait_until_action(0);
-            pline("A cloud of %s gas billows from %s.",
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "A cloud of %s gas billows from %s.",
                   Blind ? blindgas[rn2(SIZE(blindgas))] : rndcolor(),
                   the(xname(obj)));
             if (!Stunned) {
                 if (Hallucination)
-                    pline("What a groovy feeling!");
+                    pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "What a groovy feeling!");
                 else
-                    You("%s%s...", stagger(youmonst.data, "stagger"),
+                    You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s%s...", stagger(youmonst.data, "stagger"),
                         Halluc_resistance ? ""
                                           : Blind ? " and get dizzy"
                                                   : " and your vision blurs");
@@ -7335,7 +7343,7 @@ lava_effects()
             /* nowhere safe to land; repeat burning loop */
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "You're still burning.");
         }
-        You("find yourself back on solid %s.", surface(u.ux, u.uy));
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find yourself back on solid %s.", surface(u.ux, u.uy));
         return TRUE;
     } 
     else if (!Wwalking && (!u.utrap || u.utraptype != TT_LAVA)) 

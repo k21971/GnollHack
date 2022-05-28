@@ -557,7 +557,7 @@ boolean iscontrolled;
         if (!wizard || yn_query("Teleportation is not allowed on this level. Override?") != 'y') 
         {
             play_sfx_sound(SFX_MYSTERIOUS_FORCE_PREVENTS);
-            pline("A mysterious force prevents you from teleporting!");
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "A mysterious force prevents you from teleporting!");
             return TRUE;
         }
     }
@@ -993,7 +993,7 @@ boolean break_the_rules; /* True: wizard mode ^T */
             if (!castit && !break_the_rules) 
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("%s.",
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "%s.",
                     !Teleportation ? ((sp_no < MAXSPELL)
                                         ? "can't cast that spell"
                                         : "don't know that spell")
@@ -1042,7 +1042,7 @@ boolean break_the_rules; /* True: wizard mode ^T */
 
         if (cantdoit) 
         {
-            You("%s %s.", cantdoit,
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s.", cantdoit,
                 castit ? "for a teleport spell" : "to teleport");
             return 0;
         } 
@@ -1083,7 +1083,7 @@ boolean break_the_rules; /* True: wizard mode ^T */
     else 
     {
         play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-        You("%s", shudder_for_moment);
+        You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
         return 0;
     }
 
@@ -1229,7 +1229,7 @@ d_level target_level;
         if (Is_knox(&u.uz) && newlev > 0 && !force_dest)
         {
             play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-            You1(shudder_for_moment);
+            You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
             return;
         }
         /* if in Quest, the player sees "Home 1", etc., on the status
@@ -1257,7 +1257,7 @@ random_levtport:
         if (newlev == depth(&u.uz))
         {
             play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-            You1(shudder_for_moment);
+            You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
             return;
         }
     }
@@ -1268,7 +1268,7 @@ random_levtport:
     if (!next_to_u() && !force_dest) 
     {
         play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-        You1(shudder_for_moment);
+        You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
         return;
     }
 
@@ -1279,7 +1279,7 @@ random_levtport:
         if (newlev >= 0 || newlev <= -llimit) 
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You_cant("get there from here.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "get there from here.");
             return;
         }
         newlevel.dnum = u.uz.dnum;
@@ -1424,7 +1424,7 @@ register struct trap *ttmp;
 
     if (!next_to_u()) {
         play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-        You1(shudder_for_moment);
+        You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
         return;
     }
 
@@ -1504,7 +1504,7 @@ struct trap *trap;
         You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "a wrenching sensation.");
     } else if (!next_to_u()) {
         play_simple_player_sound(MONSTER_SOUND_TYPE_SHUDDER);
-        You1(shudder_for_moment);
+        You_ex1(ATR_NONE, CLR_MSG_ATTENTION, shudder_for_moment);
     } else if (trap->once) {
         deltrap(trap);
         newsym(u.ux, u.uy); /* get rid of trap symbol */
@@ -1826,7 +1826,7 @@ struct monst *mon;
         if (canseemon(mon))
         {
             play_sfx_sound_at_location(SFX_MYSTERIOUS_FORCE_PREVENTS, mon->mx, mon->my);
-            pline("A mysterious force prevents %s from teleporting!",
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A mysterious force prevents %s from teleporting!",
                 mon_nam(mon));
         }
         return TRUE;
@@ -1863,9 +1863,9 @@ int in_sight;
             play_special_effect_at(SPECIAL_EFFECT_TELEPORT_IN, 1, mtmp->mx, mtmp->my, FALSE);
             special_effect_wait_until_action(1);
             if (canseemon(mtmp))
-                pline("%s seems disoriented.", monname);
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems disoriented.", monname);
             else
-                pline("%s suddenly disappears!", monname);
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s suddenly disappears!", monname);
             seetrap(trap);
             special_effect_wait_until_end(1);
         }
@@ -2010,7 +2010,7 @@ register struct obj *obj;
     boolean restricted_fall;
     int try_limit = 4000;
 
-    if (obj->otyp == CORPSE && is_rider(&mons[obj->corpsenm])) {
+    if (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM && is_rider(&mons[obj->corpsenm])) {
         if (revive_corpse(obj))
             return FALSE;
     }

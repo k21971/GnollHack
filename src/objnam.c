@@ -1609,8 +1609,19 @@ weapon_here:
         }
         break;
     case FOOD_CLASS:
+
         if (obj->oeaten)
             Strcat(prefix, "partly eaten ");
+        
+        if (is_obj_rotting_corpse(obj) && (obj->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) != 0)
+        {
+            long rotted = get_rotted_status(obj);
+            if (obj->orotten || rotted > 3L)
+                Strcat(prefix, rotted > 5L ? "tainted " : "rotten ");
+            else
+                Strcat(prefix, "unrotten ");
+        }
+
         if (obj->otyp == CORPSE) {
             /* (quan == 1) => want corpse_xname() to supply article,
                (quan != 1) => already have count or "some" as prefix;
@@ -2026,6 +2037,8 @@ struct obj *otmp;
     if (!otmp->nknown && has_oname(otmp))
         return TRUE;
     if ((otmp->mythic_prefix || otmp->mythic_suffix) && !otmp->mknown)
+        return TRUE;
+    if (is_obj_rotting_corpse(otmp) && (otmp->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) == 0)
         return TRUE;
     /* otmp->rknown is the only item of interest if we reach here */
     /*
@@ -4796,16 +4809,6 @@ boolean is_wiz_wish;
             return (struct obj*)&zeroobj;
         }
 
-        if (!BSTRCMPI(bp, p - 4, "tree")) {
-            int subtype = get_initial_location_subtype(TREE);
-            int vartype = get_initial_location_vartype(TREE, subtype);
-            create_simple_location(x, y, TREE, subtype, vartype, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].vartyp : levl[x][y].floorvartyp, FALSE);
-            pline("A tree.");
-            newsym(x, y);
-            block_vision_and_hearing_at_point(x, y);
-            return (struct obj *) &zeroobj;
-        }
-
         for (i = 1; i < MAX_TREE_SUBTYPES; i++)
         {
             if (!tree_subtype_definitions[i].description)
@@ -4827,6 +4830,18 @@ boolean is_wiz_wish;
             }
 
         }
+
+        if (!BSTRCMPI(bp, p - 4, "tree")) {
+            int subtype = get_initial_location_subtype(TREE);
+            int vartype = get_initial_location_vartype(TREE, subtype);
+            create_simple_location(x, y, TREE, subtype, vartype, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].vartyp : levl[x][y].floorvartyp, FALSE);
+            pline("A tree.");
+            newsym(x, y);
+            block_vision_and_hearing_at_point(x, y);
+            return (struct obj*)&zeroobj;
+        }
+
+
 
         if (!BSTRCMPI(bp, p - 4, "bars")) {
             create_simple_location(x, y, IRONBARS, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].vartyp : levl[x][y].floorvartyp, FALSE);

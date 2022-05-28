@@ -169,6 +169,10 @@ typedef xchar boolean; /* 0 or 1 */
 #include "droidconf.h"
 #endif
 
+#ifdef GNH_IOS
+#include "iosconf.h"
+#endif
+
 /* Displayable name of this port; don't redefine if defined in *conf.h */
 #ifndef PORT_ID
 #ifdef AMIGA
@@ -177,7 +181,7 @@ typedef xchar boolean; /* 0 or 1 */
 #ifdef MAC
 #define PORT_ID "Mac"
 #endif
-#ifdef __APPLE__
+#if defined(__APPLE__)  && !defined(GNH_MOBILE)
 #define PORT_ID "MacOSX"
 #endif
 #ifdef MSDOS

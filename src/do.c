@@ -918,10 +918,16 @@ int
 corpsedescription(obj)
 register struct obj* obj;
 {
-    if (!obj || obj == &zeroobj || obj->otyp != CORPSE)
+    if (!obj || obj == &zeroobj || !is_obj_rotting_corpse(obj))
         return 0;
 
+    if(obj->corpsenm > NON_PM)
+        learn_corpse_type(obj->corpsenm);
 
+    obj->speflags |= SPEFLAGS_ROTTING_STATUS_KNOWN;
+    return itemdescription(obj);
+
+#if 0
     winid datawin = WIN_ERR;
 
     datawin = create_nhwindow(NHW_MENU);
@@ -959,20 +965,7 @@ register struct obj* obj;
     }
 
     int mnum = obj->corpsenm;
-    long rotted = 0L;
-
-    if (!nonrotting_corpse(mnum))
-    {
-        long age = peek_at_iced_corpse_age(obj);
-
-        /* worst case rather than random
-            in this calculation to force prompt */
-        rotted = (monstermoves - age) / (CORPSE_ROTTING_SPEED + 0 /* was rn2(CORPSE_ROTTING_SPEED_VARIATION) */);
-        if (obj->cursed)
-            rotted += 2L;
-        else if (obj->blessed)
-            rotted -= 2L;
-    }
+    long rotted = get_rotted_status(obj);
 
     if (rotted > 5L)
     {
@@ -991,17 +984,15 @@ register struct obj* obj;
     txt = buf;
     putstr(datawin, 0, txt);
 
-    struct permonst* ptr = &mons[mnum];
-    if ((ptr)->mconveys != 0UL || flesh_petrifies(ptr) || is_quantum_mechanic(ptr) || mnum == PM_GREEN_SLIME || obj->otyp == GLOB_OF_GREEN_SLIME || is_mimic(ptr) || is_were(ptr) || is_bat(ptr) || nonrotting_corpse(mnum) || is_rider(ptr)
-        || mnum == PM_STALKER || mnum == PM_LIZARD || mnum == PM_CHAMELEON || mnum == PM_DOPPELGANGER || mnum == PM_NURSE || mnum == PM_DISENCHANTER
-        || is_reviver(ptr)
-        ) 
+    //struct permonst* ptr = &mons[mnum];
+    if (otyp == CORPSE && mnum > NON_PM && mnum < NUM_MONSTERS)
     {
         Sprintf(buf, "Properties:");
         txt = buf;
         putstr(datawin, ATR_HEADING, txt);
 
         print_corpse_properties(datawin, mnum, TRUE);
+        learn_corpse_type(mnum);
     }
 
 
@@ -1022,7 +1013,7 @@ register struct obj* obj;
     destroy_nhwindow(datawin), datawin = WIN_ERR;
 
     return 1;
-
+#endif
 
 }
 
@@ -1339,6 +1330,28 @@ register struct obj* obj;
                 Sprintf(buf, "Comestible effect:      %s", buf2);
                 txt = buf;
                 putstr(datawin, ATR_INDENT_AT_COLON, txt);
+            }
+
+            int mnum = obj->corpsenm;
+            if (is_obj_rotting_corpse(obj) && mnum > NON_PM && (obj->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) !=0)
+            {
+                long rotted = get_rotted_status(obj);
+                if (rotted > 5L)
+                {
+                    strcpy(buf2, "Tainted");
+                }
+                else if (obj->orotten || rotted > 3L)
+                {
+                    strcpy(buf2, "Rotten");
+                }
+                else
+                {
+                    strcpy(buf2, "Unrotten");
+                }
+
+                Sprintf(buf, "Comestible quality:     %s", buf2);
+                txt = buf;
+                putstr(datawin, 0, txt);
             }
         }
     }
@@ -2987,6 +3000,7 @@ register struct obj* obj;
     }
 
     /* General for all items */
+    boolean show_corpse_hint = FALSE;
     if(stats_known)
     {
         /* Item properties */
@@ -3177,15 +3191,21 @@ register struct obj* obj;
             }
         }
 
-
         /* Corpse properties */
-        if (otyp == CORPSE && obj->corpsenm > NON_PM)
+        if (is_obj_rotting_corpse(obj) && obj->corpsenm > NON_PM && obj->corpsenm < NUM_MONSTERS)
         {
-            Sprintf(buf, "Corpse properties:");
-            txt = buf;
-            putstr(datawin, ATR_HEADING, txt);
+            if (mvitals[obj->corpsenm].mvflags & MV_KNOWS_CORPSE)
+            {
+                Sprintf(buf, "Corpse properties:");
+                txt = buf;
+                putstr(datawin, ATR_HEADING, txt);
 
-            print_corpse_properties(datawin, obj->corpsenm, FALSE);
+                print_corpse_properties(datawin, obj->corpsenm, FALSE);
+            }
+            else if (context.game_difficulty <= 0) /* Shows up on expert, too, just in case */
+            {
+                show_corpse_hint = TRUE;
+            }
         }
     }
 
@@ -3935,7 +3955,8 @@ register struct obj* obj;
     }
 
     /* Hints */
-    if (context.game_difficulty < 0 && obj->dknown && (!stats_known || notfullyidentified))
+    boolean show_identify_hint = context.game_difficulty < 0 && obj->dknown && (!stats_known || notfullyidentified);
+    if (show_identify_hint || show_corpse_hint)
     {
         int powercnt = 0;
 
@@ -3950,6 +3971,13 @@ register struct obj* obj;
             Sprintf(buf, " %2d - You can fully learn the statistics by identifying this item (e.g., by using a scroll of identify)", powercnt);
         txt = buf;
         putstr(datawin, ATR_INDENT_AT_DASH, txt);
+
+        if (show_corpse_hint)
+        {
+            Sprintf(buf, " %2d - You can determine this corpse's properties by using a wand of probing on it", powercnt);
+            txt = buf;
+            putstr(datawin, ATR_INDENT_AT_DASH, txt);
+        }
     }
 
     display_nhwindow(datawin, FALSE);
@@ -4362,12 +4390,12 @@ boolean pushing;
                 docrt();
                 vision_full_recalc = 1;
                 play_environment_ambient_sounds();
-                You("find yourself on dry land again!");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find yourself on dry land again!");
             }
             else if (lava && distu(rx, ry) <= 2)
             {
                 int dmg;
-                You("are hit by molten %s%c",
+                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are hit by molten %s%c",
                     hliquid("lava"), Fire_immunity ? '.' : '!');
                 burn_away_slime();
                 dmg = d(3, 6);
@@ -5330,7 +5358,18 @@ int retry;
             if (pick_list[i].item.a_int == ALL_TYPES_SELECTED)
                 all_categories = TRUE;
             else if (pick_list[i].item.a_int == 'A')
+            {
+                if (ParanoidAutoSelectAll)
+                {
+                    if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "All Items Selected", "Are you sure to drop all items?") != 'y')
+                    {
+                        free((genericptr_t)pick_list);
+                        return 0;
+                    }
+                }
+
                 drop_everything = TRUE;
+            }
             else
                 add_valid_menu_class(pick_list[i].item.a_int);
         }
@@ -5527,7 +5566,7 @@ dodown()
             else
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_cant("go down here.");
+                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "go down here.");
                 return 0;
             }
         }
@@ -5581,7 +5620,8 @@ dodown()
                 }
                 else
                 {
-                    You("were unable to fit %s.", down_or_thru);
+                    play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "were unable to fit %s.", down_or_thru);
                     return 0;
                 }
             } 
@@ -5627,7 +5667,7 @@ doup()
         && (!sstairs.sx || u.ux != sstairs.sx || u.uy != sstairs.sy
             || !sstairs.up)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_cant("go up here.");
+        You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "go up here.");
         return 0;
     }
     if (stucksteed(TRUE)) {
@@ -5635,7 +5675,7 @@ doup()
     }
     if (u.ustuck) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are %s, and cannot go up.",
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are %s, and cannot go up.",
             !u.uswallow ? "being held" : is_animal(u.ustuck->data)
                                              ? "swallowed"
                                              : "engulfed");
@@ -5643,7 +5683,8 @@ doup()
     }
     if (near_capacity() > SLT_ENCUMBER) {
         /* No levitation check; inv_weight() already allows for it */
-        Your("load is too heavy to climb the %s.",
+        play_sfx_sound(SFX_GENERAL_TOO_MUCH_ENCUMBRANCE);
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "load is too heavy to climb the %s.",
              levl[u.ux][u.uy].typ == STAIRS ? "stairs" : "ladder");
         return 1;
     }
@@ -5654,7 +5695,8 @@ doup()
             return 0;
     }
     if (!next_to_u()) {
-        You("are held back by your pet!");
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are held back by your pet!");
         return 0;
     }
     at_ladder = (boolean) (levl[u.ux][u.uy].typ == LADDER);
@@ -5861,7 +5903,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     if (on_level(&u.uz, &qstart_level) && !newdungeon && !ok_to_quest() && !wizard)
     {
         play_sfx_sound(SFX_MYSTERIOUS_FORCE_PREVENTS);
-        pline("A mysterious force prevents you from descending.");
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "A mysterious force prevents you from descending.");
         if(play_arrival_teleport_effect)
             level_teleport_effect_in(u.ux, u.uy);
         return;
@@ -5949,6 +5991,11 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             remdun_mapseen(l_idx);
     }
 
+    /* Stop all long immediate sounds from the previous level (footsteps going down are still fine) */
+    stop_all_long_immediate_sounds();
+
+
+    /* NEW LEVEL STARTS HERE */
     if (Is_really_rogue_level(newlevel) || Is_really_rogue_level(&u.uz))
         assign_graphics(Is_really_rogue_level(newlevel) ? ROGUESET : PRIMARY);
 
@@ -6219,9 +6266,13 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
      *  Move all plines beyond the screen reset.
      */
 
+    /* Update music and ambients */
+    update_game_music();
+    play_level_ambient_sounds();
+    play_environment_ambient_sounds();
+
      /* Fade back from black */
     issue_gui_command(GUI_CMD_AFTER_COLLECT);
-
 
     if (play_arrival_teleport_effect)
     {
@@ -6238,8 +6289,8 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     if (displaywakeup)
     {
         play_sfx_sound(SFX_REVIVAL);
-        pline_ex1(ATR_NONE, CLR_MSG_SUCCESSFUL, wakeupbuf);
-        display_popup_text(wakeupbuf, "Revival", POPUP_TEXT_REVIVAL, ATR_NONE, CLR_MSG_SUCCESSFUL, NO_GLYPH, POPUP_FLAGS_NONE);
+        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, wakeupbuf);
+        display_popup_text(wakeupbuf, "Revival", POPUP_TEXT_REVIVAL, ATR_NONE, CLR_MSG_SUCCESS, NO_GLYPH, POPUP_FLAGS_NONE);
     }
 
     /* special levels can have a custom arrival message */

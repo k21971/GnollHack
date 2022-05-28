@@ -525,7 +525,7 @@ boolean FDECL((*filterfunc), (OBJ_P));
             /* caller may be asking us to override filterfunc (in order
                to do a cockatrice corpse touch check during pickup even
                if/when the filter rejects food class) */
-            && (!augment_filter || o->otyp != CORPSE
+            && (!augment_filter || o->otyp != CORPSE || o->corpsenm < LOW_PM
                 || !touch_petrifies(&mons[o->corpsenm])))
             continue;
         sliarray[i].obj = o, sliarray[i].indx = (int) i;
@@ -3027,13 +3027,15 @@ struct obj* otmp_only;
                         /* ugly check: remove inappropriate things */
             if (
                 (taking_off(word) /* exclude if not worn */
-                    && !(otmp->owornmask & (W_ARMOR | W_ACCESSORY)))
+                    && !(otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS)))
                 || (!strcmp(word, "unwield") /* exclude if not wielded */
                     && !(otmp->owornmask & W_WIELDED_WEAPON))
+                || (!strcmp(word, "stash") /* exclude worn items and other containers */
+                    && (otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS) || Is_container(otmp) || !can_stash_objs()))
                 || (putting_on(word) /* exclude if already worn */
-                    && (otmp->owornmask & (W_ARMOR | W_ACCESSORY)))
+                    && (otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS)))
                 || (trading_items(word) /* exclude if already worn and unpaid items */
-                    && ((otmp->owornmask & (W_ARMOR | W_ACCESSORY)) || otmp->unpaid))
+                    && ((otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS)) || otmp->unpaid))
 #if 0 /* 3.4.1 -- include currently wielded weapon among 'wield' choices */
                 || (!strcmp(word, "wield")
                     && (otmp->owornmask & W_WEP))
@@ -3726,8 +3728,12 @@ struct obj *otmp;
 
     if (Is_container(otmp) || otmp->otyp == STATUE)
         otmp->cknown = otmp->lknown = otmp->tknown = 1;
-    if (otmp->otyp == EGG && otmp->corpsenm != NON_PM)
+    if (otmp->otyp == EGG && otmp->corpsenm > NON_PM)
         learn_egg_type(otmp->corpsenm);
+    if (is_obj_rotting_corpse(otmp) && otmp->corpsenm > NON_PM)
+        learn_corpse_type(otmp->corpsenm);
+    if (is_obj_rotting_corpse(otmp))
+        otmp->speflags |= SPEFLAGS_ROTTING_STATUS_KNOWN;
 }
 
 /* ggetobj callback routine; identify an object and give immediate feedback */
@@ -4136,7 +4142,12 @@ long pickcnt;
                     : getobj_ready_objs);
             }
 
-            if (!acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word))
+            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
+                set_current_container_to_dummyobj();
+            boolean acceptable = acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word);
+            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
+                set_current_container_to_null();
+            if (!acceptable)
                 continue;
 
             cnt++;
@@ -4183,7 +4194,12 @@ long pickcnt;
                     : getobj_ready_objs);
             }
 
-            if (!acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word))
+            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
+                set_current_container_to_dummyobj();
+            boolean acceptable = acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word);
+            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
+                set_current_container_to_null();
+            if (!acceptable)
                 continue;
 
             efp = &extcmdlist[i];
@@ -4524,7 +4540,7 @@ boolean addinventoryheader, wornonly;
                  xtra_choice, MENU_UNSELECTED);
     }
 
-#if !defined(GNH_ANDROID)
+#if !defined(GNH_MOBILE)
    if(strcmp(headertext, "") != 0)
    {
        add_menu(win, NO_GLYPH, &any, ' ', 0, ATR_NONE,
@@ -4635,7 +4651,7 @@ nextclass:
     }
     else
     {
-#if !defined(GNH_ANDROID)
+#if !defined(GNH_MOBILE)
         end_menu(win, query && *query ? query : (char*)0);
 #else
         end_menu_ex(win, query && *query ? query : (char*)0, headertext && strcmp(headertext, "") != 0 ? headertext : (char*)0);
@@ -5700,7 +5716,7 @@ boolean picked_some, explicit_cmd;
             dfeature = 0; /* ice already identified */
         if (!can_reach_floor(TRUE)) {
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
-            pline1("But you can't reach it!");
+            pline_ex1(ATR_NONE, CLR_MSG_FAIL, "But you can't reach it!");
             return 0;
         }
     }
@@ -6090,6 +6106,10 @@ register struct obj *otmp, *obj;
     if (obj->otyp == CORPSE || obj->otyp == EGG || obj->otyp == TIN) {
         if (obj->corpsenm != otmp->corpsenm)
             return FALSE;
+    }
+
+    if (is_obj_rotting_corpse(obj) && (obj->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) != (otmp->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN)) {
+        return FALSE;
     }
 
     /* hatching eggs don't merge; ditto for revivable corpses */

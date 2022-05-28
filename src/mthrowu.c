@@ -1438,7 +1438,7 @@ struct attack* mattk;
             if ((adtyp >= AD_MAGM) && (adtyp <= AD_STON))
             {
                 if (canseemon(mtmp))
-                    pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s casts \'%s\' at %s!", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s casts \'%s\' at %s!", Monnam(mtmp),
                         flash_types[ad_to_typ(adtyp)], mon_nam(mtarg));
 
                 dobuzz((int)(-ad_to_typ(adtyp)), (struct obj*)0, mtmp, damn, damd, damp,
@@ -2138,9 +2138,9 @@ boolean your_fault, from_invent;
         /* breakage makes its own noises */
         if (obj_type == POT_ACID) {
             if (cansee(barsx, barsy) && !unbreakable)
-                pline_The("iron bars are dissolved!");
+                pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "iron bars are dissolved!");
             else
-                You_hear(Hallucination ? "angry snakes!" : "a hissing noise.");
+                You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, Hallucination ? "angry snakes!" : "a hissing noise.");
             if (!unbreakable)
                 dissolve_bars(barsx, barsy);
         }

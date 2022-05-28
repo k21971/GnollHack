@@ -216,7 +216,7 @@ doread()
 
         if (Blind) 
         {
-            You_cant("feel any Braille writing.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
             return 0;
         }
         /* can't read shirt worn under suit (under cloak is ok though) */
@@ -318,7 +318,7 @@ doread()
     {
         if (Blind) 
         {
-            You_cant("feel any Braille writing.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
             return 0;
         }
         if (flags.verbose)
@@ -371,7 +371,7 @@ doread()
 
         if (Blind) 
         {
-            You_cant("feel any Braille writing.");
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
             return 0;
         }
         pline("The wrapper reads: \"%s\".",
@@ -2496,7 +2496,7 @@ boolean *effect_happened_ptr;
     }
     case SPE_MASS_SLEEP:
     {
-        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "Glittering dust starts to swirl around you...");
+        pline_ex(ATR_NONE, CLR_MSG_SPELL, "Glittering dust starts to swirl around you...");
 
         int candidates, results, vis_results;
         int i, j, bd, res = 0;
@@ -2552,7 +2552,7 @@ boolean *effect_happened_ptr;
     case SPE_HOLY_WORD:
     {
         You("recite the holy word aloud!");
-        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "A blinding light blasts around you!");
+        pline_ex(ATR_NONE, CLR_MSG_SPELL, "A blinding light blasts around you!");
 
         int candidates, results, vis_results;
         int i, j, bd, res = 0;
@@ -3118,7 +3118,7 @@ boolean *effect_happened_ptr;
             break;
         }
         if(trap_detect(sobj) == 0) //Something was detected
-            You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "become aware of the location of nearby traps!");
+            You_ex(ATR_NONE, CLR_MSG_SPELL, "become aware of the location of nearby traps!");
         else
             play_simple_object_sound(sobj, OBJECT_SOUND_TYPE_GENERAL_EFFECT2);
         break;
@@ -3639,13 +3639,13 @@ struct obj *obj;
 
         if (!Blind) {
             if (u.uswallow) {
-                pline_ex(ATR_NONE, CLR_MSG_WARNING, "It seems even darker in here than before.");
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "It seems even darker in here than before.");
             } else {
                 if (uwep && (artifact_light(uwep) || obj_shines_magical_light(uwep) || has_obj_mythic_magical_light(uwep)) && uwep->lamplit)
-                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "Suddenly, the only light left comes from %s!",
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "Suddenly, the only light left comes from %s!",
                           the(xname(uwep)));
                 else
-                    You_ex(ATR_NONE, CLR_MSG_WARNING, "are surrounded by darkness!");
+                    You_ex(ATR_NONE, CLR_MSG_SPELL, "are surrounded by darkness!");
             }
         }
 
@@ -3658,14 +3658,14 @@ struct obj *obj;
             if (Blind)
                 ; /* no feedback */
             else if (is_animal(u.ustuck->data))
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s is lit.", s_suffix(Monnam(u.ustuck)),
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s %s is lit.", s_suffix(Monnam(u.ustuck)),
                       mbodypart(u.ustuck, STOMACH));
             else if (is_whirly(u.ustuck->data))
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shines briefly.", Monnam(u.ustuck));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s shines briefly.", Monnam(u.ustuck));
             else
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s glistens.", Monnam(u.ustuck));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s glistens.", Monnam(u.ustuck));
         } else if (!Blind)
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A lit field surrounds you!");
+            pline_ex(ATR_NONE, CLR_MSG_SPELL, "A lit field surrounds you!");
     }
 
     /* No-op when swallowed or in water */

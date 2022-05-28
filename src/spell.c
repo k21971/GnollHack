@@ -25,8 +25,8 @@
 #define spellname(spell) OBJ_NAME(objects[spellid(spell)])
 #define spellet(spell) \
     ((char) ((spell < 26) ? ('a' + spell) : ('A' + spell - 26)))  /* Obsolete! Do not use! */
-#define has_spell_tile(spell) ((objects[spellid(spell)].oc_flags5 & O5_HAS_SPELL_TILE) != 0)
-#define spell_to_glyph(spell) (has_spell_tile(spell) ? (spellid(spell) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF) : (objnum_to_glyph(spellid(spell))))
+#define uses_spell_tile(spell) ((objects[spellid(spell)].oc_flags5 & O5_USES_SPELL_TILE) != 0)
+#define spell_to_glyph(spell) (uses_spell_tile(spell) ? (spellid(spell) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF) : (objnum_to_glyph(spellid(spell))))
 
 STATIC_DCL void FDECL(print_spell_level_text, (char*, int, UCHAR_P));
 STATIC_DCL void FDECL(print_spell_level_symbol, (char*, int));
@@ -107,7 +107,7 @@ int spell_id;
 boolean active;
 {
     struct extended_create_window_info info = { 0 };
-    if (has_spell_tile(spell_id) && active)
+    if (uses_spell_tile(spell_id) && active)
         info.create_flags |= WINDOW_CREATE_FLAGS_ACTIVE;
     return info;
 }
@@ -271,8 +271,8 @@ struct obj *book2;
 
         if (arti_cursed) {
             play_sfx_sound(SFX_FAIL_TO_CAST_CORRECTLY);
-            pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "invocation fails!");
-            pline("At least one of your artifacts is cursed...");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "invocation fails!");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "At least one of your artifacts is cursed...");
         } else if (arti1_primed && arti2_primed) {
             unsigned soon =
                 (unsigned) d(2, 6); /* time til next intervene() */
@@ -477,7 +477,7 @@ learn(VOID_ARGS)
         else
         {
             play_sfx_sound(SFX_SPELL_LEARN_FAIL);
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Despite your best efforts, you fail to understand the spell in %s.", the(cxname(book)));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Despite your best efforts, you fail to understand the spell in %s.", the(cxname(book)));
         }
 
         if (gone || !rn2(2)) {
@@ -529,7 +529,7 @@ learn(VOID_ARGS)
         if (book->spestudied > MAX_SPELL_STUDY)
         {
             play_sfx_sound(SFX_SPELL_TOO_FAINT);
-            pline("This spellbook is too faint to be read any more.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "This spellbook is too faint to be read any more.");
             book->otyp = booktype = SPE_BLANK_PAPER;
             /* reset spestudied as if polymorph had taken place */
             book->spestudied = rn2(book->spestudied);
@@ -561,7 +561,7 @@ learn(VOID_ARGS)
         if (book->spestudied >= MAX_SPELL_STUDY) {
             /* pre-used due to being the product of polymorph */
             play_sfx_sound(SFX_SPELL_TOO_FAINT);
-            pline("This spellbook is too faint to read even once.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "This spellbook is too faint to read even once.");
             book->otyp = booktype = SPE_BLANK_PAPER;
             /* reset spestudied as if polymorph had taken place */
             book->spestudied = rn2(book->spestudied);
@@ -719,7 +719,7 @@ register struct obj *spellbook;
                 }
                 else
                 {
-                    pline("This spellbook contains \"%s\".", namebuf);
+                    pline_ex(ATR_NONE, CLR_MSG_HINT, "This spellbook contains \"%s\".", namebuf);
                     makeknown(spellbook->otyp);
                     takeround = 1;
                     Sprintf(buf, "\"%s\" is %s. Continue?", Namebuf2, an(lvlbuf));
@@ -764,7 +764,7 @@ register struct obj *spellbook;
                 if (eyecount(youmonst.data) > 1)
                     eyes = makeplural(eyes);
                 play_sfx_sound(SFX_ACQUIRE_SLEEP);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "This book is so dull that you can't keep your %s open.",
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "This book is so dull that you can't keep your %s open.",
                       eyes);
                 dullbook += rnd(2 * objects[booktype].oc_spell_level);
                 fall_asleep(-dullbook, TRUE);
@@ -993,13 +993,13 @@ rejectcasting()
     if (Stunned)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "are too impaired to cast a spell.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are too impaired to cast a spell.");
         return TRUE;
     } 
     else if (Cancelled)
     {
         play_sfx_sound(SFX_CANCELLATION_IN_FORCE);
-        Your_ex(ATR_NONE, CLR_MSG_WARNING, "magic is not flowing properly to allow for casting a spell.");
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "magic is not flowing properly to allow for casting a spell.");
         return TRUE;
     }
     return FALSE;
@@ -1020,13 +1020,13 @@ int spell;
     if (!(objects[spellbookid].oc_spell_flags & S1_NO_VERBAL_COMPONENT) && !can_chant(&youmonst))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "are unable to chant the incantation for a spell with a verbal component!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are unable to chant the incantation for a spell with a verbal component!");
         return TRUE;
     }
     else if (!(objects[spellbookid].oc_spell_flags & S1_NO_SOMATIC_COMPONENT) && nohands(youmonst.data))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "do not have hands to cast a spell with a somatic component!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "do not have hands to cast a spell with a somatic component!");
         return TRUE;
     }
 #if 0 /* Removed as excessively dangerous for wizards using staffs */
@@ -1043,7 +1043,7 @@ int spell;
 #endif
     else if (!(objects[spellbookid].oc_spell_flags & S1_NO_SOMATIC_COMPONENT) && u.uburied) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot cast a spell with a somatic component while being buried!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot cast a spell with a somatic component while being buried!");
         return TRUE;
     }
     return FALSE;
@@ -1114,7 +1114,7 @@ int spell_list_type;
             if (idx < 0 || idx >= nspells)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("don't know that spell.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know that spell.");
                 continue; /* ask again */
             }
             *spell_no = idx;
@@ -1183,10 +1183,10 @@ int* spell_no;
             {
                 Sprintf(buf, "%s (%s)", fullname, descbuf);
                 info.color = NO_COLOR;
-                if (has_spell_tile(splnum))
+                if (uses_spell_tile(splnum))
                     info.menu_flags |= MENU_FLAGS_ACTIVE;
             }
-            if (has_spell_tile(splnum) && !inactive)
+            if (uses_spell_tile(splnum) && !inactive)
                 info.menu_flags |= MENU_FLAGS_ACTIVE;
 
             any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
@@ -2185,8 +2185,8 @@ boolean atme;
 
     if (spellamount(spell) == 0) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "do not have the spell's material components prepared.");
-        char ans = yn_query_ex(ATR_NONE, CLR_MSG_ATTENTION, "No Components Mixed", "Do you want to mix the spell's material components now?");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "do not have the spell's material components prepared.");
+        char ans = yn_query_ex(ATR_NONE, CLR_MSG_FAIL, "No Components Mixed", "Do you want to mix the spell's material components now?");
         if (ans == 'y')
         {
             return domaterialcomponentsmenu(spell);
@@ -2197,7 +2197,7 @@ boolean atme;
 
     if (spellcooldownleft(spell) > 0) {
         play_sfx_sound(SFX_NOT_READY_YET);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot cast the spell before the cooldown has expired.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot cast the spell before the cooldown has expired.");
         return 0; /* no time elapses */
     }
 
@@ -2205,7 +2205,7 @@ boolean atme;
     if (spellknow(spell) <= 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot recall this spell anymore.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot recall this spell anymore.");
         return 0;
     }
 
@@ -2244,7 +2244,7 @@ boolean atme;
     } else*/
     if (ACURR(A_STR) < 4 && spellid(spell) != SPE_RESTORE_ABILITY) {
         play_sfx_sound(SFX_GENERAL_NOT_ENOUGH_STAMINA);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "lack the strength to cast spells.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the strength to cast spells.");
         return 0;
     } else if (check_capacity(
                 "Your concentration falters while carrying so much stuff.")) {
@@ -2278,7 +2278,7 @@ boolean atme;
     if (denergy > dumana)
     {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "don't have enough mana to cast that spell.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough mana to cast that spell.");
         return res;
     } 
     //else {
@@ -2354,7 +2354,7 @@ boolean atme;
         play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
         u_wait_until_action();
         play_sfx_sound(SFX_FAIL_TO_CAST_CORRECTLY);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "fail to cast the spell correctly.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "fail to cast the spell correctly.");
         deduct_mana_cost(denergy / 2);
         context.botl = 1;
         update_u_action_revert(ACTION_TILE_NO_ACTION);
@@ -2567,7 +2567,7 @@ boolean atme;
                  * "nevermind" is not an option.
                  */
                 play_sfx_sound(SFX_MAGICAL_ENERGY_RELEASED);
-                pline_The("magical energy is released!");
+                pline_The_ex(ATR_NONE, CLR_MSG_SPELL, "magical energy is released!");
             }
 
             if (!u.dx && !u.dy && !u.dz)
@@ -2644,7 +2644,7 @@ boolean atme;
         else
         {
             play_sfx_sound(SFX_FAIL_TO_CAST_CORRECTLY);
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "The spell fails!");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "The spell fails!");
         }
         break;
     }
@@ -2772,7 +2772,7 @@ boolean atme;
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
         play_sfx_sound_at_location(SFX_GENERAL_GAIN_ABILITY_SPELL, u.ux, u.uy);
         special_effect_wait_until_action(0);
-        You_ex(ATR_NONE, CLR_MSG_POSITIVE, "successfully cast \"%s\".", spellname(spell));
+        You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully cast \"%s\".", spellname(spell));
         addspellintrinsictimeout(otyp);
         special_effect_wait_until_end(0);
         break;
@@ -2821,18 +2821,18 @@ boolean atme;
                 }
                 else
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in black energy for a moment.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in black energy for a moment.", Tobjnam(otmp, "flicker"));
                 }
                 break;
             case SPE_COLD_ENCHANT_ITEM:
                 if (otmp->elemental_enchantment == DEATH_ENCHANTMENT)
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in blue for a moment, but then glows black.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in blue for a moment, but then glows black.", Tobjnam(otmp, "flicker"));
                     break;
                 }
                 if (otmp->elemental_enchantment == FIRE_ENCHANTMENT)
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The cold energies dispel the flaming enchantment on %s.", yname(otmp));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "The cold energies dispel the flaming enchantment on %s.", yname(otmp));
                     otmp->elemental_enchantment = 0;
                     update_inventory();
                     break;
@@ -2840,25 +2840,25 @@ boolean atme;
 
                 if (is_elemental_enchantable(otmp))
                 {
-                    You_ex(ATR_NONE, CLR_MSG_POSITIVE, "enchant %s with freezing magic.", yname(otmp));
+                    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "enchant %s with freezing magic.", yname(otmp));
                     otmp = elemental_enchant_quan(otmp, ELEMENTAL_ENCHANTMENT_QUANTITY_NORMAL, COLD_ENCHANTMENT);
                     prinv((char*)0, otmp, 0L);
                     //otmp->elemental_enchantment = COLD_ENCHANTMENT;
                 }
                 else
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in blue for a moment.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in blue for a moment.", Tobjnam(otmp, "flicker"));
                 }
                 break;
             case SPE_FIRE_ENCHANT_ITEM:
                 if (otmp->elemental_enchantment == DEATH_ENCHANTMENT)
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in red for a moment, but then glows black.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in red for a moment, but then glows black.", Tobjnam(otmp, "flicker"));
                     break;
                 }
                 if (otmp->elemental_enchantment == COLD_ENCHANTMENT)
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The fiery energies dispel the freezing enchantment on %s.", yname(otmp));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "The fiery energies dispel the freezing enchantment on %s.", yname(otmp));
                     otmp->elemental_enchantment = 0;
                     update_inventory();
                     break;
@@ -2866,32 +2866,32 @@ boolean atme;
 
                 if (is_elemental_enchantable(otmp))
                 {
-                    You_ex(ATR_NONE, CLR_MSG_POSITIVE, "enchant %s with fire magic.", yname(otmp));
+                    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "enchant %s with fire magic.", yname(otmp));
                     otmp = elemental_enchant_quan(otmp, ELEMENTAL_ENCHANTMENT_QUANTITY_NORMAL, FIRE_ENCHANTMENT);
                     prinv((char*)0, otmp, 0L);
                     //otmp->elemental_enchantment = FIRE_ENCHANTMENT;
                 }
                 else
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in red for a moment.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in red for a moment.", Tobjnam(otmp, "flicker"));
                 }
                 break;
             case SPE_LIGHTNING_ENCHANT_ITEM:
                 if (otmp->elemental_enchantment == DEATH_ENCHANTMENT)
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in blue for a moment, but then glows black.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in blue for a moment, but then glows black.", Tobjnam(otmp, "flicker"));
                     break;
                 }
                 if (is_elemental_enchantable(otmp))
                 {
-                    You_ex(ATR_NONE, CLR_MSG_POSITIVE, "enchant %s with lightning magic.", yname(otmp));
+                    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "enchant %s with lightning magic.", yname(otmp));
                     otmp = elemental_enchant_quan(otmp, ELEMENTAL_ENCHANTMENT_QUANTITY_NORMAL, LIGHTNING_ENCHANTMENT);
                     prinv((char*)0, otmp, 0L);
                     //otmp->elemental_enchantment = LIGHTNING_ENCHANTMENT;
                 }
                 else
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in blue for a moment.", Tobjnam(otmp, "flicker"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s in blue for a moment.", Tobjnam(otmp, "flicker"));
                 }
                 break;
             }
@@ -2950,113 +2950,113 @@ int otyp;
         switch(objects[otyp].oc_dir_subtype)
         {
         case REFLECTING:
-            Your("skin feels more reflecting than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels more reflecting than before.");
             break;
         case FIRE_IMMUNITY:
         case IMPROVED_FIRE_RESISTANCE:
         case FIRE_RESISTANCE:
-            Your("skin feels less prone to burning than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels less prone to burning than before.");
             break;
         case COLD_IMMUNITY:
         case IMPROVED_COLD_RESISTANCE:
         case COLD_RESISTANCE:
-            Your("skin feels less prone to frostbites than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels less prone to frostbites than before.");
             break;
         case SHOCK_IMMUNITY:
         case IMPROVED_SHOCK_RESISTANCE:
         case SHOCK_RESISTANCE:
-            Your("skin feels less prone to electricity than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels less prone to electricity than before.");
             break;
         case DISINTEGRATION_RESISTANCE:
-            Your("body feels firmer than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "body feels firmer than before.");
             break;
         case POISON_RESISTANCE:
-            You_feel("more healthy than before.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more healthy than before.");
             break;
         case ACID_RESISTANCE:
         case IMPROVED_ACID_RESISTANCE:
         case ACID_IMMUNITY:
-            Your("skin feels less prone to acid than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels less prone to acid than before.");
             break;
         case STONE_RESISTANCE:
-            Your("skin feels more limber than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels more limber than before.");
             break;
         case DRAIN_RESISTANCE:
-            You_feel("less suspectible to draining than before.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "less suspectible to draining than before.");
             break;
         case SICK_RESISTANCE:
-            You_feel("unbothered by disease agents.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "unbothered by disease agents.");
             break;
         case INVULNERABLE:
-            Your("skin feels less prone to damage than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels less prone to damage than before.");
             break;
         case ANTIMAGIC:
-            You_feel("more protected from magic.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more protected from magic.");
             break;
         case MAGIC_MISSILE_IMMUNITY:
         case IMPROVED_MAGIC_MISSILE_RESISTANCE:
         case MAGIC_MISSILE_RESISTANCE:
-            You_feel("more protected from magic missiles.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more protected from magic missiles.");
             break;
         case DEATH_RESISTANCE:
-            Your("soul's silver cord feels thicker than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "soul's silver cord feels thicker than before.");
             break;
         case CHARM_RESISTANCE:
-            You_feel("more firm about your own motivations.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more firm about your own motivations.");
             break;
         case FEAR_RESISTANCE:
-            You_feel("more courageous.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more courageous.");
             break;
         case MIND_SHIELDING:
-            You_feel("shielded from mental detection.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "shielded from mental detection.");
             break;
         case LYCANTHROPY_RESISTANCE:
-            You_feel("more protected from lycanthropy.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more protected from lycanthropy.");
             break;
         case CURSE_RESISTANCE:
-            You_feel("more protected from curses.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more protected from curses.");
             break;
         case LIFESAVED:
-            You_feel("less mortal than before.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "less mortal than before.");
             break;
         case DETECT_MONSTERS:
-            You_feel("sensitive to the presence of monsters.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "sensitive to the presence of monsters.");
             break;
         case BLIND_TELEPATHY:
-            You_feel("telepathic when blind.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "telepathic when blind.");
             break;
         case TELEPAT:
-            You_feel("telepathic.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "telepathic.");
             break;
         case XRAY_VISION:
-            You("can see through walls.");
+            You_ex(ATR_NONE, CLR_MSG_POSITIVE, "can see through walls.");
             break;
         case WATER_WALKING:
-            You_feel("like you could walk on water.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "like you could walk on water.");
             break;
         case MAGICAL_BREATHING:
-            You_feel("like you breathe in water.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "like you breathe in water.");
             break;
         case DISPLACED:
-            Your("image is duplicated by a displaced double.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "image is duplicated by a displaced double.");
             break;
         case CONFLICT:
-            Your("neighborhood feels more quarrelsome than before.");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "neighborhood feels more quarrelsome than before.");
             break;
         case MAGICAL_PROTECTION:
-            You_feel("protected!");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "protected!");
             break;
         case MAGICAL_SHIELDING:
-            You_feel("shielded!");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "shielded!");
             break;
         case MAGICAL_BARKSKIN:
-            Your("skin hardens into bark!");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin hardens into bark!");
             break;
         case MAGICAL_STONESKIN:
-            Your("skin hardens into stone!");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin hardens into stone!");
             break;
         case BISECTION_RESISTANCE:
-            Your("skin feels strong as steel!");
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels strong as steel!");
             break;
         default:
             break;
@@ -3613,7 +3613,7 @@ int *spell_no;
             Strcat(spacebuf, " ");
 
         if (!iflags.menu_tab_sep) {
-#if defined (GNH_ANDROID)
+#if defined (GNH_MOBILE)
             Sprintf(fmt, "%%-%ds  #  Description    %%s", namelength);
 #else
             Sprintf(fmt, "    %%-%ds  #  Description    %%s", namelength);
@@ -3840,7 +3840,7 @@ boolean addemptyline;
 
     if (!iflags.menu_tab_sep)
     {
-#if defined (GNH_ANDROID)
+#if defined (GNH_MOBILE)
         Sprintf(fmt, "%%-%ds  Casts  Adds  Material components    %%s", namelength);
 #else
         Sprintf(fmt, "    %%-%ds  Casts  Adds  Material components    %%s", namelength);
@@ -4000,7 +4000,7 @@ boolean addemptyline;
 
     if (!iflags.menu_tab_sep)
     {
-#if defined(GNH_ANDROID)
+#if defined(GNH_MOBILE)
         Sprintf(fmt, "%%-%ds Level %%-13s Mana Stat Fail Cool Casts", namelength);
 #else
         Sprintf(fmt, "    %%-%ds Level %%-13s Mana Stat Fail Cool Casts", namelength);
@@ -4086,7 +4086,7 @@ int splaction;
     {
         info.color = NO_COLOR;
     }
-    if(has_spell_tile(splnum) && !inactive)
+    if(uses_spell_tile(splnum) && !inactive)
         info.menu_flags |= MENU_FLAGS_ACTIVE;
 
     any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
@@ -4112,7 +4112,7 @@ int splaction;
     *fullname = highc(*fullname);
 
     int glyph = NO_GLYPH;
-    if (has_spell_tile(splnum))
+    if (uses_spell_tile(splnum))
     {
         glyph = spellid(splnum) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF;
     }
@@ -4158,7 +4158,7 @@ int splaction;
             availablebuf, addsbuf);
         info.color = NO_COLOR;
     }
-    if (has_spell_tile(splnum) && !inactive)
+    if (uses_spell_tile(splnum) && !inactive)
         info.menu_flags |= MENU_FLAGS_ACTIVE;
 
     any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
@@ -4372,7 +4372,7 @@ dospellmanagemenu()
     selnum++;
 #endif
 
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
     strcpy(available_selection_item[selnum].name, "Set or clear a hotkey for a spell");
     //available_selection_item[selnum].function_ptr = &setspellhotkey;
     available_selection_item[selnum].action = 4;
@@ -4855,21 +4855,21 @@ int spell;
     if (spellknow(spell) <= 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot recall this spell or its material components anymore.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot recall this spell or its material components anymore.");
         return 0;
     }
 
     if (!spellmatcomp(spell))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("That spell does not require material components.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "That spell does not require material components.");
         return 0;
     }
 
     if (!invent)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("have nothing to prepare spells with.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "have nothing to prepare spells with.");
         return 0;
     }
 
@@ -5137,11 +5137,11 @@ int spell;
         int addedamount = spells_gained_per_mixing * selected_multiplier;
         spellamount(spell) += addedamount;
         play_sfx_sound(SFX_MIXING_SUCCESS);
-        You_ex(ATR_NONE, CLR_MSG_POSITIVE, "successfully prepared the material components.");
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "successfully prepared the material components.");
         if (addedamount == 1)
-            You("now have one more casting of \"%s\" prepared.", spellname);
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have one more casting of \"%s\" prepared.", spellname);
         else
-            You("now have %d more castings of \"%s\" prepared.", addedamount, spellname);
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have %d more castings of \"%s\" prepared.", addedamount, spellname);
 
 #if 0
         /* gain skill for successful preparation */

@@ -46,10 +46,17 @@ namespace GnollHackCommon
     public delegate byte BooleanVoidPtrCallback(IntPtr value1);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate int CreateGHWindowCallback(int winid, int style, int glyph, byte dataflags, obj objdata, objclassdata otypdata);
+    [return: MarshalAs(UnmanagedType.LPStr)]
+    public delegate string GetMsgHistoryCallback(IntPtr attr, IntPtr color, byte value1);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate void PrintGlyphCallback(int value1, int value2, int value3, int value4, int value5, int value6, int value7, uint value8, LayerInfo layers);
+    public delegate void PutMsgHistoryCallback([MarshalAs(UnmanagedType.LPStr)] string value1, int attr, int color, byte value2);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    public delegate int CreateGHWindowCallback(int winid, int style, int glyph, byte dataflags, IntPtr objdata_ptr, IntPtr otypdata_ptr);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    public delegate void PrintGlyphCallback(int value1, int value2, int value3, int value4, int value5, int value6, int value7, uint value8, IntPtr layers_ptr);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void StartMenuCallback(int winid, int style);
@@ -57,7 +64,7 @@ namespace GnollHackCommon
     public delegate void AddMenuCallback(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, [MarshalAs(UnmanagedType.LPStr)]  string text, byte presel, int color);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void AddExtendedMenuCallback(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, [MarshalAs(UnmanagedType.LPStr)] string text, byte presel, int color, int maxcount,
-        UInt64 oid, UInt64 mid, char heading_groupaccel, char special_mark, ulong menuflags, byte dataflags, int style, obj otmpdata, objclassdata otypdata);
+        UInt64 oid, UInt64 mid, char heading_groupaccel, char special_mark, ulong menuflags, byte dataflags, int style, IntPtr otmpdata_ptr, IntPtr otypdata_ptr);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void EndMenuCallback(int value1, [MarshalAs(UnmanagedType.LPStr)] string value2, [MarshalAs(UnmanagedType.LPStr)] string value3);
 
@@ -192,7 +199,7 @@ namespace GnollHackCommon
     public delegate void OpenSpecialViewCallback(int viewtype, [MarshalAs(UnmanagedType.LPStr)] string text, int param1, int param2);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate void SendObjectDataCallback(int x, int y, obj otmp, int cmdtype, int where, objclassdata otypdata, ulong oflags);
+    public delegate void SendObjectDataCallback(int x, int y, IntPtr otmp_ptr, int cmdtype, int where, IntPtr otypdata_ptr, ulong oflags);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate void SendMonsterDataCallback(int cmdtype, int x, int y, monst_info monster_data, ulong oflags);
+    public delegate void SendMonsterDataCallback(int cmdtype, int x, int y, IntPtr monster_data_ptr, ulong oflags);
 }

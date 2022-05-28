@@ -128,7 +128,8 @@ extern int NDECL(doextversion);       /**/
 extern int NDECL(doswapweapon);       /**/
 extern int NDECL(dowield);            /**/
 extern int NDECL(dowieldquiver);      /**/
-extern int NDECL(dounwield);            /**/
+extern int NDECL(dounwield);          /**/
+extern int NDECL(dostash);            /**/
 extern int NDECL(dozap);              /**/
 extern int NDECL(doorganize);         /**/
 #endif /* DUMB */
@@ -168,7 +169,7 @@ STATIC_PTR int NDECL(wiz_smell);
 STATIC_PTR int NDECL(wiz_intrinsic);
 STATIC_PTR int NDECL(wiz_show_wmodes);
 STATIC_DCL void NDECL(wiz_map_levltyp);
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
 STATIC_DCL int NDECL(wiz_save_monsters);
 STATIC_DCL int NDECL(wiz_save_tiledata);
 STATIC_DCL int NDECL(wiz_count_tiles);
@@ -390,6 +391,11 @@ doextcmd(VOID_ARGS)
             You("can't do that.");
             return 0;
         }
+        if (!(wizard || discover || CasualMode) && (extcmdlist[idx].flags & CASUALMODECMD)) {
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            You("can't do that.");
+            return 0;
+        }
         if (iflags.menu_requested && !accept_menu_prefix(func)) {
             pline("'%s' prefix has no effect for the %s command.",
                   visctrl(Cmd.spkeys[NHKF_REQMENU]),
@@ -413,10 +419,12 @@ doextlist(VOID_ARGS)
     anything any;
     menu_item* selected = (menu_item*)0;
     int n, pass;
-    int menumode = 0, menushown[2], onelist = 0;
+    int menumode = 0, menushown[3], onelist = 0;
     boolean redisplay = TRUE, search = FALSE;
     static const char *headings[] = { "Extended commands",
-                                      "Debugging Extended Commands" };
+                                      "Casual Extended Commands",
+                                      "Debugging Extended Commands",
+                                      };
 
     searchbuf[0] = '\0';
     menuwin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_DISPLAY_FILE, NO_GLYPH, zerocreatewindowinfo);
@@ -425,7 +433,7 @@ doextlist(VOID_ARGS)
         redisplay = FALSE;
         any = zeroany;
         start_menu_ex(menuwin, GHMENU_STYLE_CHOOSE_COMMAND);
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
         add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_TITLE,
                  "Extended Commands List", MENU_UNSELECTED);
         add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE,
@@ -472,15 +480,17 @@ doextlist(VOID_ARGS)
         any = zeroany;
         add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE,
                  " ", MENU_UNSELECTED);
-        menushown[0] = menushown[1] = 0;
+        menushown[0] = menushown[1] = menushown[2] = 0;
         n = 0;
-        for (pass = 0; pass <= 1; ++pass) {
-            /* skip second pass if not in wizard mode or wizard mode
+        for (pass = 0; pass <= 2; ++pass) {
+            /* skip second/third pass if not in wizard mode or wizard mode
                commands are being integrated into a single list */
-            if (pass == 1 && (onelist || !wizard))
+            if (pass == 1 && (onelist || !(wizard || discover || CasualMode)))
+                continue;
+            if (pass == 2 && (onelist || !wizard))
                 break;
             for (efp = extcmdlist; efp->ef_txt; efp++) {
-                int wizc;
+                int wizc, casualc;
 
                 if ((efp->flags & CMD_NOT_AVAILABLE) != 0)
                     continue;
@@ -501,9 +511,14 @@ doextlist(VOID_ARGS)
                    when showing two sections, skip wizard mode commands
                    in pass==0 and skip other commands in pass==1 */
                 wizc = (efp->flags & WIZMODECMD) != 0;
+                casualc = (efp->flags & CASUALMODECMD) != 0;
                 if (wizc && !wizard)
                     continue;
-                if (!onelist && pass != wizc)
+                if (casualc && !(wizard || discover || CasualMode))
+                    continue;
+                if (!onelist && ((pass != 1 && casualc) || (pass == 1 && !casualc)))
+                    continue;
+                if (!onelist && ((pass != 2 && wizc) || (pass == 2 && !wizc)))
                     continue;
 
                 /* We're about to show an item, have we shown the menu yet?
@@ -531,7 +546,7 @@ doextlist(VOID_ARGS)
         if (*searchbuf && !n)
             add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_NONE,
                      "no matches", MENU_UNSELECTED);
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
         end_menu(menuwin, (char *) 0);
 #else
         end_menu(menuwin, "Extended Commands List");
@@ -835,7 +850,7 @@ doability(VOID_ARGS)
         abilitynum++;
     }
 
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
     /* SKILL-BASED ABILITIES */
     any = zeroany;
     add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
@@ -1498,7 +1513,7 @@ enter_explore_mode(VOID_ARGS)
     } else {
 #ifdef SYSCF
 #if defined(UNIX)
-#if !defined(GNH_ANDROID)
+#if !defined(GNH_MOBILE)
             if (!sysopt.explorers || !sysopt.explorers[0]
             || !check_user_string(sysopt.explorers)) 
 #endif
@@ -1510,11 +1525,12 @@ enter_explore_mode(VOID_ARGS)
 #endif
         pline_ex(ATR_NONE, CLR_MSG_WARNING,
         "Beware!  From explore mode there will be no return to normal game.");
-        if (paranoid_query_ex(ATR_NONE, CLR_MSG_WARNING, ParanoidQuit, (char*)0,
+        if (paranoid_query_ex(ATR_NONE, CLR_MSG_WARNING, ParanoidQuit, "Confirm Explore Mode",
                            "Do you want to enter explore mode?")) {
             clear_nhwindow(WIN_MESSAGE);
-            You("are now in non-scoring explore mode.");
             discover = TRUE;
+            CasualMode = FALSE, ModernMode = FALSE;
+            You_ex(ATR_NONE, CLR_MSG_HINT, "are now in %s mode.", get_game_mode_text(TRUE));
             context.botl = context.botlx = 1;
         } else {
             clear_nhwindow(WIN_MESSAGE);
@@ -2063,7 +2079,7 @@ wiz_map_levltyp(VOID_ARGS)
     return;
 }
 
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
 /* Save monster list */
 STATIC_PTR int
 wiz_save_monsters(VOID_ARGS) /* Save a csv file for monsters */
@@ -2503,7 +2519,7 @@ wiz_save_quest_texts(VOID_ARGS) /* Save a csv file for monsters */
 
     return 0;
 }
-#endif /* ifndef GNH_ANDROID */
+#endif /* ifndef GNH_MOBILE */
 
 
 /* temporary? hack, since level type codes aren't the same as screen
@@ -3070,7 +3086,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
     *tmpbuf = highc(*tmpbuf); /* same adjustment as bottom line */
     /* as in background_enlightenment, when poly'd we need to use the saved
        gender in u.mfemale rather than the current you-as-monster gender */
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
     Sprintf(buf, "%s the %s's attributes:", tmpbuf,
             ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
                 ? urole.name.f
@@ -3105,7 +3121,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
         display_nhwindow(en_win, TRUE);
     } else {
         menu_item *selected = 0;
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
         Sprintf(buf, "%s the %s", tmpbuf,
             ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
             ? urole.name.f
@@ -3144,7 +3160,7 @@ int final;
     innategend = (Upolyd ? u.mfemale : flags.female) ? 1 : 0;
     role_titl = (innategend && urole.name.f) ? urole.name.f : urole.name.m;
     rank_titl = rank_of(u.ulevel, Role_switch, innategend);
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
     enlght_out("", ATR_NONE); /* separator after title */
 #endif
     enlght_out("Background:", ATR_HEADING);
@@ -3211,7 +3227,7 @@ int final;
             u_gname());
 
     boolean usenextrow = TRUE;
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
     usenextrow = (boolean)final;
 #endif
     if (usenextrow)
@@ -3431,9 +3447,10 @@ int final;
     int pct_monster_dmg_mult = (int)(monster_damage_mult * 100);
     int pct_player_dmg_mult = (int)((1 / monster_hp_mult) * 100);
     char difficultybuf[BUFSIZ];
-    Sprintf(difficultybuf, " (%d%% monster damage, %d%% player damage)", pct_monster_dmg_mult, pct_player_dmg_mult);
+    Sprintf(difficultybuf, " (%d%% damage by monsters, %d%% by player)", pct_monster_dmg_mult, pct_player_dmg_mult);
     enl_msg("Your game difficulty ", "is ", "was ", buf, difficultybuf);
 
+    enl_msg("You ", "are playing in ", "were playing in ", get_game_mode_text(TRUE), " mode");
 
 }
 
@@ -4994,7 +5011,7 @@ int cmdflag;
         strcpy(descbuf, efp->ef_desc);
         *descbuf = highc(*descbuf);
 
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
         char shortcutbuf[BUFSZ] = "";
         size_t desclen = 0;
         desclen = strlen(descbuf);
@@ -5080,6 +5097,33 @@ int msgflag;          /* for variant message phrasing */
         /* for dohide(), when player uses '#monster' command */
         You("are %s %s.", msgflag ? "already" : "now", buf);
     }
+}
+
+int
+dodeletesavedgame(VOID_ARGS)
+{
+    if (wizard || discover || CasualMode)
+    {
+        boolean has_existing_save_file = check_existing_save_file();
+        if (has_existing_save_file)
+        {
+            if (yn_query_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Delete Save File", "Are you sure to delete the save file?") == 'y')
+            {
+                delete_savefile();
+                pline1("Save file has been deleted.");
+            }
+            else
+                pline1(Never_mind);
+        }
+        else
+        {
+            pline1("There is no save file to delete.");
+        }
+    }
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(dodeletesavedgame)));
+
+    return 0;
 }
 
 /* KMH, #conduct
@@ -5220,12 +5264,12 @@ struct ext_func_tab extcmdlist[] = {
             doattributes, IFBURIED | AUTOCOMPLETE },
     { '@', "autopickup", "toggle the pickup option on/off",
             dotogglepickup, IFBURIED },
-#if defined (USE_TILES) && !defined(GNH_ANDROID)
+#if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M('b'), "bars", "toggle tile hit point bars on/off",
             dotogglehpbars, IFBURIED | AUTOCOMPLETE },
 #endif
     { C('b'), "break", "break something", dobreak, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_GENERAL, 0, 0, "break" },
-#if defined (USE_TILES) && !defined(GNH_ANDROID)
+#if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M('y'), "bufftimers", "toggle tile buff timers on/off",
             dotogglebufftimers, IFBURIED | AUTOCOMPLETE },
 #endif
@@ -5236,6 +5280,8 @@ struct ext_func_tab extcmdlist[] = {
             docommandmenu, IFBURIED | GENERALCMD | AUTOCOMPLETE },
     { M(3) /*M('c')*/, "conduct", "list voluntary challenges you have maintained",
             doconduct, IFBURIED | AUTOCOMPLETE },
+    { M(6), "deletesavedgame", "delete saved game if it exists",
+            dodeletesavedgame, IFBURIED | CASUALMODECMD | AUTOCOMPLETE },
     { C('g'), "dig", "dig the ground", dodig, INCMDMENU },
     { M('d'), "dip", "dip an object into something", dodip, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_GENERAL, 0, getobj_allowall, "dip" },
     { '>', "down", "go down a staircase", dodown },
@@ -5254,7 +5300,7 @@ struct ext_func_tab extcmdlist[] = {
             doquickwhatis, IFBURIED | GENERALCMD },
     { M('g'), "genocided", "list genocided monsters",
             dogenocidedmonsters, IFBURIED },
-#if defined (USE_TILES) && !defined(GNH_ANDROID)
+#if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M('_'), "grid", "toggle tile grid on/off",
             dotogglegrid, IFBURIED | AUTOCOMPLETE },
 #endif
@@ -5354,6 +5400,7 @@ struct ext_func_tab extcmdlist[] = {
 #endif /* SHELL */
     },
     { C('s'), "sit", "sit down", dosit, AUTOCOMPLETE | INCMDMENU },
+    { M(7), "stash", "stash an item into a container", dostash, SINGLE_OBJ_CMD_GENERAL, 0, getobj_stash_objs, "stash" },
     { '\0', "stats", "show memory statistics",
             wiz_show_stats, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { C('z'), "suspend", "suspend the game",
@@ -5365,7 +5412,7 @@ struct ext_func_tab extcmdlist[] = {
 
     { 'T', "takeoff", "take off one piece of armor", dotakeoff, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_clothes, "take off", "take off" },
     { M('t')/*'A'*/, "takeoffall", "remove all armor", doddoremarm },
-#if defined (USE_TILES) && !defined(GNH_ANDROID)
+#if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M(';'), "targeting", "toggle tile targeting graphics on/off",
             dotogglemonstertargeting, IFBURIED | AUTOCOMPLETE },
     { M(':'), "umark", "toggle tile player mark graphics on/off",
@@ -5421,7 +5468,7 @@ struct ext_func_tab extcmdlist[] = {
             dospellmanage, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
     { '\0', "reorderspells", "sort and reorder known spells",
             dovspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
-#if defined (USE_TILES) && !defined(GNH_ANDROID)
+#if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M('.'), "zoomnormal", "revert to normal zoom level",
             dozoomnormal, IFBURIED | AUTOCOMPLETE },
     { M('+'), "zoomin", "zoom map out",
@@ -5433,7 +5480,7 @@ struct ext_func_tab extcmdlist[] = {
     { C(','), "zoomhalf", "zoom map out to 50% of normal",
             dozoomhalf, IFBURIED | AUTOCOMPLETE },
 #endif
-#ifdef GNH_ANDROID
+#ifdef GNH_MOBILE
     { '{', "viewpet", "view currently active pet",
             doviewpet, IFBURIED },
 #endif
@@ -5462,7 +5509,7 @@ struct ext_func_tab extcmdlist[] = {
             wiz_makemap, IFBURIED | WIZMODECMD },
     { C('f'), "wizmap", "map the level",
             wiz_map, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-#ifndef GNH_ANDROID
+#ifndef GNH_MOBILE
     { '\0', "wizsavemon", "save monsters into a file",
             wiz_save_monsters, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { '\0', "wizsaveenc", "save encounters into a file",
@@ -5752,14 +5799,14 @@ dokeylist(VOID_ARGS)
     if (dokeylist_putcmds(datawin, TRUE, GENERALCMD, WIZMODECMD, keys_used)) {
         putstr(datawin, 0, "");
         putstr(datawin, 0, "General commands:");
-        (void) dokeylist_putcmds(datawin, FALSE, GENERALCMD, WIZMODECMD,
+        (void) dokeylist_putcmds(datawin, FALSE, GENERALCMD, WIZMODECMD | CASUALMODECMD,
                                  keys_used);
     }
 
     if (dokeylist_putcmds(datawin, TRUE, 0, WIZMODECMD, keys_used)) {
         putstr(datawin, 0, "");
         putstr(datawin, 0, "Game commands:");
-        (void) dokeylist_putcmds(datawin, FALSE, 0, WIZMODECMD, keys_used);
+        (void) dokeylist_putcmds(datawin, FALSE, 0, WIZMODECMD | CASUALMODECMD, keys_used);
     }
 
     if (wizard
@@ -5767,6 +5814,13 @@ dokeylist(VOID_ARGS)
         putstr(datawin, 0, "");
         putstr(datawin, 0, "Wizard-mode commands:");
         (void) dokeylist_putcmds(datawin, FALSE, WIZMODECMD, 0, keys_used);
+    }
+
+    if ((wizard || discover || CasualMode)
+        && dokeylist_putcmds(datawin, TRUE, CASUALMODECMD, 0, keys_used)) {
+        putstr(datawin, 0, "");
+        putstr(datawin, 0, "Casual-mode commands:");
+        (void)dokeylist_putcmds(datawin, FALSE, CASUALMODECMD, 0, keys_used);
     }
 
     display_nhwindow(datawin, FALSE);
@@ -6953,13 +7007,19 @@ register char *cmd;
             if (!wizard && (tlist->flags & WIZMODECMD))
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_cant("do that!");
+                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "do that!");
                 res = 0;
             }
-            else if (u.uburied && !(tlist->flags & IFBURIED)) 
+            else if (!(wizard || discover || CasualMode) && (tlist->flags & CASUALMODECMD))
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_cant("do that while you are buried!");
+                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "do that!");
+                res = 0;
+            }
+            else if (u.uburied && !(tlist->flags & IFBURIED))
+            {
+                play_sfx_sound(SFX_GENERAL_CANNOT);
+                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "do that while you are buried!");
                 res = 0;
             } 
             else 
@@ -8400,7 +8460,7 @@ const char *prompt, *title;
 STATIC_PTR int
 dosuspend_core(VOID_ARGS)
 {
-#if defined(SUSPEND) && !defined(GNH_ANDROID)
+#if defined(SUSPEND) && !defined(GNH_MOBILE)
     /* Does current window system support suspend? */
     if ((*windowprocs.win_can_suspend)()) {
         /* NB: SYSCF SHELLERS handled in port code. */
@@ -8705,6 +8765,10 @@ enum create_context_menu_types menu_type;
             0, 0, NO_COLOR);
 
         add_context_menu('.', Cmd.spkeys[NHKF_GETDIR_SELF], CONTEXT_MENU_STYLE_GETDIR, u_to_glyph(), "Self",
+            0, 0, NO_COLOR);
+        break;
+    case CREATE_CONTEXT_MENU_BLOCKING_WINDOW:
+        add_context_menu(27, Cmd.spkeys[NHKF_ESC], CONTEXT_MENU_STYLE_CLOSE_DISPLAY, NO_GLYPH, "Close",
             0, 0, NO_COLOR);
         break;
     default:

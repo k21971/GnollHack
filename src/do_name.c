@@ -2212,6 +2212,19 @@ struct monst *mtmp;
                     FALSE);
 }
 
+char*
+noittame_mon_nam(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return "";
+    
+    if (is_tame(mtmp))
+        return noit_mon_nam(mtmp);
+    else
+        return mon_nam(mtmp);
+}
+
 char *
 Monnam(mtmp)
 struct monst *mtmp;
@@ -2230,6 +2243,19 @@ struct monst *mtmp;
 
     *bp = highc(*bp);
     return  bp;
+}
+
+char*
+noittame_Monnam(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return "";
+
+    if (is_tame(mtmp))
+        return noit_Monnam(mtmp);
+    else
+        return Monnam(mtmp);
 }
 
 /* return "a dog" rather than "Fido", honoring hallucination and visibility */
