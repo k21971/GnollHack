@@ -14,21 +14,21 @@ namespace GnollHackClient.Pages.Game
     [XamlCompilation(XamlCompilationOptions.Compile)]
     public partial class GameMenuPage : ContentPage
     {
-        private GamePage _gamePage;
-        private TableSection _developerSection;
-        private TableSection _optionsSection;
+        public GamePage _gamePage;
+        private ViewCell _optionsViewCell;
+        private ViewCell _gcViewCell;
 
         public GameMenuPage(GamePage gamePage)
         {
             InitializeComponent();
 
             _gamePage = gamePage;
-            _developerSection = DeveloperSection;
-            _optionsSection = OptionsSection;
+            _gcViewCell = GCViewCell;
+            _optionsViewCell = OptionsViewCell;
             if (!App.DeveloperMode)
             {
-                GameTableView.Root.Remove(_optionsSection);
-                GameTableView.Root.Remove(_developerSection);
+                BaseSection.Remove(GCViewCell);
+                BaseSection.Remove(OptionsViewCell);
             }
         }
 
@@ -80,22 +80,26 @@ namespace GnollHackClient.Pages.Game
         {
             MainLayout.IsEnabled = false;
             App.PlayButtonClickedSound();
-            var settingsPage = new SettingsPage(this._gamePage);
+            var settingsPage = new SettingsPage(this, null);
             await App.Current.MainPage.Navigation.PushModalAsync(settingsPage);
         }
 
         private void ContentPage_Appearing(object sender, EventArgs e)
         {
             App.BackButtonPressed += BackButtonPressed;
+        }
+
+        public void UpdateLayout()
+        {
             MainLayout.IsEnabled = true;
-            if (App.DeveloperMode && !GameTableView.Root.Contains(_optionsSection))
-                GameTableView.Root.Insert(1, _optionsSection);
-            if (!App.DeveloperMode && GameTableView.Root.Contains(_optionsSection))
-                GameTableView.Root.Remove(_optionsSection);
-            if (App.DeveloperMode && !GameTableView.Root.Contains(_developerSection))
-                GameTableView.Root.Insert(3, _developerSection);
-            if (!App.DeveloperMode && GameTableView.Root.Contains(_developerSection))
-                GameTableView.Root.Remove(_developerSection);
+            if (App.DeveloperMode && !BaseSection.Contains(_optionsViewCell))
+                BaseSection.Insert(2, _optionsViewCell);
+            if (!App.DeveloperMode && BaseSection.Contains(_optionsViewCell))
+                BaseSection.Remove(_optionsViewCell);
+            if (App.DeveloperMode && !BaseSection.Contains(GCViewCell))
+                BaseSection.Insert(4, GCViewCell);
+            if (!App.DeveloperMode && BaseSection.Contains(GCViewCell))
+                BaseSection.Remove(GCViewCell);
         }
 
         private bool _backPressed = false;

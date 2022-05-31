@@ -14,7 +14,7 @@
     <AssemblyName>GnollHackClient.iOS</AssemblyName>
     <MtouchEnableSGenConc>true</MtouchEnableSGenConc>
     <MtouchHttpClientHandler>NSUrlSessionHandler</MtouchHttpClientHandler>
-    <ProvisioningType>automatic</ProvisioningType>
+    <ProvisioningType>manual</ProvisioningType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|iPhoneSimulator' ">
     <DebugSymbols>true</DebugSymbols>
@@ -48,29 +48,40 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <MtouchArch>ARM64</MtouchArch>
-    <CodesignKey>Apple Development: Janne Gustafsson (8775PY8K73)</CodesignKey>
+    <CodesignKey>Apple Development: Janne Gustafsson (LWNBT5L73Q)</CodesignKey>
     <MtouchDebug>true</MtouchDebug>
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
     <MtouchLink>None</MtouchLink>
     <MtouchInterpreter>-all</MtouchInterpreter>
-    <MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir}/NativeReferences -framework AudioToolbox -framework CoreAudio -lgnollhackios -lfmod_iphoneos -lfmodstudio_iphoneos -force_load ${ProjectDir}/NativeReferences/libgnollhackios.a ${ProjectDir}/NativeReferences/libfmod_iphoneos.a ${ProjectDir}/NativeReferences/libfmodstudio_iphoneos.a"</MtouchExtraArgs>
+    <MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir}/NativeReferences -framework AudioToolbox -framework CoreAudio -lgnollhackios -lfmod_iphoneos -lfmodstudio_iphoneos -force_load ${ProjectDir}/NativeReferences/libgnollhackios.a -force_load ${ProjectDir}/NativeReferences/libfmod_iphoneos.a -force_load ${ProjectDir}/NativeReferences/libfmodstudio_iphoneos.a"</MtouchExtraArgs>
     <MtouchSdkVersion>
     </MtouchSdkVersion>
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
+    <MtouchFastDev>false</MtouchFastDev>
+    <CodesignProvision>GnollHack HMP</CodesignProvision>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhone' ">
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\iPhone\Release</OutputPath>
+    <DefineConstants>UNITY_IPHONE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <MtouchArch>ARM64</MtouchArch>
-    <CodesignKey>iPhone Developer</CodesignKey>
+    <CodesignKey>Apple Development: Janne Gustafsson (LWNBT5L73Q)</CodesignKey>
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
+    <MtouchInterpreter>-all</MtouchInterpreter>
+    <MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir}/NativeReferences -framework AudioToolbox -framework CoreAudio -lgnollhackios -lfmod_iphoneos -lfmodstudio_iphoneos -force_load ${ProjectDir}/NativeReferences/libgnollhackios.a -force_load ${ProjectDir}/NativeReferences/libfmod_iphoneos.a -force_load ${ProjectDir}/NativeReferences/libfmodstudio_iphoneos.a"</MtouchExtraArgs>
+    <MtouchLink>SdkOnly</MtouchLink>
+    <MtouchNoSymbolStrip>false</MtouchNoSymbolStrip>
+    <MtouchFastDev>false</MtouchFastDev>
+    <CodesignProvision>GnollHack HMP</CodesignProvision>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <AppExtensionDebugBundleId />
   </PropertyGroup>
+  <PropertyGroup />
+  <PropertyGroup />
   <ItemGroup>
     <Compile Include="..\GnollHackClient.FMOD\FmodService.cs" />
     <Compile Include="..\GnollHackClient.FMOD\fmod.cs" />
@@ -78,6 +89,7 @@
     <Compile Include="..\GnollHackClient.FMOD\fmod_errors.cs" />
     <Compile Include="..\GnollHackClient.FMOD\fmod_studio.cs" />
     <Compile Include="..\GnollHackClient.Common\GnollHackService.cs" />
+    <Compile Include="GHEditorRenderer.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="AppDelegate.cs" />
     <None Include="Entitlements.plist" />
@@ -99,6 +111,8 @@
     <BundleResource Include="banks\Auxiliary.bank" />
     <BundleResource Include="banks\Master.bank" />
     <BundleResource Include="banks\Master.strings.bank" />
+    <ITunesArtwork Include="iTunesArtwork" />
+    <ITunesArtwork Include="iTunesArtwork%402x" />
   </ItemGroup>
   <ItemGroup>
     <InterfaceDefinition Include="Resources\LaunchScreen.storyboard" />
@@ -190,17 +204,17 @@
     <BundleResource Include="Resources\mainmenulandscape.mp4" />
   </ItemGroup>
   <ItemGroup>
+    <BundleResource Include="Resources\mainmenuportrait.mp4" />
+  </ItemGroup>
+  <ItemGroup>
+    <NativeReference Include="NativeReferences/libfmodstudio_iphoneos.a">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="NativeReferences/libfmod_iphoneos.a">
+      <Kind>Static</Kind>
+    </NativeReference>
     <NativeReference Include="NativeReferences/libgnollhackios.a">
       <Kind>Static</Kind>
     </NativeReference>
-    <NativeReference Include="NativeReferences/libfmodL_iphoneos.a">
-      <Kind>Static</Kind>
-    </NativeReference>
-    <NativeReference Include="NativeReferences/libfmodstudioL_iphoneos.a">
-      <Kind>Static</Kind>
-    </NativeReference>
-  </ItemGroup>
-  <ItemGroup>
-    <BundleResource Include="Resources\mainmenuportrait.mp4" />
   </ItemGroup>
 </Project>

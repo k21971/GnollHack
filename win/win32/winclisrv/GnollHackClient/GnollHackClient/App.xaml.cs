@@ -15,11 +15,13 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections;
 using System.IO.Compression;
+using System.Globalization;
 
 [assembly: ExportFont("diablo_h.ttf", Alias = "Diablo")]
 [assembly: ExportFont("uwch.ttf", Alias = "Underwood")]
-[assembly: ExportFont("imrl.ttf", Alias = "Immortal")]
+[assembly: ExportFont("Immortal-Regular.ttf", Alias = "Immortal")]
 [assembly: ExportFont("endr.ttf", Alias = "Endor")]
+[assembly: ExportFont("shxi.ttf", Alias = "Xizor")]
 [assembly: ExportFont("Lato-Regular.ttf", Alias = "Lato-Regular")]
 [assembly: ExportFont("Lato-Bold.ttf", Alias = "Lato-Bold")]
 [assembly: ExportFont("DejaVuSansMono.ttf", Alias = "DejaVuSansMono")]
@@ -34,7 +36,8 @@ namespace GnollHackClient
         public App()
         {
             InitializeComponent();
-            App.LoadServices();
+            App.GetDependencyServices();
+
             var mainPage = new MainPage();
             var navPage = new NavigationPage(mainPage);
             MainPage = navPage;
@@ -45,6 +48,7 @@ namespace GnollHackClient
             App.CasualMode = Preferences.Get("CasualMode", false);
             App.SponsorButtonVisited = Preferences.Get("SponsorButtonVisited", false);
             App.ShowSpecialEffect = Preferences.Get("ShowSpecialEffect", false);
+
             App.ReadSecrets();
             Array.Sort<SecretsFile>(App.CurrentSecrets.files, new SecretsFileSizeComparer());
             App.BackButtonPressed += App.EmptyBackButtonPressed;
@@ -98,7 +102,7 @@ namespace GnollHackClient
                 PlatformService.OverrideAnimationDuration();
         }
 
-        public static void LoadServices()
+        public static void GetDependencyServices()
         {
             _mainGnollHackService = DependencyService.Get<IGnollHackService>();
             _mainGnollHackService.LoadLibrary();
@@ -107,29 +111,7 @@ namespace GnollHackClient
             _platformService = DependencyService.Get<IPlatformService>();
         }
 
-        public static void InitializeServices()
-        {
-            bool resetFiles = Preferences.Get("ResetAtStart", true);
-            if (resetFiles)
-            {
-                _mainGnollHackService.ClearFiles();
-                Preferences.Set("ResetAtStart", false);
-                Preferences.Set("ResetExternalFiles", true);
-            }
-            ResetAcquiredFiles();
-            _mainGnollHackService.InitializeGnollHack(App.CurrentSecrets);
-            try
-            {
-                _fmodService.InitializeFmod();
-                _fmodService.LoadBanks();
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-        }
-
-        private static void ResetAcquiredFiles()
+        public static void ResetAcquiredFiles()
         {
             string ghdir = _mainGnollHackService.GetGnollHackPath();
             bool resetfiles = Preferences.Get("ResetExternalFiles", true);
@@ -174,7 +156,6 @@ namespace GnollHackClient
             }
         }
 
-        public static bool IsModernAndroid { get; set; }
         public static bool DeveloperMode { get; set; }
         public static bool FullVersionMode { get; set; }
         public static bool ClassicMode { get; set; }
@@ -184,6 +165,11 @@ namespace GnollHackClient
         public static string GHVersionId { get; set; }
         public static string GHVersionString { get; set; }
         public static string GHPath { get; set; }
+        //public static readonly string LogFile = "console.log";
+        //public static TextWriter OldOut;
+        //public static TextWriter OldError;
+        //public static StreamWriter LogOut;
+        //public static FileStream LogStream;
         public static Cookie AuthenticationCookie { get; set; }
         public static Server SelectedServer { get; set; }
         public static string UserName { get; set; }
@@ -298,7 +284,7 @@ namespace GnollHackClient
                     }
                 }
             }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.imrl.ttf"))
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.Immortal-Regular.ttf"))
             {
                 if (stream != null)
                 {
@@ -674,6 +660,14 @@ namespace GnollHackClient
 
             }
         }
+
+        //public const string CultureName = "en-US";
+        //public static CultureInfo Culture = new CultureInfo(CultureName);
+
+        //public static string GetCurrentTime()
+        //{
+        //    return DateTime.Now.ToString(Culture);
+        //}
 
     }
 

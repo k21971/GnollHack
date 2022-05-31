@@ -100,7 +100,7 @@ E int FDECL(endlessarrows, (struct obj*, int, int));
 E struct obj* FDECL(elemental_enchant_quan, (struct obj*, int, UCHAR_P));
 E void FDECL(use_magic_whistle, (struct obj*));
 E int FDECL(count_other_containers, (struct obj*, struct obj*, struct obj**, BOOLEAN_P));
-E struct obj* FDECL(select_other_container, (struct obj*, struct obj*, BOOLEAN_P));
+E struct obj* FDECL(select_other_container, (struct obj*, struct obj*, BOOLEAN_P, BOOLEAN_P));
 E void FDECL(get_pole_type_weapon_min_max_distances, (struct obj*, struct monst*, int*, int*));
 E int FDECL(use_grail, (struct obj*, BOOLEAN_P));
 E int FDECL(use_salve, (struct obj*, BOOLEAN_P));
@@ -186,7 +186,7 @@ E void FDECL(losestr, (int));
 E void FDECL(poisontell, (int, BOOLEAN_P));
 E void FDECL(poisoned, (const char *, int, const char *, int, BOOLEAN_P, int));
 E void FDECL(extra_enchantment_damage, (const char*, UCHAR_P, const char*, BOOLEAN_P));
-E void FDECL(change_luck, (SCHAR_P, BOOLEAN_P));
+E void FDECL(change_luck, (int, BOOLEAN_P));
 E int FDECL(stone_luck, (BOOLEAN_P));
 E boolean FDECL(object_uses_spellbook_wand_flags_and_properties, (struct obj*));
 E boolean FDECL(inappropriate_character_type, (struct obj*));
@@ -371,6 +371,8 @@ E void FDECL(zoomtoscale, (double));
 E void NDECL(update_bindings_list);
 E void FDECL(create_context_menu, (enum create_context_menu_types));
 E int NDECL(doviewpet);
+E int NDECL(domarkautostash);
+E int NDECL(dounmarkautostash);
 
 /* ### dbridge.c ### */
 

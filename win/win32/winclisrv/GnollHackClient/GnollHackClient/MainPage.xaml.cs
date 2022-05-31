@@ -84,7 +84,8 @@ namespace GnollHackClient
         private Animation _sponsorAnimation = null;
         private bool _firsttime = true;
         private bool _mainScreenMusicStarted = false;
-        private async void ContentPage_Appearing(object sender, EventArgs e)
+
+        public void UpdateLayout()
         {
             wizardModeGrid.IsVisible = App.DeveloperMode;
             if (!App.DeveloperMode)
@@ -97,7 +98,11 @@ namespace GnollHackClient
             casualModeSwitch.IsToggled = App.CasualMode;
 
             UpdateMobileVersionLabel();
+        }
 
+        private async void ContentPage_Appearing(object sender, EventArgs e)
+        {
+            UpdateLayout();
             if (_firsttime)
             {
                 App.DebugWriteProfilingStopwatchTimeAndRestart("MainPage First Time");
@@ -131,20 +136,46 @@ namespace GnollHackClient
                 //_sponsorAnimation.Commit(SponsorButton, "Animation", 16, 4000, Easing.Linear, (v, c) => BackgroundColor = Color.Default);
             }
         }
+        public void InitializeServices()
+        {
+            bool resetFiles = Preferences.Get("ResetAtStart", true);
+            if (resetFiles)
+            {
+                App.GnollHackService.ClearFiles();
+                Preferences.Set("ResetAtStart", false);
+                Preferences.Set("ResetExternalFiles", true);
+            }
+            App.ResetAcquiredFiles();
+            App.GnollHackService.InitializeGnollHack(App.CurrentSecrets);
+            App.FmodService.InitializeFmod();
+
+            //App.AddLogLine("Attempting to load FMOD banks.");
+            //try
+            //{
+            //    _fmodService.LoadBanks();
+            //}
+            //catch(Exception ex)
+            //{
+            //    Debug.WriteLine("Loading FMOD banks failed: " + ex.Message);
+            //}
+        }
+
 
         private async Task StartUpTasks()
         {
+            InitializeServices();
+
             Assembly assembly = GetType().GetTypeInfo().Assembly;
-            App.InitializeServices();
             App.InitTypefaces(assembly);
             App.InitBitmaps(assembly);
-            App.IsModernAndroid = App.PlatformService.IsModernAndroid();
+
             string verstr = App.GnollHackService.GetVersionString();
             string verid = App.GnollHackService.GetVersionId();
             string path = App.GnollHackService.GetGnollHackPath();
             App.GHVersionString = verstr;
             App.GHVersionId = verid;
             App.GHPath = path;
+
             VersionLabel.Text = verid;
             GnollHackLabel.Text = "GnollHack"; // + verstr;
 
@@ -173,9 +204,9 @@ namespace GnollHackClient
             {
                 App.FmodService.LoadBanks();
             }
-            catch
+            catch (Exception ex)
             {
-
+                Debug.WriteLine("Loading FMOD banks failed: " + ex.Message);
             }
 
             float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
@@ -195,6 +226,7 @@ namespace GnollHackClient
 
             }
         }
+
 
         private object _abortLock = new object();
         private bool _abortDisplayed = false;
@@ -291,7 +323,7 @@ namespace GnollHackClient
             }
             catch(Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Debug.WriteLine("Playing music failed: " + ex.Message);
             }
         }
 
@@ -398,7 +430,6 @@ namespace GnollHackClient
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
             bool hideautoupdatealert = Preferences.Get("HideAutoUpdateAlert", false);
-            bool isandroid = Device.RuntimePlatform == Device.Android;
             bool isfromgoogleplay = true;
             if(!hideautoupdatealert)
             {
@@ -406,10 +437,12 @@ namespace GnollHackClient
                 PopupCheckBoxLayout.IsVisible = true;
                 PopupTitleLabel.TextColor = Color.Red;
                 PopupTitleLabel.Text = "Auto-Update Warning";
-                if (isandroid && isfromgoogleplay)
-                    PopupLabel.Text = "Updating GnollHack may cause your save games to become invalid. We recommend that you turn off Auto-Update from Google Play Store for GnollHack and manually apply updates, when you have no saved games.";
-                else 
-                    PopupLabel.Text = "Updating GnollHack may render your saved games invalid. We recommend that you disable automatic updates in your device settings.";
+                if (App.IsAndroid && isfromgoogleplay)
+                    PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you turn off Auto-Update from Google Play Store for GnollHack and manually apply updates when you have no saved games.";
+                else if (App.IsiOS)
+                    PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates by toggling off App Updates under App Store section in the Settings app, and manually apply updates when you have no saved games.";
+                else
+                    PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates in your device settings and manually apply updates when you have no saved games.";
                 PopupGrid.IsVisible = true;
             }
             else
@@ -438,7 +471,7 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
-            var settingsPage = new SettingsPage(null);
+            var settingsPage = new SettingsPage(null, this);
             await App.Current.MainPage.Navigation.PushModalAsync(settingsPage);
         }
 
