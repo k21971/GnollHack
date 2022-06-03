@@ -925,7 +925,7 @@ struct monst *mon;
 
     if (mon_warning(mon)) 
     {
-        double mon_difficulty = (double)(mon->cham > NON_PM ? max(mons[mon->mnum].difficulty, mons[mon->cham].difficulty) : mons[mon->mnum].difficulty);
+        double mon_difficulty = (double)(mon->cham >= LOW_PM ? max(mons[mon->mnum].difficulty, mons[mon->cham].difficulty) : mons[mon->mnum].difficulty);
         double warning_threshold[WARNCOUNT] = { 0 };
         warning_threshold[0] = max(0.0, (double)u.ulevel * 0.25);
         warning_threshold[1] = max(warning_threshold[0] + 1.0, (double)u.ulevel * 0.50);
@@ -1827,6 +1827,9 @@ void
 swallowed(first)
 int first;
 {
+    if (!u.ustuck)
+        return;
+
     static xchar lastx, lasty; /* last swallowed position */
     int swallower, left_ok, rght_ok;
 
@@ -1846,7 +1849,7 @@ int first;
                     clear_glyph_buffer_at(x, y);
     }
 
-    swallower = monsndx(u.ustuck->data);
+    swallower = u.ustuck->mnum;
     /* assume isok(u.ux,u.uy) */
     left_ok = isok(u.ux - 1, u.uy);
     rght_ok = isok(u.ux + 1, u.uy);
@@ -3322,7 +3325,7 @@ int x, y, glyph;
         return;
     }
 
-    if (1)//gbuf[y][x].layers.glyph != glyph || iflags.use_background_glyph)
+    //if (gbuf[y][x].layers.glyph != glyph || iflags.use_background_glyph) // Always true
     {
         gbuf[y][x].layers.glyph = glyph;
         gbuf[y][x].layers.bkglyph = get_bk_glyph(x, y);

@@ -7,9 +7,11 @@ namespace GnollHackClient
     public interface IFmodService
     {
         void InitializeFmod();
+        void ReleaseAllSoundInstances();
         void ClearLoadableSoundBanks();
         void AddLoadableSoundBank(string fullfilepath);
         void LoadBanks();
+        void UnloadBanks();
         void PlayTestSound();
         void StopTestSound();
         int PlayImmediateSound(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume, string[] parameterNames, float[] parameterValues, int arraysize, int sound_type, int play_group, uint dialogue_mid, ulong play_flags);
@@ -25,5 +27,7 @@ namespace GnollHackClient
         int StopAllSounds(ulong flags, uint dialogue_mid);
         int AdjustVolumes(float new_general_volume, float new_general_music_volume, float new_general_ambient_volume, float new_general_dialogue_volume, float new_general_sfx_volume, float new_general_ui_volume);
         int SetQuieterMode(bool state);
+        uint GetVersionCode();
+        string GetVersionString();
     }
 }

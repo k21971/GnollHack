@@ -3413,9 +3413,11 @@ struct obj* other_container;
         checkfunc = ck_bag;
         break;
     case 2:
-        if (0 && other_container)
+#if 0
+        if (other_container)
             move_target_container = other_container;
         else
+#endif
         {
             move_target_container = (struct obj*)0;
             /* Select container here */
@@ -3430,9 +3432,12 @@ struct obj* other_container;
         checkfunc = (int FDECL((*), (OBJ_P))) 0;
         break;
     case 3:
-        if (0 && other_container)
+#if 0
+
+        if (other_container)
             move_target_container = other_container;
         else
+#endif
         {
             move_target_container = (struct obj*)0;
             /* Select container here */
@@ -3493,7 +3498,7 @@ int command_id;
    5 = pick up items from the floor and put them in a container
  */
 struct obj* applied_container;
-struct obj* other_container;
+struct obj* other_container UNUSED;
 {
     int n, i, n_looted = 0;
     boolean all_categories = TRUE, loot_everything = FALSE;
@@ -3532,9 +3537,11 @@ struct obj* other_container;
     /* Select target container if necessary */
     if (command_id == 2)
     {
-        if (0 && other_container)
+#if 0
+        if (other_container)
             move_target_container = other_container;
         else
+#endif
         {
             move_target_container = (struct obj*)0;
             /* Choose another container */
@@ -3545,9 +3552,11 @@ struct obj* other_container;
     }
     else if (command_id == 3)
     {
-        if (0 && other_container)
+#if 0
+        if (other_container)
             move_target_container = other_container;
         else
+#endif
         {
             move_target_container = (struct obj*)0;
             /* Choose another container */

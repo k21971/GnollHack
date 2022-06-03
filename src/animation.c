@@ -1746,7 +1746,7 @@ enum autodraw_types* autodraw_ptr;
 
             if (otmp->quan > 1)
             {
-                int glyph_idx = (otmp->quan <= 8 ? otmp->quan - 2 : otmp->quan <= 30 ? 7 : otmp->quan <= 100 ? 8 : otmp->quan <= 1000 ? 9 : 10);
+                int glyph_idx = (otmp->quan <= 8 ? (int)otmp->quan - 2 : otmp->quan <= 30 ? 7 : otmp->quan <= 100 ? 8 : otmp->quan <= 1000 ? 9 : 10);
                 if (autodraw_ptr)
                     *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
                 return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
@@ -1766,7 +1766,7 @@ enum autodraw_types* autodraw_ptr;
 
             if (otmp->quan > 1)
             {
-                int glyph_idx = (otmp->quan <= 8 ? otmp->quan - 2 : otmp->quan <= 20 ? 7 : otmp->quan <= 50 ? 8 : otmp->quan <= 100 ? 9 : 10);
+                int glyph_idx = (otmp->quan <= 8 ? (int)otmp->quan - 2 : otmp->quan <= 20 ? 7 : otmp->quan <= 50 ? 8 : otmp->quan <= 100 ? 9 : 10);
                 if (autodraw_ptr)
                     *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
                 return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
@@ -2327,7 +2327,7 @@ struct replacement_info info;
 
             if (otmp->quan > 1)
             {
-                int glyph_idx = (otmp->quan <= 8 ? otmp->quan - 2 : otmp->quan <= 30 ? 7 : otmp->quan <= 100 ? 8 : otmp->quan <= 1000 ? 9 : 10);
+                int glyph_idx = (otmp->quan <= 8 ? (int)otmp->quan - 2 : otmp->quan <= 30 ? 7 : otmp->quan <= 100 ? 8 : otmp->quan <= 1000 ? 9 : 10);
                 return sign * (glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
             }
             break;
@@ -2342,7 +2342,7 @@ struct replacement_info info;
 
             if (otmp->quan > 1)
             {
-                int glyph_idx = (otmp->quan <= 8 ? otmp->quan - 2 : otmp->quan <= 20 ? 7 : otmp->quan <= 50 ? 8 : otmp->quan <= 100 ? 9 : 10);
+                int glyph_idx = (otmp->quan <= 8 ? (int)otmp->quan - 2 : otmp->quan <= 20 ? 7 : otmp->quan <= 50 ? 8 : otmp->quan <= 100 ? 9 : 10);
                 return sign * (glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
             }
             break;
@@ -3115,11 +3115,11 @@ short animidx;
             return glyph2tile[i + GLYPH_UI_TILE_OFF];
     }
 
+#if 0
     /* Spell tiles */
     for (i = 0; i < MAXSPELL; i++)
     {
         /* Currently spell tiles do not have animations */
-        break;
         //return glyph2tile[i + GLYPH_SPELL_TILE_OFF];
     }
 
@@ -3127,9 +3127,9 @@ short animidx;
     for (i = 0; i < P_NUM_SKILLS; i++)
     {
         /* Currently skill tiles do not have animations */
-        break;
         //return glyph2tile[i + GLYPH_SKILL_TILE_OFF];
     }
+#endif
 
     /* Replacement */
     for (i = 1; i < MAX_REPLACEMENTS; i++)
@@ -3254,11 +3254,11 @@ short enlidx, enl_anim_tile_idx;
             return glyph2tile[i + GLYPH_UI_TILE_OFF];
     }
 
+#if 0
     /* Spell tiles */
     for (i = 0; i < MAXSPELL; i++)
     {
         /* Currently spell tiles do not have enlargements */
-        break;
         //return glyph2tile[i + GLYPH_SPELL_TILE_OFF];
     }
 
@@ -3266,9 +3266,9 @@ short enlidx, enl_anim_tile_idx;
     for (i = 0; i < P_NUM_SKILLS; i++)
     {
         /* Currently skill tiles do not have enlargements */
-        break;
         //return glyph2tile[i + GLYPH_SKILL_TILE_OFF];
     }
+#endif
 
     /* Replacement */
     for (i = 1; i < MAX_REPLACEMENTS; i++)
@@ -3419,11 +3419,11 @@ short replacement_idx;
             return glyph2tile[i + GLYPH_UI_TILE_OFF];
     }
 
+#if 0
     /* Spell tiles */
     for (i = 0; i < MAXSPELL; i++)
     {
         /* Currently spell tiles do not have replacements */
-        break;
         //return glyph2tile[i + GLYPH_SPELL_TILE_OFF];
     }
 
@@ -3431,9 +3431,9 @@ short replacement_idx;
     for (i = 0; i < P_NUM_SKILLS; i++)
     {
         /* Currently skill tiles do not have replacements */
-        break;
         //return glyph2tile[i + GLYPH_SKILL_TILE_OFF];
     }
+#endif
 
     return -1;
 }
@@ -3509,7 +3509,7 @@ int spef_number;
 {
     if (context.spef_intervals_to_wait_until_action[spef_number] > 0UL)
     {
-        delay_output_intervals(context.spef_intervals_to_wait_until_action[spef_number]);
+        delay_output_intervals((int)context.spef_intervals_to_wait_until_action[spef_number]);
         context.spef_intervals_to_wait_until_action[spef_number] = 0UL;
     }
 }
@@ -3520,7 +3520,7 @@ int spef_number;
 {
     if (context.spef_intervals_to_wait_until_end[spef_number] > 0)
     {
-        delay_output_intervals(context.spef_intervals_to_wait_until_end[spef_number]);
+        delay_output_intervals((int)context.spef_intervals_to_wait_until_end[spef_number]);
         context.spef_intervals_to_wait_until_end[spef_number] = 0UL;
     }
 
@@ -3545,8 +3545,8 @@ int milliseconds;
     if (milliseconds < 0)
         return;
 
-    unsigned long interval_length = (flags.animation_frame_interval_in_milliseconds > 0 ? flags.animation_frame_interval_in_milliseconds : ANIMATION_FRAME_INTERVAL);
-    unsigned long intervals = (unsigned long)milliseconds / interval_length;
+    int interval_length = (flags.animation_frame_interval_in_milliseconds > 0 ? flags.animation_frame_interval_in_milliseconds : ANIMATION_FRAME_INTERVAL);
+    int intervals = milliseconds / interval_length;
 
     reduce_counters_intervals(intervals);
 }

@@ -16,7 +16,7 @@ extern const char *hu_stat[]; /* defined in eat.c */
 const char *const enc_stat[] = { "",         "Burdened",  "Stressed",
                                  "Strained", "Overtaxed", "Overloaded" };
 
-STATIC_OVL NEARDATA int mrank_sz = 0; /* loaded by max_rank_sz (from u_init) */
+STATIC_OVL NEARDATA size_t mrank_sz = 0; /* loaded by max_rank_sz (from u_init) */
 STATIC_DCL void NDECL(bot_via_windowport);
 STATIC_DCL void NDECL(stat_update_time);
 STATIC_DCL void FDECL(compose_partystatline, (char*, char*, char*, char*, char*));
@@ -87,7 +87,7 @@ do_statusline1()
         Strcpy(nb = eos(nb), rank());
 
     Sprintf(nb = eos(nb), "  ");
-    i = mrank_sz + 15;
+    i = (int)mrank_sz + 15;
     j = (int) ((nb + 2) - newbot1); /* strlen(newbot1) but less computation */
     if ((i - j) > 0)
         Sprintf(nb = eos(nb), "%*s", i - j, " "); /* pad with spaces */
@@ -131,7 +131,7 @@ do_statusline2()
             time (in moves), varying number of status conditions */
         gmode[QBUFSZ], dloc[QBUFSZ], hlth[QBUFSZ], expr[QBUFSZ], tmmv[QBUFSZ], move[QBUFSZ], weaponstyle[QBUFSZ], cond[QBUFSZ], skll[QBUFSZ];
     register char *nb;
-    unsigned gln, dln, hln, xln, mln, tln, cln, sln, wln;
+    size_t gln, dln, hln, xln, mln, tln, cln, sln, wln;
     int hp, hpmax, cap;
 
     /*
@@ -286,7 +286,7 @@ do_statusline2()
         if (gln + 1 + dln + 1 + hln + 1 + xln + 1 + tln + 1 + cln + 1 > MAXCO)
         {
             panic("bot2: second status line exceeds MAXCO (%u > %d)",
-                  (gln + 1 + dln + 1 + hln + 1 + xln + 1 + tln + 1 + cln + 1), MAXCO);
+                  (int)(gln + 1 + dln + 1 + hln + 1 + xln + 1 + tln + 1 + cln + 1), MAXCO);
             strcpy(newbot2, "");
             return newbot2;
         }
@@ -400,7 +400,8 @@ rank()
 int
 title_to_mon(str, rank_indx, title_length)
 const char *str;
-int *rank_indx, *title_length;
+int* rank_indx;
+size_t* title_length;
 {
     register int i, j;
 
@@ -432,7 +433,8 @@ int *rank_indx, *title_length;
 void
 max_rank_sz()
 {
-    register int i, r, maxr = 0;
+    register int i;
+    size_t r, maxr = 0;
     for (i = 0; i < 9; i++) {
         if (urole.rank[i].m && (r = strlen(urole.rank[i].m)) > maxr)
             maxr = r;
@@ -561,7 +563,7 @@ STATIC_DCL boolean FDECL(parse_status_hl2, (char (*)[QBUFSZ], BOOLEAN_P));
 STATIC_DCL unsigned long FDECL(match_str2conditionbitmask, (const char *));
 STATIC_DCL unsigned long FDECL(str2conditionbitmask, (char *));
 STATIC_DCL boolean FDECL(parse_condition, (char (*)[QBUFSZ], int));
-STATIC_DCL char *FDECL(hlattr2attrname, (int, char *, int));
+STATIC_DCL char *FDECL(hlattr2attrname, (int, char *, size_t));
 STATIC_DCL void FDECL(status_hilite_linestr_add, (int, struct hilite_s *,
                                                 unsigned long, const char *));
 STATIC_DCL void NDECL(status_hilite_linestr_done);
@@ -941,8 +943,10 @@ struct monst* mon;
 
     unsigned long conditions = 0UL;
 
+#if 0
     if (0)
         conditions |= BL_MASK_GRAB;
+#endif
     if (is_stoning(mon))
         conditions |= BL_MASK_STONE;
     if (is_turning_into_slime(mon))
@@ -986,9 +990,10 @@ struct monst* mon;
         conditions |= BL_MASK_LEV;
     if (is_flying(mon))
         conditions |= BL_MASK_FLY;
+#if 0
     if (0)
         conditions |= BL_MASK_RIDE;
-
+#endif
     return conditions;
 }
 
@@ -3188,14 +3193,16 @@ clear_status_hilites()
     }
 }
 
-STATIC_OVL char *
+STATIC_OVL char*
 hlattr2attrname(attrib, buf, bufsz)
-int attrib, bufsz;
+int attrib;
 char *buf;
+size_t bufsz;
 {
     if (attrib && buf) {
         char attbuf[BUFSZ];
-        int k, first = 0;
+        size_t k;
+        int first = 0;
 
         attbuf[0] = '\0';
         if (attrib == HL_NONE) {
@@ -3368,7 +3375,7 @@ status_hilite_linestr_gather_conditions()
         if (cond_maps[i].bm) {
             int clr = NO_COLOR, atr = HL_NONE;
 
-            split_clridx(cond_maps[i].clratr, &clr, &atr);
+            split_clridx((int)cond_maps[i].clratr, &clr, &atr);
             if (clr != NO_COLOR || atr != HL_NONE) {
                 char clrbuf[BUFSZ];
                 char attrbuf[BUFSZ];

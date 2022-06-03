@@ -966,8 +966,8 @@ struct permonst *ptr;
     i = (int) (ptr - &mons[0]);
     if (i < LOW_PM || i >= NUM_MONSTERS) 
     {
-        panic("monsndx - could not index monster (%s)",
-              fmt_ptr((genericptr_t) ptr));
+        panic("monsndx - could not index monster (%s, %s, %d)",
+            fmt_ptr((genericptr_t)&mons[0]), fmt_ptr((genericptr_t) ptr), i);
         return NON_PM; /* will not get here */
     }
     return i;
@@ -1010,7 +1010,7 @@ int* fem_ptr;
     register int mntmp = NON_PM;
     register char *s, *str, *term;
     char buf[BUFSZ];
-    int len, slen;
+    size_t len, slen;
 
     str = strcpy(buf, in_str);
 
@@ -1143,7 +1143,7 @@ int* fem_ptr;
         register const struct alt_spl *namep;
 
         for (namep = names; namep->name; namep++)
-            if (!strncmpi(str, namep->name, (int)strlen(namep->name)))
+            if (!strncmpi(str, namep->name, strlen(namep->name)))
             {
                 if(namep->gender == 1 && fem_ptr)
                     *fem_ptr = 0;
@@ -1169,7 +1169,7 @@ int* fem_ptr;
             if (!relevant_name)
                 continue;
 
-            register int m_i_len = relevant_name ? (int)strlen(relevant_name) : 0;
+            size_t m_i_len = relevant_name ? strlen(relevant_name) : 0;
 
             if (m_i_len > len && !strncmpi(relevant_name, str, m_i_len)) {
                 if (m_i_len == slen) {
@@ -1203,7 +1203,7 @@ int* fem_ptr;
     }
 
     if (mntmp == NON_PM)
-        mntmp = title_to_mon(str, (int *) 0, (int *) 0);
+        mntmp = title_to_mon(str, (int *) 0, (size_t *) 0);
     
     return mntmp;
 }
@@ -1575,6 +1575,9 @@ on_fire(mptr, mattk)
 struct permonst *mptr;
 struct attack *mattk;
 {
+    if (!mptr || !mattk)
+        return "on fire";
+
     const char *what;
 
     switch (monsndx(mptr)) {

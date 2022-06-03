@@ -3080,10 +3080,11 @@ create_portal()
 /* OBSOLETE -- JG */
 boolean
 finesse_ahriman(obj)
-struct obj *obj;
+struct obj *obj UNUSED;
 {
     return 0;
 
+#if 0
     const struct artifact *oart;
     struct prop save_Lev;
     boolean result;
@@ -3105,6 +3106,7 @@ struct obj *obj;
     result = (boolean) !Levitation;
     u.uprops[LEVITATION] = save_Lev;
     return result;
+#endif
 }
 
 /* WAC return TRUE if artifact is always lit */
@@ -3885,7 +3887,7 @@ int
 artifact_to_obj(artifactid)
 int artifactid;
 {
-    if (artifactid <= 0 || artifactid > NUM_ARTIFACTS || artifactid == NO_GLYPH)
+    if (artifactid <= 0 || artifactid > NUM_ARTIFACTS)
         return STRANGE_OBJECT;
     return (int)artilist[artifactid].otyp;
 

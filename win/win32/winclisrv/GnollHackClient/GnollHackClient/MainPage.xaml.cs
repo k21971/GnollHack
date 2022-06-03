@@ -174,9 +174,11 @@ namespace GnollHackClient
             string verstr = App.GnollHackService.GetVersionString();
             string verid = App.GnollHackService.GetVersionId();
             string path = App.GnollHackService.GetGnollHackPath();
+            string fmodverstr = App.FmodService.GetVersionString();
             App.GHVersionString = verstr;
             App.GHVersionId = verid;
             App.GHPath = path;
+            App.FMODVersionString = fmodverstr;
 
             VersionLabel.Text = verid;
             GnollHackLabel.Text = "GnollHack"; // + verstr;
@@ -200,15 +202,18 @@ namespace GnollHackClient
             StillImage.Source = ImageSource.FromResource("GnollHackClient.Assets.main-menu-portrait-snapshot.jpg", assembly);
 
             GetFilesFromResources();
-
             await DownloadAndCheckFiles();
-            try
+
+            if (App.LoadBanks)
             {
-                App.FmodService.LoadBanks();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("Loading FMOD banks failed: " + ex.Message);
+                try
+                {
+                    App.FmodService.LoadBanks();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("Loading FMOD banks failed: " + ex.Message);
+                }
             }
 
             float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
@@ -221,7 +226,8 @@ namespace GnollHackClient
             try
             {
                 App.FmodService.AdjustVolumes(generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume);
-                App.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, 0.5f, 1.0f);
+                if (App.LoadBanks)
+                    App.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, 0.5f, 1.0f);
             }
             catch
             {

@@ -123,7 +123,19 @@ namespace GnollHackClient.Unknown
 
         private bool FMODup()
         {
-            return _initialized;
+            return _initialized && App.LoadBanks;
+        }
+
+        public void UnloadBanks()
+        {
+            RESULT res;
+            //res = _system.unloadAll();
+            foreach(var bank in _banks)
+            {
+                res = bank.unload();
+                bank.clearHandle();
+            }
+            _banks.Clear();
         }
 
         public void LoadBanks()
@@ -182,6 +194,28 @@ namespace GnollHackClient.Unknown
         public List<GHSoundInstance> occupationAmbientInstances = new List<GHSoundInstance>();
         public List<GHSoundInstance> effectAmbientInstances = new List<GHSoundInstance>();
         public List<GHSoundInstance> ambientList = new List<GHSoundInstance>();
+
+        public const int nooflists = 8;
+        public void ReleaseAllSoundInstances()
+        {
+            List<GHSoundInstance>[] listoflists = new List<GHSoundInstance>[nooflists]
+            {
+                musicInstances, immediateInstances, longImmediateInstances, levelAmbientInstances,
+                environmentAmbientInstances, occupationAmbientInstances, effectAmbientInstances, ambientList
+            };
+
+            foreach(List<GHSoundInstance> list in listoflists)
+            {
+                foreach (GHSoundInstance instance in list)
+                {
+                    if (!instance.stopped)
+                        instance.instance.stop(STOP_MODE.IMMEDIATE);
+                    instance.instance.release();
+                }
+                list.Clear();
+            }
+            RESULT res = _system.update();
+        }
 
         public static RESULT GNHImmediateEventCallback(EVENT_CALLBACK_TYPE type, EventInstance _event, IntPtr parameters)
         {
@@ -1207,5 +1241,30 @@ namespace GnollHackClient.Unknown
             return (int)RESULT.OK; // AdjustMusicAndAmbientVolumes();
         }
 
+        public uint GetVersionCode()
+        {
+            if (!FMODup())
+                return 0;
+
+            uint ver = 0;
+            RESULT res = _coresystem.getVersion(out ver);
+            if (res != RESULT.OK)
+                return 0;
+
+            return ver;
+        }
+        public string GetVersionString()
+        {
+            uint ver = GetVersionCode();
+            if (ver == 0)
+                return "";
+
+            uint majorversion = (ver >> 16) & 0xFFFFU;
+            uint minorversion = (ver >> 8) & 0xFFU;
+            uint patchversion = ver & 0xFFU;
+
+            string str = majorversion + "." + minorversion + "." + patchversion;
+            return str;
+        }
     }
 }

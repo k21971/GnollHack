@@ -42,7 +42,7 @@
         const char *    ordin           (int)
         char *          sitoa           (int)
         int             sgn             (int)
-        int             rounddiv        (long, int)
+        int             rounddiv        (int, int)
         int             distmin         (int, int, int, int)
         int             dist2           (int, int, int, int)
         boolean         online2         (int, int)
@@ -635,7 +635,7 @@ int n;
 /* calculate x/y, rounding as appropriate */
 int
 rounddiv(x, y)
-long x;
+int x;
 int y;
 {
     int r, m;
@@ -797,9 +797,11 @@ const char *patrn, *strng;
 int
 strncmpi(s1, s2, n) /*{ aka strncasecmp }*/
 register const char *s1, *s2;
-register int n; /*(should probably be size_t, which is unsigned)*/
+register size_t n;
 {
     register char t1, t2;
+    if (!n)
+        return 0;
 
     while (n--) {
         if (!*s2)

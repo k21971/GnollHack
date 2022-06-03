@@ -150,7 +150,7 @@ mummy_rot_dialogue()
     if (!is_living(youmonst.data) || Sick_resistance)
         return;
 
-    register long i = context.mummyrot_advancement;
+    int i = context.mummyrot_advancement;
 
     if (i < 20)
     {
@@ -985,9 +985,8 @@ nh_timeout()
                         Ultra_fast || Very_fast || Fast ? " a bit" : "");
                 break;
             case LIGHTNING_FAST:
-                if (1)
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel%s less quick than before.",
-                        Super_fast || Ultra_fast || Very_fast || Fast ? " a bit" : "");
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel%s less quick than before.",
+                    Super_fast || Ultra_fast || Very_fast || Fast ? " a bit" : "");
                 break;
             case SLOWED:
                 You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are starting to speed up.");

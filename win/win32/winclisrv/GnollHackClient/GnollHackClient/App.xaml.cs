@@ -36,6 +36,7 @@ namespace GnollHackClient
         public App()
         {
             InitializeComponent();
+            VersionTracking.Track();
             App.GetDependencyServices();
 
             var mainPage = new MainPage();
@@ -52,6 +53,7 @@ namespace GnollHackClient
             App.CasualMode = Preferences.Get("CasualMode", false);
             App.SponsorButtonVisited = Preferences.Get("SponsorButtonVisited", false);
             App.ShowSpecialEffect = Preferences.Get("ShowSpecialEffect", false);
+            App.LoadBanks = Preferences.Get("LoadSoundBanks", true);
 
             App.ReadSecrets();
             Array.Sort<SecretsFile>(App.CurrentSecrets.files, new SecretsFileSizeComparer());
@@ -174,6 +176,7 @@ namespace GnollHackClient
 
         public static string GHVersionId { get; set; }
         public static string GHVersionString { get; set; }
+        public static string FMODVersionString { get; set; }
         public static string GHPath { get; set; }
         //public static readonly string LogFile = "console.log";
         //public static TextWriter OldOut;
@@ -186,6 +189,7 @@ namespace GnollHackClient
         public static bool IsServerGame { get; set; }
         public static bool SponsorButtonVisited { get; set; }
         public static bool ShowSpecialEffect { get; set; }
+        public static bool LoadBanks { get; set; }
 
 
         public static NavigationPage MainNavigationPage { get { return (NavigationPage)Current.MainPage; } }

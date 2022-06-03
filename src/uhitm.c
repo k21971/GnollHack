@@ -455,7 +455,7 @@ register struct monst *mtmp;
     /* Intelligent chaotic weapons (Stormbringer) want blood */
     if ((is_safepet(mtmp) || is_displaceable_peaceful(mtmp) || is_stopping_peaceful(mtmp)) && !context.forcefight)
     {
-        if (1) //!uwep || !(uwep->oartifact && artifact_has_flag(uwep, AF_BLOODTHIRSTY))) 
+        //if (1) //!uwep || !(uwep->oartifact && artifact_has_flag(uwep, AF_BLOODTHIRSTY)))  // Always true
         {
             /* There are some additional considerations: this won't work
              * if in a shop or Punished or you miss a random roll or
@@ -2866,11 +2866,13 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         }
         break;
     case AD_FIRE:
-        if (0 /*negated*/)
+#if 0
+        if (negated)
         {
             damage = 0;
             break;
         }
+#endif
         hit_tile = HIT_ON_FIRE;
         if (!Blind)
             pline("%s is %s!", Monnam(mdef), on_fire(pd, mattk));
@@ -2903,12 +2905,14 @@ int specialdmg; /* blessed and/or silver bonus against various things */
 
         break;
     case AD_COLD:
-        if (0 /*negated*/)
+#if 0
+
+        if (*negated)
         {
             damage = 0;
             break;
         }
-
+#endif
         hit_tile = HIT_FROZEN;
         if (!Blind)
             pline("%s is covered in frost!", Monnam(mdef));
@@ -2925,11 +2929,13 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         damage += adjust_damage(destroy_mitem(mdef, POTION_CLASS, AD_COLD), &youmonst, mdef, mattk->adtyp, ADFLAGS_NONE);
         break;
     case AD_ELEC:
-        if (0 /*negated*/) 
+#if 0
+        if (negated) 
         {
             damage = 0;
             break;
         }
+#endif
 
         hit_tile = HIT_ELECTROCUTED;
         if (!Blind)
@@ -3596,7 +3602,7 @@ register struct attack *mattk;
                 } else {
                     tmp = 1 + (pd->cwt >> 8);
                     if (corpse_chance(mdef, &youmonst, TRUE)
-                        && !(mvitals[monsndx(pd)].mvflags & MV_NOCORPSE))
+                        && !(mvitals[mdef->mnum].mvflags & MV_NOCORPSE))
                     {
                         /* nutrition only if there can be a corpse */
                         u.uhunger += (pd->cnutrit + 1) / 2;
@@ -5181,7 +5187,7 @@ unsigned long additional_newsym_flags;
     {
         if (context.u_intervals_to_wait_until_end > 0)
         {
-            delay_output_intervals(context.u_intervals_to_wait_until_end);
+            delay_output_intervals((int)context.u_intervals_to_wait_until_end);
             context.u_intervals_to_wait_until_end = 0UL;
         }
     }
@@ -5214,7 +5220,7 @@ unsigned long additional_newsym_flags;
             }
             else
             {
-                delay_output_intervals(animations[anim].intervals_between_frames * animations[anim].sound_play_frame);
+                delay_output_intervals((int)animations[anim].intervals_between_frames * animations[anim].sound_play_frame);
                 if (animations[anim].action_execution_frame > animations[anim].sound_play_frame)
                 {
                     context.u_intervals_to_wait_until_action = animations[anim].intervals_between_frames * (animations[anim].action_execution_frame - animations[anim].sound_play_frame);
@@ -5305,7 +5311,7 @@ unsigned long additional_newsym_flags;
         if (context.m_intervals_to_wait_until_end > 0)
         {
             if(canspotmon(mtmp))
-                delay_output_intervals(context.m_intervals_to_wait_until_end);
+                delay_output_intervals((int)context.m_intervals_to_wait_until_end);
             context.m_intervals_to_wait_until_end = 0UL;
         }
     }
@@ -5341,7 +5347,7 @@ unsigned long additional_newsym_flags;
             }
             else
             {
-                delay_output_intervals(animations[anim].intervals_between_frames * animations[anim].sound_play_frame);
+                delay_output_intervals((int)animations[anim].intervals_between_frames * animations[anim].sound_play_frame);
                 if (animations[anim].action_execution_frame > animations[anim].sound_play_frame)
                 {
                     context.m_intervals_to_wait_until_action = animations[anim].intervals_between_frames * (animations[anim].action_execution_frame - animations[anim].sound_play_frame);
@@ -5376,7 +5382,7 @@ u_wait_until_action()
 {
     if (context.u_intervals_to_wait_until_action > 0UL)
     {
-        delay_output_intervals(context.u_intervals_to_wait_until_action);
+        delay_output_intervals((int)context.u_intervals_to_wait_until_action);
         context.u_intervals_to_wait_until_action = 0UL;
     }
 }
@@ -5386,7 +5392,7 @@ m_wait_until_action()
 {
     if (context.m_intervals_to_wait_until_action > 0UL)
     {
-        delay_output_intervals(context.m_intervals_to_wait_until_action);
+        delay_output_intervals((int)context.m_intervals_to_wait_until_action);
         context.m_intervals_to_wait_until_action = 0UL;
     }
 }
@@ -5396,7 +5402,7 @@ u_wait_until_end()
 {
     if (context.u_intervals_to_wait_until_end > 0UL)
     {
-        delay_output_intervals(context.u_intervals_to_wait_until_end);
+        delay_output_intervals((int)context.u_intervals_to_wait_until_end);
         context.u_intervals_to_wait_until_end = 0UL;
     }
 }
@@ -5406,7 +5412,7 @@ m_wait_until_end()
 {
     if (context.m_intervals_to_wait_until_end > 0UL)
     {
-        delay_output_intervals(context.m_intervals_to_wait_until_end);
+        delay_output_intervals((int)context.m_intervals_to_wait_until_end);
         context.m_intervals_to_wait_until_end = 0UL;
     }
 }

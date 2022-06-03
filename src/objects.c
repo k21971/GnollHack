@@ -1755,7 +1755,7 @@ OBJECT(OBJ("Amulet of Yendor", /* note: description == name */
 /* miscellaneous (magic) items */
 #define MISCELLANEOUSITEM(name,desc,sub,itemdesc,kn,magic,mergeable,spetype,charged,recharging,prob,cost,wt,power,power2,power3,pflags,manabonus,hpbonus,bonusattrs,attrbonus,splcastpen,nut,material,color,height,soundset,flags,flags2,flags3,flags4,flags5,flags6,powconfermask) \
     OBJECT(OBJ(name, desc, None, None, itemdesc, height, 0, 0, 0),                                          \
-           BITS(kn, mergeable, charged || spetype ? 1 : 0, 0, magic, spetype, charged, recharging, 0, 0, 0, 0, 0, sub, 0, material),        \
+           BITS(kn, mergeable, (charged) != 0 || (spetype) != 0 ? 1 : 0, 0, magic, spetype, charged, recharging, 0, 0, 0, 0, 0, sub, 0, material),        \
            power, power2, power3, pflags, MISCELLANEOUS_CLASS, prob, MULTIGEN_SINGLE, 0, wt, cost,  \
            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, A1_NONE, A2_NONE, 0, \
            0, 0, 0, 0, 0, 0, manabonus, hpbonus, bonusattrs, attrbonus, splcastpen, 0, \
@@ -1933,7 +1933,7 @@ MISCELLANEOUSITEM("belt of storm giant strength", "rudimentary belt", MISC_BELT,
 /* tools with weapon characteristics come last */
 #define GENERAL_TOOL(name,desc,contentname,contentdesc,itemdesc, stand_anim, enl, repl, subtype,kn,mrg,mgc,spetype,charged,recharging,prob,wt,cost,cooldown,manabon,hpbon,bonusattr,attrbonus,splcastpen,power1,power2,power3,pflags,special_quality,mat,color,height,soundset,flags,flags2,flags3,flags4,flags5,flags6,powconfermask) \
     OBJECT(OBJ(name, desc, contentname, contentdesc, itemdesc, height, stand_anim, enl, repl),                                           \
-           BITS(kn, mrg, charged || spetype ? 1 : 0, 0, mgc, spetype, charged, recharging, 0, 0, 0, 0, 0, subtype, P_NONE, mat), \
+           BITS(kn, mrg, (charged) != 0 || (spetype) != 0 ? 1 : 0, 0, mgc, spetype, charged, recharging, 0, 0, 0, 0, 0, subtype, P_NONE, mat), \
            power1, power2, power3, pflags,  TOOL_CLASS, prob, MULTIGEN_SINGLE, 0, wt, cost, \
            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, A1_NONE, A2_NONE, 0, \
            0, 0, 0, 0, 0, 0, manabon, hpbon, bonusattr, attrbonus, splcastpen, 0, \
@@ -2760,7 +2760,7 @@ SPELL("wish",              "jewel-encrusted", None, "ancient conjuration magic",
 SPELL("black blade of disaster", "ebony", None, "long-forgotten conjuration magic", "Summons a blade that disintegrates targets on hit",
     P_CONJURATION_SPELL,           2, 10,             0,11,200, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 3, 10, 30, S1_SPELLBOOK_MUST_BE_READ_TO_IDENTIFY, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BLACK, OBJECT_SOUNDSET_SPELLBOOK, O1_DISINTEGRATION_RESISTANT, O2_NONE, O3_NONE, O4_VERY_RARE, O5_NONE, O6_NONE),
 SPELL("mage armor",           "ornamental", None, None, "Summons a wizard-friendly magical armor with AC4",
-    P_CONJURATION_SPELL,           4,  1,             0, 1, 12, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 4, 20, 200, S1_NONE, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BLACK, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    P_CONJURATION_SPELL,           4,  1,             0, 1, 12, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 4, 20, 200, S1_NONE, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BLACK, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_USES_SPELL_TILE, O6_NONE),
 SPELL("call hierarch modron",  "spherical", None, "alien conjuration magic", "Summons a permanent hierarch modron",
     P_CONJURATION_SPELL,           0,  5,             0,10,300, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_SPELLBOOK_MUST_BE_READ_TO_IDENTIFY, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NO_GENERATION, O4_NONE, O5_NONE, O6_NONE),
 SPELL("sphere of annihilation",    "jet-studded", None, "long-forgotten conjuration magic", "Disintegrates everything around you",
@@ -2888,7 +2888,7 @@ SPELL("power word stun",   "ludicrous", None, None, "Stuns the target",//Note mo
 SPELL("light",            "cloth", None, None, "Lights up the nearby area",
       P_DIVINATION_SPELL,         4,   1,             0, 0,  2, A_MAX_INT_WIS_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_CLOTH, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("probe monster",    "adamantium-plated", None, None, "Displays the monster's statistics",
-      P_DIVINATION_SPELL,         4,   1,             0, -1, 4, A_MAX_INT_WIS_CHA, 12, 0,   5, 0, 1, IMMEDIATE, IMMEDIATE_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT | S1_DOES_NOT_TAKE_A_TURN, S2_NONE, ALL_TARGETS, AD_NONE, HI_CLOTH, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+      P_DIVINATION_SPELL,         4,   1,             0, -1, 4, A_MAX_INT_WIS_CHA, 12, 0,   5, 0, 1, IMMEDIATE, IMMEDIATE_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT | S1_DOES_NOT_TAKE_A_TURN, S2_NONE, ALL_TARGETS, AD_NONE, HI_CLOTH, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_USES_SPELL_TILE, O6_NONE),
 SPELL("detect monsters",  "leathery", None, None, "The caster can sense all monsters on the level",
       P_DIVINATION_SPELL,         4,   1,             0, 2, 16, A_MAX_INT_WIS_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE,  HI_LEATHER, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("improved monster detection",  "tarnished", None, None, "The caster can sense all monsters on the level for a duration",
@@ -2949,13 +2949,13 @@ SPELL("protect armor",          "glowing", None, None, "Makes a piece of armor r
 SPELL("protect weapon",          "antiquarian", None, None, "Makes a weapon rust- or burn-proof",
       P_ENCHANTMENT_SPELL,        5, 2,             0, 4, 60, A_MAX_INT_CHA, 0, 0, 200, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("cold-enchant item",        "baleful", None, None, "Cold-enchants one suitable item",
-    P_ENCHANTMENT_SPELL,        5, 1,             0, 5, 80, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_COLD_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    P_ENCHANTMENT_SPELL,        5, 1,             0, 5, 80, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_COLD_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_USES_SPELL_TILE, O6_NONE),
 SPELL("fire-enchant item",        "deformed", None, None, "Fire-enchants one suitable item",
-    P_ENCHANTMENT_SPELL,        5, 1,             0, 2, 32, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_FIRE_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    P_ENCHANTMENT_SPELL,        5, 1,             0, 2, 32, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_FIRE_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_USES_SPELL_TILE, O6_NONE),
 SPELL("lightning-enchant item",    "degraded", None, None, "Lightning-enchants one suitable item",
-    P_ENCHANTMENT_SPELL,        5, 1,             0, 3, 40, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_LIGHTNING_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    P_ENCHANTMENT_SPELL,        5, 1,             0, 3, 40, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_LIGHTNING_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_USES_SPELL_TILE, O6_NONE),
 SPELL("death-enchant item",        "diabolical", None, None, "Death-enchants one suitable item",
-    P_ENCHANTMENT_SPELL,        3, 3,             0, 8,160, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_VERY_RARE, O5_NONE, O6_NONE),
+    P_ENCHANTMENT_SPELL,        3, 3,             0, 8,160, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0, S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_VERY_RARE, O5_USES_SPELL_TILE, O6_NONE),
 SPELL("mass conflict",            "odious", None, None, "Causes all monsters to attach each other on the level",
     P_ENCHANTMENT_SPELL,        3, 3,             0, 9,100, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, CONFLICT, 0, 0, 0, 0, 3, 10, 50, S1_NO_SOMATIC_COMPONENT | S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_WIS, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_VERY_RARE, O5_NONE, O6_NONE),
 SPELL("mirror image",            "nonsensical", None, None, "A displaced mirror image appears beside the caster",

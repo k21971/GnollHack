@@ -24,7 +24,6 @@ namespace GnollHackClient.Pages.Game
             _fileName = fileName;
             HeaderLabel.Text = header;
             Assembly assembly = GetType().GetTypeInfo().Assembly;
-            CloseButtonImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
             if (App.IsiOS)
             {
                 TextEditor.IsVisible = false;

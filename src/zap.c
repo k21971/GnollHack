@@ -337,15 +337,15 @@ struct monst* origmonst;
             pline_ex(ATR_NONE, CLR_MSG_SPELL, "Boing!");
             break; /* skip makeknown */
         }
-        else if (u.uswallow || 1)
-        { //rnd(20) < 10 + find_mac(mtmp))
+        else // if (u.uswallow || rnd(20) < 10 + find_mac(mtmp))
+        {
             /* resist deals the damage and displays the damage dealt */
             play_sfx_sound_at_location(SFX_MAGIC_ARROW_HIT, mtmp->mx, mtmp->my);
             hit_with_hit_tile(zap_type_text, mtmp, exclam(dmg), -1, "", HIT_GENERAL, FALSE);
             (void) inflict_spell_damage(mtmp, otmp, origmonst, dmg, AD_MAGM, TELL);
         } 
-        else
-            miss(zap_type_text, mtmp);
+        //else
+        //    miss(zap_type_text, mtmp);
         learn_it = TRUE;
         break;
     case SPE_SHOCKING_TOUCH:
@@ -1388,7 +1388,7 @@ cure_petrification_here:
     case JAR_OF_BASILISK_BLOOD:
     case SPE_STONE_TO_FLESH:
         res = 1;
-        if (monsndx(mtmp->data) == PM_STONE_GOLEM) {
+        if (mtmp->mnum == PM_STONE_GOLEM) {
             char *name = Monnam(mtmp);
 
             /* turn into flesh golem */
@@ -1613,13 +1613,15 @@ struct monst* mtmp;
             strcpy(endbuf, "");
             strcpy(endbuf2, "");
 
-            if (0 && (has_innate || has_innate2))
+#if 0
+            if (has_innate || has_innate2)
             {
                 if (strcmp(endbuf, ""))
                     Strcat(endbuf, ", ");
 
                 Strcat(endbuf, "innate");
             }
+#endif
 
             if (has_extrinsic)
             {
@@ -1628,13 +1630,15 @@ struct monst* mtmp;
 
                 Strcat(endbuf, "extrinsic");
             }
-            if (0 && has_instrinsic_acquired)
+#if 0
+            if (has_instrinsic_acquired)
             {
                 if (strcmp(endbuf, ""))
                     Strcat(endbuf, ", ");
 
                 Strcat(endbuf, "acquired");
             }
+#endif
             if (has_temporary)
             {
                 if (strcmp(endbuf, ""))
@@ -4755,7 +4759,7 @@ register struct obj *obj;
         You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully cast the voodoo animation spell.");
         int zombietype;
         int monstcount = 0;
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         struct obj* sobj;
         sobj = fobj;
 
@@ -4789,7 +4793,7 @@ register struct obj *obj;
         You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully permormed the embalming magic.");
         int zombietype;
         int monstcount = 0;
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         struct obj* sobj;
         sobj = fobj;
 
@@ -4825,7 +4829,7 @@ register struct obj *obj;
         int zombietype;
         int monstcount = 0;
         int hatchlingcount = 0;
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         struct obj* sobj;
         sobj = fobj;
 
@@ -4881,7 +4885,7 @@ register struct obj *obj;
         pline_ex(ATR_NONE, CLR_MSG_SPELL, "Air begins to shine with strange golden color...");
         pline_ex(ATR_NONE, CLR_MSG_SPELL, "Suddenly immense power blasts all around you!");
 
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
 
         boolean showmon = FALSE;
         for (int i = 0; i < 10; i++)
@@ -4943,7 +4947,7 @@ register struct obj *obj;
     case SPE_CIRCLE_OF_SUNLIGHT:
     case SPE_CIRCLE_OF_RADIANCE:
     {
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         play_explosion_animation_at(u.ux, u.uy, EXPL_CIRCLE_OF_RADIANCE);
         play_sfx_sound(SFX_CIRCLE_OF_RADIANCE);
         explosion_wait_until_action();
@@ -4969,7 +4973,7 @@ register struct obj *obj;
     }
     case SPE_CIRCLE_OF_FIRE:
     {
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         play_explosion_animation_at(u.ux, u.uy, EXPL_CIRCLE_OF_FIRE);
         play_sfx_sound(SFX_CIRCLE_OF_FIRE);
         explosion_wait_until_action();
@@ -5001,7 +5005,7 @@ register struct obj *obj;
     }
     case SPE_CIRCLE_OF_FROST:
     {
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         play_explosion_animation_at(u.ux, u.uy, EXPL_CIRCLE_OF_FROST);
         play_sfx_sound(SFX_CIRCLE_OF_FROST);
         explosion_wait_until_action();
@@ -5033,7 +5037,7 @@ register struct obj *obj;
     }
     case SPE_CIRCLE_OF_LIGHTNING:
     {
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         play_explosion_animation_at(u.ux, u.uy, EXPL_CIRCLE_OF_LIGHTNING);
         play_sfx_sound(SFX_CIRCLE_OF_LIGHTNING);
         explosion_wait_until_action();
@@ -5065,7 +5069,7 @@ register struct obj *obj;
     }    
     case SPE_CIRCLE_OF_MAGIC:
     {
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         play_explosion_animation_at(u.ux, u.uy, EXPL_CIRCLE_OF_MAGIC);
         play_sfx_sound(SFX_CIRCLE_OF_MAGIC);
         explosion_wait_until_action();
@@ -5097,7 +5101,7 @@ register struct obj *obj;
     }
     case SPE_CIRCLE_OF_TELEPORTATION:
     {
-        int radius = objects[obj->otyp].oc_spell_radius;
+        int radius = (int)objects[obj->otyp].oc_spell_radius;
         for (struct monst* mon = fmon; mon; mon = mon->nmon)
         {
             if (dist2(u.ux, u.uy, mon->mx, mon->my) <= radius * (radius + 1))
@@ -7162,12 +7166,12 @@ struct obj *obj;
             if (objects[otyp].oc_dir == TOUCH)
                 range = 1;
             else if (objects[otyp].oc_spell_range > 0)
-                range = objects[otyp].oc_spell_range;
+                range = (int)objects[otyp].oc_spell_range;
             else
                 range = rn1(8, 6);
 
             if (objects[otyp].oc_spell_radius > 0)
-                radius = objects[otyp].oc_spell_radius;
+                radius = (int)objects[otyp].oc_spell_radius;
 
             uchar hit_only_one = 1;
             if (objects[otyp].oc_dir == IMMEDIATE_MULTIPLE_TARGETS)
@@ -7807,7 +7811,7 @@ boolean stop_at_first_hit_object;
                 }
                 
                 int had_effect = (*fhitm)(mtmp, obj, origmonst);
-                int more_effect_num = 0;
+                //int more_effect_num = 0;
 
                 if (had_effect && obj)
                     play_immediate_ray_sound_at_location(object_soundsets[objects[obj->otyp].oc_soundset].ray_soundset, RAY_SOUND_TYPE_HIT_MONSTER, bhitpos.x, bhitpos.y);
@@ -7830,9 +7834,9 @@ boolean stop_at_first_hit_object;
                                 struct monst* mtmp2 = m_at(px, py);
                                 if (mtmp2 && mtmp2 != mtmp && mtmp2 != &youmonst)
                                 {
-                                    int had_more_effect = 0;
-                                    had_more_effect = (*fhitm)(mtmp2, obj, origmonst);
-                                    more_effect_num += had_more_effect;
+                                    //int had_more_effect = 0;
+                                    /*had_more_effect = */(void)(*fhitm)(mtmp2, obj, origmonst);
+                                    //more_effect_num += had_more_effect;
                                 }
                             }
                         }
@@ -9027,7 +9031,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
     }
     if (type < 0)
         newsym(u.ux, u.uy);
-    range = (!origobj || objects[origobj_copy.otyp].oc_spell_range <= 0) ? rn1(7, 7) : objects[origobj_copy.otyp].oc_spell_range;
+    range = (!origobj || objects[origobj_copy.otyp].oc_spell_range <= 0) ? rn1(7, 7) : (int)objects[origobj_copy.otyp].oc_spell_range;
     if (dx == 0 && dy == 0)
         range = 1;
     save_bhitpos = bhitpos;
@@ -9136,7 +9140,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
                 force_redraw_at(sx, sy);
                 if (animations[anim].sound_play_frame > 0)
                 {
-                    delay_output_intervals(animations[anim].sound_play_frame * animations[anim].intervals_between_frames);
+                    delay_output_intervals((int)animations[anim].sound_play_frame * animations[anim].intervals_between_frames);
                 }
                 update_ambient_ray_sound_to_location(soundset_id, sx, sy);
             }
@@ -9163,7 +9167,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
                 }
                 if (animations[anim].sound_play_frame > 0)
                 {
-                    delay_output_intervals(animations[anim].sound_play_frame * animations[anim].intervals_between_frames);
+                    delay_output_intervals((int)animations[anim].sound_play_frame * animations[anim].intervals_between_frames);
                 }
             }
             update_ambient_ray_sound_to_location(soundset_id, sx, sy);
@@ -9475,7 +9479,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
         {
             if (playing_anim)
             {
-                delay_output_intervals(context.zap_aggregate_intervals_to_wait_until_action);
+                delay_output_intervals((int)context.zap_aggregate_intervals_to_wait_until_action);
                 context.zap_aggregate_intervals_to_wait_until_action = 0UL;
             }
             else
@@ -9490,7 +9494,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
     }
     if (!isexplosioneffect && context.zap_aggregate_intervals_to_wait_until_end > 0)
     {
-        delay_output_intervals(context.zap_aggregate_intervals_to_wait_until_end);
+        delay_output_intervals((int)context.zap_aggregate_intervals_to_wait_until_end);
     }
     context.zap_aggregate_intervals_to_wait_until_end = 0UL;
 

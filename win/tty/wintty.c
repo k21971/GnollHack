@@ -1787,7 +1787,7 @@ const char *s; /* valid responses */
     if (flags.standout)
         standoutbeg();
     xputs(prompt);
-    ttyDisplay->curx += strlen(prompt);
+    ttyDisplay->curx += (short)strlen(prompt);
     if (flags.standout)
         standoutend();
 
@@ -3050,11 +3050,11 @@ boolean preselected;        /* item is marked as selected */
 
     cw->nitems++;
     if (identifier->a_void) {
-        int len = strlen(str);
+        size_t len = strlen(str);
 
         if (len >= BUFSZ) {
             /* We *think* everything's coming in off at most BUFSZ bufs... */
-            impossible("Menu item too long (%d).", len);
+            impossible("Menu item too long (%ld).", len);
             len = BUFSZ - 1;
         }
         Sprintf(buf, "%c - ", ch ? ch : '?');
@@ -3121,7 +3121,7 @@ const char *prompt, *subtitle; /* prompt to for menu */
 {
     struct WinDesc *cw = 0;
     tty_menu_item *curr;
-    short len;
+    size_t len;
     int lmax, n;
     char menu_ch;
 
@@ -3179,12 +3179,12 @@ const char *prompt, *subtitle; /* prompt to for menu */
 
         /* cut off any lines that are too long */
         len = strlen(curr->str) + 2; /* extra space at beg & end */
-        if (len > (int) ttyDisplay->cols) {
+        if (len > (size_t) ttyDisplay->cols) {
             curr->str[ttyDisplay->cols - 2] = 0;
-            len = ttyDisplay->cols;
+            len = (size_t)ttyDisplay->cols;
         }
-        if (len > cw->cols)
-            cw->cols = len;
+        if ((long)len > cw->cols)
+            cw->cols = (long)len;
     }
     cw->plist[cw->npages] = 0; /* plist terminator */
 
@@ -3202,14 +3202,14 @@ const char *prompt, *subtitle; /* prompt to for menu */
         len = strlen(cw->morestr);
     }
 
-    if (len > (int) ttyDisplay->cols) {
+    if (len > (size_t)ttyDisplay->cols) {
         /* truncate the prompt if it's too long for the screen */
         if (cw->npages <= 1) /* only str in single page case */
             cw->morestr[ttyDisplay->cols] = 0;
-        len = ttyDisplay->cols;
+        len = (size_t)ttyDisplay->cols;
     }
-    if (len > cw->cols)
-        cw->cols = len;
+    if (len > (size_t)cw->cols)
+        cw->cols = (long)len;
 
     cw->maxcol = cw->cols;
 
@@ -4777,7 +4777,8 @@ render_status(VOID_ARGS)
                     if (!tty_condition_bits)
                         continue;
 
-                    if (0) //num_rows == 3)
+#if 0
+                    if (num_rows == 3)
                     {
                         int k;
                         char *dat = &cw->data[y][0];
@@ -4808,6 +4809,7 @@ render_status(VOID_ARGS)
                         tty_status[NOW][BL_CONDITION].x = x;
                         tty_curs(WIN_STATUS, x, y);
                     }
+#endif
 
                     bits = tty_condition_bits;
                     for (c = 0; c < SIZE(conditions); ++c) {
