@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0  lev_comp.l	$NHDT-Date: 1543371690 2018/11/28 02:21:30 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /*	Copyright (c) 1989 by Jean-Christophe Collet */
@@ -284,6 +284,8 @@ confused	ST_RET(CONFUSED_ID);
 seen_traps	ST_RET(SEENTRAPS_ID);
 waitforu	ST_RET(WAITFORU_ID);
 protector	ST_RET(PROTECTOR_ID);
+maxhp		ST_RET(MAXHP_ID);
+level_adjustment  ST_RET(LEVEL_ADJUSTMENT_ID);
 switchable	ST_RET(SWITCHABLE_ID);
 secret_door	ST_RET(SECRET_DOOR_ID);
 uses_up_key	ST_RET(USES_UP_KEY_ID);

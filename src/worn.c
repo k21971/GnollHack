@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    worn.c    $NHDT-Date: 1550524569 2019/02/18 21:16:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1905,7 +1905,8 @@ boolean racialexception;
         {
         case W_AMUL:
             if (obj->oclass != AMULET_CLASS
-                || (obj->otyp != AMULET_OF_LIFE_SAVING
+                || (obj->otyp != AMULET_OF_LIFE_SAVING && obj->otyp != AMULET_VERSUS_PETRIFICATION 
+                    && obj->otyp != AMULET_VERSUS_POISON && obj->otyp != AMULET_VERSUS_UNDEATH
                     && obj->otyp != AMULET_OF_REFLECTION))
                 continue;
             best = obj;
@@ -2385,6 +2386,7 @@ boolean polyspot;
 
             You("touch %s.", mon_nam(u.usteed));
             Sprintf(buf, "falling off %s", an(mon_monster_name(u.usteed)));
+            killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
             instapetrify(buf);
         }
         dismount_steed(DISMOUNT_FELL);

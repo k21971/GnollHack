@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    shk.c    $NHDT-Date: 1555201699 2019/04/14 00:28:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.159 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -108,6 +108,11 @@ long amount;
         remove_worn_item(ygold, FALSE); /* quiver */
     freeinv(ygold);
     add_to_minv(mon, ygold);
+
+    char ftbuf[BUFSZ];
+    Sprintf(ftbuf, "-%ld gold", amount);
+    display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_REDUCED, ATR_NONE, NO_COLOR, 0UL);
+
     context.botl = 1;
     return amount;
 }
@@ -540,6 +545,12 @@ char *enterstring;
     if (!*enterstring)
         return;
 
+    if (!u.uachieve.entered_shop)
+    {
+        //achievement_gained("Entered a Shop");
+        u.uachieve.entered_shop = 1;
+    }
+
     if (!(shkp = shop_keeper(*enterstring))) {
         if (!index(empty_shops, *enterstring)
             && in_rooms(u.ux, u.uy, SHOPBASE)
@@ -925,13 +936,13 @@ boolean silent;
         while (--ct >= 0)
             if (bp->bo_id == obj->o_id) {
                 if (!obj->unpaid)
-                    pline("onbill: paid obj on bill?");
+                    impossible("onbill: paid obj on bill?");
                 return bp;
             } else
                 bp++;
     }
     if (obj->unpaid && !silent)
-        pline("onbill: unpaid obj not on bill?");
+        impossible("onbill: unpaid obj not on bill?");
     return (struct bill_x *) 0;
 }
 
@@ -2179,7 +2190,7 @@ unsigned oid;
     int res = 0, otyp = obj->otyp;
 
     if (!(obj->dknown && objects[otyp].oc_name_known)
-        && (obj->oclass != GEM_CLASS || objects[otyp].oc_material != MAT_GLASS)) {
+        && (obj->oclass != GEM_CLASS || (objects[otyp].oc_material != MAT_GLASS && objects[otyp].oc_material != MAT_CRYSTAL))) {
         res = ((oid % 4) == 0); /* id%4 ==0 -> +1, ==1..3 -> 0 */
     }
     return res;
@@ -2205,7 +2216,8 @@ register struct monst *shkp; /* if angry, impose a surcharge */
         tmp = 5L;
     /* shopkeeper may notice if the player isn't very knowledgeable -
        especially when gem prices are concerned */
-    if (!obj->dknown || (!obj->oartifact && !objects[obj->otyp].oc_name_known) || (obj->oartifact && !obj->nknown))
+    if (!obj->dknown 
+        || (!obj->oartifact && !objects[obj->otyp].oc_name_known) || (obj->oartifact && !obj->nknown))
     {
         if (obj->oclass == GEM_CLASS
             && objects[obj->otyp].oc_material == MAT_GLASS) 
@@ -2506,6 +2518,8 @@ register struct monst * mtmp;
         if (obj->oclass == GEM_CLASS) {
             /* different shop keepers give different prices */
             if (objects[obj->otyp].oc_material == MAT_GEMSTONE
+                || objects[obj->otyp].oc_material == MAT_HARD_CRYSTAL
+                || objects[obj->otyp].oc_material == MAT_CRYSTAL
                 || objects[obj->otyp].oc_material == MAT_GLASS) {
                 tmp = (obj->otyp % (6 - mtmp->m_id % 3));
                 tmp = (tmp + 3) * obj->quan;
@@ -2716,7 +2730,7 @@ register struct monst *shkp;
 /* shopkeeper tells you what you bought or sold, sometimes partly IDing it */
 STATIC_OVL void
 shk_names_obj(shkp, obj, fmt, amt, arg)
-struct monst *shkp;
+struct monst *shkp UNUSED;
 struct obj *obj;
 const char *fmt; /* "%s %ld %s %s", doname(obj), amt, plur(amt), arg */
 long amt;
@@ -2730,13 +2744,14 @@ const char *arg;
      * scrolls/books (that is, blank and mail), but only if the
      * object is within the shk's area of interest/expertise.
      */
-    if (!objects[obj->otyp].oc_magic && saleable(shkp, obj)
-        && (obj->oclass == WEAPON_CLASS || obj->oclass == ARMOR_CLASS
-            || obj->oclass == SCROLL_CLASS || obj->oclass == SPBOOK_CLASS
-            )) {  // Took Mirror out since there is also a magic mirror now || obj->otyp == MIRROR
-        was_unknown |= !objects[obj->otyp].oc_name_known;
-        makeknown(obj->otyp);
-    }
+    // Deactivated --JG
+    //if (!objects[obj->otyp].oc_magic && saleable(shkp, obj)
+    //    && (obj->oclass == WEAPON_CLASS || obj->oclass == ARMOR_CLASS
+    //        || obj->oclass == SCROLL_CLASS || obj->oclass == SPBOOK_CLASS
+    //        )) {  // Took Mirror out since there is also a magic mirror now || obj->otyp == MIRROR
+    //    was_unknown |= !objects[obj->otyp].oc_name_known;
+    //    makeknown(obj->otyp);
+    //}
     obj_name = doname(obj);
     /* Use an alternate message when extra information is being provided */
     if (was_unknown) {
@@ -4861,8 +4876,9 @@ struct monst *shkp;
            wishes for a shopkeeper statue and then animates it.
            (Note: shkname() would be "" in a case like this.) */
         play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_SEEN_UNTENDED_SHOPS);
-        pline("%s asks whether you've seen any untended shops recently.",
+        Sprintf(ansbuf, "%s asks whether you've seen any untended shops recently.",
               Monnam(shkp));
+        popup_talk_line_noquotes(shkp, ansbuf);
         /* [Perhaps we ought to check whether this conversation
            is taking place inside an untended shop, but a shopless
            shk can probably be expected to be rather disoriented.] */
@@ -4873,11 +4889,12 @@ struct monst *shkp;
     if (ANGRY(shkp))
     {
         play_voice_shopkeeper_simple_line(shkp, eshk->robbed ? SHOPKEEPER_LINE_DISLIKE_NON_PAYING_CUSTOMERS : SHOPKEEPER_LINE_DISLIKE_RUDE_CUSTOMERS);
-        pline("%s %s how much %s dislikes %s customers.",
+        Sprintf(ansbuf, "%s %s how much %s dislikes %s customers.",
               Shknam(shkp),
               (!Deaf && !muteshk(shkp)) ? "mentions" : "indicates",
               noit_mhe(shkp), eshk->robbed ? "non-paying" : "rude");
-    } 
+        popup_talk_line_noquotes(shkp, ansbuf);
+    }
     else if (eshk->following) 
     {
         if (strncmp(eshk->customer, plname, PL_NSIZ)) 
@@ -4888,7 +4905,7 @@ struct monst *shkp;
                 {
                     play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_I_WAS_LOOKING_FOR_SOMEONE_ELSE);
                     Sprintf(ansbuf, "%s, adventurer!  I was looking for someone else.", Hello(shkp));
-                    verbalize1(ansbuf);
+                    //verbalize1(ansbuf);
                     popup_talk_line(shkp, ansbuf);
                 }
                 else
@@ -4904,12 +4921,15 @@ struct monst *shkp;
                 play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_DIDNT_YOU_FORGET_TO_PAY);
                 Sprintf(ansbuf, "%s, %s!  Didn't you forget to pay?",
                     Hello(shkp), iflags.using_gui_sounds ? "adventurer" : plname);
-                verbalize1(ansbuf);
+                //verbalize1(ansbuf);
                 popup_talk_line(shkp, ansbuf);
             }
             else
-                pline("%s taps you on the %s.",
-                      Shknam(shkp), body_part(ARM));
+            {
+                Sprintf(ansbuf, "%s taps you on the %s.",
+                    Shknam(shkp), body_part(ARM));
+                popup_talk_line_noquotes(shkp, ansbuf);
+            }
         }
     } 
     else if (eshk->billct)
@@ -4919,10 +4939,12 @@ struct monst *shkp;
         if(!Deaf && !muteshk(shkp))
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_YOUR_BILL_COMES_TO_THIS_AMOUNT);
 
-        pline("%s %s that your bill comes to %ld %s.",
+        Sprintf(ansbuf, "%s %s that your bill comes to %ld %s.",
               Shknam(shkp),
               (!Deaf && !muteshk(shkp)) ? "says" : "indicates",
               total, currency(total));
+
+        popup_talk_line_noquotes(shkp, ansbuf);
     }
     else if (eshk->debit) 
     {
@@ -4930,60 +4952,69 @@ struct monst *shkp;
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_OWE_SOME_GOLD);
 
         if(iflags.using_gui_sounds)
-            pline("%s %s that you owe %s some gold. (%ld %s in fact!)",
+            Sprintf(ansbuf, "%s %s that you owe %s some gold. (%ld %s in fact!)",
                 Shknam(shkp),
                 (!Deaf && !muteshk(shkp)) ? "reminds you" : "indicates",
                 noit_mhim(shkp), eshk->debit, currency(eshk->debit));
         else
-            pline("%s %s that you owe %s %ld %s.",
+            Sprintf(ansbuf, "%s %s that you owe %s %ld %s.",
                   Shknam(shkp),
                   (!Deaf && !muteshk(shkp)) ? "reminds you" : "indicates",
                   noit_mhim(shkp), eshk->debit, currency(eshk->debit));
+
+        popup_talk_line_noquotes(shkp, ansbuf);
     }
     else if (eshk->credit)
     {
         if (!Deaf && !muteshk(shkp))
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_USING_OUTSTANDING_CREDIT);
-        pline("%s encourages you to use your %ld %s of credit.",
+
+        Sprintf(ansbuf, "%s encourages you to use your %ld %s of credit.",
               Shknam(shkp), eshk->credit, currency(eshk->credit));
+
+        popup_talk_line_noquotes(shkp, ansbuf);
     }
     else if (eshk->robbed) 
     {
         if (!Deaf && !muteshk(shkp))
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_WAS_ROBBED);
-        pline("%s %s about a recent robbery.",
+
+        Sprintf(ansbuf, "%s %s about a recent robbery.",
               Shknam(shkp),
               (!Deaf && !muteshk(shkp)) ? "complains" : "indicates concern");
+
+        popup_talk_line_noquotes(shkp, ansbuf);
     }
     else if ((shkmoney = money_cnt(shkp->minvent)) < 50L) 
     {
         if (!Deaf && !muteshk(shkp))
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_BUSINESS_IS_BAD);
-        pline("%s %s that business is bad.",
+
+        Sprintf(ansbuf, "%s %s that business is bad.",
               Shknam(shkp),
               (!Deaf && !muteshk(shkp)) ? "complains" : "indicates");
 
-        if (!Deaf && !muteshk(shkp))
-            popup_talk_line(shkp, "Business is bad.");
+        popup_talk_line_noquotes(shkp, ansbuf);
+
     }
     else if (shkmoney > 8000)
     {
         if(!Deaf && !muteshk(shkp))
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_BUSINESS_IS_GOOD);
-        pline("%s %s that business is good.",
+
+        Sprintf(ansbuf, "%s %s that business is good.",
               Shknam(shkp),
               (!Deaf && !muteshk(shkp)) ? "says" : "indicates");
 
-        if (!Deaf && !muteshk(shkp))
-            popup_talk_line(shkp, "Business is good.");
+        popup_talk_line_noquotes(shkp, ansbuf);
     }
     else
     {
         if (!Deaf && !muteshk(shkp))
         {
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_PROBLEM_WITH_SHOPLIFTERS);
-            pline("%s talks about the problem of shoplifters.", Shknam(shkp));
-            popup_talk_line(shkp, "We have a problem with shoplifters around here.");
+            Sprintf(ansbuf, "%s talks about the problem of shoplifters.", Shknam(shkp));
+            popup_talk_line_noquotes(shkp, ansbuf);
         }
     }
 }

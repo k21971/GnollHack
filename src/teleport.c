@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    teleport.c    $NHDT-Date: 1553885439 2019/03/29 18:50:39 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.86 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -574,7 +574,7 @@ boolean iscontrolled;
             return FALSE;
     }
 
-    if ((Teleport_control && !Stunned) || iscontrolled || (wizard && (iswizcmd || yn_query("Enforce teleport control?") == 'y')))
+    if ((Teleport_control && !Stunned) || iscontrolled || (wizard && (iswizcmd /* || yn_query("Enforce teleport control?") == 'y'*/)))
     {
         if (unconscious() && !iscontrolled && !iswizcmd)
         {
@@ -1121,7 +1121,7 @@ d_level target_level;
         newlevel = target_level;
         newlev = target_level.dlevel;
     }
-    else if ((Teleport_control && !Stunned) || controltype == 1 || (wizard && (teletype == 1 || yn_query("Enforce teleport control?") == 'y')))
+    else if ((Teleport_control && !Stunned) || controltype == 1 || (wizard && (teletype == 1 /* || yn_query("Enforce teleport control?") == 'y'*/)))
     {
         char qbuf[BUFSZ];
         char phbuf[BUFSZ] = "";
@@ -1145,7 +1145,7 @@ d_level target_level;
             *buf = '\0'; /* EDIT_GETLIN: if we're on second or later pass,
                             the previous input was invalid so don't use it
                             as getlin()'s preloaded default answer */
-            getlin_ex(wizard ? GETLINE_WIZ_LEVELPORT : GETLINE_LEVELPORT, ATR_NONE, NO_COLOR, qbuf, buf, *phbuf ? phbuf : (char*)0, (char*)0);
+            getlin_ex(wizard ? GETLINE_WIZ_LEVELPORT : GETLINE_LEVELPORT, ATR_NONE, NO_COLOR, qbuf, buf, *phbuf ? phbuf : (char*)0, (char*)0, (char*)0);
             if (!strcmp(buf, "\033")) { /* cancelled */
                 if (teletype != 1 && Confusion && rnl(5)) {
                     pline("Oops...");
@@ -1292,6 +1292,7 @@ random_levtport:
     }
 
     killer.name[0] = 0; /* still alive, so far... */
+    killer.hint_idx = 0;
 
     if (iflags.debug_fuzzer && newlev < 0)
         goto random_levtport;

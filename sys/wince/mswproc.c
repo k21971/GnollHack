@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	mswproc.c	$NHDT-Date: 1433806606 2015/06/08 23:36:46 $  $NHDT-Branch: master $:$NHDT-Revision: 1.60 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -1382,7 +1382,7 @@ char yn_function(const char *ques, const char *choices, char default)
                    ports might use a popup.
 */
 char
-mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, unsigned long ynflags)
+mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
 {
     int result = -1;
     char ch;
@@ -1493,12 +1493,19 @@ getlin(const char *ques, char *input)
                ports might use a popup.
 */
 void
-mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix)
+mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline)
 {
     logDebug("mswin_getlin(%s, %p)\n", question, input);
     char promptbuf[BUFSZ] = "";
-    if(question)
-        Sprintf(promptbuf, "%s", question);
+    //Do not show introline
+    //if (introline && *introline)
+    //    Sprintf(promptbuf, "%s", introline);
+    if (question)
+    {
+        if (*promptbuf)
+            Strcat(promptbuf, " ");
+        Sprintf(eos(promptbuf), "%s", question);
+    }
     if (placeholder)
         Sprintf(eos(promptbuf), " [%s]", placeholder);
     if (linesuffix)

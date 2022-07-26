@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    dothrow.c    $NHDT-Date: 1556201496 2019/04/25 14:11:36 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -76,7 +76,7 @@ boolean firing;
 
     if (!canletgo(obj, firing ? "fire" : "throw"))
         return 0;
-    if ((objects[obj->otyp].oc_flags & O1_CAN_BE_THROWN_ONLY_IF_WIELDED) && obj != uwep) {
+    if ((objects[obj->otyp].oc_flags & O1_CAN_BE_THROWN_ONLY_IF_WIELDED) && obj != uwep && !(u.twoweap && obj == uwep2)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s must be wielded before it can be thrown.", The(xname(obj)));
         return 0;
@@ -89,7 +89,7 @@ boolean firing;
     }
     if (!u.dx && !u.dy && !u.dz) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot %s an object at yourself.", firing ? "fire" : "throw");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot %s an object at yourself.", firing ? "fire" : "throw");
         return 0;
     }
     u_wipe_engr(2);
@@ -101,6 +101,7 @@ boolean firing;
                expression "with your bare hands" sounds better */
             makeplural(body_part(HAND)));
         Sprintf(killer.name, "throwing %s bare-handed", killer_xname(obj));
+        killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
         instapetrify(killer.name);
     }
     if (welded(obj, &youmonst)) {
@@ -403,6 +404,16 @@ double* average_ptr;
             if (average_ptr)
                 *average_ptr = 2.0;
             break;
+        case MULTISHOT_LAUNCHER_STAFF_SLING:
+        {
+            int fixed = min(2, max(1, skilllevel / 2));
+            boolean has_random = skilllevel == P_SKILLED ? TRUE : FALSE;
+            int random = has_random ? rn2(2) : 0;
+            multishot = fixed + random;
+            if (average_ptr)
+                *average_ptr = (double)fixed + (has_random ? 0.5 : 0.0);
+            break;
+        }
         default:
             break;
         }
@@ -445,13 +456,16 @@ double* average_ptr;
             multishot = fixed + random;
             if (average_ptr)
                 *average_ptr = (double)fixed + (has_random ? 0.5 : 0.0);
-        }
             break;
+        }
         case MULTISHOT_MELEE_TRIPLE_HEADED_FLAIL:
         {
-            multishot = max(1, skilllevel - 3);
+            int fixed = min(3, max(1, skilllevel / 2));
+            boolean has_random = skilllevel == P_SKILLED || skilllevel == P_MASTER ? 1 : 0;
+            int random = has_random ? rn2(2) : 0;
+            multishot = fixed + random;
             if (average_ptr)
-                *average_ptr = (double)multishot;
+                *average_ptr = (double)fixed + (has_random ? 0.5 : 0.0);
             break;
         }
         default:
@@ -540,7 +554,7 @@ autoquiver()
                    || (otmp->otyp == FLINT
                        && objects[otmp->otyp].oc_name_known)
                    || (otmp->oclass == GEM_CLASS
-                       && objects[otmp->otyp].oc_material == MAT_GLASS
+                       && (objects[otmp->otyp].oc_material == MAT_GLASS || objects[otmp->otyp].oc_material == MAT_CRYSTAL)
                        && objects[otmp->otyp].oc_name_known))
         {
             if (uslinging())
@@ -634,13 +648,13 @@ dofire()
         if (!flags.autoquiver)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("have no ammunition readied.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "have no ammunition readied.");
         } 
         else 
         {
             autoquiver();
             if ((obj = uquiver) == 0)
-                You("have nothing appropriate for your quiver.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "have nothing appropriate for your quiver.");
         }
 
         /* if autoquiver is disabled or has failed, prompt for missile;
@@ -1271,6 +1285,7 @@ struct obj *obj;
 boolean hitsroof;
 {
     const char *action;
+    boolean isinstakill = FALSE;
     boolean petrifier = ((obj->otyp == EGG || obj->otyp == CORPSE)
                          && touch_petrifies(&mons[obj->corpsenm]));
     /* note: obj->quan == 1 */
@@ -1359,7 +1374,7 @@ boolean hitsroof;
 
         if (obj->oartifact)
             /* need a fake die roll here; rn1(18,2) avoids 1 and 20 */
-            artimsg = artifact_hit((struct monst *) 0, &youmonst, obj, &damage, rn1(18, 2));
+            artimsg = artifact_hit((struct monst *) 0, &youmonst, obj, &damage, &isinstakill, rn1(18, 2));
 
         if (damage == 0) { /* probably wasn't a weapon; base damage on weight */
             damage = adjust_damage(obj->owt / 100, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE);
@@ -1410,7 +1425,10 @@ boolean hitsroof;
         }
         hitfloor(obj, TRUE);
         thrownobj = 0;
-        losehp(damage, "falling object", KILLED_BY_AN);
+        if(isinstakill)
+            kill_player("falling object", KILLED_BY_AN);
+        else
+            losehp(damage, "falling object", KILLED_BY_AN);
     }
     return TRUE;
 }
@@ -1469,6 +1487,7 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
     boolean impaired = (Confusion || Stunned || Blind
                                      || Hallucination || Fumbling);
     boolean tethered_weapon = is_obj_tethered_weapon(obj, wep_mask);
+    boolean isinstakill = FALSE;
 
     notonhead = FALSE; /* reset potentially stale value */
     if ((obj->cursed || obj->greased) && (u.dx || u.dy) && !rn2(7))
@@ -1680,7 +1699,7 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
             /* in case addinv() autoquivered */
             if (thrownobj && thrownobj->owornmask & W_QUIVER)
                 setuqwep((struct obj *) 0);
-            setuwep(thrownobj, W_WEP);
+            setuwep(thrownobj, wep_mask);
         } 
         else
         {
@@ -1760,9 +1779,15 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
                               Tobjnam(obj, Blind ? "hit" : "fly"),
                               body_part(ARM));
                         if (obj->oartifact)
-                            (void) artifact_hit((struct monst *) 0, &youmonst, obj, &dmg, 0);
-                        losehp(dmg, killer_xname(obj),
-                               KILLED_BY);
+                            (void)artifact_hit((struct monst *) 0, &youmonst, obj, &dmg, &isinstakill, 0);
+                        if (isinstakill)
+                        {
+                            kill_player(killer_xname(obj), KILLED_BY);
+                        }
+                        else
+                        {
+                            losehp(dmg, killer_xname(obj), KILLED_BY);
+                        }
                     }
                     if (ship_object(obj, u.ux, u.uy, FALSE))
                     {
@@ -1854,6 +1879,7 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
             vision_full_recalc = 1;
         if (obj_has_sound_source(obj))
             hearing_full_recalc = 1;
+        flush_screen(1);
     }
 }
 
@@ -2540,19 +2566,23 @@ boolean from_invent;
             explode_oil(obj, x, y);
         } else if (distu(x, y) <= 2) {
             if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data)) {
+                char dcbuf[BUFSZ] = "";
                 if (obj->otyp != POT_WATER) {
                     if (!has_innate_breathless(youmonst.data)) {
                         /* [what about "familiar odor" when known?] */
-                        You("smell a peculiar odor...");
+                        Strcpy(dcbuf, "You smell a peculiar odor...");
+                        pline1(dcbuf);
                     } else {
                         const char *eyes = body_part(EYE);
 
                         if (eyecount(youmonst.data) != 1)
                             eyes = makeplural(eyes);
-                        Your("%s %s.", eyes, vtense(eyes, "water"));
+
+                        Sprintf(dcbuf, "Your %s %s.", eyes, vtense(eyes, "water"));
+                        pline1(dcbuf);
                     }
                 }
-                potionbreathe(obj);
+                potionbreathe(obj, dcbuf);
             }
         }
         /* monster breathing isn't handled... [yet?] */
@@ -2692,7 +2722,7 @@ struct obj *obj;
 
     if (!u.dx && !u.dy && !u.dz) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot throw gold at yourself.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot throw gold at yourself.");
         return 0;
     }
     freeinv(obj);

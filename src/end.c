@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    end.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.170 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -665,7 +665,7 @@ VA_DECL(const char *, str)
             struct special_view_info info = { 0 };
             info.viewtype = SPECIAL_VIEW_PANIC;
             info.text = str;
-            open_special_view(info);
+            (void)open_special_view(info);
         }
 #endif
     }
@@ -749,6 +749,7 @@ dump_plines()
 }
 #endif
 
+
 /*ARGSUSED*/
 STATIC_OVL void
 dump_everything(how, when)
@@ -804,6 +805,8 @@ time_t when; /* date+time at end of game */
     container_contents(invent, TRUE, TRUE, FALSE, 0);
     enlightenment((BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
                   (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
+    putstr(0, 0, "");
+    dump_spells();
     putstr(0, 0, "");
     list_vanquished('d', FALSE, TRUE); /* 'd' => 'y' */
     putstr(0, 0, "");
@@ -946,15 +949,18 @@ int how;
     u.uhp = u.uhpmax;
     if (Upolyd) /* Unchanging, or death which bypasses losing hit points */
         u.mh = u.mhmax;
+
+    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
+
     if (u.uhunger < 500 || how == CHOKING) {
         init_uhunger();
     }
     /* cure impending doom of sickness hero won't have time to fix */
     if ((Sick & TIMEOUT) == 1L) {
-        make_sick(0L, (char *) 0, FALSE);
+        make_sick(0L, (char *) 0, FALSE, 0);
     }
     if ((FoodPoisoned & TIMEOUT) == 1L) {
-        make_food_poisoned(0L, (char*)0, FALSE);
+        make_food_poisoned(0L, (char*)0, FALSE, 0);
     }
     if ((Confusion & TIMEOUT) == 1L) {
         make_confused(0L, FALSE);
@@ -1146,6 +1152,7 @@ int how;
         if (killer.name[0]) {
             paniclog("trickery", killer.name);
             killer.name[0] = '\0';
+            killer.hint_idx = 0;
         }
         if (wizard) {
             You1("are a very tricky wizard, it seems.");
@@ -1192,6 +1199,7 @@ int how;
             }
             killer.name[0] = '\0';
             killer.format = 0;
+            killer.hint_idx = 0;
             return;
         }
     }
@@ -1282,14 +1290,11 @@ int how;
     if (!survive && how <= GENOCIDED)
     {
         u.utruemortality++;
-        if (wizard || discover)
+        if ((wizard || discover) && !paranoid_query_ex(ATR_NONE, NO_COLOR, ParanoidDie, (char*)0, "Die?"))
         {
-            if (!paranoid_query_ex(ATR_NONE, NO_COLOR, ParanoidDie, (char*)0, "Die?"))
-            {
-                pline("OK, so you don't %s.", (how == CHOKING) ? "choke" : "die");
-                savelife(how);
-                survive = TRUE;
-            }
+            pline("OK, so you don't %s.", (how == CHOKING) ? "choke" : "die");
+            savelife(how);
+            survive = TRUE;
         }
         else if (ModernMode)
         {
@@ -1327,6 +1332,7 @@ int how;
                     play_sfx_sound(SFX_ACQUIRE_CONFUSION);
                 make_confused(itimeout_incr(HConfusion, d(2, 3)), FALSE);
             }
+            death_hint();
         }
     }
 
@@ -1334,6 +1340,7 @@ int how;
     {
         killer.name[0] = '\0';
         killer.format = KILLED_BY_AN; /* reset to 0 */
+        killer.hint_idx = 0;
         if (how < PANICKED)
         {
             remove_glyph_buffer_layer_flags(u.ux, u.uy, LFLAGS_M_KILLED);
@@ -1448,6 +1455,8 @@ int how;
     default:
         break;
     }
+
+    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
  
     if(endtext)
         display_screen_text(endtext, (const char*)0, (const char*)0, screentextstyle, ATR_NONE, clr, 0UL);
@@ -1458,9 +1467,9 @@ int how;
     /* maybe not on object lists; if an active light source, would cause
        big trouble (`obj_is_local' panic) for savebones() -> savelev() */
     if (thrownobj && thrownobj->where == OBJ_FREE)
-        dealloc_obj(thrownobj);
+        obfree(thrownobj, (struct obj*)0);
     if (kickedobj && kickedobj->where == OBJ_FREE)
-        dealloc_obj(kickedobj);
+        obfree(kickedobj, (struct obj*)0);
 
     /* remember time of death here instead of having bones, rip, and
        topten figure it out separately and possibly getting different
@@ -1550,6 +1559,7 @@ int how;
         taken = FALSE; /* lint; assert( !bones_ok ); */
 
     clearlocks();
+    death_hint();
 
     if (have_windows)
         display_nhwindow(WIN_MESSAGE, FALSE);
@@ -1909,6 +1919,11 @@ int how;
         Sprintf(pbuf, "You played on %s difficulty in %s mode.", get_game_difficulty_text(context.game_difficulty),
             get_game_mode_text(TRUE));
         dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        if (!n_game_recoveries)
+            Strcpy(pbuf, "The dungeon never collapsed on you.");
+        else
+            Sprintf(pbuf, "The dungeon collapsed on you %lu time%s.", n_game_recoveries, plur(n_game_recoveries));
+        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
         Sprintf(pbuf,
             "You were level %d with a maximum of %d hit point%s when you %s.",
             u.ulevel, u.uhpmax, plur(u.uhpmax), ends[how]);
@@ -1927,7 +1942,7 @@ int how;
     if (have_windows && !iflags.toptenwin)
         exit_nhwindows((char*)0), have_windows = FALSE;
 
-    if((!wizard && !discover && !CasualMode) || (CasualMode && how == ASCENDED) /* || (wizard && yn_query("Write a top score entry?") == 'y') */)
+    if(((!discover && !CasualMode) || (CasualMode && how == ASCENDED)) && (!wizard || yn_query("Write a top score entry?") == 'y'))
         topten(how, endtime);
 
     if (CasualMode && how == ASCENDED && has_existing_save_file)
@@ -1972,7 +1987,7 @@ int show_weights;
             box->cknown = 1; /* we're looking at the contents now */
             if (identified)
                 box->lknown = 1;
-            if (box->otyp == BAG_OF_TRICKS) {
+            if (Is_noncontainer(box) /*->otyp == BAG_OF_TRICKS*/) {
                 continue; /* wrong type of container */
             } else if (box->cobj) {
                 winid tmpwin = create_nhwindow(NHW_MENU);
@@ -1986,6 +2001,7 @@ int show_weights;
                    a cat corpse inside the box; either way, inventory
                    reports the box as containing "1 item" */
                 cat = SchroedingersBox(box);
+                count = 0;
 
                 Sprintf(buf, "Contents of %s:", the(xname(box)));
                 putstr(tmpwin, ATR_TITLE, buf);
@@ -2260,7 +2276,8 @@ char defquery;
 boolean ask, isend;
 {
     register int i;
-    int pfx, nkilled;
+    int pfx, nkilled, fkilled;
+    boolean all_female, no_female;
     unsigned ntypes, ni;
     long total_killed = 0L;
     winid klwin;
@@ -2276,7 +2293,8 @@ boolean ask, isend;
     ntypes = 0;
     for (i = LOW_PM; i < NUM_MONSTERS; i++) 
     {
-        if ((nkilled = (int) mvitals[i].died) == 0)
+        nkilled = (int)mvitals[i].died;
+        if (nkilled == 0)
             continue;
         mindx[ntypes++] = i;
         total_killed += (long) nkilled;
@@ -2319,6 +2337,9 @@ boolean ask, isend;
             {
                 i = mindx[ni];
                 nkilled = mvitals[i].died;
+                fkilled = mvitals[i].died_female;
+                no_female = (fkilled == 0);
+                all_female = (fkilled == nkilled);
                 mlet = mons[i].mlet;
                 if (class_header && mlet != prev_mlet) 
                 {
@@ -2359,13 +2380,15 @@ boolean ask, isend;
                     /* trolls or undead might have come back,
                        but we don't keep track of that */
                     if (nkilled == 1)
-                        Strcpy(buf, an(pm_common_name(&mons[i])));
+                        Strcpy(buf, an(all_female ? pm_female_name(&mons[i]) : no_female ? mons[i].mname : pm_common_name(&mons[i])));
                     else
-                        Sprintf(buf, "%3d %s", nkilled,
-                                makeplural(pm_common_name(&mons[i])));
+                    {
+                        const char* plural_name = all_female ? makeplural(pm_female_name(&mons[i])) : no_female ? makeplural(mons[i].mname) : pm_plural_name(&mons[i], 3);
+                        Sprintf(buf, "%3d %s", nkilled, plural_name);
+                    }
                 }
                 /* number of leading spaces to match 3 digit prefix */
-                pfx = !strncmpi(buf, "the ", 3) ? 0
+                pfx = !strncmpi(buf, "the ", 4) ? 0
                       : !strncmpi(buf, "an ", 3) ? 1
                         : !strncmpi(buf, "a ", 2) ? 2
                           : !digit(buf[2]) ? 4 : 0;
@@ -2404,6 +2427,60 @@ boolean ask, isend;
 #endif
     }
 }
+
+void
+print_selfies(enwin)
+winid enwin;
+{
+    short mindx[NUM_MONSTERS] = { 0 };
+    int ntypes = 0;
+    int i;
+    int pfx;
+    for (i = LOW_PM; i < NUM_MONSTERS; i++)
+    {
+        if (mvitals[i].mvflags & MV_SELFIE_TAKEN)
+        {
+            mindx[ntypes] = i;
+            ntypes++;
+        }
+    }
+
+    if (!ntypes)
+    {
+        putstr(enwin, 0, " (No selfies taken with monsters)");
+    }
+    else
+    {
+        qsort((genericptr_t)mindx, ntypes, sizeof * mindx, vanqsort_cmp);
+
+        char buf[BUFSZ], buftoo[BUFSZ];
+        int ni;
+        for (ni = 0; ni < ntypes; ni++)
+        {
+            i = mindx[ni];
+            if (UniqCritterIndx(i))
+            {
+                Sprintf(buf, "%s%s",
+                    !is_mname_proper_name(&mons[i]) ? "the " : "",
+                    pm_common_name(&mons[i]));
+            }
+            else
+            {
+                Strcpy(buf, an(pm_common_name(&mons[i])));
+            }
+
+            /* number of leading spaces to match 3 digit prefix */
+            pfx = !strncmpi(buf, "the ", 4) ? 0
+                : !strncmpi(buf, "an ", 3) ? 1
+                : !strncmpi(buf, "a ", 2) ? 2
+                : !digit(buf[2]) ? 4 : 0;
+
+            Sprintf(buftoo, "%*s%s", pfx, "", buf);
+            putstr(enwin, 0, buftoo);
+        }
+    }
+}
+
 
 /* number of monster species which have been genocided */
 int
@@ -2487,7 +2564,7 @@ boolean ask, isend;
 
                 if (mvitals[i].mvflags & MV_GONE) 
                 {
-                    Sprintf(buf, " %s", makeplural(pm_common_name(&mons[i])));
+                    Sprintf(buf, " %s", pm_plural_name(&mons[i], 1));
                     /*
                      * "Extinct" is unfortunate terminology.  A species
                      * is marked extinct when its birth limit is reached,
@@ -2537,10 +2614,11 @@ boolean ask, isend;
 
 /* set a delayed killer, ensure non-delayed killer is cleared out */
 void
-delayed_killer(id, format, killername)
+delayed_killer(id, format, killername, killerhintidx)
 int id;
 int format;
 const char *killername;
+int killerhintidx;
 {
     struct kinfo *k = find_delayed_killer(id);
 
@@ -2553,6 +2631,7 @@ const char *killername;
         killer.next = k;
     }
 
+    k->hint_idx = killerhintidx;
     k->format = format;
     Strcpy(k->name, killername ? killername : "");
     killer.name[0] = 0;
@@ -2719,13 +2798,38 @@ get_current_game_score()
         utotal = LONG_MAX; /* wrap around */
     return utotal;
 #endif
+    if (discover || CasualMode)
+        return 0L;
+
     long utotal = 0;
     long Deepest_Dungeon_Level = deepest_lev_reached(FALSE);
     long Achievements_Score = (long)(u.uachieve.amulet + u.uachieve.ascended + u.uachieve.bell + u.uachieve.book + u.uachieve.enter_gehennom + u.uachieve.finish_sokoban +
         u.uachieve.killed_medusa + u.uachieve.killed_yacc + u.uachieve.menorah + u.uachieve.prime_codex + u.uachieve.mines_luckstone +
         !!In_endgame(&u.uz) + !!Is_astralevel(&u.uz) + u.uevent.invoked 
         + u.uhave.prime_codex /* Various things that yield points when carried out of the Dungeons of Doom */
+        + u.uachieve.role_achievement /* Special role-specific achievement */
+        + u.uachieve.crowned
         );
+
+    long Small_Achievements_Score = (long)(u.uachieve.consulted_oracle + u.uachieve.read_discworld_novel
+        + u.uachieve.entered_gnomish_mines + u.uachieve.entered_mine_town + u.uachieve.entered_shop + u.uachieve.entered_temple
+        + u.uachieve.entered_sokoban + u.uachieve.entered_bigroom + u.uachieve.learned_castle_tune 
+        + u.uachieve.entered_large_circular_dungeon + u.uachieve.entered_plane_of_modron + u.uachieve.entered_hellish_pastures
+        + u.uachieve.entered_astral_plane + u.uachieve.entered_elemental_planes
+        );
+
+    long Tourist_Selfie_Score = 0L;
+    if (Role_if(PM_TOURIST))
+    {
+        int i;
+        for (i = LOW_PM; i < NUM_MONSTERS; i++)
+        {
+            if (mvitals[i].mvflags & MV_SELFIE_TAKEN)
+            {
+                Tourist_Selfie_Score += 50L * (mons[i].difficulty + 1);
+            }
+        }
+    }
 
     int ngenocided = num_genocides();
 
@@ -2746,7 +2850,7 @@ get_current_game_score()
         + 10 * (ngenocided == 0)
         );
 
-    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L;
+    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 5000L + Small_Achievements_Score * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L + Tourist_Selfie_Score;
 
     double Turn_Count_Multiplier = sqrt(50000.0) / sqrt((double)max(1L, moves));
     double Ascension_Multiplier = u.uachieve.ascended ? min(16.0, max(2.0, 4.0 * Turn_Count_Multiplier)) : 1.0;

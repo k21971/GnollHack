@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    mswproc.c    $NHDT-Date: 1545705822 2018/12/25 02:43:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.130 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -82,6 +82,7 @@ COLORREF message_bg_color = RGB(0, 0, 0);
 COLORREF message_fg_color = RGB(0xFF, 0xFF, 0xFF);
 
 strbuf_t raw_print_strbuf = { 0 };
+
 
 /* Interface definition, for windows.c */
 struct window_procs mswin_procs = {
@@ -780,6 +781,19 @@ mswin_askname(void)
 {
     logDebug("mswin_askname()\n");
 
+#ifdef SELECTSAVED
+    if (iflags.wc2_selectsaved && !iflags.renameinprogress)
+        switch (restore_menu(WIN_ERR)) {
+        case -1:
+            bail("Until next time then..."); /* quit */
+            /*NOTREACHED*/
+        case 2:
+        case 0:
+            break; /* no game chosen; start new game */
+        case 1:
+            return; /* plname[] has been set */
+        }
+#endif /* SELECTSAVED */
     if (mswin_getlin_window(GETLINE_ASK_NAME, ATR_NONE, NO_COLOR, "Who are you?", plname, PL_NSIZ) == IDCANCEL) {
         bail("bye-bye");
         /* not reached */
@@ -919,6 +933,12 @@ mswin_create_nhwindow_ex(int type, int style, int glyph, struct extended_create_
     }
     case NHW_TEXT: {
         GetNHApp()->windowlist[i].win = mswin_init_text_window();
+        GetNHApp()->windowlist[i].type = type;
+        GetNHApp()->windowlist[i].dead = 0;
+        break;
+    }
+    case NHW_BASE: {
+        GetNHApp()->windowlist[i].win = GetNHApp()->hMainWnd;
         GetNHApp()->windowlist[i].type = type;
         GetNHApp()->windowlist[i].dead = 0;
         break;
@@ -1645,7 +1665,7 @@ char yn_function(const char *ques, const char *choices, char default)
                    ports might use a popup.
 */
 char
-mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, unsigned long ynflags)
+mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
 {
     char ch;
     char yn_esc_map = '\033';
@@ -1812,10 +1832,11 @@ getlin(const char *ques, char *input)
                ports might use a popup.
 */
 void
-mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix)
+mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline)
 {
     logDebug("mswin_getlin(%s, %p)\n", question, input);
     char promptbuf[BUFSZ] = "";
+    //Do not show introline
     if (question)
         Sprintf(promptbuf, "%s", question);
     if (placeholder)
@@ -3561,7 +3582,7 @@ mswin_set_animation_timer_interval(unsigned int interval)
 }
 
 
-void
+int
 mswin_open_special_view(struct special_view_info info)
 {
     switch (info.viewtype)
@@ -3569,10 +3590,12 @@ mswin_open_special_view(struct special_view_info info)
     case SPECIAL_VIEW_CHAT_MESSAGE:
         genl_chat_message();
         break;
+    case SPECIAL_VIEW_YN_DIALOG:
+        return mswin_yn_function_ex(YN_STYLE_GENERAL, info.attr, info.color, NO_GLYPH, info.title, info.text, "yn", 'n', "Yes\nNo", (const char*)0, 0UL);
     default:
         break;
     }
-    return;
+    return 0;
 }
 
 void
@@ -3705,12 +3728,13 @@ mswin_init_platform(VOID_ARGS)
 
     /* FMOD Banks */
     HINSTANCE hInstance = (HINSTANCE)GetModuleHandle(NULL);
-    int rid[3] = { IDR_RCDATA_MASTER, IDR_RCDATA_STRINGS, IDR_RCDATA_AUXILIARY };
-    char* bfilename[3] = { 0, 0, 0 };
+    int rid[4] = { IDR_RCDATA_MASTER, IDR_RCDATA_STRINGS, IDR_RCDATA_AUXILIARY, IDR_RCDATA_INTRO };
+    char* bfilename[4] = { 0, 0, 0, 0 };
     bfilename[0] = iflags.wc2_master_bank_file;
     bfilename[1] = iflags.wc2_master_strings_bank_file;
     bfilename[2] = iflags.wc2_auxiliary_bank_file;
-    for (int i = 0; i < 3; i++)
+    bfilename[3] = iflags.wc2_intro_bank_file;
+    for (int i = 0; i < 4; i++)
     {
         if (bfilename[i])
         {

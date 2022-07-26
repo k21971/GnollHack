@@ -58,10 +58,18 @@ namespace GnollHackClient
             StartLocalGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
             StartLocalGameButton.TextColor = Color.Gray;
+            if (App.IsiOS)
+                carouselView.Stop();
+
             var gamePage = new GamePage(this);
             gamePage.EnableWizardMode = wizardModeSwitch.IsToggled;
             gamePage.EnableCasualMode = casualModeSwitch.IsToggled;
             gamePage.EnableModernMode = !classicModeSwitch.IsToggled;
+            //gamePage.Disappearing += (sender2, e2) =>
+            //{
+            //    if (App.IsiOS)
+            //        carouselView.Play();
+            //};
             await App.Current.MainPage.Navigation.PushModalAsync(gamePage);
             gamePage.StartGame();
         }
@@ -138,7 +146,7 @@ namespace GnollHackClient
                 //_sponsorAnimation.Commit(SponsorButton, "Animation", 16, 4000, Easing.Linear, (v, c) => BackgroundColor = Color.Default);
             }
         }
-        public void InitializeServices()
+        public async Task InitializeServices()
         {
             bool resetFiles = Preferences.Get("ResetAtStart", true);
             if (resetFiles)
@@ -148,72 +156,152 @@ namespace GnollHackClient
                 Preferences.Set("ResetExternalFiles", true);
             }
             App.ResetAcquiredFiles();
-            App.GnollHackService.InitializeGnollHack(App.CurrentSecrets);
-            App.FmodService.InitializeFmod();
 
-            //App.AddLogLine("Attempting to load FMOD banks.");
-            //try
-            //{
-            //    _fmodService.LoadBanks();
-            //}
-            //catch(Exception ex)
-            //{
-            //    Debug.WriteLine("Loading FMOD banks failed: " + ex.Message);
-            //}
+            await TryInitializeGnollHack();
+            await TryInitializeFMOD();
+
         }
 
+        public async Task TryReadSecrets()
+        {
+            try
+            {
+                App.ReadSecrets();
+                Array.Sort<SecretsFile>(App.CurrentSecrets.files, new SecretsFileSizeComparer());
+
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Reading Secrets File Failed", "GnollHack failed to read secrets file: " + ex.Message, "OK");
+            }
+        }
+
+        public async Task TryInitializeGnollHack()
+        {
+            try
+            {
+                App.GnollHackService.InitializeGnollHack(App.CurrentSecrets);
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("GnollHack Initialization Failed", "Initializing GnollHack failed: " + ex.Message, "OK");
+            }
+        }
+
+        public async Task TryInitializeFMOD()
+        {
+            try
+            {
+                App.FmodService.InitializeFmod();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("FMOD Initialization Failed", "Initializing FMOD failed: " + ex.Message, "OK");
+            }
+        }
+
+        public async Task TryGetFilesFromResources()
+        {
+            try
+            {
+                GetFilesFromResources();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("File Unpacking Failure", "GnollHack failed to unpack core files: " + ex.Message, "OK");
+            }
+        }
+
+        public async Task TryClearCoreFiles()
+        {
+            try
+            {
+                App.GnollHackService.ClearCoreFiles();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("File Clearing Failure", "GnollHack failed to clear core files: " + ex.Message, "OK");
+            }
+        }
+
+        public async Task TryLoadBanks(int subType)
+        {
+            try
+            {
+                App.FmodService.LoadBanks(subType);
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Loading FMOD Banks Failed", "GnollHack failed to load FMOD banks of type " + subType + ": " + ex.Message, "OK");
+            }
+        }
 
         private async Task StartUpTasks()
         {
-            InitializeServices();
+            await TryReadSecrets();
+            await InitializeServices();
 
             Assembly assembly = GetType().GetTypeInfo().Assembly;
-            App.InitTypefaces(assembly);
-            App.InitBitmaps(assembly);
+            App.InitAdditionalTypefaces(assembly);
+            App.InitSymbolBitmaps(assembly);
+            App.InitGameBitmaps(assembly);
+            carouselView.Init();
 
-            string verstr = App.GnollHackService.GetVersionString();
-            string verid = App.GnollHackService.GetVersionId();
-            string path = App.GnollHackService.GetGnollHackPath();
-            string fmodverstr = App.FmodService.GetVersionString();
+            string verstr = "?";
+            string verid = "?";
+            string path = ".";
+            string fmodverstr = "?";
+            try
+            {
+                verstr = App.GnollHackService.GetVersionString();
+                verid = App.GnollHackService.GetVersionId();
+                path = App.GnollHackService.GetGnollHackPath();
+                fmodverstr = App.FmodService.GetVersionString();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
             App.GHVersionString = verstr;
             App.GHVersionId = verid;
             App.GHPath = path;
             App.FMODVersionString = fmodverstr;
 
             VersionLabel.Text = verid;
-            GnollHackLabel.Text = "GnollHack"; // + verstr;
+            GnollHackLabel.Text = "GnollHack";
 
             string prev_version = Preferences.Get("VersionId", "");
             if(prev_version != verid)
             {
-                App.GnollHackService.ClearCoreFiles();
-                App.GnollHackService.InitializeGnollHack(App.CurrentSecrets);
+                await TryClearCoreFiles();
+                await TryInitializeGnollHack();
             }
             Preferences.Set("VersionId", verid);
 
-            StartLocalGameImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            StartServerGameImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            clearImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            topScoreImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            optionsImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            settingsImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            creditsImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            exitImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
-            StillImage.Source = ImageSource.FromResource("GnollHackClient.Assets.main-menu-portrait-snapshot.jpg", assembly);
+            try
+            {
+                StartLocalGameImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                StartServerGameImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                clearImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                topScoreImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                optionsImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                settingsImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                creditsImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                exitImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+                StillImage.Source = ImageSource.FromResource("GnollHackClient.Assets.main-menu-portrait-snapshot.jpg", assembly);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
 
-            GetFilesFromResources();
+            await TryGetFilesFromResources();
             await DownloadAndCheckFiles();
 
             if (App.LoadBanks)
             {
-                try
-                {
-                    App.FmodService.LoadBanks();
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("Loading FMOD banks failed: " + ex.Message);
-                }
+                await TryLoadBanks(0);
+                await TryLoadBanks(2);
             }
 
             float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
@@ -229,9 +317,9 @@ namespace GnollHackClient
                 if (App.LoadBanks)
                     App.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, 0.5f, 1.0f);
             }
-            catch
+            catch (Exception ex)
             {
-
+                Debug.WriteLine(ex.Message);
             }
         }
 
@@ -323,6 +411,12 @@ namespace GnollHackClient
                 videoView.Play();
                 StillImage.IsVisible = false;
             }
+            else if (App.IsiOS)
+            {
+                carouselView.IsVisible = true;
+                carouselView.Play();
+                StillImage.IsVisible = false;
+            }
 
             try
             {
@@ -358,8 +452,12 @@ namespace GnollHackClient
             }
             else
             {
-                StillImage.IsVisible = true;
-                await StillImage.FadeTo(1, 250);
+                //StillImage.IsVisible = true;
+                //await StillImage.FadeTo(1, 250);
+                carouselView.IsVisible = true;
+                carouselView.InvalidateSurface();
+                await carouselView.FadeTo(1, 250);
+                carouselView.Play();
             }
 
             UpperButtonGrid.IsVisible = true;
@@ -470,7 +568,15 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
+            if (App.IsiOS)
+                carouselView.Stop();
             var resetPage = new ResetPage();
+            resetPage.Disappearing += (sender2, e2) =>
+            {
+                if (App.IsiOS)
+                    carouselView.Play();
+                UpperButtonGrid.IsEnabled = true;
+            };
             await App.Current.MainPage.Navigation.PushModalAsync(resetPage);
             UpperButtonGrid.IsEnabled = true;
         }
@@ -479,7 +585,15 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
+            if (App.IsiOS)
+                carouselView.Stop();
             var settingsPage = new SettingsPage(null, this);
+            settingsPage.Disappearing += (sender2, e2) =>
+            {
+                if (App.IsiOS)
+                    carouselView.Play();
+                UpperButtonGrid.IsEnabled = true;
+            };
             await App.Current.MainPage.Navigation.PushModalAsync(settingsPage);
             UpperButtonGrid.IsEnabled = true;
         }
@@ -488,16 +602,27 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
+            if (App.IsiOS)
+                carouselView.Stop();
             string fulltargetpath = Path.Combine(App.GHPath, "defaults.gnh");
             var editorPage = new EditorPage(fulltargetpath, "Default Options File");
             string errormsg = "";
             if (!editorPage.ReadFile(out errormsg))
             {
                 ErrorLabel.Text = errormsg;
+                if (App.IsiOS)
+                    carouselView.Play();
+                UpperButtonGrid.IsEnabled = true;
             }
             else
             {
                 ErrorLabel.Text = "";
+                editorPage.Disappearing += (sender2, e2) =>
+                {
+                    if (App.IsiOS)
+                        carouselView.Play();
+                    UpperButtonGrid.IsEnabled = true;
+                };
                 await App.Current.MainPage.Navigation.PushModalAsync(editorPage);
             }
             UpperButtonGrid.IsEnabled = true;
@@ -507,7 +632,15 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
+            if (App.IsiOS)
+                carouselView.Stop();
             var creditsPage = new CreditsPage();
+            creditsPage.Disappearing += (sender2, e2) =>
+            {
+                if (App.IsiOS)
+                    carouselView.Play();
+                UpperButtonGrid.IsEnabled = true;
+            };
             await App.Current.MainPage.Navigation.PushModalAsync(creditsPage);
             UpperButtonGrid.IsEnabled = true;
         }
@@ -519,6 +652,10 @@ namespace GnollHackClient
                 StillImage.IsVisible = true;
                 videoView.Stop();
                 videoView.IsVisible = false;
+            }
+            else
+            {
+                carouselView.Stop();
             }
         }
 
@@ -554,6 +691,10 @@ namespace GnollHackClient
                     videoView.HeightRequest = height;
                     videoView.Play();
                 }
+                else
+                {
+                    carouselView.InvalidateSurface();
+                }
             }
         }
 
@@ -561,6 +702,8 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
+            if (App.IsiOS)
+                carouselView.Stop();
             string fulltargetpath = Path.Combine(App.GHPath, "xlogfile");
             if(File.Exists(fulltargetpath))
             {
@@ -569,10 +712,19 @@ namespace GnollHackClient
                 if (!topScorePage.ReadFile(out errormsg))
                 {
                     ErrorLabel.Text = errormsg;
+                    if (App.IsiOS)
+                        carouselView.Play();
+                    UpperButtonGrid.IsEnabled = true;
                 }
                 else
                 {
                     ErrorLabel.Text = "";
+                    topScorePage.Disappearing += (sender2, e2) =>
+                    {
+                        if (App.IsiOS)
+                            carouselView.Play();
+                        UpperButtonGrid.IsEnabled = true;
+                    };
                     await App.Current.MainPage.Navigation.PushModalAsync(topScorePage);
                 }
             }
@@ -580,6 +732,12 @@ namespace GnollHackClient
             {
                 /* No top scores */
                 var topScorePage = new TopScorePage();
+                topScorePage.Disappearing += (sender2, e2) =>
+                {
+                    if (App.IsiOS)
+                        carouselView.Play();
+                    UpperButtonGrid.IsEnabled = true;
+                };
                 await App.Current.MainPage.Navigation.PushModalAsync(topScorePage);
             }
             UpperButtonGrid.IsEnabled = true;
@@ -701,7 +859,7 @@ namespace GnollHackClient
                 {
                     string sdir = string.IsNullOrWhiteSpace(sf.target_directory) ? ghdir : Path.Combine(ghdir, sf.target_directory);
                     string sfile = Path.Combine(sdir, sf.name);
-                    App.FmodService.AddLoadableSoundBank(sfile);
+                    App.FmodService.AddLoadableSoundBank(sfile, sf.subtype_id);
                 }
 
                 if (sf == App.CurrentSecrets.files.Last<SecretsFile>())
@@ -986,6 +1144,8 @@ namespace GnollHackClient
             SponsorButton.IsEnabled = false;
             Uri uri = new Uri(GHConstants.GnollHackSponsorPage);
             App.PlayButtonClickedSound();
+            if (App.IsiOS)
+                carouselView.Stop();
             try
             {
                 await Browser.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
@@ -998,6 +1158,8 @@ namespace GnollHackClient
             {
                 await DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
             }
+            if (App.IsiOS)
+                carouselView.Play();
             SponsorButton.IsEnabled = true;
         }
 
@@ -1136,7 +1298,7 @@ namespace GnollHackClient
             }
             else
             {
-                wizardModeSwitch.IsToggled = false;
+                //wizardModeSwitch.IsToggled = false;
             }
         }
 
@@ -1146,7 +1308,7 @@ namespace GnollHackClient
             Preferences.Set("CasualMode", App.CasualMode);
             if (casualModeSwitch.IsToggled)
             {
-                wizardModeSwitch.IsToggled = false;
+                //wizardModeSwitch.IsToggled = false;
             }
             else
             {
@@ -1182,7 +1344,7 @@ namespace GnollHackClient
             PopupCheckBoxLayout.IsVisible = false;
             PopupTitleLabel.TextColor = ClientUtils.NHColor2XColor((int)nhcolor.NO_COLOR, 0, false, true);
             PopupTitleLabel.Text = "Classic Mode";
-            PopupLabel.Text = "In the Classic Mode, death is permanent. Otherwise, your god will revive you at the starting altar, or at another special location. Each such revival will reduce your game score.";
+            PopupLabel.Text = "In Classic Mode, a character's death is permanent. The resulting score is listed in top scores. A dead character may arise as a ghost.\n\nIn Modern Mode, your god will revive you at the starting altar, or at another special location. Each such revival will reduce your game score, which will be recorded in top scores upon quitting or winning the game.";
             PopupGrid.IsVisible = true;
         }
 
@@ -1192,7 +1354,7 @@ namespace GnollHackClient
             PopupCheckBoxLayout.IsVisible = false;
             PopupTitleLabel.TextColor = ClientUtils.NHColor2XColor((int)nhcolor.NO_COLOR, 0, false, true);
             PopupTitleLabel.Text = "Casual Mode";
-            PopupLabel.Text = "Casual Mode is a non-scoring game mode in which your saved games will not be deleted after loading, enabling you to load them again after quitting or dying.";
+            PopupLabel.Text = "Casual Mode is a non-scoring game mode in which your saved games will not be deleted after loading, enabling you to load them again after quitting or dying. Games in Casual Mode are recorded in top scores with zero score upon winning the game.";
             PopupGrid.IsVisible = true;
         }
 
@@ -1210,8 +1372,8 @@ namespace GnollHackClient
         {
             if (wizardModeSwitch.IsToggled)
             {
-                classicModeSwitch.IsToggled = true;
-                casualModeSwitch.IsToggled = false;
+                //classicModeSwitch.IsToggled = true;
+                //casualModeSwitch.IsToggled = false;
             }
             else
             {

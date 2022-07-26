@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    sounds.c    $NHDT-Date: 1542765362 2018/11/21 01:56:02 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.81 $ */
 /*      Copyright (c) 1989 Janet Walz, Mike Threepoint */
@@ -139,6 +139,7 @@ STATIC_DCL int FDECL(do_chat_npc_identify_accessories_and_charged_items, (struct
 STATIC_DCL int FDECL(do_chat_npc_identify_gems_stones_and_charged_items, (struct monst*));
 STATIC_DCL int FDECL(do_chat_npc_general_identify, (struct monst*, const char*, int, long, int, int));
 STATIC_DCL int FDECL(do_chat_npc_sell_gems_and_stones, (struct monst*));
+STATIC_DCL int FDECL(do_chat_npc_forge_sling_bullets, (struct monst*));
 STATIC_DCL int FDECL(do_chat_npc_sell_dilithium_crystals, (struct monst*));
 STATIC_DCL int FDECL(do_chat_npc_sell_spellbooks, (struct monst*));
 STATIC_DCL int FDECL(do_chat_npc_branch_portal, (struct monst*));
@@ -157,7 +158,7 @@ STATIC_DCL int FDECL(general_service_query_with_extra, (struct monst*, int (*)(s
 STATIC_DCL int FDECL(repair_armor_func, (struct monst*));
 STATIC_DCL int FDECL(repair_weapon_func, (struct monst*));
 STATIC_DCL int FDECL(refill_lantern_func, (struct monst*));
-STATIC_DCL int FDECL(forge_special_func, (struct monst*, int, int, int));
+STATIC_DCL int FDECL(forge_special_func, (struct monst*, int, int, int, int, int));
 STATIC_DCL int FDECL(forge_dragon_scale_mail_func, (struct monst*));
 STATIC_DCL int FDECL(forge_shield_of_reflection_func, (struct monst*));
 STATIC_DCL int FDECL(forge_crystal_plate_mail_func, (struct monst*));
@@ -168,6 +169,12 @@ STATIC_DCL int FDECL(forge_plate_mail_func, (struct monst*));
 STATIC_DCL int FDECL(forge_bronze_plate_mail_func, (struct monst*));
 STATIC_DCL int FDECL(forge_field_plate_mail_func, (struct monst*));
 STATIC_DCL int FDECL(forge_full_plate_mail_func, (struct monst*));
+STATIC_DCL int FDECL(forge_iron_sling_bullets_func, (struct monst*));
+STATIC_DCL int FDECL(forge_ex_iron_sling_bullets_func, (struct monst*));
+STATIC_DCL int FDECL(forge_el_iron_sling_bullets_func, (struct monst*));
+STATIC_DCL int FDECL(forge_silver_sling_bullets_func, (struct monst*));
+STATIC_DCL int FDECL(forge_ex_silver_sling_bullets_func, (struct monst*));
+STATIC_DCL int FDECL(forge_el_silver_sling_bullets_func, (struct monst*));
 STATIC_DCL int FDECL(learn_spell_func, (struct monst*));
 STATIC_DCL int FDECL(spell_teaching, (struct monst*, int*));
 STATIC_DCL boolean FDECL(maybe_dilithium_crystal, (struct obj*));
@@ -1102,7 +1109,7 @@ boolean dopopup, fromchatmenu;
     case MS_LEADER:
     case MS_NEMESIS:
     case MS_GUARDIAN:
-        quest_chat(mtmp);
+        quest_chat(mtmp, dopopup);
         break;
     case MS_SELL: /* pitch, pay, total */
         if (mtmp->isshk)
@@ -2108,6 +2115,7 @@ dochat()
     struct monst *mtmp;
     int tx, ty;
     struct obj *otmp;
+    boolean elbereth_was_known = (boolean)u.uevent.elbereth_known;
 
     if (!getdir("Talk to whom? (in what direction)")) 
     {
@@ -2121,7 +2129,7 @@ dochat()
         info.viewtype = SPECIAL_VIEW_CHAT_MESSAGE;
 
         /* Chat message functionality */
-        open_special_view(info);
+        (void)open_special_view(info);
         return 0;
     }
 
@@ -3242,7 +3250,7 @@ dochat()
             strcpy(available_chat_list[chatnum].name, "Ask to join the party");
             available_chat_list[chatnum].function_ptr = &do_chat_join_party;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
-            available_chat_list[chatnum].stops_dialogue = TRUE;
+            available_chat_list[chatnum].stops_dialogue = FALSE;
 
             any = zeroany;
             any.a_char = available_chat_list[chatnum].charnum;
@@ -3359,7 +3367,7 @@ dochat()
             strcpy(available_chat_list[chatnum].name, "Bless or curse an item");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_blesscurse;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
-            available_chat_list[chatnum].stops_dialogue = TRUE;
+            available_chat_list[chatnum].stops_dialogue = FALSE;
 
             any = zeroany;
             any.a_char = available_chat_list[chatnum].charnum;
@@ -3413,7 +3421,8 @@ dochat()
             }
 
         }
-        else if (is_peaceful(mtmp) && is_priest(mtmp->data) && msound != MS_ORACLE)
+        else if (is_peaceful(mtmp) && is_priest(mtmp->data) && msound != MS_ORACLE 
+            && msound != MS_LEADER && msound != MS_GUARDIAN)
         {
             /* Non-priest monster priests here */
             strcpy(available_chat_list[chatnum].name, "Healing");
@@ -3604,7 +3613,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Forge a plate armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_forge_standard_armor;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3618,7 +3627,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Forge a special armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_forge_special_armor;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3648,7 +3657,7 @@ dochat()
                 strcpy(available_chat_list[chatnum].name, sbuf);
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_sell_ore;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3662,7 +3671,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Enchant a piece of armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_enchant_armor;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3676,7 +3685,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Enchant a weapon");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_enchant_weapon;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3690,7 +3699,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Repair a piece of armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_repair_armor;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3704,7 +3713,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Repair a weapon");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_repair_weapon;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3718,7 +3727,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Protect a piece of armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_protect_armor;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3732,7 +3741,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Protect a weapon");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_protect_weapon;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3747,7 +3756,7 @@ dochat()
                 Sprintf(available_chat_list[chatnum].name, "Refill oil for a lamp or lantern");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_refill_lantern;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3769,7 +3778,7 @@ dochat()
                 strcpy(available_chat_list[chatnum].name, "Offer research support");
                 available_chat_list[chatnum].function_ptr = &do_chat_quantum_mechanic_research_support;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
-                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].stops_dialogue = FALSE;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3839,7 +3848,7 @@ dochat()
                     Sprintf(available_chat_list[chatnum].name, "Enchant an accessory");
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_enchant_accessory;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
-                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
 
                     any = zeroany;
                     any.a_char = available_chat_list[chatnum].charnum;
@@ -3857,7 +3866,7 @@ dochat()
                     Sprintf(available_chat_list[chatnum].name, "Recharge an item");
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_recharge;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
-                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
 
                     any = zeroany;
                     any.a_char = available_chat_list[chatnum].charnum;
@@ -3874,7 +3883,7 @@ dochat()
                     Sprintf(available_chat_list[chatnum].name, "Fully recharge an item");
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_blessed_recharge;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
-                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
 
                     any = zeroany;
                     any.a_char = available_chat_list[chatnum].charnum;
@@ -3912,7 +3921,24 @@ dochat()
                     strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_sell_gems_and_stones;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
-                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
+
+                    any = zeroany;
+                    any.a_char = available_chat_list[chatnum].charnum;
+
+                    add_menu(win, NO_GLYPH, &any,
+                        any.a_char, 0, ATR_NONE,
+                        available_chat_list[chatnum].name, MENU_UNSELECTED);
+
+                    chatnum++;
+                }
+
+                if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_FORGE_SLING_BULLETS)
+                {
+                    Sprintf(available_chat_list[chatnum].name, "Forge sling-bullets");
+                    available_chat_list[chatnum].function_ptr = &do_chat_npc_forge_sling_bullets;
+                    available_chat_list[chatnum].charnum = 'a' + chatnum;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
 
                     any = zeroany;
                     any.a_char = available_chat_list[chatnum].charnum;
@@ -3931,7 +3957,7 @@ dochat()
                     strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_sell_dilithium_crystals;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
-                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
 
                     any = zeroany;
                     any.a_char = available_chat_list[chatnum].charnum;
@@ -3950,7 +3976,7 @@ dochat()
                     strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_sell_spellbooks;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
-                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    available_chat_list[chatnum].stops_dialogue = FALSE;
 
                     any = zeroany;
                     any.a_char = available_chat_list[chatnum].charnum;
@@ -4070,7 +4096,7 @@ dochat()
         {
             You("don't have anything to talk about.");
             destroy_nhwindow(win);
-            return result;
+            break; //Out of while loop
         }
 
 
@@ -4083,7 +4109,7 @@ dochat()
         destroy_nhwindow(win);
 
         if (i == '\0')
-            return result;
+            break; //Out of while loop
 
         int res = 0;
         int j;
@@ -4098,7 +4124,10 @@ dochat()
                     res = (available_chat_list[j].function_ptr)(mtmp);
 
                     if (res == 2) /* Changed level or the like and mtmp does not exist anymore */
-                        return 1;
+                    {
+                        result = 1;
+                        goto end_of_chat_here;
+                    }
 
                     if(res != 0)
                         result = 1;
@@ -4110,8 +4139,14 @@ dochat()
                 break;
             }
         }
+        if (!is_peaceful(mtmp))
+            stopsdialogue = TRUE;
     } while (i > 0 && !stopsdialogue);
     
+end_of_chat_here:
+    if (!elbereth_was_known && u.uevent.elbereth_known)
+        standard_hint("You can engrave \'Elbereth\' on the ground to protect yourself against attacking monsters.", &u.uhint.elbereth);
+
     return result;
 }
 
@@ -4254,7 +4289,7 @@ struct monst* mtmp;
     {
         if (!is_peaceful(mtmp))
         {
-            if (uwep && is_wielded_weapon(uwep))
+            if (uwep && is_wieldable_weapon(uwep))
             {
                 play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_HAH_DROP_YOUR_WEAPON_FIRST_SCUM);
                 Sprintf(ansbuf, "Hah, drop your weapon first, scum!");
@@ -4600,10 +4635,14 @@ struct monst* mtmp;
     char pbuf[BUFSZ] = "";
     if (givepawsuccess)
     {
-        Sprintf(pbuf, "%s gives you the paw!", noittame_Monnam(mtmp));
+        boolean tamenessadded = FALSE;
         if (mtmp->mtame > 0 && mtmp->mtame < 20 && !rn2(mtmp->mtame + 20))
+        {
             mtmp->mtame++;
-        popup_talk_line_ex(mtmp, pbuf, ATR_NONE, CLR_MSG_POSITIVE, TRUE, FALSE);
+            tamenessadded = TRUE;
+        }
+        Sprintf(pbuf, "%s gives you the paw%s!", noittame_Monnam(mtmp), tamenessadded ? ", and seems happier than before" : "");
+        popup_talk_line_ex(mtmp, pbuf, ATR_NONE, tamenessadded ? CLR_MSG_POSITIVE : CLR_MSG_SUCCESS, TRUE, FALSE);
     }
     else
     {
@@ -4625,33 +4664,41 @@ struct monst* mtmp;
     if (is_animal(mtmp->data) && mtmp->mtame > 2 && rn2(mtmp->mtame) && mon_can_move(mtmp) && (!has_edog(mtmp) || (has_edog(mtmp) && (EDOG(mtmp)->abuse <= 0 || !rn2(EDOG(mtmp)->abuse + 2)))))
     {
         play_monster_happy_sound(mtmp, MONSTER_HAPPY_SOUND_NORMAL);
+        boolean tamenessadded = FALSE, becamefaithful = FALSE;
+        if (mtmp->mtame > 0 && mtmp->mtame < 20 && !rn2(10 + mtmp->mtame))
+        {
+            mtmp->mtame++;
+            tamenessadded = TRUE;
+        }
+        if (mtmp->mtame >= 15 && !mtmp->isfaithful && !rn2(max(2, 25 - mtmp->mtame)))
+        {
+            mtmp->isfaithful = 1;
+            becamefaithful = TRUE;
+        }
 
+        const char* adjective = tamenessadded ? "very softly" : "softly";
+        const char* inwhat = becamefaithful ? "admiration" : "appreciation";
         switch (mtmp->data->msound)
         {
         case MS_BARK:
-            Sprintf(pbuf, "%s woofs.", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s woofs %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         case MS_MEW:
-            Sprintf(pbuf, "%s mews softly.", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s mews %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         case MS_NEIGH:
-            Sprintf(pbuf, "%s snorts.", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s snorts %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         case MS_BLEAT:
-            Sprintf(pbuf, "%s baas.", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s baas %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         default:
-            Sprintf(pbuf, "%s seems to appreciate your kind words!", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s seems to %s your kind words%s!", noittame_Monnam(mtmp),
+                becamefaithful ? "admire" : "appreciate", tamenessadded ? " very much" : "");
             break;
         }
 
-        if (mtmp->mtame > 0 && mtmp->mtame < 20 && !rn2(10 + mtmp->mtame))
-            mtmp->mtame++;
-
-        if (mtmp->mtame >= 15 && !mtmp->isfaithful && !rn2(max(2, 25 - mtmp->mtame)))
-            mtmp->isfaithful = 1;
-
-        popup_talk_line_ex(mtmp, pbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
+        popup_talk_line_ex(mtmp, pbuf, ATR_NONE, tamenessadded || becamefaithful ? CLR_MSG_POSITIVE : CLR_MSG_SUCCESS, TRUE, FALSE);
     }
     else if(rn2(4) && mon_can_move(mtmp))
         domonnoise(mtmp, FALSE, TRUE);
@@ -4715,33 +4762,41 @@ struct monst* mtmp;
     else if (is_animal(mtmp->data) && mtmp->mtame > 0 && rn2(mtmp->mtame + 1) && mon_can_move(mtmp) && (!has_edog(mtmp) || (has_edog(mtmp) && (EDOG(mtmp)->abuse <= 0 || !rn2(EDOG(mtmp)->abuse + 2)))))
     {
         play_monster_happy_sound(mtmp, MONSTER_HAPPY_SOUND_PURR);
+        boolean tamenessadded = FALSE, becamefaithful = FALSE;
+        if (mtmp->mtame > 0 && mtmp->mtame < 20 && !rn2(10 + mtmp->mtame))
+        {
+            mtmp->mtame++;
+            tamenessadded = TRUE;
+        }
+        if (mtmp->mtame >= 15 && !mtmp->isfaithful && !rn2(max(2, 25 - mtmp->mtame)))
+        {
+            mtmp->isfaithful = 1;
+            becamefaithful = TRUE;
+        }
 
+        const char* adjective = tamenessadded ? "very softly" : "softly";
+        const char* inwhat = becamefaithful ? "admiration" : "appreciation";
         switch (mtmp->data->msound)
         {
         case MS_BARK:
-            Sprintf(pbuf, "%s grunts softly in appreciation!", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s grunts %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         case MS_MEW:
-            Sprintf(pbuf, "%s purrs in appreciation!", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s purrs %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         case MS_NEIGH:
-            Sprintf(pbuf, "%s snorts in appreciation!", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s snorts %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         case MS_BLEAT:
-            Sprintf(pbuf, "%s baas in appreciation!", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s baas %s in %s!", noittame_Monnam(mtmp), adjective, inwhat);
             break;
         default:
-            Sprintf(pbuf, "%s seems to appreciate your gesture!", noittame_Monnam(mtmp));
+            Sprintf(pbuf, "%s seems to %s your gesture%s!", noittame_Monnam(mtmp),
+                becamefaithful ? "admire" : "appreciate", tamenessadded ? " very much" : "");
             break;
         }
 
-        if (mtmp->mtame > 0 && mtmp->mtame < 20 && !rn2(10 + mtmp->mtame))
-            mtmp->mtame++;
-
-        if (mtmp->mtame >= 15 && !mtmp->isfaithful && !rn2(max(2, 25 - mtmp->mtame)))
-            mtmp->isfaithful = 1;
-
-        popup_talk_line_ex(mtmp, pbuf, ATR_NONE, CLR_MSG_POSITIVE, TRUE, FALSE);
+        popup_talk_line_ex(mtmp, pbuf, ATR_NONE, tamenessadded || becamefaithful ? CLR_MSG_POSITIVE : CLR_MSG_SUCCESS, TRUE, FALSE);
     }
     else if(rn2(4) && mon_can_move(mtmp))
         domonnoise(mtmp, FALSE, TRUE);
@@ -6079,7 +6134,7 @@ struct monst* mtmp;
 
     if (!otmp->owornmask 
         && otmp->oclass != COIN_CLASS
-        && ((otmp->speflags & SPEFLAGS_GRABBED_FROM_YOU) ||
+        && ((otmp->speflags & SPEFLAGS_GRABBED_FROM_YOU) || mtmp->isnpc || mtmp->issmith ||
                (otmp->oclass != WEAPON_CLASS /* monsters do not currently sell their weapons */
             && otmp->oclass != ROCK_CLASS /* or giants their boulders */
             && !(is_pick(otmp) && needspick(mtmp->data)) /* or dwarves their picks */
@@ -7076,23 +7131,23 @@ struct monst* mtmp;
         break;
     case 2:
         cost = max(1L, (long)((800 + 80 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_shield_of_reflection_func, "forge a shield of reflection", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "15 nuggets of silver ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_SHIELD_OF_REFLECTION);
+        return general_service_query_with_extra(mtmp, forge_shield_of_reflection_func, "forge a shield of reflection", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of silver ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_SHIELD_OF_REFLECTION);
         break;
     case 3:
         cost = max(1L, (long)((600 + 60 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_crystal_plate_mail_func, "forge a crystal plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "3 dilithium crystals", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_CRYSTAL_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_crystal_plate_mail_func, "forge a crystal plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "2 dilithium crystals", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_CRYSTAL_PLATE_MAIL);
         break;
     case 4:
         cost = max(1L, (long)((600 + 60 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_adamantium_full_plate_mail_func, "forge an adamantium full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of adamantium ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_AN_ADAMANTIUM_FULL_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_adamantium_full_plate_mail_func, "forge an adamantium full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "4 nuggets of adamantium ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_AN_ADAMANTIUM_FULL_PLATE_MAIL);
         break;
     case 5:
         cost = max(1L, (long)((600 + 60 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_mithril_full_plate_mail_func, "forge a mithril full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of mithril ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_MITHRIL_FULL_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_mithril_full_plate_mail_func, "forge a mithril full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "4 nuggets of mithril ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_MITHRIL_FULL_PLATE_MAIL);
         break;
     case 6:
         cost = max(1L, (long)((600 + 60 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_orichalcum_full_plate_mail_func, "forge an orichalcum full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of orichalcum ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_AN_ORICHALCUM_FULL_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_orichalcum_full_plate_mail_func, "forge an orichalcum full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "4 nuggets of orichalcum ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_AN_ORICHALCUM_FULL_PLATE_MAIL);
         break;
     default:
         pline1(Never_mind);
@@ -7167,19 +7222,19 @@ struct monst* mtmp;
     {
     case 1:
         cost = max(1L, (long)((100 + 10 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_plate_mail_func, "forge a plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of iron ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_plate_mail_func, "forge a plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "4 nuggets of iron ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_PLATE_MAIL);
         break;
     case 2:
         cost = max(1L, (long)((50 + 5 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_bronze_plate_mail_func, "forge a bronze plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of copper ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_BRONZE_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_bronze_plate_mail_func, "forge a bronze plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "4 nuggets of copper ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_BRONZE_PLATE_MAIL);
         break;
     case 3:
         cost = max(1L, (long)((200 + 20 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_field_plate_mail_func, "forge a field plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "15 nuggets of iron ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_FIELD_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_field_plate_mail_func, "forge a field plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "6 nuggets of iron ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_FIELD_PLATE_MAIL);
         break;
     case 4:
         cost = max(1L, (long)((400 + 40 * (double)u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA))));
-        return general_service_query_with_extra(mtmp, forge_full_plate_mail_func, "forge a full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "30 nuggets of iron ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_FULL_PLATE_MAIL);
+        return general_service_query_with_extra(mtmp, forge_full_plate_mail_func, "forge a full plate mail", cost, "forging any armor", QUERY_STYLE_COMPONENTS, "8 nuggets of iron ore", SMITH_LINE_WOULD_YOU_LIKE_TO_FORGE_A_FULL_PLATE_MAIL);
         break;
     default:
         pline1(Never_mind);
@@ -7195,6 +7250,117 @@ struct monst* mtmp;
 {
     return do_chat_npc_general_identify(mtmp, "weapon or armor", -1, max(1L, (long)((double)(75 + 5 * u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA)))), SMITH_LINE_WOULD_YOU_LIKE_TO_IDENTIFY_A_WEAPON_OR_ARMOR, SMITH_LINE_WOULD_YOU_LIKE_TO_IDENTIFY_ONE_MORE_WEAPON_OR_ARMOR);
 }
+
+
+STATIC_OVL int
+do_chat_npc_forge_sling_bullets(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp || !mtmp->isnpc || !mtmp->mextra || !ENPC(mtmp))
+        return 0;
+
+    menu_item* pick_list = (menu_item*)0;
+    winid win;
+    anything any;
+
+    any = zeroany;
+    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_GENERAL, get_seen_monster_glyph(mtmp), extended_create_window_info_from_mon(mtmp));
+    start_menu_ex(win, GHMENU_STYLE_CHAT_CHOOSE_ITEM);
+
+
+    any = zeroany;
+    any.a_char = 1;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        "Forge 10 iron sling-bullets", MENU_UNSELECTED);
+
+    any = zeroany;
+    any.a_char = 2;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        "Forge 10 exceptional iron sling-bullets", MENU_UNSELECTED);
+
+    any = zeroany;
+    any.a_char = 3;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        "Forge 10 elite iron sling-bullets", MENU_UNSELECTED);
+
+    any = zeroany;
+    any.a_char = 4;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        "Forge 10 silver sling-bullets", MENU_UNSELECTED);
+
+    any = zeroany;
+    any.a_char = 5;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        "Forge 10 exceptional silver sling-bullets", MENU_UNSELECTED);
+
+    any = zeroany;
+    any.a_char = 6;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        "Forge 10 elite silver sling-bullets", MENU_UNSELECTED);
+
+    /* Finish the menu */
+    end_menu(win, "Which type of armor do you want to forge?");
+
+    int i = 0;
+    /* Now generate the menu */
+    if (select_menu(win, PICK_ONE, &pick_list) > 0)
+    {
+        i = pick_list->item.a_char;
+        free((genericptr_t)pick_list);
+    }
+    destroy_nhwindow(win);
+
+    if (i < 1)
+        return 0;
+
+    long cost = 0;
+
+    switch (i)
+    {
+    case 1:
+        cost = max(1L, (long)((double)(objects[IRON_SLING_BULLET].oc_cost) * 3 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        return general_service_query_with_extra(mtmp, forge_iron_sling_bullets_func, "forge 10 iron sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "2 nuggets of iron ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_IRON_SLING_BULLETS);
+        break;
+    case 2:
+        cost = max(1L, (long)((double)(objects[IRON_SLING_BULLET].oc_cost) * 12 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        return general_service_query_with_extra(mtmp, forge_ex_iron_sling_bullets_func, "forge 10 exceptional iron sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "3 nuggets of iron ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_EXCEPTIONAL_IRON_SLING_BULLETS);
+        break;
+    case 3:
+        cost = max(1L, (long)((double)(objects[IRON_SLING_BULLET].oc_cost) * 48 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        return general_service_query_with_extra(mtmp, forge_el_iron_sling_bullets_func, "forge 10 elite iron sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "4 nuggets of iron ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_ELITE_IRON_SLING_BULLETS);
+        break;
+    case 4:
+        cost = max(1L, (long)((double)(objects[SILVER_SLING_BULLET].oc_cost) * 3 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        return general_service_query_with_extra(mtmp, forge_silver_sling_bullets_func, "forge 10 silver sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "2 nuggets of silver ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_SILVER_SLING_BULLETS);
+        break;
+    case 5:
+        cost = max(1L, (long)((double)(objects[SILVER_SLING_BULLET].oc_cost) * 12 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        return general_service_query_with_extra(mtmp, forge_ex_silver_sling_bullets_func, "forge 10 exceptional silver sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "3 nuggets of silver ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_EXCEPTIONAL_SILVER_SLING_BULLETS);
+        break;
+    case 6:
+        cost = max(1L, (long)((double)(objects[SILVER_SLING_BULLET].oc_cost) * 48 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        return general_service_query_with_extra(mtmp, forge_el_silver_sling_bullets_func, "forge 10 elite silver sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "4 nuggets of silver ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_ELITE_SILVER_SLING_BULLETS);
+        break;
+    default:
+        pline1(Never_mind);
+        break;
+    }
+
+    return 0;
+}
+
 
 STATIC_OVL boolean
 maybe_forgeable_ore(otmp)
@@ -7406,7 +7572,7 @@ int npc_identification_type_index;
     }
     else if (npc_identification_type_index == 2)
     {
-        if (otmp->oclass == RING_CLASS || otmp->oclass == MISCELLANEOUS_CLASS || objects[otmp->otyp].oc_charged > CHARGED_NOT_CHARGED)
+        if (otmp->oclass == AMULET_CLASS || otmp->oclass == RING_CLASS || otmp->oclass == MISCELLANEOUS_CLASS || objects[otmp->otyp].oc_charged > CHARGED_NOT_CHARGED)
             return TRUE;
         else
             return FALSE;
@@ -7541,6 +7707,7 @@ struct monst* mtmp;
             0 };
         
         hermit_talk(mtmp, linearray, GHSOUND_ELVEN_BARD_ELBERETH);
+        u.uevent.elbereth_known = 1;
         break;
     }
     }
@@ -7659,7 +7826,7 @@ struct monst* mtmp;
         bot();
     }
 
-    mtmp->mspec_used = 100;
+    mtmp->mspec_used = 100 / mon_spec_cooldown_divisor(mtmp);
     refresh_m_tile_gui_info(mtmp, TRUE);
     Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "velocity suddenly seems very uncertain!");
     if (rn2(2)) 
@@ -7739,7 +7906,7 @@ struct monst* mtmp;
         bot();
     }
 
-    mtmp->mspec_used = 100;
+    mtmp->mspec_used = 100 / mon_spec_cooldown_divisor(mtmp);
     refresh_m_tile_gui_info(mtmp, TRUE);
 
     Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "position suddenly seems %suncertain!",
@@ -8258,6 +8425,8 @@ long id_cost;
             {
                 play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
                 You_ex1_popup("don't have enough money for that!", "Not Enough Money", ATR_NONE, CLR_MSG_FAIL, NO_GLYPH, POPUP_FLAGS_NONE);
+                if(!itemize && res > 0)
+                    update_inventory();
                 return res;
             }
 
@@ -8267,9 +8436,13 @@ long id_cost;
             bot();
             id_res = identify(otmp);
             res += id_res;
+            if (itemize)
+                update_inventory();
         }
         free((genericptr_t)pick_list);
         mark_synch(); /* Before we loop to pop open another menu */
+        if (!itemize && res > 0)
+            update_inventory();
     }
     return res;
 }
@@ -8469,7 +8642,7 @@ struct monst* mtmp;
     if (!m_speak_check(mtmp))
         return 0;
 
-    (void)quest_chat(mtmp); /* To avoid two consecutive hints */
+    (void)quest_chat(mtmp, TRUE); /* To avoid two consecutive hints */
     return 0;
 }
 
@@ -8501,6 +8674,17 @@ const char* line;
     linearray[0] = line;
     hermit_talk(mtmp, linearray, GHSOUND_NONE);
 }
+
+void
+popup_talk_line_noquotes(mtmp, line)
+struct monst* mtmp;
+const char* line;
+{
+    const char* linearray[2] = { 0, 0 };
+    linearray[0] = line;
+    popup_talk(mtmp, linearray, GHSOUND_NONE, ATR_NONE, NO_COLOR, TRUE, FALSE);
+}
+
 
 void
 popup_talk_line_ex(mtmp, line, attr, color, printtext, addquotes)
@@ -9309,28 +9493,32 @@ struct monst* mtmp;
 {
     const char repair_armor_objects[] = { ALL_CLASSES, ARMOR_CLASS, 0 };
     struct obj* otmp = getobj(repair_armor_objects, "repair", 0, "");
+    char talkbuf[BUFSZ];
 
     if (!otmp)
         return 0;
 
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_LETS_HAVE_A_LOOK);
     if(iflags.using_gui_sounds)
-        pline("%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
     else
-        pline("%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
 
     if (otmp && otmp->oclass != ARMOR_CLASS)
     {
         play_sfx_sound(SFX_REPAIR_ITEM_FAIL);
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_THIS_IS_NOT_AN_ARMOR_I_CAN_REPAIR);
-        verbalize("Sorry, this is not an armor I can repair.");
+        Strcpy(talkbuf, "Sorry, this is not an armor I can repair.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
     else if (otmp && !erosion_matters(otmp))
     {
         play_sfx_sound(SFX_REPAIR_ITEM_FAIL);
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_I_COULDNT_MAKE_THIS_ANY_BETTER_THAN_BEFORE);
-        verbalize("Sorry, I couldn't make this any better than before.");
+        Strcpy(talkbuf, "Sorry, I couldn't make this any better than before.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
 
@@ -9338,18 +9526,21 @@ struct monst* mtmp;
     if (otmp->oeroded || otmp->oeroded2)
     {
         otmp->oeroded = otmp->oeroded2 = 0;
-        pline("%s as good as new!",
+        Sprintf(talkbuf, "%s as good as new!",
             Yobjnam2(otmp, Blind ? "feel" : "look"));
+        pline_ex1_popup(ATR_NONE, NO_COLOR, talkbuf, "Repair Armor", TRUE);
     }
     else
     {
         otmp->oeroded = otmp->oeroded2 = 0;
-        pline("%s as good as new, just like %s before!",
+        Sprintf(talkbuf, "%s as good as new, just like %s before!",
             Yobjnam2(otmp, Blind ? "feel" : "look"), otmp->quan == 1 ? "it was" : "they were");
+        pline_ex1_popup(ATR_NONE, NO_COLOR, talkbuf, "Repair Armor", TRUE);
     }
     update_inventory();
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
-    verbalize("Thank you for using my services.");
+    Strcpy(talkbuf, "Thank you for using my services.");
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
     return 1;
 }
 
@@ -9359,29 +9550,33 @@ struct monst* mtmp;
 {
     const char repair_weapon_objects[] = { ALL_CLASSES, WEAPON_CLASS, 0 };
     struct obj* otmp = getobj(repair_weapon_objects, "repair", 0, "");
+    char talkbuf[BUFSZ];
 
     if (!otmp)
         return 0;
 
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_LETS_HAVE_A_LOOK);
     if (iflags.using_gui_sounds)
-        pline("%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
     else
-        pline("%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
 
     /* Check if the selection is not an appropriate weapon */
     if (otmp && !is_weapon(otmp))
     {
         play_sfx_sound(SFX_REPAIR_ITEM_FAIL);
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_THIS_IS_NOT_A_WEAPON_I_CAN_REPAIR);
-        verbalize("Sorry, this is not a weapon I can repair.");
+        Strcpy(talkbuf, "Sorry, this is not a weapon I can repair.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
     else if (otmp && !erosion_matters(otmp))
     {
         play_sfx_sound(SFX_REPAIR_ITEM_FAIL);
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_I_COULDNT_MAKE_THIS_ANY_BETTER_THAN_BEFORE);
-        verbalize("Sorry, I couldn't make this any better than before.");
+        Strcpy(talkbuf, "Sorry, I couldn't make this any better than before.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
 
@@ -9389,18 +9584,21 @@ struct monst* mtmp;
     if (otmp->oeroded || otmp->oeroded2)
     {
         otmp->oeroded = otmp->oeroded2 = 0;
-        pline("%s as good as new!",
+        Sprintf(talkbuf, "%s as good as new!",
             Yobjnam2(otmp, Blind ? "feel" : "look"));
+        pline_ex1_popup(ATR_NONE, NO_COLOR, talkbuf, "Repair Weapon", TRUE);
     }
     else
     {
         otmp->oeroded = otmp->oeroded2 = 0;
-        pline("%s as good as new, just like %s before!",
+        Sprintf(talkbuf, "%s as good as new, just like %s before!",
             Yobjnam2(otmp, Blind ? "feel" : "look"), otmp->quan == 1 ? "it was" : "they were");
+        pline_ex1_popup(ATR_NONE, NO_COLOR, talkbuf, "Repair Weapon", TRUE);
     }
     update_inventory();
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
-    verbalize("Thank you for using my services.");
+    Strcpy(talkbuf, "Thank you for using my services.");
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
     return 1;
 }
 
@@ -9410,6 +9608,7 @@ struct monst* mtmp;
 {
     const char refill_lantern_objects[] = { ALL_CLASSES, TOOL_CLASS, 0 };
     struct obj* otmp = getobj(refill_lantern_objects, "refill", 0, "");
+    char talkbuf[BUFSZ];
 
     if (!otmp)
         return 0;
@@ -9419,7 +9618,8 @@ struct monst* mtmp;
     {
 //        play_sfx_sound(SFX_REPAIR_ITEM_FAIL);
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_THIS_IS_NOT_AN_ITEM_THAT_I_CAN_FILL_WITH_OIL);
-        verbalize("Sorry, this is not an item that I can fill with oil.");
+        Strcpy(talkbuf, "Sorry, this is not an item that I can fill with oil.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
     else if (otmp && otmp->age > 1500L)
@@ -9430,16 +9630,21 @@ struct monst* mtmp;
             if (otmp->otyp == BRASS_LANTERN)
             {
                 play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_YOUR_LANTERN_IS_ALREADY_FULL);
-                verbalize("Sorry, your lantern is already full.");
+                Strcpy(talkbuf, "Sorry, your lantern is already full.");
+                popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
             }
             else
             {
                 play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_YOUR_LAMP_IS_ALREADY_FULL);
-                verbalize("Sorry, your lamp is already full.");
+                Strcpy(talkbuf, "Sorry, your lamp is already full.");
+                popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
             }
         }
         else
-            verbalize("Sorry, %s %s already full.", yname(otmp), otense(otmp, "are"));
+        {
+            Sprintf(talkbuf, "Sorry, %s %s already full.", yname(otmp), otense(otmp, "are"));
+            popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
+        }
 
         return 0;
     }
@@ -9456,14 +9661,16 @@ struct monst* mtmp;
         otmp->age = 0;
     }
 
-    pline("%s fills %s with oil.", noittame_Monnam(mtmp), yname(otmp));
+    Sprintf(talkbuf, "%s fills %s with oil.", noittame_Monnam(mtmp), yname(otmp));
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
 
-    otmp->age = 1500L;
+    otmp->age = MAX_OIL_IN_LAMP;
     otmp->special_quality = 1;
     update_inventory();
 
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
-    verbalize("Thank you for using my services.");
+    Strcpy(talkbuf, "Thank you for using my services.");
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
     return 1;
 }
 
@@ -9473,6 +9680,7 @@ struct monst* mtmp;
 {
     const char forge_objects[] = { ALL_CLASSES, ARMOR_CLASS, 0 };
     struct obj* otmp = getobj_ex(forge_objects, "forge into a dragon scale mail", 0, "", maybe_dragon_scales);
+    char talkbuf[BUFSZ];
 
     if (!otmp)
         return 0;
@@ -9480,28 +9688,37 @@ struct monst* mtmp;
     if (iflags.using_gui_sounds)
     {
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_LETS_HAVE_A_LOOK);
-        pline("%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
     }
     else
     {
-        pline("%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
     }
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
 
     /* Check if the selection is appropriate */
     if (otmp && !maybe_dragon_scales(otmp))
     {
         //play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
         play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_THIS_IS_NOT_AN_ITEM_THAT_I_CAN_FORGE_INTO_A_DRAGON_SCALE_MAIL);
-        verbalize("Sorry, this is not an item that I can forge into a dragon scale mail.");
+        Strcpy(talkbuf, "Sorry, this is not an item that I can forge into a dragon scale mail.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
 
-    pline("%s starts working on %s.", noittame_Monnam(mtmp), yname(otmp));
+    play_sfx_sound(SFX_NEARBY_LOUD_CLANGING);
+    Sprintf(talkbuf, "%s starts working on %s.", noittame_Monnam(mtmp), yname(otmp));
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
+#ifndef GNH_MOBILE
+    if (iflags.using_gui_sounds)
+        delay_output_milliseconds(2000);
+#endif
 
-    dragon_scales_to_scale_mail(otmp, FALSE);
+    dragon_scales_to_scale_mail(otmp, FALSE, TRUE);
 
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
-    verbalize("Thank you for using my services.");
+    Strcpy(talkbuf, "Thank you for using my services.");
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
     return 1;
 }
 
@@ -9509,71 +9726,114 @@ STATIC_OVL int
 forge_orichalcum_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_ORICHALCUM_ORE, 8, ORICHALCUM_FULL_PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_ORICHALCUM_ORE, 4, ORICHALCUM_FULL_PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_crystal_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, DILITHIUM_CRYSTAL, 3, CRYSTAL_PLATE_MAIL);
+    return forge_special_func(mtmp, DILITHIUM_CRYSTAL, 2, CRYSTAL_PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_shield_of_reflection_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 15, SHIELD_OF_REFLECTION);
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 8, SHIELD_OF_REFLECTION, 0, 0);
 }
 
 STATIC_OVL int
 forge_adamantium_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_ADAMANTIUM_ORE, 8, ADAMANTIUM_FULL_PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_ADAMANTIUM_ORE, 4, ADAMANTIUM_FULL_PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_mithril_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_MITHRIL_ORE, 8, MITHRIL_FULL_PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_MITHRIL_ORE, 4, MITHRIL_FULL_PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 8, PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 4, PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_bronze_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_COPPER_ORE, 8, BRONZE_PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_COPPER_ORE, 4, BRONZE_PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_field_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 15, FIELD_PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 6, FIELD_PLATE_MAIL, 0, 0);
 }
 
 STATIC_OVL int
 forge_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 30, FULL_PLATE_MAIL);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 8, FULL_PLATE_MAIL, 0, 0);
+}
+
+STATIC_OVL int
+forge_iron_sling_bullets_func(mtmp)
+struct monst* mtmp;
+{
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 2, IRON_SLING_BULLET, 10, EXCEPTIONALITY_NORMAL);
+}
+
+STATIC_OVL int
+forge_ex_iron_sling_bullets_func(mtmp)
+struct monst* mtmp;
+{
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 3, IRON_SLING_BULLET, 10, EXCEPTIONALITY_EXCEPTIONAL);
+}
+
+STATIC_OVL int
+forge_el_iron_sling_bullets_func(mtmp)
+struct monst* mtmp;
+{
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 4, IRON_SLING_BULLET, 10, EXCEPTIONALITY_ELITE);
+}
+
+STATIC_OVL int
+forge_silver_sling_bullets_func(mtmp)
+struct monst* mtmp;
+{
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 2, SILVER_SLING_BULLET, 10, EXCEPTIONALITY_NORMAL);
+}
+
+STATIC_OVL int
+forge_ex_silver_sling_bullets_func(mtmp)
+struct monst* mtmp;
+{
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 3, SILVER_SLING_BULLET, 10, EXCEPTIONALITY_EXCEPTIONAL);
+}
+
+STATIC_OVL int
+forge_el_silver_sling_bullets_func(mtmp)
+struct monst* mtmp;
+{
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 4, SILVER_SLING_BULLET, 10, EXCEPTIONALITY_ELITE);
 }
 
 
 STATIC_OVL int
-forge_special_func(mtmp, forge_source_otyp, forge_source_quan, forge_dest_otyp)
+forge_special_func(mtmp, forge_source_otyp, forge_source_quan, forge_dest_otyp, quan, exceptionality)
 struct monst* mtmp;
-int forge_source_otyp, forge_source_quan, forge_dest_otyp;
+int forge_source_otyp, forge_source_quan, forge_dest_otyp, quan, exceptionality;
 {
+    char talkbuf[BUFSZ];
     char forge_objects[3] = { 0, 0, 0 };
     forge_objects[0] = ALL_CLASSES;
     forge_objects[1] = objects[forge_source_otyp].oc_class;
@@ -9590,22 +9850,24 @@ int forge_source_otyp, forge_source_quan, forge_dest_otyp;
 
     if (iflags.using_gui_sounds)
     {
-        play_monster_special_dialogue_line(mtmp, SMITH_LINE_LETS_HAVE_A_LOOK);
-        pline("%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
+        play_monster_special_dialogue_line(mtmp, mtmp->issmith ? SMITH_LINE_LETS_HAVE_A_LOOK : NPC_LINE_LETS_HAVE_A_LOOK);
+        Sprintf(talkbuf, "%s says: \"Let's have a look.\"", noittame_Monnam(mtmp));
         delay_output_milliseconds(750);
     }
     else
     {
-        pline("%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
+        Sprintf(talkbuf, "%s says: \"Let's have a look at %s.\"", noittame_Monnam(mtmp), yname(otmp));
     }
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
 
     int quan_needed = forge_source_quan;
     /* Check if the selection is appropriate */
     if (otmp && !maybe_otyp(otmp))
     {
         //play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-        play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_THIS_IS_NOT_A_COMPONENT_THAT_I_CAN_FORGE_INTO_THE_REQUESTED_ITEM);
-        verbalize("Sorry, this is not an item that I can forge into %s.", an(OBJ_NAME(objects[forge_dest_otyp])));
+        play_monster_special_dialogue_line(mtmp, mtmp->issmith ? SMITH_LINE_LETS_HAVE_A_LOOK : NPC_LINE_SORRY_THIS_IS_NOT_A_COMPONENT_THAT_I_CAN_FORGE_INTO_THE_REQUESTED_ITEM);
+        Sprintf(talkbuf, "Sorry, this is not an item that I can forge into %s.", an(OBJ_NAME(objects[forge_dest_otyp])));
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
 
@@ -9620,20 +9882,25 @@ int forge_source_otyp, forge_source_quan, forge_dest_otyp;
         pseudo.quan = quan_needed;
         if (iflags.using_gui_sounds)
         {
-            play_monster_special_dialogue_line(mtmp, SMITH_LINE_SORRY_YOU_NEED_MORE_COMPONENTS_TO_FORGE_THE_REQUESTED_ITEM);
-            pline("\"Sorry, you need more components to forge the requested item.\" (You need %d %s for %s.) ", quan_needed, cxname(&pseudo), an(OBJ_NAME(objects[forge_dest_otyp])));
+            play_monster_special_dialogue_line(mtmp, mtmp->issmith ? SMITH_LINE_SORRY_YOU_NEED_MORE_COMPONENTS_TO_FORGE_THE_REQUESTED_ITEM : NPC_LINE_SORRY_YOU_NEED_MORE_COMPONENTS_TO_FORGE_THE_REQUESTED_ITEM);
+            Sprintf(talkbuf, "\"Sorry, you need more components to forge the requested item.\" (You need %d %s for %s.) ", quan_needed, cxname(&pseudo), an(OBJ_NAME(objects[forge_dest_otyp])));
+            popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         }
         else
         {
-            verbalize("Sorry, you need %d %s to forge %s.", quan_needed, cxname(&pseudo), an(OBJ_NAME(objects[forge_dest_otyp])));
+            Sprintf(talkbuf, "Sorry, you need %d %s to forge %s.", quan_needed, cxname(&pseudo), an(OBJ_NAME(objects[forge_dest_otyp])));
+            popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         }
         return 0;
     }
 
     play_sfx_sound(SFX_NEARBY_LOUD_CLANGING);
-    pline("%s starts working on %s.", noittame_Monnam(mtmp), yname(otmp));
+    Sprintf(talkbuf, "%s starts working on %s.", noittame_Monnam(mtmp), yname(otmp));
+    popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
+#ifndef GNH_MOBILE
     if (iflags.using_gui_sounds)
         delay_output_milliseconds(2000);
+#endif
 
     if (otmp->quan > quan_needed)
     {
@@ -9649,19 +9916,32 @@ int forge_source_otyp, forge_source_quan, forge_dest_otyp;
     struct obj* craftedobj = mksobj(forge_dest_otyp, FALSE, FALSE, 3);
     if (craftedobj)
     {
-        pline("%s hands %s to you.", noittame_Monnam(mtmp), an(cxname(craftedobj)));
+        if (quan > 0)
+        {
+            craftedobj->quan = quan;
+            craftedobj->owt = weight(craftedobj);
+        }
+        if (exceptionality > 0)
+        {
+            craftedobj->exceptionality = exceptionality;
+        }
+        fully_identify_obj(craftedobj);
+        Sprintf(talkbuf, "%s hands %s to you.", noittame_Monnam(mtmp), an(cxname(craftedobj)));
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         hold_another_object(craftedobj, "Oops!  %s out of your grasp!",
             The(aobjnam(craftedobj, "slip")),
             (const char*)0);
 
         stop_all_immediate_sounds();
         play_sfx_sound(SFX_BUY_FROM_NPC);
-        play_monster_special_dialogue_line(mtmp, SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
-        verbalize("Thank you for using my services.");
+        play_monster_special_dialogue_line(mtmp, mtmp->issmith ? SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES : NPC_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
+        Strcpy(talkbuf, "Thank you for using my services.");
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
     }
     else
     {
-        pline("%s stares blankly for a moment as if something is seriously amiss.", noittame_Monnam(mtmp));
+        Sprintf(talkbuf, "%s stares blankly for a moment as if something is seriously amiss.", noittame_Monnam(mtmp));
+        popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
     }
 
     return 1;
@@ -9697,14 +9977,14 @@ int* spell_otyps;
     if (cnt == 0)
     {
         play_monster_standard_dialogue_line(mtmp, MONSTER_STANDARD_DIALOGUE_CANNOT_TEACH_SPELLS);
-        strcpy(speakbuf, "Unfortunately, I cannot teach any spells at the moment.");
+        Strcpy(speakbuf, "Unfortunately, I cannot teach any spells at the moment.");
         popup_talk_line_ex(mtmp, speakbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 1;
     }
     else if (not_known_cnt == 0)
     {
         play_monster_standard_dialogue_line(mtmp, MONSTER_STANDARD_CANNOT_TEACH_SPELLS_YOU_DONT_KNOW);
-        strcpy(speakbuf, "Unfortunately, I cannot teach any spells you do not already know.");
+        Strcpy(speakbuf, "Unfortunately, I cannot teach any spells you do not already know.");
         popup_talk_line_ex(mtmp, speakbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 1;
     }
@@ -9753,9 +10033,10 @@ int* spell_otyps;
 
     if (spell_count <= 0)
     {
-        play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s doesn't have any spells to teach.", noittame_Monnam(mtmp));
         destroy_nhwindow(win);
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        Sprintf(speakbuf, "%s doesn't have any spells to teach.", noittame_Monnam(mtmp));
+        popup_talk_line_ex(mtmp, speakbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
     }
 

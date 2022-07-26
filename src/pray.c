@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    pray.c    $NHDT-Date: 1549074257 2019/02/02 02:24:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.110 $ */
 /* Copyright (c) Benson I. Margulies, Mike Stephenson, Steve Linhart, 1989. */
@@ -394,11 +394,11 @@ int trouble;
     switch (trouble) {
     case TROUBLE_STONED:
         play_sfx_sound(SFX_CURE_AILMENT);
-        make_stoned(0L, "You feel more limber.", 0, (char *) 0);
+        make_stoned(0L, "You feel more limber.", 0, (char *) 0, 0);
         break;
     case TROUBLE_SLIMED:
         play_sfx_sound(SFX_CURE_AILMENT);
-        make_slimed(0L, "The slime disappears.");
+        make_slimed(0L, "The slime disappears.", 0, (char*)0, 0);
         break;
     case TROUBLE_STRANGLED:
         if (uamul && uamul->otyp == AMULET_OF_STRANGULATION)
@@ -407,7 +407,10 @@ int trouble;
             Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "amulet vanishes!");
             useup(uamul);
         }
-        You_ex(ATR_NONE, CLR_MSG_POSITIVE, "can breathe again.");
+        if(Breathless)
+            You_ex1(ATR_NONE, CLR_MSG_POSITIVE, "are no longer being strangled.");
+        else
+            You_ex1(ATR_NONE, CLR_MSG_POSITIVE, "can breathe again.");
         Strangled = 0;
         context.botl = context.botlx = 1;
         break;
@@ -428,17 +431,17 @@ int trouble;
     case TROUBLE_SICK:
         play_sfx_sound(SFX_CURE_DISEASE);
         You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "better.");
-        make_sick(0L, (char *) 0, FALSE);
+        make_sick(0L, (char *) 0, FALSE, 0);
         break;
     case TROUBLE_FOOD_POISONED:
         play_sfx_sound(SFX_CURE_DISEASE);
         You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "better.");
-        make_food_poisoned(0L, (char*)0, FALSE);
+        make_food_poisoned(0L, (char*)0, FALSE, 0);
         break;
     case TROUBLE_MUMMY_ROT:
         play_sfx_sound(SFX_CURE_DISEASE);
         You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "better.");
-        make_mummy_rotted(0L, (char*)0, FALSE);
+        make_mummy_rotted(0L, (char*)0, FALSE, 0);
         break;
     case TROUBLE_REGION:
         /* stinking cloud, with hero vulnerable to HP loss */
@@ -896,10 +899,10 @@ const char *str;
         str = Something;
     if (u.uswallow) {
         /* barrier between you and the floor */
-        pline("%s %s into %s %s.", str, vtense(str, "drop"),
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s %s into %s %s.", str, vtense(str, "drop"),
               s_suffix(mon_nam(u.ustuck)), mbodypart(u.ustuck, STOMACH));
     } else {
-        pline("%s %s %s your %s!", str,
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s %s %s your %s!", str,
               Blind ? "lands" : vtense(str, "appear"),
               Levitation ? "beneath" : "at", makeplural(body_part(FOOT)));
     }
@@ -911,6 +914,7 @@ gcrownu()
     struct obj *obj, *obj2;
     boolean already_exists, in_hand, in_hand2;
     short class_gift;
+    struct monst* steed_gift = 0;
     int sp_no;
 #define ok_wep(o) ((o) && ((o)->oclass == WEAPON_CLASS || is_weptool(o)))
 
@@ -937,7 +941,7 @@ gcrownu()
     boolean gauntlets_already_exists = exist_artifact(GAUNTLETS_OF_BALANCE, artiname(ART_GAUNTLETS_OF_YIN_AND_YANG));
     boolean monkgauntlets = (Role_if(PM_MONK) && !gauntlets_already_exists);
     boolean usegnollchaoticgift = (Race_if(PM_GNOLL) && !exist_artifact(FLAIL, artiname(ART_HOWLING_FLAIL)));
-    short chaotic_crowning_gift_oartifact = usegnollchaoticgift ? ART_HOWLING_FLAIL : ART_STORMBRINGER;
+    short chaotic_crowning_gift_oartifact = usegnollchaoticgift ? ART_HOWLING_FLAIL : exist_artifact(RUNESWORD, artiname(ART_STORMBRINGER)) ? ART_MOURNBLADE : ART_STORMBRINGER;
     int chaotic_crowning_gift_baseitem = usegnollchaoticgift ? RUNED_FLAIL : RUNESWORD;
     enum p_skills chaotic_crowning_gift_skill = usegnollchaoticgift ? P_FLAIL : P_SWORD;
 
@@ -962,14 +966,14 @@ gcrownu()
         in_hand = (uwep && uwep->oartifact == chaotic_crowning_gift_oartifact);
         in_hand2 = (uarms && uarms->oartifact == chaotic_crowning_gift_oartifact);
         already_exists = exist_artifact(chaotic_crowning_gift_baseitem, artiname(chaotic_crowning_gift_oartifact));
-        if (Role_if(PM_WIZARD) || Role_if(PM_PRIEST))
+        if (Role_if(PM_WIZARD) || Role_if(PM_PRIEST) || Role_if(PM_MONK))
         {
             play_voice_god_simple_line_by_align(u.ualign.type, GOD_LINE_I_CROWN_THEE_THE_GLORY_OF_ARIOCH);
             verbalize_ex(ATR_NONE, CLR_MSG_GOD, "I crown thee... The Glory of Arioch!");
         }
         else
         {
-            boolean takelives = ((already_exists && !in_hand && !in_hand2) || chaotic_crowning_gift_oartifact != ART_STORMBRINGER);
+            boolean takelives = ((already_exists && !in_hand && !in_hand2) || chaotic_crowning_gift_oartifact == ART_HOWLING_FLAIL);
             play_voice_god_simple_line_by_align(u.ualign.type, takelives ? GOD_LINE_THOU_ART_CHOSEN_TO_TAKE_LIVES_FOR_MY_GLORY : GOD_LINE_THOU_ART_CHOSEN_TO_STEAL_SOULS_FOR_MY_GLORY);
             verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Thou art chosen to %s for My Glory!",
                 takelives ? "take lives" : "steal souls");
@@ -1233,6 +1237,12 @@ gcrownu()
                 bless(otmp);
                 (void)add_to_container(obj, otmp);
             }
+            else if (!already_learnt_spell_type(SPE_CREATE_ELDER_DRACOLICH))
+            {
+                otmp = mksobj(SPE_CREATE_ELDER_DRACOLICH, TRUE, FALSE, TRUE);
+                bless(otmp);
+                (void)add_to_container(obj, otmp);
+            }
 
             if (!already_learnt_spell_type(SPE_GREATER_UNDEATH_REPLENISHMENT))
             {
@@ -1431,6 +1441,10 @@ gcrownu()
             {
                 /* acquire Rhongomyniad's skill regardless of weapon or gift */
                 unrestrict_weapon_skill(P_SPEAR);
+
+                /* Summon a ki-rin as a steed, too */
+                steed_gift = summoncreature(STRANGE_OBJECT, PM_KI_RIN, "%s appears in a puff of smoke.", MM_SUMMON_IN_SMOKE_ANIMATION | MM_SADDLED,
+                    SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH);
             }
             break;
         case A_NEUTRAL:
@@ -1478,11 +1492,18 @@ gcrownu()
             unrestrict_weapon_skill(P_SWORD);
             if ((obj && obj->oartifact == ART_VORPAL_BLADE) || (obj2 && obj2->oartifact == ART_VORPAL_BLADE))
                 discover_artifact(ART_VORPAL_BLADE);
+
+            if (Role_if(PM_KNIGHT))
+            {
+                /* Summon a roc as a steed, too */
+                steed_gift = summoncreature(STRANGE_OBJECT, PM_ROC, "%s appears in a puff of smoke.", MM_SUMMON_IN_SMOKE_ANIMATION | MM_SADDLED,
+                    SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH);
+            }
             break;
         case A_CHAOTIC: {
             char swordbuf[BUFSZ];
 
-            if(chaotic_crowning_gift_oartifact == ART_STORMBRINGER)
+            if(chaotic_crowning_gift_oartifact == ART_STORMBRINGER || chaotic_crowning_gift_oartifact == ART_MOURNBLADE)
                 Sprintf(swordbuf, "%s sword", hcolor(NH_BLACK));
             else if (chaotic_crowning_gift_oartifact == ART_HOWLING_FLAIL)
                 Sprintf(swordbuf, "runed flail");
@@ -1515,10 +1536,20 @@ gcrownu()
                 u.ugifts++;
                 obj->aknown = obj->nknown = TRUE;
             }
-            /* acquire Stormbringer's skill regardless of weapon or gift */
+            /* Acquire two-weapon combat for dual-wielding Stormbringer and Mournblade  */
+            if (chaotic_crowning_gift_oartifact == ART_STORMBRINGER || chaotic_crowning_gift_oartifact == ART_MOURNBLADE)
+                unrestrict_weapon_skill(P_TWO_WEAPON_COMBAT);
+            /* acquire weapon skill regardless of weapon or gift */
             unrestrict_weapon_skill(chaotic_crowning_gift_skill);
             if (obj && obj->oartifact == chaotic_crowning_gift_oartifact)
                 discover_artifact(chaotic_crowning_gift_oartifact);
+
+            if (Role_if(PM_KNIGHT))
+            {
+                /* A chaotic knight gets a gorgon as a steed */
+                steed_gift = summoncreature(STRANGE_OBJECT, PM_GORGON, "%s appears in a puff of smoke.", MM_SUMMON_IN_SMOKE_ANIMATION | MM_SADDLED,
+                    SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH);
+            }
             break;
         }
         default:
@@ -1550,7 +1581,7 @@ gcrownu()
         /* acquire skill in this weapon */
         unrestrict_weapon_skill(weapon_skill_type(obj2));
     }
-    else if (class_gift == STRANGE_OBJECT)
+    else if (class_gift == STRANGE_OBJECT && steed_gift == 0)
     {
         /* opportunity knocked, but there was nobody home... */
         You_feel_ex(ATR_NONE, CLR_MSG_MYSTICAL, "unworthy.");
@@ -1560,6 +1591,16 @@ gcrownu()
     /* lastly, confer an extra skill slot/credit beyond the
        up-to-29 you can get from gaining experience levels */
     add_weapon_skill(1);
+
+    if (u.uevent.uhand_of_elbereth > 0)
+    {
+        const char* hofe = hofe_titles[u.uevent.uhand_of_elbereth - 1];
+        if (!strncmpi(hofe, "the ", 4))
+            hofe += 4;
+
+        u.uachieve.crowned = 1;
+        achievement_gained(hofe);
+    }
     return;
 }
 
@@ -2028,7 +2069,7 @@ boolean bless_stuff;
                 if (!bless_stuff)
                 {
                     something_happened = TRUE;
-                    strip_charges(otmp, FALSE);
+                    strip_charges(otmp, FALSE, FALSE);
                 }
                 else if (bless_stuff && otmp->charges < lim)
                 {
@@ -2270,19 +2311,34 @@ dosacrifice()
 
                 if ((pm = dlord(altaralign)) != NON_PM && (dmon = makemon(&mons[pm], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END)) != 0)
                 {
+                    if(context.dlords_summoned_via_altar < 255)
+                        context.dlords_summoned_via_altar++;
                     play_sfx_sound(SFX_SUMMON_DEMON);
                     char dbuf[BUFSZ];
+                    boolean itdreadful = FALSE;
 
                     Strcpy(dbuf, a_monnam(dmon));
                     if (!strcmpi(dbuf, "it"))
+                    {
+                        itdreadful = TRUE;
                         Strcpy(dbuf, "something dreadful");
+                    }
                     else
                         dmon->mstrategy &= ~STRAT_APPEARMSG;
 
                     You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "have summoned %s!", dbuf);
                     if (sgn(u.ualign.type) == sgn(dmon->data->maligntyp))
-                        dmon->mpeaceful = TRUE;
-
+                    {
+                        int rndval = (u.ualign.record >= PIOUS ? 5 : u.ualign.record >= DEVOUT ? 4 : u.ualign.record >= FERVENT ? 3 : u.ualign.record >= STRIDENT ? 2 : u.ualign.record >= 0 ? 1 : 0) + 2 - (int)context.dlords_summoned_via_altar;
+                        if (context.dlords_summoned_via_altar <= 1 || (rndval > 1 && rn2(rndval)) || !rn2(1 + context.dlords_summoned_via_altar * (u.ualign.record < 0 ? 2 : 1)))
+                        {
+                            dmon->mpeaceful = TRUE;
+                            dmon->mon_flags |= MON_FLAGS_SUMMONED_AT_ALTAR;
+                            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Luckily for you, %s appears to be pleased with your sacrifice.", itdreadful ? "that something" : dbuf);
+                        }
+                        else
+                            You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "you have overstayed your welcome with the Lords of the Abyss.");
+                    }
                     if (!Fear_resistance)
                     {
                         You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are terrified, and unable to move.");
@@ -2448,8 +2504,6 @@ dosacrifice()
                 if (flags.showscore && !u.uachieve.ascended)
                     context.botl = 1;
 #endif
-                if (!u.uachieve.ascended)
-                    achievement_gained("Ascended");
                 u.uachieve.ascended = 1;
 
                 play_sfx_sound(SFX_INVISIBLE_CHOIR_SINGS);
@@ -2475,6 +2529,7 @@ dosacrifice()
                       "In return for thy service, I grant thee the gift of Immortality!");
                 You_ex(ATR_NONE, CLR_MSG_POSITIVE, "ascend to the status of Demigod%s...",
                     flags.female ? "dess" : "");
+                achievement_gained("Ascended");
                 done(ASCENDED);
             }
         }
@@ -2860,6 +2915,30 @@ dosacrifice()
     return 1;
 }
 
+void
+removealtarsummons(VOID_ARGS)
+{
+    int cnt = 0;
+    struct monst* mtmp, *mtmp2;
+    for (mtmp = fmon; mtmp; mtmp = mtmp2)
+    {
+        mtmp2 = mtmp->nmon; //Just in case mtmp gets deleted
+        if (DEADMONSTER(mtmp))
+            continue;
+        if (mtmp->mon_flags & MON_FLAGS_SUMMONED_AT_ALTAR)
+        {
+            //Returns to whence it came
+            mongone(mtmp);
+            cnt++;
+        }
+    }
+    if (cnt > 0 && !Deaf)
+    {
+        play_sfx_sound(SFX_DISTANT_PUFF);
+        You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a distant puff.");
+    }
+}
+
 int
 get_artifact_replacement_item_otyp()
 {
@@ -2953,6 +3032,13 @@ dopray()
             char qbuf[BUFSZ];
             Sprintf(qbuf, "Praying too often in succession may anger your %s. Do you still want to pray?", align_gtitle(u.ualign.type));
             if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "Praying Too Often", qbuf) != 'y')
+                return 0;
+        }
+        else if (context.game_difficulty == MIN_DIFFICULTY_LEVEL && Inhell)
+        {
+            char qbuf[BUFSZ];
+            Strcpy(qbuf, "You cannot safely pray in Gehennom. Do you still want to pray?");
+            if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "Praying in Gehennom", qbuf) != 'y')
                 return 0;
         }
         else if (ParanoidPray || context.game_difficulty == MIN_DIFFICULTY_LEVEL)

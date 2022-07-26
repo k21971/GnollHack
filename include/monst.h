@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    monst.h    $NHDT-Date: 1550524559 2019/02/18 21:15:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -211,6 +211,7 @@ struct monst {
 #define MON_FLAGS_RWRAITH           0x00000001
 #define MON_FLAGS_CHAINED           0x00000002
 #define MON_FLAGS_CLONED_WIZ        0x00000004
+#define MON_FLAGS_SUMMONED_AT_ALTAR 0x00000008
 
     unsigned long mstrategy; /* for monsters with mflag3: current strategy */
 

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    topl.c    $NHDT-Date: 1549333449 2019/02/05 02:24:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -366,9 +366,9 @@ extern char erase_char; /* from xxxtty.c; don't need kill_char */
 
 /* returns a single keystroke; also sets 'yn_number' */
 char
-tty_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags)
+tty_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 int style UNUSED, attr UNUSED, color UNUSED, glyph UNUSED;
-const char *title UNUSED, *query, *resp, *resp_desc UNUSED;
+const char *title UNUSED, *query, *resp, *resp_desc UNUSED, *introline UNUSED;
 char def;
 unsigned long ynflags UNUSED;
 /*

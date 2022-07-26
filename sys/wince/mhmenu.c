@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0  mhmenu.c       $NHDT-Date: 1524689398 2018/04/25 20:49:58 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.28 $ */
 /*      Copyright (c) 2009 by Michael Allison              */
@@ -1201,7 +1201,7 @@ onListChar(HWND hWnd, HWND hwndList, WORD ch)
             int selected_item;
 
             reset_menu_count(hwndList, data);
-            mswin_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", buf, (char*)0, (char*)0);
+            mswin_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", buf, (char*)0, (char*)0, (char*)0);
             if (!*buf || *buf == '\033')
                 return -2;
             selected_item = -1;

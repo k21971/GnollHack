@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mthrowu.c    $NHDT-Date: 1542765360 2018/11/21 01:56:00 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.78 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1122,7 +1122,7 @@ struct obj *obj;         /* missile (or stack providing it) */
                 if (!Stoned && !Stone_resistance
                     && !(poly_when_stoned(youmonst.data)
                          && polymon(PM_STONE_GOLEM))) {
-                    make_stoned(5L, (char *) 0, KILLED_BY, "");
+                    make_stoned(5L, (char *) 0, KILLED_BY, "", HINT_KILLED_HIT_BY_COCKATRICE_CORPSE);
                 }
             }
             stop_occupation();
@@ -1326,7 +1326,7 @@ struct attack  *mattk;
                 /* breath runs out sometimes. Also, give monster some
                  * cunning; don't breath if the target fell asleep.
                  */
-                mtmp->mspec_used = 5 + rn2(10);
+                mtmp->mspec_used = (5 + rn2(10)) / mon_spec_cooldown_divisor(mtmp);
 
                 /* If this is a pet, it'll get hungry. Minions and
                  * spell beings won't hunger */
@@ -1928,10 +1928,10 @@ struct attack* mattk;
                  * cunning; don't breath if the player fell asleep.
                  */
                 //if (!rn2(3))
-                mtmp->mspec_used = 5 + rn2(10);
+                mtmp->mspec_used = (5 + rn2(10)) / mon_spec_cooldown_divisor(mtmp);
                 
                 if (typ == AD_SLEE && !Sleep_resistance)
-                    mtmp->mspec_used += rnd(20);
+                    mtmp->mspec_used += rnd(20) / mon_spec_cooldown_divisor(mtmp);
                 
                 if (action_taken)
                     update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);

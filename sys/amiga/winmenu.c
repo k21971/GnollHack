@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	winmenu.c	$NHDT-Date: 1432512796 2015/05/25 00:13:16 $  $NHDT-Branch: master $:$NHDT-Revision: 1.7 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993,1996.
@@ -759,7 +759,7 @@ menu_item **retmip;
                     if (how == PICK_ONE || how == PICK_ANY) {
                         char buf[BUFSZ];
                         amip = cw->menu.items;
-                        amii_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", buf, 0, 0);
+                        amii_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", buf, 0, 0, 0);
                         if (!*buf || *buf == '\033')
                             break;
                         while (amip) {

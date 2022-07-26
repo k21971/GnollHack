@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	winami.c	$NHDT-Date: 1501981093 2017/08/06 00:58:13 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993,1996.
@@ -451,7 +451,7 @@ amii_askname()
     char plnametmp[300]; /* From winreq.c: sizeof(StrStringSIBuff) */
     *plnametmp = 0;
     do {
-        amii_getlin_ex(GETLINE_ASK_NAME, ATR_NONE, NO_COLOR, "Who are you?", plnametmp, 0, 0);
+        amii_getlin_ex(GETLINE_ASK_NAME, ATR_NONE, NO_COLOR, "Who are you?", plnametmp, 0, 0, 0));
     } while (strlen(plnametmp) == 0);
 
     strncpy(plname, plnametmp, PL_NSIZ - 1); /* Avoid overflowing plname[] */

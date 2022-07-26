@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    hacklib.c    $NHDT-Date: 1552639487 2019/03/15 08:44:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.67 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -292,7 +292,7 @@ const char* source;
     for (bp = dest_buffer; *bp; bp++)
     {
         if ((bp == dest_buffer 
-            || (*(bp - 1) == ' ' && 
+            || ((*(bp - 1) == ' ' || *(bp - 1) == '-') &&
                 strncmp(bp, "the ", 4) && strncmp(bp, "an ", 3) && strncmp(bp, "a ", 2) && 
                 strncmp(bp, "of ", 3) && strncmp(bp, "and ", 4) && strncmp(bp, "or ", 3) &&
                 strncmp(bp, "at ", 3) && strncmp(bp, "on ", 3) && strncmp(bp, "in ", 3) && 
@@ -1688,7 +1688,7 @@ const char* str;
     struct special_view_info info = { 0 };
     info.viewtype = SPECIAL_VIEW_DEBUGLOG;
     info.text = str;
-    open_special_view(info);
+    (void)open_special_view(info);
 }
 
 /*hacklib.c*/

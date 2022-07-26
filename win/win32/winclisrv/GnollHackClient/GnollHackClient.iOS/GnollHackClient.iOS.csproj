@@ -92,6 +92,8 @@
     <Compile Include="..\GnollHackClient.FMOD\fmod_studio.cs" />
     <Compile Include="..\GnollHackClient.Common\GnollHackService.cs" />
     <Compile Include="GHEditorRenderer.cs" />
+    <Compile Include="GHGamePageRenderer.cs" />
+    <Compile Include="GHMainPageRenderer.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="AppDelegate.cs" />
     <None Include="Entitlements.plist" />
@@ -111,6 +113,7 @@
     <Compile Include="PlatformService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <BundleResource Include="banks\Auxiliary.bank" />
+    <BundleResource Include="banks\Intro.bank" />
     <BundleResource Include="banks\Master.bank" />
     <BundleResource Include="banks\Master.strings.bank" />
     <ITunesArtwork Include="iTunesArtwork" />

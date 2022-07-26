@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* NetHack 0.1    recover.c    $NHDT-Date: 1550103078 2019/02/14 00:11:18 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.19 $ */
 /*    Copyright (c) Janet Walz, 1992.                  */
@@ -15,6 +15,7 @@
 #endif
 
 #include "config.h"
+#include "lev.h"
 #if !defined(O_WRONLY) && !defined(LSC) && !defined(AZTEC_C)
 #include <fcntl.h>
 #endif
@@ -226,6 +227,7 @@ char *basename;
     xchar levc;
     struct version_info version_data;
     struct savefile_info sfi;
+    struct save_game_stats gamestats;
     char plbuf[PL_NSIZ];
 
     /* level 0 file contains:
@@ -276,16 +278,22 @@ char *basename;
         || (read(gfd, (genericptr_t) &sfi, sizeof sfi) != sizeof sfi)
         || (read(gfd, (genericptr_t) &pltmpsiz, sizeof pltmpsiz)
             != sizeof pltmpsiz) || (pltmpsiz > PL_NSIZ)
-        || (read(gfd, (genericptr_t) plbuf, pltmpsiz) != pltmpsiz)) {
+        || (read(gfd, (genericptr_t) plbuf, pltmpsiz) != pltmpsiz)
+        || (read(gfd, (genericptr_t)&gamestats, sizeof gamestats) != sizeof gamestats)
+        ) {
         Fprintf(stderr, "Error reading %s -- can't recover.\n", lock);
         Close(gfd);
         return -1;
     }
 
+    /* Add number of recoveries by one */
+    gamestats.num_recoveries++;
+
     /* save file should contain:
      *  version info
      *  savefile info
      *  player name
+     *  save game stats
      *  current level (including pets)
      *  (non-level-based) game state
      *  other levels
@@ -338,6 +346,16 @@ char *basename;
     if (write(sfd, (genericptr_t) plbuf, pltmpsiz) != pltmpsiz) {
         Fprintf(stderr, "Error writing %s; recovery failed (player name).\n",
                 savename);
+        Close(gfd);
+        Close(sfd);
+        Close(lfd);
+        return -1;
+    }
+
+    if (write(sfd, (genericptr_t)&gamestats, sizeof gamestats) != sizeof gamestats) {
+        Fprintf(stderr,
+            "Error writing %s; recovery failed (save_game_stats).\n",
+            savename);
         Close(gfd);
         Close(sfd);
         Close(lfd);

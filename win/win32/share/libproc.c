@@ -118,26 +118,90 @@ void lib_player_selection(void)
 
 void lib_askname(void)
 {
+    char* name = 0;
+    char mdbuf[BUFSZ] = "";
+    char modenamebuf[BUFSZ] = "";
+    char modedescbuf[BUFSZ] = "";
+    Sprintf(mdbuf, "%s mode", get_game_mode_text(FALSE));
+    strcpy_capitalized_for_title(modenamebuf, mdbuf);
+    strcpy(modedescbuf, get_game_mode_description());
+    *modedescbuf = highc(*modedescbuf);
+
 #ifdef SELECTSAVED
     if (iflags.wc2_selectsaved && !iflags.renameinprogress)
     {
-        switch (restore_menu(WIN_ERR))
+        do
         {
-        case -1:
-            lib_bail("Until next time then..."); /* quit */
-            /*NOTREACHED*/
-            return;
-        case 0:
-            break; /* no game chosen; start new game */
-        case 1:
-            return; /* plname[] has been set */
-        }
+            boolean repeataskname = FALSE;
+            int menures = restore_menu(WIN_ERR);
+            switch (menures)
+            {
+            case -1:
+                lib_bail((char*)0); // "Until next time then..."); /* quit */
+                /*NOTREACHED*/
+                return;
+            case 2:
+            case 0: /* no game chosen; start new game */
+                do
+                {
+                    repeataskname = FALSE;
+                    name = lib_callbacks.callback_askname(modenamebuf, modedescbuf);
+                    if (name && *name != 0)
+                    {
+                        strncpy(plname, name, PL_NSIZ - 1);
+                        plname[PL_NSIZ - 1] = '\0';
+                        if (check_saved_game_exists())
+                        {
+                            char qbuf[BUFSZ] = "";
+                            Sprintf(qbuf, "There is already a saved game for a character named \'%s\'. Do you want to overwrite the save file and delete the existing character?", plname);
+                            char ans = lib_yn_function_ex(YN_STYLE_GENERAL, ATR_NONE, CLR_RED, NO_GLYPH, "Overwrite Existing Character?",
+                                qbuf, "ynql", 'n', "Yes\nNo\nQuit\nLoad", (const char*)0, 0UL);
+                            if (ans == 'l')
+                            {
+                                return;
+                            }
+                            else if (ans == 'y')
+                            {
+                                set_savefile_name(TRUE);
+                                delete_savefile();
+                                return;
+                            }
+                            else
+                            {
+                                name = 0;
+                                *plname = 0;
+                                if (ans == 'n')
+                                    repeataskname = TRUE;
+                            }
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        if (menures == 2)
+                            lib_bail((char*)0); // Cannot return to restore_menu, so terminate the program; otherwise the game will repeat askname until a name is given, which is not the intention
+                    }
+                } while (repeataskname);
+                break;
+            case 1:
+                return; /* plname[] has been set */
+            }
+        } while (name == 0 || *name == 0);
+        return;
     }
 #endif /* SELECTSAVED */
 
-    char* name = lib_callbacks.callback_askname();
-    strncpy(plname, name, PL_NSIZ - 1);
-    plname[PL_NSIZ - 1] = '\0';
+    name = lib_callbacks.callback_askname(modenamebuf, modedescbuf);
+    if (name == 0 || *name == 0)
+        lib_bail((char*)0); /* quit */
+    else
+    {
+        strncpy(plname, name, PL_NSIZ - 1);
+        plname[PL_NSIZ - 1] = '\0';
+    }
 }
 
 void lib_get_nh_event(void)
@@ -164,7 +228,8 @@ winid lib_create_nhwindow_ex(int type, int style, int glyph, struct extended_cre
 {
     struct objclassdata ocdata = get_objclassdata(info.object);
     return lib_callbacks.callback_create_nhwindow_ex(type, style, glyph,
-        (info.object ? 1 : 0) | (info.monster ? 2 : 0) | (Hallucination ? 4 : 0) | (info.create_flags & WINDOW_CREATE_FLAGS_ACTIVE ? 8 : 0), 
+        (info.object ? 1 : 0) | (info.monster ? 2 : 0) | (Hallucination ? 4 : 0) | (info.create_flags & WINDOW_CREATE_FLAGS_ACTIVE ? 8 : 0)
+        | (info.create_flags & WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS ? 16 : 0),
         info.object, &ocdata);
 }
 
@@ -467,7 +532,7 @@ void lib_issue_gui_command(int initid)
 
     switch (initid)
     {
-    case GUI_CMD_PETS:
+    case GUI_CMD_CLEAR_PET_DATA:
     {
         struct monst_info mi = { 0 };
         struct monst* mtmp;
@@ -527,32 +592,38 @@ int lib_doprev_message(void)
     return 0;
 }
 
-char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char* question, const char* choices, CHAR_P def, const char* resp_desc, unsigned long ynflags)
+char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char* question, const char* choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
 {
-    char buf[BUFSIZ] = "", tbuf[BUFSIZ] = "";
+    char buf[BUFSIZ] = "", tbuf[BUFSIZ] = "", ibuf[BUFSIZ] = "";
     if(question)
         write_text2buf_utf8(buf, BUFSIZ, question);
     if (title)
         write_text2buf_utf8(tbuf, BUFSIZ, title);
+    if (introline)
+        write_text2buf_utf8(ibuf, BUFSIZ, introline);
     char defs[2] = { 0,0 };
     defs[0] = def;
-    int res = lib_callbacks.callback_yn_function_ex(style, attr, color, glyph, title ? tbuf : 0, question ? buf : 0, choices, defs, resp_desc, ynflags);
+    int res = lib_callbacks.callback_yn_function_ex(style, attr, color, glyph, title ? tbuf : 0, question ? buf : 0, choices, defs, resp_desc, introline ? ibuf : 0, ynflags);
     return convert_gnhch(res);
 }
 
-void lib_getlin_ex(int style, int attr, int color, const char* question, char* input, const char* placeholder, const char* linesuffix)
+void lib_getlin_ex(int style, int attr, int color, const char* question, char* input, const char* placeholder, const char* linesuffix, const char* introline)
 {
     char buf[BUFSIZ] = "";
     char phbuf[BUFSIZ] = "";
     char dvbuf[BUFSIZ] = "";
+    char ibuf[BUFSIZ] = "";
+
     if (question)
         write_text2buf_utf8(buf, BUFSIZ, question);
     if (placeholder)
         write_text2buf_utf8(phbuf, BUFSIZ, placeholder);
     if (linesuffix)
         write_text2buf_utf8(dvbuf, BUFSIZ, linesuffix);
+    if (introline)
+        write_text2buf_utf8(ibuf, BUFSIZ, introline);
 
-    char* res = lib_callbacks.callback_getlin_ex(style, attr, color, question ? buf : 0, placeholder ? phbuf : 0, linesuffix ? dvbuf : 0);
+    char* res = lib_callbacks.callback_getlin_ex(style, attr, color, buf, placeholder ? phbuf : 0, linesuffix ? dvbuf : 0, introline ? ibuf : 0);
     if (res && input)
     {
         char msgbuf[BUFSZ] = "";
@@ -564,7 +635,7 @@ void lib_getlin_ex(int style, int attr, int color, const char* question, char* i
 
 int lib_get_ext_cmd(void)
 {
-    char* res = lib_callbacks.callback_getlin_ex(GETLINE_EXTENDED_COMMAND, ATR_NONE, NO_COLOR, "Type an Extended Command", 0, 0);
+    char* res = lib_callbacks.callback_getlin_ex(GETLINE_EXTENDED_COMMAND, ATR_NONE, NO_COLOR, "Type an Extended Command", 0, 0, 0);
     if (!res)
         return -1;
 
@@ -1044,14 +1115,15 @@ void lib_set_animation_timer_interval(unsigned int param)
     return;
 }
 
-void lib_open_special_view(struct special_view_info info)
+int lib_open_special_view(struct special_view_info info)
 {
-    char buf[BUFSIZ];
+    char buf[BUFSIZ], buf2[BUFSIZ];
     if (info.text)
         write_text2buf_utf8(buf, BUFSIZ, info.text);
+    if (info.title)
+        write_text2buf_utf8(buf2, BUFSIZ, info.title);
 
-    lib_callbacks.callback_open_special_view(info.viewtype, info.text ? buf : 0, info.param1, info.param2);
-    return;
+    return lib_callbacks.callback_open_special_view(info.viewtype, info.text ? buf : 0, info.title ? buf2 : 0, info.attr, info.color);
 }
 
 void lib_stop_all_sounds(struct stop_all_info info)
@@ -1279,6 +1351,8 @@ lib_ui_has_input(VOID_ARGS)
 /* Helper functions */
 void lib_bail(const char* mesg)
 {
+    clearlocks();
+    lib_exit_nhwindows(mesg);
     gnollhack_exit(EXIT_SUCCESS);
 }
 

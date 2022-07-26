@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    o_init.c    $NHDT-Date: 1545383615 2018/12/21 09:13:35 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -249,7 +249,7 @@ NEARDATA struct mythic_definition mythic_suffix_qualities[MAX_MYTHIC_SUFFIXES] =
 
 NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_SUFFIX_POWERS] =
 {
-    { "Lightness", "Weighs one-third of normal", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
+    { "Lightness", "Weighs one-eight of normal", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Sorcery", "Incurs no spellcasting penalty", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Troll slaying", "Triple damage to trolls", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_TROLL, 0UL , MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Troll revival prevention", "Prevents revival of trolls", MYTHIC_POWER_TYPE_PREVENTS_REVIVAL, 0L, 0.0, S_TROLL, 0UL , MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
@@ -265,7 +265,7 @@ NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_SUFFIX_P
     { "Undead destruction", "Triple damage to undead", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_UNDEAD, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
     { "Speed", "Increases speed to very fast", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, VERY_FAST, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Wounding", "Causes permanent damage equal to 1d4 + enchantment", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
-    { "Defense", "Enchantment provides AC and MC", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
+    { "Defense", "Enchantment and quality provide AC and MC", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Sharpness", "Has 15% chance of dealing damage equal to 15% of max HP", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Reach", "Has extended range", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Luck", "Confers luck", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
@@ -522,17 +522,15 @@ int *lo_p, *hi_p; /* output: range that item belongs among */
             *lo_p = CLOAK_OF_PROTECTION, *hi_p = CLOAK_OF_DISPLACEMENT;
         else if (otyp >= SPEED_BOOTS && otyp <= LEVITATION_BOOTS)
             *lo_p = SPEED_BOOTS, *hi_p = LEVITATION_BOOTS;
-        else if (otyp >= ROBE && otyp <= ROBE_OF_STARRY_WISDOM)
-            * lo_p = ROBE, * hi_p = ROBE_OF_STARRY_WISDOM;
+        else if (otyp >= MEDIEVAL_ROBE && otyp <= ROBE_OF_STARRY_WISDOM)
+            * lo_p = MEDIEVAL_ROBE, * hi_p = ROBE_OF_STARRY_WISDOM;
         else if (otyp >= LEATHER_BRACERS && otyp <= BRACERS_AGAINST_MAGIC_MISSILES)
             * lo_p = LEATHER_BRACERS, * hi_p = BRACERS_AGAINST_MAGIC_MISSILES;
         else if (otyp >= SHIRT_OF_UNCONTROLLABLE_LAUGHTER && otyp <= T_SHIRT)
             * lo_p = SHIRT_OF_UNCONTROLLABLE_LAUGHTER, * hi_p = T_SHIRT;
         break;
     case WEAPON_CLASS:
-        if (otyp >= SWORD_OF_UNHOLY_DESECRATION && otyp <= NINE_LIVES_STEALER)
-            *lo_p = SWORD_OF_UNHOLY_DESECRATION, * hi_p = NINE_LIVES_STEALER;
-        else if (otyp >= STAFF_OF_THE_MAGI && otyp <= STAFF_OF_WITHERING)
+        if (otyp >= STAFF_OF_THE_MAGI && otyp <= STAFF_OF_WITHERING)
             *lo_p = STAFF_OF_THE_MAGI, * hi_p = STAFF_OF_WITHERING;
         break;
     case TOOL_CLASS:
@@ -626,7 +624,7 @@ shuffle_all()
         TALLOW_CANDLE, OIL_LAMP, TIN_WHISTLE, WOODEN_FLUTE, TOOLED_HORN, WOODEN_HARP, LEATHER_DRUM, JAR_OF_EXTRA_HEALING_SALVE
     };
     static short shuffle_types_with_material[] = {
-         WAN_LIGHT, ROBE, LEATHER_BRACERS, NOSE_RING_OF_BULL_STRENGTH, IOUN_STONE_OF_PROTECTION, 
+         WAN_LIGHT, MEDIEVAL_ROBE, LEATHER_BRACERS, NOSE_RING_OF_BULL_STRENGTH, IOUN_STONE_OF_PROTECTION,
          LENSES, GOGGLES_OF_NIGHT, LEATHER_BELT, ROYAL_CROWN, CORNUTHAUM, CHAMPIGNON, 
          RIN_ADORNMENT
     };
@@ -752,8 +750,8 @@ boolean credit_hero;
         }
         /* moves==1L => initial inventory, gameover => final disclosure */
         if (moves > 1L && !program_state.gameover) {
-            if (objects[oindx].oc_class == GEM_CLASS)
-                gem_learned(oindx); /* could affect price of unpaid gems */
+            //if (objects[oindx].oc_class == GEM_CLASS)
+            gem_learned(oindx); /* could affect price of unpaid gems -- actually of any items in shop --JG */
             update_inventory();
         }
     }
@@ -783,8 +781,8 @@ register int oindx;
         else
             impossible("named object not in disco");
 
-        if (objects[oindx].oc_class == GEM_CLASS)
-            gem_learned(oindx); /* ok, it's actually been unlearned */
+        //if (objects[oindx].oc_class == GEM_CLASS)
+        gem_learned(oindx); /* ok, it's actually been unlearned  -- actually of any items in shop --JG */
         update_inventory();
     }
 }
@@ -1116,7 +1114,7 @@ rename_disco()
             odummy.quan = 1L;
             odummy.known = !objects[dis].oc_uses_known;
             odummy.dknown = 1;
-            docall(&odummy);
+            docall(&odummy, (char*)0);
         }
     }
     destroy_nhwindow(tmpwin);
@@ -1358,4 +1356,32 @@ struct monst* mattacker UNUSED;
 
     return multiplier;
 }
+
+int
+get_obj_exceptionality_ac_bonus(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return 0;
+
+    if (obj->exceptionality > 0 && (is_armor(obj) || (objects[obj->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)))
+    {
+        if (obj->exceptionality > EXCEPTIONALITY_ELITE)
+            return 3;
+        else
+            return obj->exceptionality;
+    }
+    return 0;
+}
+
+int
+get_obj_exceptionality_mc_bonus(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return 0;
+
+    return get_obj_exceptionality_ac_bonus(obj) / 3;
+}
+
 /*o_init.c*/

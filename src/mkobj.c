@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mkobj.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.142 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -224,7 +224,7 @@ unsigned long mkflags;
 
     struct obj *otmp;
 
-    otmp = mkobj_with_flags(let, artif, FALSE, mkflags);
+    otmp = mkobj_with_flags(let, artif, FALSE, (struct monst*)0, mkflags);
     if (otmp)
     {
         place_object(otmp, x, y);
@@ -304,21 +304,19 @@ char oclass;
 boolean artif;
 int mkobj_type;
 {
-    return mkobj_with_flags(oclass, artif, mkobj_type, 0UL);
+    return mkobj_with_flags(oclass, artif, mkobj_type, (struct monst*)0, 0UL);
 }
 
 struct obj *
-mkobj_with_flags(oclass, artif, mkobj_type, mkflags)
+mkobj_with_flags(oclass, artif, mkobj_type, mowner, mkflags)
 char oclass;
 boolean artif;
 int mkobj_type;
+struct monst* mowner;
 unsigned long mkflags;
 {
     int tprob;
     int i = 0;
-    unsigned long rndflags = 0UL;
-    if (mkflags & MKOBJ_FLAGS_ALSO_RARE)
-        rndflags |= RNDITEM_FLAGS_ALSO_RARE;
 
     for (int try_ct = 0; try_ct < 20; try_ct++)
     {
@@ -333,7 +331,7 @@ unsigned long mkflags;
             oclass = iprobs->iclass;
         }
 
-        i = random_objectid_from_class(oclass, rndflags);
+        i = random_objectid_from_class(oclass, mowner, mkflags);
 
         if (mkobj_type == 1 && (objects[i].oc_flags2 & O2_CONTAINER)) /* No containers in containers */
             continue;
@@ -346,21 +344,20 @@ unsigned long mkflags;
 }
 
 int
-random_objectid_from_class(oclass, rndflags)
+random_objectid_from_class(oclass, mowner, rndflags)
 char oclass;
+struct monst* mowner;
 unsigned long rndflags;
 {
     int i = 0;
-    boolean also_rare = !!(rndflags & RNDITEM_FLAGS_ALSO_RARE);
-    xchar leveldif = level_difficulty();
+    boolean also_rare = !!(rndflags & MKOBJ_FLAGS_ALSO_RARE);
+    int leveldif = level_difficulty();
 
-    int randomizationclass = rn2(4);
+    if (oclass == SPBOOK_CLASS && !(rndflags & MKOBJ_FLAGS_NORMAL_SPELLBOOK))
+        return random_spellbook_objectid(mowner, rndflags);
 
     for (int tryct = 0; tryct < 50; tryct++)
     {
-        boolean unacceptable = FALSE;
-        boolean breakforloop = TRUE;
-
         int prob = rnd(1000);
         i = bases[(int)oclass];
         while ((prob -= objects[i].oc_prob) > 0)
@@ -390,82 +387,128 @@ unsigned long rndflags;
             continue; /* new try */
         }
 
-        /* Special code generating more relevant spellbooks */
-        if (oclass == SPBOOK_CLASS && randomizationclass < 3)
+        if (oclass == GEM_CLASS && In_hell(&u.uz) && tryct < 25)
         {
-            switch (randomizationclass)
+            /* Kludge to adjust Gehennom gem probabilities */
+            if (i < LUCKSTONE)
             {
-            case 0: /* Disregard spell books of too low and high level, stat, and school */
-                if (P_SKILL_LEVEL(objects[i].oc_skill) < P_BASIC)
-                    unacceptable = TRUE;
-                /* FALLTHRU */
-            case 1: /* Disregard spell books of too low and high level and stat */
-                if ((Role_if(PM_WIZARD) && !(objects[i].oc_spell_attribute == A_INT
-                    || objects[i].oc_spell_attribute == A_MAX_INT_WIS
-                    || objects[i].oc_spell_attribute == A_MAX_INT_CHA
-                    || objects[i].oc_spell_attribute == A_MAX_INT_WIS_CHA
-                    || objects[i].oc_spell_attribute == A_AVG_INT_WIS
-                    || objects[i].oc_spell_attribute == A_AVG_INT_CHA
-                    || objects[i].oc_spell_attribute == A_AVG_INT_WIS_CHA
-                    ))
-                    || (Role_if(PM_PRIEST) && !(objects[i].oc_spell_attribute == A_WIS
-                        || objects[i].oc_spell_attribute == A_MAX_INT_WIS
-                        || objects[i].oc_spell_attribute == A_MAX_WIS_CHA
-                        || objects[i].oc_spell_attribute == A_MAX_INT_WIS_CHA
-                        || objects[i].oc_spell_attribute == A_AVG_INT_WIS
-                        || objects[i].oc_spell_attribute == A_AVG_WIS_CHA
-                        || objects[i].oc_spell_attribute == A_AVG_INT_WIS_CHA
-                        ))
-                    )
-                    unacceptable = TRUE;
-                /* FALLTHRU */
-            case 2: /* Disregard spell books of too low and high level */
-                if (objects[i].oc_spell_level > max(3, (u.ulevel + 1) / 2 + 2)        /* Level 1 ->  3, Level 5 ->  5, Level 11 ->  8, Level 19 -> 12*/
-                    || objects[i].oc_spell_level < min(6, (u.ulevel + 1) / 2 - 4) /* Level 1 -> -3, Level 5 -> -1, Level 11 ->  2, Level 19 -> 6 */
-                    )
-                    unacceptable = TRUE;
-                break;
-            default:
-                break;
+                int skip_prob = 99 - (int)objects[i].oc_cost / 5;
+                if (rn2(100) < skip_prob)
+                    continue;
             }
-
-
-            if (!unacceptable)
+            else if (i > CLAY_PEBBLE)
             {
-                boolean alreadyknown = FALSE;
-
-                for (int j = 0; i < MAXSPELL && spellid(j) != NO_SPELL; j++)
-                {
-                    if (spellid(j) == i)
-                    {
-                        alreadyknown = TRUE;
-                        break;
-                    }
-                }
-
-                if (alreadyknown)
-                {
-                    switch (rn2(3))
-                    {
-                    case 0: /* pick another item from the same randomization class */
-                        breakforloop = FALSE;
-                        break;
-                    case 1: /* pick another item from new randomized randomization class */
-                        randomizationclass = rn2(4);
-                        breakforloop = FALSE;
-                        break;
-                    case 2: /* we make a spellbook for a spell that the player already knows */
-                        breakforloop = TRUE;
-                        break;
-                    }
-                }
+                int skip_prob = 100 - (int)objects[i].oc_cost / 2; //At 200 gold, no chance of being skipped
+                if (rn2(100) < skip_prob)
+                    continue;
+            }
+            else
+            {
+                if (rn2(2)) // Balance out skipping probabilities so that non-skipped sections do not become overly prevalent
+                    continue;
             }
         }
-        if (breakforloop)
-            break; /* stop the for loop and make the item */
     }
 
     return i;
+}
+
+int
+random_spellbook_objectid(mowner, rndflags)
+struct monst* mowner;
+unsigned long rndflags;
+{
+    int leveldif = level_difficulty();
+    int used_dif = mowner ? mowner->m_lev : leveldif;
+    int max_spell_level = max(0, min(12, (used_dif - 1) / 2 + 3));
+    int min_spell_level = max(-1, min(6, used_dif / 5 - 2));
+
+    int nonrestrschools = 0;
+    int school_id;
+    for (school_id = P_FIRST_SPELL; school_id <= P_LAST_SPELL; school_id++)
+    {
+        if (!P_RESTRICTED(school_id))
+            nonrestrschools++;;
+    }
+
+    unsigned long knownspellschools = mowner ? mon_known_spell_schools(mowner) : 0UL;
+    if (!nonrestrschools || (!mowner && !rn2(2)))
+        knownspellschools = 0xFFFFFFFFUL;
+
+    boolean flex_first_school = rn2(2);
+    uchar acceptable[MAXSPELL] = { 0 };
+    int round;
+    int cnt = 0;
+    for (round = 0; round < 5; round++)
+    {
+        size_t siz = sizeof acceptable;
+        memset(&acceptable, 0, siz);
+        cnt = 0;
+        int i;
+        for (i = FIRST_SPELL; i < FIRST_SPELL + MAXSPELL; i++)
+        {
+            boolean mon_knows_spell_school = is_known_spell_school(knownspellschools, objects[i].oc_skill);
+            if ((objects[i].oc_spell_level >= min_spell_level || round >= 3)
+                && (objects[i].oc_spell_level <= max_spell_level || round >= (flex_first_school ? 2 : 1))
+                && (!P_RESTRICTED(objects[i].oc_skill) || mon_knows_spell_school || round >= (flex_first_school ? 1 : 2)))
+            {
+                boolean alreadyknown = FALSE;
+                if (round < 4)
+                {
+                    alreadyknown = already_learnt_spell_type(i);
+                }
+
+                if (!alreadyknown)
+                {
+                    acceptable[i - FIRST_SPELL] = P_RESTRICTED(objects[i].oc_skill) ? 1 : 3;
+                    cnt++;
+                }
+            }
+        }
+        if (cnt < 5 && rn2(6 - cnt)) //If very few choices, maybe go to the next round
+            continue;
+
+        if (cnt > 0)
+            break;
+    }
+
+    int id;
+    if (cnt == 0)
+        goto random_spellbook_here;
+    else if (cnt == 1)
+    {
+        for (id = 0; id < MAXSPELL; id++)
+        {
+            if (acceptable[id])
+                return FIRST_SPELL + id;
+        }
+        goto random_spellbook_here;
+    }
+
+    int totalprob = 0;
+    for (id = 0; id < MAXSPELL; id++)
+    {
+        if (acceptable[id])
+            totalprob += (int)objects[FIRST_SPELL + id].oc_prob * (int)acceptable[id];
+    }
+
+    if (totalprob == 0)
+        goto random_spellbook_here;
+
+    int roll = rn2(totalprob);
+    for (id = 0; id < MAXSPELL; id++)
+    {
+        if (acceptable[id])
+        {
+            int obj_id = FIRST_SPELL + id;
+            roll -= (int)objects[obj_id].oc_prob * (int)acceptable[id];
+            if(roll < 0)
+                return obj_id;
+        }
+    }
+
+random_spellbook_here:
+    return random_objectid_from_class(SPBOOK_CLASS, mowner, rndflags | MKOBJ_FLAGS_NORMAL_SPELLBOOK);
 }
 
 STATIC_OVL void
@@ -501,7 +544,7 @@ struct obj *box;
         n = 3;
         break;
     case SARCOPHAGUS:
-        n = 7;
+        n = 4;
         break;
     case SACK:
     case OILSKIN_SACK:
@@ -573,8 +616,8 @@ struct obj *box;
         }
         else if (box->otyp == SARCOPHAGUS || box->otyp == COFFIN)
         {
-            char item_classes[5] = { COIN_CLASS, GEM_CLASS, MISCELLANEOUS_CLASS, AMULET_CLASS, RING_CLASS };
-            otmp = mkobj(item_classes[rn2(5)], TRUE, TRUE);
+            char item_classes[6] = { COIN_CLASS, GEM_CLASS, MISCELLANEOUS_CLASS, AMULET_CLASS, RING_CLASS, WEAPON_CLASS };
+            otmp = mkobj(item_classes[rn2(6)], TRUE, TRUE);
             if (otmp->oclass == COIN_CLASS)
             {
                 /* 2.5 x level's usual amount; weight adjusted below */
@@ -1116,14 +1159,14 @@ struct obj* obj;
 void
 clear_memoryobjs()
 {
-    struct obj* obj, *contained_obj;
+    struct obj* obj; // , * contained_obj;
     while ((obj = memoryobjs) != 0) {
         obj_extract_self(obj);
-        while ((contained_obj = obj->cobj) != 0) {
-            obj_extract_self(contained_obj);
-            dealloc_obj(contained_obj);
-        }
-        dealloc_obj(obj);
+        //while ((contained_obj = obj->cobj) != 0) {
+        //    obj_extract_self(contained_obj);
+        //    obfree(contained_obj, (struct obj*)0);
+        //}
+        obfree(obj, (struct obj*)0);
     }
 
 }
@@ -1142,15 +1185,15 @@ int x, y;
         level.locations[x][y].hero_memory_layers.o_id = 0;
 
         /* Clear actual memory objects */
-        struct obj* obj, * contained_obj;
+        struct obj* obj; // , * contained_obj;
         while ((obj = level.locations[x][y].hero_memory_layers.memory_objchn) != 0)
         {
             obj_extract_self(obj);
-            while ((contained_obj = obj->cobj) != 0) {
-                obj_extract_self(contained_obj);
-                dealloc_obj(contained_obj);
-            }
-            dealloc_obj(obj);
+            //while ((contained_obj = obj->cobj) != 0) {
+            //    obj_extract_self(contained_obj);
+            //    dealloc_obj(contained_obj);
+            //}
+            obfree(obj, (struct obj*)0);
         }
     }
 }
@@ -1297,6 +1340,7 @@ unsigned long mkflags;
     int mndx, tryct;
     struct obj *otmp;
     char let = objects[otyp].oc_class;
+    boolean forcemythic = (mkflags & MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY) != 0;
 
     otmp = newobj();
     *otmp = zeroobj;
@@ -1327,6 +1371,7 @@ unsigned long mkflags;
     otmp->mythic_suffix = 0;
     otmp->cooldownleft = 0;
     otmp->repowerleft = 0;
+    otmp->invokeleft = 0;
     otmp->blessed = 0;
     otmp->lamplit = 0;
     otmp->makingsound = 0;
@@ -1518,8 +1563,7 @@ unsigned long mkflags;
             case TALLOW_CANDLE:
             case WAX_CANDLE:
                 otmp->special_quality = 1;
-                otmp->age = 30L * /* 600 or 300 */
-                            objects[otmp->otyp].oc_cost;
+                otmp->age = candle_starting_burn_time(otmp);
                 otmp->lamplit = 0;
                 otmp->quan = 1L + (long) (rn2(2) ? rn2(7) : 0);
                 blessorcurse(otmp, 5);
@@ -1529,7 +1573,7 @@ unsigned long mkflags;
                 otmp->lamplit = 0;
                 if (otmp->special_quality > 0)
                 {
-                    otmp->age = CANDELABRUM_STARTING_AGE;
+                    otmp->age = candlelabrum_starting_burn_time(otmp);
                 }
                 else
                 {
@@ -1540,7 +1584,7 @@ unsigned long mkflags;
             case BRASS_LANTERN:
             case OIL_LAMP:
                 otmp->special_quality = 1;
-                otmp->age = (long) rn1(500, 1000);
+                otmp->age = lamp_starting_burn_time(otmp);
                 otmp->lamplit = 0;
                 blessorcurse(otmp, 5);
                 break;
@@ -1723,9 +1767,7 @@ unsigned long mkflags;
             break;
         case POTION_CLASS: /* note: potions get some additional init below */
         case SCROLL_CLASS:
-#ifdef MAIL
             if (otmp->otyp != SCR_MAIL)
-#endif
                 blessorcurse(otmp, 4);
             break;
         case SPBOOK_CLASS:
@@ -1935,7 +1977,7 @@ unsigned long mkflags;
     }
 
     /* Mythic quality */
-    if (can_obj_have_mythic(otmp) && level_difficulty() >= 3 && mkobj_type < 2 && otmp->oartifact == 0)
+    if (can_obj_have_mythic(otmp) && (forcemythic || (level_difficulty() >= 3 && mkobj_type < 2)) && otmp->oartifact == 0)
     {
         boolean doublechance = !!(objects[otmp->otyp].oc_flags4 & O4_DOUBLE_MYTHIC_CHANCE);
         boolean makemythic = FALSE;
@@ -1950,7 +1992,7 @@ unsigned long mkflags;
         else
             makemythic = otmp->exceptionality ? !rn2(doublechance ? 6 : 12) : !rn2(doublechance ? 12 : 24);
 
-        if (makemythic)
+        if (makemythic || forcemythic)
         {
             randomize_mythic_quality(otmp, FALSE, &otmp->mythic_prefix, &otmp->mythic_suffix);
         }
@@ -1980,7 +2022,7 @@ unsigned long mkflags;
         set_corpsenm(otmp, otmp->corpsenm);
         break;
     case POT_OIL:
-        otmp->age = MAX_OIL_IN_FLASK; /* amount of oil */
+        otmp->age = potion_starting_burn_time(otmp); /* amount of oil */
         /*FALLTHRU*/
     case POT_WATER: /* POTION_CLASS */
         otmp->speflags &= ~(SPEFLAGS_FROM_SINK); /* overloads corpsenm, which was set to NON_PM */
@@ -2286,7 +2328,7 @@ const char* recharge_texts[MAX_RECHARGING_TYPES] =
     "rechargeable as special magical tool",
     "rechargeable as camera",
     "rechargeable as an artifact bell",
-    "rechargeable up to five times",
+    "rechargeable up to nine times",
     "not rechargeable",
     "not rechargeable",
     "rechargeable up to seven times",
@@ -2294,6 +2336,7 @@ const char* recharge_texts[MAX_RECHARGING_TYPES] =
     "rechargeable up to five times",
     "rechargeable to fill up the jar",
     "rechargeable as a magic cube",
+    "rechargeable up to seven times",
 };
 
 const char *
@@ -2940,7 +2983,7 @@ register struct obj *otmp;
         old_volume = obj_ambient_sound_volume(otmp);
     already_cursed = otmp->cursed;
     otmp->blessed = 0;
-    if((objects[otmp->otyp].oc_flags & O1_NOT_CURSEABLE) || has_obj_mythic_uncurseable(otmp))
+    if(is_obj_uncurseable(otmp))
         otmp->cursed = 0;
     else
         otmp->cursed = 1;
@@ -3045,7 +3088,7 @@ register struct obj *obj;
     int wt = (int) objects[obj->otyp].oc_weight;
 
     if (has_obj_mythic_lightness(obj))
-        wt /= 3;
+        wt /= 8;
 
     /* glob absorpsion means that merging globs accumulates weight while
        quantity stays 1, so update 'wt' to reflect that, unless owt is 0,
@@ -3696,6 +3739,10 @@ struct monst *mtmp;
             }
             otmp->owornmask = 0L; /* obfree() expects this */
         }
+
+        if (otmp->oartifact)
+            artifact_taken_away(otmp->oartifact);
+
         obfree(otmp, (struct obj *) 0); /* dealloc_obj() isn't sufficient */
     }
 }
@@ -4644,7 +4691,8 @@ struct obj **obj1, **obj2;
             otmp1->quan = 1L;
             obj_extract_self(otmp2);
             newsym(otmp2->ox, otmp2->oy); /* in case of floor */
-            dealloc_obj(otmp2);
+            obfree(otmp2, (struct obj*)0);
+            //dealloc_obj(otmp2);
             *obj2 = (struct obj *) 0;
             return otmp1;
         }

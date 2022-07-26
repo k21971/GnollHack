@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    steed.c    $NHDT-Date: 1545441042 2018/12/22 01:10:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.62 $ */
 /* Copyright (c) Kevin Hugo, 1998-1999. */
@@ -61,7 +61,7 @@ struct obj *otmp;
     }
     if (!u.dx && !u.dy) {
         play_sfx_sound(SFX_GENERAL_THATS_SILLY);
-        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Saddle yourself?  Very funny...");
+        pline_ex(ATR_NONE, NO_COLOR, "Saddle yourself?  Very funny...");
         return 0;
     }
 
@@ -87,6 +87,7 @@ struct obj *otmp;
         You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "touch %s.", mon_nam(mtmp));
         if (!(poly_when_stoned(youmonst.data) && polymon(PM_STONE_GOLEM))) {
             Sprintf(kbuf, "attempting to saddle %s", an(mon_monster_name(mtmp)));
+            killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
             instapetrify(kbuf);
         }
     }
@@ -345,6 +346,7 @@ struct monst *mtmp; /* The animal */
 
         You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "touch %s.", mon_nam(mtmp));
         Sprintf(kbuf, "attempting to ride %s", an(mon_monster_name(mtmp)));
+        killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
         instapetrify(kbuf);
     }
     if (!is_tame(mtmp) || mtmp->isminion)

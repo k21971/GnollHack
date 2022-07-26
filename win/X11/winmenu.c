@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	winmenu.c	$NHDT-Date: 1542245161 2018/11/15 01:26:01 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.33 $ */
 /* Copyright (c) Dean Luick, 1992				  */
@@ -478,7 +478,7 @@ struct xwindow *wp;
     buf[0] = buf[1] = '\0';
     pat = &buf[1]; /* leave room to maybe insert '*' at front */
     if (menu_info->how != PICK_NONE) {
-        X11_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", pat);
+        X11_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", pat, 0, 0, 0);
         if (!*pat || *pat == '\033')
             return;
         /* convert "string" into "*string*" for use with pmatch() */

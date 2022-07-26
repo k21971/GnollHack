@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    vault.c    $NHDT-Date: 1549921171 2019/02/11 21:39:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.62 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -181,7 +181,7 @@ struct monst *grd;
 
     if (!dispose) {
         /* destroy guard's gold; drop any other inventory */
-        relobj(grd, 0, FALSE, TRUE);
+        release_monster_objects(grd, 0, FALSE, TRUE);
         grd->mhp = 0;
         parkguard(grd);
         dispose = clear_fcorr(grd, TRUE);
@@ -462,7 +462,7 @@ invault()
                 play_monster_special_dialogue_line(guard, VAULT_GUARD_LINE_HELLO_STRANGER_WHO_ARE_YOU);
 
             getlin_ex(GETLINE_QUESTION, ATR_NONE, NO_COLOR, Deaf ? "You are required to supply your name."
-                        : "\"Hello stranger, who are you?\"", buf, (char*)0, " -");
+                        : "\"Hello stranger, who are you?\"", buf, (char*)0, " -", (char*)0);
             (void) mungspaces(buf);
         } while (!buf[0] && --trycount > 0);
 

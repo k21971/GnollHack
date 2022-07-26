@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    read.c    $NHDT-Date: 1546465285 2019/01/02 21:41:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,6 +22,7 @@ static const char all_count[] = { ALLOW_COUNT, ALL_CLASSES, 0 };
 STATIC_DCL boolean FDECL(learnscrolltyp, (SHORT_P));
 STATIC_DCL char *FDECL(erode_obj_text, (struct obj *, char *));
 STATIC_DCL char *FDECL(apron_text, (struct obj *, char *buf));
+STATIC_DCL void FDECL(enchant_ring, (struct obj*, int, BOOLEAN_P));
 STATIC_DCL void FDECL(forget_single_object, (int));
 #if 0 /* not used */
 STATIC_DCL void FDECL(forget_objclass, (int));
@@ -194,7 +195,7 @@ doread()
     if (scroll->oclass == SPBOOK_CLASS && scroll->cooldownleft > 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot read %s before its cooldown has expired.", the(cxname(scroll)));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot read %s before its cooldown has expired.", the(cxname(scroll)));
         return 0;
     }
 
@@ -398,13 +399,13 @@ doread()
         if (what) 
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Being blind, you cannot read the %s.", what);
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Being blind, you cannot read the %s.", what);
             return 0;
         }
     }
 
     confused = (Confusion != 0);
-#ifdef MAIL
+
     if (scroll->otyp == SCR_MAIL) 
     {
         confused = FALSE; /* override */
@@ -423,7 +424,6 @@ doread()
                 return 0;
         }
     }
-#endif
 
     /* Actions required to win the game aren't counted towards conduct */
     /* Novel conduct is handled in read_tribute so exclude it too*/
@@ -486,7 +486,7 @@ doread()
             if (known)
                 learnscroll(scroll);
             else if (!objects[scroll->otyp].oc_uname)
-                docall(scroll);
+                docall(scroll, (char*)0);
         }
         scroll->in_use = FALSE;
         if (scroll->otyp != SCR_BLANK_PAPER && scroll->otyp != SCR_IDENTIFY)
@@ -542,9 +542,9 @@ struct obj* otmp;
 }
 
 void
-strip_charges(obj, verbose)
+strip_charges(obj, verbose, dopopup)
 register struct obj *obj;
-boolean verbose;
+boolean verbose, dopopup;
 {
     if (obj->blessed || obj->charges <= 0)
     {
@@ -552,7 +552,7 @@ boolean verbose;
         {
             if(obj->charges <= 0)
                 play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-            pline1(nothing_happens);
+            pline_ex1_popup(ATR_NONE, NO_COLOR, nothing_happens, "No Effect", dopopup);
         }
     } 
     else 
@@ -560,8 +560,10 @@ boolean verbose;
         /* order matters: message, shop handling, actual transformation */
         if (verbose)
         {
+            char effbuf[BUFSZ];
             play_sfx_sound(SFX_STRIP_CHARGES);
-            pline("%s briefly.", Yobjnam2(obj, "vibrate"));
+            Sprintf(effbuf, "%s briefly.", Yobjnam2(obj, "vibrate"));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_WARNING, effbuf, "Vibration", dopopup);
         }
         costly_alteration(obj, COST_UNCHRG);
         obj->charges = 0;
@@ -571,23 +573,31 @@ boolean verbose;
 }
 
 void
-p_glow1(otmp, pline_attr, pline_color)
+p_glow1(otmp, pline_attr, pline_color, title, dopopup)
 register struct obj *otmp;
 register int pline_attr, pline_color;
+const char* title;
+boolean dopopup;
 {
+    char effbuf[BUFSZ];
     play_sfx_sound(SFX_AURA_GLOW);
-    pline_ex(pline_attr, pline_color, "%s briefly.", Yobjnam2(otmp, Blind ? "vibrate" : "glow"));
+    Sprintf(effbuf, "%s briefly.", Yobjnam2(otmp, Blind ? "vibrate" : "glow"));
+    pline_ex1_popup(pline_attr, pline_color, effbuf, title ? title : Blind ? "Brief Vibration" : "Magical Glow", dopopup);
 }
 
 void
-p_glow2(otmp, color, pline_attr, pline_color)
+p_glow2(otmp, color, pline_attr, pline_color, title, dopopup)
 register struct obj *otmp;
 register const char *color;
 register int pline_attr, pline_color;
+const char* title;
+boolean dopopup;
 {
+    char effbuf[BUFSZ];
     play_sfx_sound(SFX_AURA_GLOW);
-    pline_ex(pline_attr, pline_color, "%s%s%s for a moment.", Yobjnam2(otmp, Blind ? "vibrate" : "glow"),
+    Sprintf(effbuf, "%s%s%s for a moment.", Yobjnam2(otmp, Blind ? "vibrate" : "glow"),
           Blind ? "" : " ", Blind ? "" : hcolor(color));
+    pline_ex1_popup(pline_attr, pline_color, effbuf, title ? title : Blind ? "Magical Vibration" : "Magical Glow", dopopup);
 }
 
 /* Is the object chargeable?  For purposes of inventory display; it is
@@ -618,10 +628,11 @@ struct obj *obj;
 /* recharge an object; curse_bless is -1 if the recharging implement
    was cursed, +1 if blessed, 0 otherwise. */
 void
-recharge(obj, curse_bless, verbose)
+recharge(obj, curse_bless, verbose, title, dopopup)
 struct obj *obj;
 int curse_bless;
-boolean verbose;
+const char* title;
+boolean verbose, dopopup;
 {
     if (!obj)
         return;
@@ -629,6 +640,7 @@ boolean verbose;
     register int n;
     boolean is_cursed, is_blessed;
     boolean play_effect = FALSE;
+    char effbuf[BUFSZ] = "";
 
     is_cursed = curse_bless < 0;
     is_blessed = curse_bless > 0;
@@ -645,7 +657,7 @@ boolean verbose;
 
         if (is_cursed)
         {
-            strip_charges(obj, verbose);
+            strip_charges(obj, verbose, dopopup);
             update_inventory();
         }
         else if (obj->charges >= lim)
@@ -665,7 +677,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -677,7 +689,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -723,7 +735,7 @@ boolean verbose;
         /* now handle the actual recharging */
         if (is_cursed) 
         {
-            strip_charges(obj, verbose);
+            strip_charges(obj, verbose, dopopup);
         } 
         else 
         {
@@ -749,9 +761,9 @@ boolean verbose;
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
 
                 if (obj->charges >= lim)
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                 else
-                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
 
                 play_effect = TRUE;
             }
@@ -781,7 +793,7 @@ boolean verbose;
         {
         case RECHARGING_BELL_OF_OPENING:
             if (is_cursed)
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             else if (is_blessed)
             {
                 if (verbose)
@@ -807,7 +819,7 @@ boolean verbose;
         case RECHARGING_CAMERA:
         {
             if (is_cursed)
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             else if (rechrg
                 && obj->otyp
                 == MAGIC_MARKER) { /* previously recharged */
@@ -815,9 +827,15 @@ boolean verbose;
                 if (verbose)
                 {
                     if (obj->charges < 3)
-                        Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "marker seems permanently dried out.");
+                    {
+                        Strcpy(effbuf, "Your marker seems permanently dried out.");
+                        pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "Dried Out", dopopup);
+                    }
                     else
-                        pline1(nothing_happens);
+                    {
+                        Strcpy(effbuf, nothing_happens);
+                        pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "No Effect", dopopup);
+                    }
                 }
             }
             else if (is_blessed)
@@ -839,7 +857,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -859,7 +877,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_WHITE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_WHITE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -870,7 +888,7 @@ boolean verbose;
         case OIL_LAMP:
         case BRASS_LANTERN:
             if (is_cursed) {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
                 if (obj->lamplit) {
                     if (!Blind)
                         pline("%s out!", Tobjnam(obj, "go"));
@@ -881,7 +899,7 @@ boolean verbose;
                 obj->special_quality = 1;
                 obj->age = 1500;
                 if (verbose)
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
             }
             else {
                 obj->special_quality = 1;
@@ -889,7 +907,7 @@ boolean verbose;
                 if (obj->age > 1500)
                     obj->age = 1500;
                 if (verbose)
-                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
             }
             break;
 #endif
@@ -897,7 +915,7 @@ boolean verbose;
         {
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             }
             else if (is_blessed)
             {
@@ -905,7 +923,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -917,7 +935,7 @@ boolean verbose;
                     if (verbose)
                     {
                         play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                        p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                        p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                         play_effect = TRUE;
                     }
                 }
@@ -930,7 +948,7 @@ boolean verbose;
         {
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             }
             else if (is_blessed)
             {
@@ -943,7 +961,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -955,7 +973,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -967,7 +985,7 @@ boolean verbose;
             const char* contents = (OBJ_CONTENT_DESC(obj->otyp) != 0 ? OBJ_CONTENT_DESC(obj->otyp) : "unknown contents"); // (objects[obj->otyp].oc_name_known&& OBJ_CONTENT_NAME(obj->otyp) != 0 ? OBJ_CONTENT_NAME(obj->otyp) : OBJ_CONTENT_DESC(obj->otyp) != 0 ? OBJ_CONTENT_DESC(obj->otyp) : "unknown contents");
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             }
             else if (is_blessed)
             {
@@ -978,7 +996,8 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s%s with %s.", Tobjnam(obj, "fill"), obj->charges >= lim ? " up" : "", contents);
+                    Sprintf(effbuf, "%s%s with %s.", Tobjnam(obj, "fill"), obj->charges >= lim ? " up" : "", contents);
+                    pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, "Recharging", dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -991,7 +1010,8 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                    pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s%s with %s.", Tobjnam(obj, "fill"), obj->charges >= lim ? " up" : "", contents);
+                    Sprintf(effbuf, "%s%s with %s.", Tobjnam(obj, "fill"), obj->charges >= lim ? " up" : "", contents);
+                    pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, "Recharging", dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -1001,7 +1021,7 @@ boolean verbose;
         {
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             }
             else if (is_blessed)
             {
@@ -1011,7 +1031,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -1023,7 +1043,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -1034,7 +1054,7 @@ boolean verbose;
         {
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             }
             else if (is_blessed)
             {
@@ -1044,7 +1064,7 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
@@ -1056,29 +1076,25 @@ boolean verbose;
                 if (verbose)
                 {
                     play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                    p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                     play_effect = TRUE;
                 }
             }
             break;
         }
+        case RECHARGING_RING_OF_CONFLICT:
+        case RECHARGING_WAND_OF_ORCUS:
+        case RECHARGING_HOWLING_FLAIL:
         case RECHARGING_NINE_LIVES_STEALER:
-            if (is_cursed) 
+        {
+            int rechargelim = rtype == RECHARGING_NINE_LIVES_STEALER ? 9 : 7;
+            if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
             }
-            else if (obj->recharged >= 5 || !rn2(max(2, 6 - obj->recharged)))
+            else if (obj->recharged >= rechargelim)
             {
-                const char* expltext = !obj->charges ? "suddenly" : "vibrates violently and";
-                int dmg = d(3, 9);
-                obj->in_use = TRUE; /* in case losehp() is fatal (or --More--^C) */
-                if (verbose)
-                {
-                    play_sfx_sound(SFX_EXPLOSION_MAGICAL);
-                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s explodes!", Yname2(obj), expltext);
-                }
-                losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_NONE), "exploding sword", KILLED_BY_AN);
-                useup(obj);
+                goto not_chargable;
             }
             else if (obj->charges < lim)
             {
@@ -1088,7 +1104,7 @@ boolean verbose;
                     if (verbose)
                     {
                         play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                        p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
+                        p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                         play_effect = TRUE;
                     }
                 }
@@ -1100,7 +1116,7 @@ boolean verbose;
                     if (verbose)
                     {
                         play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                        p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
+                        p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
                         play_effect = TRUE;
                     }
                 }
@@ -1110,12 +1126,13 @@ boolean verbose;
                 goto not_chargable;
             }
             break;
+        }
         case RECHARGING_RING_OF_THREE_WISHES:
         case RECHARGING_LUCK_BLADE:
             /* Unchargeable */
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
                 break;
             }
             else
@@ -1123,54 +1140,6 @@ boolean verbose;
                 goto not_chargable;
             }
             break;
-        case RECHARGING_RING_OF_CONFLICT:
-        case RECHARGING_WAND_OF_ORCUS:
-        {
-            if (is_cursed)
-            {
-                strip_charges(obj, verbose);
-                break;
-            }
-
-            if (obj->charges > lim)
-            {
-                if(verbose)
-                    play_sfx_sound(SFX_CHARGES_AT_MAXIMUM);
-                obj->charges = lim;
-                break;
-            }
-            else if (obj->charges < lim)
-            {
-                if (is_blessed)
-                {
-                    obj->charges = lim;
-                    if (verbose)
-                    {
-                        play_sfx_sound(SFX_BLESSED_RECHARGE_SUCCESS);
-                        p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE);
-                        play_effect = TRUE;
-                    }
-                }
-                else if (obj->charges < lim)
-                {
-                    obj->charges += 2 + rnd(4);
-                    if (obj->charges > lim)
-                        obj->charges = lim;
-                    if (verbose)
-                    {
-                        play_sfx_sound(SFX_RECHARGE_SUCCESS);
-                        p_glow1(obj, ATR_NONE, CLR_MSG_POSITIVE);
-                        play_effect = TRUE;
-                    }
-                }
-            }
-            else
-            {
-                goto not_chargable;
-            }
-
-            break;
-        }
         case RECHARGING_HOLY_GRAIL:
         {
             const char* contents = (objects[obj->otyp].oc_name_known && OBJ_CONTENT_NAME(obj->otyp) != 0 ? OBJ_CONTENT_NAME(obj->otyp) : OBJ_CONTENT_DESC(obj->otyp) != 0 ? OBJ_CONTENT_DESC(obj->otyp) : "unknown contents");
@@ -1182,7 +1151,7 @@ boolean verbose;
 
             if (is_cursed)
             {
-                strip_charges(obj, verbose);
+                strip_charges(obj, verbose, dopopup);
                 break;
             }
 
@@ -1211,7 +1180,8 @@ boolean verbose;
                     else
                         play_sfx_sound(SFX_RECHARGE_SUCCESS);
 
-                    pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s%s with %s.", Tobjnam(obj, "fill"), obj->charges >= lim ? " up" : "", contents);
+                    Sprintf(effbuf, "%s%s with %s.", Tobjnam(obj, "fill"), obj->charges >= lim ? " up" : "", contents);
+                    pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, "Recharging", dopopup);
                     play_effect = TRUE;
                 }
                 update_inventory();
@@ -1235,7 +1205,8 @@ boolean verbose;
         if (verbose)
         {
             play_sfx_sound(SFX_RECHARGE_FAIL);
-            You("have a feeling of loss.");
+            Strcpy(effbuf, "You have a feeling of loss.");
+            pline_ex1_popup(ATR_NONE, CLR_MSG_WARNING, effbuf, "Feeling of Loss", dopopup);
         }
     }
 
@@ -1250,15 +1221,17 @@ boolean verbose;
     }
 }
 
-void
-enchant_ring(obj, curse_bless)
+STATIC_OVL void
+enchant_ring(obj, curse_bless, dopopup)
 struct obj* obj;
 int curse_bless;
+boolean dopopup;
 {
     boolean is_cursed, is_blessed;
 
     is_cursed = curse_bless < 0;
     is_blessed = curse_bless > 0;
+    char effbuf[BUFSZ] = "";
 
     if (obj && (obj->oclass == RING_CLASS || obj->oclass == MISCELLANEOUS_CLASS) && objects[obj->otyp].oc_enchantable)
     {
@@ -1271,8 +1244,9 @@ int curse_bless;
         if ((obj->enchantment > maxcharge || obj->enchantment < -maxcharge) && rn2(3))
         {
             play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
-            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s momentarily, then %s!", Yobjnam2(obj, "pulsate"),
+            Sprintf(effbuf, "%s momentarily, then %s!", Yobjnam2(obj, "pulsate"),
                 otense(obj, "explode"));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, effbuf, "Explosion", dopopup);
             if (is_on)
                 Ring_gone(obj);
             s = rnd(3 * abs(obj->enchantment)); /* amount of damage */
@@ -1290,8 +1264,9 @@ int curse_bless;
             else
                 play_sfx_sound(SFX_ENCHANT_ITEM_NEGATIVE);
 
-            pline("%s spins %sclockwise for a moment.", Yname2(obj),
+            Sprintf(effbuf, "%s spins %sclockwise for a moment.", Yname2(obj),
                 s < 0 ? "counter" : "");
+            pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "", dopopup);
             if (s < 0)
                 costly_alteration(obj, COST_DECHNT);
             /* cause attributes and/or properties to be updated */
@@ -1309,18 +1284,20 @@ int curse_bless;
             if (obj->enchantment > maxcharge)
             {
                 play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_WARNING);
-                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s unexpectedly.", Yobjnam2(obj, "suddenly vibrate"));
+                Sprintf(effbuf, "%s unexpectedly.", Yobjnam2(obj, "suddenly vibrate"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_WARNING, effbuf, "Vibration", dopopup);
             }
 
             update_all_character_properties(obj, TRUE);
+            update_inventory();
         }
     }
     else
     {
         play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-        You("have a feeling of loss.");
+        Strcpy(effbuf, "You have a feeling of loss.");
+        pline_ex1_popup(ATR_NONE, CLR_MSG_WARNING, effbuf, "Feeling of Loss", dopopup);
     }
-
 }
 
 /* Forget known information about this object type. */
@@ -1544,7 +1521,7 @@ struct monst* origmonst;
 {
     boolean was_tame = is_tame(mtmp);
     boolean was_peaceful = is_peaceful(mtmp);
-    int adj_save = get_saving_throw_adjustment(sobj, origmonst);
+    int adj_save = get_saving_throw_adjustment(sobj, mtmp, origmonst);
 
     if (sobj->cursed) 
     {
@@ -1616,7 +1593,7 @@ struct monst* origmonst;
     boolean was_tame = is_tame(mtmp);
     boolean was_peaceful = is_peaceful(mtmp);
 
-    int save_adj = get_saving_throw_adjustment(sobj, origmonst);
+    int save_adj = get_saving_throw_adjustment(sobj, mtmp, origmonst);
 
     if(is_undead(mtmp->data) || is_vampshifter(mtmp))
     {
@@ -1736,16 +1713,15 @@ boolean *effect_happened_ptr;
 #define COST_none (-1)
     int costchange = COST_none;
     boolean altfmt = FALSE;
-    int duration = d(objects[otyp].oc_spell_dur_dice, objects[otyp].oc_spell_dur_diesize) + objects[otyp].oc_spell_dur_plus;
+    int duration = get_obj_spell_duration(sobj);
     boolean is_serviced_spell = !!(sobj->speflags & SPEFLAGS_SERVICED_SPELL);
-    int save_adj = get_saving_throw_adjustment(sobj, sobj->oclass != SPBOOK_CLASS || is_serviced_spell ? (struct monst*)0 : &youmonst);
     if (objects[otyp].oc_magic)
         exercise(A_WIS, TRUE);                       /* just for trying */
     already_known = (sobj->oclass == SPBOOK_CLASS /* spell */
                      || objects[otyp].oc_name_known);
+    char effbuf[BUFSZ] = "";
 
     switch (otyp) {
-#ifdef MAIL
     case SCR_MAIL:
         known = TRUE;
         if (sobj->special_quality == 2)
@@ -1759,9 +1735,14 @@ boolean *effect_happened_ptr;
             pline(
                 "This seems to be junk mail addressed to the finder of the Eye of Larn.");
         else
+        {
+#ifdef MAIL
             readmail(sobj);
-        break;
+#else
+            pline("This scroll is mail, but it is totally scrambled.");
 #endif
+        }
+        break;
     case SPE_PROTECT_ARMOR:
     case SCR_PROTECT_ARMOR:
     case SPE_ENCHANT_ARMOR:
@@ -1784,9 +1765,10 @@ boolean *effect_happened_ptr;
             if(otmp && otmp->oclass != ARMOR_CLASS)
             {
                 play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, !Blind
+                Sprintf(effbuf, !Blind
                     ? "%s then fades."
                     : "%s warm for a moment.", Yobjnam2(otmp, !Blind ? "glow" : "feel"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, otyp == SPE_ENCHANT_ARMOR ? "Enchant Armor" : "Protect Armor", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 sobj = 0;
                 break;
             }
@@ -1801,7 +1783,7 @@ boolean *effect_happened_ptr;
             special_effect_wait_until_end(0);
             strange_feeling(sobj, !Blind
                 ? "Your skin glows then fades."
-                : "Your skin feels warm for a moment.");
+                : "Your skin feels warm for a moment.", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             sobj = 0; /* useup() in strange_feeling() */
             exercise(A_CON, !scursed);
             exercise(A_STR, !scursed);
@@ -1817,23 +1799,26 @@ boolean *effect_happened_ptr;
             special_effect_wait_until_action(0);
             if (Blind) {
                 otmp->rknown = FALSE;
-                pline("%s warm for a moment.", Yobjnam2(otmp, "feel"));
+                Sprintf(effbuf, "%s warm for a moment.", Yobjnam2(otmp, "feel"));
+                pline_ex1_popup(ATR_NONE, NO_COLOR, effbuf, "Warm Feeling", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             }
             else {
                 otmp->rknown = TRUE;
                 if (!confused && !scursed && otyp == SCR_PROTECT_ARMOR)
                     known = TRUE;
 
-                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s covered by a %s %s %s!", Yobjnam2(otmp, "are"),
+                Sprintf(effbuf, "%s covered by a %s %s %s!", Yobjnam2(otmp, "are"),
                     scursed ? "mottled" : "shimmering",
                     hcolor(scursed ? NH_BLACK : NH_GOLDEN),
                     scursed ? "glow"
                     : (is_shield(otmp) ? "layer" : "shield"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, known || otmp->oclass == SPBOOK_CLASS ? "Protect Armor" : "Magical Effect", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             }
             if (new_erodeproof && (otmp->oeroded || otmp->oeroded2)) {
                 otmp->oeroded = otmp->oeroded2 = 0;
-                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s as good as new!",
+                Sprintf(effbuf, "%s as good as new!",
                     Yobjnam2(otmp, Blind ? "feel" : "look"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, known || otmp->oclass == SPBOOK_CLASS ? "Protect Armor" : "Magical Repair", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             }
             if (old_erodeproof && !new_erodeproof) {
                 /* restore old_erodeproof before shop charges */
@@ -1842,6 +1827,7 @@ boolean *effect_happened_ptr;
             }
             otmp->oerodeproof = new_erodeproof ? 1 : 0;
             special_effect_wait_until_end(0);
+            update_inventory();
             break;
         }
 
@@ -1862,12 +1848,13 @@ boolean *effect_happened_ptr;
         {
             play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
             otmp->in_use = TRUE;
-            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s violently %s%s%s for a while, then %s.", Yname2(otmp),
+            Sprintf(effbuf, "%s violently %s%s%s for a while, then %s.", Yname2(otmp),
                 otense(otmp, Blind ? "vibrate" : "glow"),
                 (!Blind && !same_color) ? " " : "",
                 (Blind || same_color) ? "" : hcolor(scursed ? NH_BLACK
                     : NH_SILVER),
                 otense(otmp, "evaporate"));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, effbuf, "Evaporation", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             remove_worn_item(otmp, FALSE);
             useup(otmp);
             break;
@@ -1880,7 +1867,7 @@ boolean *effect_happened_ptr;
 
         if (s >= 0 && is_dragon_scales(otmp)) 
         {
-            dragon_scales_to_scale_mail(otmp, sblessed);
+            dragon_scales_to_scale_mail(otmp, sblessed, FALSE);
             break;
         }
 
@@ -1897,13 +1884,16 @@ boolean *effect_happened_ptr;
 
         special_effect_wait_until_action(0);
 
-        pline_ex(ATR_NONE, scursed ? CLR_MSG_NEGATIVE : CLR_MSG_POSITIVE, "%s %s%s%s%s for a %s.", Yname2(otmp),
+        Sprintf(effbuf, "%s %s%s%s%s for a %s.", Yname2(otmp),
             s == 0 ? "violently " : "",
             otense(otmp, Blind ? "vibrate" : "glow"),
             (!Blind && !same_color) ? " " : "",
             (Blind || same_color)
             ? "" : hcolor(scursed ? NH_BLACK : NH_SILVER),
             (s * s > 1) ? "while" : "moment");
+        pline_ex1_popup(ATR_NONE, scursed ? CLR_MSG_NEGATIVE : CLR_MSG_POSITIVE, effbuf, 
+            known || otmp->oclass == SPBOOK_CLASS ? "Enchant Armor" : Blind ? "Magical Vibration" : "Magical Glow", 
+            sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
 
         /* [this cost handling will need updating if shop pricing is
            ever changed to care about curse/bless status of armor] */
@@ -1932,12 +1922,13 @@ boolean *effect_happened_ptr;
         if (otmp->enchantment > max_ench)
         {
             play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_WARNING);
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s %s.", Yobjnam2(otmp, "suddenly vibrate"),
+            Sprintf(effbuf, "%s %s.", Yobjnam2(otmp, "suddenly vibrate"),
                 Blind ? "again" : "unexpectedly");
+            pline_ex1_popup(ATR_NONE, CLR_MSG_WARNING, effbuf, "Vibration", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
         }
 
         special_effect_wait_until_end(0);
-
+        update_inventory();
         break;
     }
     case SCR_DESTROY_ARMOR:
@@ -1948,7 +1939,7 @@ boolean *effect_happened_ptr;
             if (!otmp)
             {
                 play_sfx_sound(SFX_HANDS_ITCH);
-                strange_feeling(sobj, "Your bones itch.");
+                strange_feeling(sobj, "Your bones itch.", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 sobj = 0; /* useup() in strange_feeling() */
                 exercise(A_STR, FALSE);
                 exercise(A_CON, FALSE);
@@ -1957,18 +1948,20 @@ boolean *effect_happened_ptr;
             old_erodeproof = (otmp->oerodeproof != 0);
             new_erodeproof = scursed;
             otmp->oerodeproof = 0; /* for messages */
-            p_glow2(otmp, NH_PURPLE, ATR_NONE, CLR_MSG_POSITIVE);
+            p_glow2(otmp, NH_PURPLE, ATR_NONE, CLR_MSG_POSITIVE, (const char*)0, sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             if (old_erodeproof && !new_erodeproof) {
                 /* restore old_erodeproof before shop charges */
                 otmp->oerodeproof = 1;
                 costly_alteration(otmp, COST_DEGRD);
             }
             otmp->oerodeproof = new_erodeproof ? 1 : 0;
+            update_inventory();
             break;
         }
         if (uarmc && uarmc->otyp == CLOAK_OF_INTEGRITY)
         {
-            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s the destructive energies of the scroll.", Yobjnam2(uarmc, "absorb"));
+            Sprintf(effbuf, "%s the destructive energies of the scroll.", Yobjnam2(uarmc, "absorb"));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, "Cloak of Integrity", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             makeknown(uarmc->otyp);
             known = TRUE;
             otmp = uarmc;
@@ -1978,7 +1971,7 @@ boolean *effect_happened_ptr;
         {
             if (!scursed || !otmp || !otmp->cursed) {
                 if (!destroy_arm(otmp)) {
-                    strange_feeling(sobj, "Your skin itches.");
+                    strange_feeling(sobj, "Your skin itches.", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                     sobj = 0; /* useup() in strange_feeling() */
                     exercise(A_STR, FALSE);
                     exercise(A_CON, FALSE);
@@ -2011,7 +2004,7 @@ boolean *effect_happened_ptr;
                 You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "confused.");
             }
             special_effect_wait_until_action(0);
-            make_confused(itimeout_incr(HConfusion, rnd(100)), FALSE);
+            make_confused(itimeout_incr(HConfusion, duration), FALSE);
             special_effect_wait_until_end(0);
         }
         else if (confused) 
@@ -2024,7 +2017,7 @@ boolean *effect_happened_ptr;
                 Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s begin to %s%s.", makeplural(body_part(HAND)),
                     Blind ? "tingle" : "glow ",
                     Blind ? "" : hcolor(NH_PURPLE));
-                make_confused(itimeout_incr(HConfusion, rnd(100)), FALSE);
+                make_confused(itimeout_incr(HConfusion, duration), FALSE);
                 special_effect_wait_until_end(0);
             }
             else 
@@ -2080,6 +2073,8 @@ boolean *effect_happened_ptr;
         {
             if (DEADMONSTER(mtmp))
                 continue;
+
+            int save_adj = get_saving_throw_adjustment(sobj, mtmp, sobj->oclass != SPBOOK_CLASS || is_serviced_spell ? (struct monst*)0 : &youmonst);
             if (resists_fear(mtmp) || check_ability_resistance_success(mtmp, A_WIS, save_adj))
                 continue;
 
@@ -2094,8 +2089,7 @@ boolean *effect_happened_ptr;
                 }
                 else
                 {
-                    duration = d(objects[otyp].oc_spell_dur_dice, objects[otyp].oc_spell_dur_diesize) + objects[otyp].oc_spell_dur_plus;
-                    make_mon_fearful(mtmp, duration ? duration : 100 + rnd(50));
+                    make_mon_fearful(mtmp, duration);
                 }
                 if (!is_tame(mtmp))
                     ct++; /* pets don't laugh at you */
@@ -2182,8 +2176,8 @@ boolean *effect_happened_ptr;
                     }
                 }
 
-                if (sblessed || wornmask || objects[obj->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED
-                    || objects[obj->otyp].oc_flags & O1_BECOMES_CURSED_WHEN_PICKED_UP_AND_DROPPED
+                if (sblessed || wornmask || (objects[obj->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED) != 0
+                    || (objects[obj->otyp].oc_flags & O1_BECOMES_CURSED_WHEN_PICKED_UP_AND_DROPPED) != 0
                     || (obj->otyp == LEASH && obj->leashmon)) 
                 {
                     /* water price varies by curse/bless status */
@@ -2279,9 +2273,10 @@ boolean *effect_happened_ptr;
                 ))
             {
                 play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, !Blind
+                Sprintf(effbuf, !Blind
                     ? "%s then fades."
                     : "%s warm for a moment.", Yobjnam2(otmp, !Blind ? "glow" : "feel"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, otyp == SPE_ENCHANT_WEAPON ? "Enchant Weapon" : "Protect Weapon", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 sobj = 0;
                 break;
             }
@@ -2309,7 +2304,8 @@ boolean *effect_happened_ptr;
             if (!otmp)
             {
                 play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-                Your("%s tingle for a moment.", makeplural(body_part(FINGER)));
+                Sprintf(effbuf, "Your %s tingle for a moment.", makeplural(body_part(FINGER)));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "Tingling", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 sobj = 0;
                 break;
             }
@@ -2332,7 +2328,8 @@ boolean *effect_happened_ptr;
             if (Blind)
             {
                 otmp->rknown = FALSE;
-                Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "weapon feels warm for a moment.");
+                Strcpy(effbuf, "Your weapon feels warm for a moment.");
+                pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "Warm Feeling", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             }
             else 
             {
@@ -2340,17 +2337,19 @@ boolean *effect_happened_ptr;
                 if (!confused && !scursed && otyp == SCR_PROTECT_WEAPON)
                     known = TRUE;
 
-                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s covered by a %s %s %s!", Yobjnam2(otmp, "are"),
+                Sprintf(effbuf, "%s covered by a %s %s %s!", Yobjnam2(otmp, "are"),
                     scursed ? "mottled" : "shimmering",
                     hcolor(scursed ? NH_PURPLE : NH_GOLDEN),
                     scursed ? "glow" : "shield");
+                pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, known || otmp->oclass == SPBOOK_CLASS ? "Protect Weapon" : "Magical Effect", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             }
 
             if (new_erodeproof && (otmp->oeroded || otmp->oeroded2)) 
             {
                 otmp->oeroded = otmp->oeroded2 = 0;
-                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s as good as new!",
+                Sprintf(effbuf, "%s as good as new!",
                     Yobjnam2(otmp, Blind ? "feel" : "look"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, effbuf, known || otmp->oclass == SPBOOK_CLASS ? "Protect Weapon" : "Magical Repair", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             }
 
             if (old_erodeproof && !new_erodeproof)
@@ -2361,7 +2360,7 @@ boolean *effect_happened_ptr;
             }
             otmp->oerodeproof = new_erodeproof ? 1 : 0;
             special_effect_wait_until_end(0);
-
+            update_inventory();
             break;
         }
         
@@ -2369,10 +2368,10 @@ boolean *effect_happened_ptr;
         if (otyp == SPE_PROTECT_WEAPON || otyp == SCR_PROTECT_WEAPON)
         {
             if (otmp)
-                You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "as if your weapon is warmer than normal, but then it passes.");
+                Strcpy(effbuf, "You feel as if your weapon is warmer than normal, but then it passes.");
             else
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "experience a passing feeling of warmth.");
-
+                Strcpy(effbuf, "You experience a passing feeling of warmth.");
+            pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "Warm Feeling", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
             break;
         }
 
@@ -2386,7 +2385,8 @@ boolean *effect_happened_ptr;
         if (!enchant_weapon(sobj, otmp, scursed ? -1
             : !otmp ? 1
             : (otmp->enchantment >= special_threshold) ? !rn2(special_chance)
-            : sblessed ? rnd(2): 1))
+            : sblessed ? rnd(2): 1,
+            sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0))
             sobj = 0; /* nothing enchanted: strange_feeling -> useup */
         
         special_effect_wait_until_end(0);
@@ -2400,7 +2400,7 @@ boolean *effect_happened_ptr;
         }
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
         special_effect_wait_until_action(0);
-        incr_itimeout(&HConflict, d(2, 10) + 140);
+        incr_itimeout(&HConflict, duration);
         refresh_u_tile_gui_info(TRUE);
         special_effect_wait_until_end(0);
         break;
@@ -2517,6 +2517,7 @@ boolean *effect_happened_ptr;
                     {
                         ++candidates;
                         res = 0;
+                        int save_adj = get_saving_throw_adjustment(sobj, mtmp, sobj->oclass != SPBOOK_CLASS || is_serviced_spell ? (struct monst*)0 : &youmonst);
                         if (sleep_monst(mtmp, sobj, &youmonst, duration, save_adj, TELL))
                         {
                             slept_monst(mtmp);
@@ -2572,7 +2573,8 @@ boolean *effect_happened_ptr;
                 {
                     ++candidates;
                     res = 0;
-                    if (!mtmp->mtame && !is_peaceful(mtmp) 
+                    int save_adj = get_saving_throw_adjustment(sobj, mtmp, sobj->oclass != SPBOOK_CLASS || is_serviced_spell ? (struct monst*)0 : &youmonst);
+                    if (!mtmp->mtame && !is_peaceful(mtmp)
                         && !check_ability_resistance_success(&youmonst, A_CON, save_adj))
                     {
                         if (mtmp->m_lev < u.ulevel - 10)
@@ -2841,15 +2843,21 @@ boolean *effect_happened_ptr;
                 }
                 if (func) 
                 {
+                    /* finally, change curse/bless state */
+                    play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
+                    play_sfx_sound(soundid);
+                    special_effect_wait_until_action(0);
+
                     /* give feedback before altering the target object;
                        this used to set obj->bknown even when not seeing
                        the effect; now hero has to see the glow, and bknown
                        is cleared instead of set if perception is distorted */
                     glowcolor = hcolor(glowcolor);
                     if (altfmt)
-                        pline_ex(ATR_NONE, textcolor, "%s with %s aura.", Yobjnam2(otmp, "glow"), an(glowcolor));
+                        Sprintf(effbuf, "%s with %s aura.", Yobjnam2(otmp, "glow"), an(glowcolor));
                     else
-                        pline_ex(ATR_NONE, textcolor, "%s %s.", Yobjnam2(otmp, "glow"), glowcolor);
+                        Sprintf(effbuf, "%s %s.", Yobjnam2(otmp, "glow"), glowcolor);
+                    pline_ex1_popup(ATR_NONE, textcolor, effbuf, otyp == SPE_BLESS ? "Bless" : "Curse", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                     iflags.last_msg = PLNMSG_OBJ_GLOWS;
                     otmp->bknown = !Hallucination;
                     /* potions of water are the only shop goods whose price depends
@@ -2865,10 +2873,6 @@ boolean *effect_happened_ptr;
                                degraded it, now you'll have to buy it... */
                             costly_alteration(otmp, costchange);
                     }
-                    /* finally, change curse/bless state */
-                    play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
-                    play_sfx_sound(soundid);
-                    special_effect_wait_until_action(0);
 
                     (*func)(otmp);
 
@@ -2883,7 +2887,8 @@ boolean *effect_happened_ptr;
                so inventory must be empty (another message has
                already been given above if reading a scroll) */
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("You're not carrying anything to be %s.", (otyp == SPE_BLESS ? "blessed" : "cursed"));
+            Sprintf(effbuf, "You're not carrying anything to be %s.", (otyp == SPE_BLESS ? "blessed" : "cursed"));
+            pline_ex1_popup(ATR_NONE, NO_COLOR, effbuf, "", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
         }
         break;
     case SCR_CHARGING:
@@ -2925,7 +2930,7 @@ boolean *effect_happened_ptr;
         otmp = getobj(all_count, "charge", 0, "");
         if (otmp)
         {
-            recharge(otmp, scursed ? -1 : sblessed ? 1 : 0, TRUE);
+            recharge(otmp, scursed ? -1 : sblessed ? 1 : 0, TRUE, !sobj ? "Scroll of Charging" : "Recharging", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
         }
         break;
     case SCR_ENCHANT_ACCESSORY:
@@ -2943,12 +2948,17 @@ boolean *effect_happened_ptr;
             if (otmp && ((otmp->oclass != RING_CLASS && otmp->oclass != MISCELLANEOUS_CLASS) || objects[otmp->otyp].oc_enchantable == ENCHTYPE_NO_ENCHANTMENT))
             {
                 play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-                if(objects[otmp->otyp].oc_enchantable == ENCHTYPE_NO_ENCHANTMENT)
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "have a feeling of loss.");
+                int effcolor = CLR_MSG_ATTENTION;
+                if (objects[otmp->otyp].oc_enchantable == ENCHTYPE_NO_ENCHANTMENT)
+                {
+                    Strcpy(effbuf, "You have a feeling of loss.");
+                    effcolor = CLR_MSG_WARNING;
+                }
                 else
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, !Blind
+                    Sprintf(effbuf, !Blind
                         ? "%s then fades."
                         : "%s warm for a moment.", Yobjnam2(otmp, !Blind ? "glow" : "feel"));
+                pline_ex1_popup(ATR_NONE, effcolor, effbuf, "Enchant Accessory", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 sobj = 0;
                 break;
             }
@@ -2959,7 +2969,8 @@ boolean *effect_happened_ptr;
             {
                 play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
                 special_effect_wait_until_action(0);
-                Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "head spins.");
+                Strcpy(effbuf, "Your head spins.");
+                pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, effbuf, "Head Spins", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 make_stunned((HStun& TIMEOUT) + rn1(scursed ? 90 : 40, 10), TRUE);;
                 context.botl = context.botlx = 1;
                 special_effect_wait_until_end(0);
@@ -3052,7 +3063,7 @@ boolean *effect_happened_ptr;
             {
                 play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
                 special_effect_wait_until_action(0);
-                enchant_ring(otmp, scursed ? -1 : sblessed ? 1 : 0);
+                enchant_ring(otmp, scursed ? -1 : sblessed ? 1 : 0, sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
                 special_effect_wait_until_end(0);
             }
             else
@@ -3062,7 +3073,10 @@ boolean *effect_happened_ptr;
             }
         }
         else
-            Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s tingle.", makeplural(body_part(FINGER)));
+        {
+            Sprintf(effbuf, "%s tingle.", makeplural(body_part(FINGER)));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "Tingling", sobj ? (sobj->speflags & SPEFLAGS_SERVICED_SPELL) != 0 : 0);
+        }
 
         known = TRUE;
 
@@ -3228,8 +3242,11 @@ boolean *effect_happened_ptr;
             }
         }
 
+        int dmgdice = objects[otyp].oc_spell_dmg_dice;
+        int dmgdiesize = objects[otyp].oc_spell_dmg_diesize;
+        int dmgplus = objects[otyp].oc_spell_dmg_plus;
         if (increased_damage)
-            explode(cc.x, cc.y, 11, &youmonst, 5, 6, 10, otyp, SCROLL_CLASS, EXPL_SCROLL_OF_FIRE);
+            explode(cc.x, cc.y, 11, &youmonst, dmgdice, dmgdiesize, dmgplus, otyp, SCROLL_CLASS, EXPL_SCROLL_OF_FIRE);
         else
             explode(cc.x, cc.y, 11, &youmonst, 1, 2, (4 * sbcsign + 2) / 3, otyp, SCROLL_CLASS, EXPL_SCROLL_OF_FIRE);
 
@@ -3381,8 +3398,12 @@ boolean *effect_happened_ptr;
         u.dx = cc.x - u.ux;
         update_u_facing(TRUE);
         u.dx = 0;
+        int durdice = objects[otyp].oc_spell_dur_dice;
+        int durdiesize = objects[otyp].oc_spell_dur_diesize;
+        int durplus = objects[otyp].oc_spell_dur_plus;
+        int durbucplus = objects[otyp].oc_spell_dur_buc_plus;
         (void) create_gas_cloud(cc.x, cc.y, REGION_POISON_GAS, 3 + bcsign(sobj),
-                                1, 8 + 4 * bcsign(sobj), 5);
+            durdice, durdiesize, durplus + durbucplus * bcsign(sobj));
         break;
     }
     default:
@@ -3787,7 +3808,7 @@ do_class_genocide()
             }
             else
             {
-                getlin_ex(GETLINE_MONSTER_CLASS, ATR_NONE, NO_COLOR, "What class of monsters do you wish to genocide?", buf, (char*)0, (char*)0);
+                getlin_ex(GETLINE_MONSTER_CLASS, ATR_NONE, NO_COLOR, "What class of monsters do you wish to genocide?", buf, (char*)0, (char*)0, (char*)0);
                 (void)mungspaces(buf);
             }
         } 
@@ -3852,7 +3873,7 @@ do_class_genocide()
             {
                 char nam[BUFSZ];
 
-                Strcpy(nam, makeplural(mons[i].mname));
+                Strcpy(nam, pm_plural_name(&mons[i], 1)); // makeplural(mons[i].mname));
                 /* Although "genus" is Latin for race, the hero benefits
                  * from both race and role; thus genocide affects either.
                  */
@@ -3989,7 +4010,7 @@ int how;
                 pline1(thats_enough_tries);
                 return;
             }
-            getlin_ex(GETLINE_GENOCIDE, ATR_NONE, NO_COLOR, "What monster do you want to genocide?", buf, "type the name", (char*)0);
+            getlin_ex(GETLINE_GENOCIDE, ATR_NONE, NO_COLOR, "What monster do you want to genocide?", buf, "type the name", (char*)0, (char*)0);
             (void) mungspaces(buf);
             /* choosing "none" preserves genocideless conduct */
             if (*buf == '\033' || !strcmpi(buf, "none")
@@ -4048,22 +4069,36 @@ int how;
     }
 
     which = "all ";
-    if (Hallucination) 
+    char singularbuf[BUFSZ] = "";
+    char pluralbuf[BUFSZ] = "";
+    if (Hallucination)
     {
         if (Upolyd)
-            Strcpy(buf, youmonst.data->mname);
+        {
+            Strcpy(singularbuf, youmonst.data->mname);
+        }
         else 
         {
-            Strcpy(buf, (flags.female && urole.name.f) ? urole.name.f
+            Strcpy(singularbuf, (flags.female && urole.name.f) ? urole.name.f
                                                        : urole.name.m);
-            buf[0] = lowc(buf[0]);
+            singularbuf[0] = lowc(singularbuf[0]);
         }
+        const char* plr = makeplural(singularbuf);
+        Strcpy(pluralbuf, plr);
     }
     else 
     {
-        Strcpy(buf, ptr->mname); /* make sure we have standard singular */
         if ((ptr->geno & G_UNIQ) && ptr != &mons[PM_HIGH_PRIEST])
+        {
             which = !is_mname_proper_name(ptr) ? "the " : "";
+            Strcpy(singularbuf, ptr->mname); /* make sure we have standard singular */
+            Strcpy(pluralbuf, ptr->mname); /* make sure we have standard singular */
+        }
+        else
+        {
+            Strcpy(singularbuf, pm_common_name(ptr));
+            Strcpy(pluralbuf, pm_plural_name(ptr, 1));
+        }
     }
 
     if (how & REALLY) 
@@ -4072,8 +4107,8 @@ int how;
 
         /* setting no-corpse affects wishing and random tin generation */
         mvitals[mndx].mvflags |= (MV_GENOCIDED | MV_NOCORPSE);
-        pline("Wiped out %s%s.", which,
-              (*which != 'a') ? buf : makeplural(buf));
+        pline("Wiped out %s%s.", which, pluralbuf);
+              //(*which != 'a') ? buf : makeplural(buf));
 
         if (killplayer) 
         {
@@ -4100,7 +4135,7 @@ int how;
             /* KMH -- Unchanging prevents rehumanization */
             if (Upolyd && ptr != youmonst.data) 
             {
-                delayed_killer(POLYMORPH, killer.format, killer.name);
+                delayed_killer(POLYMORPH, killer.format, killer.name, HINT_KILLED_GENOCIDED_PLAYER);
                 You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s inside.", udeadinside());
             } 
             else
@@ -4139,7 +4174,7 @@ int how;
             play_sfx_sound(SFX_SUMMON_MONSTER);
             cnt = monster_census(FALSE) - census;
             pline("Sent in %s%s.", (cnt > 1) ? "some " : "",
-                  (cnt > 1) ? makeplural(buf) : an(buf));
+                  (cnt > 1) ? makeplural(singularbuf) : an(singularbuf));
         }
         else
             pline1(nothing_happens);
@@ -4450,7 +4485,7 @@ create_particular()
     struct _create_particular_data d;
 
     do {
-        getlin_ex(GETLINE_GENESIS, ATR_NONE, NO_COLOR, "Create what kind of monster?", buf, "type the name or symbol", (char*)0);
+        getlin_ex(GETLINE_GENESIS, ATR_NONE, NO_COLOR, "Create what kind of monster?", buf, "type the name or symbol", (char*)0, (char*)0);
         bufp = mungspaces(buf);
         if (*bufp == '\033')
             return FALSE;
@@ -4471,9 +4506,9 @@ create_particular()
 }
 
 void
-dragon_scales_to_scale_mail(otmp, sblessed)
+dragon_scales_to_scale_mail(otmp, sblessed, dopopup)
 struct obj* otmp;
-boolean sblessed;
+boolean sblessed, dopopup;
 {
     if (!otmp || !is_dragon_scales(otmp))
         return;
@@ -4486,7 +4521,9 @@ boolean sblessed;
     special_effect_wait_until_action(0);
 
     /* dragon scales get turned into dragon scale mail */
-    pline("%s merges and hardens!", Yname2(otmp));
+    char buf[BUFSZ];
+    Sprintf(buf, "%s merges and hardens!", Yname2(otmp));
+    pline_ex1_popup(ATR_NONE, NO_COLOR, buf, "Dragon Scale Mail", dopopup);
 
     if(worn)
         setworn((struct obj*)0, W_ARM);

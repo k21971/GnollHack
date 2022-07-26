@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    you.h    $NHDT-Date: 1547514642 2019/01/15 01:10:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.35 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,6 +22,7 @@
 #include "prop.h" /* (needed here for util/makedefs.c) */
 #endif
 #include "skills.h"
+#include "general.h"
 
 #include <time.h>
 
@@ -112,9 +113,14 @@ struct u_event {
     Bitfield(uvibrated, 1);         /* stepped on "vibrating square" */
     Bitfield(ascended, 1);          /* has offered the Amulet */
 
+    Bitfield(role_achievement_1, 1);  /* passed the first requirement of the role achievement */
+    Bitfield(role_achievement_2, 1);  /* passed the second requirement of the role achievement */
+
+    Bitfield(elbereth_known, 1);      /* has learned of Elbereth */
 };
 
 struct u_achieve {
+    /* Major Achievements */
     Bitfield(amulet, 1);  /* touched Amulet */
     Bitfield(bell, 1);    /* touched Bell */
     Bitfield(book, 1);    /* touched Book */
@@ -124,9 +130,140 @@ struct u_achieve {
     Bitfield(ascended, 1); /* not quite the same as u.uevent.ascended */
     Bitfield(mines_luckstone, 1); /* got a luckstone at end of mines */
     Bitfield(finish_sokoban, 1);  /* obtained the sokoban prize */
-
     Bitfield(killed_medusa, 1);
     Bitfield(killed_yacc, 1);
+
+    /* Minor Achievements */
+    Bitfield(consulted_oracle, 1);
+    Bitfield(read_discworld_novel, 1);
+    Bitfield(entered_gnomish_mines, 1);
+    Bitfield(entered_mine_town, 1);
+    Bitfield(entered_shop, 1);
+    Bitfield(entered_temple, 1);
+    Bitfield(entered_sokoban, 1);
+    Bitfield(entered_bigroom, 1);
+    Bitfield(learned_castle_tune, 1);
+    Bitfield(entered_large_circular_dungeon, 1);
+    Bitfield(entered_plane_of_modron, 1);
+    Bitfield(entered_hellish_pastures, 1);
+    Bitfield(entered_elemental_planes, 1);
+    Bitfield(entered_astral_plane, 1);
+
+    /* Other Achievements */
+    Bitfield(role_achievement, 1); /* Special achievement for the role */
+    Bitfield(crowned, 1); /* Became Hand of Elbereth, Envoy of Balance, or Glory of Arioch */
+};
+
+enum kill_hints
+{
+    HINT_KILLED_NO_KILLER = 0,
+    HINT_KILLED_COCKATRICE,
+    HINT_KILLED_TOUCHED_COCKATRICE,
+    HINT_KILLED_TOUCHED_COCKATRICE_CORPSE,
+    HINT_KILLED_ATE_COCKATRICE_CORPSE,
+    HINT_KILLED_HIT_BY_COCKATRICE_CORPSE,
+    HINT_KILLED_DROWNED,
+    HINT_KILLED_DROWNED_BY_MONSTER,
+    HINT_KILLED_SUFFOCATION,
+    HINT_KILLED_SUFFOCATION_BY_BEING_BURIED,
+    HINT_KILLED_ITEM_STRANGULATION,
+    HINT_KILLED_MONSTER_STRANGULATION,
+    HINT_KILLED_DISINTEGRATION_RAY,
+    HINT_KILLED_PETRIFICATION_RAY,
+    HINT_KILLED_MEDUSA_GAZE,
+    HINT_KILLED_TOUCH_OF_DEATH,
+    HINT_KILLED_DEATH_RAY,
+    HINT_KILLED_MUMMY_ROT,
+    HINT_KILLED_FOOD_POISONING,
+    HINT_KILLED_TERMINAL_ILLNESS,
+    HINT_KILLED_SLIMED,
+    HINT_KILLED_PETRIFICATION,
+    HINT_KILLED_OLD_CORPSE,
+    HINT_KILLED_TAINTED_CORPSE,
+    HINT_KILLED_SICKENING_CORPSE,
+    HINT_KILLED_POTION_OF_SICKNESS,
+    HINT_KILLED_MUMMY_ROTTED_CORPSE,
+    HINT_KILLED_ILLNESS_FROM_CURSED_UNICORN_HORN,
+    HINT_KILLED_ATE_GREEN_SLIME,
+    HINT_KILLED_GENOCIDED_PLAYER,
+    HINT_KILLED_STARVATION,
+    HINT_KILLED_BRAINLESSNESS,
+    NUM_KILL_HINTS
+};
+
+#define NUM_KILL_HINT_ULONGS 2
+struct u_hint {
+    unsigned long kill_hints_given[NUM_KILL_HINT_ULONGS]; //One bit per kill hint enum
+
+    boolean ate_rotten_corpse; 
+    boolean ate_tainted_corpse;
+    boolean ate_poisonous_corpse;
+    boolean ate_sickening_corpse;
+    boolean ate_mummy_rotted_corpse;
+    boolean ate_hallucinating_corpse;
+    boolean ate_stunning_corpse;
+    boolean ate_polymorphing_corpse;
+
+    boolean ate_tainted_food;
+    boolean ate_poisonous_food;
+    boolean ate_sickening_food;
+    boolean ate_hallucinating_food;
+
+    boolean poisoned_by_fountain;
+    boolean drank_potion_of_sickness;
+    boolean drank_potion_of_poison;
+    boolean drank_potion_of_paralysis_or_sleep;
+
+    boolean drank_potion_of_hallucination;
+    boolean polymorphed_by_trap;
+    boolean being_drowned;
+    boolean being_strangled_by_item;
+    boolean being_strangled_by_monster;
+
+    boolean paralyzed_by_thrown_potion;
+    boolean fell_asleep_by_thrown_potion;
+    boolean fell_asleep_by_trap;
+
+    boolean got_level_drained;
+    boolean damaged_by_passive_fire;
+    boolean damaged_by_passive_electricity;
+    boolean monster_revived;
+    boolean got_grabbed;
+
+    boolean stuff_got_stolen;
+    boolean stuff_got_stolen_by_harpy;
+    boolean paralyzed_by_floating_eye; //Passive defense
+    boolean paralyzed_by_cube; //Passive defense
+    boolean paralyzed_by_monster;
+    boolean got_hungry;
+    boolean got_weak;
+    boolean got_fainting;
+
+    boolean low_hit_points;
+    boolean got_mobbed;
+    boolean got_digested;
+    boolean brain_got_eaten;
+
+    boolean items_destroyed_by_shock;
+    boolean items_destroyed_by_fire;
+    boolean items_destroyed_by_cold;
+
+    boolean bag_destroyed_by_cancellation;
+    boolean got_burdened;
+
+    boolean got_food_poisoning;
+    boolean got_mummy_rot;
+    boolean got_sliming;
+    boolean got_stoning;
+
+    boolean got_stunned;
+    boolean got_terminal_illness;
+    boolean pet_got_mummy_rot;
+
+    boolean elbereth;
+    boolean reserved2;
+    boolean reserved3;
+    boolean reserved4;
 };
 
 struct u_realtime {
@@ -403,6 +540,7 @@ struct you {
     unsigned udg_cnt;           /* how long you have been demigod */
     struct u_achieve uachieve;  /* achievements */
     struct u_event uevent;      /* certain events have happened */
+    struct u_hint uhint;        /* certain hints have been given */
     struct u_have uhave;        /* you're carrying special objects */
     struct u_conduct uconduct;  /* KMH, conduct */
     struct u_roleplay uroleplay;

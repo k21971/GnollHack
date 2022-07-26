@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    write.c    $NHDT-Date: 1450261366 2015/12/16 10:22:46 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.17 $ */
 /* GnollHack may be freely redistributed.  See license for details. */
@@ -20,10 +20,8 @@ register struct obj *otmp;
 
     switch (otmp->otyp)
     {
-#ifdef MAIL
     case SCR_MAIL:
         return 2;
-#endif
     case SCR_LIGHT:
     case SCR_GOLD_DETECTION:
     case SCR_FOOD_DETECTION:
@@ -114,7 +112,7 @@ register struct obj *pen;
 
     if (nohands(youmonst.data)) {
         play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-        You("need hands to be able to write!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "need hands to be able to write!");
         return 0;
     } else if (Glib) {
         pline("%s from your %s.", Tobjnam(pen, "slip"),
@@ -136,12 +134,12 @@ register struct obj *pen;
     if (Blind) {
         if (!paper->dknown) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("don't know if that %s is blank or not.", typeword);
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know if that %s is blank or not.", typeword);
             return 0;
         } else if (paper->oclass == SPBOOK_CLASS) {
             /* can't write a magic book while blind */
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("%s can't create braille text.",
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s can't create braille text.",
                   upstart(ysimple_name(pen)));
             return 0;
         }
@@ -360,12 +358,11 @@ found:
     }
     new_obj->blessed = (curseval > 0);
     new_obj->cursed = (curseval < 0);
-#ifdef MAIL
+
     if (new_obj->otyp == SCR_MAIL)
         /* 0: delivered in-game via external event (or randomly for fake mail);
            1: from bones or wishing; 2: written with marker */
         new_obj->special_quality = 2;
-#endif
     /* unlike alchemy, for example, a successful result yields the
        specifically chosen item so hero recognizes it even if blind;
        the exception is for being lucky writing an undiscovered scroll,

@@ -7,6 +7,9 @@
 #ifndef PROP_H
 #define PROP_H
 
+#include "botl.h"
+#include "tiledata.h"
+
 #define NO_POWER 0
 
 /* Resistances to troubles */
@@ -183,8 +186,9 @@ enum prop_types {
     UNDEAD_CONTROL    = 163,
     CANCELLATION_RESISTANCE = 164,
     HALF_SLOW_DIGESTION = 165,
-    LAUGHING          = 166,
-    MAX_PROPS         = 167
+    SLIME_RESISTANCE = 166,
+    LAUGHING          = 167,
+    MAX_PROPS         = 168
 };
 #define LAST_PROP (MAX_PROPS - 1)
 
@@ -210,6 +214,7 @@ struct prop {
 /* Weapons */
 #define W_WEP         0x00000200L        /* Wielded weapon in the primary hand */
 #define W_WEP2        W_ARMS             /* Wielded weapon in the secondary hand (uses the same hand as W_ARMS) */
+#define W_AUTOSTASH   0x00000400L        /* Autostash for putting items in automatically; NOT USED currently */
 #define W_QUIVER      0x00000800L        /* Quiver for (f)iring ammo */
 #define W_SWAPWEP     0x00001000L        /* Alternate weapon in the primary hand */
 #define W_SWAPWEP2    0x00002000L        /* Alternate weapon/shield in the secondary hand */
@@ -243,10 +248,12 @@ struct prop {
 
 #define W_MISCITEMS (W_MISC  | W_MISC2 | W_MISC3 | W_MISC4 | W_MISC5)
 #define W_ACCESSORY (W_RING | W_AMUL | W_MISCITEMS | W_BLINDFOLD)
+#define W_WORN_NOT_WIELDED ((W_ARMOR & ~W_ARMS) | W_ACCESSORY)
+#define W_WORN_AND_WIELDED (W_WORN_NOT_WIELDED | W_WIELDED_WEAPON)
 
 /* Special */
 #define W_ARTIFACT_CARRIED 0x10000000L     /* Carrying artifact (not really worn) */
-/*0x20000000 used by I_SPECIAL */
+/* 0x20000000 used by I_SPECIAL */
 #define W_ARTIFACT_INVOKED 0x40000000L     /* Invoked artifact  (not really worn) */
 #define W_CARRIED 0x80000000L              /* Carried */
 
@@ -321,6 +328,9 @@ struct propname {
 };
 
 extern const struct propname propertynames[];
+extern const char* condition_names[NUM_BL_CONDITIONS];
+extern const char* status_names[MAX_STATUS_MARKS];
 
+extern enum game_ui_status_mark_types statusmarkorder[MAX_STATUS_MARKS];
 
 #endif /* PROP_H */

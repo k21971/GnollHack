@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0  makedefs.c  $NHDT-Date: 1557254354 2019/05/07 18:39:14 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1108,7 +1108,8 @@ rumors_failure:
  *
  */
 #define IGNORED_FEATURES                 \
-    (0L | (1L << 19) /* SCORE_ON_BOTL */ \
+    (0L | (1L << 6)  /* MAIL */          \
+     | (1L << 19)    /* SCORE_ON_BOTL */ \
      | (1L << 27)    /* ZEROCOMP */      \
      | (1L << 28)    /* RLECOMP */       \
      )
@@ -1227,7 +1228,7 @@ const char *build_date;
     strcpy(betaflagbuf, "*");
 #endif
     if (EDITLEVEL > 0)
-        Sprintf(editbuf, "%d", EDITLEVEL % 10);
+        Sprintf(editbuf, "%d", EDITLEVEL > 20 ? EDITLEVEL - 20 : EDITLEVEL % 10);
     if (HOTFIXLEVEL > 0)
         Sprintf(hotfixbuf, " (Hot Fix %d)", HOTFIXLEVEL);
 
@@ -1274,7 +1275,7 @@ const char *build_date;
     strcpy(betaflagbuf, "*");
 #endif
     if (EDITLEVEL > 0)
-        Sprintf(editbuf, "%d", EDITLEVEL % 10);
+        Sprintf(editbuf, "%d", EDITLEVEL > 20 ? EDITLEVEL - 20 : EDITLEVEL % 10);
     if (HOTFIXLEVEL > 0)
         Sprintf(hotfixbuf, " (Hot Fix %d)", HOTFIXLEVEL);
 

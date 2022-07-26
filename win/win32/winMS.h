@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    winMS.h    $NHDT-Date: 1434804346 2015/06/20 12:45:46 $  $NHDT-Branch: win32-x64-working $:$NHDT-Revision: 1.41 $ */
 /* Copyright (C) 2001 by Alex Kompel */
@@ -180,8 +180,8 @@ int mswin_nhgetch(void);
 int mswin_nh_poskey(int *x, int *y, int *mod);
 void mswin_nhbell(void);
 int mswin_doprev_message(void);
-char mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, unsigned long ynflags);
-void mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix);
+char mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags);
+void mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline);
 int mswin_get_ext_cmd(void);
 void mswin_number_pad(int state);
 void mswin_delay_output(void);
@@ -204,7 +204,7 @@ void mswin_status_enablefield(int fieldidx, const char *nm, const char *fmt,
 void mswin_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, unsigned long *colormasks);
 void mswin_stretch_window(void);
 void mswin_set_animation_timer_interval(unsigned int);
-void mswin_open_special_view(struct special_view_info info);
+int mswin_open_special_view(struct special_view_info info);
 void mswin_stop_all_sounds(struct stop_all_info info);
 void mswin_play_immediate_ghsound(struct ghsound_immediate_info info);
 void mswin_play_ghsound_occupation_ambient(struct ghsound_occupation_ambient_info info);

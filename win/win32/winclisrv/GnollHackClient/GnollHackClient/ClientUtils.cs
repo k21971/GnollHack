@@ -50,7 +50,7 @@ namespace GnollHackClient
                     res = revertblackwhite ? SKColors.Green : GHGreen;
                     break;
                 case nhcolor.CLR_BROWN:
-                    if(usealtcolors)
+                    if (usealtcolors)
                         res = GHTitleGold;
                     else
                         res = revertblackwhite ? SKColors.Brown : GHBrown;
@@ -121,7 +121,7 @@ namespace GnollHackClient
                     res = revertblackandwhite ? Color.Green : XGreen;
                     break;
                 case nhcolor.CLR_BROWN:
-                    if(usealtcolors)
+                    if (usealtcolors)
                         res = XTitleGoldColor;
                     else
                         res = revertblackandwhite ? Color.Brown : XBrown;
@@ -215,7 +215,12 @@ namespace GnollHackClient
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                     break;
+                case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    res = 340;
+                    break;
+                case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
+                    res = 550;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
                     break;
@@ -233,10 +238,10 @@ namespace GnollHackClient
                     res = 1024;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_DUNGEON_OVERVIEW:
-                    res = 880;
+                    res = 550;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_OPTIONS:
-                    res = 1024;
+                    res = 660;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_HELP:
                     res = 880;
@@ -281,6 +286,10 @@ namespace GnollHackClient
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                     break;
+                case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    res = "ARChristy";
+                    break;
+                case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
@@ -340,6 +349,10 @@ namespace GnollHackClient
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                     break;
+                case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    res = 42;
+                    break;
+                case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
@@ -399,6 +412,8 @@ namespace GnollHackClient
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                     break;
+                case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
@@ -434,7 +449,6 @@ namespace GnollHackClient
                     break;
                 case ghmenu_styles.GHMENU_STYLE_INVENTORY:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
-                case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_PERMANENT_INVENTORY:
                     break;
@@ -458,6 +472,8 @@ namespace GnollHackClient
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                     break;
+                case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
@@ -471,6 +487,8 @@ namespace GnollHackClient
                 case ghmenu_styles.GHMENU_STYLE_SKILLS:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_SPELLS:
+                case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
+                    res = 13.5;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_DUNGEON_OVERVIEW:
                     break;
@@ -484,6 +502,53 @@ namespace GnollHackClient
             return res;
         }
 
+        public static bool MenuSubtitleUsesSpecialSymbols(ghmenu_styles style)
+        {
+            switch (style)
+            {
+                case ghmenu_styles.GHMENU_STYLE_SPELLS:
+                case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static char MenuSubtitleWordWrapSeparator(ghmenu_styles style)
+        {
+            switch (style)
+            {
+                case ghmenu_styles.GHMENU_STYLE_SPELLS:
+                case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
+                    return ',';
+                default:
+                    return ' ';
+            }
+        }
+
+        public static bool MenuSubtitleDisplayWrapSeparator(ghmenu_styles style)
+        {
+            switch (style)
+            {
+                case ghmenu_styles.GHMENU_STYLE_SPELLS:
+                case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        public static bool StyleClosesMenuUponDestroy(ghmenu_styles style)
+        {
+            switch (style)
+            {
+                default:
+                case ghmenu_styles.GHMENU_STYLE_GENERAL:
+                    return false; /* Closes already upon pressing OK / Cancel before destroy */
+                case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
+                    return true;
+            }
+        }
 
         public static void ProcessAdjustedItems(List<GHPutStrItem> adjusted_list, List<GHPutStrItem> normal_list)
         {
@@ -493,7 +558,7 @@ namespace GnollHackClient
             for (int cnt = 0; cnt < normal_list.Count; cnt++)
             {
                 GHPutStrItem psi = normal_list[cnt];
-                if (newpsi != null && (psi.Text == ""))
+                if (newpsi != null && (psi.Text == "" || psi.StartingSpaces != newpsi.PaddingAmount))
                 {
                     adjusted_list.Add(newpsi);
                     newpsi = null;
@@ -519,7 +584,7 @@ namespace GnollHackClient
                     }
 
                     int spacecnt = 0;
-                    for(int i = 0; i < psi.Text.Length; i++)
+                    for (int i = 0; i < psi.Text.Length; i++)
                     {
                         char ch = psi.Text[i];
                         if (ch == ' ')
@@ -682,7 +747,7 @@ namespace GnollHackClient
             else if (App.DisplayRefreshRate >= 20.0f && mapRefreshRate >= MapRefreshRateStyle.MapFPS20)
                 return 20;
             else
-                return GHConstants.MainCanvasAnimationFrequency;
+                return 40;
         }
 
         public static MapRefreshRateStyle GetDefaultMapFPS()
@@ -712,6 +777,12 @@ namespace GnollHackClient
                 return 90;
             else
                 return 60;
+        }
+
+
+        public static double GetWindowHideSecs()
+        {
+            return 0.05 + ((double)GHConstants.PollingInterval) / 1000 * GHConstants.WindowHideIntervals;
         }
     }
 }

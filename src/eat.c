@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    eat.c    $NHDT-Date: 1542765357 2018/11/21 01:55:57 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.197 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -19,11 +19,11 @@ STATIC_DCL void NDECL(recalc_wt);
 STATIC_DCL struct obj *FDECL(touchfood, (struct obj *));
 STATIC_DCL void NDECL(do_reset_eat);
 STATIC_DCL void FDECL(done_eating, (BOOLEAN_P));
-STATIC_DCL void FDECL(corpse_pre_effect, (int));
+STATIC_DCL void FDECL(corpse_pre_effect, (int, UCHAR_P));
 STATIC_DCL boolean FDECL(intrinsic_possible, (int, struct permonst *));
 STATIC_DCL void FDECL(givit, (int, struct permonst *));
 STATIC_DCL void FDECL(temporary_givit, (int, int));
-STATIC_DCL void FDECL(corpse_after_effect, (int));
+STATIC_DCL void FDECL(corpse_after_effect, (int, UCHAR_P));
 STATIC_DCL void FDECL(consume_tin, (const char *));
 STATIC_DCL void FDECL(start_tin, (struct obj *));
 STATIC_DCL int FDECL(eatcorpse, (struct obj *));
@@ -514,7 +514,7 @@ boolean message;
     }
 
     if (is_obj_rotting_corpse(piece))
-        corpse_after_effect(piece->corpsenm);
+        corpse_after_effect(piece->corpsenm, (uchar)is_female_corpse_or_statue(piece));
     else
         food_after_effect(piece);
 
@@ -601,7 +601,7 @@ double *dmg_p; /* for dishing out extra damage in lieu of Int loss */
         if (magr == &youmonst) 
         {
             if (!Stone_resistance && !Stoned)
-                make_stoned(5L, (char *) 0, KILLED_BY_AN, mon_monster_name(mdef));
+                make_stoned(5L, (char *) 0, KILLED_BY_AN, mon_monster_name(mdef), HINT_KILLED_ATE_COCKATRICE_CORPSE);
         }
         else
         {
@@ -714,6 +714,7 @@ double *dmg_p; /* for dishing out extra damage in lieu of Int loss */
             {
                 Strcpy(killer.name, brainlessness);
                 killer.format = KILLED_BY;
+                killer.hint_idx = HINT_KILLED_BRAINLESSNESS;
                 done(DIED);
                 /* amulet of life saving has now been used up */
                 pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Unfortunately your brain is still gone.");
@@ -727,6 +728,7 @@ double *dmg_p; /* for dishing out extra damage in lieu of Int loss */
             }
             Strcpy(killer.name, brainlessness);
             killer.format = KILLED_BY;
+            killer.hint_idx = HINT_KILLED_BRAINLESSNESS;
             done(DIED);
             /* can only get here when in wizard or explore mode and user has
                explicitly chosen not to die; arbitrarily boost intelligence */
@@ -735,6 +737,7 @@ double *dmg_p; /* for dishing out extra damage in lieu of Int loss */
         }
         give_nutrit = TRUE; /* in case a conflicted pet is doing this */
         exercise(A_WIS, FALSE);
+        brain_hint(magr);
         /* caller handles Int and memory loss */
 
     }
@@ -815,18 +818,21 @@ boolean allowmsg;
 }
 
 STATIC_OVL void
-corpse_pre_effect(pm)
+corpse_pre_effect(pm, gender)
 register int pm;
+uchar gender; /* 0 = male, 1 = female, 2 = unknown */
 {
     if (pm < LOW_PM)
         return;
 
     (void) maybe_cannibal(pm, TRUE);
-    if (flesh_petrifies(&mons[pm])) {
+    if (flesh_petrifies(&mons[pm])) 
+    {
         if (!Stone_resistance
             && !(poly_when_stoned(youmonst.data)
-                 && polymon(PM_STONE_GOLEM))) {
-            Sprintf(killer.name, "tasting %s meat", pm_common_name(&mons[pm]));
+                 && polymon(PM_STONE_GOLEM))) 
+        {
+            Sprintf(killer.name, "tasting %s meat", pm_general_name(&mons[pm], gender));
             killer.format = KILLED_BY;
             play_sfx_sound(SFX_PETRIFY);
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "turn to stone.");
@@ -837,6 +843,22 @@ register int pm;
         }
     }
 
+    if (has_monster_type_nonedible_corpse(&mons[pm]))
+    {
+        You_feel("this is too hard to eat.");
+        if (is_reviver(&mons[pm]) && revives_upon_meddling(&mons[pm]))
+        {
+            if (revive_corpse(context.victual.piece)) {
+                context.victual.piece = (struct obj*)0;
+                context.victual.o_id = 0;
+            }
+        }
+        else if (context.victual.piece)
+            context.victual.eating = FALSE;
+        return; /* no eating */
+    }
+
+
     switch (pm) {
     case PM_LITTLE_DOG:
     case PM_DOG:
@@ -846,7 +868,7 @@ register int pm;
     case PM_LARGE_CAT:
         /* cannibals are allowed to eat domestic animals without penalty */
         if (!CANNIBAL_ALLOWED()) {
-            You_feel("that eating the %s was a bad idea.", pm_common_name(&mons[pm]));
+            You_feel("that eating the %s was a bad idea.", pm_general_name(&mons[pm], gender));
             HAggravate_monster |= FROM_ACQUIRED;
         }
         break;
@@ -866,7 +888,7 @@ register int pm;
     case PM_PESTILENCE:
     case PM_FAMINE: {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Eating that is instantly fatal.");
-        Sprintf(killer.name, "unwisely ate the body of %s", pm_common_name(&mons[pm]));
+        Sprintf(killer.name, "unwisely ate the body of %s", pm_general_name(&mons[pm], gender));
         killer.format = NO_KILLER_PREFIX;
         done(DIED);
         /* life-saving needed to reach here */
@@ -881,11 +903,10 @@ register int pm;
         return;
     }
     case PM_GREEN_SLIME:
-        if (!Slimed && !Unchanging && !slimeproof(youmonst.data)) {
+        if (!Slimed && !Unchanging && !Slime_resistance && !slimeproof(youmonst.data)) {
             play_sfx_sound(SFX_START_SLIMING);
             You("don't feel very well.");
-            make_slimed(10L, (char *) 0);
-            delayed_killer(SLIMED, KILLED_BY_AN, "");
+            make_slimed(10L, (char *) 0, KILLED_BY, "eating green slime", HINT_KILLED_ATE_GREEN_SLIME);
         }
     /* Fall through */
     default:
@@ -909,7 +930,7 @@ fix_petrification()
     if (Stoned)
         play_sfx_sound(SFX_CURE_AILMENT);
 
-    make_stoned(0L, buf, 0, (char *) 0);
+    make_stoned(0L, buf, 0, (char *) 0, 0);
 }
 
 /*
@@ -1239,8 +1260,9 @@ register struct permonst *ptr;
 
 /* called after completely consuming a corpse */
 STATIC_OVL void
-corpse_after_effect(pm)
+corpse_after_effect(pm, gender)
 int pm;
+uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
 {
     int tmp = 0;
     int catch_lycanthropy = NON_PM;
@@ -1316,6 +1338,7 @@ int pm;
         if (!Stunned)
             play_sfx_sound(SFX_ACQUIRE_STUN);
         make_stunned((HStun & TIMEOUT) + 30L, FALSE);
+        standard_hint("Some corpses make you stunned. You can also check this out by using a wand of probing.", &u.uhint.ate_stunning_corpse);
         break;
     case PM_CHAOS_MIMIC:
         tmp += 10;
@@ -1359,6 +1382,7 @@ int pm;
             create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
             display_nhwindow(WIN_MAP, TRUE);
             create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
+            standard_hint("Some corpses cause to polymorph. You can check this out by using a wand of probing.", &u.uhint.ate_polymorphing_corpse);
         }
         break;
     case PM_QUANTUM_MECHANIC:
@@ -1387,6 +1411,7 @@ int pm;
             You_feel("a change coming over you.");
             polyself(0);
         }
+        standard_hint("Some corpses cause to polymorph. You can check this out by using a wand of probing.", &u.uhint.ate_polymorphing_corpse);
         break;
     case PM_DISENCHANTER:
         /* picks an intrinsic at random and removes it; there's
@@ -1791,17 +1816,13 @@ const char *mesg;
         else if (which == 2)
             what = the(what);
 
-        char buf[BUFSZ], smellsbuf[BUFSZ];
+        char smellsbuf[BUFSZ];
         const char* eatit = "Eat it?";
         Sprintf(smellsbuf, "It smells like %s.", what);
-#ifdef GNH_MOBILE
-        Sprintf(buf, "%s %s", smellsbuf, eatit);
-#else
         pline1(smellsbuf);
-        strcpy(buf, eatit);
-#endif
+
         //if (yn_query("Eat it?") == 'n') 
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, "Tin Opened", buf, ynchars, 'n', yndescs) != 'y')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, "Tin Opened", eatit, ynchars, 'n', yndescs, smellsbuf) != 'y')
         {
             if (flags.verbose)
                 You("discard the open tin.");
@@ -1824,8 +1845,8 @@ const char *mesg;
         eating_conducts(&mons[mnum]);
 
         tin->dknown = tin->known = 1;
-        corpse_pre_effect(mnum);
-        corpse_after_effect(mnum);
+        corpse_pre_effect(mnum, 2);
+        corpse_after_effect(mnum, 2);
 
         /* charge for one at pre-eating cost */
         tin = costly_tin(COST_OPEN);
@@ -1850,7 +1871,7 @@ const char *mesg;
     }
     else
     { /* spinach... */
-        char buf[BUFSZ], containsbuf[BUFSZ];
+        char containsbuf[BUFSZ];
         const char* eatit = "Eat it?";
         if (tin->cursed)
         {
@@ -1863,14 +1884,10 @@ const char *mesg;
             tin->dknown = tin->known = 1;
         }
 
-#ifdef GNH_MOBILE
-        Sprintf(buf, "%s %s", containsbuf, eatit);
-#else
         pline1(containsbuf);
-        strcpy(buf, eatit);
-#endif
+
         //if (yn_query("Eat it?") == 'n') 
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, "Tin Opened", buf, ynchars, 'n', yndescs) != 'y')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, "Tin Opened", eatit, ynchars, 'n', yndescs, containsbuf) != 'y')
         {
             if (flags.verbose)
                 You("discard the open tin.");
@@ -2109,7 +2126,7 @@ struct obj *otmp;
 
     boolean stoneable = (flesh_petrifies(&mons[mnum]) && !Stone_resistance
                          && !poly_when_stoned(youmonst.data)),
-            slimeable = (mnum == PM_GREEN_SLIME && !Slimed && !Unchanging
+            slimeable = (mnum == PM_GREEN_SLIME && !Slimed && !Unchanging && !Slime_resistance
                          && !slimeproof(youmonst.data)),
             glob = otmp->globby ? TRUE : FALSE;
 
@@ -2144,6 +2161,7 @@ struct obj *otmp;
               cannibal ? ", you cannibal" : "");
         if (Sick_resistance) {
             pline("It doesn't seem at all sickening, though...");
+            standard_hint("Corpses rot and become dangerous to eat after a while. You can check their status out by using a wand of probing.", &u.uhint.ate_rotten_corpse);
         }
         else
         {
@@ -2157,10 +2175,12 @@ struct obj *otmp;
             if(!FoodPoisoned)
                 play_sfx_sound(SFX_CATCH_FOOD_POISONING);
 
+
             make_food_poisoned(sick_time, corpse_xname(otmp, "rotted", CXN_NORMAL),
-                      TRUE);
+                      TRUE, HINT_KILLED_OLD_CORPSE);
 
             pline("(It must have died too long ago to be safe to eat.)");
+            standard_hint("Corpses rot and become dangerous to eat after a while. You can check their status out by using a wand of probing.", &u.uhint.ate_rotten_corpse);
         }
         if (carried(otmp))
             useup(otmp);
@@ -2171,9 +2191,10 @@ struct obj *otmp;
     else if (has_sickening_corpse(&mons[mnum]) && rn2(5))
     {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Ulch - that must have been infected by terminal disease!");
-        if (Sick_resistance) 
+        if (Sick_resistance)
         {
             pline("It doesn't seem at all sickening, though...");
+            standard_hint("Some corpses are inflicted by terminal illness. You can check this out by using a wand of probing.", &u.uhint.ate_sickening_corpse);
         }
         else
         {
@@ -2188,9 +2209,10 @@ struct obj *otmp;
             if (!Sick)
                 play_sfx_sound(SFX_CATCH_TERMINAL_ILLNESS);
 
-            make_sick(sick_time, corpse_xname(otmp, "", CXN_NORMAL), TRUE);
+            make_sick(sick_time, corpse_xname(otmp, "", CXN_NORMAL), TRUE, HINT_KILLED_SICKENING_CORPSE);
 
             (void)touchfood(otmp);
+            standard_hint("Some corpses are inflicted by terminal illness. You can check this out by using a wand of probing.", &u.uhint.ate_sickening_corpse);
             return 1;
         }
     }
@@ -2200,14 +2222,16 @@ struct obj *otmp;
         if (Sick_resistance)
         {
             pline("It doesn't seem at all sickening, though...");
+            standard_hint("Some corpses are inflicted by mummy rot. You can check this out by using a wand of probing.", &u.uhint.ate_mummy_rotted_corpse);
         }
         else
         {
             play_occupation_immediate_sound(objects[otmp->otyp].oc_soundset, OCCUPATION_EATING, OCCUPATION_SOUND_TYPE_START);
             play_sfx_sound(SFX_CATCH_MUMMY_ROT);
-            make_mummy_rotted(-1L, corpse_xname(otmp, "", CXN_NORMAL), TRUE);
+            make_mummy_rotted(-1L, corpse_xname(otmp, "", CXN_NORMAL), TRUE, HINT_KILLED_MUMMY_ROTTED_CORPSE);
 
             (void)touchfood(otmp);
+            standard_hint("Some corpses are inflicted by mummy rot. You can check this out by using a wand of probing.", &u.uhint.ate_mummy_rotted_corpse);
             return 1;
         }
     }
@@ -2234,7 +2258,8 @@ struct obj *otmp;
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             You("seem unaffected by the poison.");
         }
-    /* now any corpse left too long will make you mildly ill */
+        standard_hint("Some corpses are inherently poisonous. You can check this out by using a wand of probing.", &u.uhint.ate_poisonous_corpse);
+        /* now any corpse left too long will make you mildly ill */
     } 
     else if ((rotted > 5L || (rotted > 3L && rn2(5))) && !Sick_resistance)
     {
@@ -2330,7 +2355,7 @@ boolean resume;
     context.victual.total_nutrition = otmp->oeaten;
 
     if (is_obj_rotting_corpse(otmp)) {
-        corpse_pre_effect(context.victual.piece->corpsenm);
+        corpse_pre_effect(context.victual.piece->corpsenm, (uchar)is_female_corpse_or_statue(otmp));
         if (!context.victual.piece || !context.victual.eating) {
             /* rider revived, or died and lifesaved */
             return;
@@ -2847,7 +2872,7 @@ struct obj *otmp;
     if (otmp->oclass == FOOD_CLASS)
         return food;
 
-    if (otmp->oclass == GEM_CLASS && objects[otmp->otyp].oc_material == MAT_GLASS
+    if (otmp->oclass == GEM_CLASS && (objects[otmp->otyp].oc_material == MAT_GLASS || objects[otmp->otyp].oc_material == MAT_CRYSTAL)
         && otmp->dknown)
         makeknown(otmp->otyp);
     return foodwords[objects[otmp->otyp].oc_material];
@@ -2990,7 +3015,7 @@ struct obj *otmp;
                 if (!Stoned) {
                     Sprintf(killer.name, "%s egg",
                             corpse_monster_name(otmp));
-                    make_stoned(5L, (char *) 0, KILLED_BY_AN, killer.name);
+                    make_stoned(5L, (char *) 0, KILLED_BY_AN, killer.name, HINT_KILLED_ATE_COCKATRICE_CORPSE);
                 }
             }
             /* note: no "tastes like chicken" message for eggs */
@@ -3002,17 +3027,17 @@ struct obj *otmp;
         if (Sick && !otmp->cursed)
         {
             cured = TRUE;
-            make_sick(0L, (char*)0, TRUE);
+            make_sick(0L, (char*)0, TRUE, 0);
         }
         if (FoodPoisoned && !otmp->cursed)
         {
             cured = TRUE;
-            make_food_poisoned(0L, (char*)0, TRUE);
+            make_food_poisoned(0L, (char*)0, TRUE, 0);
         }
         if (MummyRot && !otmp->cursed)
         {
             cured = TRUE;
-            make_mummy_rotted(0L, (char*)0, TRUE);
+            make_mummy_rotted(0L, (char*)0, TRUE, 0);
         }
         if (Vomiting && !otmp->cursed)
         {
@@ -3139,7 +3164,7 @@ struct obj *otmp;
                         && !poly_when_stoned(youmonst.data));
 
         if (mnum == PM_GREEN_SLIME || otmp->otyp == GLOB_OF_GREEN_SLIME)
-            stoneorslime = (!Unchanging && !slimeproof(youmonst.data));
+            stoneorslime = (!Unchanging && !Slime_resistance && !slimeproof(youmonst.data));
 
         if (cadaver && mnum >= LOW_PM && !nonrotting_corpse(mnum))
         {
@@ -3166,7 +3191,7 @@ struct obj *otmp;
         /* Tainted meat */
         Sprintf(buf, "%s like %s could be tainted!  %s", foodsmell, it_or_they,
                 eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3177,7 +3202,7 @@ struct obj *otmp;
     {
         Sprintf(buf, "%s like %s could be something very dangerous!  %s",
                 foodsmell, it_or_they, eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3187,7 +3212,7 @@ struct obj *otmp;
         /* Rotten */
         Sprintf(buf, "%s like %s could be rotten! %s",  foodsmell, it_or_they,
                 eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3199,7 +3224,7 @@ struct obj *otmp;
         /* poisonous */
         Sprintf(buf, "%s like %s might be poisonous!  %s", foodsmell,
                 it_or_they, eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3210,14 +3235,14 @@ struct obj *otmp;
         /* causes sleep, for long enough to be dangerous */
         Sprintf(buf, "%s like %s might have been poisoned.  %s", foodsmell,
                 it_or_they, eat_it_anyway);
-        return (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs) == 'n') ? 1 : 2;
+        return (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n') ? 1 : 2;
     }
 
     if (cadaver && mnum >= LOW_PM && !vegetarian(&mons[mnum]) && !u.uconduct.unvegetarian
         && Role_if(PM_MONK)) 
     {
         Sprintf(buf, "%s unhealthy.  %s", foodsmell, eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3227,7 +3252,7 @@ struct obj *otmp;
         || (cadaver && mnum >= LOW_PM && has_acidic_corpse(&mons[mnum]))) && !Acid_immunity && !Acid_resistance)
     {
         Sprintf(buf, "%s rather acidic.  %s", foodsmell, eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3238,7 +3263,7 @@ struct obj *otmp;
     {
         Sprintf(buf, "%s disgusting to you right now.  %s", foodsmell,
                 eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3254,7 +3279,7 @@ struct obj *otmp;
     {
         Sprintf(buf, "%s foul and unfamiliar to you.  %s", foodsmell,
                 eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3266,7 +3291,7 @@ struct obj *otmp;
              || (cadaver && mnum >= LOW_PM && !vegetarian(&mons[mnum]))))
     {
         Sprintf(buf, "%s unfamiliar to you.  %s", foodsmell, eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3277,7 +3302,7 @@ struct obj *otmp;
         /* Tainted meat with Sick_resistance */
         Sprintf(buf, "%s like %s could be tainted!  %s",
                 foodsmell, it_or_they, eat_it_anyway);
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs) == 'n')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
             return 1;
         else
             return 2;
@@ -3413,12 +3438,14 @@ doeat()
     /* KMH -- Slow digestion is... indigestible */
     if (otmp->otyp == RIN_SLOW_DIGESTION)
     {
+        char dcbuf[BUFSZ] = "";
         play_occupation_immediate_sound(objects[otmp->otyp].oc_soundset, OCCUPATION_EATING, OCCUPATION_SOUND_TYPE_START);
-        pline("This ring is indigestible!");
+        Strcpy(dcbuf, "This ring is indigestible!");
+        pline1(dcbuf);
         (void) rottenfood(otmp);
         if (otmp->dknown && !objects[otmp->otyp].oc_name_known
             && !objects[otmp->otyp].oc_uname)
-            docall(otmp);
+            docall(otmp, dcbuf);
         return 1;
     }
 
@@ -3598,6 +3625,7 @@ doeat()
             if (Sick_resistance)
             {
                 pline("It doesn't seem at all sickening, though...");
+                standard_hint("Some food items can be inherently tainted. You can check this out, e.g., by using a wand of probing.", &u.uhint.ate_tainted_corpse);
             }
             else 
             {
@@ -3611,12 +3639,14 @@ doeat()
                 if (!FoodPoisoned)
                     play_sfx_sound(SFX_CATCH_FOOD_POISONING);
 
-                make_food_poisoned(sick_time, doname(otmp), TRUE);
+                standard_hint("Some food items can be inherently tainted. You can check this out by identifying the item.", &u.uhint.ate_tainted_food);
+                make_food_poisoned(sick_time, doname(otmp), TRUE, HINT_KILLED_TAINTED_CORPSE);
             }
             if (carried(otmp))
                 useup(otmp);
             else
                 useupf(otmp, 1L);
+
             return 2;
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_ACIDIC && !Acid_immunity && !Acid_resistance) 
@@ -3641,6 +3671,7 @@ doeat()
                 play_sfx_sound(SFX_GENERAL_UNAFFECTED);
                 You("seem unaffected by the poison.");
             }
+            standard_hint("Some food items can be inherently poisonous. You can check this out by identifying the item.", &u.uhint.ate_poisonous_food);
             consume_oeaten(otmp, 2); /* oeaten >>= 2 */
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_DEADLY_POISONOUS)
@@ -3658,14 +3689,25 @@ doeat()
                 play_sfx_sound(SFX_GENERAL_UNAFFECTED);
                 You("seem unaffected by the poison.");
             }
+            standard_hint("Some food items can be inherently poisonous. You can check this out by identifying the item.", &u.uhint.ate_poisonous_food);
             consume_oeaten(otmp, 2); /* oeaten >>= 2 */
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_SICKENING && !Sick_resistance)
         {
             identifycolor = CLR_MSG_NEGATIVE;
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%ssick.", (FoodPoisoned) ? "very " : "");
-            losehp(adjust_damage(rnd(8), (struct monst*)0, &youmonst, AD_DISE, ADFLAGS_NONE), "sickening food", KILLED_BY_AN);
+            //losehp(adjust_damage(rnd(8), (struct monst*)0, &youmonst, AD_DISE, ADFLAGS_NONE), "sickening food", KILLED_BY_AN);
+            identifycolor = CLR_MSG_NEGATIVE;
+            long sick_time;
+            sick_time = (long)rn1(10, 10);
+            /* make sure new ill doesn't result in improvement */
+            if (Sick && (sick_time > Sick))
+                sick_time = (Sick > 1L) ? Sick - 1L : 1L;
+            if (!Sick)
+                play_sfx_sound(SFX_CATCH_TERMINAL_ILLNESS);
+            make_sick(sick_time, doname(otmp), TRUE, HINT_KILLED_SICKENING_CORPSE);
             consume_oeaten(otmp, 2); /* oeaten >>= 2 */
+            standard_hint("Some food items can be inflicted by terminal illness. You can check this out by identifying the item.", &u.uhint.ate_sickening_food);
         }
         else if (objects[otmp->otyp].oc_edible_subtype == EDIBLETYPE_HALLUCINATING && !Halluc_resistance)
         {
@@ -3676,6 +3718,7 @@ doeat()
             {
                 play_sfx_sound(SFX_ACQUIRE_HALLUCINATION);
                 (void)make_hallucinated(itimeout_incr(HHallucination, duration), TRUE, 0L);
+                standard_hint("Some food items cause hallucination. You can check this out by identifying the item.", &u.uhint.ate_hallucinating_food);
             }
 
             consume_oeaten(otmp, 2); /* oeaten >>= 2 */
@@ -3962,15 +4005,9 @@ int num;
                         && context.victual.reqtime > 1) 
                     {
                         const char* conteattxt = "Continue eating?";
-                        char buf[BUFSZ];
-#ifdef GNH_MOBILE
-                        Sprintf(buf, "%s %s", hardtimetxt, conteattxt);
-#else
                         pline1(hardtimetxt);
-                        Sprintf(buf, "%s", conteattxt);
-#endif
                         /* a one-gulp food will not survive a stop */
-                        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, "Choking Warning", buf, ynchars, 'n', yndescs) != 'y') 
+                        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_WARNING, "Choking Warning", conteattxt, ynchars, 'n', yndescs, hardtimetxt) != 'y')
                         {
                             reset_eat();
                             nomovemsg = (char *) 0;
@@ -4078,7 +4115,8 @@ boolean incr;
                 stop_occupation();
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "faint from lack of food.");
                 incr_itimeout(&HDeaf, duration);
-                context.botl = TRUE;
+                context.botl = context.botlx = TRUE;
+                bot();
                 refresh_u_tile_gui_info(TRUE);
                 play_environment_ambient_sounds();
                 nomul(-duration);
@@ -4100,10 +4138,12 @@ boolean incr;
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "die from starvation.");
             killer.format = KILLED_BY;
             Strcpy(killer.name, "starvation");
+            killer.hint_idx = HINT_KILLED_STARVATION;
             done(STARVING);
             /* if we return, we lifesaved, and that calls update_hunger_status */
             return;
         }
+        pray_hint("recover from fainting due to hunger", "eating food", &u.uhint.got_fainting);
     }
 
     if (newhs != u.uhs) {
@@ -4138,6 +4178,7 @@ boolean incr;
                 && (occupation != eatfood && occupation != opentin))
                 stop_occupation();
             context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+            pray_hint("recover from hunger", "eating food", & u.uhint.got_hungry);
             break;
         case WEAK:
             if (Hallucination)
@@ -4158,6 +4199,7 @@ boolean incr;
                 && (occupation != eatfood && occupation != opentin))
                 stop_occupation();
             context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+            pray_hint("recover from weakness due to hunger", "eating food", &u.uhint.got_weak);
             break;
         }
         u.uhs = newhs;
@@ -4169,6 +4211,7 @@ boolean incr;
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "die from hunger and exhaustion.");
             killer.format = KILLED_BY;
             Strcpy(killer.name, "exhaustion");
+            killer.hint_idx = HINT_KILLED_STARVATION;
             done(STARVING);
             return;
         }
@@ -4311,7 +4354,7 @@ vomit() /* A good idea from David Neves */
     else 
     {
         if (FoodPoisoned)
-            make_food_poisoned(0L, (char *) 0, TRUE);
+            make_food_poisoned(0L, (char *) 0, TRUE, 0);
 
         /* if not enough in stomach to actually vomit then dry heave;
            vomiting_dialog() gives a vomit message when its countdown

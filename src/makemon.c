@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    makemon.c    $NHDT-Date: 1556150377 2019/04/24 23:59:37 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.134 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -281,7 +281,7 @@ struct obj* obj;
             else
             {
                 generate_random_item = TRUE;
-                otyp = random_objectid_from_class(obj->oclass, 0UL);
+                otyp = random_objectid_from_class(obj->oclass, mtmp, 0UL);
             }
         }
     }
@@ -290,7 +290,7 @@ struct obj* obj;
         if (objects[obj->otyp].oc_prob == 0 || (objects[obj->otyp].oc_flags3 & O3_NO_GENERATION))
         {
             generate_random_item = TRUE;
-            otyp = random_objectid_from_class(obj->oclass, 0UL);
+            otyp = random_objectid_from_class(obj->oclass, mtmp, 0UL);
         }
     }
 
@@ -1240,7 +1240,7 @@ register struct monst *mtmp;
         break;
     case S_DOG:
         if(!rn2(20))
-            (void)mon_gets_noinit_item(mtmp, BONE, 1);
+            (void)mongets_noinit_item(mtmp, BONE, 1);
         
         break;
     case S_HUMAN:
@@ -1368,7 +1368,7 @@ register struct monst *mtmp;
             else if (!rn2(4))
                 (void)mongets(mtmp, !rn2(2) ? ROBE_OF_MAGIC_RESISTANCE : !rn2(2) ? ROBE_OF_PROTECTION : ROBE_OF_EYES);
             else
-                (void)mongets(mtmp, ROBE);
+                (void)mongets(mtmp, WIZARD_S_ROBE);
 
             if(!rn2(4))
                 (void)mongets(mtmp, BRACERS_OF_DEFENSE);
@@ -1391,12 +1391,14 @@ register struct monst *mtmp;
             || quest_mon_represents_role(ptr, PM_PRIEST)) {
             if (ptr == &mons[PM_HIGH_PRIEST])
             {
-                otmp = mongets(mtmp, ROBE_OF_STARRY_WISDOM);
+                otmp = mongets(mtmp, !rn2(2) ? ROBE_OF_STARRY_WISDOM : GOWN_OF_THE_ARCHBISHOPS);
                 otmp->enchantment = max(otmp->enchantment, rn2(3));
             }
             else
             {
-                (void)mongets(mtmp, rn2(7) ? ROBE
+                (void)mongets(mtmp, rn2(9) ? CLERICAL_GOWN
+                    : GOWN_OF_THE_ARCHBISHOPS);
+                (void)mongets(mtmp, rn2(7) ? LEATHER_CLOAK
                     : rn2(3) ? CLOAK_OF_PROTECTION
                     : CLOAK_OF_MAGIC_RESISTANCE);
                 (void)mongets(mtmp, SMALL_SHIELD);
@@ -1404,7 +1406,8 @@ register struct monst *mtmp;
             }
         }
         else if (quest_mon_represents_role(ptr, PM_MONK)) {
-            (void)mongets(mtmp, rn2(11) ? ROBE : CLOAK_OF_MAGIC_RESISTANCE);
+            (void)mongets(mtmp, SIMPLE_GOWN);
+            (void)mongets(mtmp, rn2(11) ? LEATHER_CLOAK : CLOAK_OF_MAGIC_RESISTANCE);
         }
         else if (ptr == &mons[PM_ELVENKING])
         {
@@ -1515,10 +1518,10 @@ register struct monst *mtmp;
             if (!rn2(50))
                 (void)mongets(mtmp, ROBE_OF_THE_ARCHMAGI);
             else if (!rn2(4))
-                (void)mongets(mtmp, rn2(5) ? ROBE : rn2(2) ? ROBE_OF_MAGIC_RESISTANCE : ROBE_OF_PROTECTION);
+                (void)mongets(mtmp, rn2(5) ? WIZARD_S_ROBE : rn2(2) ? ROBE_OF_MAGIC_RESISTANCE : ROBE_OF_PROTECTION);
 
             if (!rn2(4))
-                (void)mongets(mtmp, !rn2(5) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                (void)mongets(mtmp, !rn2(5) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
             
             //Reagents
             n = rn2(3);
@@ -1561,7 +1564,7 @@ register struct monst *mtmp;
 
         //Potion of gain energy
         if (!rn2(3))
-            (void)mongets(mtmp, !rn2(4) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+            (void)mongets(mtmp, !rn2(4) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
 
         //Reagents
         n = rn2(3) + (ptr == &mons[PM_MASTER_LICH] || ptr == &mons[PM_ARCH_LICH] ? 1 : 0); //1...3 + 2
@@ -1588,10 +1591,10 @@ register struct monst *mtmp;
             if (!rn2(20))
                 (void)mongets(mtmp, !rn2(2) ? ROBE_OF_THE_ARCHMAGI : ROBE_OF_MAGIC_RESISTANCE);
             else
-                (void)mongets(mtmp, rn2(5) ? ROBE : ROBE_OF_PROTECTION);
+                (void)mongets(mtmp, rn2(5) ? WIZARD_S_ROBE : ROBE_OF_PROTECTION);
 
         } else if(!rn2(4))
-            (void)mongets(mtmp, rn2(20) ? ROBE : ROBE_OF_PROTECTION);
+            (void)mongets(mtmp, rn2(20) ? WIZARD_S_ROBE : ROBE_OF_PROTECTION);
 
         if (!rn2(4))
             (void)mongetsgold(mtmp, 100 + rn2(701));
@@ -1714,7 +1717,7 @@ register struct monst *mtmp;
         if (ptr == &mons[PM_KOBOLD_SHAMAN])
         {
             if (!rn2(6))
-                (void)mongets(mtmp, !rn2(50) ? POT_FULL_ENERGY : !rn2(10) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                (void)mongets(mtmp, !rn2(50) ? POT_FULL_ENERGY : !rn2(10) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
             
             /* Some random reagants */
             n = rn2(2);
@@ -1889,7 +1892,7 @@ register struct monst *mtmp;
         if (ptr == &mons[PM_ORC_SHAMAN])
         {
             if (!rn2(5))
-                (void)mongets(mtmp, !rn2(30) ? POT_FULL_ENERGY : !rn2(8) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                (void)mongets(mtmp, !rn2(30) ? POT_FULL_ENERGY : !rn2(8) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
 
             if (!rn2(3))
             {
@@ -1913,7 +1916,7 @@ register struct monst *mtmp;
         {
                 //Potion of gain energy
                 if (!rn2(3))
-                    (void)mongets(mtmp, !rn2(10) ? POT_FULL_ENERGY : !rn2(4) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                    (void)mongets(mtmp, !rn2(10) ? POT_FULL_ENERGY : !rn2(5) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
 
                 n = rn2(3);
                 for (i = 0; i < n; i++)
@@ -2027,7 +2030,7 @@ register struct monst *mtmp;
 
             //Potion of gain energy
             if (!rn2(5))
-                (void)mongets(mtmp, !rn2(20) ? POT_FULL_ENERGY : !rn2(7) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                (void)mongets(mtmp, !rn2(20) ? POT_FULL_ENERGY : !rn2(7) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
 
             if (!rn2(6))
                 (void)mongets(mtmp, WAN_CREATE_MONSTER);
@@ -2055,12 +2058,12 @@ register struct monst *mtmp;
         if (ptr == &mons[PM_OGRE_MAGE])
         {
             if (!rn2(4))
-                (void)mongets(mtmp, !rn2(5) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                (void)mongets(mtmp, !rn2(5) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
         }
         else if (ptr == &mons[PM_OGRE_ARCHMAGE])
         {
             if (!rn2(3))
-                (void)mongets(mtmp, !rn2(3) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : POT_GAIN_ENERGY);
+                (void)mongets(mtmp, !rn2(3) ? POT_FULL_ENERGY : !rn2(2) ? POT_GREATER_ENERGY : !rn2(3) ? POT_EXTRA_ENERGY : POT_GAIN_ENERGY);
         }
 
         break;
@@ -2293,7 +2296,7 @@ boolean ghostly;
         && !(mvitals[mndx].mvflags & (uchar)MV_EXTINCT)) {
         if (wizard) {
             debugpline1("Automatically extinguished %s.",
-                        makeplural(pm_common_name(&mons[mndx])));
+                        pm_plural_name(&mons[mndx], 1));
         }
         mvitals[mndx].mvflags |= (uchar)MV_EXTINCT;
         reset_rndmonst(mndx);
@@ -2373,21 +2376,16 @@ struct monst* mon;
 /* set up a new monster's initial level and hit points;
    used by newcham() as well as by makemon() */
 void
-newmonhp(mon, mndx, mmflags)
+newmonhp(mon, mndx, level_adjustment, mmflags)
 struct monst *mon;
-int mndx;
+int mndx, level_adjustment;
 unsigned long mmflags;
 {
     struct permonst *ptr = &mons[mndx];
     boolean use_maxhp = !!(mmflags & MM_MAX_HP);
     boolean use_normalhd = !!(mmflags & MM_NORMAL_HIT_DICE);
-    //boolean adj_existing_hp = !!(mmflags & MM_ADJUST_HP_FROM_EXISTING);
-    //int old_maxhp = mon->mhpmax;
-    //int old_basemaxhp = mon->mbasehpmax;
-    //int old_hp = mon->mhp;
 
-    //if(!adj_existing_hp)
-    mon->m_lev = use_normalhd ? ptr->mlevel : adj_lev(ptr);
+    mon->m_lev = use_normalhd ? ptr->mlevel : adj_lev(ptr, level_adjustment);
 
     boolean dragonmaxhp = !!(ptr->mlet == S_DRAGON && mndx >= PM_GRAY_DRAGON && In_endgame(&u.uz));
 
@@ -2584,17 +2582,17 @@ register struct permonst* ptr;
 register int x, y;
 unsigned long mmflags;
 {
-    return makemon_limited(ptr, x, y, mmflags, 0, 0);
+    return makemon_limited(ptr, x, y, mmflags, 0, 0, 0);
 }
 
 struct monst*
-makemon_ex(ptr, x, y, mmflags, subtype)
+makemon_ex(ptr, x, y, mmflags, subtype, level_adjustment)
 register struct permonst* ptr;
 register int x, y;
 unsigned long mmflags;
-int subtype;
+int subtype, level_adjustment;
 {
-    return makemon_limited(ptr, x, y, mmflags, subtype, 0);
+    return makemon_limited(ptr, x, y, mmflags, subtype, 0, level_adjustment);
 }
 
 /*
@@ -2605,12 +2603,12 @@ int subtype;
  *      In case we make a monster group, only return the one at [x,y].
  */
 struct monst *
-makemon_limited(ptr, x, y, mmflags, subtype, level_limit)
+makemon_limited(ptr, x, y, mmflags, subtype, level_limit, level_adjustment)
 register struct permonst *ptr;
 register int x, y;
 unsigned long mmflags;
 int subtype;
-int level_limit;
+int level_limit, level_adjustment;
 {
     register struct monst *mtmp;
     int mndx = NON_PM, mcham, ct, mitem;
@@ -2619,6 +2617,7 @@ int level_limit;
     boolean allow_minvent = ((mmflags & MM_NO_MONSTER_INVENTORY) == 0);
     boolean countbirth = ((mmflags & MM_NOCOUNTBIRTH) == 0);
     boolean setorigin = ((mmflags & MM_SET_ORIGIN_COORDINATES) == 0);
+    boolean saddled = ((mmflags & MM_SADDLED) != 0);
     unsigned long gpflags = (mmflags & MM_IGNOREWATER) ? MM_IGNOREWATER : 0;
     int origin_x = x, origin_y = y;
 
@@ -2844,7 +2843,7 @@ int level_limit;
     }
     
     /* set up level and hit points */
-    newmonhp(mtmp, mndx, mmflags);
+    newmonhp(mtmp, mndx, level_adjustment, mmflags);
 
     /* set up the number of heads */
     mtmp->heads_left = ptr->heads;
@@ -3095,7 +3094,7 @@ int level_limit;
         m_initinv(mtmp); /* add on a few special items incl. more armor */
         m_dowear(mtmp, TRUE);
 
-        if (!rn2(100) && is_domestic(ptr)
+        if ((saddled || (!rn2(100) && is_domestic(ptr)))
             && can_saddle(mtmp) && !which_armor(mtmp, W_SADDLE)) 
         {
             struct obj *otmp = mksobj(SADDLE, TRUE, FALSE, FALSE);
@@ -3520,7 +3519,7 @@ int difficulty_level_adjustment;
     if (i == 1)
     {
         /* Try first with a tighter range */
-        minmlev = (int)min(25.0, max(0.0, (zlevel_formin + (double)u.ulevel) * min_multiplier / 2.5 - 1.0));
+        minmlev = (int)min(25.0, max(0.0, (zlevel_formin + (double)u.ulevel) * min_multiplier / 1.66 - 1.0));
         maxmlev = (int)max(1.0, (zlevel_formax + (double)u.ulevel) * max_multiplier + 0.5);
 #if 0
         midmlev = (zlevel * 2 + u.ulevel) / 3;
@@ -3530,7 +3529,7 @@ int difficulty_level_adjustment;
     }
     else if (i == 2)
     {
-        minmlev = (int)min(15.0, max(0.0, (zlevel_formin + (double)u.ulevel) * min_multiplier / 5.0 - 1.0));
+        minmlev = (int)min(15.0, max(0.0, (zlevel_formin + (double)u.ulevel) * min_multiplier / 2.5 - 1.0));
         maxmlev = (int)max(1.0, (zlevel_formax + (double)u.ulevel) * 1.189 * max_multiplier + 0.5);
 #if 0
         minmlev = ((zlevel * 2 + u.ulevel) * min_multiplier) / (12 * min_divisor);
@@ -3589,11 +3588,9 @@ int mndx, mvflagsmask, genomask;
         return FALSE;
     if (ptr->geno & genomask)
         return FALSE;
-#ifdef MAIL
     /* special levels might ask for random demon type; reject this one */
     if (ptr == &mons[PM_MAIL_DAEMON])
         return FALSE;
-#endif
     return TRUE;
 }
 
@@ -3701,7 +3698,7 @@ int difficulty_adj;
                    being picked nearly twice as often as succubus);
                    we need the '+1' in case the entire set is too high
                    level (really low level hero) */
-                nums[last] = k + 1 - (adj_lev(&mons[last]) > (u.ulevel * 2));
+                nums[last] = k + 1 - (adj_lev(&mons[last], 0) > (u.ulevel * 2));
                 num += nums[last];
             }
         }
@@ -3756,8 +3753,9 @@ int mclass;
 
 /* adjust strength of monsters based on u.uz and u.ulevel */
 int
-adj_lev(ptr)
+adj_lev(ptr, manual_adj)
 register struct permonst *ptr;
+int manual_adj;
 {
     int tmp, tmp2;
 
@@ -3771,7 +3769,8 @@ register struct permonst *ptr;
         return tmp;
     }
 
-    if ((tmp = ptr->mlevel) > MAX_MONSTER_LEVEL)
+    tmp = ptr->mlevel + manual_adj;
+    if (tmp > MAX_MONSTER_LEVEL)
         return MAX_MONSTER_LEVEL; /* "special" demons/devils */
     tmp2 = (level_difficulty() - tmp);
     if (tmp2 < 0)
@@ -3783,9 +3782,11 @@ register struct permonst *ptr;
     if (tmp2 > 0)
         tmp += (tmp2 / 4); /* level as well */
 
-    tmp2 = (3 * ((int) ptr->mlevel)) / 2; /* crude upper limit */
+    tmp2 = (3 * ((int) ptr->mlevel)) / 2 + manual_adj; /* crude upper limit */
     if (tmp2 > MAX_MONSTER_LEVEL)
         tmp2 = MAX_MONSTER_LEVEL;  /* hard upper limit */
+    if (tmp2 < 0)
+        tmp2 = 0;  /* hard lower limit */
     return ((tmp > tmp2) ? tmp2 : (tmp > 0 ? tmp : 0)); /* 0 lower limit */
 }
 
@@ -4099,7 +4100,7 @@ int otyp;
 }
 
 struct obj*
-mon_gets_noinit_item(mtmp, otyp, number)
+mongets_noinit_item(mtmp, otyp, number)
 struct monst* mtmp;
 int otyp;
 int number;
@@ -4124,6 +4125,20 @@ int number;
 
     return (struct obj*)0;
 }
+
+
+struct obj*
+mongets_spellbook(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return (struct obj*)0;
+    struct obj* otmp = mkobj(SPBOOK_CLASS, FALSE, FALSE);
+    if (otmp)
+        (void)mpickobj(mtmp, otmp);
+    return otmp;
+}
+
 
 
 int

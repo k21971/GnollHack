@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    role.c    $NHDT-Date: 1547086250 2019/01/10 02:10:50 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
@@ -97,16 +97,17 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_CONJURATION_SPELL */
             SKILL_PROGRESS_NONE, /* P_CELESTIAL_SPELL */
             SKILL_PROGRESS_NONE, /* P_NATURE_SPELL */
-            SKILL_PROGRESS_NONE, /* P_NECROMANCY_SPELL */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_NECROMANCY_SPELL */
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
             SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
-    
     },
     { { "Barbarian", 0 },
       { { "Plunderer", "Plunderess" },
@@ -178,10 +179,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Caveman", "Cavewoman" },
       { { "Troglodyte", 0 },
         { "Aborigine", 0 },
@@ -252,10 +256,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Healer", 0 },
       { { "Rhizotomist", 0 },
         { "Empiric", 0 },
@@ -325,10 +332,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */       
+        }
+    },
     { { "Knight", 0 },
       { { "Gallant", 0 },
         { "Esquire", 0 },
@@ -358,7 +368,7 @@ const struct Role roles[] = {
       MH_HUMAN | MH_DWARF | ROLE_MALE | ROLE_FEMALE | ROLE_LAWFUL,
       /* Str Int Wis Dex Con Cha */
       { 15,  7, 12,  8, 14, 17 },
-      { 30, 15, 15, 10, 20, 10 },
+      { 30, 5, 15, 20, 25, 5 },
       /* Init   Lower  Higher */
       { 15, 0, 0, 11, 2, 1 }, /* Hit points */
       { 3, 2, 3, 2, 3, 2 }, /* Energy 1d3+2*/
@@ -398,10 +408,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_BASIC, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Monk", 0 },
       { { "Candidate", 0 },
         { "Novice", 0 },
@@ -478,10 +491,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_BASIC, /* P_DODGE */
+            SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Priest", "Priestess" },
       { { "Aspirant", 0 },
         { "Acolyte", 0 },
@@ -552,10 +568,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     /* Note:  Rogue precedes Ranger so that use of `-R' on the command line
        retains its traditional meaning. */
     { { "Rogue", 0 },
@@ -627,10 +646,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_BASIC, /* P_DODGE */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Ranger", 0 },
       {
 #if 0 /* OBSOLETE */
@@ -715,10 +737,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Samurai", 0 },
       { { "Hatamoto", 0 },       /* Banner Knight */
         { "Ronin", 0 },          /* no allegiance */
@@ -788,10 +813,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Tourist", 0 },
       { { "Rambler", 0 },
         { "Sightseer", 0 },
@@ -861,10 +889,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        }
-      },
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+        }
+    },
     { { "Valkyrie", 0 },
       { { "Stripling", 0 },
         { "Skirmisher", 0 },
@@ -934,11 +965,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_INI_BASIC, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
             SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
-      },
+    },
     { { "Wizard", 0 },
       { { "Evoker", 0 },
         { "Conjurer", 0 },
@@ -1009,11 +1042,13 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
+            SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
             SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
-      },
+    },
     /* Array terminator */
     { { 0, 0 } }
 };
@@ -1042,6 +1077,7 @@ struct Role urole = {
      0,
      0,
     {
+        SKILL_PROGRESS_NONE,
         SKILL_PROGRESS_NONE,
         SKILL_PROGRESS_NONE,
         SKILL_PROGRESS_NONE,
@@ -2641,9 +2677,7 @@ struct monst *mtmp;
         return "Aloha"; /* Hawaiian */
     case PM_VALKYRIE:
         return
-#ifdef MAIL
                (mtmp && mtmp->data == &mons[PM_MAIL_DAEMON]) ? "Hallo" :
-#endif
                "Velkommen"; /* Norse */
     default:
         return "Hello";

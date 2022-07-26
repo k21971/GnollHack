@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    rumors.c    $NHDT-Date: 1545132266 2018/12/18 11:24:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.34 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -430,7 +430,7 @@ int fd, mode;
     if (perform_bwrite(mode)) {
         bwrite(fd, (genericptr_t) &oracle_cnt, sizeof oracle_cnt);
         if (oracle_cnt)
-            bwrite(fd, (genericptr_t) oracle_loc, oracle_cnt * sizeof(long));
+            bwrite(fd, (genericptr_t) oracle_loc, oracle_cnt * sizeof(unsigned long));
     }
     if (release_data(mode)) {
         if (oracle_cnt) {
@@ -446,8 +446,8 @@ int fd;
 {
     mread(fd, (genericptr_t) &oracle_cnt, sizeof oracle_cnt);
     if (oracle_cnt) {
-        oracle_loc = (unsigned long *) alloc(oracle_cnt * sizeof(long));
-        mread(fd, (genericptr_t) oracle_loc, oracle_cnt * sizeof(long));
+        oracle_loc = (unsigned long *) alloc(oracle_cnt * sizeof(unsigned long));
+        mread(fd, (genericptr_t) oracle_loc, oracle_cnt * sizeof(unsigned long));
         oracle_flg = 1; /* no need to call init_oracles() */
     }
 }
@@ -505,13 +505,18 @@ int oraclesstyle; /* 0 = cookie, 1 = oracle, 2 = spell */
         if (mtmp && oraclesstyle == 1)
             play_voice_oracle_major_consultation(mtmp, oracle_idx - 1);
 
-        while (dlb_fgets(line, COLNO, oracles) && strcmp(line, "---\n")) {
+        while (dlb_fgets(line, COLNO, oracles) && strcmp(line, "---\n")) 
+        {
             if ((endp = index(line, '\n')) != 0)
                 *endp = 0;
-            putstr(tmpwin, 0, xcrypt(line, xbuf));
+            char* xcryptbuf = xcrypt(line, xbuf);
+            putstr(tmpwin, 0, xcryptbuf);
+            if(!u.uevent.elbereth_known && strstri(xcryptbuf, "Elbereth"))
+                u.uevent.elbereth_known = 1;
         }
         display_nhwindow(tmpwin, TRUE);
         destroy_nhwindow(tmpwin);
+
  close_oracles:
         (void) dlb_fclose(oracles);
     } else {
@@ -624,6 +629,13 @@ struct monst *oracl;
         more_experienced(add_xpts, 0); //  u_pay / 50);
         newexplevel();
     }
+
+    if (!u.uachieve.consulted_oracle)
+    {
+        //achievement_gained("Consulted the Oracle");
+        u.uachieve.consulted_oracle = 1;
+    }
+
     return 1;
 }
 

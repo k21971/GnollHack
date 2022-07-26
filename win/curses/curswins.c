@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 curswins.c */
@@ -126,8 +126,13 @@ curses_create_window(int width, int height, orient orientation)
         } else {
             startx = term_cols - width;
         }
+        if (height >= term_rows)
+            starty = 0;
+        else if (height <= maph)
+            starty = mapy + mapb_offset;
+        else
+            starty = (term_rows / 2) - (height / 2);
 
-        starty = 0;
         break;
     }
 

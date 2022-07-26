@@ -134,7 +134,7 @@ struct autodraw_definition {
 #define AUTODRAW_DIR_UP 0x04
 #define AUTODRAW_DIR_DOWN 0x08
 
-extern NEARDATA struct autodraw_definition autodraws[];
+extern NEARDATA const struct autodraw_definition autodraws[];
 
 
 
@@ -204,6 +204,7 @@ enum animation_types
     KOBOLD_ANIMATION,
     LARGE_KOBOLD_ANIMATION,
     KOBOLD_LORD_ANIMATION,
+    KOBOLD_LADY_ANIMATION,
     KOBOLD_SHAMAN_ANIMATION,
     FREEZING_SPHERE_STAND_ANIMATION,
     FLAMING_SPHERE_STAND_ANIMATION,
@@ -1109,7 +1110,7 @@ enum animation_types
 #define TELEPORT_CURSOR_ANIMATION_FRAMES 3
 #define TELEPORT_CURSOR_ANIMATION_TILES 3
 
-extern NEARDATA struct animation_definition animations[];
+extern NEARDATA const struct animation_definition animations[];
 
 
 /* Enlargement sets */
@@ -2186,7 +2187,7 @@ enum enlargement_types
 #define BLACK_LIGHT_FLASH_ENLARGEMENT_TILES 2
 #define OGRE_ENLARGEMENT_TILES 5
 
-extern NEARDATA struct enlargement_definition enlargements[];
+extern NEARDATA const struct enlargement_definition enlargements[];
 
 
 /* Replacements */
@@ -2222,6 +2223,7 @@ enum replacement_action_types
     REPLACEMENT_ACTION_PRISONER_STATUE,
     REPLACEMENT_ACTION_ALTERNATIVE_APPEARANCE,
     REPLACEMENT_ACTION_GLOB,
+    REPLACEMENT_ACTION_ACOLYTE,
 };
 
 
@@ -2403,6 +2405,12 @@ enum replacement_types
     BROWN_GLOB_REPLACEMENT,
     GRAY_GLOB_REPLACEMENT,
     GREEN_GLOB_REPLACEMENT,
+    ACOLYTE_MALE_REPLACEMENT,
+    ACOLYTE_FEMALE_REPLACEMENT,
+    ARCH_PRIEST_REPLACEMENT,
+    ACOLYTE_MALE_STATUE_REPLACEMENT,
+    ACOLYTE_FEMALE_STATUE_REPLACEMENT,
+    ARCH_PRIEST_STATUE_REPLACEMENT,
     MAX_REPLACEMENTS
 };
 
@@ -2462,8 +2470,9 @@ enum replacement_types
 #define PRISONER_CHAINED_REPLACEMENT_TILES 1
 #define COTTON_SLIPPERS_REPLACEMENT_TILES 1
 #define GLOB_REPLACEMENT_TILES 3
+#define ACOLYTE_REPLACEMENT_TILES 2
 
-extern NEARDATA struct replacement_definition replacements[];
+extern NEARDATA const struct replacement_definition replacements[];
 
 
 /* Special effects */
@@ -2515,7 +2524,7 @@ struct special_effect_definition {
     short /*enum enlargement_types*/ enlargement;
 };
 
-extern NEARDATA struct special_effect_definition special_effects[MAX_SPECIAL_EFFECTS];
+extern NEARDATA const struct special_effect_definition special_effects[MAX_SPECIAL_EFFECTS];
 
 
 struct game_cursor_definition {
@@ -2526,7 +2535,7 @@ struct game_cursor_definition {
 };
 
 
-extern NEARDATA struct game_cursor_definition game_cursors[MAX_CURSORS];
+extern NEARDATA const struct game_cursor_definition game_cursors[MAX_CURSORS];
 
 struct hit_tile_definition {
     const char* name;
@@ -2535,7 +2544,7 @@ struct hit_tile_definition {
     short /*enum enlargement_types*/ enlargement;
 };
 
-extern NEARDATA struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES];
+extern NEARDATA const struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES];
 
 
 struct general_tile_definition {
@@ -2545,7 +2554,7 @@ struct general_tile_definition {
     short /*enum enlargement_types*/ enlargement;
 };
 
-extern NEARDATA struct general_tile_definition general_tile_definitions[MAX_GENERAL_TILES];
+extern NEARDATA const struct general_tile_definition general_tile_definitions[MAX_GENERAL_TILES];
 
 #define MAX_PLAYED_SPECIAL_EFFECTS 12  // Must be greater than or equal to MAXNASTIES
 #define MAX_PLAYED_ZAP_ANIMATIONS 16

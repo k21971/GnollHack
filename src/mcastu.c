@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mcastu.c    $NHDT-Date: 1436753517 2015/07/13 02:11:57 $  $NHDT-Branch: master $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -312,7 +312,7 @@ boolean foundyou;
         return (0);
     }
 
-    *appr_spec_ptr = is_ultimate ? d(3, 20) + 60 : is_intermediate ? d(1, 6) + 14 : rnd(2) + 1;
+    *appr_spec_ptr = (is_ultimate ? d(3, 20) + 60 : is_intermediate ? d(1, 6) + 14 : rnd(2) + 1) / mon_spec_cooldown_divisor(mtmp);
 
     /* monster can cast spells, but is casting a directed spell at the
        wrong place?  If so, give a message, and return.  Do this *after*
@@ -437,13 +437,13 @@ boolean foundyou;
         }
         break;
     case AD_MAGM:
-        You("are hit by a shower of missiles!");
+        You_ex(ATR_NONE, CLR_MSG_SPELL, "are hit by a shower of missiles!");
         if (iflags.using_gui_sounds)
         {
             delay_output_milliseconds(200);
             play_sfx_sound(SFX_HAIL_OF_MAGIC_MISSILES_HITS);
         }
-        if (Magic_missile_immunity || Antimagic_or_resistance || Invulnerable) {
+        if (Magic_missile_immunity || Invulnerable) {
             play_sfx_sound(SFX_GENERAL_REFLECTS);
             u_shieldeff();
             pline_The("missiles bounce off!");
@@ -641,7 +641,7 @@ int spellnum;
         if (Antimagic_or_resistance) {
             play_sfx_sound(SFX_GENERAL_RESISTS);
             u_shieldeff();
-            pline("A field of force surrounds you!");
+            pline_ex(ATR_NONE, CLR_MSG_SPELL, "A field of force surrounds you!");
         }
         else if (uarmc && uarmc->otyp == CLOAK_OF_INTEGRITY) {
             play_sfx_sound(SFX_GENERAL_RESISTS);
@@ -658,7 +658,7 @@ int spellnum;
         if (Antimagic_or_resistance) {
             play_sfx_sound(SFX_GENERAL_RESISTS);
             u_shieldeff();
-            You_feel("momentarily weakened.");
+            You_feel_ex(ATR_NONE, CLR_MSG_SPELL, "momentarily weakened.");
         }
         else 
         {
@@ -694,7 +694,7 @@ int spellnum;
             if (!Stunned)
             {
                 play_sfx_sound(SFX_DISORIENTED_FOR_MOMENT);
-                You_feel("momentarily disoriented.");
+                You_feel_ex(ATR_NONE, CLR_MSG_SPELL, "momentarily disoriented.");
             }
             make_stunned(1L, FALSE);
         } else {
@@ -831,6 +831,7 @@ int spellnum;
         destroy_item(POTION_CLASS, AD_FIRE);
         destroy_item(SPBOOK_CLASS, AD_FIRE);
         (void) burn_floor_objects(u.ux, u.uy, TRUE, FALSE);
+        item_destruction_hint(AD_FIRE, FALSE);
         break;
     case CLC_LIGHTNING: {
         boolean reflects;
@@ -848,6 +849,7 @@ int spellnum;
         destroy_item(WAND_CLASS, AD_ELEC);
         destroy_item(RING_CLASS, AD_ELEC);
         (void) flashburn((long) rnd(100));
+        item_destruction_hint(AD_ELEC, FALSE);
         break;
     }
     case CLC_CURSE_ITEMS:
@@ -1329,7 +1331,7 @@ register struct attack *mattk;
                 pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s casts \'%s\' at you!", Monnam(mtmp),
                       flash_types[ad_to_typ(adtyp)]);
             buzz(-ad_to_typ(adtyp), (struct obj*)0, mtmp, damn, damd, damp, mtmp->mx, mtmp->my, sgn(tbx), sgn(tby));
-            *appr_spec_ptr = is_ultimate ? d(2, 8) + 100 : d(2, 4) + 10;
+            *appr_spec_ptr = (is_ultimate ? d(2, 8) + 100 : d(2, 4) + 10) / mon_spec_cooldown_divisor(mtmp);
         }
         else
             impossible("Monster spell %d cast", mattk->adtyp - 1);

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    steal.c    $NHDT-Date: 1554580626 2019/04/06 19:57:06 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.72 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -129,7 +129,7 @@ register struct monst *mtmp;
         /* reduce "rear hooves/claws" to "hooves/claws" */
         if (!strncmp(what, "rear ", 5))
             what += 5;
-        pline("%s quickly snatches some gold from %s %s %s!", Monnam(mtmp),
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s quickly snatches some gold from %s %s %s!", Monnam(mtmp),
               (Levitation || Flying) ? "beneath" : "between", whose, what);
         if (!ygold || !rn2(5)) {
             if (!tele_restrict(mtmp))
@@ -152,10 +152,10 @@ register struct monst *mtmp;
 
         char ftbuf[BUFSZ];
         Sprintf(ftbuf, "-%ld gold", tmp);
-        display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_STOLEN, ATR_NONE, NO_COLOR, 0UL);
+        display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_REDUCED, ATR_NONE, NO_COLOR, 0UL);
 
         play_sfx_sound(SFX_STEAL_GOLD);
-        Your("purse feels lighter.");
+        Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "purse feels lighter.");
         if (!tele_restrict(mtmp))
         {
             (void)rloc2(mtmp, TRUE, TRUE);
@@ -186,7 +186,7 @@ stealarm(VOID_ARGS)
                     if (otmp->unpaid)
                         subfrombill(otmp, shop_keeper(*u.ushops));
                     freeinv(otmp);
-                    pline("%s steals %s!", Monnam(mtmp), doname(otmp));
+                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s steals %s!", Monnam(mtmp), doname(otmp));
                     (void) mpickobj(mtmp, otmp); /* may free otmp */
                     /* Implies seduction, "you gladly hand over ..."
                        so we don't set mavenge bit here. */
@@ -239,7 +239,7 @@ boolean unchain_ball; /* whether to unpunish or just unwield */
             (void) Helmet_off();
         else if (obj == uarms && is_shield(obj))
             (void) Shield_off();
-        else if (obj == uarms && is_wielded_weapon(obj))
+        else if (obj == uarms && is_wieldable_weapon(obj))
             uwep2gone();
         else if (obj == uarmu)
             (void) Shirt_off();
@@ -308,9 +308,9 @@ char *objnambuf;
     nothing_to_steal:
         /* Not even a thousand men in armor can strip a naked man. */
         if (Blind)
-            pline("Somebody tries to rob you, but finds nothing to steal.");
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Somebody tries to rob you, but finds nothing to steal.");
         else
-            pline("%s tries to rob you, but there is nothing to steal!",
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s tries to rob you, but there is nothing to steal!",
                   Monnam(mtmp));
         return 1; /* let her flee */
     }
@@ -392,7 +392,7 @@ gotobj:
             static const char *const how[] = { "steal", "snatch", "grab",
                                                "take" };
         cant_take:
-            pline("%s tries to %s %s%s but gives up.", Monnam(mtmp),
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s tries to %s %s%s but gives up.", Monnam(mtmp),
                   how[rn2(SIZE(how))],
                   (otmp->owornmask & W_ARMOR) ? "your " : "",
                   (otmp->owornmask & W_ARMOR) ? equipname(otmp)
@@ -417,7 +417,11 @@ gotobj:
     /* you're going to notice the theft... */
     stop_occupation();
 
-    if (otmp->owornmask & (W_ARMOR | W_ACCESSORY)) {
+    long wmask = W_WORN_NOT_WIELDED;
+    if (uarms && is_shield(uarms))
+        wmask |= W_ARMS;
+
+    if (otmp->owornmask & wmask) {
         switch (otmp->oclass) {
         case TOOL_CLASS:
         case AMULET_CLASS:
@@ -448,7 +452,7 @@ gotobj:
                     unmul((char *) 0);
                 slowly = (armordelay >= 1 || multi < 0 || Sleeping || Paralyzed_or_immobile);
                 if (flags.female)
-                    pline("%s charms you.  You gladly %s your %s.",
+                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s charms you.  You gladly %s your %s.",
                           !seen ? "She" : Monnam(mtmp),
                           curssv ? "let her take"
                                  : !slowly ? "hand over"
@@ -456,7 +460,7 @@ gotobj:
                                                          : "start removing",
                           equipname(otmp));
                 else
-                    pline("%s seduces you and %s off your %s.",
+                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s seduces you and %s off your %s.",
                           !seen ? "She" : Adjmonnam(mtmp, "beautiful"),
                           curssv
                               ? "helps you to take"
@@ -502,7 +506,7 @@ gotobj:
         subfrombill(otmp, shop_keeper(*u.ushops));
     freeinv(otmp);
     play_sfx_sound(SFX_STEAL_ITEM);
-    pline("%s stole %s.", named ? "She" : Monnam(mtmp), doname(otmp));
+    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s stole %s.", named ? "She" : Monnam(mtmp), doname(otmp));
     could_petrify =
         (otmp->otyp == CORPSE && touch_petrifies(&mons[otmp->corpsenm]));
     (void) mpickobj(mtmp, otmp); /* may free otmp */
@@ -511,6 +515,10 @@ gotobj:
     {
         start_delayed_petrification(mtmp, FALSE);
     }
+    if(mtmp->mnum == PM_HARPY)
+        standard_hint("You can use a wand of slow monster on the harpy, or a wand of lightning to blind the harpy, and then kill it with ranged weapons. Consider also genociding harpies as early as possible.", &u.uhint.stuff_got_stolen_by_harpy);
+    else
+        standard_hint("Consider killing stealing monsters with ranged weapons before they come close to you.", &u.uhint.stuff_got_stolen);
     return (multi < 0) ? 0 : 1;
 }
 
@@ -652,7 +660,7 @@ struct monst *mtmp;
         Strcpy(buf, doname(otmp));
         (void) mpickobj(mtmp, otmp); /* could merge and free otmp but won't */
         play_sfx_sound(SFX_STEAL_ITEM);
-        pline("%s steals %s!", Monnam(mtmp), buf);
+        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s steals %s!", Monnam(mtmp), buf);
         if (has_teleportation(mtmp) && !tele_restrict(mtmp))
         {
             (void)rloc2(mtmp, TRUE, TRUE);
@@ -801,7 +809,7 @@ struct monst *mon;
 
 /* release the objects the creature is carrying */
 void
-relobj(mtmp, show, is_pet, is_mon_dead)
+release_monster_objects(mtmp, show, is_pet, is_mon_dead)
 struct monst *mtmp;
 int show;
 boolean is_pet; /* If true, pet should keep wielded/worn items */
@@ -874,6 +882,10 @@ boolean is_mon_dead;
                     dismount_steed(DISMOUNT_FELL);
             }
 
+            if (otmp->oartifact)
+            {
+                artifact_taken_away(otmp->oartifact); //It can now be generated again some time later
+            }
             obfree(otmp, (struct obj*) 0); //Delete the item
         }
         else

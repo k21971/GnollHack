@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    muse.c    $NHDT-Date: 1547025167 2019/01/09 09:12:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /*      Copyright (C) 1990 by Ken Arromdee                         */
@@ -67,7 +67,7 @@ struct obj *obj;
 {
     boolean vis;
 
-    if (!obj)
+    if (!obj || !mon)
         return 0;
     vis = cansee(mon->mx, mon->my);
 
@@ -140,7 +140,7 @@ struct obj *obj;
             return 2;
         }
     }
-    if (obj->oclass == WAND_CLASS && obj->cursed
+    if (obj->oclass == WAND_CLASS && obj->cursed && !is_cancelled(mon)
         && !rn2(WAND_BACKFIRE_CHANCE)) {
         int dam = d(obj->charges + 2, 6);
 
@@ -578,7 +578,7 @@ struct monst *mtmp;
         /* nomore(MUSE_WAN_DIGGING); */
         if (m.has_defense == MUSE_WAN_DIGGING)
             break;
-        if (obj->otyp == WAN_DIGGING && obj->charges > 0 && !stuck && !t
+        if (obj->otyp == WAN_DIGGING && obj->charges > 0 && !is_cancelled(mtmp) && !stuck && !t
             && !mtmp->isshk && !mtmp->isgd && !mtmp->ispriest && !mtmp->issmith && !mtmp->isnpc
             && !is_floater(mtmp->data)
             /* monsters digging in Sokoban can ruin things */
@@ -595,7 +595,7 @@ struct monst *mtmp;
         }
         nomore(MUSE_WAN_TELEPORTATION_SELF);
         nomore(MUSE_WAN_TELEPORTATION);
-        if (obj->otyp == WAN_TELEPORTATION && obj->charges > 0 && !level.flags.noteleport)
+        if (obj->otyp == WAN_TELEPORTATION && obj->charges > 0 && !is_cancelled(mtmp) && !level.flags.noteleport)
         {
             /* use the TELEP_TRAP bit to determine if they know
              * about noteleport on this level or not.  Avoids
@@ -648,7 +648,7 @@ struct monst *mtmp;
                 m.has_defense = MUSE_POT_EXTRA_HEALING;
             }
             nomore(MUSE_WAN_CREATE_MONSTER);
-            if (obj->otyp == WAN_CREATE_MONSTER && obj->charges > 0)
+            if (obj->otyp == WAN_CREATE_MONSTER && obj->charges > 0 && !is_cancelled(mtmp))
             {
                 m.defensive = obj;
                 m.has_defense = MUSE_WAN_CREATE_MONSTER;
@@ -669,7 +669,7 @@ struct monst *mtmp;
                 m.has_defense = MUSE_POT_FULL_HEALING;
             }
             nomore(MUSE_WAN_CREATE_MONSTER);
-            if (obj->otyp == WAN_CREATE_MONSTER && obj->charges > 0)
+            if (obj->otyp == WAN_CREATE_MONSTER && obj->charges > 0 && !is_cancelled(mtmp))
             {
                 m.defensive = obj;
                 m.has_defense = MUSE_WAN_CREATE_MONSTER;
@@ -935,7 +935,7 @@ struct monst *mtmp;
             makeknown(SCR_CREATE_MONSTER);
         else if (!objects[SCR_CREATE_MONSTER].oc_name_known
                  && !objects[SCR_CREATE_MONSTER].oc_uname)
-            docall(otmp);
+            docall(otmp, (char*)0);
         m_useup(mtmp, otmp);
         return 2;
     }
@@ -1103,6 +1103,8 @@ struct monst *mtmp;
             mtmp->mhp = (mtmp->mhpmax += (otmp->blessed ? 2 : 0));
         if (is_blinded(mtmp))
             mcureblindness(mtmp, vismon);
+        if (is_mummy_rotted(mtmp))
+            mtmp->mprops[MUMMY_ROT] &= ~(M_INTRINSIC_ACQUIRED | M_TIMEOUT);
         if (vismon)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks much better.", Monnam(mtmp));
         if (oseen)
@@ -1119,6 +1121,8 @@ struct monst *mtmp;
             mtmp->mhp = (mtmp->mhpmax += (otmp->blessed ? 3 : 0));
         if (is_blinded(mtmp))
             mcureblindness(mtmp, vismon);
+        if (is_mummy_rotted(mtmp))
+            mtmp->mprops[MUMMY_ROT] &= ~(M_INTRINSIC_ACQUIRED | M_TIMEOUT);
         if (vismon)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks much, much better.", Monnam(mtmp));
         if (oseen)
@@ -1134,6 +1138,8 @@ struct monst *mtmp;
         mtmp->mhp = (mtmp->mhpmax += (otmp->blessed ? 8 : 4));
         if (is_blinded(mtmp) && otmp->otyp != POT_SICKNESS)
             mcureblindness(mtmp, vismon);
+        if (is_mummy_rotted(mtmp) && otmp->otyp != POT_SICKNESS)
+            mtmp->mprops[MUMMY_ROT] &= ~(M_INTRINSIC_ACQUIRED | M_TIMEOUT);
         if (vismon)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks completely healed.", Monnam(mtmp));
         if (oseen)
@@ -1283,72 +1289,72 @@ struct monst *mtmp;
         if (!reflection_skip) 
         {
             nomore(MUSE_WAN_DEATH);
-            if (obj->otyp == WAN_DEATH && obj->charges > 0 && !death_resistant_skip && !level_skip_powerful_wand
+            if (obj->otyp == WAN_DEATH && obj->charges > 0 && !is_cancelled(mtmp) && !death_resistant_skip && !level_skip_powerful_wand
                 && lined_up(mtmp, TRUE, AD_DRAY, TRUE, M_RAY_RANGE)) 
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_DEATH;
             }
             nomore(MUSE_WAN_DISINTEGRATION);
-            if (obj->otyp == WAN_DISINTEGRATION && obj->charges > 0 && !disintegration_resistant_skip && ((!uarm && !uarms && !level_skip_powerful_wand) || ((uarm || uarms) && !level_skip_normal_wand))
+            if (obj->otyp == WAN_DISINTEGRATION && obj->charges > 0 && !is_cancelled(mtmp) && !disintegration_resistant_skip && ((!uarm && !uarms && !level_skip_powerful_wand) || ((uarm || uarms) && !level_skip_normal_wand))
                 && lined_up(mtmp, TRUE, AD_DISN, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_DISINTEGRATION;
             }
             nomore(MUSE_WAN_PETRIFICATION);
-            if (obj->otyp == WAN_PETRIFICATION && obj->charges > 0 && !petrification_resistant_skip && !level_skip_powerful_wand
+            if (obj->otyp == WAN_PETRIFICATION && obj->charges > 0 && !is_cancelled(mtmp) && !petrification_resistant_skip && !level_skip_powerful_wand
                 && lined_up(mtmp, TRUE, AD_STON, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_PETRIFICATION;
             }
             nomore(MUSE_WAN_SLEEP);
-            if (obj->otyp == WAN_SLEEP && obj->charges > 0 && multi >= 0 && !Sleeping && !Paralyzed_or_immobile && !sleep_resistant_skip && !antimagic_skip && !level_skip_normal_wand &&
+            if (obj->otyp == WAN_SLEEP && obj->charges > 0 && !is_cancelled(mtmp) && multi >= 0 && !Sleeping && !Paralyzed_or_immobile && !sleep_resistant_skip && !antimagic_skip && !level_skip_normal_wand &&
                 lined_up(mtmp, TRUE, AD_SLEE, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_SLEEP;
             }
             nomore(MUSE_WAN_FIRE);
-            if (obj->otyp == WAN_FIRE && obj->charges > 0 && !fire_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_FIRE, TRUE, M_RAY_RANGE))
+            if (obj->otyp == WAN_FIRE && obj->charges > 0 && !is_cancelled(mtmp) && !fire_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_FIRE, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_FIRE;
             }
             nomore(MUSE_FIRE_HORN);
-            if (obj->otyp == FIRE_HORN && obj->charges > 0 && can_blow(mtmp) && !fire_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_FIRE, TRUE, M_RAY_RANGE))
+            if (obj->otyp == FIRE_HORN && obj->charges > 0 && !is_cancelled(mtmp) && can_blow(mtmp) && !fire_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_FIRE, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_FIRE_HORN;
             }
             nomore(MUSE_WAN_COLD);
-            if (obj->otyp == WAN_COLD && obj->charges > 0 && !cold_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_COLD, TRUE, M_RAY_RANGE))
+            if (obj->otyp == WAN_COLD && obj->charges > 0 && !is_cancelled(mtmp) && !cold_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_COLD, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_COLD;
             }
             nomore(MUSE_FROST_HORN);
-            if (obj->otyp == FROST_HORN && obj->charges > 0 && can_blow(mtmp) && !cold_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_COLD, TRUE, M_RAY_RANGE))
+            if (obj->otyp == FROST_HORN && obj->charges > 0 && !is_cancelled(mtmp) && can_blow(mtmp) && !cold_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_COLD, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_FROST_HORN;
             }
             nomore(MUSE_WAN_LIGHTNING);
-            if (obj->otyp == WAN_LIGHTNING && obj->charges > 0 && !shock_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_ELEC, TRUE, M_RAY_RANGE))
+            if (obj->otyp == WAN_LIGHTNING && obj->charges > 0 && !is_cancelled(mtmp) && !shock_resistant_skip && !level_skip_normal_wand && lined_up(mtmp, TRUE, AD_ELEC, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_LIGHTNING;
             }
             nomore(MUSE_WAN_MAGIC_MISSILE);
-            if (obj->otyp == WAN_MAGIC_MISSILE && obj->charges > 0 && !magic_missile_resistant_skip && !antimagic_skip && !level_skip_weak_wand && lined_up(mtmp, TRUE, AD_MAGM, TRUE, M_RAY_RANGE))
+            if (obj->otyp == WAN_MAGIC_MISSILE && obj->charges > 0 && !is_cancelled(mtmp) && !magic_missile_resistant_skip && !antimagic_skip && !level_skip_weak_wand && lined_up(mtmp, TRUE, AD_MAGM, TRUE, M_RAY_RANGE))
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_MAGIC_MISSILE;
             }
         }
         nomore(MUSE_WAN_STRIKING);
-        if (obj->otyp == WAN_STRIKING && obj->charges > 0 && !magic_missile_resistant_skip && !level_skip_weak_wand && lined_up(mtmp, TRUE, AD_MAGM, FALSE, M_RAY_RANGE))
+        if (obj->otyp == WAN_STRIKING && obj->charges > 0 && !is_cancelled(mtmp) && !magic_missile_resistant_skip && !level_skip_weak_wand && lined_up(mtmp, TRUE, AD_MAGM, FALSE, M_RAY_RANGE))
         {
             m.offensive = obj;
             m.has_offense = MUSE_WAN_STRIKING;
@@ -1456,6 +1462,7 @@ register struct monst* origmonst;
             seemimic(mtmp);
     }
 
+    int duration = get_obj_spell_duration(otmp);
     switch (otmp->otyp) 
     {
     case WAN_STRIKING:
@@ -1521,14 +1528,14 @@ register struct monst* origmonst;
     case SPE_CANCELLATION:
     case WAN_DISJUNCTION:
     case SPE_DISJUNCTION:
-        (void) cancel_monst(mtmp, otmp, FALSE, TRUE, FALSE, d(objects[otmp->otyp].oc_spell_dur_dice, objects[otmp->otyp].oc_spell_dur_diesize) + objects[otmp->otyp].oc_spell_dur_plus);
+        (void) cancel_monst(mtmp, otmp, FALSE, TRUE, FALSE, duration);
         break;
     case SPE_LOWER_MAGIC_RESISTANCE:
     case SPE_DIMINISH_MAGIC_RESISTANCE:
     case SPE_ABOLISH_MAGIC_RESISTANCE:
     case SPE_NEGATE_MAGIC_RESISTANCE:
     case SPE_FORBID_SUMMONING:
-        (void)add_temporary_property(mtmp, otmp, FALSE, TRUE, FALSE, d(objects[otmp->otyp].oc_spell_dur_dice, objects[otmp->otyp].oc_spell_dur_diesize) + objects[otmp->otyp].oc_spell_dur_plus);
+        (void)add_temporary_property(mtmp, otmp, FALSE, TRUE, FALSE, duration);
         break;
     }
     if (reveal_invis) {
@@ -1983,7 +1990,7 @@ struct monst *mtmp;
          * invisible unless you can see them.  Not really right, but...
          */
         nomore(MUSE_WAN_MAKE_INVISIBLE);
-        if (obj->otyp == WAN_MAKE_INVISIBLE && obj->charges > 0 && !has_invisibility(mtmp)
+        if (obj->otyp == WAN_MAKE_INVISIBLE && obj->charges > 0 && !is_cancelled(mtmp) && !has_invisibility(mtmp)
             && !has_blocks_invisibility(mtmp) && (!is_peaceful(mtmp) || See_invisible)
             && (!attacktype(mtmp->data, AT_GAZE) || is_cancelled(mtmp))) {
             m.misc = obj;
@@ -1997,7 +2004,7 @@ struct monst *mtmp;
             m.has_misc = MUSE_POT_INVISIBILITY;
         }
         nomore(MUSE_WAN_SPEED_MONSTER);
-        if (obj->otyp == WAN_SPEED_MONSTER && obj->charges > 0
+        if (obj->otyp == WAN_SPEED_MONSTER && obj->charges > 0 && !is_cancelled(mtmp)
             && !has_very_fast(mtmp) && !has_ultra_fast(mtmp) && !has_super_fast(mtmp) && !has_lightning_fast(mtmp) && !mtmp->isgd) {
             m.misc = obj;
             m.has_misc = MUSE_WAN_SPEED_MONSTER;
@@ -2018,7 +2025,7 @@ struct monst *mtmp;
             m.has_misc = MUSE_POT_LIGHTNING_SPEED;
         }
         nomore(MUSE_WAN_POLYMORPH);
-        if (obj->otyp == WAN_POLYMORPH && obj->charges > 0
+        if (obj->otyp == WAN_POLYMORPH && obj->charges > 0 && !is_cancelled(mtmp)
             && (mtmp->cham == NON_PM) && mons[mtmp->mnum].difficulty < 6) {
             m.misc = obj;
             m.has_misc = MUSE_WAN_POLYMORPH;
@@ -2084,12 +2091,14 @@ struct monst *mtmp;
                 if (on_level(&tolevel, &u.uz))
                     goto skipmsg;
                 if (vismon) {
+                    char dcbuf[BUFSZ] = "";
                     play_sfx_sound_at_location(SFX_CURSED_GAIN_LEVEL, mtmp->mx, mtmp->my);
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s rises up, through the %s!", Monnam(mtmp),
+                    Sprintf(dcbuf, "%s rises up, through the %s!", Monnam(mtmp),
                           ceiling(mtmp->mx, mtmp->my));
+                    pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                     if (!objects[POT_GAIN_LEVEL].oc_name_known
                         && !objects[POT_GAIN_LEVEL].oc_uname)
-                        docall(otmp);
+                        docall(otmp, dcbuf);
                 }
                 m_useup(mtmp, otmp);
                 migrate_to_level(mtmp, ledger_no(&tolevel), MIGR_RANDOM,
@@ -2098,10 +2107,12 @@ struct monst *mtmp;
             } else {
  skipmsg:
                 if (vismon) {
-                    pline("%s looks uneasy.", Monnam(mtmp));
+                    char dcbuf[BUFSZ] = "";
+                    Sprintf(dcbuf, "%s looks uneasy.", Monnam(mtmp));
+                    pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                     if (!objects[POT_GAIN_LEVEL].oc_name_known
                         && !objects[POT_GAIN_LEVEL].oc_uname)
-                        docall(otmp);
+                        docall(otmp, dcbuf);
                 }
                 m_useup(mtmp, otmp);
                 return 2;
@@ -2482,7 +2493,7 @@ const char *str;
             }
             return TRUE;
         }
-        else if (is_wielded_weapon(orefl))
+        else if (is_wieldable_weapon(orefl))
         {
             if (str)
             {
@@ -2556,7 +2567,7 @@ const char *fmt, *str;
                         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, fmt, str, "shield");
                     makeknown(uarms->otyp);
                 }
-                else if(is_wielded_weapon(uarms))
+                else if(is_wieldable_weapon(uarms))
                 {
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, fmt, str, "left hand weapon");
                 }
@@ -2580,7 +2591,7 @@ const char *fmt, *str;
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, fmt, str, "right hand shield");
                     makeknown(uwep->otyp);
                 }
-                else if (is_wielded_weapon(uwep))
+                else if (is_wieldable_weapon(uwep))
                 {
                     if(u.twoweap)
                         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, fmt, str, "right hand weapon");
@@ -2868,7 +2879,7 @@ boolean tinok;
     return (boolean) (obj->corpsenm == PM_LIZARD
                       || (has_acidic_corpse(&mons[obj->corpsenm])
                           && (obj->corpsenm != PM_GREEN_SLIME
-                              || slimeproof(mon->data))));
+                              || resists_slime(mon))));
 }
 
 STATIC_OVL boolean
@@ -2916,7 +2927,7 @@ boolean by_you;
      * (via our caller) newcham()'s "mon turns into slime" feedback.
      */
 
-    if (slimeproof(mptr))
+    if (resists_slime(mon))
         return FALSE;
     if (mon->meating || !mon_can_move(mon))
         return FALSE;
@@ -3032,7 +3043,7 @@ boolean by_you; /* true: if mon kills itself, hero gets credit/blame */
         if (vis)
             pline("%s breathes fire on %sself.", Monnam(mon), mhim(mon));
         if (!rn2(3))
-            mon->mspec_used = rn1(10, 5);
+            mon->mspec_used = rn1(10, 5) / mon_spec_cooldown_divisor(mon);
         /* -21 => monster's fire breath; 1 => # of damage dice */
         damage = zhitm(mon, by_you ? 21 : -21, (struct obj*)0, mon, 1, 8, 0, &odummyp, &zhitm_out_flags);
     }
@@ -3045,7 +3056,7 @@ boolean by_you; /* true: if mon kills itself, hero gets credit/blame */
                 pline("Oh, what a pretty fire!");
             if (vis && !objects[otyp].oc_name_known
                 && !objects[otyp].oc_uname)
-                docall(obj);
+                docall(obj, (char*)0);
             m_useup(mon, obj); /* after docall() */
             vis = FALSE;       /* skip makeknown() below */
             res = FALSE;       /* failed to cure sliming */

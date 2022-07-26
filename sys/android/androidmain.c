@@ -115,6 +115,7 @@ int GnollHackMain(int argc, char** argv)
 //	getmailstatus();
 //#endif
 
+	display_gamewindows();
 	plnamesuffix(); /* strip suffix from name; calls askname() */
 					/* again if suffix was whole name */
 					/* accepts any suffix */
@@ -158,8 +159,6 @@ int GnollHackMain(int argc, char** argv)
 	 *  new game or before a level restore on a saved game.
 	 */
 	vision_init();
-
-	display_gamewindows();
 
 	if((fd = restore_saved_game()) >= 0)
 	{
@@ -245,12 +244,18 @@ static void process_options(argc, argv)
 		case 'D':
 #ifdef WIZARD
 			wizard = TRUE;
-		break;
+			break;
 #endif
 		/* otherwise fall thru to discover */
 		case 'X':
 			discover = TRUE;
-		break;
+			break;
+		case 'M':
+			ModernMode = TRUE;
+			break;
+		case 'C':
+			CasualMode = TRUE;
+			break;
 #ifdef NEWS
 			case 'n':
 			iflags.news = FALSE;

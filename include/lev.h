@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    lev.h    $NHDT-Date: 1432512781 2015/05/25 00:13:01 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -11,6 +11,8 @@
 #define LEV_H
 
 #include "soundset.h"
+#include "align.h"
+#include "wintype.h"
 
 #define COUNT_SAVE 0x1
 #define WRITE_SAVE 0x2
@@ -70,6 +72,37 @@ typedef struct soundsource_t {
 } sound_source;
 
 
+/* Used in save and restore */
+struct save_game_stats {
+    int glyph;
+    int gui_glyph;
+    short rolenum;
+    short racenum;
+    boolean gender;
+    aligntyp alignment;
+    short ulevel;
+    char dgn_name[MAX_DGN_NAME_LENGTH];
+    char level_name[MAX_LVL_NAME_LENGTH];
+    xchar dnum;
+    xchar dlevel;
+    schar depth;
+    schar game_difficulty;
+    long umoves;
+    boolean debug_mode;
+    boolean explore_mode;
+    boolean modern_mode;
+    boolean casual_mode;
+    time_t time_stamp;
+
+    /* Other information */
+    unsigned long num_recoveries;
+};
+
+struct save_game_data {
+    char* playername;
+    boolean is_running;
+    struct save_game_stats gamestats;
+};
 
 
 #endif /* LEV_H */

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    music.c    $NHDT-Date: 1544442713 2018/12/10 11:51:53 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.57 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -31,7 +31,7 @@
 #include "hack.h"
 
 STATIC_DCL void FDECL(awaken_monsters, (int, BOOLEAN_P));
-STATIC_DCL void FDECL(put_monsters_to_sleep, (int));
+STATIC_DCL void FDECL(put_monsters_to_sleep, (int, int));
 STATIC_DCL void FDECL(charm_snakes, (int));
 STATIC_DCL void FDECL(calm_nymphs, (int));
 STATIC_DCL void FDECL(charm_monsters, (int, int));
@@ -102,16 +102,17 @@ boolean isscary;
  */
 
 STATIC_OVL void
-put_monsters_to_sleep(distance)
-int distance;
+put_monsters_to_sleep(otyp, distance)
+int otyp, distance;
 {
     register struct monst *mtmp;
+    int duration = get_otyp_spell_duration(otyp);
 
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
         if (DEADMONSTER(mtmp))
             continue;
         if (distu(mtmp->mx, mtmp->my) < distance
-            && sleep_monst(mtmp, (struct obj*)0, (struct monst*)0, d(10, 10), 0, FALSE)) {
+            && sleep_monst(mtmp, (struct obj*)0, (struct monst*)0, duration, 0, FALSE)) {
             //mtmp->msleeping = 1; /* 10d10 turns + wake_nearby to rouse */
             slept_monst(mtmp);
         }
@@ -595,7 +596,7 @@ struct obj *instr;
         consume_obj_charge(instr, TRUE);
 
         You("produce %s music.", Hallucination ? "piped" : "soft");
-        put_monsters_to_sleep(u.ulevel * 5);
+        put_monsters_to_sleep(itmp.otyp, u.ulevel * 5);
         exercise(A_DEX, TRUE);
         break;
     case WOODEN_FLUTE: /* May charm snakes */
@@ -792,7 +793,7 @@ struct obj *instr;
         } 
         else 
         {
-            getlin_ex(GETLINE_TUNE, ATR_NONE, NO_COLOR, "What tune are you playing? ", buf, (char*)0, "[5 notes, A-G]");
+            getlin_ex(GETLINE_TUNE, ATR_NONE, NO_COLOR, "What tune are you playing? ", buf, (char*)0, "[5 notes, A-G]", (char*)0);
             (void) mungspaces(buf);
             if (*buf == '\033')
                 goto nevermind;
@@ -895,6 +896,13 @@ struct obj *instr;
                                     maybe_close_drawbridge(x, y);
                                 else
                                     open_drawbridge(x, y);
+
+                                if (!u.uachieve.learned_castle_tune)
+                                {
+                                    //achievement_gained("Learned Castle Drawbridge Tune");
+                                    u.uachieve.learned_castle_tune = 1;
+                                }
+
                                 return 1;
                             }
             } 

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    pager.c    $NHDT-Date: 1555627307 2019/04/18 22:41:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.151 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -598,6 +598,9 @@ char *buf, *monbuf;
             break;
         case S_cloud:
             Strcpy(buf, Is_airlevel(&u.uz) ? "cloudy area" : "fog/vapor cloud");
+            break;
+        case S_fountain:
+            Strcpy(buf, get_fountain_name(x, y));
             break;
         case S_unexplored:
             noarticle = TRUE;
@@ -1442,7 +1445,7 @@ coord *click_cc;
           }
         case '?':
             from_screen = FALSE;
-            getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, "Specify what?", out_str, "type the word", (char*)0);
+            getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, "Specify what?", out_str, "type the word", (char*)0, (char*)0);
             if (strcmp(out_str, " ")) /* keep single space as-is */
                 /* remove leading and trailing whitespace and
                    condense consecutive internal whitespace */

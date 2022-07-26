@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    save.c    $NHDT-Date: 1554591225 2019/04/06 22:53:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -82,23 +82,53 @@ dosave()
     if (iflags.debug_fuzzer)
         return 0;
     clear_nhwindow(WIN_MESSAGE);
-    if (yn_query("Really save?") == 'n') {
+    if (!CasualMode && yn_query("Really save?") == 'n')
+    {
         clear_nhwindow(WIN_MESSAGE);
         if (multi > 0)
             nomul(0);
-    } else {
+    } 
+    else 
+    {
+        boolean contplay = FALSE;
+        if (CasualMode)
+        {
+            clear_nhwindow(WIN_MESSAGE);
+            char ans = ynq("Continue playing after saving?");
+            switch (ans)
+            {
+            case 'q':
+                clear_nhwindow(WIN_MESSAGE);
+                if (multi > 0)
+                    nomul(0);
+                return 0;
+            case 'y':
+                contplay = TRUE;
+                break;
+            default:
+                break;
+            }
+        }
+
         clear_nhwindow(WIN_MESSAGE);
         pline("Saving...");
 #if defined(UNIX) || defined(VMS) || defined(__EMX__)
         program_state.done_hup = 0;
 #endif
-        if (dosave0()) {
-            u.uhp = -1; /* universal game's over indicator */
-            /* make sure they see the Saving message */
-            display_nhwindow(WIN_MESSAGE, TRUE);
-            exit_nhwindows("Be seeing you...");
-            nh_terminate(EXIT_SUCCESS);
-        } else
+        if (dosave0())
+        {
+            //if(contplay)
+            //    display_popup_text("Game was saved successfully.", "Game Saved", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, 0UL);
+            if (!contplay || !load_saved_game(1))
+            {
+                u.uhp = -1; /* universal game's over indicator */
+                /* make sure they see the Saving message */
+                display_nhwindow(WIN_MESSAGE, TRUE);
+                exit_nhwindows(contplay ? "Cannot continue the game..." : "Be seeing you...");
+                nh_terminate(EXIT_SUCCESS);
+            }
+        }
+        else
             (void) doredraw();
     }
     return 0;
@@ -223,6 +253,7 @@ dosave0()
     store_version(fd);
     store_savefileinfo(fd);
     store_plname_in_file(fd);
+    store_save_game_stats_in_file(fd);
     ustuck_id = (u.ustuck ? u.ustuck->m_id : 0);
     usteed_id = (u.usteed ? u.usteed->m_id : 0);
     savelev(fd, ledger_no(&u.uz), WRITE_SAVE | FREE_SAVE);
@@ -302,6 +333,7 @@ register int fd, mode;
 #ifdef SYSFLAGS
     bwrite(fd, (genericptr_t) &sysflags, sizeof(struct sysflag));
 #endif
+    bwrite(fd, (genericptr_t)&spl_orderindx, sizeof(spl_orderindx));
     urealtime.finish_time = getnow();
     urealtime.realtime += (long) (urealtime.finish_time
                                   - urealtime.start_timing);
@@ -455,7 +487,7 @@ savestateinlock()
             store_version(fd);
             store_savefileinfo(fd);
             store_plname_in_file(fd);
-
+            store_save_game_stats_in_file(fd);
             ustuck_id = (u.ustuck ? u.ustuck->m_id : 0);
             usteed_id = (u.usteed ? u.usteed->m_id : 0);
             savegamestate(fd, WRITE_SAVE);
@@ -1304,6 +1336,49 @@ int fd;
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t) &plsiztmp, sizeof(plsiztmp));
     bwrite(fd, (genericptr_t) plname, plsiztmp);
+    bufon(fd);
+    return;
+}
+
+
+void
+store_save_game_stats_in_file(fd)
+int fd;
+{
+    struct save_game_stats gamestats = { 0 };
+    gamestats.glyph = abs(u_to_glyph());
+    gamestats.gui_glyph = maybe_get_replaced_glyph(gamestats.glyph, u.ux, u.uy, data_to_replacement_info(gamestats.glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL));
+    gamestats.rolenum = urole.rolenum;
+    gamestats.racenum = urace.racenum;
+    gamestats.gender = Upolyd ? u.mfemale : flags.female;
+    gamestats.alignment = u.ualign.type;
+    gamestats.ulevel = (short)u.ulevel;
+    strcpy(gamestats.dgn_name, dungeons[u.uz.dnum].dname);
+
+    s_level* slev = Is_special(&u.uz);
+    mapseen* mptr = 0;
+    if (slev)
+        mptr = find_mapseen(&u.uz);
+
+    if (slev && mptr && mptr->flags.special_level_true_nature_known)
+    {
+        Sprintf(gamestats.level_name, "%s", slev->name);
+    }
+    gamestats.dnum = u.uz.dnum;
+    gamestats.dlevel = u.uz.dlevel;
+    gamestats.depth = depth(&u.uz);
+    gamestats.game_difficulty = context.game_difficulty;
+    gamestats.umoves = moves;
+    gamestats.debug_mode = wizard;
+    gamestats.explore_mode = discover;
+    gamestats.modern_mode = ModernMode;
+    gamestats.casual_mode = CasualMode;
+    gamestats.time_stamp = getnow();
+    gamestats.num_recoveries = n_game_recoveries;
+
+    bufoff(fd);
+    /* bwrite() before bufon() uses plain write() */
+    bwrite(fd, (genericptr_t)&gamestats, sizeof gamestats);
     bufon(fd);
     return;
 }

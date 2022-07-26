@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    wintty.h    $NHDT-Date: 1553858470 2019/03/29 11:21:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.33 $ */
 /* Copyright (c) David Cohrs, 1991,1992                  */
@@ -217,8 +217,8 @@ E int NDECL(tty_nhgetch);
 E int FDECL(tty_nh_poskey, (int *, int *, int *));
 E void NDECL(tty_nhbell);
 E int NDECL(tty_doprev_message);
-E char FDECL(tty_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, unsigned long));
-E void FDECL(tty_getlin_ex, (int, int, int, const char *, char *, const char*, const char*));
+E char FDECL(tty_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+E void FDECL(tty_getlin_ex, (int, int, int, const char *, char *, const char*, const char*, const char*));
 E int NDECL(tty_get_ext_cmd);
 E void FDECL(tty_number_pad, (int));
 E void NDECL(tty_delay_output);
@@ -245,6 +245,7 @@ E void FDECL(genl_outrip, (winid, int, time_t));
 
 E char *FDECL(tty_getmsghistory_ex, (int*, int*, BOOLEAN_P));
 E void FDECL(tty_putmsghistory_ex, (const char *, int, int, BOOLEAN_P));
+E int FDECL(tty_open_special_view, (struct special_view_info));
 
 #ifdef NO_TERMS
 #ifdef MAC

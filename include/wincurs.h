@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0 wincurs.h */
 /* Copyright (c) Karl Garrison, 2010. */
@@ -114,8 +114,8 @@ extern int curses_nh_poskey(int *x, int *y, int *mod);
 extern void curses_nhbell(void);
 extern int curses_doprev_message(void);
 extern char curses_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices,
-                               CHAR_P def, const char* resp_desc, unsigned long ynflags);
-extern void curses_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix);
+                               CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags);
+extern void curses_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline);
 extern int curses_get_ext_cmd(void);
 extern void curses_number_pad(int state);
 extern void curses_delay_output(void);
@@ -127,6 +127,7 @@ extern void curses_outrip(winid wid, int how);
 extern void genl_outrip(winid tmpwin, int how, time_t when);
 extern void curses_preference_update(const char *pref);
 extern void curs_reset_windows(boolean, boolean);
+extern int curses_open_special_view(struct special_view_info info);
 
 /* curswins.c */
 

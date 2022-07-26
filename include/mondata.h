@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mondata.h    $NHDT-Date: 1550524558 2019/02/18 21:15:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.37 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -193,6 +193,9 @@
 #define may_start_with_saddle(ptr) (((ptr)->mflags6 & M6_MAY_START_WITH_SADDLE) != 0L)
 #define is_shade(ptr) (((ptr)->mflags6 & M6_SHADE) != 0)
 #define is_teleport_heal_caster(ptr) (((ptr)->mflags6 & M6_TELEPORT_HEAL_TACTICS) != 0)
+#define has_monster_type_nontinnable_corpse(ptr) (((ptr)->mflags6 & M6_NON_TINNABLE) != 0)
+#define has_monster_type_nonedible_corpse(ptr) (((ptr)->mflags6 & M6_NON_EDIBLE) != 0)
+#define revives_upon_meddling(ptr) (((ptr)->mflags6 & M6_REVIVES_UPON_MEDDLING) != 0)
 
 #define is_archaeologist(ptr) (((ptr)->mflags7 & M7_ARCHAEOLOGIST) != 0L)
 #define is_barbarian(ptr) (((ptr)->mflags7 & M7_BARBARIAN) != 0L)
@@ -254,6 +257,9 @@
 
 #define has_innate_telepathy(ptr) \
     has_innate(ptr, MR_TELEPATHY)
+
+#define has_innate_energy_regeneration(ptr) \
+    has_innate2(ptr, MR2_ENERGY_REGENERATION)
 
 
 /* fixed ability */
@@ -661,6 +667,8 @@
 #define has_bisection_resistance(mon) \
     (has_property(mon, BISECTION_RESISTANCE))
 
+#define has_slime_resistance(mon) \
+    (has_property(mon, SLIME_RESISTANCE))
 
 /* permonst resistances */
 #define pm_resists_disint(ptr) \
@@ -754,7 +762,10 @@
 
 /* other "resists" definitions */
 #define resists_bisection(mon) \
-    (has_property(mon, BISECTION_RESISTANCE) ||  is_incorporeal((mon)->data) || amorphous((mon)->data))
+    (has_bisection_resistance(mon) || is_incorporeal((mon)->data) || amorphous((mon)->data))
+
+#define resists_slime(mon) \
+    (slimeproof((mon)->data) || has_slime_resistance(mon))
 
 /* more on paralysis */
 #define is_paralyzed(mon) \
@@ -787,6 +798,13 @@
     (has_innate_see_invisible((mon)->data) || has_property(mon, SEE_INVISIBLE))
 #define has_regeneration(mon) \
     (has_innate_regeneration((mon)->data) || has_property(mon, REGENERATION))
+#define has_energy_regeneration(mon) \
+    (has_innate_energy_regeneration((mon)->data) || has_property(mon, ENERGY_REGENERATION))
+#define has_half_spec_cooldown(mon) has_energy_regeneration(mon)
+#define has_one_third_spec_cooldown(mon) \
+    (has_property(mon, RAPID_ENERGY_REGENERATION) || has_property(mon, RAPIDER_ENERGY_REGENERATION) || has_property(mon, RAPIDEST_ENERGY_REGENERATION))
+#define mon_spec_cooldown_divisor(mon) \
+    (has_one_third_spec_cooldown(mon) ? 3 : has_half_spec_cooldown(mon) ? 2 : 1)
 #define has_teleportation(mon) \
     (has_innate_teleportation((mon)->data) || has_property(mon, TELEPORT))
 #define has_teleport_control(mon) \

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    monmove.c    $NHDT-Date: 1557094802 2019/05/05 22:20:02 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1356,7 +1356,6 @@ register int after;
     }
 
 
-#ifdef MAIL
     if (ptr == &mons[PM_MAIL_DAEMON])
     {
         if (!Deaf && canseemon(mtmp))
@@ -1364,7 +1363,6 @@ register int after;
         mongone(mtmp);
         return 2;
     }
-#endif
 
     /* teleport if that lies in our nature */
     if (ptr == &mons[PM_TENGU] && !rn2(5) && !is_cancelled(mtmp)

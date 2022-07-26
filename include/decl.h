@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0  decl.h  $NHDT-Date: 1547025154 2019/01/09 09:12:34 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.147 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -215,7 +215,7 @@ E const char ynqchars[];
 E const char ynaqchars[];
 E const char ynNaqchars[];
 E const char dnqchars[];
-E const char idqchars[];
+E const char sdqchars[];
 
 E const char yndescs[];
 E const char ynqdescs[];
@@ -227,7 +227,7 @@ E const char ciqdescs[];
 E const char bcqdescs[];
 E const char fnqdescs[];
 E const char dnqdescs[];
-E const char idqdescs[];
+E const char sdqdescs[];
 
 E NEARDATA long yn_number;
 
@@ -244,6 +244,7 @@ E NEARDATA struct kinfo {
 #define KILLED_BY_AN 0
 #define KILLED_BY 1
 #define NO_KILLER_PREFIX 2
+    int hint_idx;
     char name[BUFSZ]; /* actual killer name */
 } killer;
 
@@ -283,6 +284,9 @@ E NEARDATA char ramname[];
 E NEARDATA char luggagename[];
 E NEARDATA char wolfname[];
 E char preferred_pet;
+
+E NEARDATA unsigned long n_game_recoveries;
+
 E const char *occtxt; /* defined when occupation != NULL */
 E enum object_soundset_types occsoundset; /* defined when occupation != NULL */
 E enum object_occupation_types occtyp; /* defined when occupation != NULL */
@@ -341,7 +345,7 @@ struct zap_type_definition {
     short animation;
 };
 
-E NEARDATA struct zap_type_definition zap_type_definitions[MAX_ZAP_TYPES];
+E NEARDATA const struct zap_type_definition zap_type_definitions[MAX_ZAP_TYPES];
 
 
 struct explosion_type_definition {
@@ -351,7 +355,7 @@ struct explosion_type_definition {
     enum sfx_sound_types sfx;
 };
 
-E NEARDATA struct explosion_type_definition explosion_type_definitions[MAX_EXPLOSIONS];
+E NEARDATA const struct explosion_type_definition explosion_type_definitions[MAX_EXPLOSIONS];
 
 E NEARDATA struct obj *uchain; /* defined only when punished */
 E NEARDATA struct obj *uball;
@@ -391,6 +395,7 @@ E NEARDATA struct monst *mydogs, *migrating_mons;
 E NEARDATA struct mvitals {
     uchar born;
     uchar died;
+    uchar died_female;
     uchar mvflags;
 } mvitals[NUM_MONSTERS];
 
@@ -478,6 +483,8 @@ E NEARDATA winid WIN_MAP, WIN_INVEN, WIN_HERE;
 #define You_ex1(a, b, cstr) You_ex(a, b, "%s", cstr)
 #define You_hear_ex1(a, b, cstr) You_hear_ex(a, b, "%s", cstr)
 #define verbalize_ex1(a, b, cstr) verbalize_ex(a, b, "%s", cstr)
+
+#define pline_ex1_popup(a, b, cstr, title, dopop) pline_ex1(a, b, cstr); if (dopop) display_popup_text(cstr, title, POPUP_TEXT_GENERAL, a, b, NO_GLYPH, 0)
 
 E char toplines[];
 #ifndef TCAP_H
@@ -587,6 +594,8 @@ E const char* Moloch;
 E const char unavailcmd[];
 /* for rejecting #if !SHELL, !SUSPEND */
 E const char cmdnotavail[];
+
+E const char* const hofe_titles[3];
 
 E unsigned long file_end_marker;
 #undef E

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    objclass.h    $NHDT-Date: 1547255901 2019/01/12 01:18:21 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -52,6 +52,7 @@ enum multishot_types {
     MULTISHOT_NONE = 0,
     MULTISHOT_LAUNCHER_MULTISHOT_BOW,
     MULTISHOT_LAUNCHER_REPEATING_CROSSBOW,
+    MULTISHOT_LAUNCHER_STAFF_SLING,
     MULTISHOT_THROWN_DAGGER,
     MULTISHOT_THROWN_DART,
     MULTISHOT_THROWN_SHURIKEN,
@@ -310,6 +311,7 @@ enum recharging_types {
     RECHARGING_HOLY_GRAIL,
     RECHARGING_SALVE,
     RECHARGING_CUBIC_GATE,
+    RECHARGING_HOWLING_FLAIL,
     MAX_RECHARGING_TYPES
 };
 
@@ -523,6 +525,7 @@ struct objclass {
 #define A2_NONE                                                      0x00000000UL
 #define A2_HITS_ADJACENT_SQUARES                                     0x00000001UL  /* like Cleaver */
 #define A2_REQUIRES_AND_EXPENDS_A_CHARGE                             0x00000002UL  /* Nine lives stealer */
+#define A2_REQUIRES_ARTIFACT_INVOKE_ON                               0x00000004UL  /* Nine lives stealer */
 
 
 #define oc_spell_flags oc_aflags
@@ -597,7 +600,7 @@ struct objclass {
 #define BONUS_TO_EXPERIENCE     0x00000800
 #define BONUS_TO_ARCHERY        0x00001000
 #define BONUS_TO_ALL_SPELL_CASTING 0x00002000
-    /* free bit */
+#define FULL_MC_BONUS           0x00004000
     /* free bit */
 #define SETS_FIXED_ATTRIBUTE    0x00010000
 #define FIXED_IS_MAXIMUM        0x00020000
@@ -659,7 +662,7 @@ struct objclass {
 #define EDIBLEFX_CURE_PETRIFICATION -16
 
 
-/* spells */
+/* spells, wands, scrolls */
 #define oc_spell_cooldown oc_oc1         /* books: spell cooldown time */
 #define oc_spell_level oc_oc2            /* books: spell level */
 #define oc_spell_mana_cost oc_oc3        /* books: spell mana cost */
@@ -672,12 +675,13 @@ struct objclass {
 #define oc_spell_dmg_dice oc_wsdice      /* books: spell damage no of dice */
 #define oc_spell_dmg_diesize oc_wsdam    /* books: spell damage size of dice */
 #define oc_spell_dmg_plus oc_wsdmgplus   /* books: spell damage constant added */
+#define oc_spell_per_level_dice oc_wldice       /* books: spell per level bonus no of dice (overlaps with duration, which is not allowed) */
+#define oc_spell_per_level_diesize oc_wldam     /* books: spell per level bonus size of dice (overlaps with duration, which is not allowed) */
+#define oc_spell_per_level_plus oc_wldmgplus    /* books: spell per level bonus constant added (overlaps with duration, which is not allowed) */
 #define oc_spell_dur_dice oc_wldice      /* books: spell duration no of dice */
 #define oc_spell_dur_diesize oc_wldam    /* books: spell duration size of dice */
 #define oc_spell_dur_plus oc_wldmgplus   /* books: spell duration constant added */
-#define oc_spell_per_level_dice oc_wldice       /* books: spell per level bonus no of dice */
-#define oc_spell_per_level_diesize oc_wldam     /* books: spell per level bonus size of dice */
-#define oc_spell_per_level_plus oc_wldmgplus    /* books: spell per level bonus constant added */
+#define oc_spell_dur_buc_plus oc_extra_damagetype   /* books: spell duration constant added multiplied by bcsign */
 
 /* potions */
 #define oc_potion_breathe_buc_multiplier oc_oc1
@@ -686,6 +690,7 @@ struct objclass {
 #define oc_potion_extra_data1 oc_oc4
 #define oc_potion_breathe_dice_buc_multiplier oc_oc5
 #define oc_potion_normal_dice_buc_multiplier oc_oc6
+#define oc_potion_nutrition_dice_buc_multiplier oc_oc7
 #define oc_potion_saving_throw_adjustment oc_mc_adjustment    /* potions: potion saving throw adjustment */
 #define oc_potion_breathe_dice oc_wsdice                      /* potions: potion breathe duration no of dice */
 #define oc_potion_breathe_diesize oc_wsdam                    /* potions: potion breathe duration size of dice */
@@ -698,6 +703,21 @@ struct objclass {
 #define oc_potion_nutrition_diesize oc_wedam                  /* potions: potion nutrition size of dice */
 #define oc_potion_nutrition_plus oc_wedmgplus                 /* potions: potion nutrition constant added */
 
+/* scrolls */
+#define oc_scroll_dmg_dice oc_spell_dmg_dice                  /* scrolls: effect damage no of dice */
+#define oc_scroll_dmg_diesize oc_spell_dmg_diesize            /* scrolls: effect damage size of dice */
+#define oc_scroll_dmg_plus oc_spell_dmg_plus                  /* scrolls: effect damage constant added */
+#define oc_scroll_dur_dice oc_spell_dur_dice                  /* scrolls: effect duration no of dice */
+#define oc_scroll_dur_diesize oc_spell_dur_diesize            /* scrolls: effect duration size of dice */
+#define oc_scroll_dur_plus oc_spell_dur_plus                  /* scrolls: effect duration constant added */
+
+/* wands */
+#define oc_wand_dmg_dice oc_spell_dmg_dice                    /* wands: effect damage no of dice */
+#define oc_wand_dmg_diesize oc_spell_dmg_diesize              /* wands: effect damage size of dice */
+#define oc_wand_dmg_plus oc_spell_dmg_plus                    /* wands: effect damage constant added */
+#define oc_wand_dur_dice oc_spell_dur_dice                    /* wands: effect duration no of dice */
+#define oc_wand_dur_diesize oc_spell_dur_diesize              /* wands: effect duration size of dice */
+#define oc_wand_dur_plus oc_spell_dur_plus                    /* wands: effect duration constant added */
 
     int oc_dir_subtype;               /* spells: ID for type of ray or immediate effect, weapons: damage type */
 
@@ -807,7 +827,7 @@ struct objclass {
 #define O1_WEIGHT_DOES_NOT_REDUCE_RANGE      0x04000000UL            /* the object magically flies when thrown, ignoring its weight */
 #define O1_RETURNS_TO_HAND_AFTER_THROWING    0x08000000UL            /* the object returns to the owner's hand after throwing */
 #define O1_CAN_BE_THROWN_ONLY_IF_WIELDED     0x10000000UL            /* has to be wielded to be thrown, e.g., Mjollnir */
-#define O1_WAND_LIKE_TOOL                    0x20000000UL            /* apply is the same as zap, uses spellbook/wand paramters and flags instead of normal flags */
+#define O1_SPELLTOOL                         0x20000000UL            /* apply is the same as zap, uses spellbook/wand paramters and flags instead of normal flags */
 #define O1_NON_SPELL_SPELLBOOK               0x40000000UL            /* uses non-spellbook flags and other non-spellbook stats */
 #define O1_NOT_CURSEABLE                     0x80000000UL
 
@@ -919,7 +939,7 @@ struct objclass {
 #define O4_INAPPROPRIATE_CHARACTERS_CANT_HANDLE            0x00010000UL
 #define O4_NON_MYTHIC                                      0x00020000UL
 #define O4_DOUBLE_MYTHIC_CHANCE                            0x00040000UL
-/* free bit */
+#define O4_HEIGHT_IS_CLIPPING                              0x00080000UL    /* Item graphics get clipped rather than scaled by height */
 #define O4_CONTAINER_CONTENTS_VISIBLE                      0x00100000UL    /* Can always see the contents */
 #define O4_CONTAINER_CONTENTS_USE_ON                       0x00200000UL    /* Contents are put "on" the container rather than "in" the container  */
 #define O4_CONTAINER_ACCEPTS_ONLY_SCROLLS_AND_BOOKS        0x00400000UL    /* Only books and scrolls fit in */
@@ -942,8 +962,15 @@ struct objclass {
 #define O5_FULL_NAME                   0x00000020UL /* Do not append or prepend anything to the name */
 #define O5_OK_FOR_ILLITERATE           0x00000040UL /* Does not break illiterate conduct */
 #define O5_NOT_CANCELLABLE             0x00000080UL /* Cannot be cancelled */
-#define O5_USES_SPELL_TILE             0x00000100UL /* Spellbook uses a special spell tile glyph instead of the object glyph */
+/* Free bit */
 #define O5_HAS_ALTERNATIVE_APPEARANCE  0x00000200UL /* Alternative appearance available */
+#define O5_EFFECT_IS_HEALING           0x00000400UL /* (Potion) Effect data is healing */
+#define O5_EFFECT_IS_MANA              0x00000800UL /* (Potion) Effect data is mana */
+#define O5_EFFECT_IS_DAMAGE            0x00001000UL /* (Potion) Effect data is damage */
+#define O5_EFFECT_FOR_BLESSED_ONLY     0x00002000UL /* Effect data is for blessed potion only (monster detection, scroll of fire) */
+
+#define O5_LIGHT_SOURCE                0x00010000UL
+#define O5_BURNS_INFINITELY            0x00020000UL
 
 #define O6_NONE                        0x00000000UL
 

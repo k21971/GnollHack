@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    topten.c    $NHDT-Date: 1450451497 2015/12/18 15:11:37 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -389,7 +389,7 @@ int how;
             aligns[1 - u.ualignbase[A_ORIGINAL]].filecode);
     Fprintf(rfile, "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
     Fprintf(rfile, "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
-    Fprintf(rfile, "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "casual-classic") : ModernMode ? "modern" : "normal");
+    Fprintf(rfile, "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
     Fprintf(rfile, "%cdemo=%d", XLOG_SEP, In_Demo ? 1 : 0);
     Fprintf(rfile, "\n");
 #undef XLOG_SEP
@@ -486,6 +486,38 @@ encodeachieve()
         r |= 1L << 12;
     if (u.uachieve.prime_codex)
         r |= 1L << 13;
+    if (u.uachieve.consulted_oracle)
+        r |= 1L << 14;
+    if (u.uachieve.read_discworld_novel)
+        r |= 1L << 15;
+    if (u.uachieve.entered_gnomish_mines)
+        r |= 1L << 16;
+    if (u.uachieve.entered_mine_town)
+        r |= 1L << 17;
+    if (u.uachieve.entered_shop)
+        r |= 1L << 18;
+    if (u.uachieve.entered_temple)
+        r |= 1L << 19;
+    if (u.uachieve.entered_sokoban)
+        r |= 1L << 20;
+    if (u.uachieve.entered_bigroom)
+        r |= 1L << 21;
+    if (u.uachieve.learned_castle_tune)
+        r |= 1L << 22;
+    if (u.uachieve.entered_large_circular_dungeon)
+        r |= 1L << 23;
+    if (u.uachieve.entered_plane_of_modron)
+        r |= 1L << 24;
+    if (u.uachieve.entered_hellish_pastures)
+        r |= 1L << 25;
+    if (u.uachieve.entered_elemental_planes)
+        r |= 1L << 26;
+    if (u.uachieve.entered_astral_plane)
+        r |= 1L << 27;
+    if (u.uachieve.role_achievement)
+        r |= 1L << 28;
+    if (u.uachieve.crowned)
+        r |= 1L << 29;
 
     return r;
 }
@@ -512,7 +544,7 @@ boolean condition;
 STATIC_OVL char*
 encode_extended_achievements()
 {
-    static char buf[4 * BUFSZ]; /* Long enough */
+    static char buf[10 * BUFSZ]; /* Long enough */
 
     buf[0] = '\0';
     add_achieveX(buf, "obtained_the_bell_of_opening", u.uachieve.bell);
@@ -521,18 +553,46 @@ encode_extended_achievements()
     add_achieveX(buf, "obtained_the_book_of_the_dead", u.uachieve.book);
     add_achieveX(buf, "performed_the_invocation_ritual", u.uevent.invoked);
     add_achieveX(buf, "obtained_the_amulet_of_yendor", u.uachieve.amulet);
-    add_achieveX(buf, "entered_elemental_planes", In_endgame(&u.uz));
-    add_achieveX(buf, "entered_astral_plane", In_endgame(&u.uz));
     add_achieveX(buf, "ascended", u.uachieve.ascended);
     add_achieveX(buf, "obtained_the_luckstone_from_the_mines", u.uachieve.mines_luckstone);
     add_achieveX(buf, "obtained_the_sokoban_prize", u.uachieve.finish_sokoban);
     add_achieveX(buf, "defeated_medusa", u.uachieve.killed_medusa);
     add_achieveX(buf, "defeated_yacc", u.uachieve.killed_yacc);
     add_achieveX(buf, "obtained_the_prime_codex", u.uachieve.prime_codex);
+    add_achieveX(buf, "consulted_the_oracle", u.uachieve.consulted_oracle);
+    add_achieveX(buf, "read_a_discworld_novel", u.uachieve.read_discworld_novel);
+    add_achieveX(buf, "entered_the_gnomish_mines", u.uachieve.entered_gnomish_mines);
+    add_achieveX(buf, "entered_mine_town", u.uachieve.entered_mine_town);
+    add_achieveX(buf, "entered_a_shop", u.uachieve.entered_shop);
+    add_achieveX(buf, "entered_a_temple", u.uachieve.entered_temple);
+    add_achieveX(buf, "entered_sokoban", u.uachieve.entered_sokoban);
+    add_achieveX(buf, "entered_bigroom", u.uachieve.entered_bigroom);
+    add_achieveX(buf, "learned_castle_drawbridge_tune", u.uachieve.learned_castle_tune);
+    add_achieveX(buf, "entered_large_circular_dungeon", u.uachieve.entered_large_circular_dungeon);
+    add_achieveX(buf, "entered_plane_of_modron", u.uachieve.entered_plane_of_modron);
+    add_achieveX(buf, "entered_hellish_pastures", u.uachieve.entered_hellish_pastures);
+    add_achieveX(buf, "entered_elemental_planes", u.uachieve.entered_elemental_planes);
+    add_achieveX(buf, "entered_astral_plane", u.uachieve.entered_astral_plane);
+    add_achieveX(buf, "role_achievement", u.uachieve.role_achievement);
+    add_achieveX(buf, "crowned", u.uachieve.crowned);
 
     return buf;
 }
 
+/*
+        case ACH_TUNE:
+            achievement = "learned_castle_drawbridge_tune";
+            break;
+        case ACH_RNK1: case ACH_RNK2: case ACH_RNK3: case ACH_RNK4:
+        case ACH_RNK5: case ACH_RNK6: case ACH_RNK7: case ACH_RNK8:
+            Sprintf(rnkbuf, "attained_the_rank_of_%s",
+                rank_of(rank_to_xlev(absidx - (ACH_RNK1 - 1)),
+                    Role_switch, (achidx < 0) ? TRUE : FALSE));
+            strNsubst(rnkbuf, " ", "_", 0);
+            achievement = lcase(rnkbuf);
+            break;
+            
+            */
 STATIC_OVL char*
 encode_extended_conducts()
 {
@@ -676,7 +736,8 @@ time_t when;
     }
 #endif /* XLOGFILE */
 
-    if (wizard || discover || CasualMode) {
+    if (discover || (CasualMode && how != ASCENDED)) // If in wizard mode, write the log normally
+    {
         if (how != PANICKED)
             HUP {
                 char pbuf[BUFSZ];
@@ -684,7 +745,7 @@ time_t when;
                 topten_print("");
                 Sprintf(pbuf,
              "Since you were in %s mode, the score list will not be checked.",
-                        wizard ? "wizard" : discover ? "explore" : ModernMode ? "casual" : "casual-classic");
+                        wizard ? "wizard" : discover ? "explore" : ModernMode ? "casual" : "reloadable");
                 topten_print(pbuf);
             }
         goto showwin;

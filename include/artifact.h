@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    artifact.h    $NHDT-Date: 1433050871 2015/05/31 05:41:11 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -24,7 +24,7 @@
 #define AF_BEHEAD      0x00000020UL  /* beheads monsters */
 #define AF_BISECT      0x00000040UL  /* bisects monsters */
 #define AF_HITS_ADJACENT_SQUARES               0x00000080UL  /* hits adjacent squares (like Cleaver) */
-#define AF_BLOODTHIRSTY                        0x00000100UL  /* no attack confirmation (like Stormbringer) */
+#define AF_BLOODTHIRSTY                        0x00000100UL  /* no attack confirmation (like Stormbringer); DEACTIVATED in GnollHack */
 #define AF_MAGIC_ABSORBING                     0x00000200UL  /* absorbs curses (like Magicbane) */
 #define AF_PREVENTS_REVIVAL_OF_MON             0x00000400UL  /* prevents revival of specified monsters (like Trollsbane) */
 #define AF_PREVENTS_SUMMONING_OF_MON           0x00000800UL  /* prevents summoning by specified monsters (like Demonbane) */
@@ -48,8 +48,8 @@
 #define AF_FAMOUS                              0x02000000UL  /* Name is always known */
 #define AF_INVOKE_REQUIRES_WORN                0x04000000UL  /* ditto */
 #define AF_INVOKE_EXPENDS_CHARGE               0x08000000UL  /* ditto */
-#define AF_INVOKE_MAY_DRAIN_ENERGY             0x10000000UL  /* ditto */
-#define AF_INVOKE_MAY_DRAIN_LIFE               0x20000000UL  /* ditto */
+/* free bit */
+/* free bit */
 #define AF_READABLE                            0x40000000UL  /* readable even if base item is not */
 #define AF_NO_WISH                             0x80000000UL  /* not wishable, not that for artifacts the base item's no wish does not apply */
 
@@ -61,13 +61,27 @@
 #define AF2_APPLICABLE_AS_AXE                  0x00000010UL  
 #define AF2_NAME_IS_PROPER_NAME                0x00000020UL  /* Do not use 'The' */
 #define AF2_INDESTRUCTIBLE                     0x00000040UL  
+#define AF2_DUAL_RUNESWORD_BONUS               0x00000080UL  
+#define AF2_HEIGHT_IS_CLIPPING                 0x00000100UL  /* Height clips rather than scales the item graphics */
 
 
 #define has_artifact_floor_tile(artifact_idx) \
     ((artilist[(artifact_idx)].aflags2 & AF2_FLOOR_TILE) != 0)
 
+#define has_artifact_height_clipping(artifact_idx) \
+    ((artilist[(artifact_idx)].aflags2 & AF2_HEIGHT_IS_CLIPPING) != 0)
+
 #define has_artifact_proper_name(artifact_idx) \
     ((artilist[(artifact_idx)].aflags2 & AF2_NAME_IS_PROPER_NAME) != 0)
+
+#define has_artifact_dual_runesword_bonus(artifact_idx) \
+    ((artilist[(artifact_idx)].aflags2 & AF2_DUAL_RUNESWORD_BONUS) != 0)
+
+#define obj_has_dual_runesword_bonus(o) \
+    ((o) && (o)->oartifact && has_artifact_dual_runesword_bonus((o)->oartifact) && uwep && uarms && uwep->oartifact && uarms->oartifact && uwep->otyp == RUNESWORD &&  uarms->otyp == RUNESWORD)
+
+#define monwep_has_dual_runesword_bonus(mon, o) \
+    ((mon) == &youmonst ? obj_has_dual_runesword_bonus(o) : ((mon) && (o) && is_multiweaponmonster((mon)->data) && (o)->oartifact && has_artifact_dual_runesword_bonus((o)->oartifact) && MON_WEP(mon) && MON_WEP(mon)->oartifact && MON_WEP(mon)->otyp == RUNESWORD && count_mon_runeswords(mon) >= 2))
 
 /* wielded or carried special effects */
 #define SPFX_NONE                  0x00000000UL  /* No special effects, just a bonus */
@@ -165,10 +179,12 @@ enum invoke_prop_types {
     ARTINVOKE_DEMON_SUMMON,
     ARTINVOKE_AIR_ELEMENTAL_SUMMON,
     ARTINVOKE_RECHARGE_ITSELF,
-    ARTINVOKE_TIME_STOP /* Keep last */
+    ARTINVOKE_INVOKE_WITH_TIMER,
+    ARTINVOKE_TIME_STOP,
+    MAX_ARTINVOKES /* this is NOT the number of artifact invokes*/
 };
 
-#define NUM_ARTINVOKES (ARTINVOKE_TIME_STOP - ARTINVOKE_TAMING + 1)
+#define NUM_ARTINVOKES (MAX_ARTINVOKES - ARTINVOKE_TAMING)
 
 extern const char* artifact_invoke_names[NUM_ARTINVOKES];
 extern NEARDATA struct artifact artilist[];

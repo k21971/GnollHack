@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    obj.h    $NHDT-Date: 1508827590 2017/10/24 06:46:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.60 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -88,6 +88,8 @@ struct obj {
 #define SPEFLAGS_ALTERNATIVE_APPEARANCE        0x01000000UL /* Alternative glyph is used for the object */
 #define SPEFLAGS_ROTTING_STATUS_KNOWN          0x02000000UL
 #define SPEFLAGS_AUTOSTASH                     0x04000000UL
+#define SPEFLAGS_EMPTY_NOTICED                 0x08000000UL
+#define SPEFLAGS_BEING_BROKEN                  0x10000000UL
 
     char oclass;    /* object class */
     char invlet;    /* designation in inventory */
@@ -184,6 +186,7 @@ struct obj {
     short repowerleft;       /* artifact cooldown left before its invoke ability can be used again*/
     short detectioncount;    /* monsters detected for WARN_ORC and other similar properties */
     boolean invokeon;      /* the object's / artifact's invoked ability is on */
+    short invokeleft;      /* the counter for artifact's invoke ability remaining on */
     unsigned o_id_memory;  /* This is a memory object of this o_id */
     unsigned m_id_memory;  /* This is a memory object of this mimic m_id */
 
@@ -284,13 +287,15 @@ struct obj {
     ((o)->oclass == TOOL_CLASS && (objects[(o)->otyp].oc_flags4 & O4_WEAPON_TOOL) != 0)
         /* towel is not a weptool:  enchantment isn't an enchantment, cursed towel
            doesn't weld to hand, and twoweapon won't work with one */
-#define is_wielded_weapon(o) \
+#define is_wieldable_weapon(o) \
     ((o)->oclass == WEAPON_CLASS || is_weptool(o) || (objects[(o)->otyp].oc_flags & O1_IS_WEAPON_WHEN_WIELDED) != 0)
 #define is_weapon(o) \
-    (is_wielded_weapon(o) || (objects[(o)->otyp].oc_flags5 & O5_IS_WEAPON_WHEN_WORN) != 0)
+    (is_wieldable_weapon(o) || (objects[(o)->otyp].oc_flags5 & O5_IS_WEAPON_WHEN_WORN) != 0)
 #define is_missile(o)                                          \
     (((o)->oclass == WEAPON_CLASS || is_weptool(o)) && is_thrown_weapon_only(o))
 
+#define is_armor(o) \
+    ((o)->oclass == ARMOR_CLASS)
 #define is_amulet(o) \
     ((o)->oclass == AMULET_CLASS)
 #define is_wet_towel(o) ((o)->otyp == TOWEL && (o)->special_quality > 0)
@@ -410,7 +415,7 @@ struct obj {
     ((otmp)->oclass == ARMOR_CLASS && is_gnomish_obj(otmp))
 
 /* Wielded items */
-#define is_wielded_item(o) (is_wielded_weapon(o) || is_shield(o))
+#define is_wielded_item(o) (is_wieldable_weapon(o) || is_shield(o))
 
 /* Eggs and other food */
 #define MAX_EGG_HATCH_TIME 200 /* longest an egg can remain unhatched */
@@ -506,8 +511,8 @@ struct obj {
     is_otyp_special_praying_item((otmp)->otyp)
 
 /* Wand-like tools */
-#define is_wand_like_tool(otmp) \
-    ((objects[(otmp)->otyp].oc_flags & O1_WAND_LIKE_TOOL) != 0)
+#define is_spelltool(otmp) \
+    ((objects[(otmp)->otyp].oc_flags & O1_SPELLTOOL) != 0)
 
 /* Other tools */
 #define is_saw(otmp)                                              \
@@ -623,6 +628,11 @@ struct obj {
     ((objects[(otyp)].oc_flags4 & O4_FLOOR_TILE) != 0)
 
 #define has_obj_floor_tile(o) has_otyp_floor_tile((o)->otyp)     
+
+#define has_otyp_height_clipping(otyp)                                 \
+    ((objects[(otyp)].oc_flags4 & O4_HEIGHT_IS_CLIPPING) != 0)
+
+#define has_obj_height_clipping(o) has_otyp_height_clipping((o)->otyp)     
 
 #define is_otyp_mbag_destroying(otyp)                                 \
     ((objects[(otyp)].oc_flags5 & O5_MBAG_DESTROYING_ITEM) != 0)
@@ -906,16 +916,16 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
     ((objects[otyp].oc_flags4 & O4_NON_MYTHIC) != 0 || objects[otyp].oc_magic) /* Inherently (already special) magical items cannot be made mythical, this is just for normal boring objects */
 
 #define can_obj_have_mythic(o) \
-    (!otyp_non_mythic((o)->otyp) && (is_weapon(o) || (o)->oclass == ARMOR_CLASS))
+    (!otyp_non_mythic((o)->otyp) && (is_weapon(o) || is_armor(o)))
 
 #define mythic_power_applies_to_obj(o, pwrflags) \
     (!(!is_weapon(o) && ((pwrflags) & MYTHIC_POWER_FLAG_WEAPON_ONLY) != 0) && \
-     !((o)->oclass != ARMOR_CLASS && ((pwrflags) & MYTHIC_POWER_FLAG_ARMOR_ONLY) != 0) && \
+     !(!is_armor(o) && ((pwrflags) & MYTHIC_POWER_FLAG_ARMOR_ONLY) != 0) && \
      !((is_missile(o) || is_ammo(o)) && ((pwrflags) & MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO) != 0) && \
      !(!is_missile(o) && ((pwrflags) & MYTHIC_POWER_FLAG_THROWN_WEAPONS_ONLY) != 0) && \
-     !(((o)->oclass != ARMOR_CLASS || objects[(o)->otyp].oc_armor_category != ARM_SUIT) && ((pwrflags) & MYTHIC_POWER_FLAG_SUIT_ONLY) != 0) && \
-     !(((o)->oclass != ARMOR_CLASS || objects[(o)->otyp].oc_armor_category != ARM_HELM) && ((pwrflags) & MYTHIC_POWER_FLAG_HELMET_ONLY) != 0) && \
-     !(((o)->oclass != ARMOR_CLASS || objects[(o)->otyp].oc_armor_category != ARM_SHIELD) && ((pwrflags) & MYTHIC_POWER_FLAG_SHIELD_ONLY) != 0) )
+     !((!is_armor(o)  || !is_suit(o)) && ((pwrflags) & MYTHIC_POWER_FLAG_SUIT_ONLY) != 0) && \
+     !((!is_armor(o)  || !is_helmet(o)) && ((pwrflags) & MYTHIC_POWER_FLAG_HELMET_ONLY) != 0) && \
+     !((!is_armor(o)  || !is_shield(o)) && ((pwrflags) & MYTHIC_POWER_FLAG_SHIELD_ONLY) != 0) )
 
 #define has_obj_mythic_prefix_power(o, pwrindex) \
     ((mythic_prefix_qualities[(o)->mythic_prefix].mythic_powers & (1UL << (pwrindex))) != 0 && mythic_power_applies_to_obj(o, mythic_prefix_powers[(pwrindex)].power_flags))
@@ -943,6 +953,23 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
 #define has_obj_mythic_uncurseable(o)           has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_UNCURSEABLE)
 #define has_obj_mythic_great_strength(o)        has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_STRENGTH)
 
+#define is_obj_uncurseable(o) \
+    ((objects[(o)->otyp].oc_flags& O1_NOT_CURSEABLE) || has_obj_mythic_uncurseable(o))
+
+#define is_obj_light_source(o) \
+   ((objects[(o)->otyp].oc_flags5 & O5_LIGHT_SOURCE) != 0 || artifact_light(o) ||obj_shines_magical_light(o) || has_obj_mythic_magical_light(o))
+
+#define candle_starting_burn_time(o) (30L * objects[(o)->otyp].oc_cost)
+#define candle_maximum_burn_time(o) candle_starting_burn_time(o)
+#define candlelabrum_starting_burn_time(o) MAX_BURN_IN_CANDELABRUM
+#define candlelabrum_maximum_burn_time(o) candlelabrum_starting_burn_time(o)
+#define lamp_starting_burn_time(o) ((long)rn1(500, 1000))
+#define lamp_maximum_burn_time(o) MAX_OIL_IN_LAMP
+#define potion_starting_burn_time(o) MAX_OIL_IN_FLASK
+#define potion_maximum_burn_time(o) potion_starting_burn_time(o)
+#define obj_burns_infinitely(o) \
+   ((objects[(o)->otyp].oc_flags5 & O5_BURNS_INFINITELY) != 0 || artifact_light(o) || obj_shines_magical_light(o) || has_obj_mythic_magical_light(o))
+
 /* Manuals */
 enum manual_types
 {
@@ -963,16 +990,21 @@ enum manual_types
     MANUAL_UNDERSTANDING_PETS_AND_HIRELINGS,
     MANUAL_ITEM_IDENTIFICATION_101,
     MANUAL_ITEM_IDENTIFICATION_102,
+    MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I,
+    MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II,
     /* Non-randomly generated below */
-    MANUAL_GUIDE_TO_DRAGON_SCALE_MAILS,
+    MANUAL_GUIDE_TO_DRAGON_SCALE_MAILS, /* Start marker */
     MANUAL_GUIDE_TO_ALTARS_AND_SACRIFICE,
     MANUAL_SECRETS_OF_SCARE_MONSTER,
     MANUAL_GURATHULS_GUIDE_TO_ASCENSION,
     MANUAL_MASTER_CLASS_IN_WANDS,
     MANUAL_INFERNAL_INHABITANTS_OF_GEHENNOM,
     MANUAL_ADVANCED_READING_IN_KNOWN_MONSTERS,
+    MANUAL_MANUAL_OF_THE_PLANES,
     MAX_MANUAL_TYPES
 };
+
+#define NUM_RANDOM_MANUALS MANUAL_GUIDE_TO_DRAGON_SCALE_MAILS
 
 /* Flags for get_obj_location(). */
 #define CONTAINED_TOO 0x1

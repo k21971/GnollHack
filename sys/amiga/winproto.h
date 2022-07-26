@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	winproto.h	$NHDT-Date: 1433806597 2015/06/08 23:36:37 $  $NHDT-Branch: master $:$NHDT-Revision: 1.9 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993. */
@@ -11,7 +11,7 @@ void DrawCol(struct Window *w, int idx, UWORD *colors);
 void DispCol(struct Window *w, int idx, UWORD *colors);
 void amii_change_color(int, long, int);
 char *amii_get_color_string();
-void amii_getlin_ex(int style, int attr, int color, const char *prompt, char *bufp, const char* placeholder, const char* linesuffix);
+void amii_getlin_ex(int style, int attr, int color, const char *prompt, char *bufp, const char* placeholder, const char* linesuffix, const char* introline);
 void getlind(const char *prompt, char *bufp, const char *dflt);
 char *amii_get_color_string(void);
 int filecopy(char *from, char *to);
@@ -132,7 +132,7 @@ void amii_askname(void);
 void amii_player_selection(void);
 void RandomWindow(char *name);
 int amii_get_ext_cmd(void);
-char amii_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *prompt, const char *resp, char def, const char*, unsigned long);
+char amii_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *prompt, const char *resp, char def, const char* resp_desc, const char* introline, unsigned long ynflags);
 void amii_display_file(const char *fn, boolean complain);
 void SetBorder(struct Gadget *gd);
 void *malloc(register unsigned size);

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    timeout.c    $NHDT-Date: 1545182148 2018/12/19 01:15:48 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.89 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -283,7 +283,7 @@ stoned_dialogue()
         if (Vomiting)
             make_vomiting(0L, FALSE);
         if (Slimed)
-            make_slimed(0L, (char *) 0);
+            make_slimed(0L, (char *) 0, 0, (char*)0, 0);
         break;
     default:
         break;
@@ -489,7 +489,7 @@ slime_dialogue()
     case 1L: /* turning into slime */
         /* if also turning to stone, stop doing that (no message) */
         if (Stoned)
-            make_stoned(0L, (char *) 0, KILLED_BY_AN, (char *) 0);
+            make_stoned(0L, (char *) 0, KILLED_BY_AN, (char *) 0, 0);
         break;
     }
     exercise(A_DEX, FALSE);
@@ -499,7 +499,7 @@ void
 burn_away_slime()
 {
     if (Slimed) {
-        make_slimed(0L, "The slime that covers you is burned away!");
+        make_slimed(0L, "The slime that covers you is burned away!", 0, (char*)0, 0);
     }
 }
 
@@ -519,9 +519,11 @@ struct kinfo *kptr;
     if (kptr && kptr->name[0]) {
         killer.format = kptr->format;
         Strcpy(killer.name, kptr->name);
+        killer.hint_idx = kptr->hint_idx;
     } else {
         killer.format = NO_KILLER_PREFIX;
         Strcpy(killer.name, "turned into green slime");
+        killer.hint_idx = HINT_KILLED_SLIMED;
     }
     dealloc_killer(kptr);
 
@@ -604,7 +606,7 @@ nh_timeout()
     boolean was_terminally_ill = !!Sick;
     boolean was_food_poisoned = !!FoodPoisoned;
     boolean was_stoned = !!Stoned;
-    boolean was_strangled = !!Strangled;
+    boolean was_strangled = (Strangled && !Breathless);
     boolean was_suffocating = (Airless_environment && !Survives_without_air);
     boolean was_vomiting = !!Vomiting;
     boolean was_slimed = !!Slimed;
@@ -656,7 +658,7 @@ nh_timeout()
         slime_dialogue();
     if (Vomiting)
         vomiting_dialogue();
-    if (Strangled)
+    if (Strangled && !Breathless)
         choke_dialogue();
     if (Sick)
         sick_dialogue();
@@ -721,10 +723,12 @@ nh_timeout()
                 if (kptr && kptr->name[0]) {
                     killer.format = kptr->format;
                     Strcpy(killer.name, kptr->name);
+                    killer.hint_idx = kptr->hint_idx;
                 }
                 else {
                     killer.format = NO_KILLER_PREFIX;
                     Strcpy(killer.name, "killed by petrification");
+                    killer.hint_idx = HINT_KILLED_PETRIFICATION;
                 }
                 if (kptr)
                     dealloc_killer(kptr);
@@ -746,11 +750,13 @@ nh_timeout()
                 {
                     killer.format = kptr->format;
                     Strcpy(killer.name, kptr->name);
+                    killer.hint_idx = kptr->hint_idx;
                 }
                 else
                 {
                     killer.format = KILLED_BY_AN;
                     killer.name[0] = 0; /* take the default */
+                    killer.hint_idx = 0;
                 }
     
                 if(kptr)
@@ -795,11 +801,13 @@ nh_timeout()
                     {
                         killer.format = kptr->format;
                         Strcpy(killer.name, kptr->name);
+                        killer.hint_idx = kptr->hint_idx;
                     }
                     else 
                     {
                         killer.format = KILLED_BY_AN;
                         killer.name[0] = 0; /* take the default */
+                        killer.hint_idx = 0;
                     }
 
                     if (kptr)
@@ -819,7 +827,7 @@ nh_timeout()
                     }
                     done(ROTTED);
                     /* Life saved */
-                    make_mummy_rotted(0L, (char*)0, FALSE);
+                    make_mummy_rotted(0L, (char*)0, FALSE, 0);
                 }
 
                 break;
@@ -837,13 +845,19 @@ nh_timeout()
                 break;
             case STRANGLED:
                 killer.format = KILLED_BY_AN;
-                if (uamul && uamul->otyp == AMULET_OF_STRANGULATION)
+                if (Breathless)
+                {
+                    // Nothing
+                }
+                else if (uamul && uamul->otyp == AMULET_OF_STRANGULATION)
                 {
                     Strcpy(killer.name, "amulet of strangulation");
+                    killer.hint_idx = HINT_KILLED_ITEM_STRANGULATION;
                     done(STRANGULATION);
                 }
                 else if (u.ustuck && (is_constrictor(u.ustuck->data) || hug_throttles(u.ustuck->data)))
                 {
+                    killer.hint_idx = HINT_KILLED_MONSTER_STRANGULATION;
                     done_in_by(u.ustuck, STRANGULATION);
                 }
                 /* must be declining to die in explore|wizard mode;
@@ -858,12 +872,17 @@ nh_timeout()
             {
                 boolean drowned_by_monster = u.ustuck && is_pool(u.ustuck->mx, u.ustuck->my) && !Swimming && !Amphibious;
                 if (Survives_without_air)
-                    ;
+                {
+                    //Nothing
+                }
                 else
                 {
                     You_ex(ATR_NONE, CLR_MSG_NEGATIVE, Underwater || drowned_by_monster ? "drown." : "suffocate.");
                     if (drowned_by_monster)
+                    {
+                        killer.hint_idx = HINT_KILLED_DROWNED_BY_MONSTER;
                         done_in_by(u.ustuck, DROWNED);
+                    }
                     else
                     {
                         killer.format = KILLED_BY;
@@ -871,11 +890,15 @@ nh_timeout()
 
                         if (isdrowning)
                         {
+                            killer.hint_idx = HINT_KILLED_DROWNED;
                             killer.format = KILLED_BY_AN;
                             Sprintf(killer.name, "%s", is_pool(u.ux, u.uy) ? (levl[u.ux][u.uy].typ == MOAT ? "moat" : "pool of water") : "body of water");
                         }
                         else
+                        {
+                            killer.hint_idx = u.uburied ? HINT_KILLED_SUFFOCATION_BY_BEING_BURIED : HINT_KILLED_SUFFOCATION;
                             Sprintf(killer.name, "%s", u.uburied ? "being buried alive" : "");
+                        }
 
                         done(isdrowning ? DROWNING : SUFFOCATION);
                     }
@@ -1260,6 +1283,9 @@ nh_timeout()
             case DIVINE_CHARISMA:
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel less charming than before.");
                 break;
+            case SLIME_RESISTANCE:
+                Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin is starting to feel less fiery than before.");
+                break;
             }
         }
         else if ((upp->intrinsic & TIMEOUT) > 0)
@@ -1267,7 +1293,10 @@ nh_timeout()
             // Continuous warning
             switch (propnum) {
             case STRANGLED:
-                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are being strangled!");
+                if (!Breathless)
+                    You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are being strangled!");
+                else
+                    upp->intrinsic &= ~TIMEOUT; /* You can breathe, so clear the strangulation timeout -- It will be set to the full time value below */
                 break;
             case AIRLESS_ENVIRONMENT:
                 if (!Survives_without_air)
@@ -1301,7 +1330,7 @@ nh_timeout()
         || (was_terminally_ill != !!Sick)
         || (was_food_poisoned != !!FoodPoisoned)
         || (was_stoned != !!Stoned)
-        || (was_strangled != !!Strangled)
+        || (was_strangled != (Strangled && !Breathless))
         || (was_suffocating != (Airless_environment && !Survives_without_air))
         || (was_vomiting != !!Vomiting)
         || (was_slimed != !!Slimed)
@@ -1659,6 +1688,7 @@ slip_or_trip()
             && touch_petrifies(&mons[otmp->corpsenm]) && !Stone_resistance) {
             Sprintf(killer.name, "tripping over %s corpse",
                     an(corpse_monster_name(otmp)));
+            killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
             instapetrify(killer.name);
         }
     } else if (rn2(3) && is_ice(u.ux, u.uy)) {
@@ -2107,10 +2137,13 @@ long timeout;
  * Burn rules:
  *      potions of oil, lamps & candles:
  *              age = # of turns of fuel left
- *              enchantment = <unused>
+ *              special_quality = <unused>
  *      magic lamps:
  *              age = <unused>
- *              enchantment = 0 not lightable, 1 lightable forever
+ *              special_quality = 0 not lightable, 1 lightable forever
+ *      magic candles:
+ *              age = <unused>
+ *              special_quality = 0 not lightable, 1 lightable forever, partly used, 2 lightable forever, unused
  *      candelabrum:
  *              age = # of turns of fuel left
  *              special_quality = # of candles
@@ -2130,72 +2163,83 @@ begin_burn(obj, already_lit)
 struct obj *obj;
 boolean already_lit;
 {
-    int radius = 3;
-    long turns = 0;
-    boolean do_timer = TRUE;
-
-    if (obj->age == 0 && obj->otyp != MAGIC_LAMP && obj->otyp != MAGIC_CANDLE && !artifact_light(obj) && !obj_shines_magical_light(obj) && !has_obj_mythic_magical_light(obj))
+    if (!obj)
         return;
 
-    switch (obj->otyp) {
-    case MAGIC_LAMP:
-        obj->lamplit = 1;
+    if (obj->age == 0 && !obj_burns_infinitely(obj))
+        return;
+
+    int radius = obj_light_radius(obj);
+    long turns = 0;
+    boolean do_timer = TRUE;
+    if (obj_burns_infinitely(obj))
+    {
+        /* Infinite burn */
         do_timer = FALSE;
-        break;
-    case MAGIC_CANDLE:
         obj->lamplit = 1;
-        if (obj->special_quality == 2)
-            obj->special_quality = 1;
 
-        do_timer = FALSE;
-        break;
-    case POT_OIL:
-        turns = obj->age;
-        if (obj->odiluted)
-            turns = (3L * turns + 2L) / 4L;
-        radius = 1; /* very dim light */
-        break;
-
-    case BRASS_LANTERN:
-    case OIL_LAMP:
-        /* magic times are 150, 100, 50, 25, and 0 */
-        if (obj->age > 150L)
-            turns = obj->age - 150L;
-        else if (obj->age > 100L)
-            turns = obj->age - 100L;
-        else if (obj->age > 50L)
-            turns = obj->age - 50L;
-        else if (obj->age > 25L)
-            turns = obj->age - 25L;
-        else
-            turns = obj->age;
-        break;
-
-    case CANDELABRUM_OF_INVOCATION:
-    case LARGE_FIVE_BRANCHED_CANDELABRUM:
-    case TALLOW_CANDLE:
-    case WAX_CANDLE:
-        /* magic times are 75, 15, and 0 */
-        if (obj->age > 75L)
-            turns = obj->age - 75L;
-        else if (obj->age > 15L)
-            turns = obj->age - 15L;
-        else
-            turns = obj->age;
-        radius = candle_light_range(obj);
-        break;
-
-    default:
-        /* [ALI] Support artifact light sources */
-        if (artifact_light(obj) || (obj_shines_magical_light(obj) || has_obj_mythic_magical_light(obj))) {
-            obj->lamplit = 1;
-            do_timer = FALSE;
-            radius = arti_light_radius(obj);
-        } else {
-            impossible("begin burn: unexpected %s", xname(obj));
-            turns = obj->age;
+        if (obj->otyp == MAGIC_CANDLE)
+        {
+            if (obj->special_quality == 2)
+                obj->special_quality = 1;
         }
-        break;
+    }
+    else
+    {
+
+        switch (obj->otyp) {
+        case MAGIC_LAMP:
+            //obj->lamplit = 1;
+            //do_timer = FALSE;
+            break;
+        case MAGIC_CANDLE:
+            //obj->lamplit = 1;
+            if (obj->special_quality == 2)
+                obj->special_quality = 1;
+            //do_timer = FALSE;
+            break;
+        case POT_OIL:
+            turns = obj->age;
+            if (obj->odiluted)
+                turns = (3L * turns + 2L) / 4L;
+            //radius = 1; /* very dim light */
+            break;
+
+        case BRASS_LANTERN:
+        case OIL_LAMP:
+            /* magic times are 150, 100, 50, 25, and 0 */
+            if (obj->age > 150L)
+                turns = obj->age - 150L;
+            else if (obj->age > 100L)
+                turns = obj->age - 100L;
+            else if (obj->age > 50L)
+                turns = obj->age - 50L;
+            else if (obj->age > 25L)
+                turns = obj->age - 25L;
+            else
+                turns = obj->age;
+            break;
+
+        case CANDELABRUM_OF_INVOCATION:
+        case LARGE_FIVE_BRANCHED_CANDELABRUM:
+        case TALLOW_CANDLE:
+        case WAX_CANDLE:
+            /* magic times are 75, 15, and 0 */
+            if (obj->age > 75L)
+                turns = obj->age - 75L;
+            else if (obj->age > 15L)
+                turns = obj->age - 15L;
+            else
+                turns = obj->age;
+            //radius = candle_light_range(obj);
+            break;
+
+        default:
+            if(!is_obj_light_source(obj))
+                impossible("begin burn: unexpected %s", xname(obj));
+            turns = obj->age;
+            break;
+        }
     }
 
     if (do_timer) {
@@ -2236,7 +2280,7 @@ boolean timer_attached;
         return;
     }
 
-    if (obj->otyp == MAGIC_LAMP || obj->otyp == MAGIC_CANDLE || artifact_light(obj) || obj_shines_magical_light(obj) || has_obj_mythic_magical_light(obj))
+    if (obj_burns_infinitely(obj))
         timer_attached = FALSE;
 
     if (!timer_attached) {
@@ -2433,23 +2477,11 @@ long timeout;
     else
         play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, mon->mx, mon->my);
 
-    //Note: assume that the monster drops all its items
-
-    struct permonst* mptr;
-
-    mon->mhp = 0;
-
-    /* Player is thrown from his steed when it unsummons */
-    if (mon == u.usteed)
-        dismount_steed(DISMOUNT_GENERIC);
-
-    mptr = mon->data;
-
     if (glyph_is_invisible(levl[mon->mx][mon->my].hero_memory_layers.glyph))
         unmap_object(mon->mx, mon->my);
 
-    m_detach(mon, mptr, FALSE);
-
+    release_monster_objects(mon, FALSE, FALSE, FALSE);
+    mongone(mon);
 }
 
 
@@ -2851,7 +2883,7 @@ anything *arg;
     gnu->arg = *arg;
     insert_timer(gnu);
 
-    if (kind == TIMER_OBJECT) /* increment monster's timed count */
+    if (kind == TIMER_OBJECT) /* increment object's timed count */
     {
         (arg->a_obj)->timed++;
     }
@@ -3472,22 +3504,6 @@ boolean ghostly;
     }
 }
 
-const char* get_property_name(prop_index)
-int prop_index;
-{
-    int idx;
-    for (idx = 0; propertynames[idx].prop_num; idx++)
-    {
-        if (propertynames[idx].prop_num == prop_index)
-        {
-            return propertynames[idx].prop_noun;
-        }
-    }
-
-    return "";
-}
-
-
 /*
  * Timeout callback for for objects that are making noise.
  */
@@ -3539,83 +3555,143 @@ boolean was_flying;
     {
     case REFLECTING:
         if (!Reflecting)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels less reflecting than before.");
+        }
         break;
     case FIRE_IMMUNITY:
         if (!Fire_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to burning than before.");
+        }
         break;
     case COLD_IMMUNITY:
         if (!Cold_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to frostbites than before.");
+        }
         break;
     case SHOCK_IMMUNITY:
         if (!Shock_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to electricity than before.");
+        }
         break;
     case IMPROVED_FIRE_RESISTANCE:
         if (!Improved_fire_resistance && !Fire_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to burning than before.");
+        }
         break;
     case IMPROVED_COLD_RESISTANCE:
         if (!Improved_cold_resistance && !Cold_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to frostbites than before.");
+        }
         break;
     case IMPROVED_SHOCK_RESISTANCE:
         if (!Improved_shock_resistance && !Shock_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to electricity than before.");
+        }
         break;
     case FIRE_RESISTANCE:
         if (!Fire_resistance && !Improved_fire_resistance && !Fire_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to burning than before.");
+        }
         break;
     case COLD_RESISTANCE:
         if (!Cold_resistance && !Improved_cold_resistance && !Cold_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to frostbites than before.");
+        }
         break;
     case SHOCK_RESISTANCE:
         if (!Shock_resistance && !Improved_shock_resistance && !Shock_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to electricity than before.");
+        }
         break;
     case DISINTEGRATION_RESISTANCE:
         if (!Disint_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "body feels less firm than before.");
+        }
         break;
     case POISON_RESISTANCE:
         if (!Poison_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less healthy than before.");
+        }
         break;
     case ACID_IMMUNITY:
         if (!Acid_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to acid than before.");
+        }
         break;
     case IMPROVED_ACID_RESISTANCE:
         if (!Improved_acid_resistance && !Acid_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to acid than before.");
+        }
         break;
     case ACID_RESISTANCE:
         if (!Acid_resistance && !Improved_acid_resistance && !Acid_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to acid than before.");
+        }
         break;
     case STONE_RESISTANCE:
         if (!Stone_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less limber than before.");
+        }
         break;
     case DRAIN_RESISTANCE:
         if (!Drain_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel more suspectible to draining than before.");
+        }
         break;
     case SICK_RESISTANCE:
         if (!Sick_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel like you might be catching a cold.");
+        }
         break;
     case INVULNERABLE:
         if (!Invulnerable)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels more prone to damage than before.");
+        }
         break;
     case ANTIMAGIC:
         if (!Antimagic)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less protected from magic.");
+        }
         break;
     case MAGIC_MISSILE_IMMUNITY:
         if (!Magic_missile_immunity)
@@ -3623,50 +3699,83 @@ boolean was_flying;
         break;
     case IMPROVED_MAGIC_MISSILE_RESISTANCE:
         if (!Improved_magic_missile_resistance && !Magic_missile_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less protected from magic missiles.");
+        }
         break;
     case MAGIC_MISSILE_RESISTANCE:
         if (!Magic_missile_resistance && !Improved_magic_missile_resistance && !Magic_missile_immunity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less protected from magic missiles.");
+        }
         break;
     case CANCELLED:
         if (!Cancelled)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel your magic is flowing more normally.");
+        }
         break;
     case CANCELLATION_RESISTANCE:
         /* Nothing intentionally */
         break;
     case THREE_FOURTHS_MAGIC_RESISTANCE:
         if (!Three_fourths_magic_resistance && !Half_magic_resistance && !One_fourth_magic_resistance && !No_magic_resistance)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel your magic resistance is working more properly.");
+        }
         break;
     case HALVED_MAGIC_RESISTANCE:
         if (!Half_magic_resistance && !One_fourth_magic_resistance && !No_magic_resistance)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel your magic resistance is working more properly.");
+        }
         break;
     case ONE_FOURTH_MAGIC_RESISTANCE:
         if (!One_fourth_magic_resistance && !No_magic_resistance)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel your magic resistance is working more properly.");
+        }
         break;
     case NO_MAGIC_RESISTANCE:
         if (!No_magic_resistance)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel your magic resistance is working more properly.");
+        }
         break;
     case FEARFUL:
         if (!Fearful)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "regain your composure.");
+        }
         break;
     case SUMMON_FORBIDDEN:
         if (!Summon_forbidden)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel summoning is working properly again.");
+        }
         break;
     case CHARMED:
         if (!Charmed_or_controlled)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "own motivations make more sense to you now.");
+        }
         break;
     case UNDEAD_CONTROL:
         if (!Charmed_or_controlled)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "are more in control of your own actions.");
+        }
         break;
     case DEATH_RESISTANCE:
         if (!Death_resistance)
@@ -3674,55 +3783,91 @@ boolean was_flying;
         break;
     case CHARM_RESISTANCE:
         if (!Charm_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less certain of your own motivations.");
+        }
         break;
     case FEAR_RESISTANCE:
         if (!Fear_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less courageous.");
+        }
         break;
     case MIND_SHIELDING:
         if (!Mind_shielding)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "unprotected from mental detection.");
+        }
         break;
     case LYCANTHROPY_RESISTANCE:
         if (!Lycanthropy_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel that your immunity to lycanthropy is gone.");
+        }
         break;
     case CURSE_RESISTANCE:
         if (!Curse_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less protected from curses.");
+        }
         break;
     case LIFESAVED:
         if (!Lifesaved)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel more mortal than before.");
+        }
         break;
     case DETECT_MONSTERS:
         if (!Detect_monsters)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less sensitive to the presence of monsters than before.");
+        }
         see_monsters();
         break;
     case BLIND_TELEPATHY:
         if (!Blind_telepat)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less telepathic when blind.");
+        }
         see_monsters();
         break;
     case TELEPAT:
         if (!Unblind_telepat)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less telepathic.");
+        }
         see_monsters();
         break;
     case XRAY_VISION:
         if (!XRay_vision)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "can no longer see through walls.");
+        }
         see_monsters();
         break;
     case WATER_WALKING:
         if (!Wwalking)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less able to walk on water.");
+        }
         break;
     case MAGICAL_BREATHING:
         if (!EMagical_breathing && !HMagical_breathing)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less able to breathe in water.");
+        }
         break;
     case DISPLACED:
         if (!Displaced)
@@ -3733,141 +3878,232 @@ boolean was_flying;
         break;
     case CONFLICT:
         if (!Conflict)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "neighborhood feels less quarrelsome than before.");
+        }
         break;
     case MAGICAL_PROTECTION:
         if (!Magical_protection)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less protected than before.");
+        }
         break;
     case MAGICAL_SHIELDING:
         if (!Magical_shielding)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less shielded than before.");
+        }
         break;
     case MAGICAL_BARKSKIN:
         if (!Magical_barkskin)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels less bark-like than before.");
+        }
         break;
     case MAGICAL_STONESKIN:
         if (!Magical_stoneskin)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels less stone-like than before.");
+        }
         break;
     case BISECTION_RESISTANCE:
         if (!Bisection_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels less steel-like than before.");
+        }
         break;
     case TITAN_STRENGTH:
         if (!Titan_strength)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less strong than before.");
+        }
         break;
     case DIVINE_ENDURANCE:
         if (!Divine_endurance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel you have less endurance than before.");
+        }
         break;
     case DIVINE_DEXTERITY:
         if (!Divine_dexterity)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less dexterous than before.");
+        }
         break;
     case DIVINE_INTELLECT:
         if (!Divine_intellect)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less smart than before.");
+        }
         break;
     case DIVINE_WISDOM:
         if (!Divine_wisdom)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel you have less common sense than before.");
+        }
         break;
     case DIVINE_CHARISMA:
         if (!Divine_charisma)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less charming than before.");
+        }
         break;
     case FAST:
         if (!Lightning_fast && !Super_fast && !Ultra_fast && !Very_fast && !Fast)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less quick than before.");
+        }
         break;
     case VERY_FAST:
         if (!Lightning_fast && !Super_fast && !Ultra_fast && !Very_fast)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless quick than before.",
                 Fast ? "a bit " : "");
+        }
         break;
     case ULTRA_FAST:
         if (!Lightning_fast && !Super_fast && !Ultra_fast)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless quick than before.",
                 Very_fast || Fast ? "a bit " : "");
+        }
         break;
     case SUPER_FAST:
         if (!Lightning_fast && !Super_fast)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless quick than before.",
                 Ultra_fast || Very_fast || Fast ? "a bit " : "");
+        }
         break;
     case LIGHTNING_FAST:
         if (!Lightning_fast)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless quick than before.",
                 Super_fast || Ultra_fast || Very_fast || Fast ? "a bit " : "");
+        }
         break;
     case SLOWED:
         if (!Slowed)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "yourself speed up%s.",
                 Very_fast || Ultra_fast || Super_fast || Lightning_fast ? " a lot" : Fast ? "" : " a bit");
+        }
         break;
     case HEROISM:
         if (!Super_heroism && !Heroism)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "less heroic than before.");
+        }
         break;
     case SUPER_HEROISM:
         if (!Super_heroism)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless heroic than before.",
                 Heroism ? "a bit " : "");
+        }
         break;
     case RAPID_REGENERATION:
         if (!Divine_regeneration && !Rapidest_regeneration && !Rapider_regeneration && !Rapid_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are healing %sless rapidly than before.",
                 Regeneration ? "" : "much ");
+        }
         break;
     case RAPIDER_REGENERATION:
         if (!Divine_regeneration && !Rapidest_regeneration && !Rapider_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are healing %sless rapidly than before.",
                 Rapid_regeneration || Regeneration ? "" : "much ");
+        }
         break;
     case RAPIDEST_REGENERATION:
         if (!Divine_regeneration && !Rapidest_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are healing %sless rapidly than before.",
                 Rapider_regeneration || Rapid_regeneration || Regeneration ? "" : "much ");
+        }
         break;
     case DIVINE_REGENERATION:
         if (!Divine_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are healing %sless rapidly than before.",
                 Rapidest_regeneration || Rapider_regeneration || Rapid_regeneration || Regeneration ? "" : "much ");
+        }
         break;
     case RAPID_ENERGY_REGENERATION:
         if (!Rapidest_energy_regeneration && !Rapider_energy_regeneration && !Rapid_energy_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are gaining mana %sless rapidly than before.",
                 Energy_regeneration ? "" : "much ");
+        }
         break;
     case RAPIDER_ENERGY_REGENERATION:
         if (!Rapidest_energy_regeneration && !Rapider_energy_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are gaining mana %sless rapidly than before.",
                 Rapid_energy_regeneration || Energy_regeneration ? "" : "much ");
+        }
         break;
     case RAPIDEST_ENERGY_REGENERATION:
         if (!Rapidest_energy_regeneration)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are gaining mana %sless rapidly than before.",
                 Rapider_energy_regeneration || Rapid_energy_regeneration || Energy_regeneration ? "" : "much ");
+        }
         break;
     case MELEE_LIFE_LEECH:
         if (!Melee_life_leech)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "have lost your ability to leech life in melee!");
+        }
         break;
     case CRAZED:
         if (!Crazed)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "more sane than before!");
+        }
         break;
     case SILENCED:
         if (!Silenced)
+        {
+            play_sfx_sound(SFX_NEGATIVE_EFFECT_ENDED);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "can speak again!");
+        }
         break;
 
     case INVISIBILITY:
         newsym(u.ux, u.uy);
         if (!Invis && !Blocks_Invisibility && !Blind) {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You(!See_invisible
                 ? "are no longer invisible."
                 : "can no longer see through yourself.");
@@ -3880,7 +4116,10 @@ boolean was_flying;
         newsym(u.ux, u.uy);   /* make self appear */
         stop_occupation();
         if (!See_invisible)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are no longer able to see invisibile monsters.");
+        }
         break;
     case LEVITATION:
         (void)float_down(I_SPECIAL | TIMEOUT, 0L);
@@ -3898,6 +4137,7 @@ boolean was_flying;
         if (!Warn_of_mon) {
             context.warntype.speciesidx = NON_PM;
             if (context.warntype.species) {
+                play_sfx_sound(SFX_PROTECTION_END_WARNING);
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are no longer warned about %s.",
                     makeplural(context.warntype.species->mname));
                 context.warntype.species = (struct permonst*)0;
@@ -3925,6 +4165,7 @@ boolean was_flying;
         break;
     case PASSES_WALLS:
         if (!Passes_walls) {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
             if (stuck_in_wall())
                 You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "hemmed in again.");
             else
@@ -3952,6 +4193,13 @@ boolean was_flying;
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are no longer paralyzed");
             else
                 Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "limbs are moving again!");
+        }
+        break;
+    case SLIME_RESISTANCE:
+        if (!Slime_resistance)
+        {
+            play_sfx_sound(SFX_PROTECTION_END_WARNING);
+            Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin feels less fiery than before.");
         }
         break;
     default:

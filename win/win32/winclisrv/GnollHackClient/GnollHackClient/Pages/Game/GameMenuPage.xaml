@@ -15,8 +15,8 @@
 
             <StackLayout x:Name="MainLayout" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" >
                 <Label x:Name="lblHeader" Text="Menu" FontSize="Large" FontAttributes="Bold" FontFamily="Diablo" TextColor="Black"
-                HorizontalOptions="CenterAndExpand" Margin="0,10,0,20" />
-                <TableView x:Name="GameTableView" HorizontalOptions="CenterAndExpand" VerticalOptions="FillAndExpand" BackgroundColor="Transparent"
+                    HorizontalOptions="CenterAndExpand" Margin="0,10,0,20" />
+                <TableView x:Name="GameTableView" WidthRequest="400" HorizontalOptions="CenterAndExpand" VerticalOptions="FillAndExpand" BackgroundColor="Transparent"
                            Intent="Menu">
                     <TableRoot>
                         <TableSection x:Name="BaseSection">
@@ -53,6 +53,13 @@
                                     <ff:CachedImage Source="resource://GnollHackClient.Assets.button_normal.png" WidthRequest="320" HorizontalOptions="Center" VerticalOptions="FillAndExpand" Aspect="Fill" />
                                     <Button x:Name="btnGC" WidthRequest="320" FontFamily="Diablo" Text="Collect Garbage" BackgroundColor="Transparent" TextColor="White"
                                     HorizontalOptions="Fill" VerticalOptions="FillAndExpand"  Clicked="btnGC_Clicked" />
+                                </Grid>
+                            </ViewCell>
+                            <ViewCell>
+                                <Grid WidthRequest="320" HorizontalOptions="Center">
+                                    <ff:CachedImage Source="resource://GnollHackClient.Assets.button_normal.png" WidthRequest="320" HorizontalOptions="Center" VerticalOptions="FillAndExpand" Aspect="Fill" />
+                                    <Button x:Name="btnVersion" WidthRequest="320" FontFamily="Diablo" Text="Version" BackgroundColor="Transparent" TextColor="White"
+                                    HorizontalOptions="Fill" VerticalOptions="FillAndExpand"  Clicked="btnVersion_Clicked" />
                                 </Grid>
                             </ViewCell>
                             <ViewCell>

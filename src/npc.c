@@ -35,7 +35,7 @@ struct npc_subtype_definition npc_subtype_definitions[MAX_NPC_SUBTYPES] =
         {(char*)0, (char*)0, (char*)0},
         6, 0,
         10, 1000, 15000,
-        NPC_SERVICE_BUY_GEMS_AND_STONES | NPC_SERVICE_IDENTIFY_GEMS_AND_STONES,
+        NPC_SERVICE_BUY_GEMS_AND_STONES | NPC_SERVICE_IDENTIFY_GEMS_AND_STONES | NPC_SERVICE_FORGE_SLING_BULLETS,
         NPC_FLAGS_PARQUET_FLOOR | NPC_FLAGS_DOORS_CLOSED | NPC_FLAGS_LIGHTS_ON | NPC_FLAGS_DOUBLE_MONEY_IN_HELL | NPC_FLAGS_HAS_STANDARD_DISTANT_SOUNDS
     },
     {
@@ -455,9 +455,9 @@ int mtype;
 
     unsigned long extraflags = (npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_FEMALE) != 0  ? MM_FEMALE : Inhell || (npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_MALE) != 0 ? MM_MALE : 0UL; /* Since there is only one soundset for unusual creature types */
 
-    npc = makemon_ex(&mons[npc_montype], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, npctype);
+    npc = makemon_ex(&mons[npc_montype], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, npctype, 0);
     if(!npc)
-        npc = makemon_ex(&mons[npc_subtype_definitions[npctype].mnum], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, npctype); /* Fallback */
+        npc = makemon_ex(&mons[npc_subtype_definitions[npctype].mnum], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, npctype, 0); /* Fallback */
     
     if (npc)
     {
@@ -501,6 +501,15 @@ int mtype;
             for (i = 0; i < 24; i++)
             {
                 mongets(npc, rnd_class(FIRST_GEM, LAST_GEM));
+            }
+
+            /* Sling bullets */
+            mongets(npc, LEADEN_SLING_BULLET);
+            mongets(npc, IRON_SLING_BULLET);
+            for (i = 0; i < 3; i++)
+            {
+                if(!rn2(2))
+                    mongets(npc, rnd_class(LEADEN_SLING_BULLET, SILVER_SLING_BULLET));
             }
             break;
         }
@@ -556,9 +565,27 @@ int mtype;
             {
                 mongets(npc, SPE_MANUAL);
             }
+
+            mongets(npc, RIN_LEVITATION);
+            mongets(npc, RIN_FIRE_RESISTANCE);
+            mongets(npc, RIN_PROTECTION_FROM_UNDEATH);
+            mongets(npc, WAN_UNDEAD_TURNING);
             break;
         }
         case NPC_ORC_HERMIT3:
+        {
+            struct obj* otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_ADVANCED_READING_IN_KNOWN_MONSTERS, MKOBJ_FLAGS_PARAM_IS_TITLE);
+            if (otmp)
+                (void)mpickobj(npc, otmp);
+
+            int cnt = 1 + rnd(2);
+            for (i = 0; i < cnt; i++)
+            {
+                mongets(npc, SPE_MANUAL);
+            }
+
+            break;
+        }
         case NPC_HERMIT3:
         {
             struct obj* otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_ADVANCED_READING_IN_KNOWN_MONSTERS, MKOBJ_FLAGS_PARAM_IS_TITLE);
@@ -570,6 +597,16 @@ int mtype;
             {
                 mongets(npc, SPE_MANUAL);
             }
+
+            mongets(npc, GNOMISH_FELT_HAT);
+            cnt = 2 + rnd(2);
+            for (i = 0; i < cnt; i++)
+            {
+                otmp = mksobj_with_flags(GNOMISH_FELT_HAT, TRUE, FALSE, FALSE, 0, MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY);
+                if (otmp)
+                    (void)mpickobj(npc, otmp);
+            }
+
             break;
         }
         case NPC_ARTIFICER:
@@ -581,6 +618,23 @@ int mtype;
             otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_PRINCIPLES_OF_MAGIC, MKOBJ_FLAGS_PARAM_IS_TITLE);
             if (otmp)
                 (void)mpickobj(npc, otmp);
+
+            mongets(npc, WAN_TOWN_PORTAL);
+            otmp = mkobj(WAND_CLASS, TRUE, TRUE);
+            if (otmp)
+                (void)mpickobj(npc, otmp);
+            if (!rn2(2))
+            {
+                otmp = mkobj(WAND_CLASS, TRUE, TRUE);
+                if (otmp)
+                    (void)mpickobj(npc, otmp);
+            }
+            if (!rn2(2))
+            {
+                otmp = mkobj(WAND_CLASS, TRUE, TRUE);
+                if (otmp)
+                    (void)mpickobj(npc, otmp);
+            }
             break;
         }
         default:
@@ -667,6 +721,11 @@ int mtype;
                 if (!rn2(6) && cnt < MAX_SPECIAL_TEACH_SPELLS)
                 {
                     ENPC(npc)->special_teach_spells[cnt] = SPE_CREATE_DRACOLICH;
+                    cnt++;
+                }
+                if (!rn2(6) && cnt < MAX_SPECIAL_TEACH_SPELLS)
+                {
+                    ENPC(npc)->special_teach_spells[cnt] = SPE_CREATE_ELDER_DRACOLICH;
                     cnt++;
                 }
             }

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    uhitm.c    $NHDT-Date: 1555720104 2019/04/20 00:28:24 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.207 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -156,6 +156,7 @@ struct obj *wep; /* uwep for attack(), null for kick_monster() */
             {
                 play_sfx_sound(SFX_ACQUIRE_GRAB);
                 u.ustuck = mtmp;
+                refresh_m_tile_gui_info(mtmp, FALSE);
             }
         }
         /* #H7329 - if hero is on engraved "Elbereth", this will end up
@@ -845,8 +846,8 @@ struct attack *uattk;
 
     if (u.twoweap && !(uwep && bimanual(uwep)) && malive && m_at(x, y) == mon) //&& !override_confirmation 
     {
-        if (uarms && is_wielded_weapon(uarms))
-            You("strike with your left-hand weapon.");
+        if (uarms && is_wieldable_weapon(uarms))
+            You("strike with your left-hand %s.", is_shield(uarms) ? "shield" : "weapon");
         else
             You("strike with your left %s%s.", uarmg ? "gloved " : "", body_part(HAND));
 
@@ -963,6 +964,7 @@ boolean* obj_destroyed;
         /* not grapnels; applied implies uwep */
         || (thrown == HMON_APPLIED && is_appliable_pole_type_weapon(uwep)));
     boolean hide_damage_amount = FALSE;
+    boolean isinstakilled = FALSE;
     boolean isdisintegrated = FALSE;
     int damage_increase_adtyp = AD_MAGM; /* base assumption if nothing else is set */
     boolean incorrect_weapon_use = FALSE;
@@ -1057,7 +1059,7 @@ boolean* obj_destroyed;
                 /* artifact gauntlets*/
                 int ahres = 0;
                 if (uarmg->oartifact
-                    && (ahres = artifact_hit(&youmonst, mon, uarmg, &damage, dieroll)))
+                    && (ahres = artifact_hit(&youmonst, mon, uarmg, &damage, &isinstakilled, dieroll)))
                 {
                     if (DEADMONSTER(mon)) /* artifact killed monster */
                         return FALSE;
@@ -1074,7 +1076,9 @@ boolean* obj_destroyed;
                 int special_hit_dmg = pseudo_artifact_hit(&youmonst, mon, uarmg, extratmp, dieroll, critstrikeroll, &spec_adtyp);
                 if (special_hit_dmg < 0)
                 {
-                    damage += 2 * (double)mon->mhp + 200;
+                    //damage += 2 * (double)mon->mhp + 200;
+                    //mon->mhp = 0;
+                    isinstakilled = TRUE;
                     if (special_hit_dmg == -2)
                         isdisintegrated = TRUE;
                     hide_damage_amount = TRUE;
@@ -1238,7 +1242,7 @@ boolean* obj_destroyed;
 
                 int ahres = 0;
                 if (obj->oartifact
-                    && (ahres = artifact_hit(&youmonst, mon, obj, &damage, dieroll))) 
+                    && (ahres = artifact_hit(&youmonst, mon, obj, &damage, &isinstakilled, dieroll))) 
                 {
                     if (DEADMONSTER(mon)) /* artifact killed monster */
                         return FALSE;
@@ -1255,7 +1259,9 @@ boolean* obj_destroyed;
                 int special_hit_dmg = pseudo_artifact_hit(&youmonst, mon, obj, extratmp, dieroll, critstrikeroll, &spec_adtyp);
                 if (special_hit_dmg < 0)
                 {
-                    damage += 2 * (double)mon->mhp + 200;
+                    //damage += 2 * (double)mon->mhp + 200;
+                    //mon->mhp = 0;
+                    isinstakilled = TRUE;
                     if (special_hit_dmg == -2)
                         isdisintegrated = TRUE;
                     hide_damage_amount = TRUE;
@@ -1831,21 +1837,24 @@ boolean* obj_destroyed;
         /* make sure that negative damage adjustment can't result
            in inadvertently boosting the victim's hit points */
         damage = 0;
-        if (is_shade(mdat))
+        if (!isinstakilled)
         {
-            if (!hittxt) 
+            if (is_shade(mdat))
             {
-                const char* what = *unconventional ? unconventional : "attack";
+                if (!hittxt)
+                {
+                    const char* what = *unconventional ? unconventional : "attack";
 
-                Your("%s %s harmlessly through %s.", what,
-                    vtense(what, "pass"), mon_nam(mon));
-                hittxt = TRUE;
+                    Your("%s %s harmlessly through %s.", what,
+                        vtense(what, "pass"), mon_nam(mon));
+                    hittxt = TRUE;
+                }
             }
-        }
-        else 
-        {
-            if (get_dmg_bonus)
-                damage = 1;
+            else
+            {
+                if (get_dmg_bonus)
+                    damage = 1;
+            }
         }
     }
 
@@ -1918,6 +1927,10 @@ boolean* obj_destroyed;
         }
     }
 
+    if (isinstakilled)
+    {
+        mon->mhp = 0;
+    }
 
     int mon_hp_before = mon->mhp;
 
@@ -2231,16 +2244,18 @@ boolean* obj_destroyed;
         /* Shattering is done below, here just the message*/
         objectshatters = TRUE;
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_BREAK);
+        char dcbuf[BUFSZ] = "";
         if(obj->quan == 1)
-            pline("%s from the blow!", Yobjnam2(obj, "shatter"));
+            Sprintf(dcbuf, "%s from the blow!", Yobjnam2(obj, "shatter"));
         else
-            pline("One of %s shatters from the blow!", yname(obj));
+            Sprintf(dcbuf, "One of %s shatters from the blow!", yname(obj));
 
+        pline1(dcbuf);
         if (obj->oclass == GEM_CLASS)
         {
             if (obj->dknown && !objects[obj->otyp].oc_name_known
                 && !objects[obj->otyp].oc_uname)
-                docall(obj);
+                docall(obj, dcbuf);
         }
     }
 
@@ -2414,7 +2429,8 @@ boolean* obj_destroyed;
             nohandglow(mon);
             if (!is_confused(mon) && !check_ability_resistance_success(mon, A_WIS, 0))
             {
-                increase_mon_property(mon, CONFUSION, d(1, 20) + 20);
+                int duration = get_otyp_spell_duration(SCR_CONFUSE_MONSTER);
+                increase_mon_property(mon, CONFUSION, duration);
                 if (!is_stunned(mon) && mon_can_move(mon)
                     && canseemon(mon))
                 {
@@ -2480,7 +2496,7 @@ boolean* obj_destroyed;
                 delay_output_milliseconds(150);
                 play_sfx_sound(SFX_WEAPON_NO_LONGER_POISONED);
             }
-            Your("%s %s no longer poisoned.", saved_oname,
+            Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s no longer poisoned.", saved_oname,
                 vtense(saved_oname, "are"));
         }
 
@@ -2491,7 +2507,7 @@ boolean* obj_destroyed;
                 delay_output_milliseconds(150);
                 play_sfx_sound(SFX_WEAPON_NO_LONGER_ENCHANTED);
             }
-            Your("%s %s no longer enchanted.", saved_oname,
+            Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s no longer enchanted.", saved_oname,
                 vtense(saved_oname, "are"));
         }
 
@@ -2621,8 +2637,11 @@ demonpet()
         dtmp->disregards_enemy_strength = TRUE;
         dtmp->disregards_own_health = FALSE;
         dtmp->hasbloodlust = TRUE;
-        dtmp->summonduration = d(objects[SPE_SUMMON_DEMON].oc_spell_dur_dice, objects[SPE_SUMMON_DEMON].oc_spell_dur_diesize) + objects[SPE_SUMMON_DEMON].oc_spell_dur_plus;
-        begin_summontimer(dtmp);
+        if ((objects[SPE_SUMMON_DEMON].oc_spell_dur_dice > 0 && objects[SPE_SUMMON_DEMON].oc_spell_dur_diesize > 0) || objects[SPE_SUMMON_DEMON].oc_spell_dur_plus > 0)
+        {
+            dtmp->summonduration = d(objects[SPE_SUMMON_DEMON].oc_spell_dur_dice, objects[SPE_SUMMON_DEMON].oc_spell_dur_diesize) + objects[SPE_SUMMON_DEMON].oc_spell_dur_plus;
+            begin_summontimer(dtmp);
+        }
 
         play_sfx_sound_at_location(SFX_SUMMON_DEMON, dtmp->mx, dtmp->my);
         if (canseemon(dtmp))
@@ -2652,6 +2671,7 @@ struct obj *otmp;
 #endif
 
     /* stealing this corpse is fatal... */
+    killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
     instapetrify(corpse_xname(otmp, "stolen", CXN_ARTICLE));
     /* apparently wasn't fatal after all... */
     return TRUE;
@@ -3126,7 +3146,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
                 if (!Slimed) {
                     play_sfx_sound(SFX_START_SLIMING);
                     You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "suck in some slime and don't feel very well.");
-                    make_slimed(10L, (char *) 0);
+                    make_slimed(10L, (char *) 0, KILLED_BY, "sucking in some green slime", HINT_KILLED_ATE_GREEN_SLIME);
                 }
             }
             break;
@@ -3203,7 +3223,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
     case AD_SLIM:
         if (negated)
             break; /* physical damage only */
-        if (!rn2(4) && !slimeproof(pd))
+        if (!rn2(4) && !resists_slime(mdef))
         {
             hit_tile = HIT_SLIMED;
             if (!munslime(mdef, TRUE) && !DEADMONSTER(mdef)) {
@@ -3558,6 +3578,7 @@ register struct attack *mattk;
                 mname = an(mname);
             You("englut %s.", mon_nam(mdef));
             Sprintf(kbuf, "swallowing %s whole", mname);
+            killer.hint_idx = HINT_KILLED_ATE_COCKATRICE_CORPSE;
             instapetrify(kbuf);
         } 
         else
@@ -3635,7 +3656,7 @@ register struct attack *mattk;
                         if (!Unchanging)
                         {
                             play_sfx_sound(SFX_START_SLIMING);
-                            make_slimed(5L, (char *) 0);
+                            make_slimed(5L, (char *) 0, KILLED_BY, "trying to digest green slime", HINT_KILLED_ATE_GREEN_SLIME);
                         }
                     } 
                     else
@@ -4370,7 +4391,7 @@ boolean wep_was_destroyed;
         break;
     case AD_MAGM:
         /* wrath of gods for attacking Oracle */
-        if (Magic_missile_immunity || Antimagic_or_resistance || Invulnerable) {
+        if (Magic_missile_immunity || Invulnerable) {
             play_sfx_sound(SFX_HAIL_OF_MAGIC_MISSILES_MISSES);
             u_shieldeff();
             pline("A hail of magic missiles narrowly misses you!");
@@ -4424,7 +4445,7 @@ boolean wep_was_destroyed;
                         incr_itimeout(&HParalyzed, (ACURR(A_WIS) > 12 || rn2(4)) ? basedmg : 127);
                         context.botl = context.botlx = 1;
                         refresh_u_tile_gui_info(TRUE);
-
+                        standard_hint("Do not hit floating eyes in melee unless you wear a blindfold or a towel. Use ranged weapons against them.", &u.uhint.paralyzed_by_floating_eye);
 #if 0
                         nomul((ACURR(A_WIS) > 12 || rn2(4)) ? -tmp : -127);
                         multi_reason = "frozen by a monster's gaze";
@@ -4446,7 +4467,7 @@ boolean wep_was_destroyed;
                 incr_itimeout(&HParalyzed, basedmg);
                 context.botl = context.botlx = 1;
                 refresh_u_tile_gui_info(TRUE);
-
+                standard_hint("Get free action as early as possible. Use ranged weapons to attack monsters with paralyzing passive defense.", &u.uhint.paralyzed_by_cube);
 #if 0
                 nomovemsg = You_can_move_again;
                 nomul(-tmp);
@@ -4507,6 +4528,7 @@ boolean wep_was_destroyed;
                 else
                     You("are suddenly very hot!");
                 mdamageu_with_hit_tile(mon, damage, TRUE, hit_tile); /* fire damage */
+                standard_hint("Acquire full fire resistance or use ranged weapons to bypass passive fire defense.", &u.uhint.damaged_by_passive_fire);
             }
             break;
         case AD_ELEC:
@@ -4521,6 +4543,7 @@ boolean wep_was_destroyed;
             play_sfx_sound(SFX_MONSTER_GETS_ZAPPED);
             You("are jolted with electricity!");
             mdamageu_with_hit_tile(mon, damage, TRUE, hit_tile);
+            standard_hint("Acquire full shock resistance or use ranged weapons to bypass passive electricity defense.", &u.uhint.damaged_by_passive_electricity);
             break;
         default:
             break;
@@ -4614,6 +4637,7 @@ struct monst *mtmp;
     {
         play_sfx_sound(SFX_ACQUIRE_GRAB);
         u.ustuck = mtmp;
+        refresh_m_tile_gui_info(mtmp, FALSE);
     }
 
     if (Blind) 
@@ -5052,6 +5076,10 @@ double hp_d;
             refresh_u_tile_gui_info(TRUE);
     }
 
+    if (hp_d > 0 && critically_low_hp(TRUE))
+    {
+        pray_hint("heal yourself", "drinking a potion of healing or retreating to another level to heal up", &u.uhint.low_hit_points);
+    }
 
     return *target_integer_part_ptr;
 }

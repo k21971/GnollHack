@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mklev.c    $NHDT-Date: 1550800390 2019/02/22 01:53:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -896,12 +896,12 @@ makelevel()
         }
         else if (In_hell(&u.uz))
         {
-            if(Invocation_lev(&u.uz) || !rn2(3))
+            if(Invocation_lev(&u.uz)) // || !rn2(3) )
                 makemaz("");
-            else if (In_hell(&u.uz))
+            else // if (In_hell(&u.uz))
                 makemaz("hellfill");
-            else
-                makemaz("mainfill");
+            //else
+            //    makemaz("mainfill");
 
             return;
         }
@@ -987,8 +987,8 @@ makelevel()
         if (wizard && nh_getenv("SHOPTYPE"))
             res = mkroom(SHOPBASE);
 
-        if (!res && u_depth > depth(&oracle_level) + 3 && u_depth > 10 && u_depth <= 20 && u_depth <= min(depth(&medusa_level), depth(&oracle_level) + 4) && !context.made_deserted_shop
-            && (nroom >= room_threshold && (rn2(3) || (u_depth < depth(&medusa_level) && (u_depth >= depth(&oracle_level) + 6 || u_depth >= 15)))))
+        if (!res && u_depth >= 10 && u_depth <= 16 && !context.made_deserted_shop
+            && (nroom >= room_threshold && (rn2(2) || u_depth >= 12)))
             res = mkroom(DESERTEDSHOP);
 
         boolean shopok = (context.made_shop_count == 0 ? 1 :
@@ -999,7 +999,10 @@ makelevel()
             && nroom >= room_threshold && shopok)  // rn2(u_depth) < 3))
             res = mkroom(SHOPBASE);
 
-        if (!res && u_depth > 1 && u_depth < depth(&medusa_level) && !(context.npc_made & (1UL << NPC_ELVEN_BARD)))
+        if (!res && u_depth > 1 && u_depth < depth(&medusa_level) && !(context.npc_made & (1UL << NPC_ELVEN_BARD))
+            && (context.game_difficulty == MIN_DIFFICULTY_LEVEL 
+                || (context.game_difficulty < 0 && !rn2(max(2, 2 * (context.game_difficulty - MIN_DIFFICULTY_LEVEL) + 1)))
+                || (context.game_difficulty >= 0 && !rn2(100 * context.game_difficulty + 20))))
             res = mknpcroom(NPC_ELVEN_BARD);
 
         if (!res && u_depth > 8 && u_depth < depth(&medusa_level) &&
@@ -1163,54 +1166,70 @@ makelevel()
 
             /* Stash has now some random contents */
             struct obj* stash = mksobj_at(CHEST, x, y, FALSE, FALSE);
-            stash->olocked = FALSE;
-            stash->otrapped = FALSE;
-            stash->tknown = 1;
-            stash->speflags |= SPEFLAGS_NO_PICKUP;
-            char namebuf[BUFSZ];
-            Sprintf(namebuf, "%s stash", s_suffix(plname));
-            stash = uoname(stash, namebuf);
-
-            /* Stash has now some random contents */
-            struct obj* otmp = (struct obj*)0;
-
-            /* 2-3 items in stash */
-            int itemnum = 2 + (!rn2(4) ? 1 : 0);
-            for (int icnt = 0; icnt < itemnum; icnt++)
+            if (stash)
             {
-                otmp = mkobj(RANDOM_CLASS, FALSE, TRUE);
-                otmp->bknown = 1;
-                (void)add_to_container(stash, otmp);
-            }
+                stash->olocked = FALSE;
+                stash->otrapped = FALSE;
+                stash->tknown = 1;
+                stash->speflags |= SPEFLAGS_NO_PICKUP;
+                char namebuf[BUFSZ];
+                Sprintf(namebuf, "%s stash", s_suffix(plname));
+                stash = uoname(stash, namebuf);
 
-            if (context.game_difficulty < 0)
-            {
-                otmp = mksobj(SPE_MANUAL, TRUE, FALSE, FALSE);
-                otmp->bknown = 1;
-                (void)add_to_container(stash, otmp);
-            }
+                /* Stash has now some random contents */
+                struct obj* otmp = (struct obj*)0;
+
+                /* 2-3 items in stash */
+                int itemnum = 2 + (!rn2(4) ? 1 : 0);
+                for (int icnt = 0; icnt < itemnum; icnt++)
+                {
+                    otmp = mkobj(RANDOM_CLASS, FALSE, TRUE);
+                    if (otmp)
+                    {
+                        otmp->bknown = 1;
+                        (void)add_to_container(stash, otmp);
+                    }
+                }
+
+                if (context.game_difficulty < 0)
+                {
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                    if (otmp)
+                    {
+                        otmp->bknown = 1;
+                        (void)add_to_container(stash, otmp);
+                    }
+
+                    otmp = mksobj(SPE_MANUAL, TRUE, FALSE, FALSE);
+                    if (otmp)
+                    {
+                        otmp->bknown = 1;
+                        (void)add_to_container(stash, otmp);
+                    }
+                }
 
 #if 0
-            if (!carrying(AXE) && !carrying(BATTLE_AXE))
-            {
-                otmp = mksobj(AXE, FALSE, FALSE, FALSE);
-                uncurse(otmp);
-                otmp->bknown = 1;
-                (void)add_to_container(stash, otmp);
-            }
-            else
-            {
-                otmp = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE);
-                otmp->quan = rnd(200);
-                otmp->owt = weight(otmp);
-                otmp->bknown = 1;
-                (void)add_to_container(stash, otmp);
-            }
+                if (!carrying(AXE) && !carrying(BATTLE_AXE))
+                {
+                    otmp = mksobj(AXE, FALSE, FALSE, FALSE);
+                    uncurse(otmp);
+                    otmp->bknown = 1;
+                    (void)add_to_container(stash, otmp);
+                }
+                else
+                {
+                    otmp = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE);
+                    otmp->quan = rnd(200);
+                    otmp->owt = weight(otmp);
+                    otmp->bknown = 1;
+                    (void)add_to_container(stash, otmp);
+                }
 
-            otmp = mkobj(FOOD_CLASS, FALSE, FALSE);
-            otmp->bknown = 1;
-            (void)add_to_container(stash, otmp);
+                otmp = mkobj(FOOD_CLASS, FALSE, FALSE);
+                otmp->bknown = 1;
+                (void)add_to_container(stash, otmp);
 #endif
+            }
 
             /* Add hermit */
             int stash_x = x;
@@ -1934,7 +1953,7 @@ coord *tm;
                (less useful to use, and encourage pets to avoid the trap) */
             if (otmp) {
                 otmp->blessed = 0;
-                if((objects[otmp->otyp].oc_flags & O1_NOT_CURSEABLE) || has_obj_mythic_uncurseable(otmp))
+                if(is_obj_uncurseable(otmp))
                     otmp->cursed = 0;
                 else
                     otmp->cursed = 1;

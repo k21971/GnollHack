@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    dbridge.c    $NHDT-Date: 1503355815 2017/08/21 22:50:15 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.39 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet              */
@@ -444,9 +444,11 @@ int xkill_flags, how;
     if (is_u(etmp)) {
         if (how == DROWNING) {
             killer.name[0] = 0; /* drown() sets its own killer */
+            killer.hint_idx = 0;
             (void) drown();
         } else if (how == BURNING) {
             killer.name[0] = 0; /* lava_effects() sets own killer */
+            killer.hint_idx = 0;
             (void) lava_effects();
         } else {
             coord xy;
@@ -475,7 +477,8 @@ int xkill_flags, how;
         int entitycnt;
 
         killer.name[0] = 0;
-/* fake "digested to death" damage-type suppresses corpse */
+        killer.hint_idx = 0;
+        /* fake "digested to death" damage-type suppresses corpse */
 #define mk_message(dest) (((dest & XKILL_NOMSG) != 0) ? (char *) 0 : "")
 #define mk_corpse(dest) (((dest & XKILL_NOCORPSE) != 0) ? AD_DGST : AD_PHYS)
         /* if monsters are moving, one of them caused the destruction */

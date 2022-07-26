@@ -135,6 +135,8 @@ char *argv[];
 
     process_options(argc, argv); /* command line options */
 
+    display_gamewindows();
+
     /* wizard mode access is deferred until here */
     set_playmode(); /* sets plname to "wizard" for wizard mode */
     /* strip role,race,&c suffix; calls askname() if plname[] is empty
@@ -169,8 +171,6 @@ char *argv[];
      *  new game or before a level restore on a saved game.
      */
     vision_init();
-
-    display_gamewindows();
 
 /*
  * First, try to find and restore a save file for specified character.
@@ -251,6 +251,14 @@ char *argv[];
         case 'X':
         case 'x':
             discover = TRUE, wizard = FALSE;
+            break;
+        case 'M':
+        case 'm':
+            ModernMode = TRUE;
+            break;
+        case 'C':
+        case 'c':
+            CasualMode = TRUE;
             break;
 #ifdef NEWS
         case 'n':

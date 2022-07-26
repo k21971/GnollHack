@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    hack.h    $NHDT-Date: 1549327459 2019/02/05 00:44:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.102 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -173,6 +173,7 @@ enum dismount_types {
 #define CXN_NOCORPSE 16 /* suppress " corpse" suffix */
 
 #define KXNFLAGS_NO_ARTICLE 0x01
+#define KXNFLAGS_SPELL      0x02  // Not the book, but the spell from it
 
    /* getpos() return values */
 enum getpos_retval {
@@ -355,7 +356,7 @@ extern short tile2enlargement[MAX_TILES];
 #define MM_NORMAL_HIT_DICE              0x00100000UL /* use normal hit dice */
 #define MM_EMIN_COALIGNED               0x00200000UL /* minion is of the same alignment as player */
 #define MM_SET_ORIGIN_COORDINATES       0x00400000UL /* origin coordinates are set to x, y */
-#define MM_ADJUST_HP_FROM_EXISTING      0x00800000UL /* OBSOLETE - Calculate only new maxhp and adjust HP proportionally */
+#define MM_SADDLED                      0x00800000UL
 #define MM_PLAY_SUMMON_ANIMATION        0x01000000UL
 #define MM_SUMMON_MONSTER_ANIMATION     0x00000000UL
 #define MM_CHAOTIC_SUMMON_ANIMATION     0x02000000UL
@@ -480,9 +481,9 @@ extern short tile2enlargement[MAX_TILES];
 #define dnq(query) yn_function(query, dnqchars, 'q', dnqdescs)
 #define idq(query) yn_function(query, idqchars, 'q', idqdescs)
 
-#define yn_query_ex(a, c, title, query) yn_function_ex(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynchars, 'n', yndescs, 0UL)
-#define ynq_ex(a, c, title, query) yn_function_ex(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynqchars, 'q', ynqdescs, 0UL)
-#define yn_function_es(s, a, c, title, query, chars, resp, descs) yn_function_ex(s, a, c, NO_GLYPH, title, query, chars, resp, descs, 0UL)
+#define yn_query_ex(a, c, title, query) yn_function_ex(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynchars, 'n', yndescs, (const char*)0, 0UL)
+#define ynq_ex(a, c, title, query) yn_function_ex(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynqchars, 'q', ynqdescs, (const char*)0, 0UL)
+#define yn_function_es(s, a, c, title, query, chars, resp, descs, introline) yn_function_ex(s, a, c, NO_GLYPH, title, query, chars, resp, descs, introline, 0UL)
 
 /* Macros for scatter */
 #define VIS_EFFECTS 0x01 /* display visual effects */
@@ -612,11 +613,11 @@ enum bodypart_types {
 #define plur(x) (((x) == 1) ? "" : "s")
 
 #define ARM_AC_BONUS(obj, ptr) ((int)(((obj)->oclass == ARMOR_CLASS || (obj)->oclass == MISCELLANEOUS_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ?                    \
-    (objects[(obj)->otyp].oc_armor_class + (objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC ? 0 : (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment))) \
+    (objects[(obj)->otyp].oc_armor_class + get_obj_exceptionality_ac_bonus(obj) + (objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC ? 0 : (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment))) \
      - (objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_AC ? 0 : min((int) greatest_erosion(obj), objects[(obj)->otyp].oc_armor_class))) : 0))
 
 #define ARM_MC_BONUS(obj, ptr)                      \
-    ((int)(objects[(obj)->otyp].oc_magic_cancellation + (objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) / 2 : 0) \
+    ((int)(objects[(obj)->otyp].oc_magic_cancellation + get_obj_exceptionality_mc_bonus(obj) + (objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) / 2 : 0) \
      - (objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_MC ? 0 : min(greatest_erosion(obj) / 2, objects[(obj)->otyp].oc_magic_cancellation))))
 
 

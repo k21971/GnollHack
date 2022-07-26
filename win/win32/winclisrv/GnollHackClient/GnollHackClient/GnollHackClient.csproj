@@ -56,9 +56,13 @@
     <None Remove="Assets\Icons\wait.png" />
     <None Remove="Assets\Immortal-Regular.ttf" />
     <None Remove="Assets\imrl.otf" />
+    <None Remove="Assets\Intro.bank" />
     <None Remove="Assets\Lato-Bold.ttf" />
     <None Remove="Assets\Lato-Regular.ttf" />
+    <None Remove="Assets\main-menu-dwarf.jpg" />
+    <None Remove="Assets\main-menu-gnoll.jpg" />
     <None Remove="Assets\main-menu-portrait-snapshot.jpg" />
+    <None Remove="Assets\main-menu-ranger.jpg" />
     <None Remove="Assets\Master.bank" />
     <None Remove="Assets\Master.strings.bank" />
     <None Remove="Assets\shxi.ttf" />
@@ -78,6 +82,7 @@
     <None Remove="Assets\UI\arrow_upleft.png" />
     <None Remove="Assets\UI\arrow_upright.png" />
     <None Remove="Assets\UI\attributes.png" />
+    <None Remove="Assets\UI\autopickup.png" />
     <None Remove="Assets\UI\background-oldpaper.png" />
     <None Remove="Assets\UI\break.png" />
     <None Remove="Assets\UI\cancel.png" />
@@ -222,6 +227,7 @@
     <None Remove="Assets\UI\travel.png" />
     <None Remove="Assets\UI\twoweap.png" />
     <None Remove="Assets\UI\untrap.png" />
+    <None Remove="Assets\UI\unwield.png" />
     <None Remove="Assets\UI\viewspell.png" />
     <None Remove="Assets\UI\vitruvian-gnoll.png" />
     <None Remove="Assets\UI\wait.png" />
@@ -256,6 +262,11 @@
     <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits.png" />
     <EmbeddedResource Include="Assets\Icons\missing_icon.png" />
     <EmbeddedResource Include="Assets\Immortal-Regular.ttf" />
+    <EmbeddedResource Include="Assets\main-menu-dwarf.jpg" />
+    <EmbeddedResource Include="Assets\main-menu-gnoll.jpg" />
+    <EmbeddedResource Include="Assets\main-menu-ranger.jpg" />
+    <EmbeddedResource Include="Assets\UI\autopickup.png" />
+    <EmbeddedResource Include="Assets\UI\unwield.png" />
     <Page Include="Assets\imrl.otf" />
     <EmbeddedResource Include="Assets\Lato-Bold.ttf" />
     <EmbeddedResource Include="Assets\Lato-Regular.ttf" />

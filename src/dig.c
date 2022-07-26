@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    dig.c    $NHDT-Date: 1547421446 2019/01/13 23:17:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -946,7 +946,7 @@ coord *cc;
         || (IS_ROCK(lev->typ) && lev->typ != SDOOR
             && (lev->wall_info & W_NONDIGGABLE) != 0)) {
         play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-        pline_The("%s %shere is too hard to dig in.", surface(dig_x, dig_y),
+        pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "%s %shere is too hard to dig in.", surface(dig_x, dig_y),
                   (dig_x != u.ux || dig_y != u.uy) ? "t" : "");
     } else if (is_pool_or_lava(dig_x, dig_y)) {
         play_sfx_sound(SFX_SPLASH_HIT);
@@ -961,7 +961,7 @@ coord *cc;
            closed "door" where the portcullis/mechanism is located */
         if (pit_only) {
             play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-            pline_The("drawbridge seems too hard to dig through.");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "drawbridge seems too hard to dig through.");
             return FALSE;
         } else {
             int x = dig_x, y = dig_y;
@@ -1008,7 +1008,7 @@ coord *cc;
              * the drawbridge.  The following is a cop-out. --dlc
              */
             play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-            pline_The("%s %shere is too hard to dig in.",
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "%s %shere is too hard to dig in.",
                       surface(dig_x, dig_y),
                       (dig_x != u.ux || dig_y != u.uy) ? "t" : "");
             return FALSE;
@@ -1025,19 +1025,19 @@ coord *cc;
     else if (IS_THRONE(lev->typ)) 
     {
         play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-        pline_The("throne is too hard to break apart.");
+        pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "throne is too hard to break apart.");
 
     }
     else if (IS_ANVIL(lev->typ)) 
     {
         play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-        pline_The("anvil is too hard to break apart.");
+        pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "anvil is too hard to break apart.");
 
     } 
     else if (IS_ALTAR(lev->typ)) 
     {
         play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-        pline_The("altar is too hard to break apart.");
+        pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "altar is too hard to break apart.");
 
     } 
     else 
@@ -1093,7 +1093,7 @@ coord *cc;
 
     /* Grave-robbing is frowned upon... */
     exercise(A_WIS, FALSE);
-    if (Role_if(PM_ARCHAEOLOGIST)) {
+    if (Role_if(PM_ARCHAEOLOGIST) && (u.ualign.type != A_CHAOTIC)) {
         play_sfx_sound(SFX_GUILTY);
         adjalign(-sgn(u.ualign.type) * 3);
         You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "like a despicable grave-robber!");
@@ -1195,7 +1195,7 @@ struct obj *obj;
 
     if (u.utrap && u.utraptype == TT_WEB) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s you can't %s while entangled in a web.",
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s you can't %s while entangled in a web.",
               /* res==0 => no prior message;
                  res==1 => just got "You now wield a pick-axe." message */
               !res ? "Unfortunately," : "But", verb);
@@ -2377,7 +2377,7 @@ struct obj* origobj;
     {
         mtmp = u.ustuck;
 
-        if (!is_whirly(mtmp->data)) 
+        if (mtmp && !is_whirly(mtmp->data)) 
         {
             if (is_animal(mtmp->data))
                 You("dehydrate %s %s wall!", s_suffix(mon_nam(mtmp)),
@@ -2436,7 +2436,7 @@ struct obj* origobj;
                 create_current_floor_location(zx, zy, 0, back_to_broken_glyph(zx, zy), TRUE);
                 newsym(zx, zy);
                 if (see_it)
-                    pline_The("fountain dries up!");
+                    pline_The1("fountain dries up!");
                 /* The location is seen if the hero/monster is invisible
                    or felt if the hero is blind. */
             }
@@ -2504,7 +2504,7 @@ struct obj* origobj;
             context.zap_animation_counter_on[idx] = TRUE;
             context.zap_aggregate_intervals_to_wait_until_action = 0UL;
             context.zap_aggregate_intervals_to_wait_until_end = anim_intervals;
-            toggle_animation_timer(ANIMATION_TIMER_ZAP, i, TRUE, zx, zy, 0, 0UL);
+            toggle_animation_timer(ANIMATION_TIMER_ZAP, idx, TRUE, zx, zy, 0, 0UL);
 
             if (animations[anim].action_execution_frame > 0)
             {
@@ -2570,9 +2570,9 @@ struct obj* origobj;
         }
 
         /* Destroy potions */
-        struct obj* otmp, * otmp2;
+        struct obj* otmp, *otmp2;
         for (otmp = level.objects[zx][zy]; otmp; otmp = otmp2) {
-            otmp2 = otmp->nexthere;
+            otmp2 = otmp->nexthere; //Save nextthere to otmp2, because otmp may get deleted below
             if(otmp->oclass == POTION_CLASS)
             {
                 play_immediate_ray_sound_at_location(OBJECT_RAY_SOUNDSET_EVAPORATION_BEAM, RAY_SOUND_TYPE_HIT_OBJECT, zx, zy);
@@ -3320,7 +3320,7 @@ dodig()
     if (!(lev->typ == GRASS || lev->typ == GROUND || IS_GRAVE(lev->typ)))
     {
         play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
-        pline("It is too hard to dig here with %s.", digbuf);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "It is too hard to dig here with %s.", digbuf);
         return 0;
     }
 

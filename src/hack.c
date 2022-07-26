@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    hack.c    $NHDT-Date: 1551137618 2019/02/25 23:33:38 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.208 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -146,12 +146,17 @@ moverock()
     register struct obj *otmp;
     register struct trap *ttmp;
     register struct monst *mtmp;
+    char pushbuf[BUFSZ * 2] = "";
+    int pushcolor = NO_COLOR;
 
     play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_PUSH_EFFORT);
 
     sx = u.ux + u.dx, sy = u.uy + u.dy; /* boulder starting position */
     while ((otmp = sobj_at(BOULDER, sx, sy)) != 0) 
     {
+        strcpy(pushbuf, "");
+        pushcolor = NO_COLOR;
+
         /* make sure that this boulder is visible as the top object */
         if (otmp != level.objects[sx][sy])
             movobj(otmp, sx, sy);
@@ -173,7 +178,8 @@ moverock()
             if (Blind)
                 feel_location(sx, sy);
             play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-            pline("You're too small to push that %s.", xname(otmp));
+            Sprintf(pushbuf, "You're too small to push that %s.", xname(otmp));
+            pushcolor = CLR_MSG_FAIL;
             goto cannot_push;
         }
         if (isok(rx, ry) && !IS_ROCK(levl[rx][ry].typ)
@@ -191,8 +197,9 @@ moverock()
                     feel_location(sx, sy);
 
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                pline("%s won't roll diagonally on this %s.",
+                Sprintf(pushbuf, "%s won't roll diagonally on this %s.",
                       The(xname(otmp)), surface(sx, sy));
+                pushcolor = CLR_MSG_HINT;
                 goto cannot_push;
             }
 
@@ -205,15 +212,19 @@ moverock()
             {
                 if (Blind)
                     feel_location(sx, sy);
+
+                pushcolor = CLR_MSG_HINT;
                 if (canspotmon(mtmp))
                 {
-                    pline("There's %s on the other side.", a_monnam(mtmp));
-                } else {
-                    You_hear("a monster behind %s.", the(xname(otmp)));
+                    Sprintf(pushbuf, "There's %s on the other side.", a_monnam(mtmp));
+                }
+                else 
+                {
+                    Sprintf(pushbuf, "You hear a monster behind %s.", the(xname(otmp)));
                     map_invisible(rx, ry);
                 }
                 if (flags.verbose)
-                    pline("Perhaps that's why %s cannot move it.",
+                    Sprintf(eos(pushbuf), " Perhaps that's why %s cannot move it.",
                           u.usteed ? y_monnam(u.usteed) : "you");
                 goto cannot_push;
             }
@@ -394,18 +405,24 @@ moverock()
             } else {
                 newsym(sx, sy);
             }
-        } else {
- nopushmsg:
+        } 
+        else 
+        {
+nopushmsg:
+            pushcolor = CLR_MSG_FAIL;
             if (u.usteed)
-                pline("%s tries to move %s, but cannot.",
+                Sprintf(pushbuf, "%s tries to move %s, but cannot.",
                       upstart(y_monnam(u.usteed)), the(xname(otmp)));
             else
-                You("try to move %s, but in vain.", the(xname(otmp)));
+                Sprintf(pushbuf, "You try to move %s, but in vain.", the(xname(otmp)));
+
             if (Blind)
                 feel_location(sx, sy);
  cannot_push:
             if (throws_rocks(youmonst.data)) 
             {
+                pline_ex1(ATR_NONE, pushcolor, pushbuf);
+
                 boolean
                     canpickup = (!Sokoban
                                  /* similar exception as in can_lift():
@@ -447,15 +464,24 @@ moverock()
                                             && IS_ROCK(levl[sx][u.uy].typ))))
                     || verysmall(youmonst.data)))
             {
-                if (yn_query("However, you can squeeze yourself into a small opening. Proceed?") == 'y')
+                if(*pushbuf)
+                    pline_ex1(ATR_NONE, pushcolor, pushbuf);
+
+                if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, "Squeeze into Opening?", 
+                    "However, you can squeeze yourself into a small opening. Proceed?",
+                    ynchars, 'n', yndescs, pushbuf) == 'y')
                 {
                     sokoban_guilt();
                     break;
                 }
                 else
                     return -1;
-            } else
+            } 
+            else
+            {
+                pline_ex1(ATR_NONE, pushcolor, pushbuf);
                 return -1;
+            }
         }
     }
     return 0;
@@ -1218,8 +1244,8 @@ int mode;
             }
             return TRUE;
         }
-        if (mode == TRAVP_TRAVEL)
-            context.run = 8;
+        //if (mode == TRAVP_TRAVEL)
+        //    context.run = 8;
     }
     if (u.tx != u.ux || u.ty != u.uy) {
         xchar travel[COLNO][ROWNO];
@@ -1335,7 +1361,7 @@ int mode;
                                     && x == u.tx && y == u.ty) {
                                     nomul(0);
                                     /* reset run so domove run checks work */
-                                    context.run = 8;
+                                    //context.run = 8;
                                     iflags.travelcc.x = iflags.travelcc.y = 0;
                                 }
                                 return TRUE;
@@ -2763,7 +2789,6 @@ boolean pick;
                 }
                 damage = adjust_damage(d(max(1, mtmp->data->mlevel - 1), 6), (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE);
                 mdamageu(mtmp, damage, TRUE);
-
             }
             break;
         default: /* monster surprises you. */
@@ -2993,20 +3018,20 @@ register boolean newlev;
         switch (rt) {
         case ZOO:
             play_sfx_sound(SFX_ENTER_ZOO);
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Welcome to David's treasure zoo!");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "Welcome to David's treasure zoo!");
             break;
         case SWAMP:
             play_sfx_sound(SFX_ENTER_SWAMP);
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "It %s rather %s down here.", Blind ? "feels" : "looks",
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "It %s rather %s down here.", Blind ? "feels" : "looks",
                   Blind ? "humid" : "muddy");
             break;
         case COURT:
             play_sfx_sound(SFX_ENTER_COURT);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an opulent throne room!");
+            You_ex(ATR_NONE, CLR_MSG_HINT, "enter an opulent throne room!");
             break;
         case LEPREHALL:
             play_sfx_sound(SFX_ENTER_LEPRECHAUN_HALL);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a leprechaun hall!");
+            You_ex(ATR_NONE, CLR_MSG_HINT, "enter a leprechaun hall!");
             break;
         case MORGUE:
             if (midnight()) {
@@ -3017,36 +3042,36 @@ register boolean newlev;
             else
             {
                 play_sfx_sound(SFX_ENTER_MORGUE);
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "have an uncanny feeling...");
+                You_ex(ATR_NONE, CLR_MSG_WARNING, "have an uncanny feeling...");
             }
             break;
         case BEEHIVE:
             play_sfx_sound(SFX_ENTER_BEEHIVE);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a giant beehive!");
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "enter a giant beehive!");
             break;
         case GARDEN:
             play_sfx_sound(SFX_ENTER_GARDEN);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a lovely underground garden!");
+            You_ex(ATR_NONE, CLR_MSG_HINT, "enter a lovely underground garden!");
             break;
         case DESERTEDSHOP:
             play_sfx_sound(SFX_ENTER_DESERTED_SHOP);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a shop that has been deserted a long time ago!");
+            You_ex(ATR_NONE, CLR_MSG_HINT, "enter a shop that has been deserted a long time ago!");
             break;
         case LIBRARY:
             play_sfx_sound(SFX_ENTER_LIBRARY);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a library!");
+            You_ex(ATR_NONE, CLR_MSG_HINT, "enter a library!");
             break;
         case DRAGONLAIR:
             play_sfx_sound(SFX_ENTER_DRAGON_LAIR);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a dragon lair!");
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "enter a dragon lair!");
             break;
         case COCKNEST:
             play_sfx_sound(SFX_ENTER_COCKATRICE_NEST);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a disgusting nest!");
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "enter a disgusting nest!");
             break;
         case ANTHOLE:
             play_sfx_sound(SFX_ENTER_ANTHOLE);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an anthole!");
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "enter an anthole!");
             break;
         case BARRACKS:
             if (monstinroom(&mons[PM_SOLDIER], roomno)
@@ -3055,17 +3080,17 @@ register boolean newlev;
                 || monstinroom(&mons[PM_CAPTAIN], roomno))
             {
                 play_sfx_sound(SFX_ENTER_BARRACKS);
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter a military barracks!");
+                You_ex(ATR_NONE, CLR_MSG_HINT, "enter a military barracks!");
             }
             else
             {
                 play_sfx_sound(SFX_ENTER_ABANDONED_BARRACKS);
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an abandoned barracks.");
+                You_ex(ATR_NONE, CLR_MSG_HINT, "enter an abandoned barracks.");
             }
             break;
         case ARMORY:
             play_sfx_sound(SFX_ENTER_ARMORY);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "enter an armory!");
+            You_ex(ATR_NONE, CLR_MSG_HINT, "enter an armory!");
             break;
         case DELPHI: {
             struct monst *oracle = monstinroom(&mons[PM_ORACLE], roomno);
@@ -3648,6 +3673,36 @@ maybe_wail()
 }
 
 void
+you_die(knam, k_format)
+register const char* knam;
+boolean k_format;
+{
+    killer.format = k_format;
+    if (killer.name != knam) /* the thing that killed you */
+        Strcpy(killer.name, knam ? knam : "");
+    You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "die...");
+    done(DIED);
+}
+
+
+void
+kill_player(knam, k_format)
+register const char* knam;
+boolean k_format;
+{
+    context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+    if (Upolyd)
+    {
+        u.mh = 0;
+        rehumanize();
+        return;
+    }
+
+    u.uhp = 0;
+    you_die(knam, k_format);
+}
+
+void
 losehp(n, knam, k_format)
 double n;
 register const char *knam;
@@ -3673,12 +3728,8 @@ boolean k_format;
 
     if (u.uhp < 1) 
     {
-        killer.format = k_format;
-        if (killer.name != knam) /* the thing that killed you */
-            Strcpy(killer.name, knam ? knam : "");
-        You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "die...");
-        done(DIED);
-    } 
+        you_die(knam, k_format);
+    }
     else if (n > 0 && u.uhp * 10 < u.uhpmax) 
     {
         maybe_wail();
@@ -3932,7 +3983,8 @@ get_cmap_or_cmap_variation_glyph_explanation(int glyph)
         return defsyms[glyph_to_cmap(glyph)].explanation;
     else if (glyph_is_cmap_variation(glyph))
     {
-        const char* var_explanation = defsym_variations[glyph_to_cmap_variation(glyph)].explanation;
+        int varidx = glyph_to_cmap_variation(glyph);
+        const char* var_explanation = defsym_variations[varidx].explanation;
         if(var_explanation && strcmp(var_explanation, ""))
             return var_explanation;
         else

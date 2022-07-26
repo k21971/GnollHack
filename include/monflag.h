@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    monflag.h    $NHDT-Date: 1432512778 2015/05/25 00:12:58 $  $NHDT-Branch: master $:$NHDT-Revision: 1.14 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -100,6 +100,9 @@
 #define MR2_MAGIC_MISSILE_RESISTANCE       0x00000008UL        
 #define MR2_ACID_RESISTANCE                0x00000010UL        
 #define MR2_CANCELLATION_RESISTANCE        0x00000020UL        
+#define MR2_BISECTION_RESISTANCE           0x00000040UL        
+#define MR2_SLIME_RESISTANCE               0x00000080UL        
+#define MR2_ENERGY_REGENERATION            0x00000100UL        
 
 /* conveyances: resistances, teleport, teleport control, telepathy, as well as other properties from eating the corpse */
 #define MC_NONE            0x00000000UL
@@ -356,6 +359,9 @@
 #define M6_MAY_START_WITH_SADDLE    0x00002000UL /* If steed, then may be generated with saddle */
 #define M6_SHADE                    0x00004000UL /* Shade only */
 #define M6_TELEPORT_HEAL_TACTICS    0x00008000UL /* Arch-lich, Wizard of Yendor, Demogorgon, and various other monsters */
+#define M6_NON_TINNABLE             0x00010000UL /* Corpse cannot be tinned similar to riders */
+#define M6_NON_EDIBLE               0x00020000UL /* Corpse cannot be eaten similar to riders */
+#define M6_REVIVES_UPON_MEDDLING    0x00040000UL /* Revive upon corpse meddling */
 
 #define M7_NONE                     0x00000000UL
 #define M7_ARCHAEOLOGIST            0x00000001UL            /* monster can use archaeologist items */
@@ -421,13 +427,13 @@
 #define G_LGROUP    0x00000000UL     /* 0x00000040UL appear in large groups normally */
 
 /* for mvitals[].mvflags (variant during game) */
-#define MV_EXTINCT      0x0001 /* have been extinguished as population control */
-#define MV_GENOCIDED    0x0002 /* have been genocided */
+#define MV_EXTINCT      0x01 /* have been extinguished as population control */
+#define MV_GENOCIDED    0x02 /* have been genocided */
 #define MV_GONE (MV_GENOCIDED | MV_EXTINCT)
-#define MV_KNOWN        0x0004 /* have been encountered */
-#define MV_KNOWS_EGG    0x0008 /* player recognizes egg of this monster type */
-#define MV_KNOWS_CORPSE 0x0010 /* player recognizes corpse of this monster type */
-/* free bit */
-#define MV_NOCORPSE     0x0040 /* no corpse left ever, the same bit as G_NOCORPSE just in case */
+#define MV_KNOWN        0x04 /* have been encountered */
+#define MV_KNOWS_EGG    0x08 /* player recognizes egg of this monster type */
+#define MV_KNOWS_CORPSE 0x10 /* player recognizes corpse of this monster type */
+#define MV_SELFIE_TAKEN 0x20 /* player has taken a selfie with this monster type */
+#define MV_NOCORPSE     0x40 /* no corpse left ever, the same bit as G_NOCORPSE just in case */
 
 #endif /* MONFLAG_H */

@@ -39,6 +39,9 @@ namespace GnollHackClient
             VersionTracking.Track();
             App.GetDependencyServices();
 
+            Assembly assembly = GetType().GetTypeInfo().Assembly;
+            App.InitBaseTypefaces(assembly);
+
             var mainPage = new MainPage();
             var navPage = new NavigationPage(mainPage);
             navPage.BarTextColor = Color.White;
@@ -55,8 +58,6 @@ namespace GnollHackClient
             App.ShowSpecialEffect = Preferences.Get("ShowSpecialEffect", false);
             App.LoadBanks = Preferences.Get("LoadSoundBanks", true);
 
-            App.ReadSecrets();
-            Array.Sort<SecretsFile>(App.CurrentSecrets.files, new SecretsFileSizeComparer());
             App.BackButtonPressed += App.EmptyBackButtonPressed;
         }
 
@@ -99,7 +100,7 @@ namespace GnollHackClient
         protected override void OnSleep()
         {
             if (PlatformService != null)
-                PlatformService.RevertAnimationDuration();
+                PlatformService.RevertAnimationDuration(false);
         }
 
         protected override void OnResume()
@@ -208,6 +209,10 @@ namespace GnollHackClient
         public static readonly bool IsiOS = (Device.RuntimePlatform == Device.iOS);
         public static readonly bool IsUWP = (Device.RuntimePlatform == Device.UWP);
 
+        public static readonly float DisplayScale = DeviceDisplay.MainDisplayInfo.Density <= 0 ? 1.0f : (float)DeviceDisplay.MainDisplayInfo.Density;
+        public static readonly float DisplayWidth = (float)DeviceDisplay.MainDisplayInfo.Width * DisplayScale;
+        public static readonly float DisplayHeight = (float)DeviceDisplay.MainDisplayInfo.Height * DisplayScale;
+
         public static async Task<bool> OnBackButtonPressed()
         {
             var handler = BackButtonPressed;
@@ -250,7 +255,7 @@ namespace GnollHackClient
                 return LatoRegular;
         }
 
-        public static void InitTypefaces(Assembly assembly)
+        public static void InitBaseTypefaces(Assembly assembly)
         {
             using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.diablo_h.ttf"))
             {
@@ -261,9 +266,9 @@ namespace GnollHackClient
                         App.DiabloTypeface = SKTypeface.FromStream(stream);
                         App.TypefaceDictionary.Add("Diablo", App.DiabloTypeface);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //E.g., if typeface already exists in the dictionary
+                        Debug.WriteLine(ex.Message);
                     }
                 }
             }
@@ -276,25 +281,9 @@ namespace GnollHackClient
                         App.UnderwoodTypeface = SKTypeface.FromStream(stream);
                         App.TypefaceDictionary.Add("Underwood", App.UnderwoodTypeface);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //E.g., if typeface already exists in the dictionary
-                    }
-                }
-            }
-
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.endr.ttf"))
-            {
-                if (stream != null)
-                {
-                    try
-                    {
-                        App.EndorTypeface = SKTypeface.FromStream(stream);
-                        App.TypefaceDictionary.Add("Endor", App.EndorTypeface);
-                    }
-                    catch
-                    {
-                        //E.g., if typeface already exists in the dictionary
+                        Debug.WriteLine(ex.Message);
                     }
                 }
             }
@@ -307,84 +296,9 @@ namespace GnollHackClient
                         App.ImmortalTypeface = SKTypeface.FromStream(stream);
                         App.TypefaceDictionary.Add("Immortal", App.ImmortalTypeface);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //E.g., if typeface already exists in the dictionary
-                    }
-                }
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.shxi.ttf"))
-            {
-                if (stream != null)
-                {
-                    try
-                    {
-                        App.XizorTypeface = SKTypeface.FromStream(stream);
-                        App.TypefaceDictionary.Add("Xizor", App.XizorTypeface);
-                    }
-                    catch
-                    {
-                        //E.g., if typeface already exists in the dictionary
-                    }
-                }
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.DejaVuSansMono.ttf"))
-            {
-                if (stream != null)
-                {
-                    try
-                    {
-                        App.DejaVuSansMonoTypeface = SKTypeface.FromStream(stream);
-                        App.TypefaceDictionary.Add("DejaVuSansMono", App.DejaVuSansMonoTypeface);
-                    }
-                    catch
-                    {
-                        //E.g., if typeface already exists in the dictionary
-                    }
-                }
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.DejaVuSansMono-Bold.ttf"))
-            {
-                if (stream != null)
-                {
-                    try
-                    {
-                        App.DejaVuSansMonoBoldTypeface = SKTypeface.FromStream(stream);
-                        App.TypefaceDictionary.Add("DejaVuSansMono-Bold", App.DejaVuSansMonoBoldTypeface);
-                    }
-                    catch
-                    {
-                        //E.g., if typeface already exists in the dictionary
-                    }
-                }
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.Lato-Regular.ttf"))
-            {
-                if (stream != null)
-                {
-                    try
-                    {
-                        App.LatoRegular = SKTypeface.FromStream(stream);
-                        App.TypefaceDictionary.Add("Lato-Regular", App.LatoRegular);
-                    }
-                    catch
-                    {
-                        //E.g., if typeface already exists in the dictionary
-                    }
-                }
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.Lato-Bold.ttf"))
-            {
-                if (stream != null)
-                {
-                    try
-                    {
-                        App.LatoBold = SKTypeface.FromStream(stream);
-                        App.TypefaceDictionary.Add("Lato-Bold", App.LatoBold);
-                    }
-                    catch
-                    {
-                        //E.g., if typeface already exists in the dictionary
+                        Debug.WriteLine(ex.Message);
                     }
                 }
             }
@@ -397,9 +311,103 @@ namespace GnollHackClient
                         App.ARChristyTypeface = SKTypeface.FromStream(stream);
                         App.TypefaceDictionary.Add("ARChristy", App.ARChristyTypeface);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //E.g., if typeface already exists in the dictionary
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+        }
+
+        public static void InitAdditionalTypefaces(Assembly assembly)
+        {
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.endr.ttf"))
+            {
+                if (stream != null)
+                {
+                    try
+                    {
+                        App.EndorTypeface = SKTypeface.FromStream(stream);
+                        App.TypefaceDictionary.Add("Endor", App.EndorTypeface);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.shxi.ttf"))
+            {
+                if (stream != null)
+                {
+                    try
+                    {
+                        App.XizorTypeface = SKTypeface.FromStream(stream);
+                        App.TypefaceDictionary.Add("Xizor", App.XizorTypeface);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.DejaVuSansMono.ttf"))
+            {
+                if (stream != null)
+                {
+                    try
+                    {
+                        App.DejaVuSansMonoTypeface = SKTypeface.FromStream(stream);
+                        App.TypefaceDictionary.Add("DejaVuSansMono", App.DejaVuSansMonoTypeface);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.DejaVuSansMono-Bold.ttf"))
+            {
+                if (stream != null)
+                {
+                    try
+                    {
+                        App.DejaVuSansMonoBoldTypeface = SKTypeface.FromStream(stream);
+                        App.TypefaceDictionary.Add("DejaVuSansMono-Bold", App.DejaVuSansMonoBoldTypeface);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.Lato-Regular.ttf"))
+            {
+                if (stream != null)
+                {
+                    try
+                    {
+                        App.LatoRegular = SKTypeface.FromStream(stream);
+                        App.TypefaceDictionary.Add("Lato-Regular", App.LatoRegular);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.Lato-Bold.ttf"))
+            {
+                if (stream != null)
+                {
+                    try
+                    {
+                        App.LatoBold = SKTypeface.FromStream(stream);
+                        App.TypefaceDictionary.Add("Lato-Bold", App.LatoBold);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
                     }
                 }
             }
@@ -416,41 +424,153 @@ namespace GnollHackClient
         public static SKBitmap ScrollBitmap { get; set; }
         public static SKBitmap YouBitmap { get; set; }
 
-        public static void InitBitmaps(Assembly assembly)
+        public static void InitGameBitmaps(Assembly assembly)
         {
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.menubackground.png"))
+            try
             {
-                MenuBackgroundBitmap = SKBitmap.Decode(stream);
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.menubackground.png"))
+                {
+                    MenuBackgroundBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.background-oldpaper.png"))
+                {
+                    OldPaperBackgroundBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-topleft.png"))
+                {
+                    SimpleFrameTopLeftCornerBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-topleft-small.png"))
+                {
+                    SimpleFrameSmallTopLeftCornerBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-horizontal.png"))
+                {
+                    SimpleFrameTopHorizontalBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-vertical.png"))
+                {
+                    SimpleFrameLeftVerticalBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.scroll.png"))
+                {
+                    ScrollBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.you.png"))
+                {
+                    YouBitmap = SKBitmap.Decode(stream);
+                }
             }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.background-oldpaper.png"))
+            catch (Exception ex)
             {
-                OldPaperBackgroundBitmap = SKBitmap.Decode(stream);
+                Debug.WriteLine(ex.Message);
             }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-topleft.png"))
-            {
-                SimpleFrameTopLeftCornerBitmap = SKBitmap.Decode(stream);
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-topleft-small.png"))
-            {
-                SimpleFrameSmallTopLeftCornerBitmap = SKBitmap.Decode(stream);
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-horizontal.png"))
-            {
-                SimpleFrameTopHorizontalBitmap = SKBitmap.Decode(stream);
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.frame-vertical.png"))
-            {
-                SimpleFrameLeftVerticalBitmap = SKBitmap.Decode(stream);
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.scroll.png"))
-            {
-                ScrollBitmap = SKBitmap.Decode(stream);
-            }
-            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.you.png"))
-            {
-                YouBitmap = SKBitmap.Decode(stream);
-            }
+        }
 
+        private static SKBitmap _successBitmap;
+        private static SKBitmap _manaBitmap;
+        private static SKBitmap _cooldownBitmap;
+        private static SKBitmap _castsBitmap;
+        private static SKBitmap _addsBitmap;
+        private static SKBitmap _foodBitmap;
+
+        private static SKBitmap _spellAbjurationBitmap;
+        private static SKBitmap _spellArcaneBitmap;
+        private static SKBitmap _spellCelestialBitmap;
+        private static SKBitmap _spellClericalBitmap;
+        private static SKBitmap _spellConjurationBitmap;
+        private static SKBitmap _spellDivinationBitmap;
+        private static SKBitmap _spellEnchantmentBitmap;
+        private static SKBitmap _spellHealingBitmap;
+        private static SKBitmap _spellMovementBitmap;
+        private static SKBitmap _spellNatureBitmap;
+        private static SKBitmap _spellNecromancyBitmap;
+        private static SKBitmap _spellTransmutationBitmap;
+
+        public static void InitSymbolBitmaps(Assembly assembly)
+        {
+            try
+            {
+                /* Replaceable menu symbols */
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-success.png"))
+                {
+                    _successBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-mana.png"))
+                {
+                    _manaBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-cooldown.png"))
+                {
+                    _cooldownBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-casts.png"))
+                {
+                    _castsBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-adds.png"))
+                {
+                    _addsBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-food.png"))
+                {
+                    _foodBitmap = SKBitmap.Decode(stream);
+                }
+
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-abjuration.png"))
+                {
+                    _spellAbjurationBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-arcane.png"))
+                {
+                    _spellArcaneBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-celestial.png"))
+                {
+                    _spellCelestialBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-clerical.png"))
+                {
+                    _spellClericalBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-conjuration.png"))
+                {
+                    _spellConjurationBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-divination.png"))
+                {
+                    _spellDivinationBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-enchantment.png"))
+                {
+                    _spellEnchantmentBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-healing.png"))
+                {
+                    _spellHealingBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-movement.png"))
+                {
+                    _spellMovementBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-nature.png"))
+                {
+                    _spellNatureBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-necromancy.png"))
+                {
+                    _spellNecromancyBitmap = SKBitmap.Decode(stream);
+                }
+                using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.symbol-spell-transmutation.png"))
+                {
+                    _spellTransmutationBitmap = SKBitmap.Decode(stream);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
         }
 
         public static object ProfilingStopwatchLock = new object();
@@ -607,6 +727,37 @@ namespace GnollHackClient
             return zipFile;
         }
 
+        public static string CreateSavedGamesZipArchive()
+        {
+            string ghdir = App.GnollHackService.GetGnollHackPath();
+            string targetpath = Path.Combine(ghdir, "archive");
+
+            App.CheckCreateDirectory(targetpath);
+
+            string filepath = Path.Combine(targetpath, "savedgames.zip");
+            if (File.Exists(filepath))
+                File.Delete(filepath);
+
+            string zipFile = filepath;
+            string[] files = Directory.GetFiles(ghdir);
+
+            using (ZipArchive archive = ZipFile.Open(zipFile, ZipArchiveMode.Create))
+            {
+                string[] ghsubdirlist = { "save" };
+                foreach (string ghsubdir in ghsubdirlist)
+                {
+                    string subdirpath = Path.Combine(ghdir, ghsubdir);
+                    string[] subfiles = Directory.GetFiles(subdirpath);
+                    foreach (var fPath in subfiles)
+                    {
+                        archive.CreateEntryFromFile(fPath, Path.GetFileName(fPath));
+                    }
+                }
+
+            }
+            return zipFile;
+        }
+
         public static void CheckCreateDirectory(string targetpath)
         {
             if (!Directory.Exists(targetpath))
@@ -616,9 +767,9 @@ namespace GnollHackClient
             {
                 GnollHackService.Chmod(targetpath, (uint)ChmodPermissions.S_IALL);
             }
-            catch
+            catch (Exception ex)
             {
-
+                Debug.WriteLine(ex.Message);
             }
 
             //DirectoryInfo dinfo = new DirectoryInfo(targetpath);
@@ -633,9 +784,9 @@ namespace GnollHackClient
 
                 writesuccessful = true;
             }
-            catch
+            catch (Exception ex)
             {
-
+                Debug.WriteLine(ex.Message);
             }
 
             try
@@ -643,9 +794,9 @@ namespace GnollHackClient
                 if (File.Exists(testfilepath))
                     File.Delete(testfilepath);
             }
-            catch
+            catch (Exception ex)
             {
-
+                Debug.WriteLine(ex.Message);
             }
 
             if (!writesuccessful)
@@ -667,9 +818,9 @@ namespace GnollHackClient
 
                     GnollHackService.Chmod(targetpath, (uint)ChmodPermissions.S_IALL);
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    Debug.WriteLine(ex.Message);
                 }
 
             }
@@ -682,6 +833,95 @@ namespace GnollHackClient
         //{
         //    return DateTime.Now.ToString(Culture);
         //}
+
+        public static SKBitmap GetSpecialSymbol(string str, out SKRect source_rect)
+        {
+            source_rect = new SKRect();
+            if (str == null || !str.StartsWith("&"))
+                return null;
+
+            SKBitmap bitmap = null;
+            string trimmed_str = str.Trim();
+            if (trimmed_str == "&success;")
+            {
+                bitmap = _successBitmap;
+            }
+            else if (trimmed_str == "&mana;")
+            {
+                bitmap = _manaBitmap;
+            }
+            else if (trimmed_str == "&cool;")
+            {
+                bitmap = _cooldownBitmap;
+            }
+            else if (trimmed_str == "&casts;")
+            {
+                bitmap = _castsBitmap;
+            }
+            else if (trimmed_str == "&adds;")
+            {
+                bitmap = _addsBitmap;
+            }
+            else if (trimmed_str == "&food;")
+            {
+                bitmap = _foodBitmap;
+            }
+            else if (trimmed_str == "&spabj;")
+            {
+                bitmap = _spellAbjurationBitmap;
+            }
+            else if (trimmed_str == "&sparc;")
+            {
+                bitmap = _spellArcaneBitmap;
+            }
+            else if (trimmed_str == "&spcel;")
+            {
+                bitmap = _spellCelestialBitmap;
+            }
+            else if (trimmed_str == "&spcle;")
+            {
+                bitmap = _spellClericalBitmap;
+            }
+            else if (trimmed_str == "&spcon;")
+            {
+                bitmap = _spellConjurationBitmap;
+            }
+            else if (trimmed_str == "&spdiv;")
+            {
+                bitmap = _spellDivinationBitmap;
+            }
+            else if (trimmed_str == "&spenc;")
+            {
+                bitmap = _spellEnchantmentBitmap;
+            }
+            else if (trimmed_str == "&sphea;")
+            {
+                bitmap = _spellHealingBitmap;
+            }
+            else if (trimmed_str == "&spmov;")
+            {
+                bitmap = _spellMovementBitmap;
+            }
+            else if (trimmed_str == "&spnat;")
+            {
+                bitmap = _spellNatureBitmap;
+            }
+            else if (trimmed_str == "&spnec;")
+            {
+                bitmap = _spellNecromancyBitmap;
+            }
+            else if (trimmed_str == "&sptra;")
+            {
+                bitmap = _spellTransmutationBitmap;
+            }
+
+            if(bitmap != null)
+            {
+                source_rect.Right = bitmap.Width;
+                source_rect.Bottom = bitmap.Height;
+            }
+            return bitmap;
+        }
 
     }
 

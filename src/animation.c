@@ -5,7 +5,7 @@
 #include "hack.h"
 #include "animoff.h"
 
-NEARDATA struct autodraw_definition autodraws[MAX_AUTODRAWS] =
+NEARDATA const struct autodraw_definition autodraws[MAX_AUTODRAWS] =
 {
     {"", 0, 0, 0, 0, 0, 0, 0UL},
     {
@@ -839,7 +839,7 @@ NEARDATA struct autodraw_definition autodraws[MAX_AUTODRAWS] =
 
 
 /* Special Effects */
-NEARDATA struct special_effect_definition special_effects[MAX_SPECIAL_EFFECTS] =
+NEARDATA const struct special_effect_definition special_effects[MAX_SPECIAL_EFFECTS] =
 {
     {"teleport-out",            0, 0, 2,        LAYER_GENERAL_EFFECT, NO_REPLACEMENT, TELEPORT_OUT_ANIMATION, NO_ENLARGEMENT},
     {"teleport-in",             0, 0, 2,        LAYER_GENERAL_EFFECT, NO_REPLACEMENT, TELEPORT_IN_ANIMATION, NO_ENLARGEMENT },
@@ -877,7 +877,7 @@ NEARDATA struct special_effect_definition special_effects[MAX_SPECIAL_EFFECTS] =
 
 
 /* Game Cursors */
-NEARDATA struct game_cursor_definition game_cursors[MAX_CURSORS] =
+NEARDATA const struct game_cursor_definition game_cursors[MAX_CURSORS] =
 {
     {"generic", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"look", NO_REPLACEMENT, LOOK_CURSOR_ANIMATION, NO_ENLARGEMENT },
@@ -893,7 +893,7 @@ NEARDATA struct game_cursor_definition game_cursors[MAX_CURSORS] =
 };
 
 /* Hit tile */
-NEARDATA struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES] =
+NEARDATA const struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES] =
 {
     {"hit", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"poisoned", NO_REPLACEMENT, LOOK_CURSOR_ANIMATION, NO_ENLARGEMENT },
@@ -920,7 +920,7 @@ NEARDATA struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES] =
 };
 
 /* General tile */
-NEARDATA struct general_tile_definition general_tile_definitions[MAX_GENERAL_TILES] =
+NEARDATA const struct general_tile_definition general_tile_definitions[MAX_GENERAL_TILES] =
 {
     {"death", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"chain-up", CHAIN_UP_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
@@ -2131,6 +2131,31 @@ enum autodraw_types* autodraw_ptr;
             }
             break;
         }
+        case REPLACEMENT_ACTION_ACOLYTE:
+        {
+            if (autodraw_ptr)
+                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
+
+            if (replacements[replacement_idx].number_of_tiles < 1)
+                return ntile;
+
+            int glyph_idx = 0;
+            aligntyp algn = u.ualignbase[A_ORIGINAL];
+            switch (algn)
+            {
+            case A_CHAOTIC:
+                glyph_idx = 0;
+                break;
+            case A_NEUTRAL:
+                glyph_idx = 1;
+                break;
+            default:
+                return ntile;
+            }
+            if (autodraw_ptr)
+                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
+            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
+        }
         default:
             break;
         }
@@ -2567,6 +2592,24 @@ struct replacement_info info;
                 }
                 return sign * (glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
             }
+            break;
+        }
+        case REPLACEMENT_ACTION_ACOLYTE:
+        {
+            int glyph_idx = 0;
+            aligntyp algn = u.ualignbase[A_ORIGINAL];
+            switch (algn)
+            {
+            case A_CHAOTIC:
+                glyph_idx = 0;
+                break;
+            case A_NEUTRAL:
+                glyph_idx = 1;
+                break;
+            default:
+                return glyph;
+            }
+            return sign * (glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
             break;
         }
         default:

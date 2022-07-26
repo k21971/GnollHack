@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	wingem1.c	$NHDT-Date: 1433806613 2015/06/08 23:36:53 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Christian Bressler 1999 	  */
@@ -3005,17 +3005,19 @@ int col;
 /************************* getlin *******************************/
 
 void
-Gem_getlin_ex(style, attr, color, ques, input, placeholder, linesuffix)
+Gem_getlin_ex(style, attr, color, ques, input, placeholder, linesuffix, introline)
 int style, attr, color;
 const char *ques;
 const char* placeholder;
 const char* linesuffix;
+const char* introline;
 char *input;
 {
     OBJECT *z_ob = zz_oblist[LINEGET];
     int d_exit, length;
     char *pr[2], *tmp;
     char promptbuf[BUFSZ] = "";
+    //Do not show introline
     if (ques)
         Sprintf(promptbuf, "%s", ques);
     if (placeholder)
@@ -3191,9 +3193,9 @@ XEVENT *xev;
 }
 
 char
-Gem_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags)
+Gem_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 int style, attr, color, glyph;
-const char *title, * query, * resp, * resp_desc;
+const char *title, *query, *resp, *resp_desc, *introline;
 char def;
 unsigned long ynflags;
 {

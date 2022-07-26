@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    decl.c    $NHDT-Date: 1547025164 2019/01/09 09:12:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.141 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -63,6 +63,8 @@ NEARDATA struct fruit *ffruit = (struct fruit *) 0;
 NEARDATA char tune[6] = DUMMY;
 NEARDATA boolean ransacked = 0;
 
+NEARDATA unsigned long n_game_recoveries = 0;
+
 const char *occtxt = DUMMY;
 enum object_soundset_types occsoundset = OBJECT_SOUNDSET_NONE; /* defined when occupation != NULL */
 enum object_occupation_types occtyp = OCCUPATION_NONE; /* defined when occupation != NULL */
@@ -74,7 +76,7 @@ const char ynqchars[] = "ynq";
 const char ynaqchars[] = "ynaq";
 const char ynNaqchars[] = "yn#aq";
 const char dnqchars[] = "dnq";
-const char idqchars[] = "idq";
+const char sdqchars[] = "sdq";
 
 const char yndescs[] = "Yes\nNo";
 const char ynqdescs[] = "Yes\nNo\nCancel";
@@ -83,7 +85,7 @@ const char ynaqdescs[] = "Yes\nNo\nAll\nCancel";
 const char ynaq2descs[] = "Yes\nNo\nAll\nQuit";
 const char ynNaqdescs[] = "Yes\nNo\nCount\nAll\nCancel";
 const char dnqdescs[] = "Disarm\nNeglect\nCancel";
-const char idqdescs[] = "Put Into\nDrop\nDo Nothing";
+const char sdqdescs[] = "Stash\nDrop\nNothing";
 
 NEARDATA long yn_number = 0L;
 
@@ -189,7 +191,7 @@ NEARDATA struct obj
     *thrownobj = 0,     /* object in flight due to throwing */
     *kickedobj = 0;     /* object in flight due to kicking */
 
-struct zap_type_definition zap_type_definitions[MAX_ZAP_TYPES] = {
+NEARDATA const struct zap_type_definition zap_type_definitions[MAX_ZAP_TYPES] = {
     {"magic", HI_ZAP, MAGIC_MISSILE_RAY_ANIMATION},
     {"fire", CLR_ORANGE, FIRE_RAY_ANIMATION},
     {"frost", CLR_WHITE, FROST_RAY_ANIMATION},
@@ -217,7 +219,7 @@ struct zap_type_definition zap_type_definitions[MAX_ZAP_TYPES] = {
     {"flashed-light", CLR_WHITE, NO_ANIMATION},
 };
 
-struct explosion_type_definition explosion_type_definitions[MAX_EXPLOSIONS] = {
+NEARDATA const struct explosion_type_definition explosion_type_definitions[MAX_EXPLOSIONS] = {
     {"dark", CLR_BLACK, NO_ANIMATION, SFX_EXPLOSION_DARK},
     {"noxious", CLR_GREEN, NOXIOUS_EXPLOSION_ANIMATION, SFX_EXPLOSION_NOXIOUS},
     {"muddy", CLR_BROWN, NO_ANIMATION, SFX_EXPLOSION_MUDDY},
@@ -491,6 +493,9 @@ NEARDATA const char unavailcmd[] = "Unavailable command '%s'.";
 /* for rejecting #if !SHELL, !SUSPEND */
 NEARDATA const char cmdnotavail[] = "'%s' command not available.";
 
+NEARDATA const char* const hofe_titles[3] = { "the Hand of Elbereth",
+                                            "the Envoy of Balance",
+                                            "the Glory of Arioch" };
 
 
 

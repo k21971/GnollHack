@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    mon.c    $NHDT-Date: 1556139724 2019/04/24 21:02:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.284 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -822,7 +822,7 @@ boolean createcorpse;
                 obj->owt = weight(obj);
             }
         }
-        break;
+        goto default_1;
     case PM_GRAY_OOZE:
     case PM_BROWN_PUDDING:
     case PM_GREEN_SLIME:
@@ -1370,7 +1370,7 @@ update_monster_timeouts()
                         break;
                     case SLIMED:
                         {
-                            if (!slimeproof(mtmp->data))
+                            if (!resists_slime(mtmp))
                             {
                                 (void)newcham(mtmp, &mons[PM_GREEN_SLIME], FALSE, TRUE);
                                 break_charm(mtmp, FALSE);
@@ -1826,7 +1826,8 @@ register struct monst *mtmp;
                         {
                             mon_to_stone(mtmp);
                             ptr = mtmp->data;
-                        } else if (!resists_ston(mtmp)) 
+                        } 
+                        else if (!resists_ston(mtmp)) 
                         {
                             play_sfx_sound_at_location(SFX_PETRIFY, mtmp->mx, mtmp->my);
                             if (canseemon(mtmp))
@@ -1919,7 +1920,7 @@ struct monst *mtmp;
                        && ((touch_petrifies(&mons[otmp->corpsenm])
                             && !resists_ston(mtmp))
                            || (otmp->corpsenm == PM_GREEN_SLIME
-                               && !slimeproof(mtmp->data))))) 
+                               && !resists_slime(mtmp))))) 
         {
             /* engulf */
             ++ecount;
@@ -2968,10 +2969,10 @@ boolean is_mon_dead;
         context.polearm.hitmon = 0;
     if (mtmp->mleashed)
         m_unleash(mtmp, FALSE);
-    /* to prevent an infinite relobj-flooreffects-hmon-killed loop */
+    /* to prevent an infinite release_monster_objects-flooreffects-hmon-killed loop */
     mtmp->mtrapped = 0;
     mtmp->mhp = 0; /* simplify some tests: force mhp to 0 */
-    relobj(mtmp, 0, FALSE, is_mon_dead);
+    release_monster_objects(mtmp, 0, FALSE, is_mon_dead);
     if (onmap || mtmp == level.monsters[0][0]) 
     {
         if (mtmp->wormno)
@@ -3243,16 +3244,17 @@ unsigned long mdiedflags;
      */
     tmp = mtmp->mnum;
     if (mvitals[tmp].died < 255)
+    {
         mvitals[tmp].died++;
-
+        if(mtmp->female)
+            mvitals[tmp].died_female++;
+    }
     /* if it's a (possibly polymorphed) quest leader, mark him as dead */
     if (mtmp->m_id == quest_status.leader_m_id)
         quest_status.leader_is_dead = TRUE;
-#ifdef MAIL
     /* if the mail daemon dies, no more mail delivery.  -3. */
     if (tmp == PM_MAIL_DAEMON)
         mvitals[tmp].mvflags |= MV_GENOCIDED;
-#endif
 
     if (mtmp->data->mlet == S_KOP) 
     {
@@ -3297,6 +3299,19 @@ unsigned long mdiedflags;
             achievement_gained("Defeated Yacc");
         u.uachieve.killed_yacc = 1;
     }
+
+    if (!u.uachieve.role_achievement &&
+        (      (Role_if(PM_ARCHAEOLOGIST) && mtmp->mnum == PM_GREATER_MUMMY_PHARAOH && mvitals[mtmp->mnum].died >= 2)
+            || (Role_if(PM_ROGUE) && mtmp->mnum == PM_CROESUS)
+        )
+       )
+    {
+        u.uachieve.role_achievement = 1;
+        char abuf[BUFSZ];
+        strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+        achievement_gained(abuf);
+    }
+
     if (glyph_is_invisible(levl[mtmp->mx][mtmp->my].hero_memory_layers.glyph))
         unmap_object(mtmp->mx, mtmp->my);
 
@@ -3384,6 +3399,7 @@ boolean was_swallowed; /* digestion */
 
             killer.name[0] = '\0';
             killer.format = 0;
+            killer.hint_idx = 0;
             return FALSE;
         }
     }
@@ -3426,6 +3442,17 @@ mongone(mdef)
 struct monst *mdef;
 {
     mdef->mhp = 0; /* can skip some inventory bookkeeping */
+
+    if (!program_state.in_bones || program_state.gameover)
+    {
+        //Unique monsters can now appear again
+        if (mdef->data->geno & G_UNIQ)
+        {
+            mvitals[mdef->mnum].mvflags &= ~MV_EXTINCT;
+            if (mvitals[mdef->mnum].born > 0)
+                mvitals[mdef->mnum].born--;
+        }
+    }
 
     /* dead vault guard is actually kept at coordinate <0,0> until
        his temporary corridor to/from the vault has been removed */
@@ -3746,12 +3773,10 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
     if (nocorpse || LEVEL_SPECIFIC_NOCORPSE(mdat))
         goto cleanup;
 
-#ifdef MAIL
     if (mdat == &mons[PM_MAIL_DAEMON])
     {
         stackobj(mksobj_at(SCR_MAIL, x, y, FALSE, FALSE));
     }
-#endif
 
     if (accessible(x, y) || is_pool(x, y)) 
     {
@@ -3767,7 +3792,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
             /* no items from cloned monsters */
             && !mtmp->mcloned) 
         {
-            otmp = mkobj_with_flags(RANDOM_CLASS, TRUE, TRUE, is_lord(mdat) || is_prince(mdat) || (mdat->geno & G_UNIQ) ? MKOBJ_FLAGS_ALSO_RARE : 0UL );
+            otmp = mkobj_with_flags(RANDOM_CLASS, TRUE, TRUE, mtmp, is_lord(mdat) || is_prince(mdat) || (mdat->geno & G_UNIQ) ? MKOBJ_FLAGS_ALSO_RARE : 0UL );
             /* don't create large objects from small monsters */
             otyp = otmp->otyp;
             if (mdat->msize < MZ_HUMAN && otyp != FIGURINE
@@ -3804,7 +3829,8 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
 
 cleanup:
     /* punish bad behaviour */
-    if (is_human(mdat) && !is_undead(mdat) && !is_were(mdat)
+    if (is_human(mdat) && !is_undead(mdat) && !is_were(mdat) 
+        && !(mtmp->ispriest && has_epri(mtmp) && EPRI(mtmp)->shralign == A_NONE) /* Killing Moloch's (high) priests do not make you murderer */
         && (!always_hostile(mdat) && mtmp->malign <= 0)
         && (mndx < PM_ARCHAEOLOGIST || mndx > PM_WIZARD)
         && u.ualign.type != A_CHAOTIC) 
@@ -4252,6 +4278,9 @@ boolean via_attack;
             adjalign(2);
     } else
         adjalign(-1); /* attacking peaceful monsters is bad */
+
+    mtmp->mon_flags &= ~MON_FLAGS_SUMMONED_AT_ALTAR; //Angry summoned creatures do not go back to their plane
+
     if (couldsee(mtmp->mx, mtmp->my)) {
         if (humanoid(mtmp->data) || mtmp->isshk || mtmp->isgd)
         {
@@ -4970,7 +4999,7 @@ struct monst *mon;
         tryct = 5;
         do {
             monclass = 0;
-            getlin_ex(GETLINE_POLYMORPH, ATR_NONE, NO_COLOR, pprompt, buf, (char*)0, (char*)0);
+            getlin_ex(GETLINE_POLYMORPH, ATR_NONE, NO_COLOR, pprompt, buf, (char*)0, (char*)0, (char*)0);
             mungspaces(buf);
             /* for ESC, take form selected above (might be NON_PM) */
             if (*buf == '\033')
@@ -4997,7 +5026,7 @@ struct monst *mon;
             }
 
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("It can't become that.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "It can't become that.");
         } while (--tryct > 0);
         if (!tryct)
             pline1(thats_enough_tries);
@@ -5172,7 +5201,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
     change_mon_ability_scores(mtmp, oldtype, newtype);
 
     /* set level and hit points */
-    newmonhp(mtmp, newtype, 0UL);
+    newmonhp(mtmp, newtype, 0, 0UL);
     /* new hp: same fraction of max as before */
 #ifndef LINT
     mtmp->mhp = (int)(((long)hpn * (long)mtmp->mhp) / (long)hpd);
@@ -5787,6 +5816,39 @@ struct obj* corpse;
     }
 }
 
+const char* pm_female_name(ptr)
+struct permonst* ptr;
+{
+    if (!ptr)
+        return "";
+
+    if (ptr->mfemalename && strcmp(ptr->mfemalename, ""))
+        return ptr->mfemalename;
+    else
+        return ptr->mname;
+
+}
+
+
+const char* pm_general_name(ptr, gender)
+struct permonst* ptr;
+uchar gender; /* 0 = male, 1 = female, 2 = unknown */
+{
+    if (!ptr)
+        return "";
+
+    switch (gender)
+    {
+    case 0:
+        return ptr->mname;
+    case 1:
+        return pm_female_name(ptr);
+    case 2:
+    default:
+        return pm_common_name(ptr);
+    }
+}
+
 const char* pm_common_name(ptr)
 struct permonst* ptr;
 {
@@ -5834,6 +5896,61 @@ struct obj* corpse;
             return "unspecified monsters";
     }
 }
+
+const char* pm_plural_name(ptr, style)
+struct permonst* ptr;
+uchar style; /* 0 = dwarf lords and dwarf ladies, 1 = dwarf lords and ladies, 
+                2 = dwarf lords or dwarf ladies, 3 = dwarf lords or ladies, 
+                4 = dwarf royals
+                Note: There is no difference if there is no female / common name */
+{
+    if (!ptr)
+        return "";
+
+    if(style >= 4)
+        return makeplural(pm_common_name(ptr));
+
+    const char* malename = ptr->mname;
+    const char* femalename = ptr->mfemalename;
+    if (!malename && !femalename)
+        return "";
+
+    if (!femalename || !*femalename)
+        return makeplural(malename);
+
+    const char* conjunction = (style & 2) ? "or" : "and";
+    char *str = nextobuf();
+    str[0] = 0;
+
+    char usedfemalename[BUFSZ];
+    Strcpy(usedfemalename, femalename);
+    if (style & 1)
+    {
+        const char* spacep;
+        const char* searchp = malename;
+        size_t flen = strlen(femalename);
+        char buf[BUFSZ];
+
+        while (*searchp != 0 && (spacep = strstr(searchp, " ")) != 0 && spacep > malename)
+        {
+            size_t len = (size_t)(spacep - malename);
+            if (len >= flen)
+                break;
+
+            strncpy(buf, malename, len);
+            buf[len] = 0;
+            if (!strncmp(femalename, buf, len))
+            {
+                strcpy(usedfemalename, femalename + len);
+            }
+            searchp = spacep + 1;
+        }
+    }
+
+    Sprintf(str, "%s %s %s", makeplural(malename), conjunction, makeplural(usedfemalename));
+    return str;
+}
+
 
 boolean 
 is_female_corpse_or_statue(corpse)
@@ -5892,5 +6009,21 @@ struct obj* corpse;
     }
 }
 
+int
+count_mon_runeswords(mon)
+struct monst* mon;
+{
+    if (!mon || !mon->minvent)
+        return 0;
+
+    int cnt = 0;
+    struct obj* otmp;
+    for (otmp = mon->minvent; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == RUNESWORD && otmp->oartifact > 0)
+            cnt++;
+    }
+    return cnt;
+}
 
 /*mon.c*/

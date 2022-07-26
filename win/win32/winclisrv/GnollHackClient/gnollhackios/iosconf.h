@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /*	SCCS Id: @(#)droidconf.h	3.4	2011/03/31	*/
 /* Copyright (c) Kenneth Lorber, Bethesda, Maryland, 1990, 1991, 1992, 1993. */
@@ -27,7 +27,7 @@
 
 #ifdef DUMPLOG
 #undef DUMPLOG_FILE
-#define DUMPLOG_FILE        "dumplog/gnollhack.%n.%d.log" /* Note: Actually the one in sysconf is used, not this one */
+#define DUMPLOG_FILE        "dumplog/gnollhack.%n.%d.txt" /* Note: Actually the one in sysconf is used, not this one */
 #undef DUMPLOG_DIR
 #define DUMPLOG_DIR        "dumplog" /* Note: this is just used to create a directory, DUMPLOG_FILE still needs to have the full path */
 #endif

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	wc_trace.c	$NHDT-Date: 1501464799 2017/07/31 01:33:19 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.8 $ */
 /* Copyright (c) Kenneth Lorber, 2012				  */
@@ -749,10 +749,10 @@ void *vp;
 }
 
 char
-trace_yn_function_ex(vp, style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags)
+trace_yn_function_ex(vp, style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 void *vp;
 int style, attr, color, glyph;
-const char *title, * query, * resp, * resp_desc;
+const char *title, *query, *resp, *resp_desc, *introline;
 char def;
 unsigned long ynflags;
 {

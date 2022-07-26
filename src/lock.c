@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    lock.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.84 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1647,9 +1647,11 @@ int x, y;
 
     play_simple_object_sound_at_location(otmp, x, y, OBJECT_SOUND_TYPE_BREAK);
     if (otmp->oclass == POTION_CLASS) {
-        You("%s %s shatter!", Blind ? "hear" : "see", an(bottlename()));
+        char dcbuf[BUFSZ] = "";
+        Sprintf(dcbuf, "You %s %s shatter!", Blind ? "hear" : "see", an(bottlename()));
+        pline1(dcbuf);
         if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data))
-            potionbreathe(otmp);
+            potionbreathe(otmp, dcbuf);
         return;
     }
     /* We have functions for distant and singular names, but not one */
@@ -1672,6 +1674,9 @@ int x, y;
         disposition = "is mashed";
         break;
     case MAT_GLASS:
+    case MAT_CRYSTAL:
+    case MAT_GEMSTONE:
+    case MAT_HARD_CRYSTAL:
         disposition = "shatters";
         break;
     case MAT_WOOD:

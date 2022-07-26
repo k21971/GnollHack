@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    polyself.c    $NHDT-Date: 1556497911 2019/04/29 00:31:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.132 $ */
 /*      Copyright (C) 1987, 1988, 1989 by Ken Arromdee */
@@ -91,6 +91,7 @@ set_uasmon()
     PROPSET(DRAIN_RESISTANCE, resists_drli(&youmonst));
     PROPSET(STUN_RESISTANCE, resists_stun(&youmonst));
     PROPSET(BISECTION_RESISTANCE, resists_bisection(&youmonst));
+    PROPSET(SLIME_RESISTANCE, resists_slime(&youmonst));
 
     PROPSET(FIRE_IMMUNITY, is_mon_immune_to_fire(&youmonst));
     PROPSET(COLD_IMMUNITY, is_mon_immune_to_cold(&youmonst));
@@ -148,11 +149,7 @@ set_uasmon()
 
     float_vs_flight(); /* maybe toggle (BFlying & I_SPECIAL) */
     polysense();
-
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_ONLY);
-#endif
+    status_reassess();
 }
 
 /* Levitation overrides Flying; set or clear BFlying|I_SPECIAL */
@@ -396,13 +393,13 @@ newman()
 
     u.uhunger = rn1(500, 500);
     if (Sick)
-        make_sick(0L, (char *) 0, FALSE);
+        make_sick(0L, (char *) 0, FALSE, 0);
     if (FoodPoisoned)
-        make_food_poisoned(0L, (char*)0, FALSE);
+        make_food_poisoned(0L, (char*)0, FALSE, 0);
     if (MummyRot)
-        make_mummy_rotted(0L, (char*)0, FALSE);
+        make_mummy_rotted(0L, (char*)0, FALSE, 0);
     if (Stoned)
-        make_stoned(0L, (char *) 0, 0, (char *) 0);
+        make_stoned(0L, (char *) 0, 0, (char *) 0, 0);
     if (u.uhp <= 0) {
         if (Polymorph_control) { /* even when Stunned || Unaware */
             if (u.uhp <= 0)
@@ -429,7 +426,7 @@ newman()
                    : urace.noun);
     if (Slimed) {
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "body transforms, but there is still slime on you.");
-        make_slimed(10L, (const char *) 0);
+        make_slimed(10L, (const char *) 0, KILLED_BY, "sliming", HINT_KILLED_SLIMED);
     }
 
     context.botl = context.botlx = TRUE;
@@ -498,7 +495,7 @@ int psflags;
         tryct = 5;
         do {
             mntmp = NON_PM;
-            getlin_ex(GETLINE_POLYMORPH, ATR_NONE, NO_COLOR, "Become what kind of monster?", buf, "type the name", (char*)0);
+            getlin_ex(GETLINE_POLYMORPH, ATR_NONE, NO_COLOR, "Become what kind of monster?", buf, "type the name", (char*)0, (char*)0);
             (void) mungspaces(buf);
             if (*buf == '\033')
             {
@@ -824,7 +821,7 @@ int mntmp;
     if (Stoned && poly_when_stoned(&mons[mntmp])) {
         /* poly_when_stoned already checked stone golem genocide */
         mntmp = PM_STONE_GOLEM;
-        make_stoned(0L, "You turn to stone!", 0, (char *) 0);
+        make_stoned(0L, "You turn to stone!", 0, (char *) 0, 0);
     }
 
     u.mtimedone = rn1(500, 500);
@@ -856,23 +853,23 @@ int mntmp;
 
     if (Stone_resistance && Stoned) { /* parnes@eniac.seas.upenn.edu */
         make_stoned(0L, "You no longer seem to be petrifying.", 0,
-                    (char *) 0);
+                    (char *) 0, 0);
     }
     if (Sick_resistance && (Sick || FoodPoisoned || MummyRot)) {
         if(Sick)
-            make_sick(0L, (char *) 0, FALSE);
+            make_sick(0L, (char *) 0, FALSE, 0);
         if (FoodPoisoned)
-            make_food_poisoned(0L, (char*)0, FALSE);
+            make_food_poisoned(0L, (char*)0, FALSE, 0);
         if (MummyRot)
-            make_mummy_rotted(0L, (char*)0, FALSE);
+            make_mummy_rotted(0L, (char*)0, FALSE, 0);
         You_ex(ATR_NONE, CLR_MSG_POSITIVE, "no longer feel sick.");
     }
     if (Slimed) {
         if (flaming(youmonst.data)) {
-            make_slimed(0L, "The slime burns away!");
+            make_slimed(0L, "The slime burns away!", 0, (char*)0, 0);
         } else if (mntmp == PM_GREEN_SLIME) {
             /* do it silently */
-            make_slimed(0L, (char *) 0);
+            make_slimed(0L, (char *) 0, 0, (char*)0, 0);
         }
     }
     check_strangling(FALSE); /* maybe stop strangling */
@@ -952,6 +949,7 @@ int mntmp;
             pline("%s touch %s.", no_longer_petrify_resistant,
                   mon_nam(u.usteed));
             Sprintf(buf, "riding %s", an(mon_monster_name(u.usteed)));
+            killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
             instapetrify(buf);
         }
         if (!can_ride(u.usteed))
@@ -1560,14 +1558,14 @@ dosteedbreathe()
     if (!u.usteed || !can_breathe(u.usteed->data))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("have no steed that use a breath weapon!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "have no steed that use a breath weapon!");
         return 0;
     }
 
     if (u.usteed->mspec_used > 0)
     {
         play_sfx_sound(SFX_NOT_READY_YET);
-        pline("%s breath weapon is not ready yet.", s_suffix(Monnam(u.usteed)));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s breath weapon is not ready yet.", s_suffix(Monnam(u.usteed)));
         return 0;
     }
 
@@ -1577,7 +1575,7 @@ dosteedbreathe()
     if (!u.dx && !u.dy && !u.dz)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        Your("steed cannot breathe at you!");
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "steed cannot breathe at you!");
         return 0;
     }
 
@@ -1593,9 +1591,9 @@ dosteedbreathe()
 
         buzz((int)(-(20 + typ - 1)), (struct obj*)0, u.usteed, (int)mattk->damn, (int)mattk->damd, (int)mattk->damp, u.ux, u.uy, u.dx, u.dy);
 
-        u.usteed->mspec_used = 5 + rn2(10);
+        u.usteed->mspec_used = (5 + rn2(10)) / mon_spec_cooldown_divisor(u.usteed);
         if (typ == AD_SLEE && !Sleep_resistance)
-            u.usteed->mspec_used += rnd(20);
+            u.usteed->mspec_used += rnd(20) / mon_spec_cooldown_divisor(u.usteed);
 
     }
     return 1;
@@ -1698,7 +1696,7 @@ dospinweb()
     }
     if (u.utrap) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot spin webs while stuck in a trap.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot spin webs while stuck in a trap.");
         return 0;
     }
     exercise(A_DEX, TRUE);
@@ -2018,6 +2016,7 @@ dogaze()
                                     : -200);
                                 multi_reason = "frozen by a monster's gaze";
                                 nomovemsg = 0;
+                                standard_hint("Do not gaze at floating eyes unless you have free action. Use ranged weapons against them.", &u.uhint.paralyzed_by_floating_eye);
                                 return 1;
                             }
                             else

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    wizard.c    $NHDT-Date: 1539804905 2018/10/17 19:35:05 $  $NHDT-Branch: keni-makedefsm $:$NHDT-Revision: 1.53 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -697,7 +697,7 @@ struct monst *summoner;
             if (mtmp)
             {
                 /* delay first use of spell or breath attack */
-                mtmp->mspec_used = 3 + rnd(3);
+                mtmp->mspec_used = (3 + rnd(3)) / mon_spec_cooldown_divisor(mtmp);
                 mtmp->mmagespell_used = mtmp->mspec_used;
                 mtmp->mmageultimate_used = mtmp->mspec_used;
                 mtmp->mclericspell_used = mtmp->mspec_used;
@@ -780,12 +780,12 @@ struct monst* summoner;
     context.makemon_spef_idx = 0;
     for (i = 1; i <= summon_num; i++)
     {
-        mtmp = makemon_limited((struct permonst*) 0, bypos.x, bypos.y, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, 0, max(1, ml - 1));
+        mtmp = makemon_limited((struct permonst*) 0, bypos.x, bypos.y, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, 0, max(1, ml - 1), 0);
 
         if (mtmp)
         {
             /* delay first use of spell or breath attack */
-            mtmp->mspec_used = 3 + rnd(3);
+            mtmp->mspec_used = (3 + rnd(3)) / mon_spec_cooldown_divisor(mtmp);
             mtmp->mmagespell_used = mtmp->mspec_used;
             mtmp->mmageintermediate_used = mtmp->mspec_used;
             mtmp->mmageultimate_used = mtmp->mspec_used;
@@ -863,6 +863,7 @@ resurrect()
         mtmp->mtame = mtmp->mpeaceful = 0; /* paranoia */
         set_malign(mtmp);
         newsym(mtmp->mx, mtmp->my);
+        check_boss_fight(mtmp);
         if (!Deaf) {
             pline("A voice booms out...");
             play_voice_wizard_of_yendor_simple_line(mtmp, 
@@ -872,6 +873,7 @@ resurrect()
             verbalize("So thou thought thou couldst %s me, fool.", verb);
             if(canseemon(mtmp))
                talkeff(mtmp->mx, mtmp->my);
+
         }
     }
 }

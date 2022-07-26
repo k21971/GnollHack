@@ -150,16 +150,20 @@ namespace GnollHackCommon
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     [return: MarshalAs(UnmanagedType.LPStr)]
+    public delegate string AskNameCallback([MarshalAs(UnmanagedType.LPStr)] string modeName, [MarshalAs(UnmanagedType.LPStr)] string modeDescription);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    [return: MarshalAs(UnmanagedType.LPStr)]
     public delegate string CharVoidCallback();
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     [return: MarshalAs(UnmanagedType.LPStr)]
     public delegate string CharPtrBooleanCallback(byte value1);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate int YnFunctionCallback(int style, int attr, int color, int glyph, [MarshalAs(UnmanagedType.LPStr)] string title, [MarshalAs(UnmanagedType.LPStr)] string query, [MarshalAs(UnmanagedType.LPStr)] string responses, [MarshalAs(UnmanagedType.LPStr)] string default_answer, [MarshalAs(UnmanagedType.LPStr)] string response_descriptions, ulong ynflags);
+    public delegate int YnFunctionCallback(int style, int attr, int color, int glyph, [MarshalAs(UnmanagedType.LPStr)] string title, [MarshalAs(UnmanagedType.LPStr)] string query, [MarshalAs(UnmanagedType.LPStr)] string responses, [MarshalAs(UnmanagedType.LPStr)] string default_answer, [MarshalAs(UnmanagedType.LPStr)] string response_descriptions, [MarshalAs(UnmanagedType.LPStr)] string introline, ulong ynflags);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     [return: MarshalAs(UnmanagedType.LPStr)]
-    public delegate string GetLineCallback(int style, int attr, int color, [MarshalAs(UnmanagedType.LPStr)] string value1, [MarshalAs(UnmanagedType.LPStr)] string value2, [MarshalAs(UnmanagedType.LPStr)] string value3);
+    public delegate string GetLineCallback(int style, int attr, int color, [MarshalAs(UnmanagedType.LPStr)] string value1, [MarshalAs(UnmanagedType.LPStr)] string value2, [MarshalAs(UnmanagedType.LPStr)] string value3, [MarshalAs(UnmanagedType.LPStr)] string value4);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate int IntCharCharUintCallback([MarshalAs(UnmanagedType.LPStr)] string value1, [MarshalAs(UnmanagedType.LPStr)] string value2, uint value3);
@@ -196,7 +200,7 @@ namespace GnollHackCommon
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void UpdateCursorCallback(int style, int force_paint, int show_on_u);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate void OpenSpecialViewCallback(int viewtype, [MarshalAs(UnmanagedType.LPStr)] string text, int param1, int param2);
+    public delegate int OpenSpecialViewCallback(int viewtype, [MarshalAs(UnmanagedType.LPStr)] string text, [MarshalAs(UnmanagedType.LPStr)] string title, int attr, int color);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void SendObjectDataCallback(int x, int y, IntPtr otmp_ptr, int cmdtype, int where, IntPtr otypdata_ptr, ulong oflags);

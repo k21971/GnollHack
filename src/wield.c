@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    wield.c    $NHDT-Date: 1543492132 2018/11/29 11:48:52 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.58 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -166,7 +166,7 @@ int hand;
         *unweapon_ptr = (wep->oclass == WEAPON_CLASS)
             ? is_launcher(wep) || is_ammo(wep) || is_missile(wep)
             || (is_appliable_pole_type_weapon(wep) && !is_spear(wep) && !u.usteed)
-            : !is_weptool(wep) && !is_wet_towel(wep);
+            : !is_wieldable_weapon(wep) && !is_wet_towel(wep);
     }
     else
     {
@@ -189,6 +189,7 @@ struct obj *obj;
         corpse_xname(obj, (const char *) 0, CXN_PFX_THE),
         makeplural(body_part(HAND)));
     Sprintf(kbuf, "wielding %s bare-handed", killer_xname(obj));
+    killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
     instapetrify(kbuf);
     return TRUE;
 }
@@ -218,12 +219,20 @@ long mask;
         /* No weapon */
         if (wepinhand)
         {
-            You("are now empty %s.", body_part(HANDED));
+            if(u.twoweap)
+                Your("%s %s is now empty.", mask == W_WEP2 ? "left" : "right", body_part(HAND));
+            else
+                You("are now empty %s.", body_part(HANDED));
             setuwep((struct obj *) 0, mask);
             res++;
         } 
         else
-            You("are already empty %s.", body_part(HANDED));
+        {
+            if (u.twoweap)
+                Your("%s %s is already empty.", mask == W_WEP2 ? "left" : "right", body_part(HAND));
+            else
+                You("are already empty %s.", body_part(HANDED));
+        }
     } 
     else if (wep->otyp == CORPSE && cant_wield_corpse(wep)) 
     {
@@ -454,7 +463,7 @@ struct obj* wep;
             if (bimanual(uwep))
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("cannot wield another weapon while wielding a two-handed weapon.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wield another weapon while wielding a two-handed weapon.");
                 return 0;
             }
             mask = W_WEP2;
@@ -464,7 +473,7 @@ struct obj* wep;
             if (bimanual(uarms))
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("cannot wield another weapon while wielding a two-handed weapon.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wield another weapon while wielding a two-handed weapon.");
                 return 0;
             }
             mask = W_WEP;
@@ -513,14 +522,14 @@ struct obj* wep;
         else if (bimanual(wep) && (wep == uswapwep || wep == uswapwep2))
             return doswapweapon();
         else if (wep == uswapwep)
-            return dosingleswapweapon(W_WEP);
+            return dosingleswapweapon(W_SWAPWEP, mask);
         else if (wep == uswapwep2)
-            return dosingleswapweapon(W_WEP2);
+            return dosingleswapweapon(W_SWAPWEP2, mask);
         else if (wep == uquiver)
             setuqwep((struct obj*) 0);
         else if (wep->owornmask & (W_ARMOR | W_ACCESSORY | W_SADDLE)) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("cannot wield that!");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wield that!");
             return 0;
         }
 
@@ -573,15 +582,15 @@ struct obj* wep;
         else if (bimanual(wep) && (wep == uswapwep || wep == uswapwep2))
             return doswapweapon();
         else if (wep == uswapwep)
-            return dosingleswapweapon(W_WEP);
+            return dosingleswapweapon(W_SWAPWEP, W_WEP);
         else if (wep == uswapwep2)
-            return dosingleswapweapon(W_WEP2);
+            return dosingleswapweapon(W_SWAPWEP2, W_WEP);
         else if (wep == uquiver)
             setuqwep((struct obj *) 0);
         else if (wep->owornmask & (W_ARMOR | W_ACCESSORY | W_SADDLE)) 
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("cannot wield that!");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wield that!");
             return 0;
         }
 
@@ -620,11 +629,7 @@ struct obj* wep;
     }
 
     update_all_character_properties((struct obj*)0, TRUE);
-
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+    status_reassess();
 
     return result;
 }
@@ -648,30 +653,34 @@ dounwield()
     long mask = 0L;
     if (otmp == uwep)
         mask = W_WEP;
-    else if (otmp == uwep)
+    else if (otmp == uwep2)
         mask = W_WEP2;
     else
         return 0;
 
-    if (welded(otmp, &youmonst))
+    int result;
+    if (mask == W_WEP2 && otmp == uarms && is_shield(otmp))
     {
-        weldmsg(otmp);
-        /* previously interrupted armor removal mustn't be resumed */
-        reset_remarm();
-        return 0;
+        result = armor_or_accessory_off(otmp);
+    }
+    else
+    {
+        if (welded(otmp, &youmonst))
+        {
+            weldmsg(otmp);
+            /* previously interrupted armor removal mustn't be resumed */
+            reset_remarm();
+            return 0;
+        }
+        result = ready_weapon((struct obj*)0, mask);
     }
 
-    int result = ready_weapon((struct obj*)0, mask);
     boolean unwield_succeeded = mask == W_WEP ? (uwep == (struct obj*)0) : (uwep2 == (struct obj*)0);
-    if (unwield_succeeded)
+    if (unwield_succeeded) //Note: shield unwearing may take longer
     {
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_UNWIELD);
         update_all_character_properties((struct obj*)0, TRUE);
-
-#ifdef STATUS_HILITES
-        if (VIA_WINDOWPORT())
-            status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+        status_reassess();
     }
 
     return result;
@@ -680,26 +689,42 @@ dounwield()
 
 
 int
-dosingleswapweapon(mask)
-long mask;
+dosingleswapweapon(swap_wep_mask, swap_target_mask)
+long swap_wep_mask, swap_target_mask; // swap_wep_mask = mask of original weapon in swapwep, swap_target_mask is the mask it is going to swapped to
 {
     register struct obj *oldwep, * oldswap;
     register struct obj *wep = (struct obj*)0, *altwep = (struct obj*)0, *swapwep = (struct obj*)0, *altswapwep = (struct obj*)0;
     int result = 0;
 
-    if (mask == W_WEP)
+    if (swap_wep_mask == W_SWAPWEP)
     {
-        wep = uwep;
-        altwep = uarms;
         swapwep = uswapwep;
         altswapwep = uswapwep2;
+        if (swap_target_mask == W_WEP)
+        {
+            wep = uwep;
+            altwep = uarms;
+        }
+        else
+        {
+            wep = uarms;
+            altwep = uwep;
+        }
     }
     else
     {
-        wep = uarms;
-        altwep = uwep;
         swapwep = uswapwep2;
         altswapwep = uswapwep;
+        if (swap_target_mask == W_WEP2)
+        {
+            wep = uarms;
+            altwep = uwep;
+        }
+        else
+        {
+            wep = uwep;
+            altwep = uarms;
+        }
     }
 
     /* May we attempt this? */
@@ -720,21 +745,21 @@ long mask;
     if (wep && bimanual(wep) && altswapwep)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot ready a two-handed weapon while having something already readied for the other %s.", body_part(HAND));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot ready a two-handed weapon while having something already readied for the other %s.", body_part(HAND));
         return 0;
     }
 
     if (wep && altwep && swapwep && bimanual(swapwep))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot swap to a two-handed weapon while holding something in the other %s.", body_part(HAND));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot swap to a two-handed weapon while holding something in the other %s.", body_part(HAND));
         return 0;
     }
 
     if (!wep && !swapwep)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        Your("%s %s is already empty.", mask == W_WEP ? "right" : "left", body_part(HAND));
+        Your("%s %s is already empty.", swap_target_mask == W_WEP ? "right" : "left", body_part(HAND));
         return 0;
     }
 
@@ -743,40 +768,73 @@ long mask;
     /* Unwield your current secondary weapon */
     oldwep = wep;
     oldswap = swapwep;
-    if(mask == W_WEP)
+
+    setuswapwep((struct obj*)0, swap_wep_mask);
+    /* Set your new secondary weapon */
+    result = ready_weapon(oldswap, swap_target_mask);
+
+    /* Handle swap */
+    struct obj* curwep = (swap_target_mask == W_WEP ? uwep : uarms);
+    if (curwep == oldwep)
     {
-        setuswapwep((struct obj*)0, W_SWAPWEP);
+        /* Wield failed for some reason */
+        setuswapwep(oldswap, swap_wep_mask);
+    }
+    else
+    {
+        if (curwep == oldswap)
+        {
+            /* Wield succeeded */
+            play_simple_object_sound(oldswap, OBJECT_SOUND_TYPE_WIELD);
+        }
+
+        setuswapwep(oldwep, swap_wep_mask);
+        struct obj* curswapwep = (swap_wep_mask == W_SWAPWEP ? uswapwep : uswapwep2);
+        struct obj* curswapwep2 = (swap_wep_mask == W_SWAPWEP ? uswapwep2 : uswapwep);
+        if (curswapwep)
+            prinv((char*)0, curswapwep, 0L);
+        else if (!(curswapwep2 && bimanual(curswapwep2)))
+            You("have no %s %s alternate weapon readied.", swap_wep_mask == W_SWAPWEP ? "right" : "left", body_part(HAND));
+    }
+
+#if 0
+    if(swap_wep_mask == W_SWAPWEP)
+    {
+        setuswapwep((struct obj*)0, swap_wep_mask);
         /* Set your new secondary weapon */
-        result = ready_weapon(oldswap, W_WEP);
+        result = ready_weapon(oldswap, swap_target_mask);
         if (uwep == oldwep) 
         {
             /* Wield failed for some reason */
-            setuswapwep(oldswap, W_SWAPWEP);
+            setuswapwep(oldswap, swap_wep_mask);
         }
         else
         {
-            if (uwep == oldswap)
+            struct obj* curwep = (swap_target_mask == W_WEP ? uwep : uarms);
+            if (curwep == oldswap)
             {
                 /* Wield succeeded */
                 play_simple_object_sound(oldswap, OBJECT_SOUND_TYPE_WIELD);
             }
 
-            setuswapwep(oldwep, W_SWAPWEP);
-            if (uswapwep)
-                prinv((char*)0, uswapwep, 0L);
-            else if (!(uswapwep2 && bimanual(uswapwep2)))
-                You("have no right hand alternate weapon readied.");
+            setuswapwep(oldwep, swap_wep_mask);
+            struct obj* curswapwep = (swap_wep_mask == W_SWAPWEP ? uswapwep : uswapwep2);
+            struct obj* curswapwep2 = (swap_wep_mask == W_SWAPWEP ? uswapwep2 : uswapwep);
+            if (curswapwep)
+                prinv((char*)0, curswapwep, 0L);
+            else if (!(curswapwep2 && bimanual(curswapwep2)))
+                You("have no %s %s alternate weapon readied.", swap_wep_mask == W_SWAPWEP ? "right" : "left", body_part(HAND));
         }
     }
     else
     {
-        setuswapwep((struct obj*)0, W_SWAPWEP2);
+        setuswapwep((struct obj*)0, swap_wep_mask);
         /* Set your new secondary weapon */
-        result = ready_weapon(oldswap, W_WEP2);
+        result = ready_weapon(oldswap, swap_target_mask);
         if (uarms == oldwep) 
         {
             /* Wield failed for some reason */
-            setuswapwep(oldswap, W_SWAPWEP2);
+            setuswapwep(oldswap, swap_wep_mask);
         }
         else 
         {
@@ -786,7 +844,7 @@ long mask;
                 play_simple_object_sound(oldswap, OBJECT_SOUND_TYPE_WIELD);
             }
 
-            setuswapwep(oldwep, W_SWAPWEP2);
+            setuswapwep(oldwep, swap_wep_mask);
             if (uswapwep2)
                 prinv((char*)0, uswapwep2, 0L);
             else if (!(uswapwep && bimanual(uswapwep)))
@@ -794,7 +852,6 @@ long mask;
         }
     }
 
-#if 0
     if (mask == W_WEP && uwep && (!oldweapon || uwep != oldweapon) && is_launcher(uwep) && P_SKILL_LEVEL(objects[uwep->otyp].oc_skill) >= P_SKILLED)
     {
         /* The player should be able to fire multishots */
@@ -810,10 +867,7 @@ long mask;
         /* Do nothing */
     }
 
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+    status_reassess();
 
     //Do not take a turn
     return 0; // result;
@@ -844,7 +898,7 @@ int
 doswapweapon_right_or_both()
 {
     if (flags.swap_rhand_only)
-        return dosingleswapweapon(W_WEP);
+        return dosingleswapweapon(W_SWAPWEP, W_WEP);
     else
         return doswapweapon();
 }
@@ -1102,10 +1156,7 @@ doswapweapon()
         /* Do nothing */
     }
 
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+    status_reassess();
 
     //Do not take a turn
     return 0; // result;
@@ -1181,7 +1232,7 @@ dowieldquiver()
     else if (newquiver->owornmask & (W_ARMOR | W_ACCESSORY | W_SADDLE)) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot ready that!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot ready that!");
         return 0;
     }
     else if (newquiver == uwep && uwep) 
@@ -1436,7 +1487,7 @@ const char *verb; /* "rub",&c */
     more_than_1 = (obj->quan > 1L || strstri(what, "pair of ") != 0
                    || strstri(what, "s of ") != 0);
 
-    if (obj->owornmask & ((W_ARMOR & ~W_ARMS) | W_ACCESSORY))
+    if (obj->owornmask & W_WORN_NOT_WIELDED)
     {
         You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s while wearing %s.", verb, yname(obj),
                  more_than_1 ? "them" : "it");
@@ -1527,14 +1578,14 @@ const char *verb; /* "rub",&c */
     }
     else if (uswapwep == obj)
     {
-        (void) dosingleswapweapon(W_WEP);
+        (void) dosingleswapweapon(W_SWAPWEP, selected_hand_is_right ? W_WEP : W_WEP2);
         /* doswapweapon might fail */
         if (uswapwep == obj)
             return FALSE;
     }
     else if (u.twoweap && uswapwep2 == obj) /* two-weaponing is needed for swapping, as otherwise the tool wouldn't be ready for use after the function call */
     {
-        (void)dosingleswapweapon(W_WEP2);
+        (void)dosingleswapweapon(W_SWAPWEP2, selected_hand_is_right ? W_WEP : W_WEP2);
         /* doswapweapon might fail */
         if (uswapwep2 == obj)
             return FALSE;
@@ -1675,10 +1726,7 @@ dotwoweapon()
     newsym(u.ux, u.uy);
     flush_screen(1);
     update_inventory();
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+    status_reassess();
     return 0;
 }
 
@@ -1700,10 +1748,7 @@ uwepgone()
         setworn((struct obj *) 0, W_WEP);
         update_unweapon();
         update_inventory();
-#ifdef STATUS_HILITES
-        if (VIA_WINDOWPORT())
-            status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+        //status_reassess();
     }
 }
 
@@ -1719,10 +1764,7 @@ uwep2gone()
         setworn((struct obj*) 0, W_ARMS);
         update_unweapon();
         update_inventory();
-#ifdef STATUS_HILITES
-        if (VIA_WINDOWPORT())
-            status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+        status_reassess();
     }
 }
 
@@ -1767,20 +1809,23 @@ untwoweapon()
 }
 
 int
-enchant_weapon(otmp, weapon, amount)
+enchant_weapon(otmp, weapon, amount, dopopup)
 register struct obj *otmp;
 register struct obj* weapon;
 register int amount;
+boolean dopopup;
 {
     const char *color = hcolor((amount < 0) ? NH_BLACK : NH_BLUE);
     const char *xtime, *wepname = "";
     boolean multiple;
     int otyp = STRANGE_OBJECT;
+    char buf[BUFSZ] = "";
+    boolean enchwepknown = FALSE;
+    if (otmp && (otmp->oclass == SPBOOK_CLASS || objects[otmp->otyp].oc_name_known))
+        enchwepknown = TRUE;
 
     if (!weapon || !((is_weapon(weapon) || is_ammo(weapon)) && objects[weapon->otyp].oc_enchantable)) 
     {
-        char buf[BUFSZ];
-
         if (amount >= 0 && weapon && will_weld(weapon, &youmonst))
         { /* cursed tin opener */
             play_sfx_sound(SFX_ENCHANT_ITEM_UNCURSE_AND_OTHER);
@@ -1806,7 +1851,7 @@ register int amount;
                     (amount >= 0) ? "twitch" : "itch");
         }
 
-        strange_feeling(otmp, buf); /* pline()+docall()+useup() */
+        strange_feeling(otmp, buf, dopopup); /* pline()+docall()+useup() */
         exercise(A_DEX, (boolean) (amount >= 0));
         return 0;
     }
@@ -1816,11 +1861,18 @@ register int amount;
 
     if (weapon->otyp == WORM_TOOTH && amount >= 0) 
     {
+        if (otyp != STRANGE_OBJECT)
+        {
+            makeknown(otyp);
+            enchwepknown = TRUE;
+        }
+
         play_sfx_sound(SFX_ENCHANT_ITEM_SPECIAL_SUCCESS);
         multiple = (weapon->quan > 1L);
         /* order: message, transformation, shop handling */
-        Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s %s much sharper now.", simpleonames(weapon),
+        Sprintf(buf, "%s %s much sharper now.", simpleonames(weapon),
              multiple ? "fuse, and become" : "is");
+        pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, buf, enchwepknown ? "Enchant Weapon" : "Sharpening Magic", dopopup);
         weapon->otyp = CRYSKNIFE;
         weapon->oerodeproof = 0;
 
@@ -1837,22 +1889,27 @@ register int amount;
         if (weapon->unpaid)
             alter_cost(weapon, 0L);
 
-        if (otyp != STRANGE_OBJECT)
-            makeknown(otyp);
-
         if (multiple)
             encumber_msg();
 
+        update_inventory();
         return 1;
 
     } 
     else if (weapon->otyp == CRYSKNIFE && amount < 0) 
     {
+        if (otyp != STRANGE_OBJECT && otmp->bknown)
+        {
+            makeknown(otyp);
+            enchwepknown = TRUE;
+        }
+
         multiple = (weapon->quan > 1L);
         play_sfx_sound(SFX_ENCHANT_ITEM_SPECIAL_NEGATIVE);
 
         /* order matters: message, shop handling, transformation */
-        Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s much duller now.", simpleonames(weapon), multiple ? "fuse, and become" : "is");
+        Sprintf(buf, "Your %s %s much duller now.", simpleonames(weapon), multiple ? "fuse, and become" : "is");
+        pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, enchwepknown ? "Enchant Weapon" : "Dulling Magic", dopopup);
         costly_alteration(weapon, COST_DEGRD); /* DECHNT? other? */
         weapon->otyp = WORM_TOOTH;
         weapon->oerodeproof = 0;
@@ -1863,12 +1920,10 @@ register int amount;
             weapon->owt = weight(weapon);
         }
 
-        if (otyp != STRANGE_OBJECT && otmp->bknown)
-            makeknown(otyp);
-
         if (multiple)
             encumber_msg();
 
+        update_inventory();
         return 1;
     }
 
@@ -1879,7 +1934,10 @@ register int amount;
     {
         play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
         if (!Blind)
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s.", Yobjnam2(weapon, "faintly glow"), color);
+        {
+            Sprintf(buf, "%s %s.", Yobjnam2(weapon, "faintly glow"), color);
+            pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, buf, enchwepknown ? "Enchant Weapon" : "Faint Glow", dopopup);
+        }
         return 1;
     }
 
@@ -1894,30 +1952,36 @@ register int amount;
     {
         play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
         if (!Blind)
-            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s for a while and then %s.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "evaporate"));
+            Sprintf(buf, "%s %s for a while and then %s.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "evaporate"));
         else
-            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s.", Yobjnam2(weapon, "evaporate"));
+            Sprintf(buf, "%s.", Yobjnam2(weapon, "evaporate"));
+        pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, "Evaporation", dopopup);
 
         useupall(weapon); /* let all of them disappear */
         return 1;
     }
 
-    if (!Blind) 
-    {
-        xtime = (amount * amount == 1) ? "moment" : "while";
-        pline_ex(ATR_NONE, amount == 0 ? CLR_MSG_WARNING : amount > 0 ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, "%s %s for a %s.", Yobjnam2(weapon, amount == 0 ? "violently glow" : "glow"), color, xtime);
+    if (amount == 0)
+        play_sfx_sound(SFX_ENCHANT_ITEM_VIOLENT_GLOW);
+    else
+        play_sfx_sound(amount > 1 ? SFX_ENCHANT_ITEM_BLESSED_SUCCESS : amount < 0 ? SFX_ENCHANT_ITEM_NEGATIVE : SFX_ENCHANT_ITEM_SUCCESS);
 
+    if (!Blind)
+    {
         if (otyp != STRANGE_OBJECT && weapon->known && (amount > 0 || (amount < 0 && otmp->bknown)))
+        {
             makeknown(otyp);
+            enchwepknown = TRUE;
+        }
+
+        xtime = (amount * amount == 1) ? "moment" : "while";
+        Sprintf(buf, "%s %s for a %s.", Yobjnam2(weapon, amount == 0 ? "violently glow" : "glow"), color, xtime);
+        pline_ex1_popup(ATR_NONE, amount == 0 ? CLR_MSG_WARNING : amount > 0 ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, buf, 
+            enchwepknown ? "Enchant Weapon" : amount == 0 ? "Violent Glow" : "Magical Glow", dopopup);
     }
 
     if (amount < 0)
         costly_alteration(weapon, COST_DECHNT);
-
-    if(amount == 0)
-        play_sfx_sound(SFX_ENCHANT_ITEM_VIOLENT_GLOW);
-    else
-        play_sfx_sound(amount > 1 ? SFX_ENCHANT_ITEM_BLESSED_SUCCESS : amount < 0 ? SFX_ENCHANT_ITEM_NEGATIVE : SFX_ENCHANT_ITEM_SUCCESS);
 
     weapon->enchantment += amount;
 
@@ -1939,8 +2003,9 @@ register int amount;
     if (weapon->oartifact && artifact_has_flag(weapon, AF_MAGIC_ABSORBING) && weapon->enchantment >= 0) 
     {
         play_sfx_sound(SFX_HANDS_ITCH);
-        Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "right %s %sches!", body_part(HAND),
+        Sprintf(buf, "Your right %s %sches!", body_part(HAND),
              (((amount > 1) && (weapon->enchantment > 1)) ? "flin" : "it"));
+        pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, buf, ((amount > 1) && (weapon->enchantment > 1)) ? "Flinching Sensation" : "Itching Sensation", dopopup);
     }
 
     /* an elven magic clue, cookie@keebler */
@@ -1949,9 +2014,11 @@ register int amount;
         /*&& (is_elven_weapon(weapon) || weapon->oartifact || !rn2(7)) */ ) /* Vibrates for sure */
     {
         play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_WARNING);
-        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s unexpectedly.", Yobjnam2(weapon, "suddenly vibrate"));
+        Sprintf(buf, "%s unexpectedly.", Yobjnam2(weapon, "suddenly vibrate"));
+        pline_ex1_popup(ATR_NONE, CLR_MSG_WARNING, buf, "Unexpected Vibration", dopopup);
     }
 
+    update_inventory();
     return 1;
 }
 

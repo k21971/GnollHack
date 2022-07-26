@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	mhmain.c	$NHDT-Date: 1432512800 2015/05/25 00:13:20 $  $NHDT-Branch: master $:$NHDT-Revision: 1.46 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -1138,7 +1138,7 @@ mswin_direct_command()
 {
     char cmd[BUFSZ];
     ZeroMemory(cmd, sizeof(cmd));
-    mswin_getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, "Type cmd text", cmd, (char*)0, (char*)0);
+    mswin_getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, "Type cmd text", cmd, (char*)0, (char*)0, (char*)0);
     if (cmd[0]) {
         /* feed command to nethack */
         char *p = cmd;

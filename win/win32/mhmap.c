@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mhmap.c    $NHDT-Date: 1435002695 2015/06/22 19:51:35 $  $NHDT-Branch: master $:$NHDT-Revision: 1.56 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -765,7 +765,7 @@ MapWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
 
         /* Dirty all animated tiles, unless hanging up */
-        if (!program_state.animation_hangup)
+        if (!program_state.animation_hangup && context.game_started)
         {
             program_state.animation_hangup = 1;
             for (int x = 1; x < COLNO; x++)
@@ -2039,14 +2039,14 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                             {
                                 int otyp = (glyph - GLYPH_OBJ_MISSILE_OFF) / NUM_MISSILE_DIRS;
                                 use_floor_tile = has_otyp_floor_tile(otyp);
-                                if (!has_otyp_floor_tile(otyp) && OBJ_TILE_HEIGHT(otyp) > 0)
+                                if (!has_otyp_floor_tile(otyp) && !has_otyp_height_clipping(otyp) && OBJ_TILE_HEIGHT(otyp) > 0)
                                     obj_scaling_factor = ((double)OBJ_TILE_HEIGHT(otyp)) / 48.0;
                             }
                             else if (glyph_is_artifact_missile(glyph))
                             {
                                 int artidx = ((glyph - GLYPH_ARTIFACT_MISSILE_OFF) / NUM_MISSILE_DIRS) + 1;
                                 use_floor_tile = has_artifact_floor_tile(artidx);
-                                if (!has_artifact_floor_tile(artidx) && artilist[artidx].tile_floor_height > 0)
+                                if (!has_artifact_floor_tile(artidx) && !has_artifact_height_clipping(artidx) && artilist[artidx].tile_floor_height > 0)
                                     obj_scaling_factor = ((double)artilist[artidx].tile_floor_height) / 48.0;
                             }
 
@@ -2071,12 +2071,13 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                                 int base_dest_added_from_source = 0;
                                 int artidx = otmp_round ? otmp_round->oartifact : 0;
                                 boolean has_floor_tile = !otmp_round ? FALSE : artidx ? has_artifact_floor_tile(artidx) : has_obj_floor_tile(otmp_round);
+                                boolean is_height_clipping = !otmp_round ? FALSE : artidx ? has_artifact_height_clipping(artidx) : has_obj_height_clipping(otmp_round);
                                 int obj_height = get_obj_height(otmp_round);
 
                                 /* For all normal items, we use only lower part of the tile */
-                                if (otmp_round && has_floor_tile && !showing_detection && !Hallucination)
+                                if (otmp_round && (has_floor_tile || is_height_clipping) && !showing_detection && !Hallucination)
                                 {
-                                    source_top_added = 0;
+                                    source_top_added = has_floor_tile ? 0 : (int)tileHeight / 2;
                                     if (otmp_round && obj_height > 0 && obj_height < used_item_height && !showing_detection)
                                     {
                                         base_dest_added_from_source = used_item_height - obj_height;
@@ -2167,15 +2168,16 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                         /* Scale object to be of oc_tile_floor_height height */
                         if ((is_obj_missile || is_object) && obj_scaling_factor != 1.0)
                         {
-                            double scaled_height = (obj_scaling_factor * (double)GetNHApp()->mapTile_Y / 2.0);
+                            double fulltileheight = (double)GetNHApp()->mapTile_Y / ((is_object && !full_sized_item) || move_obj_to_middle ? 2.0 : 1.0);
+                            double scaled_height = (obj_scaling_factor * fulltileheight);
                             double scaled_width = (obj_scaling_factor * (double)GetNHApp()->mapTile_X);
 
                             if(is_object)
-                                dest_top_added += (int)(applicable_scaling_factor_y * ((double)GetNHApp()->mapTile_Y / 2.0 - scaled_height));
+                                dest_top_added += (int)(applicable_scaling_factor_y * (fulltileheight - scaled_height));
                             else
-                                dest_top_added += (int)(applicable_scaling_factor_y * ((double)GetNHApp()->mapTile_Y / 2.0 - scaled_height) / 2.0);
+                                dest_top_added += (int)(applicable_scaling_factor_y * (fulltileheight - scaled_height) / 2.0);
 
-                            dest_height_deducted += (int)(applicable_scaling_factor_y * ((double)GetNHApp()->mapTile_Y / 2.0 - scaled_height));
+                            dest_height_deducted += (int)(applicable_scaling_factor_y * (fulltileheight - scaled_height));
                             dest_left_added += (int)(applicable_scaling_factor_x * (((double)GetNHApp()->mapTile_X - scaled_width) / 2.0));
                             dest_width_deducted += (int)(applicable_scaling_factor_x * ((double)GetNHApp()->mapTile_X - scaled_width));
                         }
@@ -2737,12 +2739,13 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
 
                                     int artidx = contained_obj ? contained_obj->oartifact : 0;
                                     boolean has_floor_tile = !contained_obj ? FALSE : artidx ? has_artifact_floor_tile(artidx) : has_obj_floor_tile(contained_obj);
+                                    boolean is_height_clipping = !contained_obj ? FALSE : artidx ? has_artifact_height_clipping(artidx) : has_obj_height_clipping(contained_obj);
                                     int obj_height = get_obj_height(contained_obj);
                                     int src_x = 0, src_y = ((objects[contained_obj->otyp].oc_flags4 & O4_FULL_SIZED_BITMAP) || has_floor_tile ? 0 : TILE_Y / 2);
                                     int dest_x = 0, dest_y = 0;
-                                    int item_width = has_floor_tile ? TILE_Y / 2 : obj_height ? obj_height : TILE_Y / 2;
-                                    int item_height = has_floor_tile ? TILE_X : (item_width * TILE_X) / (TILE_Y / 2);
-                                    int true_item_width = has_floor_tile && obj_height ? obj_height : item_width;
+                                    int item_width = has_floor_tile || is_height_clipping ? TILE_Y / 2 : obj_height ? obj_height : TILE_Y / 2;
+                                    int item_height = has_floor_tile || is_height_clipping ? TILE_X : (item_width * TILE_X) / (TILE_Y / 2);
+                                    int true_item_width = (has_floor_tile || is_height_clipping) && obj_height ? obj_height : item_width;
                                     int padding = (TILE_Y / 2 - rack_width) / 2;
                                     int vertical_padding = (TILE_X - item_height) / 2;
 
@@ -2877,11 +2880,12 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                                 {
                                     int artidx = contained_obj ? contained_obj->oartifact : 0;
                                     boolean has_floor_tile = !contained_obj ? FALSE : artidx ? has_artifact_floor_tile(artidx) : has_obj_floor_tile(contained_obj);
+                                    boolean is_obj_clipping = !contained_obj ? FALSE : artidx ? has_artifact_height_clipping(artidx) : has_obj_height_clipping(contained_obj);
                                     int obj_height = get_obj_height(contained_obj);
                                     int src_x = 0, src_y = ((objects[contained_obj->otyp].oc_flags4 & O4_FULL_SIZED_BITMAP) || has_floor_tile ? 0 : TILE_Y / 2);
                                     int dest_x = 0, dest_y = 0;
-                                    int item_width = has_floor_tile ? TILE_Y / 2 : obj_height ? obj_height : TILE_Y / 2;
-                                    int item_height = has_floor_tile ? TILE_X : (item_width * TILE_X) / (TILE_Y / 2);
+                                    int item_width = has_floor_tile || is_obj_clipping ? TILE_Y / 2 : obj_height ? obj_height : TILE_Y / 2;
+                                    int item_height = has_floor_tile || is_obj_clipping ? TILE_X : (item_width * TILE_X) / (TILE_Y / 2);
                                     int padding = (TILE_Y / 2 - item_width) / 2;
                                     int vertical_padding = (TILE_X - item_height) / 2;
                                     if (contained_obj->oclass != WEAPON_CLASS)
@@ -4530,7 +4534,6 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                             int ct_y = TILEBMP_Y(mtile);
                             int tiles_per_row = tileWidth / ui_tile_component_array[STATUS_MARKS].width;
                             int max_fitted_rows = (tileHeight - 4) / (ui_tile_component_array[STATUS_MARKS].height + 2);
-                            enum game_ui_status_mark_types statusmarkorder[MAX_STATUS_MARKS] = { STATUS_MARK_TOWNGUARD_PEACEFUL, STATUS_MARK_TOWNGUARD_HOSTILE, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
 
                             for (int statusorder_idx = STATUS_MARK_PET; statusorder_idx < SIZE(statusmarkorder); statusorder_idx++)
                             {
@@ -4552,7 +4555,7 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                                         display_this_status_mark = TRUE;
                                     break;
                                 case STATUS_MARK_PEACEFUL:
-                                    if (!loc_is_you && ispeaceful && !is_watch(mtmp->data))
+                                    if (!loc_is_you && ispeaceful && !ispet && !is_watch(mtmp->data))
                                         display_this_status_mark = TRUE;
                                     break;
                                 case STATUS_MARK_DETECTED:

@@ -58,14 +58,14 @@ typedef unsigned char(__callconv* BooleanIntDoubleCallback)(int, double);
 typedef unsigned char(__callconv* BooleanIntDoubleVoidPtrCallback)(int, double, void*);
 typedef unsigned char(__callconv* BooleanVoidPtrDoubleCallback)(void* , double);
 typedef unsigned char(__callconv* BooleanVoidPtrCallback)(void*);
-typedef char*(__callconv* GetLineCallback)(int, int, int, const char*, const char*, const char*);
+typedef char*(__callconv* GetLineCallback)(int, int, int, const char*, const char*, const char*, const char*);
 typedef char*(__callconv* CharPtrBooleanCallback)(BOOLEAN_P);
 typedef void(__callconv* VoidIntConstCharPtrConstCharPtrBooleanCallback)(int, const char*, const char*, UCHAR_P);
 
 /* Specific callback types */
 typedef VoidVoidCallback InitWindowsCallback;
 typedef IntVoidCallback PlayerSelectionCallback;
-typedef CharVoidCallback AskNameCallback;
+typedef char* (__callconv* AskNameCallback)(const char*, const char*);
 typedef VoidVoidCallback GetEventCallback;
 typedef VoidConstCharCallback ExitWindowsCallback;
 typedef VoidConstCharCallback SuspendWindowsCallback;
@@ -98,7 +98,7 @@ typedef IntVoidCallback GetChCallback;
 typedef int(__callconv* PosKeyCallback)(int*, int*, int*);
 typedef VoidVoidCallback BellCallback;
 typedef IntVoidCallback DoPrevMessageCallback;
-typedef int(__callconv* YnFunctionCallback)(int, int, int, int, const char*, const char*, const char*, const char*, const char*, unsigned long);
+typedef int(__callconv* YnFunctionCallback)(int, int, int, int, const char*, const char*, const char*, const char*, const char*, const char*, unsigned long);
 typedef IntVoidCallback GetExtCmdCallback;
 typedef VoidIntCallback NumberPadCallback;
 typedef VoidVoidCallback DelayOutputCallback;
@@ -121,7 +121,7 @@ typedef void(__callconv* StatusUpdateCallback)(int, char*, long, int, int, int, 
 typedef BooleanVoidCallback CanSuspendYesCallback;
 typedef VoidVoidCallback StretchWindowCallback;
 typedef void(__callconv* SetAnimationTimerCallback)(unsigned long);
-typedef void(__callconv* OpenSpecialViewCallback)(int, const char*, int, int);
+typedef int(__callconv* OpenSpecialViewCallback)(int, const char*, const char*, int, int);
 typedef int(__callconv* StopAllSoundsCallback)(unsigned int, unsigned int);
 typedef int(__callconv* PlayImmediateSoundCallback)(int, const char*, int, double, double, const char**, float*, int, int, int, unsigned int, unsigned long);
 typedef int(__callconv* PlayMusicCallback)(int, const char*, int, double, double);

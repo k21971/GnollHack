@@ -109,7 +109,7 @@ const struct propname propertynames[] = {
     { BLOCKS_INVISIBILITY, "blocking invisibility", "blocks invisibility" },
     { BLOCKS_BLINDNESS, "blocking blindness", "blocks blindness"  },
     { BLOCKS_CLAIRVOYANCE, "blocking clairvoyance", "blocks clairvoyance" },
-    { HALF_PHYSICAL_DAMAGE_AGAINST_UNDEAD_AND_DEMONS, "receiving half physical damage from undead and demons", "half physical damage against undead and demons" },
+    { HALF_PHYSICAL_DAMAGE_AGAINST_UNDEAD_AND_DEMONS, "receiving half physical damage from undead and demons", "half physical damage from undead and demons" },
     { MAGICAL_SHIELDING, "magically shielded", "magical shielding" },
     { MAGICAL_BARKSKIN, "magically barkskinned", "magical barkskin" },
     { MAGICAL_STONESKIN, "magically stoneskinned", "magical stoneskin" },
@@ -178,6 +178,7 @@ const struct propname propertynames[] = {
     { UNDEAD_CONTROL, "controlled as undead", "undead control" },
     { CANCELLATION_RESISTANCE, "resistant to cancellation", "cancellation resistance" },
     { HALF_SLOW_DIGESTION, "digesting half slower than normal", "half slower digestion" },
+    { SLIME_RESISTANCE, "resistant to green slime", "slime resistance" },
     { LAUGHING, "laughing uncontrollably", "uncontrollable laughter" },
     {  0, 0 },
 };
@@ -350,8 +351,64 @@ NEARDATA struct prop_info property_definitions[MAX_PROPS] =
     { "undead-control",               1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* UNDEAD_CONTROL = 163 */
     { "cancellation-resistance",      0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE},  /* CANCELLATION_RESISTANCE = 164 */
     { "half-slow-digestion",          1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* HALF_SLOW_DIGESTION = 165 */
-    { "laughing",                     0, 0, 1,  0, 20,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE},  /* LAUGHING = 166 */
+    { "sliming-resistance",           0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE },  /* SLIME_RESISTANCE = 166 */
+    { "laughing",                     0, 0, 1,  0, 20,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE},  /* LAUGHING = 167 */
 };
+
+const char* condition_names[NUM_BL_CONDITIONS] = {
+    "Petrifying",
+    "Slimed",
+    "Being strangled",
+    "Suffocating",
+    "Food poisoned",
+    "Terminally ill",
+    "Blind",
+    "Deaf",
+    "Stun",
+    "Confused",
+    "Hallucinating",
+    "Levitating",
+    "Flying",
+    "Riding",
+    "Slowed",
+    "Paralyzed",
+    "Frightened",
+    "Sleeping",
+    "Cancelled",
+    "Silenced",
+    "Grabbed",
+    "Mummy rot",
+    "Lycanthropy",
+};
+
+const char* status_names[MAX_STATUS_MARKS] = {
+    "Pet",
+    "Peaceful",
+    "Detected",
+    "Object pile",
+    "Satiated",
+    "Hungry",
+    "Weak",
+    "Fainting",
+    "Burdended",
+    "Stressed",
+    "Strained",
+    "Overtaxed",
+    "Overloaded",
+    "Two-weapon fighting",
+    "Skill available",
+    "Saddled",
+    "Low hit points",
+    "Critical hit points",
+    "Cooldown",
+    "Trapped",
+    "Grabber",
+    "Carrying object",
+    "Peaceful townguard",
+    "Hostile townguard",
+};
+
+enum game_ui_status_mark_types statusmarkorder[MAX_STATUS_MARKS] = { STATUS_MARK_TOWNGUARD_PEACEFUL, STATUS_MARK_TOWNGUARD_HOSTILE, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
 
 void
 props_init()
@@ -359,5 +416,22 @@ props_init()
     /* Force linkage */
     return;
 }
+
+const char* 
+get_property_name(prop_index)
+int prop_index;
+{
+    int idx;
+    for (idx = 0; propertynames[idx].prop_num; idx++)
+    {
+        if (propertynames[idx].prop_num == prop_index)
+        {
+            return propertynames[idx].prop_noun;
+        }
+    }
+
+    return "";
+}
+
 
 /* prop.c */

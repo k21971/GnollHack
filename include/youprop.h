@@ -242,6 +242,9 @@
 #define EBisection_resistance u.uprops[BISECTION_RESISTANCE].extrinsic
 #define Bisection_resistance (HBisection_resistance || EBisection_resistance)
 
+#define HSlime_resistance u.uprops[SLIME_RESISTANCE].intrinsic
+#define ESlime_resistance u.uprops[SLIME_RESISTANCE].extrinsic
+#define Slime_resistance (HSlime_resistance || ESlime_resistance)
 
 #define HEnhanced_vision u.uprops[ENHANCED_VISION].intrinsic
 #define EEnhanced_vision u.uprops[ENHANCED_VISION].extrinsic
@@ -490,7 +493,7 @@
 
 #define Underwater (u.uinwater)
 
-#define Survives_without_air ((!Underwater && Breathless) || (Underwater && (Amphibious || Swimming)))
+#define Survives_without_air (Breathless || (Underwater && (Amphibious || Swimming)))
 
 /* Note that Underwater and u.uinwater are both used in code.
    The latter form is for later implementation of other in-water

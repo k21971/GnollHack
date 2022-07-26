@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	mgetline.c	$NHDT-Date: 1432512797 2015/05/25 00:13:17 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -32,14 +32,21 @@ get_line_from_key_queue(char *bufp)
 }
 
 static void
-topl_getlin_ex(int style UNUSED, int attr, int color, const char *query, char *bufp, const char* placeholder, const char* linesuffix, Boolean ext)
+topl_getlin_ex(int style UNUSED, int attr, int color, const char *query, char *bufp, const char* placeholder, const char* linesuffix, const char* introline, Boolean ext)
 {
     if (get_line_from_key_queue(bufp))
         return;
 
     char promptbuf[BUFSZ] = "";
+    //Do not show introline
+    //if (introline && *introline)
+    //    Sprintf(promptbuf, "%s", introline);
     if (query)
-        Sprintf(promptbuf, "%s", query);
+    {
+        if (*promptbuf)
+            Strcat(promptbuf, " ");
+        Sprintf(eos(promptbuf), "%s", query);
+    }
     if (placeholder)
         Sprintf(eos(promptbuf), " [%s]", placeholder);
     if (linesuffix)
@@ -57,9 +64,9 @@ topl_getlin_ex(int style UNUSED, int attr, int color, const char *query, char *b
  * resulting string is "\033".
  */
 void
-mac_getlin_ex(int style, int attr, int color, const char *query, char *bufp, const char* placeholder, const char* linesuffix)
+mac_getlin_ex(int style, int attr, int color, const char *query, char *bufp, const char* placeholder, const char* linesuffix, const char* introline)
 {
-    topl_getlin_ex(style, attr, color, query, bufp, placeholder, linesuffix, false);
+    topl_getlin_ex(style, attr, color, query, bufp, placeholder, linesuffix, introline, false);
 }
 
 /* Read in an extended command - doing command line completion for
@@ -74,7 +81,7 @@ mac_get_ext_cmd()
 
     if (iflags.extmenu)
         return extcmd_via_menu();
-    topl_getlin_ex(GETLINE_EXTENDED_COMMAND, ATR_NONE, NO_COLOR, "# ", bufp, (char*)0, (char*)0, true);
+    topl_getlin_ex(GETLINE_EXTENDED_COMMAND, ATR_NONE, NO_COLOR, "# ", bufp, (char*)0, (char*)0, (char*)0, true);
     for (i = 0; extcmdlist[i].ef_txt != (char *) 0; i++)
         if (!strcmp(bufp, extcmdlist[i].ef_txt))
             break;

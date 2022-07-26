@@ -222,6 +222,8 @@ char *argv[];
     getmailstatus();
 #endif
 
+    display_gamewindows();
+
     /* wizard mode access is deferred until here */
     set_playmode(); /* sets plname to "wizard" for wizard mode */
     if (exact_username) {
@@ -260,8 +262,6 @@ char *argv[];
      * new game or before a level restore on a saved game.
      */
     vision_init();
-
-    display_gamewindows();
 
     /*
      * First, try to find and restore a save file for specified character.
@@ -393,6 +393,12 @@ char *argv[];
             break;
         case 'X':
             discover = TRUE, wizard = FALSE;
+            break;
+        case 'M':
+            ModernMode = TRUE;
+            break;
+        case 'C':
+            CasualMode = TRUE;
             break;
 #ifdef NEWS
         case 'n':

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    botl.c    $NHDT-Date: 1557094795 2019/05/05 22:19:55 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -220,8 +220,10 @@ do_statusline2()
         Strcpy(nb = eos(nb), " Stone");
     if (Slimed)
         Strcpy(nb = eos(nb), " Slime");
-    if (Strangled)
+    if (Strangled && !Breathless)
         Strcpy(nb = eos(nb), " Strngl");
+    if (Strangled && !Survives_without_air)
+        Strcpy(nb = eos(nb), " Suffoc");
     if (Slowed)
         Strcpy(nb = eos(nb), " Slow");
     if (Silenced)
@@ -488,7 +490,7 @@ char* buf;
     char modebuf[BUFSZ];
     const char* difsym = get_game_difficulty_symbol(context.game_difficulty);
 
-    Sprintf(modebuf, "%s%s", wizard ? "W" : discover ? "X" : CasualMode ? (ModernMode ? "C" : "S") : ModernMode ? "M" : "", difsym);
+    Sprintf(modebuf, "%s%s", wizard ? "W" : discover ? "X" : CasualMode ? (ModernMode ? "C" : "R") : ModernMode ? "M" : "", difsym);
 
     Sprintf(buf, "%s", modebuf);
     return ret;
@@ -882,7 +884,7 @@ get_u_condition_bits()
         conditions |= BL_MASK_STONE;
     if (Slimed)
         conditions |= BL_MASK_SLIME;
-    if (Strangled)
+    if (Strangled && !Breathless)
         conditions |= BL_MASK_STRNGL;
     if (Airless_environment && !Survives_without_air)
         conditions |= BL_MASK_SUFFOC;
@@ -1030,7 +1032,7 @@ boolean loc_is_you, ispeaceful, ispet, isdetected;
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_PEACEFUL:
-            if (!loc_is_you && ispeaceful && !is_watch(mtmp->data))
+            if (!loc_is_you && ispeaceful && !ispet && !is_watch(mtmp->data))
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_DETECTED:
@@ -1377,7 +1379,7 @@ boolean *valsetlist;
     idxmax = curr->idxmax;
     idxcurr = curr->idxcurr;
     if (idxmax >= 0)
-        chgmax = update_all ? 0 : compare_blstats(curr, &blstats[idx][idxmax]);
+        chgmax = update_all ? 0 : compare_blstats(&blstats[1 - idx][idxmax], &blstats[idx][idxmax]);
 
     chg = update_all ? 0 : compare_blstats(prev, curr);
 
@@ -1481,7 +1483,7 @@ boolean *valsetlist;
             || ((i == BL_TIME) && !flags.time)
             || ((i == BL_MOVE) && !flags.showmove)
             || ((i == BL_UWEP) && !flags.show_weapon_style)
-            || ((i == BL_UWEP2) && (!flags.show_weapon_style || (uwep && is_wielded_weapon(uwep) && objects[uwep->otyp].oc_bimanual) || (!u.twoweap && !uarms)))
+            || ((i == BL_UWEP2) && (!flags.show_weapon_style || (uwep && is_wieldable_weapon(uwep) && objects[uwep->otyp].oc_bimanual) || (!u.twoweap && !uarms)))
             || ((i == BL_HD) && !Upolyd)
             || ((i == BL_XP || i == BL_EXP) && Upolyd)) {
             notpresent++;
@@ -1553,7 +1555,7 @@ boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
                      : (fld == BL_EXP) ? (boolean) (flags.showexp && !Upolyd)
                        : (fld == BL_MOVE) ? flags.showmove
                         : (fld == BL_UWEP) ? flags.show_weapon_style
-                        : (fld == BL_UWEP2) ? flags.show_weapon_style && !(uwep && is_wielded_weapon(uwep) && objects[uwep->otyp].oc_bimanual) && (u.twoweap || uarms)
+                        : (fld == BL_UWEP2) ? flags.show_weapon_style && !(uwep && is_wieldable_weapon(uwep) && objects[uwep->otyp].oc_bimanual) && (u.twoweap || uarms)
                         : (fld == BL_XP) ? (boolean) !Upolyd
                          : (fld == BL_HD) ? (boolean) Upolyd
                            : TRUE;
@@ -1563,12 +1565,11 @@ boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
                    : initblstats[i].fldfmt;
         status_enablefield(fld, fieldname, fieldfmt, fldenabl);
     }
-    if(reassessment < REASSESS_NO_UPDATE_ALL)
-        update_all = TRUE;
+    update_all = TRUE;
 }
 
 void
-status_finish()
+status_finish(VOID_ARGS)
 {
     int i;
 
@@ -1597,6 +1598,15 @@ status_finish()
         }
 #endif /* STATUS_HILITES */
     }
+}
+
+void
+status_reassess(VOID_ARGS)
+{
+#ifdef STATUS_HILITES
+    if (VIA_WINDOWPORT())
+        status_initialize(REASSESS_ONLY);
+#endif
 }
 
 STATIC_OVL void

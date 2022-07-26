@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    u_init.c    $NHDT-Date: 1539510426 2018/10/14 09:47:06 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -78,7 +78,7 @@ static struct trobj Cave_man[] = {
 static struct trobj Healer[] = {
     { SCALPEL, 3, WEAPON_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { LEATHER_GLOVES, 3, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
-    { ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
+    { MEDIEVAL_ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { BEAK_MASK_OF_SICKNESS_RESISTANCE, 0, MISCELLANEOUS_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { LEATHER_HAT, 0, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { STETHOSCOPE, 0, TOOL_CLASS, 1, 0, 0 },
@@ -94,7 +94,7 @@ static struct trobj Healer[] = {
     { SPE_EXTRA_HEALING, 0, SPBOOK_CLASS, 1, 1, 0, 0 },
     { SPE_CURE_SICKNESS, 0, SPBOOK_CLASS, 1, 1, 0, 0 },
     { SPE_SLEEP, 0, SPBOOK_CLASS, 1, 1, 0, 0 },
-    { SPE_PROBE_MONSTER, 0, SPBOOK_CLASS, 1, 1, 0, 0 },
+    { SPE_PROBE, 0, SPBOOK_CLASS, 1, 1, 0, 0 },
     { GINSENG_ROOT, 0, REAGENT_CLASS, 4, 0, 0, 0 },
     { MANDRAKE_ROOT, 0, REAGENT_CLASS, 4, 0, 0, 0 },
     { CLOVE_OF_GARLIC, 0, REAGENT_CLASS, 2, 0, 0, 0 },
@@ -116,7 +116,7 @@ static struct trobj Knight[] = {
 static struct trobj Monk[] = {
 #define M_FOOD_SPELLBOOK 8
     { LEATHER_GLOVES, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
-    { ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
+    { SIMPLE_GOWN, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { POT_HEALING, 0, POTION_CLASS, 3, UNDEF_BLESS, 0, 0 },
     { FOOD_RATION, 0, FOOD_CLASS, 1, 0, 0, 0 },
     { APPLE, 0, FOOD_CLASS, 1, UNDEF_BLESS, 0, 0 },
@@ -221,7 +221,7 @@ static struct trobj Wizard[] =
 {
     { QUARTERSTAFF, 1, WEAPON_CLASS, 1, 1, 0, 0 },
     { CLOAK_OF_MAGIC_RESISTANCE, 0, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
-    { ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
+    { WIZARD_S_ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { BAG_OF_WIZARDRY, 0, TOOL_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { UNDEF_TYP, UNDEF_SPE, WAND_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { UNDEF_TYP, UNDEF_SPE, RING_CLASS, 2, UNDEF_BLESS, 0, 0 },
@@ -236,7 +236,7 @@ static struct trobj WizardAlternate[] =
 {
     { STAFF_OF_FIRE, 1, WEAPON_CLASS, 1, 1, 0, 0 },
     { LEATHER_CLOAK, 0, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
-    { ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
+    { WIZARD_S_ROBE, 1, ARMOR_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { BAG_OF_WIZARDRY, 0, TOOL_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { UNDEF_TYP, UNDEF_SPE, WAND_CLASS, 1, UNDEF_BLESS, 0, 0 },
     { UNDEF_TYP, UNDEF_SPE, RING_CLASS, 2, UNDEF_BLESS, 0, 0 },
@@ -392,8 +392,10 @@ static struct inv_sub {
     { PM_GNOLL, CHAIN_MAIL, GNOLLISH_STUDDED_LEATHER_ARMOR },
     { PM_GNOLL, LEATHER_ARMOR, GNOLLISH_LEATHER_ARMOR },
     { PM_GNOLL, STUDDED_LEATHER_ARMOR, GNOLLISH_STUDDED_LEATHER_ARMOR },
-    { PM_GNOLL, ROBE, GNOLLISH_HAIRCLOTH_ROBE },
+    { PM_GNOLL, MEDIEVAL_ROBE, GNOLLISH_HAIRCLOTH_ROBE },
     { PM_GNOLL, CLERICAL_GOWN, GNOLLISH_HAIRCLOTH_ROBE },
+    { PM_GNOLL, SIMPLE_GOWN, GNOLLISH_HAIRCLOTH_ROBE },
+    { PM_GNOLL, WIZARD_S_ROBE, GNOLLISH_HAIRCLOTH_ROBE },
     { PM_GNOLL, BEAK_MASK_OF_SICKNESS_RESISTANCE, GNOLLISH_LEATHER_MASK },
     { PM_GNOLL, CRAM_RATION, TRIPE_RATION },
     { PM_GNOLL, ELVEN_WAYBREAD, TRIPE_RATION },
@@ -425,6 +427,7 @@ static const struct def_skill Skill_A_Max[] = {
     { P_RIDING, P_MASTER },
     { P_TWO_WEAPON_COMBAT, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
+    { P_DODGE, P_EXPERT },
     { P_WAND, P_MASTER },
     { P_DISARM_TRAP, P_MASTER },
     { P_NONE, 0 }
@@ -448,10 +451,13 @@ static const struct def_skill Skill_B_Max[] = {
     { P_QUARTERSTAFF, P_EXPERT },
     { P_SPEAR, P_EXPERT },
     { P_BOW, P_EXPERT },
+    { P_CROSSBOW, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_RIDING, P_BASIC },
     { P_TWO_WEAPON_COMBAT, P_EXPERT },
     { P_BARE_HANDED_COMBAT, P_MASTER },
+    { P_DODGE, P_MASTER },
+    { P_SHIELD, P_EXPERT },
     { P_DISARM_TRAP, P_SKILLED },
     { P_NONE, 0 }
 };
@@ -462,7 +468,6 @@ static const struct def_skill Skill_B_Init[] = {
     { P_NONE, 0 }
 };
 
-
 static const struct def_skill Skill_C_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_AXE, P_EXPERT },
@@ -471,16 +476,19 @@ static const struct def_skill Skill_C_Max[] = {
     { P_FLAIL, P_GRAND_MASTER },
     { P_QUARTERSTAFF, P_GRAND_MASTER },
     { P_POLEARM, P_BASIC },
-    { P_SPEAR, P_EXPERT },
-    { P_BOW, P_BASIC },
+    { P_SPEAR, P_GRAND_MASTER },
+    { P_BOW, P_SKILLED },
     { P_SLING, P_GRAND_MASTER },
     { P_THROWN_WEAPON, P_MASTER },
     { P_NATURE_SPELL, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
+    { P_DODGE, P_MASTER },
+    { P_SHIELD, P_EXPERT },
     { P_WAND, P_EXPERT },
     { P_DISARM_TRAP, P_BASIC },
     { P_NONE, 0 }
 };
+
 static const struct def_skill Skill_C_Init[] = {
     { P_BLUDGEONING_WEAPON, P_SKILLED },
     { P_QUARTERSTAFF, P_BASIC },
@@ -498,8 +506,6 @@ static const struct def_skill Skill_H_Max[] = {
     { P_SWORD, P_SKILLED },
     { P_BLUDGEONING_WEAPON, P_SKILLED },
     { P_QUARTERSTAFF, P_GRAND_MASTER },
-    { P_POLEARM, P_BASIC },
-    { P_SPEAR, P_BASIC },
     { P_SLING, P_SKILLED },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_HEALING_SPELL, P_GRAND_MASTER },
@@ -507,6 +513,7 @@ static const struct def_skill Skill_H_Max[] = {
     { P_DIVINATION_SPELL, P_GRAND_MASTER },
     { P_ENCHANTMENT_SPELL, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_BASIC },
+    { P_DODGE, P_SKILLED },
     { P_WAND, P_MASTER },
     { P_DISARM_TRAP, P_SKILLED },
     { P_NONE, 0 }
@@ -523,11 +530,9 @@ static const struct def_skill Skill_H_Init[] = {
 };
 
 
-
 static const struct def_skill Skill_K_Max[] = {
-    { P_DAGGER, P_GRAND_MASTER },
+    { P_DAGGER, P_EXPERT },
     { P_AXE, P_MASTER },
-    { P_PICK_AXE, P_EXPERT },
     { P_SWORD, P_GRAND_MASTER },
     { P_BLUDGEONING_WEAPON, P_MASTER },
     { P_FLAIL, P_GRAND_MASTER },
@@ -541,8 +546,10 @@ static const struct def_skill Skill_K_Max[] = {
     { P_CELESTIAL_SPELL, P_SKILLED },
     { P_ABJURATION_SPELL, P_SKILLED },
     { P_RIDING, P_EXPERT },
-    { P_TWO_WEAPON_COMBAT, P_MASTER },
+    { P_TWO_WEAPON_COMBAT, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_EXPERT },
+    { P_DODGE, P_MASTER },
+    { P_SHIELD, P_GRAND_MASTER },
     { P_WAND, P_BASIC },
     { P_DISARM_TRAP, P_BASIC },
     { P_NONE, 0 }
@@ -551,6 +558,7 @@ static const struct def_skill Skill_K_Max[] = {
 static const struct def_skill Skill_K_Init[] = {
     { P_SWORD, P_BASIC },
     { P_SPEAR, P_BASIC },
+    { P_SHIELD, P_BASIC },
     { P_RIDING, P_BASIC },
     { P_NONE, 0 }
 };
@@ -558,8 +566,7 @@ static const struct def_skill Skill_K_Init[] = {
 
 static const struct def_skill Skill_Monk_Max[] = {
     { P_QUARTERSTAFF, P_EXPERT },
-    { P_SPEAR, P_BASIC },
-    { P_CROSSBOW, P_BASIC },
+    { P_SLING, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_ABJURATION_SPELL, P_GRAND_MASTER },
     { P_HEALING_SPELL, P_GRAND_MASTER },
@@ -568,6 +575,7 @@ static const struct def_skill Skill_Monk_Max[] = {
     { P_MOVEMENT_SPELL, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_GRAND_MASTER },
     { P_MARTIAL_ARTS, P_GRAND_MASTER },
+    { P_DODGE, P_GRAND_MASTER },
     { P_WAND, P_SKILLED },
     { P_DISARM_TRAP, P_BASIC },
     { P_NONE, 0 }
@@ -585,58 +593,51 @@ static const struct def_skill Skill_P_Max_Chaotic[] = {
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
     { P_QUARTERSTAFF, P_EXPERT },
-    { P_POLEARM, P_SKILLED },
-    { P_SPEAR, P_SKILLED },
-    { P_BOW, P_BASIC },
-    { P_SLING, P_SKILLED },
-    { P_CROSSBOW, P_BASIC },
-    { P_THROWN_WEAPON, P_BASIC },
+    { P_SLING, P_EXPERT },
+    { P_THROWN_WEAPON, P_SKILLED },
     { P_HEALING_SPELL, P_GRAND_MASTER },
     { P_DIVINATION_SPELL, P_GRAND_MASTER },
     { P_CLERIC_SPELL, P_GRAND_MASTER },
     { P_ABJURATION_SPELL, P_GRAND_MASTER },
     { P_NECROMANCY_SPELL, P_GRAND_MASTER },
-    { P_BARE_HANDED_COMBAT, P_BASIC },
-    { P_WAND, P_BASIC },
+    { P_BARE_HANDED_COMBAT, P_SKILLED },
+    { P_DODGE, P_SKILLED },
+    { P_SHIELD, P_MASTER },
+    { P_WAND, P_SKILLED },
     { P_NONE, 0 }
 };
 static const struct def_skill Skill_P_Max_Neutral[] = {
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
     { P_QUARTERSTAFF, P_EXPERT },
-    { P_POLEARM, P_SKILLED },
-    { P_SPEAR, P_SKILLED },
-    { P_BOW, P_BASIC },
-    { P_SLING, P_SKILLED },
-    { P_CROSSBOW, P_BASIC },
-    { P_THROWN_WEAPON, P_BASIC },
+    { P_SLING, P_EXPERT },
+    { P_THROWN_WEAPON, P_SKILLED },
     { P_HEALING_SPELL, P_GRAND_MASTER },
     { P_DIVINATION_SPELL, P_GRAND_MASTER },
     { P_CLERIC_SPELL, P_GRAND_MASTER },
     { P_ABJURATION_SPELL, P_GRAND_MASTER },
     { P_NATURE_SPELL, P_GRAND_MASTER },
-    { P_BARE_HANDED_COMBAT, P_BASIC },
-    { P_WAND, P_BASIC },
+    { P_BARE_HANDED_COMBAT, P_SKILLED },
+    { P_DODGE, P_SKILLED },
+    { P_SHIELD, P_MASTER },
+    { P_WAND, P_SKILLED },
     { P_NONE, 0 }
 };
-
 static const struct def_skill Skill_P_Max_Lawful[] = {
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
     { P_QUARTERSTAFF, P_EXPERT },
-    { P_POLEARM, P_SKILLED },
-    { P_SPEAR, P_SKILLED },
-    { P_BOW, P_BASIC },
-    { P_SLING, P_SKILLED },
-    { P_CROSSBOW, P_BASIC },
-    { P_THROWN_WEAPON, P_BASIC },
+    { P_SLING, P_EXPERT },
+    { P_THROWN_WEAPON, P_SKILLED },
     { P_HEALING_SPELL, P_GRAND_MASTER },
     { P_DIVINATION_SPELL, P_GRAND_MASTER },
     { P_CLERIC_SPELL, P_GRAND_MASTER },
     { P_ABJURATION_SPELL, P_GRAND_MASTER },
     { P_CELESTIAL_SPELL, P_GRAND_MASTER },
-    { P_BARE_HANDED_COMBAT, P_BASIC },
-    { P_WAND, P_BASIC },
+    { P_BARE_HANDED_COMBAT, P_SKILLED },
+    { P_DODGE, P_SKILLED },
+    { P_SHIELD, P_MASTER },
+    { P_WAND, P_SKILLED },
     { P_NONE, 0 }
 };
 
@@ -667,19 +668,19 @@ static const struct def_skill Skill_Rogue_Max[] = {
     { P_SWORD, P_MASTER },
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
-    { P_POLEARM, P_EXPERT },
-    { P_SPEAR, P_EXPERT },
-    { P_BOW, P_GRAND_MASTER },
-    { P_SLING, P_GRAND_MASTER },
-    { P_CROSSBOW, P_GRAND_MASTER },
-    { P_THROWN_WEAPON, P_GRAND_MASTER },
-    { P_DIVINATION_SPELL, P_EXPERT },
-    { P_MOVEMENT_SPELL, P_EXPERT },
-    { P_TRANSMUTATION_SPELL, P_EXPERT },
+    { P_BOW, P_MASTER },
+    { P_SLING, P_MASTER },
+    { P_CROSSBOW, P_MASTER },
+    { P_THROWN_WEAPON, P_MASTER },
+    { P_DIVINATION_SPELL, P_SKILLED },
+    { P_MOVEMENT_SPELL, P_SKILLED },
+    { P_TRANSMUTATION_SPELL, P_SKILLED },
     { P_RIDING, P_SKILLED },
     { P_TWO_WEAPON_COMBAT, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
-    { P_WAND, P_MASTER },
+    { P_DODGE, P_GRAND_MASTER },
+    { P_SHIELD, P_SKILLED },
+    { P_WAND, P_EXPERT },
     { P_DISARM_TRAP, P_GRAND_MASTER },
     { P_NONE, 0 }
 };
@@ -697,8 +698,6 @@ static const struct def_skill Skill_Ranger_Max[] = {
     { P_AXE, P_EXPERT },
     { P_PICK_AXE, P_BASIC },
     { P_SWORD, P_EXPERT },
-    { P_FLAIL, P_SKILLED },
-    { P_BLUDGEONING_WEAPON, P_SKILLED },
     { P_QUARTERSTAFF, P_SKILLED },
     { P_POLEARM, P_SKILLED },
     { P_SPEAR, P_EXPERT },
@@ -707,11 +706,12 @@ static const struct def_skill Skill_Ranger_Max[] = {
     { P_CROSSBOW, P_GRAND_MASTER },
     { P_THROWN_WEAPON, P_GRAND_MASTER },
     { P_WHIP, P_BASIC },
-    { P_HEALING_SPELL, P_EXPERT },
-    { P_DIVINATION_SPELL, P_EXPERT },
-    { P_NATURE_SPELL, P_GRAND_MASTER },
+    { P_HEALING_SPELL, P_SKILLED },
+    { P_DIVINATION_SPELL, P_SKILLED },
+    { P_NATURE_SPELL, P_SKILLED },
     { P_RIDING, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_SKILLED },
+    { P_DODGE, P_SKILLED },
     { P_WAND, P_SKILLED },
     { P_DISARM_TRAP, P_MASTER },
     { P_NONE, 0 }
@@ -727,23 +727,26 @@ static const struct def_skill Skill_Ranger_Init[] = {
 
 
 static const struct def_skill Skill_S_Max[] = {
-    { P_DAGGER, P_GRAND_MASTER },
+    { P_DAGGER, P_EXPERT },
     { P_SWORD, P_GRAND_MASTER },
     { P_FLAIL, P_GRAND_MASTER },
     { P_QUARTERSTAFF, P_GRAND_MASTER },
     { P_POLEARM, P_GRAND_MASTER },
     { P_SPEAR, P_GRAND_MASTER },
-    { P_BOW, P_EXPERT },
+    { P_BOW, P_GRAND_MASTER },
     { P_CROSSBOW, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_RIDING, P_SKILLED },
     { P_TWO_WEAPON_COMBAT, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_GRAND_MASTER },
     { P_MARTIAL_ARTS, P_SKILLED },
+    { P_DODGE, P_MASTER },
+    { P_SHIELD, P_EXPERT },
     { P_WAND, P_BASIC },
     { P_DISARM_TRAP, P_BASIC },
     { P_NONE, 0 }
 };
+
 static const struct def_skill Skill_S_Init[] = {
     { P_SWORD, P_BASIC },
     { P_THROWN_WEAPON, P_BASIC },
@@ -754,7 +757,7 @@ static const struct def_skill Skill_S_Init[] = {
 };
 
 static const struct def_skill Skill_T_Max[] = {
-    { P_DAGGER, P_MASTER },
+    { P_DAGGER, P_EXPERT },
     { P_AXE, P_EXPERT },
     { P_PICK_AXE, P_EXPERT },
     { P_SWORD, P_EXPERT },
@@ -778,10 +781,12 @@ static const struct def_skill Skill_T_Max[] = {
     { P_MOVEMENT_SPELL, P_GRAND_MASTER },
     { P_TRANSMUTATION_SPELL, P_EXPERT },
     { P_RIDING, P_EXPERT },
-    { P_TWO_WEAPON_COMBAT, P_MASTER },
-    { P_BARE_HANDED_COMBAT, P_MASTER },
+    { P_TWO_WEAPON_COMBAT, P_EXPERT },
+    { P_BARE_HANDED_COMBAT, P_EXPERT },
+    { P_DODGE, P_EXPERT },
+    { P_SHIELD, P_EXPERT },
     { P_WAND, P_EXPERT },
-    { P_DISARM_TRAP, P_MASTER },
+    { P_DISARM_TRAP, P_EXPERT },
     { P_NONE, 0 }
 };
 
@@ -794,19 +799,18 @@ static const struct def_skill Skill_T_Init[] = {
 static const struct def_skill Skill_V_Max[] = {
     { P_DAGGER, P_GRAND_MASTER },
     { P_AXE, P_GRAND_MASTER },
-    { P_PICK_AXE, P_MASTER },
     { P_SWORD, P_GRAND_MASTER },
     { P_BLUDGEONING_WEAPON, P_GRAND_MASTER },
-    { P_QUARTERSTAFF, P_EXPERT },
     { P_POLEARM, P_MASTER },
     { P_SPEAR, P_MASTER },
-    { P_SLING, P_BASIC },
     { P_BOW, P_EXPERT },
     { P_CROSSBOW, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_RIDING, P_SKILLED },
     { P_TWO_WEAPON_COMBAT, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_GRAND_MASTER },
+    { P_DODGE, P_MASTER },
+    { P_SHIELD, P_GRAND_MASTER },
     { P_WAND, P_BASIC },
     { P_DISARM_TRAP, P_SKILLED },
     { P_NONE, 0 }
@@ -819,18 +823,14 @@ static const struct def_skill Skill_V_Init[] = {
     { P_BLUDGEONING_WEAPON, P_BASIC },
     { P_BARE_HANDED_COMBAT, P_BASIC },
     { P_TWO_WEAPON_COMBAT, P_BASIC },
+    { P_SHIELD, P_BASIC },
     { P_NONE, 0 }
 };
 
 static const struct def_skill Skill_W_Max[] = {
     { P_DAGGER, P_EXPERT },
-    { P_AXE, P_BASIC },
     { P_SWORD, P_BASIC },
-    { P_BLUDGEONING_WEAPON, P_BASIC },
     { P_QUARTERSTAFF, P_EXPERT },
-    { P_POLEARM, P_BASIC },
-    { P_SPEAR, P_BASIC },
-    { P_SLING, P_BASIC },
     { P_THROWN_WEAPON, P_SKILLED },
     { P_ABJURATION_SPELL, P_EXPERT },
     { P_ARCANE_SPELL, P_GRAND_MASTER },
@@ -841,6 +841,7 @@ static const struct def_skill Skill_W_Max[] = {
     { P_CONJURATION_SPELL, P_GRAND_MASTER },
     { P_RIDING, P_BASIC },
     { P_BARE_HANDED_COMBAT, P_BASIC },
+    { P_DODGE, P_EXPERT },
     { P_WAND, P_GRAND_MASTER },
     { P_DISARM_TRAP, P_BASIC },
     { P_NONE, 0 }
@@ -1226,23 +1227,56 @@ u_init()
         knows_object(DWARVISH_MITHRIL_COAT);
         knows_object(DWARVISH_CLOAK);
         knows_object(DWARVISH_ROUNDSHIELD);
+        switch (Role_switch)
+        {
+        case PM_ARCHAEOLOGIST:
+        case PM_KNIGHT:
+        case PM_CAVEMAN:
+        case PM_VALKYRIE:
+            P_MAX_SKILL_LEVEL(P_PICK_AXE) = P_GRAND_MASTER;
+            break;
+        default:
+            if (P_MAX_SKILL_LEVEL(P_FLAIL) < P_BASIC)
+                P_MAX_SKILL_LEVEL(P_FLAIL) = P_BASIC;
+            break;
+        }
+        if (P_SKILL_LEVEL(P_PICK_AXE) == P_ISRESTRICTED)
+            P_SKILL_LEVEL(P_PICK_AXE) = P_UNSKILLED;        
         break;
-
     case PM_GNOLL:
         knows_object(GNOLLISH_HAIRCLOTH_ROBE);
         knows_object(GNOLLISH_HOOD);
         knows_object(GNOLLISH_LEATHER_ARMOR);
         knows_object(GNOLLISH_STUDDED_LEATHER_ARMOR);
         knows_object(GNOLLISH_QUARREL);
-        P_MAX_SKILL_LEVEL(P_FLAIL) = P_GRAND_MASTER;
+        switch (Role_switch)
+        {
+        case PM_BARBARIAN:
+        case PM_CAVEMAN:
+            P_MAX_SKILL_LEVEL(P_FLAIL) = P_GRAND_MASTER;
+            break;
+        case PM_ROGUE:
+            if (P_MAX_SKILL_LEVEL(P_FLAIL) < P_MASTER)
+                P_MAX_SKILL_LEVEL(P_FLAIL) = P_MASTER;
+            break;
+        case PM_PRIEST:
+        case PM_RANGER:
+            if (P_MAX_SKILL_LEVEL(P_FLAIL) < P_EXPERT)
+                P_MAX_SKILL_LEVEL(P_FLAIL) = P_EXPERT;
+            break;
+        case PM_WIZARD:
+        case PM_HEALER:
+            if (P_MAX_SKILL_LEVEL(P_FLAIL) < P_SKILLED)
+                P_MAX_SKILL_LEVEL(P_FLAIL) = P_SKILLED;
+            break;
+        default:
+            if (P_MAX_SKILL_LEVEL(P_FLAIL) < P_BASIC)
+                P_MAX_SKILL_LEVEL(P_FLAIL) = P_BASIC;
+            break;
+        }
         if (P_SKILL_LEVEL(P_FLAIL) == P_ISRESTRICTED)
             P_SKILL_LEVEL(P_FLAIL) = P_UNSKILLED;
-        if(P_MAX_SKILL_LEVEL(P_CROSSBOW) < P_SKILLED)
-            P_MAX_SKILL_LEVEL(P_CROSSBOW) = P_SKILLED;
-        if (P_SKILL_LEVEL(P_CROSSBOW) == P_ISRESTRICTED)
-            P_SKILL_LEVEL(P_CROSSBOW) = P_UNSKILLED;
         break;
-
     case PM_ORC:
         /* compensate for generally inferior equipment */
         if (!Role_if(PM_WIZARD))
@@ -1328,6 +1362,10 @@ u_init()
         break;
     }
 
+
+    /* Sort spells */
+    sortspells();
+
     /* Check if any skill can be advanced */
     update_can_advance_any_skill();
 
@@ -1400,7 +1438,7 @@ u_skills_init()
 
 STATIC_OVL
 void
-add_school_specific_spellbooks()
+add_school_specific_spellbooks(VOID_ARGS)
 {
     int skill;
     for (skill = P_FIRST_SPELL; skill <= P_LAST_SPELL; skill++)
@@ -1411,7 +1449,7 @@ add_school_specific_spellbooks()
             int i;
             for (i = 0; i < cnt; i++)
             {
-                struct obj* obj = mkobj(SPBOOK_CLASS, FALSE, FALSE);
+                struct obj* obj = mkobj_with_flags(SPBOOK_CLASS, FALSE, FALSE, (struct monst*)0, MKOBJ_FLAGS_NORMAL_SPELLBOOK);
                 int otyp = obj->otyp;
 
                 while (otyp == SPE_BLANK_PAPER
@@ -1440,7 +1478,7 @@ add_school_specific_spellbooks()
                         ))
                 {
                     dealloc_obj(obj);
-                    obj = mkobj(SPBOOK_CLASS, FALSE, FALSE);
+                    obj = mkobj_with_flags(SPBOOK_CLASS, FALSE, FALSE, (struct monst*)0, MKOBJ_FLAGS_NORMAL_SPELLBOOK);
                     otyp = obj->otyp;
                 }
 
@@ -2062,5 +2100,201 @@ int itemtype;
     return otmp;
 }
 
+
+const char*
+get_role_achievement_description(is_past_participle)
+boolean is_past_participle;
+{
+    const char* res = "";
+    switch (urole.rolenum)
+    {
+    case ROLE_ARCHAEOLOGIST:
+        if(is_past_participle)
+            res = "defeated two greater mummy pharaohs";
+        else
+            res = "defeat two greater mummy pharaohs";
+        break;
+    case ROLE_BARBARIAN:
+        if (u.ualignbase[A_ORIGINAL] == A_CHAOTIC)
+        {
+            if (is_past_participle)
+                res = "found Stormbringer and Mournblade";
+            else
+                res = "find Stormbringer and Mournblade";
+        }
+        else
+        {
+            if (is_past_participle)
+                res = "found the Vorpal Blade and Cleaver";
+            else
+                res = "find the Vorpal Blade and Cleaver";
+        }
+        break;
+    case ROLE_CAVEMAN:
+        if (is_past_participle)
+            res = "attained the level of Grand Master in bludgeoning weapons";
+        else
+            res = "attain the level of Grand Master in bludgeoning weapons";
+        break;
+    case ROLE_HEALER:
+        if (is_past_participle)
+            res = "attained the level of Grand Master in healing";
+        else
+            res = "attain the level of Grand Master in healing";
+        break;
+    case ROLE_KNIGHT:
+        if (is_past_participle)
+            res = "found the Holy Grail and Excalibur";
+        else
+            res = "find the Holy Grail and Excalibur";
+        break;
+    case ROLE_MONK:
+        if (is_past_participle)
+            res = "attained the level of Grand Master in martial arts";
+        else
+            res = "attain the level of Grand Master in martial arts";
+        break;
+    case ROLE_PRIEST:
+        if (is_past_participle)
+            res = "found the Mace of St. Cuthbert";
+        else
+            res = "find the Mace of St. Cuthbert";
+        break;
+    case ROLE_ROGUE:
+        if (is_past_participle)
+            res = "defeated Croesus";
+        else
+            res = "defeat Croesus";
+        break;
+    case ROLE_RANGER:
+        if (is_past_participle)
+            res = "attained the level of Grand Master in bow or crossbow";
+        else
+            res = "attain the level of Grand Master in bow or crossbow";
+        break;
+    case ROLE_SAMURAI:
+        if (is_past_participle)
+            res = "found the Kusanagi and the Katana of Masamune";
+        else
+            res = "find the Kusanagi and the Katana of Masamune";
+        break;
+    case ROLE_TOURIST:
+        if (is_past_participle)
+            res = "taken a selfie with Demogorgon";
+        else
+            res = "take a selfie with Demogorgon";
+        break;
+    case ROLE_VALKYRIE:
+        if (is_past_participle)
+            res = "attained the level of Grand Master in two-weapon combat";
+        else
+            res = "achieve the level of Grand Master in two-weapon combat";
+        break;
+    case ROLE_WIZARD:
+        if (is_past_participle)
+            res = "successfully cast a spell of level 11 or higher";
+        else
+            res = "successfully cast a spell of level 11 or higher";
+        break;
+    default:
+        res = "";
+        break;
+    }
+
+    return res;
+}
+
+boolean
+is_known_spell_school(knownspellschools, skill_id)
+unsigned long knownspellschools;
+int skill_id;
+{
+    if (skill_id < P_FIRST_SPELL || skill_id > P_LAST_SPELL)
+        return FALSE;
+
+    unsigned long knownspellbit = 1UL << (skill_id - P_FIRST_SPELL);
+    return (knownspellschools & knownspellbit) != 0;
+}
+
+unsigned long
+mon_known_spell_schools(mon)
+struct monst* mon;
+{
+    if (!mon)
+        return FALSE;
+    unsigned long mflags = mons[mon->mnum].mflags7;
+    unsigned long knownspellschools = 0UL;
+
+    int i;
+    for (i = 0; i < NUM_ROLES; i++)
+    {
+        unsigned long bit = M7_ARCHAEOLOGIST << i; // Should be 1UL
+        if (mflags & bit)
+        {
+            const struct def_skill* maxskills = 0;
+            switch (i)
+            {
+            case ROLE_ARCHAEOLOGIST:
+                maxskills = Skill_A_Max;
+                break;
+            case ROLE_BARBARIAN:
+                maxskills = Skill_B_Max;
+                break;
+            case ROLE_CAVEMAN:
+                maxskills = Skill_C_Init;
+                break;
+            case ROLE_HEALER:
+                maxskills = Skill_H_Max;
+                break;
+            case ROLE_KNIGHT:
+                maxskills = Skill_K_Max;
+                break;
+            case ROLE_MONK:
+                maxskills = Skill_Monk_Max;
+                break;
+            case ROLE_PRIEST:
+                if (mon->malign < 0)
+                    maxskills = Skill_P_Max_Chaotic;
+                else if (mon->malign > 0)
+                    maxskills = Skill_P_Max_Lawful;
+                else
+                    maxskills = Skill_P_Max_Neutral;
+                break;
+            case ROLE_ROGUE:
+                maxskills = Skill_Rogue_Max;
+                break;
+            case ROLE_RANGER:
+                maxskills = Skill_Ranger_Max;
+                break;
+            case ROLE_SAMURAI:
+                maxskills = Skill_S_Max;
+                break;
+            case ROLE_VALKYRIE:
+                maxskills = Skill_V_Max;
+                break;
+            case ROLE_WIZARD:
+                maxskills = Skill_W_Max;
+                break;
+            default:
+                break;
+            }
+
+            if (maxskills)
+            {
+                while (maxskills->skill > P_NONE)
+                {
+                    if (maxskills->skill >= P_FIRST_SPELL && maxskills->skill <= P_LAST_SPELL)
+                    {
+                        unsigned long spbit = 1UL << (maxskills->skill - P_FIRST_SPELL);
+                        knownspellschools |= spbit;
+                    }
+                    maxskills++;
+                }
+            }
+        }
+    }
+
+    return knownspellschools;
+}
 
 /*u_init.c*/

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    spell.c    $NHDT-Date: 1546565814 2019/01/04 01:36:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.88 $ */
 /*      Copyright (c) M. Stephenson 1988                          */
@@ -11,7 +11,7 @@
 #define SPELLMENU_DETAILS (-4)
 #define SPELLMENU_PREPARE (-3)
 #define SPELLMENU_CAST (-2)
-#define SPELLMENU_VIEW (-1)
+#define SPELLMENU_REORDER (-1)
 #define SPELLMENU_SORT (MAXSPELL) /* special menu entry */
 
 
@@ -25,10 +25,8 @@
 #define spellname(spell) OBJ_NAME(objects[spellid(spell)])
 #define spellet(spell) \
     ((char) ((spell < 26) ? ('a' + spell) : ('A' + spell - 26)))  /* Obsolete! Do not use! */
-#define uses_spell_tile(spell) ((objects[spellid(spell)].oc_flags5 & O5_USES_SPELL_TILE) != 0)
-#define spell_to_glyph(spell) (uses_spell_tile(spell) ? (spellid(spell) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF) : (objnum_to_glyph(spellid(spell))))
+#define spell_to_glyph(spell) (spellid(spell) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF)
 
-STATIC_DCL void FDECL(print_spell_level_text, (char*, int, UCHAR_P));
 STATIC_DCL void FDECL(print_spell_level_symbol, (char*, int));
 STATIC_DCL int FDECL(spell_let_to_idx, (CHAR_P));
 STATIC_DCL boolean FDECL(cursed_book, (struct obj * bp));
@@ -41,9 +39,9 @@ STATIC_DCL boolean FDECL(reject_specific_spell_casting, (int));
 STATIC_DCL boolean FDECL(getspell, (int *, int));
 STATIC_PTR int FDECL(CFDECLSPEC spell_cmp, (const genericptr,
                                             const genericptr));
-STATIC_DCL void NDECL(sortspells);
 STATIC_DCL boolean NDECL(spellsortmenu);
 STATIC_DCL boolean FDECL(dospellmenu, (const char *, int, int *));
+STATIC_DCL boolean FDECL(dotradspellmenu, (const char*, int, int*));
 STATIC_DCL boolean FDECL(doaltspellmenu, (const char*, int, int*));
 STATIC_DCL int FDECL(percent_success, (int));
 STATIC_DCL int FDECL(attribute_value_for_spellbook, (int));
@@ -71,23 +69,8 @@ STATIC_DCL struct extended_create_window_info FDECL(extended_create_window_info_
 /* since the spellbook itself doesn't blow up, don't say just "explodes" */
 static const char explodes[] = "radiates explosive energy";
 
-
-enum spl_sort_types {
-    SORTBY_LETTER = 0,
-    SORTBY_ALPHA,
-    SORTBY_LVL_LO,
-    SORTBY_LVL_HI,
-    SORTBY_SKL_AL,
-    SORTBY_SKL_LO,
-    SORTBY_SKL_HI,
-    SORTBY_CURRENT,
-    SORTRETAINORDER,
-
-    NUM_SPELL_SORTBY
-};
-
-static const char* spl_sortchoices[NUM_SPELL_SORTBY] = {
-    "by casting letter",
+NEARDATA const char* spl_sortchoices[NUM_SPELL_SORTBY] = {
+    "no sorting, by casting letter",
     "alphabetically",
     "by level, low to high",
     "by level, high to low",
@@ -98,16 +81,16 @@ static const char* spl_sortchoices[NUM_SPELL_SORTBY] = {
     /* a menu choice rather than a sort choice */
     "reassign casting letters to retain current order",
 };
-static int spl_sortmode = 0;   /* index into spl_sortchoices[] */
-static int* spl_orderindx = 0; /* array of spl_book[] indices */
+
+NEARDATA short spl_orderindx[MAXSPELL] = { 0 }; /* array of spl_book[] indices */
 
 STATIC_OVL struct extended_create_window_info
 extended_create_window_info_from_spell(spell_id, active)
-int spell_id;
+int spell_id UNUSED;
 boolean active;
 {
     struct extended_create_window_info info = { 0 };
-    if (uses_spell_tile(spell_id) && active)
+    if (active)
         info.create_flags |= WINDOW_CREATE_FLAGS_ACTIVE;
     return info;
 }
@@ -178,7 +161,7 @@ struct obj *bp;
         bp->in_use = was_in_use;
         break;
     case 6:
-        if (Antimagic_or_resistance) {
+        if (Magic_missile_immunity) {
             u_shieldeff();
             pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "book %s, but you are unharmed!", explodes);
         } else {
@@ -202,15 +185,21 @@ struct obj *spellbook;
 {
     boolean gone = FALSE;
 
-    if (!rn2(3) && spellbook->otyp != SPE_BOOK_OF_THE_DEAD && spellbook->otyp != SPE_BOOK_OF_MODRON) {
+    if (!rn2(3) && spellbook->otyp != SPE_BOOK_OF_THE_DEAD && spellbook->otyp != SPE_BOOK_OF_MODRON)
+    {
+        char dcbuf[BUFSZ] = "";
+        char dcbuf2[BUFSZ] = "";
+        char dcbuf3[BUFSZ] = "";
         spellbook->in_use = TRUE; /* in case called from learn */
-        pline_ex(ATR_NONE, CLR_MSG_WARNING,
-         "Being confused you have difficulties in controlling your actions.");
+        Strcpy(dcbuf2, "Being confused you have difficulties in controlling your actions.");
+        pline_ex1(ATR_NONE, CLR_MSG_WARNING, dcbuf2);
         display_nhwindow(WIN_MESSAGE, FALSE);
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "accidentally tear the spellbook to pieces.");
+        Strcpy(dcbuf3, "You accidentally tear the spellbook to pieces.");
+        pline_ex1(ATR_NONE, CLR_MSG_WARNING, dcbuf3);
+        Sprintf(dcbuf, "%s %s", dcbuf2, dcbuf3);
         if (!objects[spellbook->otyp].oc_name_known
             && !objects[spellbook->otyp].oc_uname)
-            docall(spellbook);
+            docall(spellbook, dcbuf);
         useup(spellbook);
         gone = TRUE;
     } else {
@@ -490,7 +479,7 @@ learn(VOID_ARGS)
             }
             if (!objects[book->otyp].oc_name_known
                 && !objects[book->otyp].oc_uname)
-                docall(book);
+                docall(book, (char*)0);
             useup(book);
         }
         else
@@ -579,6 +568,9 @@ learn(VOID_ARGS)
 
             incr_spell_nknow(i, 1);
             book->spestudied++;
+
+            sortspells();
+
             play_sfx_sound(SFX_SPELL_LEARN_SUCCESS);
             You_ex(ATR_NONE, CLR_MSG_POSITIVE, i > 0 ? "add %s to your repertoire." : "learn %s.", splname);
             learnsuccess = TRUE;
@@ -619,26 +611,39 @@ check_added_to_your_bill_here:
 
 }
 
-STATIC_OVL
 void
-print_spell_level_text(buf, booktype, capitalize_style)
+print_spell_level_text(buf, booktype, includeschool, capitalize_style)
 char* buf;
 int booktype;
+boolean includeschool;
 uchar capitalize_style;
 {
     if (!buf)
         return;
 
     char lvlbuf[BUFSZ];
-    if (objects[booktype].oc_spell_level == -1)
-        Sprintf(lvlbuf, "minor %s cantrip", spelltypemnemonic(objects[booktype].oc_skill));
-    else if (objects[booktype].oc_spell_level == 0)
-        Sprintf(lvlbuf, "major %s cantrip", spelltypemnemonic(objects[booktype].oc_skill));
-    else if (objects[booktype].oc_spell_level > 0)
-        Sprintf(lvlbuf, "level %ld %s spell", objects[booktype].oc_spell_level, spelltypemnemonic(objects[booktype].oc_skill));
+    if (includeschool)
+    {
+        if (objects[booktype].oc_spell_level == -1)
+            Sprintf(lvlbuf, "minor %s cantrip", spelltypemnemonic(objects[booktype].oc_skill));
+        else if (objects[booktype].oc_spell_level == 0)
+            Sprintf(lvlbuf, "major %s cantrip", spelltypemnemonic(objects[booktype].oc_skill));
+        else if (objects[booktype].oc_spell_level > 0)
+            Sprintf(lvlbuf, "level %ld %s spell", objects[booktype].oc_spell_level, spelltypemnemonic(objects[booktype].oc_skill));
+        else
+            Strcpy(lvlbuf, "spell of inappropriate level");
+    }
     else
-        strcpy(lvlbuf, "spell of inappropriate level");
-
+    {
+        if (objects[booktype].oc_spell_level == -1)
+            Sprintf(lvlbuf, "minor cantrip");
+        else if (objects[booktype].oc_spell_level == 0)
+            Sprintf(lvlbuf, "major cantrip");
+        else if (objects[booktype].oc_spell_level > 0)
+            Sprintf(lvlbuf, "%ld", objects[booktype].oc_spell_level);
+        else
+            Strcpy(lvlbuf, "inappropriate level");
+    }
     switch(capitalize_style)
     {
     case 1:
@@ -702,7 +707,7 @@ register struct obj *spellbook;
         strcpy(Namebuf2, OBJ_NAME(objects[booktype]));
         *Namebuf2 = highc(*Namebuf2);
 
-        print_spell_level_text(lvlbuf, booktype, FALSE);
+        print_spell_level_text(lvlbuf, booktype, TRUE, FALSE);
 
         if (!confused && !hallucinated)
         {
@@ -811,6 +816,11 @@ register struct obj *spellbook;
                     newexplevel();
                     u.uevent.read_tribute = 1; /* only once */
                 }
+                if (!u.uachieve.read_discworld_novel)
+                {
+                    achievement_gained("Read a Discworld Novel");
+                    u.uachieve.read_discworld_novel = 1;
+                }
             }
             return 1;
         }
@@ -899,7 +909,7 @@ register struct obj *spellbook;
                     pline_The("spellbook crumbles to dust!");
                 if (!objects[spellbook->otyp].oc_name_known
                     && !objects[spellbook->otyp].oc_uname)
-                    docall(spellbook);
+                    docall(spellbook, (char*)0);
                 useup(spellbook);
             } else
                 spellbook->in_use = FALSE;
@@ -1123,22 +1133,30 @@ int spell_list_type;
     }
 
     int splaction = (spell_list_type >= 2 ? SPELLMENU_DETAILS : spell_list_type == 1 ? SPELLMENU_PREPARE : SPELLMENU_CAST);
+    return dospellmenu(titlebuf, splaction, spell_no);
+}
+
+STATIC_OVL boolean
+dospellmenu(prompt, splaction, spell_no)
+const char* prompt;
+int splaction; /* SPELLMENU_CAST, SPELLMENU_REORDER, or spl_book[] index */
+int* spell_no;
+{
     if (iflags.spell_table_format)
     {
-        return dospellmenu(titlebuf, splaction, spell_no);
+        return dotradspellmenu(prompt, splaction, spell_no);
     }
     else
     {
-        return doaltspellmenu(titlebuf, splaction, spell_no);
+        return doaltspellmenu(prompt, splaction, spell_no);
     }
 }
-
 
 /* an alternative implementation of the '+' command, designed to work better on mobile phones */
 STATIC_OVL boolean
 doaltspellmenu(prompt, splaction, spell_no)
 const char* prompt;
-int splaction; /* SPELLMENU_CAST, SPELLMENU_VIEW, or spl_book[] index */
+int splaction; /* SPELLMENU_CAST, SPELLMENU_REORDER, or spl_book[] index */
 int* spell_no;
 {
     winid tmpwin;
@@ -1152,11 +1170,11 @@ int* spell_no;
     start_menu_ex(tmpwin, GHMENU_STYLE_SPELLS_ALTERNATE);
     any = zeroany; /* zero out all bits */
 
-    if (splaction == SPELLMENU_DETAILS || splaction == SPELLMENU_VIEW || splaction == SPELLMENU_SORT || splaction >= 0)
+    if (splaction == SPELLMENU_DETAILS || splaction == SPELLMENU_REORDER || splaction == SPELLMENU_SORT || splaction >= 0)
     {
         for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++) 
         {
-            splnum = !spl_orderindx ? i : spl_orderindx[i];
+            splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             int glyph = spell_to_glyph(splnum);
             char fullname[BUFSZ] = "";
             Sprintf(fullname, "%s", spellname(splnum));
@@ -1183,10 +1201,9 @@ int* spell_no;
             {
                 Sprintf(buf, "%s (%s)", fullname, descbuf);
                 info.color = NO_COLOR;
-                if (uses_spell_tile(splnum))
-                    info.menu_flags |= MENU_FLAGS_ACTIVE;
+                info.menu_flags |= MENU_FLAGS_ACTIVE;
             }
-            if (uses_spell_tile(splnum) && !inactive)
+            if (!inactive)
                 info.menu_flags |= MENU_FLAGS_ACTIVE;
 
             any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
@@ -1210,7 +1227,7 @@ int* spell_no;
     }
 
     how = PICK_ONE;
-    if (splaction == SPELLMENU_VIEW) 
+    if (splaction == SPELLMENU_REORDER) 
     {
         if (spellid(1) == NO_SPELL) 
         {
@@ -1225,7 +1242,29 @@ int* spell_no;
                 "[sort spells]", MENU_UNSELECTED);
         }
     }
+
+#ifdef GNH_MOBILE
+    if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && (splaction == SPELLMENU_PREPARE || splaction == SPELLMENU_CAST))
+    {
+        char subbuf[BUFSZ];
+        if (splaction == SPELLMENU_CAST)
+        {
+            Strcpy(subbuf, "&success; Success %, &mana; Mana Cost, &cool; Cooldown, &casts; Casts Left");
+        }
+        else
+        {
+            Strcpy(subbuf, "&casts; Casts Left, &adds; Casts Added");
+        }
+        end_menu_ex(tmpwin, prompt, subbuf);
+
+    }
+    else
+    {
+        end_menu(tmpwin, prompt);
+    }
+#else 
     end_menu(tmpwin, prompt);
+#endif
 
     //Show menu
     n = select_menu(tmpwin, how, &selected);
@@ -1536,6 +1575,38 @@ int skill_level;
     return multiplier;
 }
 
+const char*
+get_obj_saving_throw_description(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return "";
+
+    return get_otyp_saving_throw_description(obj->otyp);
+}
+
+const char*
+get_otyp_saving_throw_description(otyp)
+int otyp;
+{
+    if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_MAGIC_CANCELLATION)
+        return "magic cancellation";
+    else if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_STR)
+        return "strength";
+    else if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_DEX)
+        return "dexterity";
+    else if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_CON)
+        return "constitution";
+    else if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_INT)
+        return "intelligence";
+    else if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_WIS)
+        return "wisdom";
+    else if (objects[otyp].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_CHA)
+        return "charisma";
+    else
+        return "unknown type";
+}
+
 int
 spelldescription(spell)
 int spell;
@@ -1566,7 +1637,7 @@ int spell;
     putstr(datawin, ATR_TITLE, txt);
 
     /* Level & category*/
-    print_spell_level_text(buf, booktype, TRUE);
+    print_spell_level_text(buf, booktype, TRUE, TRUE);
 
     txt = buf;
     putstr(datawin, ATR_SUBTITLE, txt);
@@ -1967,25 +2038,7 @@ int spell;
     /* Saving throw adjustment */
     if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_MASK)
     {
-        char vsbuf[BUFSZ];
-        if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_MAGIC_CANCELLATION)
-            strcpy(vsbuf, "magic cancellation");
-        else if(objects[booktype].oc_spell_flags& S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_STR)
-            strcpy(vsbuf, "strength");
-        else if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_DEX)
-            strcpy(vsbuf, "dexterity");
-        else if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_CON)
-            strcpy(vsbuf, "constitution");
-        else if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_INT)
-            strcpy(vsbuf, "intelligence");
-        else if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_WIS)
-            strcpy(vsbuf, "wisdom");
-        else if (objects[booktype].oc_spell_flags & S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_CHA)
-            strcpy(vsbuf, "charisma");
-        else
-            strcpy(vsbuf, "unknown type");
-
-        Sprintf(buf, "Saving throw:     Against %s", vsbuf);
+        Sprintf(buf, "Saving throw:     Against %s", get_otyp_saving_throw_description(booktype));
 
         txt = buf;
         putstr(datawin, ATR_INDENT_AT_COLON, txt);
@@ -1995,7 +2048,7 @@ int spell;
         Sprintf(baseadjbuf, "%s%d", baseadj >= 0 ? "+" : "", baseadj);
 
         int skill_level = P_SKILL_LEVEL(objects[booktype].oc_skill);
-        int skilladj = get_skill_level_saving_throw_adjustment(skill_level);
+        int skilladj = get_spell_skill_level_saving_throw_adjustment(skill_level);
         char skill_level_namebuf[BUFSZ] = "";
         (void)skill_level_name(objects[booktype].oc_skill, skill_level_namebuf, FALSE);
         *skill_level_namebuf = lowc(*skill_level_namebuf);
@@ -2377,6 +2430,14 @@ boolean atme;
     skill = spell_skilltype(otyp);
     role_skill = P_SKILL_LEVEL(skill);
 
+    if (!u.uachieve.role_achievement && Role_if(PM_WIZARD) && spellev(spell) >= 11)
+    {
+        u.uachieve.role_achievement = 1;
+        char abuf[BUFSZ];
+        strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+        achievement_gained(abuf);
+    }
+
     switch (otyp) {
     /*
      * At first spells act as expected.  As the hero increases in skill
@@ -2459,6 +2520,7 @@ boolean atme;
     case SPE_RAISE_GIANT_ZOMBIE:
     case SPE_CREATE_GIANT_MUMMY:
     case SPE_CREATE_DRACOLICH:
+    case SPE_CREATE_ELDER_DRACOLICH:
     case SPE_RAISE_SKELETON:
     case SPE_RAISE_SKELETON_WARRIOR:
     case SPE_RAISE_SKELETON_LORD:
@@ -2504,6 +2566,24 @@ boolean atme;
     case SPE_CALL_BAHAMUT:
     case SPE_SUMMON_TREANT:
     case SPE_SUMMON_ELDER_TREANT:
+    case SPE_SUMMON_GIANT_ANT:
+    case SPE_SUMMON_SOLDIER_ANT:
+    case SPE_SUMMON_DIRE_WOLF:
+    case SPE_SUMMON_BISON:
+    case SPE_SUMMON_PEGASUS:
+    case SPE_SUMMON_ROC:
+    case SPE_SUMMON_GRIZZLY_BEAR:
+    case SPE_SUMMON_OWLBEAR:
+    case SPE_SUMMON_OWLBEAR_PATRIARCH:
+    case SPE_SUMMON_COCKATRICE:
+    case SPE_SUMMON_GIANT_COCKATRICE:
+    case SPE_SUMMON_GARGANTUAN_COCKATRICE:
+    case SPE_SUMMON_GIANT_SPIDER:
+    case SPE_SUMMON_PHASE_SPIDER:
+    case SPE_SUMMON_PURPLE_WORM:
+    case SPE_SUMMON_GARGANTUAN_BEETLE:
+    case SPE_SUMMON_RAVEN:
+    case SPE_SUMMON_WINTER_WOLF:
     case SPE_HEAVENLY_SERPENT:
     case SPE_GUARDIAN_ANGEL:
     case SPE_SUMMON_ARCHON:
@@ -2513,6 +2593,7 @@ boolean atme;
     case SPE_STICK_TO_COBRA:
     case SPE_STICK_TO_PYTHON:
     case SPE_STICK_TO_BOA:
+    case SPE_STICK_TO_GIANT_ANACONDA:
     case SPE_CALL_HIERARCH_MODRON:
     case SPE_GREAT_YENDORIAN_SUMMONING:
     case SPE_CALL_GHOUL:
@@ -2538,7 +2619,7 @@ boolean atme;
     case SPE_PRODIGIOUS_HEALING:
     case SPE_FULL_HEALING:
     case SPE_DRAIN_LEVEL:
-    case SPE_PROBE_MONSTER:
+    case SPE_PROBE:
     case SPE_STONE_TO_FLESH:
     case SPE_COMMUNE:
     case SPE_PRAYER:
@@ -3059,6 +3140,9 @@ int otyp;
         case BISECTION_RESISTANCE:
             Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels strong as steel!");
             break;
+        case SLIME_RESISTANCE:
+            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "skin feels fiery!");
+            break;
         default:
             break;
         }
@@ -3235,6 +3319,7 @@ int what;
             spl_book[i].sp_skillchance = (int)objects[SPE_TELEPORT_MONSTER].oc_spell_skill_chance;
             spl_book[i].sp_amount = -1; //Infinite??
             spl_book[i].sp_know = SPELL_IS_KEEN;
+            sortspells();
             return REMOVESPELL; /* operation needed to reverse */
         }
     } else { /* spellid(i) == SPE_TELEPORT_MONSTER */
@@ -3248,6 +3333,7 @@ int what;
             save_tport.savespell = spl_book[i];
             save_tport.tport_indx = i;
             spl_book[i].sp_id = NO_SPELL;
+            sortspells();
             return UNHIDESPELL; /* operation needed to reverse */
         }
     }
@@ -3351,12 +3437,12 @@ const genericptr vptr2;
      *  levl. = spell level;
      *  skil. = skill group aka spell class.
      */
-    int indx1 = *(int *) vptr1, indx2 = *(int *) vptr2,
-        otyp1 = spl_book[indx1].sp_id, otyp2 = spl_book[indx2].sp_id,
+    short indx1 = *(short*)vptr1, indx2 = *(short*)vptr2;
+    int otyp1 = spl_book[indx1].sp_id, otyp2 = spl_book[indx2].sp_id,
         levl1 = (int)objects[otyp1].oc_spell_level, levl2 = (int)objects[otyp2].oc_spell_level,
         skil1 = objects[otyp1].oc_skill, skil2 = objects[otyp2].oc_skill;
 
-    switch (spl_sortmode) {
+    switch (flags.spellorder) {
     case SORTBY_LETTER:
         return indx1 - indx2;
     case SORTBY_ALPHA:
@@ -3385,7 +3471,6 @@ const genericptr vptr2;
         if (levl1 != levl2)
             return levl2 - levl1;
         break;
-    case SORTBY_CURRENT:
     default:
         return (vptr1 < vptr2) ? -1
                                : (vptr1 > vptr2); /* keep current order */
@@ -3397,35 +3482,38 @@ const genericptr vptr2;
 /* sort the index used for display order of the "view known spells"
    list (sortmode == SORTBY_xxx), or sort the spellbook itself to make
    the current display order stick (sortmode == SORTRETAINORDER) */
-STATIC_OVL void
-sortspells()
+void
+sortspells(VOID_ARGS)
 {
-    int i;
+    short i;
 #if defined(SYSV) || defined(DGUX)
     unsigned n;
 #else
     int n;
 #endif
 
-    if (spl_sortmode == SORTBY_CURRENT)
+    if (flags.spellorder == SORTBY_CURRENT)
         return;
-    for (n = 0; n < MAXSPELL && spellid(n) != NO_SPELL; ++n)
-        continue;
-    if (n < 2)
-        return; /* not enough entries to need sorting */
 
-    if (!spl_orderindx) {
-        /* we haven't done any sorting yet; list is in casting order */
-        if (spl_sortmode == SORTBY_LETTER /* default */
-            || spl_sortmode == SORTRETAINORDER)
-            return;
-        /* allocate enough for full spellbook rather than just N spells */
-        spl_orderindx = (int *) alloc(MAXSPELL * sizeof(int));
+    if (flags.spellorder != SORTRETAINORDER)
+    {
+        /* Initialize sort order */
         for (i = 0; i < MAXSPELL; i++)
             spl_orderindx[i] = i;
     }
 
-    if (spl_sortmode == SORTRETAINORDER) {
+    if (flags.spellorder == SORTBY_NONE)
+        return;
+
+    /* Find the number of spells */
+    for (n = 0; n < MAXSPELL && spellid(n) != NO_SPELL; ++n)
+        continue;
+
+    if (n < 2)
+        return; /* not enough entries to need sorting */
+
+    if (flags.spellorder == SORTRETAINORDER) 
+    {
         struct spell tmp_book[MAXSPELL];
 
         /* sort spl_book[] rather than spl_orderindx[];
@@ -3435,12 +3523,12 @@ sortspells()
             tmp_book[i] = spl_book[spl_orderindx[i]];
         for (i = 0; i < MAXSPELL; i++)
             spl_book[i] = tmp_book[i], spl_orderindx[i] = i;
-        spl_sortmode = SORTBY_LETTER; /* reset */
+        flags.spellorder = SORTBY_NONE; /* reset */
         return;
     }
 
     /* usual case, sort the index rather than the spells themselves */
-    qsort((genericptr_t) spl_orderindx, n, sizeof *spl_orderindx, spell_cmp);
+    qsort((genericptr_t)spl_orderindx, n, sizeof spl_orderindx[0], spell_cmp);
     return;
 }
 
@@ -3470,7 +3558,7 @@ spellsortmenu()
         }
         any.a_int = i + 1;
         add_menu(tmpwin, NO_GLYPH, &any, let, 0, ATR_NONE, spl_sortchoices[i],
-                 (i == spl_sortmode) ? MENU_SELECTED : MENU_UNSELECTED);
+                 (i == flags.spellorder) ? MENU_SELECTED : MENU_UNSELECTED);
     }
     end_menu(tmpwin, "View known spells list sorted");
 
@@ -3479,13 +3567,22 @@ spellsortmenu()
     if (n > 0) {
         choice = selected[0].item.a_int - 1;
         /* skip preselected entry if we have more than one item chosen */
-        if (n > 1 && choice == spl_sortmode)
+        if (n > 1 && choice == flags.spellorder)
             choice = selected[1].item.a_int - 1;
         free((genericptr_t) selected);
-        spl_sortmode = choice;
+        flags.spellorder = choice;
         return TRUE;
     }
     return FALSE;
+}
+
+int
+dosortspell()
+{
+    if (spellsortmenu())
+        sortspells();
+
+    return 0;
 }
 
 int
@@ -3502,7 +3599,7 @@ dovspell()
     } 
     else 
     {
-        while (dospellmenu("Choose a spell to reorder", SPELLMENU_VIEW, &splnum))
+        while (dospellmenu("Choose a spell to reorder", SPELLMENU_REORDER, &splnum))
         {
             if (splnum == SPELLMENU_SORT) 
             {
@@ -3518,23 +3615,19 @@ dovspell()
                 spl_tmp = spl_book[splnum];
                 spl_book[splnum] = spl_book[othnum];
                 spl_book[othnum] = spl_tmp;
+
+                sortspells();
             }
         }
     }
-    if (spl_orderindx) 
-    {
-        free((genericptr_t) spl_orderindx);
-        spl_orderindx = 0;
-    }
-    spl_sortmode = SORTBY_LETTER; /* 0 */
     return 0;
 }
 
 /* the '+' command -- view known spells */
 STATIC_OVL boolean
-dospellmenu(prompt, splaction, spell_no)
+dotradspellmenu(prompt, splaction, spell_no)
 const char *prompt;
-int splaction; /* SPELLMENU_CAST, SPELLMENU_VIEW, or spl_book[] index */
+int splaction; /* SPELLMENU_CAST, SPELLMENU_REORDER, or spl_book[] index */
 int *spell_no;
 {
     winid tmpwin;
@@ -3576,7 +3669,7 @@ int *spell_no;
      * (2) that selection letters are pre-pended to the
      * given string and are of the form "a - ".
      */
-    if (splaction == SPELLMENU_DETAILS || splaction == SPELLMENU_VIEW || splaction == SPELLMENU_SORT || splaction >= 0)
+    if (splaction == SPELLMENU_DETAILS || splaction == SPELLMENU_REORDER || splaction == SPELLMENU_SORT || splaction >= 0)
     {
         int maxlen = 15;
         int maxnamelen = 0;
@@ -3584,7 +3677,7 @@ int *spell_no;
         for (i = 0; i < MAXSPELL /*min(MAXSPELL, 52)*/ && spellid(i) != NO_SPELL; i++)
         {
             int desclen = 0;
-            splnum = !spl_orderindx ? i : spl_orderindx[i];
+            splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             if (OBJ_ITEM_DESC(spellid(splnum)))
                 desclen = (int)strlen(OBJ_ITEM_DESC(spellid(splnum)));
             else
@@ -3630,7 +3723,7 @@ int *spell_no;
 
 
         for (i = 0; i < MAXSPELL /*min(MAXSPELL, 52)*/ && spellid(i) != NO_SPELL; i++) {
-            splnum = !spl_orderindx ? i : spl_orderindx[i];
+            splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             char shortenedname[BUFSZ] = "";
             char fullname[BUFSZ] = "";
 
@@ -3695,7 +3788,7 @@ int *spell_no;
         {
             int desclen = 0;
             int namelen = 0;
-            splnum = !spl_orderindx ? i : spl_orderindx[i];
+            splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             desclen = (int)strlen(matlists[spellmatcomp(splnum)].description_short);
             namelen = (int)strlen(spellname(splnum));
             if (desclen > maxlen)
@@ -3740,7 +3833,7 @@ int *spell_no;
         for (i = 0; i < MAXSPELL /*min(MAXSPELL, 52)*/ && spellid(i) != NO_SPELL; i++)
         {
             int namelen = 0;
-            splnum = !spl_orderindx ? i : spl_orderindx[i];
+            splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             namelen = (int)strlen(spellname(splnum));
             if (namelen > maxnamelen)
                 maxnamelen = namelen;
@@ -3770,7 +3863,7 @@ int *spell_no;
     }
 
     how = PICK_ONE;
-    if (splaction == SPELLMENU_VIEW) {
+    if (splaction == SPELLMENU_REORDER) {
         if (spellid(1) == NO_SPELL) {
             /* only one spell => nothing to swap with */
             how = PICK_NONE;
@@ -3875,7 +3968,7 @@ int namelength;
 int extraspaces;
 boolean usehotkey;
 {
-    int splnum = !spl_orderindx || usehotkey ? i : spl_orderindx[i];
+    int splnum = !flags.spellorder || usehotkey ? i : (int)spl_orderindx[i];
     char buf[BUFSZ], availablebuf[BUFSZ], matcompbuf[BUFSZ], levelbuf[10], fmt[BUFSZ];
     anything any = zeroany;
 
@@ -4031,7 +4124,7 @@ winid tmpwin;
 int i;
 int splaction;
 {
-    int splnum = !spl_orderindx ? i : spl_orderindx[i];
+    int splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
     char buf[BUFSIZ], availablebuf[BUFSZ], descbuf[BUFSZ], levelbuf[BUFSZ] = "";
     char fullname[BUFSZ] = "";
     anything any = zeroany;
@@ -4087,7 +4180,7 @@ int splaction;
     {
         info.color = NO_COLOR;
     }
-    if(uses_spell_tile(splnum) && !inactive)
+    if(!inactive)
         info.menu_flags |= MENU_FLAGS_ACTIVE;
 
     any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
@@ -4104,7 +4197,7 @@ winid tmpwin;
 int i;
 int splaction;
 {
-    int splnum = !spl_orderindx ? i : spl_orderindx[i];
+    int splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
     char buf[BUFSIZ], availablebuf[BUFSZ], matcompbuf[BUFSZ];
     anything any = zeroany;
     char fullname[BUFSZ];
@@ -4113,14 +4206,7 @@ int splaction;
     *fullname = highc(*fullname);
 
     int glyph = NO_GLYPH;
-    if (uses_spell_tile(splnum))
-    {
-        glyph = spellid(splnum) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF;
-    }
-    else
-    {
-        glyph = objnum_to_glyph(spellid(splnum));
-    }
+    glyph = spellid(splnum) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF;
 
     //Print spell amount
     if (spellamount(splnum) >= 0)
@@ -4159,7 +4245,7 @@ int splaction;
             availablebuf, addsbuf);
         info.color = NO_COLOR;
     }
-    if (uses_spell_tile(splnum) && !inactive)
+    if (!inactive)
         info.menu_flags |= MENU_FLAGS_ACTIVE;
 
     any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
@@ -4178,7 +4264,7 @@ char *colorbufs;
 int* colorbufcnt;
 boolean usehotkey;
 {
-    int splnum = !spl_orderindx || usehotkey ? i : spl_orderindx[i];
+    int splnum = !flags.spellorder || usehotkey ? i : (int)spl_orderindx[i];
     char buf[BUFSZ], availablebuf[BUFSZ], levelbuf[10], statbuf[10], fmt[BUFSZ];
     char shortenedname[BUFSZ] = "";
     char fullname[BUFSZ] = "";
@@ -4534,6 +4620,7 @@ int spell;
                     break;
             }
         }
+        sortspells();
         char buf[BUFSZ] = "";
         Sprintf(buf, "You removed \'%s\' from your memory permanently.", spellnamebuf);
         pline1(buf);
@@ -4550,7 +4637,7 @@ int spell;
      * the probability of player's success at cast a given spell.
      */
     int chance, statused = A_INT;
-    long armor_penalty, level_multiplier;
+    long armor_penalty;
 //    int difficulty;
     int skill;
 
@@ -4614,12 +4701,11 @@ int spell;
      * in that spell type.
      */
     skill = P_SKILL_LEVEL(spell_skilltype(spellid(spell)));
-    level_multiplier = skill < P_BASIC ? 1L : 1L * (long)skill;
 
     long bonus = 0L;
     bonus += 15L * (long)statused;
-    bonus += (long)spell_skill_success_bonus(skill);
-    bonus += level_multiplier * (long)u.ulevel;
+    bonus += (long)spell_skill_base_success_bonus(skill);
+    bonus += (long)spell_skill_ulevel_success_bonus(skill);
     bonus += (skill == P_ISRESTRICTED ? 0L : 5L * (long)u.uspellcastingbonus_unrestricted); /* items */
     bonus += 5L * (long)u.uspellcastingbonus_all; /* items */
 
@@ -4683,10 +4769,16 @@ int spell;
     return chance;
 }
 
-int spell_skill_success_bonus(slevel)
-int slevel;
+int spell_skill_base_success_bonus(skill_level)
+int skill_level;
 {
-    return 80 * max(0, slevel - 1);
+    return 80 * max(0, skill_level - 1);
+}
+
+int spell_skill_ulevel_success_bonus(skill_level)
+int skill_level;
+{
+    return (max(1, skill_level) * u.ulevel) / 4;
 }
 
 STATIC_OVL
@@ -5018,7 +5110,7 @@ int spell;
         char buf[BUFSZ] = "";
         Sprintf(qbuf, "You get %d casting%s per mixing. How many times to mix?", spells_gained_per_mixing, plur(spells_gained_per_mixing));
         Sprintf(ebuf, "[max %d] (1)", lowest_multiplier);
-        getlin_ex(GETLINE_NUMBERS_ONLY, ATR_NONE, NO_COLOR, qbuf, buf, (char*)0, ebuf);
+        getlin_ex(GETLINE_NUMBERS_ONLY, ATR_NONE, NO_COLOR, qbuf, buf, (char*)0, ebuf, (char*)0);
         (void)mungspaces(buf);
 
         if (buf[0] == '\033')
@@ -5357,5 +5449,36 @@ int spell;
     return cooldown;
 }
 
+#ifdef DUMPLOG
+void
+dump_spells()
+{
+    if (spellid(0) == NO_SPELL)
+    {
+        putstr(0, 0, "You did not know any spells.");
+    }
+    else
+    {
+        int i;
+        char buf[BUFSZ];
+        char spellnamebuf[BUFSZ];
+        char castingsbuf[BUFSZ];
+        putstr(0, 0, "Spells in your repertoire:");
+        for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
+        {
+            if (spellamount(i) >= 0)
+                Sprintf(castingsbuf, ", %d casting%s left", spellamount(i), plur(spellamount(i)));
+            else
+                Strcpy(castingsbuf, "");
+
+            Strcpy(spellnamebuf, spellname(i));
+            *spellnamebuf = highc(*spellnamebuf);
+
+            Sprintf(buf, " %s (%d%% success%s)", spellnamebuf, percent_success(i), castingsbuf);
+            putstr(0, 0, buf);
+        }
+    }
+}
+#endif
 
 /*spell.c*/

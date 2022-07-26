@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    bones.c    $NHDT-Date: 1557092711 2019/05/05 21:45:11 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.75 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985,1993. */
@@ -94,7 +94,7 @@ boolean restore;
                         }
                         else
                         {
-                            otmp->otyp = random_objectid_from_class(otmp->oclass, RNDITEM_FLAGS_ALSO_RARE);
+                            otmp->otyp = random_objectid_from_class(otmp->oclass, (struct monst*)0, MKOBJ_FLAGS_ALSO_RARE);
                             otmp->elemental_enchantment = 0;
                             otmp->exceptionality = 0;
                             otmp->mythic_prefix = 0;
@@ -391,7 +391,7 @@ can_make_bones()
         return FALSE;
     /* don't let multiple restarts generate multiple copies of objects
        in bones files */
-    if (discover || ModernMode || CasualMode)
+    if (discover || ModernMode || CasualMode) // In ModernMode bones files could work, but the player is not supposed to die in that mode, so something odd would have happened to get here
         return FALSE;
     return TRUE;
 }
@@ -640,7 +640,7 @@ getbones()
     register int ok;
     char c, *bonesid, oldbonesid[40]; /* was [10]; more should be safer */
 
-    if (discover || ModernMode || CasualMode) /* save bones files for classic mode games */
+    if (discover || ModernMode || CasualMode) /* save bones files for classic mode games; note that in ModernMode bones files could work but since the player does not die, bones files are a bit pointless */
         return 0;
 
     if (!flags.bones)

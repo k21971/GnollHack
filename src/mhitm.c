@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mhitm.c    $NHDT-Date: 1555720096 2019/04/20 00:28:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1231,6 +1231,7 @@ register struct obj* omonwep;
     int num,res = MM_MISS;
     boolean cancelled;
     double poisondamage = 0;
+    boolean isinstakilled = FALSE;
     boolean isdisintegrated = FALSE;
     boolean hittxtalreadydisplayed = FALSE;
     //boolean objectshatters = FALSE;
@@ -1382,7 +1383,7 @@ register struct obj* omonwep;
 
                 if (otmp->oartifact) 
                 {
-                    (void) artifact_hit(magr, mdef, otmp, &damage, dieroll);
+                    (void) artifact_hit(magr, mdef, otmp, &damage, &isinstakilled, dieroll);
                     if (DEADMONSTER(mdef))
                         return (MM_DEF_DIED
                                 | (grow_up(magr, mdef) ? 0 : MM_AGR_DIED));
@@ -1392,7 +1393,9 @@ register struct obj* omonwep;
                 if (special_hit_dmg < 0)
                 {
                     hittxtalreadydisplayed = TRUE;
-                    damage += 2 * (double)mdef->mhp + 200;
+                    isinstakilled = TRUE;
+                    //damage += 2 * (double)mdef->mhp + 200;
+                    //mdef->mhp = 0;
                     if (special_hit_dmg == -2)
                         isdisintegrated = TRUE;
                 }
@@ -1992,7 +1995,7 @@ register struct obj* omonwep;
     case AD_SLIM:
         if (cancelled)
             break; /* physical damage only */
-        if (!slimeproof(pd)) 
+        if (!resists_slime(mdef)) 
         {
             hit_tile = HIT_SLIMED;
             play_sfx_sound_at_location(SFX_START_SLIMING, mdef->mx, mdef->my);
@@ -2042,13 +2045,16 @@ register struct obj* omonwep;
             hit_tile = HIT_SICK;
             play_sfx_sound_at_location(SFX_CATCH_MUMMY_ROT, mdef->mx, mdef->my);
             set_mon_property_verbosely(mdef, MUMMY_ROT, -1L);
+            if(is_tame(mdef) && canspotmon(mdef))
+                standard_hint("You can heal your pet of mummy rot by feeding it a fig or an eucalyptus leaf, or by using a jar of medicinal salve.", &u.uhint.pet_got_mummy_rot);
         }
         break;
     default:
         damage = 0;
         break;
     }
-    if (!damage)
+
+    if (!damage && !isinstakilled)
     {
         refresh_m_tile_gui_info(mdef, FALSE);
         return res;
@@ -2150,6 +2156,8 @@ register struct obj* omonwep;
         }
     }
 
+    if (isinstakilled)
+        mdef->mhp = 0;
 
     //Reduce HP
     int hp_before = mdef->mhp;
@@ -2239,7 +2247,7 @@ register struct obj* omonwep;
             {
                 (void) newcham(magr, (struct permonst *) 0, FALSE, TRUE);
             }
-            else if (pd == &mons[PM_GREEN_SLIME] && !slimeproof(pa)) 
+            else if (pd == &mons[PM_GREEN_SLIME] && !resists_slime(magr)) 
             {
                 (void) newcham(magr, &mons[PM_GREEN_SLIME], FALSE, TRUE);
             }
@@ -2308,10 +2316,8 @@ int amt, saving_throw_adjustment, tellstyle;
     int total_save_adj = saving_throw_adjustment;
     if (origobj && origmonst)
     {
-        int otyp = origobj->otyp;
-        int skill_level = get_spell_skill_level(otyp, origmonst, mon);
-        if (skill_level > P_UNSKILLED)
-            total_save_adj -= 2 * (skill_level - P_UNSKILLED);
+        //Override the input value in this special case
+        total_save_adj = get_saving_throw_adjustment(origobj, mon, origmonst);
     }
 
     if (resists_sleep(mon))

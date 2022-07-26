@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    sp_lev.h    $NHDT-Date: 1544930819 2018/12/16 03:26:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /* Copyright (c) 1989 by Jean-Christophe Collet              */
@@ -190,6 +190,8 @@ enum sp_mon_var_flags {
     SP_M_V_SEENTRAPS,
     SP_M_V_WAITFORU,
     SP_M_V_PROTECTOR,
+    SP_M_V_MAXHP,
+    SP_M_V_LEVEL_ADJUSTMENT,
 
     SP_M_V_END
 };
@@ -466,7 +468,7 @@ typedef struct {
     xchar x, y, class, appear;
     schar peaceful, asleep;
     long female, invis, cancelled, revived, avenge, fleeing, blinded,
-        paralyzed, stunned, confused, waitforu, protector;
+        paralyzed, stunned, confused, waitforu, protector, maxhp, level_adjustment;
     long seentraps;
     long has_invent;
 } monster;

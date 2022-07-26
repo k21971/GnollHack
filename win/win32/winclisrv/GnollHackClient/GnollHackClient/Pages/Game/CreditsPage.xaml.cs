@@ -27,7 +27,7 @@ namespace GnollHackClient.Pages.Game
             App.PlayButtonClickedSound();
             CreditsTableView.IsEnabled = false;
             string fulltargetpath = Path.Combine(App.GHPath, "xcredits");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "Cross-Platform Credits");
+            var displFilePage = new DisplayFilePage(fulltargetpath, "Cross-Platform Credits", 80);
             string errormsg = "";
             if (!displFilePage.ReadFile(out errormsg))
             {
@@ -45,7 +45,7 @@ namespace GnollHackClient.Pages.Game
             App.PlayButtonClickedSound();
             CreditsTableView.IsEnabled = false;
             string fulltargetpath = Path.Combine(App.GHPath, "credits");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "Credits");
+            var displFilePage = new DisplayFilePage(fulltargetpath, "Credits", 77);
             string errormsg = "";
             if (!displFilePage.ReadFile(out errormsg))
             {
@@ -63,7 +63,7 @@ namespace GnollHackClient.Pages.Game
             App.PlayButtonClickedSound();
             CreditsTableView.IsEnabled = false;
             string fulltargetpath = Path.Combine(App.GHPath, "license");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "License");
+            var displFilePage = new DisplayFilePage(fulltargetpath, "License", 78);
             string errormsg = "";
             if (!displFilePage.ReadFile(out errormsg))
             {
@@ -339,6 +339,33 @@ namespace GnollHackClient.Pages.Game
             await App.Current.MainPage.Navigation.PushModalAsync(verPage);
             CreditsTableView.IsEnabled = true;
 
+        }
+
+        private async void btnSavedGames_Clicked(object sender, EventArgs e)
+        {
+            App.PlayButtonClickedSound();
+            await CheckAndRequestWritePermission();
+            await CheckAndRequestReadPermission();
+            string archive_file = "";
+            try
+            {
+                archive_file = App.CreateSavedGamesZipArchive();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Archive Creation Failure", "GnollHack failed to create a saved games archive: " + ex.Message, "OK");
+                return;
+            }
+            try
+            {
+                if (archive_file != "")
+                    ShareFile(archive_file, "GnollHack Saved Games");
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Share File Failure", "GnollHack failed to share a saved games archive: " + ex.Message, "OK");
+                return;
+            }
         }
     }
 }

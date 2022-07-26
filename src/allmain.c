@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    allmain.c    $NHDT-Date: 1555552624 2019/04/18 01:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.100 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -870,11 +870,13 @@ regenerate_hp()
                 {
                     killer.format = kptr->format;
                     Strcpy(killer.name, kptr->name);
+                    killer.hint_idx = HINT_KILLED_MUMMY_ROT;
                 }
                 else
                 {
                     killer.format = KILLED_BY_AN;
                     killer.name[0] = 0; /* take the default */
+                    killer.hint_idx = 0;
                 }
                 dealloc_killer(kptr);
 
@@ -1151,27 +1153,122 @@ const char*
 get_game_mode_text(display_nonscoring)
 boolean display_nonscoring;
 {
-    if (wizard)
-        return "wizard";
-    else if (discover)
-        return display_nonscoring ? "non-scoring explore" : "explore";
-    else if (CasualMode)
+    return get_game_mode_text_core(wizard, discover, ModernMode, CasualMode, display_nonscoring);
+}
+
+const char*
+get_game_mode_text_core(iswizardmode, isexporemode, ismodernmode, iscasualmode, display_nonscoring)
+boolean display_nonscoring, iswizardmode, isexporemode, ismodernmode, iscasualmode;
+{
+    if (iswizardmode)
     {
-        if (ModernMode)
+        if (ismodernmode)
+        {
+            if (iscasualmode)
+            {
+                return "casual wizard";
+            }
+            else
+            {
+                return "modern wizard";
+            }
+        }
+        else
+        {
+            if (iscasualmode)
+            {
+                return "reloadable wizard";
+            }
+            else
+            {
+                return "wizard";
+            }
+        }
+    }
+    else if (isexporemode)
+    {
+        if (ismodernmode)
+        {
+            if (iscasualmode)
+            {
+                return display_nonscoring ? "non-scoring casual explore" : "casual explore";
+            }
+            else
+            {
+                return display_nonscoring ? "non-scoring modern explore" : "modern explore";
+            }
+        }
+        else
+        {
+            if (iscasualmode)
+            {
+                return display_nonscoring ? "non-scoring reloadable explore" : "reloadable explore";
+            }
+            else
+            {
+                return display_nonscoring ? "non-scoring explore" : "explore";
+            }
+        }
+       
+    }
+    else if (iscasualmode)
+    {
+        if (ismodernmode)
             return display_nonscoring ? "non-scoring casual" : "casual";
         else
-            return display_nonscoring ? "non-scoring casual-classic" : "casual-classic";
+            return display_nonscoring ? "non-scoring reloadable" : "reloadable";
     }
-    else if (ModernMode)
+    else if (ismodernmode)
         return "modern";
     else
         return "classic";
+}
+
+const char*
+get_game_mode_description()
+{
+    return get_game_mode_description_core(wizard, discover, ModernMode, CasualMode);
+}
+
+const char*
+get_game_mode_description_core(iswizardmode, isexporemode, ismodernmode, iscasualmode)
+boolean iswizardmode, isexporemode, ismodernmode, iscasualmode;
+{
+    if (iswizardmode)
+        return "immortal mode with debug commands";
+    else if (isexporemode)
+        return "non-scoring immortal mode with loadable saved games";
+    else if (iscasualmode)
+    {
+        if (ismodernmode)
+            return "non-scoring mode with revival upon death and loadable saved games";
+        else
+            return "non-scoring mode with permanent death but loadable saved games";
+    }
+    else if (ismodernmode)
+        return "revival and score reduction upon death";
+    else
+        return "traditional mode with permanent death";
 
 }
 
+#define QUIT_DUMMY 100
 void 
 choose_game_difficulty()
 {
+    if (sysopt.min_difficulty > sysopt.max_difficulty)
+    {
+        /* Assume difficulty levels are disabled; perhaps should throw an error */
+        context.game_difficulty = 0;
+        return;
+    }
+    else if (sysopt.min_difficulty == sysopt.max_difficulty)
+    {
+        /* No need to choose if only one choice */
+        context.game_difficulty = sysopt.min_difficulty;
+        return;
+    }
+
     winid menuwin;
     menu_item* selected = (menu_item*)0;
     int n = 0;
@@ -1181,7 +1278,7 @@ choose_game_difficulty()
     anything any = zeroany;
 
     int i;
-    for(i = MIN_DIFFICULTY_LEVEL; i <= MAX_DIFFICULTY_LEVEL; i++)
+    for(i = sysopt.min_difficulty; i <= sysopt.max_difficulty; i++)
     {
         any = zeroany;
         any.a_int = i - MIN_DIFFICULTY_LEVEL + 1;
@@ -1205,17 +1302,36 @@ choose_game_difficulty()
             buf2, MENU_UNSELECTED);
     }
 
+    any = zeroany;
+    add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE,
+        " ", MENU_UNSELECTED);
+
+    any.a_int = QUIT_DUMMY;
+    add_menu(menuwin, NO_GLYPH, &any, 'q', 0, ATR_NONE,
+        "Quit", MENU_UNSELECTED);
+
     end_menu(menuwin, "Pick a level for game difficulty");
     n = select_menu(menuwin, PICK_ONE, &selected);
+    destroy_nhwindow(menuwin);
     if (n > 0)
     {
+        if (selected->item.a_int == QUIT_DUMMY)
+        {
+            /* Quit */
+            clearlocks();
+            exit_nhwindows((char*)0);
+            gnollhack_exit(EXIT_SUCCESS);
+        }
         context.game_difficulty = selected->item.a_int + MIN_DIFFICULTY_LEVEL - 1;
         free((genericptr_t)selected);
     }
     else
-        context.game_difficulty = MIN_DIFFICULTY_LEVEL;
-
-    destroy_nhwindow(menuwin);
+    {
+        /* Quit upon ESC, too */
+        clearlocks();
+        exit_nhwindows((char*)0);
+        gnollhack_exit(EXIT_SUCCESS);
+    }
 }
 
 
@@ -1294,10 +1410,13 @@ newgame()
         mnexto(m_at(u.ux, u.uy));
     (void) makedog();
     docrt();
+    status_reassess();
 
     if (flags.legacy) {
+        issue_gui_command(GUI_CMD_LOAD_INTRO_SOUND_BANK);
         flush_screen(1);
-        com_pager_ex((struct monst*)0, 1, ATR_NONE, CLR_MSG_HINT);
+        com_pager_ex((struct monst*)0, 1, ATR_NONE, CLR_MSG_HINT, FALSE);
+        issue_gui_command(GUI_CMD_UNLOAD_INTRO_SOUND_BANK);
     }
 
     urealtime.realtime = 0L;
@@ -1317,9 +1436,6 @@ newgame()
 
     /* GUI tips */
     show_gui_tips();
-
-    /* Main quest */
-    quest_discovered(QUEST_AMULET_OF_YENDOR);
 
     /* Check special room */
     check_special_room(FALSE);

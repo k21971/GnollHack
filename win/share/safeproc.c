@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    safeproc.c   */    
 /* Copyright (c) Michael Allison, 2018                            */
@@ -452,11 +452,20 @@ unsigned int interval;
     return;
 }
 
-void
+int
 safe_open_special_view(info)
 struct special_view_info info;
 {
-    return;
+    switch (info.viewtype)
+    {
+    case SPECIAL_VIEW_CHAT_MESSAGE:
+        break;
+    case SPECIAL_VIEW_YN_DIALOG:
+        return 'y';
+    default:
+        break;
+    }
+    return 0;
 }
 
 void
@@ -604,7 +613,7 @@ void
 safe_exit_hack(status)
 int status;
 {
-    exit(status);
+
 }
 
 
@@ -621,12 +630,13 @@ safe_doprev_message()
 }
 
 char
-safe_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags)
+safe_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 int style, attr, color, glyph;
 const char *title;
 const char *query;
 const char *resp;
 const char* resp_desc;
+const char* introline;
 char def;
 unsigned long ynflags;
 {
@@ -635,11 +645,12 @@ unsigned long ynflags;
 
 /*ARGSUSED*/
 void
-safe_getlin_ex(style, attr, color, prompt, outbuf, placeholder, linesuffix)
+safe_getlin_ex(style, attr, color, prompt, outbuf, placeholder, linesuffix, introline)
 int style UNUSED, attr UNUSED, color UNUSED;
 const char *prompt UNUSED;
 const char* placeholder UNUSED;
 const char* linesuffix UNUSED;
+const char* introline UNUSED;
 char *outbuf;
 {
     Strcpy(outbuf, "\033");

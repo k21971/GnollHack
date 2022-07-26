@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    mondata.c    $NHDT-Date: 1550525093 2019/02/18 21:24:53 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.72 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -27,7 +27,7 @@ static NEARDATA struct ability_conversion_table prop2innate[] = {
     { DISINTEGRATION_RESISTANCE, MR_DISINT, MR2_NONE, MC_DISINT, AD_DISN },
     { SHOCK_IMMUNITY, MR_ELEC, MR2_NONE, MC_NONE, AD_ELEC },
     { POISON_RESISTANCE, MR_POISON, MR2_NONE, MC_POISON, AD_DRST },
-    { ACID_IMMUNITY, MR_ACID, MR2_NONE, MC_ACID, AD_ACID  },
+    { ACID_IMMUNITY, MR_ACID, MR2_NONE, MC_NONE, AD_ACID  },
     { STONE_RESISTANCE, MR_STONE, MR2_NONE, MC_STONE, AD_STON  },
     { DEATH_RESISTANCE, MR_DEATH, MR2_NONE, MC_DEATH, AD_DETH },
     { LYCANTHROPY_RESISTANCE, MR_LYCANTHROPY, MR2_NONE, MC_NONE, AD_WERE },
@@ -62,6 +62,9 @@ static NEARDATA struct ability_conversion_table prop2innate[] = {
     { MAGIC_MISSILE_RESISTANCE, MR_NONE, MR2_MAGIC_MISSILE_RESISTANCE, MC_NONE, -1 },
     { ACID_RESISTANCE, MR_NONE, MR2_ACID_RESISTANCE, MC_ACID, -1 },
     { CANCELLATION_RESISTANCE, MR_NONE, MR2_CANCELLATION_RESISTANCE, MC_NONE, -1 },
+    { BISECTION_RESISTANCE, MR_NONE, MR2_BISECTION_RESISTANCE, MC_NONE, -1 },
+    { SLIME_RESISTANCE, MR_NONE, MR2_SLIME_RESISTANCE, MC_NONE, -1 },
+    { ENERGY_REGENERATION, MR_NONE, MR2_ENERGY_REGENERATION, MC_NONE, -1 },
 };
 
 struct mflag_description {
@@ -650,7 +653,7 @@ boolean
 can_be_strangled(mon)
 struct monst *mon;
 {
-    boolean nonbreathing, nobrainer;
+    //boolean nonbreathing, nobrainer;
 
     /* For amulet of strangulation support:  here we're considering
        strangulation to be loss of blood flow to the brain due to
@@ -661,6 +664,10 @@ struct monst *mon;
        are non-breathing creatures which have higher brain function. */
     if (!has_neck(mon->data))
         return FALSE;
+
+    return TRUE;
+
+#if 0
     if (mon == &youmonst)
     {
         /* hero can't be mindless but poly'ing into mindless form can
@@ -676,6 +683,7 @@ struct monst *mon;
         nonbreathing = is_breathless(mon);
     }
     return (boolean) (!nobrainer || !nonbreathing);
+#endif
 }
 
 /* returns True if monster can track well */
@@ -1411,16 +1419,16 @@ static const short grownups[][2] = {
     { PM_BLUE_DRAGON_HATCHLING, PM_BLUE_DRAGON },
     { PM_GREEN_DRAGON_HATCHLING, PM_GREEN_DRAGON },
     { PM_YELLOW_DRAGON_HATCHLING, PM_YELLOW_DRAGON },
-//    { PM_GRAY_DRAGON, PM_ANCIENT_GRAY_DRAGON },
-//    { PM_SILVER_DRAGON, PM_ANCIENT_SILVER_DRAGON },
-//    { PM_RED_DRAGON, PM_ANCIENT_RED_DRAGON },
-//    { PM_WHITE_DRAGON, PM_ANCIENT_WHITE_DRAGON },
-//    { PM_ORANGE_DRAGON, PM_ANCIENT_ORANGE_DRAGON },
-//    { PM_BLACK_DRAGON, PM_ANCIENT_BLACK_DRAGON },
-//    { PM_BLUE_DRAGON, PM_ANCIENT_BLUE_DRAGON },
-//    { PM_GREEN_DRAGON, PM_ANCIENT_GREEN_DRAGON },
-//    { PM_YELLOW_DRAGON, PM_ANCIENT_YELLOW_DRAGON },
-//    { PM_DRACOLICH, PM_ELDER_DRACOLICH },
+    { PM_GRAY_DRAGON, PM_ANCIENT_GRAY_DRAGON },
+    { PM_SILVER_DRAGON, PM_ANCIENT_SILVER_DRAGON },
+    { PM_RED_DRAGON, PM_ANCIENT_RED_DRAGON },
+    { PM_WHITE_DRAGON, PM_ANCIENT_WHITE_DRAGON },
+    { PM_ORANGE_DRAGON, PM_ANCIENT_ORANGE_DRAGON },
+    { PM_BLACK_DRAGON, PM_ANCIENT_BLACK_DRAGON },
+    { PM_BLUE_DRAGON, PM_ANCIENT_BLUE_DRAGON },
+    { PM_GREEN_DRAGON, PM_ANCIENT_GREEN_DRAGON },
+    { PM_YELLOW_DRAGON, PM_ANCIENT_YELLOW_DRAGON },
+    { PM_DRACOLICH, PM_ELDER_DRACOLICH },
     { PM_RED_NAGA_HATCHLING, PM_RED_NAGA },
     { PM_BLACK_NAGA_HATCHLING, PM_BLACK_NAGA },
     { PM_GOLDEN_NAGA_HATCHLING, PM_GOLDEN_NAGA },

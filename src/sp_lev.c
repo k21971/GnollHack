@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    sp_lev.c    $NHDT-Date: 1553787633 2019/03/28 15:40:33 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.111 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -1755,12 +1755,16 @@ struct mkroom *croom;
     if (MON_AT(x, y) && enexto(&cc, x, y, pm))
         x = cc.x, y = cc.y;
 
+    unsigned long mmflags = 0UL;
+    if (m->maxhp)
+        mmflags |= MM_MAX_HP;
+
     if (m->align != -(MAX_REGISTERS + 2))
         mtmp = mk_roamer(pm, Amask2align(amask), x, y, m->peaceful);
     else if (PM_ARCHAEOLOGIST <= m->id && m->id <= PM_WIZARD)
         mtmp = mk_mplayer(pm, x, y, FALSE);
     else
-        mtmp = makemon(pm, x, y, NO_MM_FLAGS);
+        mtmp = makemon_ex(pm, x, y, mmflags, 0, (int)m->level_adjustment);
 
     if (mtmp)
     {
@@ -2088,7 +2092,7 @@ struct mkroom *croom;
                         }
                         else
                         {
-                            otmp->mythic_suffix = MYTHIC_SUFFIX_SPEED;
+                            otmp->mythic_suffix = !rn2(2) ? MYTHIC_SUFFIX_FREE_ACTION : MYTHIC_SUFFIX_SPEED;
                         }
                     }
                     else
@@ -2133,7 +2137,7 @@ struct mkroom *croom;
                     else
                     {
                         if (!rn2(2))
-                            otmp->mythic_suffix = MYTHIC_SUFFIX_SHARPNESS;
+                            otmp->mythic_suffix = objects[otmp->otyp].oc_dir == WHACK || !rn2(2) ? MYTHIC_SUFFIX_FREE_ACTION : MYTHIC_SUFFIX_SHARPNESS;
                         else
                             otmp->mythic_suffix = MYTHIC_SUFFIX_SPEED;
                     }
@@ -2321,7 +2325,7 @@ struct mkroom *croom;
     {
         otmp->special_quality = o->special_quality;
         if(is_obj_candelabrum(otmp) && otmp->special_quality > 0)
-            otmp->age = CANDELABRUM_STARTING_AGE;
+            otmp->age = MAX_BURN_IN_CANDELABRUM;
         if (otmp->oclass == SPBOOK_CLASS && otmp->special_quality >= -1)
         {
             if (objects[otmp->otyp].oc_subtyp == BOOKTYPE_NOVEL)
@@ -3804,6 +3808,14 @@ struct sp_coder *coder;
         case SP_M_V_PROTECTOR:
             if (OV_typ(parm) == SPOVAR_INT)
                 tmpmons.protector = OV_i(parm);
+            break;
+        case SP_M_V_MAXHP:
+            if (OV_typ(parm) == SPOVAR_INT)
+                tmpmons.maxhp = OV_i(parm);
+            break;
+        case SP_M_V_LEVEL_ADJUSTMENT:
+            if (OV_typ(parm) == SPOVAR_INT)
+                tmpmons.level_adjustment = OV_i(parm);
             break;
         case SP_M_V_INVIS:
             if (OV_typ(parm) == SPOVAR_INT)
@@ -6703,8 +6715,8 @@ struct sp_coder* coder;
     dy2 = (xchar)SP_REGION_Y2(OV_i(area));
     typ = (int)OV_i(rtype);
 
-    get_location(&dx1, &dy1, ANY_LOC, (struct mkroom*)0);
-    get_location(&dx2, &dy2, ANY_LOC, (struct mkroom*)0);
+    get_location(&dx1, &dy1, ANY_LOC, coder->croom);
+    get_location(&dx2, &dy2, ANY_LOC, coder->croom);
 
     create_simple_permanent_region(dx1, dy1, dx2, dy2, typ);
 

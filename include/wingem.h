@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	wingem.h	$NHDT-Date: 1433806582 2015/06/08 23:36:22 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /* Copyright (c) Christian Bressler, 1999				  */
@@ -95,8 +95,8 @@ E int NDECL(Gem_nhgetch);
 E int FDECL(Gem_nh_poskey, (int *, int *, int *));
 E void NDECL(Gem_nhbell);
 E int NDECL(Gem_doprev_message);
-E char FDECL(Gem_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, unsigned long));
-E void FDECL(Gem_getlin_ex, (int, int, int, const char *, char *, const char*, const char*));
+E char FDECL(Gem_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+E void FDECL(Gem_getlin_ex, (int, int, int, const char *, char *, const char*, const char*, const char*));
 E int NDECL(Gem_get_ext_cmd);
 E void FDECL(Gem_number_pad, (int));
 E void NDECL(Gem_delay_output);

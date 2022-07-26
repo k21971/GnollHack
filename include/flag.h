@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    flag.h    $NHDT-Date: 1554155745 2019/04/01 21:55:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.150 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -26,6 +26,7 @@ struct flag {
     boolean  autokick;    /* Automatically kick doors and force locks */
 #endif
     boolean autounlock;   /* unlock doors and boxes whenever you find them being locked */
+    boolean baseacasbonus; /* show AC bonus for items (e.g., +1 or +2) rather than the AC they give (e.g, 8 or 9) */
     boolean beginner;
     boolean biff;      /* enable checking for mail */
     boolean bones;     /* allow saving/loading bones */
@@ -65,6 +66,7 @@ struct flag {
     boolean show_buff_timer;    /* show buff timers in GUI */
     boolean search_box_traps; /* search all boxes for traps when pressing s */
     boolean underline_peaceful;     /* underline non-tame peaceful monsters */
+    boolean force_hint;         /* display hints at all difficulty levels */
     boolean partylinecolor;     /* use fixed partyline coloring */
     boolean partydetails;     /* print additional info like AC and MC for all party members */
     boolean partymultiline;     /* print each party member on its own line */
@@ -126,12 +128,18 @@ struct flag {
     boolean sortpack;        /* sorted inventory */
     boolean sparkle;         /* show "resisting" special FX (Scott Bigham) */
     boolean standout;        /* use standout for --More-- */
-    boolean    swap_rhand_only; /* swap only right hand */
+    boolean swap_rhand_only; /* swap only right hand */
     boolean time;            /* display elapsed 'time' */
     boolean tombstone;       /* print tombstone */
     boolean verbose;         /* max battle info */
     boolean wiz_mstatusline; /* extra information on monsters */
     boolean wiz_alwaysenc;   /* creates always an encounter */
+
+    /* Emergency reserved booleans to make non-save-game-breaking changes */
+    boolean reserved_bool1;
+    boolean reserved_bool2;
+    boolean reserved_bool3;
+    boolean reserved_bool4;
 
     int animation_frame_interval_in_milliseconds; /* custom animation frame interval in milliseconds. If 0, then the default at 25 milliseconds is used. Delay output is twice this amount, defaulting at 50 milliseconds */
     int move_interval_in_milliseconds; /* custom move step interval in milliseconds. If 0, then the default at 50 milliseconds is used. Delay output is twice this amount, defaulting at 50 milliseconds */
@@ -226,6 +234,18 @@ struct flag {
     boolean showrace;  /* show hero glyph by race rather than by role */
     boolean travelcmd; /* allow travel command */
     int runmode;       /* update screen display during run moves */
+    uchar spellorder;
+    schar max_hint_difficulty; /* Maximum difficulty level where hints are shown */
+
+    /* Emergency reserved variables to make non-save-game-breaking changes */
+    char reserved_char1;
+    char reserved_char2;
+    short reserved_short1;
+    short reserved_short2;
+    int reserved_int1;
+    int reserved_int2;
+    unsigned long reserved_ulong1;
+    unsigned long reserved_ulong2;
 };
 
 /*
@@ -503,6 +523,7 @@ struct instance_flags {
     char* wc2_master_bank_file; /* name of custom master bank file, overrides default */
     char* wc2_master_strings_bank_file; /* name of custom master strings bank file, overrides default */
     char* wc2_auxiliary_bank_file; /* name of custom auxiliary bank file, overrides default */
+    char* wc2_intro_bank_file; /* name of custom intro bank file, overrides default */
     struct autopickup_exception *autopickup_exceptions[2];
 #define AP_LEAVE 0
 #define AP_GRAB 1
@@ -531,6 +552,23 @@ struct instance_flags {
                                     chosen_windowport[], but do not switch to
                                     it in the midst of options processing */
     boolean obsolete;  /* obsolete options can point at this, it isn't used */
+
+    /* Emergency reserved booleans to make non-save-game-breaking changes */
+    boolean reserved_bool1;
+    boolean reserved_bool2;
+    boolean reserved_bool3;
+    boolean reserved_bool4;
+
+    /* Emergency reserved variables to make non-save-game-breaking changes */
+    char reserved_char1;
+    char reserved_char2;
+    short reserved_short1;
+    short reserved_short2;
+    int reserved_int1;
+    int reserved_int2;
+    unsigned long reserved_ulong1;
+    unsigned long reserved_ulong2;
+
 };
 
 /*

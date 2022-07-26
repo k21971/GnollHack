@@ -43,9 +43,42 @@ namespace GnollHackClient.Droid
             }
         }
 
+        public ulong GetDeviceFreeDiskSpaceInBytes()
+        {
+            try
+            {
+                //Using StatFS
+                var path = new StatFs(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData));
+                long blockSize = path.BlockSizeLong;
+                long avaliableBlocks = path.AvailableBlocksLong;
+                long freeSpace = blockSize * avaliableBlocks;
+                return (ulong)freeSpace;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public ulong GetDeviceTotalDiskSpaceInBytes()
+        {
+            try
+            {
+                //Using StatFS
+                var path = new StatFs(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData));
+                long freeSpace = path.TotalBytes;
+                return (ulong)freeSpace;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+
         public void CloseApplication()
         {
-            RevertAnimationDuration();
+            RevertAnimationDuration(true);
             MainActivity.CurrentMainActivity.Finish();
         }
 
@@ -88,9 +121,9 @@ namespace GnollHackClient.Droid
         {
             var resolver = Android.App.Application.Context.ContentResolver;
             var scaleName = Android.Provider.Settings.Global.AnimatorDurationScale;
-            float scale = Android.Provider.Settings.Global.GetFloat(resolver, scaleName, 0);
+            float scale = Android.Provider.Settings.Global.GetFloat(resolver, scaleName, 1.0f);
 
-            if (scale > 0)
+            if (scale == 1.0f)
                 return;
 
             if (!_originalSet)
@@ -108,19 +141,20 @@ namespace GnollHackClient.Droid
             }
             catch //(Exception ex)
             {
-                // Log Error
+                //Debug.WriteLine(ex.Message);
             }
         }
-        public void RevertAnimationDuration()
+        public void RevertAnimationDuration(bool isfinal)
         {
-            if (_originalSet)
+            if (_originalSet && _originalAnimationDurationScale != 1.0f)
             {
                 try
                 {
                     var classForName = JNIEnv.FindClass("android/animation/ValueAnimator");
                     var methodId = JNIEnv.GetStaticMethodID(classForName, "setDurationScale", "(F)V");
 
-                    JNIEnv.CallStaticVoidMethod(classForName, methodId, new JValue(_originalAnimationDurationScale));
+                    float usedValue = !isfinal && _originalAnimationDurationScale == 0 ? 0.1f : _originalAnimationDurationScale; //Make sure that the value is not set to zero upon sleep just in case, since that seems to create problems
+                    JNIEnv.CallStaticVoidMethod(classForName, methodId, new JValue(usedValue));
                 }
                 catch //(Exception ex)
                 {

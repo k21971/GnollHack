@@ -294,6 +294,7 @@ namespace GnollHackCommon
         GLYPH_TILE_FLAG_HALF_SIZED_TILE = 0x10,
         GLYPH_TILE_FLAG_HAS_FLOOR_TILE = 0x20,
         GLYPH_TILE_FLAG_TWO_WIDE_CENTERED = 0x40,
+        GLYPH_TILE_FLAG_HEIGHT_IS_CLIPPING = 0x80,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -519,6 +520,8 @@ namespace GnollHackCommon
         GHWINDOW_STYLE_MEDIUM_WIDE_LIST,
         GHWINDOW_STYLE_SEMI_WIDE_LIST,
         GHWINDOW_STYLE_DISPLAY_FILE,
+        GHWINDOW_STYLE_HAS_INDENTED_TEXT,
+        GHWINDOW_STYLE_DISPLAY_FILE_WITH_INDENTED_TEXT,
         MAX_GHWINDOW_STYLES
     }
 
@@ -552,6 +555,8 @@ namespace GnollHackCommon
         GHMENU_STYLE_SPELL_COMMAND,
         GHMENU_STYLE_GENERAL_COMMAND,
         GHMENU_STYLE_MONSTER_ABILITY,
+        GHMENU_STYLE_DELETE_SAVED_GAME,
+        GHMENU_STYLE_START_GAME_MENU,
         MAX_GHMENU_STYLES
     }
 
@@ -561,7 +566,7 @@ namespace GnollHackCommon
         FLOATING_TEXT_HEALING,
         FLOATING_TEXT_DAMAGE,
         FLOATING_TEXT_GOLD_ACQUIRED,
-        FLOATING_TEXT_GOLD_STOLEN,
+        FLOATING_TEXT_GOLD_REDUCED,
         FLOATING_TEXT_MANA_GAIN,
         FLOATING_TEXT_MANA_LOSS,
         FLOATING_TEXT_NUTRITION_GAIN,
@@ -802,7 +807,153 @@ namespace GnollHackCommon
         public sbyte where;        /* where the object thinks it is */
         public sbyte timed; /* # of fuses (timers) attached to this obj */
 
-        public uint bitfields;
+        internal uint bitfields;
+
+        public uint cursed 
+        {
+            get { return bitfields & 0x00000001U; } 
+            set { bitfields = (bitfields & ~0x00000001U) | (value & 0x00000001U); }
+        }
+        public uint blessed
+        {
+            get { return (bitfields >> 1) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 1)) | ((value & 0x00000001U) << 1); }
+        }
+        public uint unpaid
+        {
+            get { return (bitfields >> 2) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 2)) | ((value & 0x00000001U) << 2); }
+        }
+        public uint no_charge
+        {
+            get { return (bitfields >> 3) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 3)) | ((value & 0x00000001U) << 3); }
+        }
+        public uint known
+        {
+            get { return (bitfields >> 4) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 4)) | ((value & 0x00000001U) << 4); }
+        }
+        public uint dknown
+        {
+            get { return (bitfields >> 5) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 5)) | ((value & 0x00000001U) << 5); }
+        }
+        public uint bknown
+        {
+            get { return (bitfields >> 6) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 6)) | ((value & 0x00000001U) << 6); }
+        }
+        public uint rknown
+        {
+            get { return (bitfields >> 7) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 7)) | ((value & 0x00000001U) << 7); }
+        }
+        public uint oeroded
+        {
+            get { return (bitfields >> 8) & 0x00000003U; }
+            set { bitfields = (bitfields & ~(0x00000003U << 8)) | ((value & 0x00000003U) << 8); }
+        }
+        public uint oeroded2
+        {
+            get { return (bitfields >> 10) & 0x00000003U; }
+            set { bitfields = (bitfields & ~(0x00000003U << 10)) | ((value & 0x00000003U) << 10); }
+        }
+        public uint oerodeproof
+        {
+            get { return (bitfields >> 12) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 12)) | ((value & 0x00000001U) << 12); }
+        }
+        public uint olocked
+        {
+            get { return (bitfields >> 13) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 13)) | ((value & 0x00000001U) << 13); }
+        }
+        public uint obroken
+        {
+            get { return (bitfields >> 14) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 14)) | ((value & 0x00000001U) << 14); }
+        }
+        public uint otrapped
+        {
+            get { return (bitfields >> 15) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 15)) | ((value & 0x00000001U) << 15); }
+        }
+        public uint lamplit
+        {
+            get { return (bitfields >> 16) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 16)) | ((value & 0x00000001U) << 16); }
+        }
+        public uint makingsound
+        {
+            get { return (bitfields >> 17) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 17)) | ((value & 0x00000001U) << 17); }
+        }
+        public uint globby
+        {
+            get { return (bitfields >> 18) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 18)) | ((value & 0x00000001U) << 18); }
+        }
+        public uint greased
+        {
+            get { return (bitfields >> 19) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 19)) | ((value & 0x00000001U) << 19); }
+        }
+        public uint nomerge
+        {
+            get { return (bitfields >> 20) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 20)) | ((value & 0x00000001U) << 20); }
+        }
+        public uint was_thrown
+        {
+            get { return (bitfields >> 21) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 21)) | ((value & 0x00000001U) << 21); }
+        }
+        public uint has_special_tileset
+        {
+            get { return (bitfields >> 22) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 22)) | ((value & 0x00000001U) << 22); }
+        }
+        public uint in_use
+        {
+            get { return (bitfields >> 23) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 23)) | ((value & 0x00000001U) << 23); }
+        }
+        public uint bypass
+        {
+            get { return (bitfields >> 24) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 24)) | ((value & 0x00000001U) << 24); }
+        }
+        public uint cknown
+        {
+            get { return (bitfields >> 25) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 25)) | ((value & 0x00000001U) << 25); }
+        }
+        public uint lknown
+        {
+            get { return (bitfields >> 26) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 26)) | ((value & 0x00000001U) << 26); }
+        }
+        public uint tknown
+        {
+            get { return (bitfields >> 27) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 27)) | ((value & 0x00000001U) << 27); }
+        }
+        public uint nknown
+        {
+            get { return (bitfields >> 28) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 28)) | ((value & 0x00000001U) << 28); }
+        }
+        public uint aknown
+        {
+            get { return (bitfields >> 29) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 29)) | ((value & 0x00000001U) << 29); }
+        }
+        public uint mknown
+        {
+            get { return (bitfields >> 30) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 30)) | ((value & 0x00000001U) << 30); }
+        }
 
         public int corpsenm;         /* type of corpse is mons[corpsenm] */
         public int usecount;           /* overloaded for various things that tally */
@@ -813,6 +964,7 @@ namespace GnollHackCommon
         public short repowerleft;       /* artifact cooldown left before its invoke ability can be used again*/
         public short detectioncount;    /* monsters detected for WARN_ORC and other similar properties */
         public byte invokeon;      /* the object's / artifact's invoked ability is on */
+        public short invokeleft;       /* counter for an artifact's item-specific invoke ability */
         public uint o_id_memory;  /* This is a memory object of this o_id */
         public uint m_id_memory;  /* This is a memory object of this mimic m_id */
 
@@ -1009,9 +1161,9 @@ namespace GnollHackCommon
         GUI_CMD_PROGRAM_START = 0,
         GUI_CMD_PREFERENCE_SET,
         GUI_CMD_LOAD_GLYPHS,
-        GUI_CMD_BEFORE_COLLECT,
+        GUI_CMD_FADE_TO_BLACK,
         GUI_CMD_COLLECT_GARBAGE,
-        GUI_CMD_AFTER_COLLECT,
+        GUI_CMD_FADE_FROM_BLACK,
         GUI_CMD_FORCE_ASCII,
         GUI_CMD_UNFORCE_ASCII,
         GUI_CMD_START_FLUSH,
@@ -1023,9 +1175,16 @@ namespace GnollHackCommon
         GUI_CMD_DEACTIVATE_QUIETER_MODE,
         GUI_CMD_ENABLE_WIZARD_MODE,
         GUI_CMD_ENABLE_CASUAL_MODE,
-        GUI_CMD_PETS,
+        GUI_CMD_CLEAR_PET_DATA,
         GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE,
         GUI_CMD_RESTORE_TRAVEL_MODE,
+        GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE_ON_LEVEL,
+        GUI_CMD_RESTORE_TRAVEL_MODE_ON_LEVEL,
+        GUI_CMD_CLEAR_CONDITION_TEXTS,
+        GUI_CMD_CLEAR_FLOATING_TEXTS,
+        GUI_CMD_CLEAR_GUI_EFFECTS,
+        GUI_CMD_LOAD_INTRO_SOUND_BANK,
+        GUI_CMD_UNLOAD_INTRO_SOUND_BANK,
         GUI_CMD_GAME_START,
         GUI_CMD_PROGRAM_FINISH,
     }
@@ -1065,6 +1224,8 @@ namespace GnollHackCommon
         SPECIAL_VIEW_PANIC,
         SPECIAL_VIEW_DEBUGLOG,
         SPECIAL_VIEW_MESSAGE,
+        SPECIAL_VIEW_YN_DIALOG,
+        SPECIAL_VIEW_SELFIE,
         MAX_SPECIAL_VIEW_TYPES
     }
 
@@ -1124,7 +1285,7 @@ namespace GnollHackCommon
         public const int MaxGHWindows = 32;
         public const int MapCols = 80;
         public const int MapRows = 21;
-        public const int DefaultAnimationInterval = 25;
+        public const int DelayOutputDurationInMilliseconds = 50;
         public const int MaxMessageHistoryLength = 256;
         public const float MoveDistanceThreshold = 25.0f;
         public const long MoveOrPressTimeThreshold = 200; /* Milliseconds */
@@ -1144,8 +1305,8 @@ namespace GnollHackCommon
         public const int MaxLeashed = 2;
         public const int MaxPlayedSpecialEffects = 12;
         public const int MaxPlayedZapAnimations = 16;
-        public const int MaxNormalImmediateSoundInstances = 64;
-        public const int MaxLongImmediateSoundInstances = 64;
+        public const int MaxNormalImmediateSoundInstances = 24;
+        public const int MaxLongImmediateSoundInstances = 48;
         //public const int DefaultPanTime = 5;
         public const int PIT_BOTTOM_BORDER = 2;
         public const int SPECIAL_HEIGHT_IN_PIT = -32;
@@ -1203,15 +1364,12 @@ namespace GnollHackCommon
         public const string GnollHackWikiPage = "https://github.com/hyvanmielenpelit/GnollHack/wiki";
         public const string GnollHackSponsorPage = "https://hyvanmielenpelit.fi/tule-mukaan/pienkannatusjaseneksi/in-english";
         public const string GHSettingsResourcePath = "GnollHackClient.Assets.ghsettings.json";
-        public const int MainCanvasAnimationFrequency = 40;
-        public const uint MainCanvasAnimationInterval = 25;
-        public const int GameAnimationRefreshRate = 40;
         public const int MaxRefreshRate = 120;
         public const int PollingFrequency = 60;
         public const int PollingInterval = 15;
         public const bool IsGPUDefault = true;
         public const double DefaultTextWindowMaxWidth = 600.0;
-        public const double WindowHideIntervals = 3.0;
+        public const double WindowHideIntervals = 5.0;
         public const uint MainCanvasAnimationTime = 250;
         public const uint AuxiliaryCanvasAnimationTime = 240;
         public const float MenuDefaultRowHeight = 30.0f;

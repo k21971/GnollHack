@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    pickup.c    $NHDT-Date: 1545785547 2018/12/26 00:52:27 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.222 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -200,7 +200,7 @@ int *menu_on_demand;
         not_everything = filtered = FALSE;
         Sprintf(qbuf, "What kinds of thing do you want to %s?", action);
         Sprintf(ebuf, "[%s]", ilets);
-        getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, qbuf, inbuf, (char*)0, ebuf);
+        getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, qbuf, inbuf, (char*)0, ebuf, (char*)0);
         if (*inbuf == '\033')
             return FALSE;
 
@@ -277,6 +277,7 @@ boolean remotely;
 
     pline("Touching %s is a fatal mistake.",
           corpse_xname(obj, (const char *) 0, CXN_SINGULAR | CXN_ARTICLE));
+    killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
     instapetrify(killer_xname(obj));
     return TRUE;
 }
@@ -734,8 +735,8 @@ handle_knapsack_full(VOID_ARGS)
     if (cnt > 0)
     {
         /* Ask for putting things in a bag or drop items */
-        char ans = yn_function_es(YN_STYLE_KNAPSACK_FULL, ATR_NONE, CLR_MSG_ATTENTION, "Your Knapsack Is Full", "Do you want to put items Into a container or Drop them?", idqchars, 'q', idqdescs);
-        if (ans == 'i')
+        char ans = yn_function_es(YN_STYLE_KNAPSACK_FULL, ATR_NONE, CLR_MSG_ATTENTION, "Your Knapsack Is Full", "Stash items into a container or Drop them?", sdqchars, 'q', sdqdescs, (const char*)0);
+        if (ans == 's')
         {
             struct obj* container = select_other_container(invent, (struct obj*)0, FALSE, FALSE);
             if (container)
@@ -1473,7 +1474,7 @@ boolean telekinesis;
 
     if (obj->otyp == BOULDER && Sokoban) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot get your %s around this %s.", body_part(HAND),
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot get your %s around this %s.", body_part(HAND),
             xname(obj));
         return -1;
     }
@@ -1602,13 +1603,17 @@ boolean telekinesis; /* not picking it up directly by hand */
             obj->speflags |= SPEFLAGS_WILL_TURN_TO_DUST_ON_PICKUP;
         else 
         {
+            char dcbuf[BUFSZ] = "";
             play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "scroll%s %s to dust as you %s %s up.", plur(obj->quan),
+            Sprintf(dcbuf, "scroll%s %s to dust as you %s %s up.", plur(obj->quan),
                       otense(obj, "turn"), telekinesis ? "raise" : "pick",
                       (obj->quan == 1L) ? "it" : "them");
+
+            pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
+
             if (!(objects[SCR_SCARE_MONSTER].oc_name_known)
                 && !(objects[SCR_SCARE_MONSTER].oc_uname))
-                docall(obj);
+                docall(obj, dcbuf);
             useupf(obj, obj->quan);
             return 1; /* tried to pick something up and failed, but
                          don't want to terminate pickup loop yet   */
@@ -1723,6 +1728,7 @@ encumber_msg()
             break;
         }
         context.botl = context.botlx = TRUE;
+        standard_hint("Being burdened reduces your speed and thus your combat power. Try to remain unburdened at all times, if possible. Some magical bags reduce weight of items. Put items into such bags if you have them.", &u.uhint.got_burdened);
     } else if (oldcap > newcap) {
         switch (newcap) {
         case 0:
@@ -1787,7 +1793,7 @@ boolean looting; /* loot vs tip */
         /* at present, can't loot in water even when Underwater;
            can tip underwater, but not when over--or stuck in--lava */
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot %s things that are deep in the %s.", verb,
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot %s things that are deep in the %s.", verb,
             hliquid(is_lava(x, y) ? "lava" : "water"));
         return FALSE;
     } 
@@ -2475,7 +2481,7 @@ register struct obj *obj;
     else if (obj->owornmask & (W_ARMOR | W_ACCESSORY)) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        Norep("You cannot %s %s you are wearing.",
+        Norep_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s %s you are wearing.",
               Icebox ? "refrigerate" : "stash", something);
         return 0;
     }
@@ -2483,7 +2489,7 @@ register struct obj *obj;
     {
         play_sfx_sound(SFX_GENERAL_WELDED);
         obj->bknown = 1;
-        pline("%s%s won't leave your person.", is_graystone(obj) ? "The stone" : "The item", plur(obj->quan));
+        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s%s won't leave your person.", is_graystone(obj) ? "The stone" : "The item", plur(obj->quan));
         return 0;
     }
     else if (
@@ -2492,7 +2498,7 @@ register struct obj *obj;
         )
     {
         play_sfx_sound(SFX_GENERAL_DOES_NOT_FIT);
-        pline("%s is not made for holding %s.", The(cxname(current_container)), obj->quan > 1 ? cxname(obj) : makeplural(cxname(obj)));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is not made for holding %s.", The(cxname(current_container)), obj->quan > 1 ? cxname(obj) : makeplural(cxname(obj)));
         return 0;
     }
     else if (obj->otyp == AMULET_OF_YENDOR
@@ -2507,7 +2513,7 @@ register struct obj *obj;
          * has the Amulet.  Ditto for the Candelabrum, the Bell and the Book.
          */
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s cannot be confined in such trappings.", The(xname(obj)));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s cannot be confined in such trappings.", The(xname(obj)));
         return 0;
     }
     else if (obj->otyp == LEASH && obj->leashmon != 0)
@@ -2578,7 +2584,7 @@ register struct obj *obj;
          */
         play_sfx_sound(SFX_GENERAL_DOES_NOT_FIT);
         Strcpy(buf, the(xname(obj)));
-        You("cannot fit %s into %s.", buf, the(xname(current_container)));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot fit %s into %s.", buf, the(xname(current_container)));
         return 0;
     }
 
@@ -2587,7 +2593,7 @@ register struct obj *obj;
     {
         char qbuf[BUFSZ], c;
         Sprintf(qbuf, "You are putting %s into %s. Continue?", the(xname(obj)), the(xname(current_container)));
-        if ((c = yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, (const char*)0, qbuf, ynchars, 'n', yndescs)) != 'y')
+        if ((c = yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, (const char*)0, qbuf, ynchars, 'n', yndescs, (const char*)0)) != 'y')
             return 0;
     }
 
@@ -2684,6 +2690,8 @@ register struct obj *obj;
 
         losehp(adjust_damage(d(6, 6), (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_SPELL_DAMAGE), "magical explosion", KILLED_BY_AN);
         current_container = 0; /* baggone = TRUE; */
+
+        standard_hint("Putting a wand of cancellation into a magical bag will typically cause it explode. To avoid doing this accidently, put unidentified wands into a non-magical bag.", &u.uhint.bag_destroyed_by_cancellation);
     }
 
     if (current_container) 
@@ -4237,7 +4245,7 @@ dostash()
 
     if (!can_stash_objs()) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You1("do not have any containers to stash items into.");
+        You_ex1(ATR_NONE, CLR_MSG_FAIL, "do not have any containers to stash items into.");
         return 0;
     }
 
@@ -4252,7 +4260,7 @@ dostash()
 
     if (Is_container(otmp)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You1("cannot stash that.");
+        You_ex1(ATR_NONE, CLR_MSG_FAIL, "cannot stash that.");
         return 0;
     }
 

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    mhitu.c    $NHDT-Date: 1556649298 2019/04/30 18:34:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -432,7 +432,7 @@ struct attack *alt_attk_buf;
                && (is_cancelled(magr)
                    || (weap && ((weap->otyp == CORPSE
                                  && touch_petrifies(&mons[weap->corpsenm]))
-                                || weap->oartifact == ART_STORMBRINGER
+                                || weap->oartifact == ART_STORMBRINGER || weap->oartifact == ART_MOURNBLADE
                                 || weap->oartifact == ART_VORPAL_BLADE)))) {
         *alt_attk_buf = *attk;
         attk = alt_attk_buf;
@@ -638,6 +638,8 @@ register struct monst *mtmp;
         {
             play_sfx_sound(SFX_ACQUIRE_GRAB);
             u.ustuck = mtmp;
+            refresh_m_tile_gui_info(mtmp, FALSE);
+            grab_hint(mtmp);
         }
         youmonst.m_ap_type = M_AP_NOTHING;
         youmonst.mappearance = 0;
@@ -1315,7 +1317,7 @@ struct monst *mtmp;
         /* Sound is played always to indicate reduced timer */
         play_sfx_sound(SFX_CATCH_TERMINAL_ILLNESS);
         make_sick(Sick ? Sick / 3L + 1L : (long) rn1(ACURR(A_CON), 20),
-                  mon_monster_name(mtmp), TRUE);
+                  mon_monster_name(mtmp), TRUE, HINT_KILLED_TERMINAL_ILLNESS);
         return TRUE;
     }
 }
@@ -1332,7 +1334,7 @@ struct monst* mtmp;
     {
         if(!MummyRot)
             play_sfx_sound(SFX_CATCH_MUMMY_ROT);
-        make_mummy_rotted(-1L, mon_monster_name(mtmp), TRUE);
+        make_mummy_rotted(-1L, mon_monster_name(mtmp), TRUE, HINT_KILLED_MUMMY_ROT);
         return TRUE;
     }
 }
@@ -1449,6 +1451,9 @@ int adjustment_to_roll;
     int adjscore = ability_score + adjustment_to_roll;
     int percentage = 0;
 
+    percentage = 5 * adjscore - 30;
+
+#if 0
     if (adjscore < 1)
         percentage = 0;
     else if (adjscore > 25)
@@ -1536,6 +1541,7 @@ int adjustment_to_roll;
             break;
         }
     }
+#endif
     boolean success = (rn2(100) < percentage);
     return success;
 }
@@ -1580,10 +1586,10 @@ struct monst *mon;
     {
         /* oc_magic_cancellation field is only applicable for armor (which must be worn), this should exclude spellbooks and wands, which use oc_oc2 for something else */
         /* omit W_SWAPWEP+W_QUIVER; W_ARTIFACT_CARRIED+W_ARTIFACT_INVOKED handled by protects() */
-        wearmask = (W_ARMOR & ~W_ARMS) | W_ACCESSORY;
+        wearmask = W_WORN_NOT_WIELDED;
 
         if (is_wielded_item(o) || (objects[o->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(o))
-            wearmask |= (W_WEP | W_ARMS);
+            wearmask |= W_WIELDED_WEAPON;
 
         item_mc_bonus = 0;
         int otyp = o->otyp;
@@ -1600,6 +1606,9 @@ struct monst *mon;
 
             if (o->oclass == ARMOR_CLASS || o->oclass == MISCELLANEOUS_CLASS || (objects[o->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(o) || (objects[o->otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC))
                 item_mc_bonus += o->enchantment / 3;
+
+            if (is_shield(o))
+                item_mc_bonus += is_you ? shield_skill_mc_bonus(P_SKILL_LEVEL(P_SHIELD)) : 0;
         }
 
         if ((worn || (!worn && (objects[otyp].oc_pflags & P1_ATTRIBUTE_BONUS_APPLIES_WHEN_CARRIED)))
@@ -1613,9 +1622,9 @@ struct monst *mon;
             /* Note u.umcbonus is not being used at the moment, even though it contains appropriate bonuses for you */
             if (objects[o->otyp].oc_bonus_attributes & BONUS_TO_MC)
             {
-                item_mc_bonus += objects[o->otyp].oc_attribute_bonus;
+                item_mc_bonus += objects[o->otyp].oc_attribute_bonus / ((objects[o->otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3);
                 if (!(objects[o->otyp].oc_bonus_attributes & IGNORE_ENCHANTMENT))
-                    item_mc_bonus += o->enchantment / 3;
+                    item_mc_bonus += o->enchantment / ((objects[o->otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3);
             }
         }
 
@@ -1774,6 +1783,7 @@ register struct obj* omonwep;
     struct permonst *olduasmon = youmonst.data;
     int res;
     boolean objectshatters = FALSE;
+    boolean isinstakilled = FALSE;
     boolean isdisintegrated = FALSE;
     boolean sharpness_effect = FALSE;
     int critstrikeroll = rn2(100);
@@ -1945,20 +1955,23 @@ register struct obj* omonwep;
 
                     update_extrinsics();
                     context.botl = context.botlx = 1;
+                    refresh_m_tile_gui_info(mtmp, FALSE);
                     display_u_being_hit(HIT_CRUSHED, damagedealt, 0UL);
 
                     if (is_constrictor(mtmp->data))
                     {
                         if (hug_throttles(mtmp->data))
                         {
-                            if (!has_neck(youmonst.data) || Magical_breathing || !can_be_strangled(&youmonst))
-                                You("do not feel particularly concerned.");
-                            else
-                                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is choking you to death!", Monnam(mtmp));
+                            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is choking you to death!", Monnam(mtmp));
                         }
                         else
+                        {
                             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is constricting you to death!", Monnam(mtmp));
+                        }
+                        if (Breathless)
+                            pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
                     }
+                    grab_hint(mtmp);
                 }
             }
             else if (u.ustuck == mtmp)
@@ -1971,11 +1984,15 @@ register struct obj* omonwep;
                         is_constrictor(mtmp->data) ? " to death!" : ".",
                         damagedealt);
                     display_u_being_hit(HIT_CRUSHED, damagedealt, 0UL);
+                    if (Breathless)
+                        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
                 }
                 else if (is_constrictor(mtmp->data))
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is %s you to death!", Monnam(mtmp), hug_throttles(mtmp->data) ? "choking" : "constricting");
+                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is %s you to death!", Monnam(mtmp), hug_throttles(mtmp->data) ? "choked" : "constricting");
                     display_u_being_hit(HIT_CRUSHED, damagedealt, 0UL);
+                    if (Breathless)
+                        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
                 }
                 else
                 {
@@ -2036,7 +2053,7 @@ register struct obj* omonwep;
                 int ahres = 0;
 
                 hittxt = (otmp->oartifact
-                    && (ahres = artifact_hit(mtmp, &youmonst, otmp, &damage, dieroll)));
+                    && (ahres = artifact_hit(mtmp, &youmonst, otmp, &damage, &isinstakilled, dieroll)));
 
                 if (ahres == 1)
                     displaysustain = TRUE;
@@ -2045,7 +2062,12 @@ register struct obj* omonwep;
                 int special_hit_dmg = pseudo_artifact_hit(mtmp, &youmonst, otmp, extradmg, dieroll, critstrikeroll, &spec_adtyp);
                 if (special_hit_dmg < 0)
                 {
-                    damage += (double)(2 * (Upolyd ? u.mh : u.uhp) + 200);
+                    isinstakilled = TRUE;
+                    //damage += (double)(2 * (Upolyd ? u.mh : u.uhp) + 200);
+                    //if (Upolyd)
+                    //    u.mh = 0;
+                    //else
+                    //    u.uhp = 0;
                     isdisintegrated = TRUE;
                     hittxt = TRUE; /* This means that hit text is already given */
                 }
@@ -2103,7 +2125,7 @@ register struct obj* omonwep;
                 /* this redundancy necessary because you have
                    to take the damage _before_ being cloned;
                    need to have at least 2 hp left to split */
-                if ((double)u.mh + (((double)u.mh_fraction)/10000) - damage >= 2 && (objects[otmp->otyp].oc_material == MAT_IRON
+                if (!isinstakilled && (double)u.mh + (((double)u.mh_fraction)/10000) - damage >= 2 && (objects[otmp->otyp].oc_material == MAT_IRON
                     /* relevant 'metal' objects are scalpel and tsurugi */
                     || objects[otmp->otyp].oc_material == MAT_METAL)
                     && (u.umonnum >= 0 && does_split_upon_hit(&mons[u.umonnum])))
@@ -2144,8 +2166,8 @@ register struct obj* omonwep;
 
         break;
     case AD_ROTS:
-        if (Sick_resistance)
-            damage = 0;
+        //if (Sick_resistance) // Note: Apply still the damage, since this is mummies' main attack.
+        //    damage = 0;
 
         hitmsg(mtmp, mattk, damage == 0 ? 0 : damagedealt, FALSE);
 
@@ -2188,7 +2210,8 @@ register struct obj* omonwep;
             if ((int) mtmp->m_lev > rn2(25))
                 destroy_item(SPBOOK_CLASS, AD_FIRE);
             burn_away_slime();
-        } 
+            item_destruction_hint(AD_FIRE, FALSE);
+        }
         //else
         //    damage = 0;
         break;
@@ -2208,8 +2231,11 @@ register struct obj* omonwep;
 
             display_u_being_hit(HIT_FROZEN, damagedealt, 0UL);
 
-            if ((int) mtmp->m_lev > rn2(20))
+            if ((int)mtmp->m_lev > rn2(20))
+            {
                 destroy_item(POTION_CLASS, AD_COLD);
+                item_destruction_hint(AD_COLD, FALSE);
+            }
         }
         //else
         //    damage = 0;
@@ -2236,7 +2262,9 @@ register struct obj* omonwep;
                 destroy_item(WAND_CLASS, AD_ELEC);
             if ((int) mtmp->m_lev > rn2(20))
                 destroy_item(RING_CLASS, AD_ELEC);
-        } 
+
+            item_destruction_hint(AD_ELEC, FALSE);
+        }
         //else
         //    damage = 0;
         break;
@@ -2359,7 +2387,7 @@ register struct obj* omonwep;
                 incr_itimeout(&HParalyzed, (rnd(8) + 2));
                 context.botl = context.botlx = 1;
                 refresh_u_tile_gui_info(TRUE);
-
+                standard_hint("Get free action as early as possible. Avoid engaging in close combat with paralyzing monsters before that.", &u.uhint.paralyzed_by_monster);
 #if 0
                 nomovemsg = You_can_move_again;
                 nomul(-(rnd(8) + 2));
@@ -2478,7 +2506,7 @@ register struct obj* omonwep;
                         kname = the(kname);
                     kformat = KILLED_BY;
                 }
-                make_stoned(5L, (char *) 0, kformat, kname);
+                make_stoned(5L, (char *) 0, kformat, kname, HINT_KILLED_COCKATRICE);
                 return 1;
                 /* done_in_by(mtmp, STONING); */
             }
@@ -2492,6 +2520,8 @@ register struct obj* omonwep;
         {
             play_sfx_sound(SFX_ACQUIRE_GRAB);
             u.ustuck = mtmp;
+            refresh_m_tile_gui_info(mtmp, FALSE);
+            grab_hint(mtmp);
         }
         break;
     case AD_WRAP:
@@ -2514,15 +2544,26 @@ register struct obj* omonwep;
                         pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s swings itself around you!", Monnam(mtmp));
 
                     if (is_pool(mtmp->mx, mtmp->my) && !Swimming && !Amphibious)
+                    {
                         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is drowning you!", Monnam(mtmp));
+                        if (Breathless)
+                            pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
+                    }
                     else if (is_constrictor(mtmp->data))
+                    {
                         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is constricting you to death!", Monnam(mtmp));
+                        if (Breathless)
+                            pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
+                    }
 
                     play_sfx_sound(SFX_ACQUIRE_GRAB);
                     u.ustuck = mtmp;
+                    refresh_m_tile_gui_info(mtmp, FALSE);
 
                     update_extrinsics();
                     context.botl = context.botlx = 1;
+
+                    grab_hint(mtmp);
                 }
             } 
             else if (u.ustuck == mtmp) 
@@ -2531,6 +2572,8 @@ register struct obj* omonwep;
                 {
                     /* Drowning is now delayed death */
                     pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is drowning you!", Monnam(mtmp));
+                    if (Breathless)
+                        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
 
                     /*
                     boolean moat = (levl[mtmp->mx][mtmp->my].typ != POOL)
@@ -2547,7 +2590,11 @@ register struct obj* omonwep;
                     */
                 } 
                 else if (is_constrictor(mtmp->data))
+                {
                     pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is constricting you to death!", Monnam(mtmp));
+                    if (Breathless)
+                        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, Magical_breathing ? "However, you can still breathe normally." : "However, you do not feel particularly concerned.");
+                }
                 else if (mattk->aatyp == AT_HUGS)
                 {
                     if (damagedealt > 0)
@@ -2660,7 +2707,7 @@ register struct obj* omonwep;
             }
             if (is_animal(mtmp->data) && *buf) {
                 if (canseemon(mtmp))
-                    pline("%s tries to %s away with %s.", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s tries to %s away with %s.", Monnam(mtmp),
                           locomotion(mtmp->data, "run"), buf);
             }
             monflee(mtmp, 0, FALSE, FALSE);
@@ -2818,11 +2865,11 @@ register struct obj* omonwep;
             if (!rn2(3))
                 exercise(A_CON, TRUE);
             if (Sick)
-                make_sick(0L, (char *) 0, FALSE);
+                make_sick(0L, (char *) 0, FALSE, 0);
             if (FoodPoisoned)
-                make_food_poisoned(0L, (char*)0, FALSE);
+                make_food_poisoned(0L, (char*)0, FALSE, 0);
             if (MummyRot)
-                make_mummy_rotted(0L, (char*)0, FALSE);
+                make_mummy_rotted(0L, (char*)0, FALSE, 0);
             context.botl = context.botlx = TRUE;
 
             if (goaway)
@@ -2883,8 +2930,8 @@ register struct obj* omonwep;
     case AD_STUN:
         if (uncancelled && !Stun_resistance && !rn2(4)) 
         {
-            damage /= 2;
-            damagedealt = (int)damage + ((damage - (double)((int)damage) - ((double)(Upolyd ? u.mh_fraction : u.uhp_fraction) / 10000)) > 0 ? 1 : 0);
+            //damage /= 2;
+            //damagedealt = (int)damage + ((damage - (double)((int)damage) - ((double)(Upolyd ? u.mh_fraction : u.uhp_fraction) / 10000)) > 0 ? 1 : 0);
             hitmsg(mtmp, mattk, damagedealt, TRUE);
             if (!Stunned)
                 play_sfx_sound(SFX_ACQUIRE_STUN);
@@ -2949,7 +2996,7 @@ register struct obj* omonwep;
         hitmsg(mtmp, mattk, -1, TRUE);
         if (!is_cancelled(mtmp) && !mtmp->mspec_used)
         {
-            mtmp->mspec_used = mtmp->mspec_used + ((int)ceil(damage) + rn2(6));
+            mtmp->mspec_used = mtmp->mspec_used + ((int)ceil(damage) + rn2(6)) / mon_spec_cooldown_divisor(mtmp);
             if (Confusion)
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are getting even more confused.");
             else
@@ -3033,8 +3080,7 @@ register struct obj* omonwep;
             hitmsg(mtmp, mattk, -1, FALSE);
             pline_The("slime burns away!");
             damage = 0;
-        } else if (Unchanging || is_incorporeal(youmonst.data)
-                   || youmonst.data == &mons[PM_GREEN_SLIME]) {
+        } else if (Unchanging || Slime_resistance || slimeproof(youmonst.data)) {
             hitmsg(mtmp, mattk, -1, FALSE);
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             You("are unaffected.");
@@ -3043,8 +3089,7 @@ register struct obj* omonwep;
             hitmsg(mtmp, mattk, damagedealt, TRUE);
             play_sfx_sound(SFX_START_SLIMING);
             You_ex(ATR_NONE, CLR_MSG_WARNING, "don't feel very well.");
-            make_slimed(10L, (char *) 0);
-            delayed_killer(SLIMED, KILLED_BY_AN, mon_monster_name(mtmp));
+            make_slimed(10L, (char *) 0, KILLED_BY_AN, mon_monster_name(mtmp), HINT_KILLED_SLIMED);
         }
         else {
             hitmsg(mtmp, mattk, damagedealt, TRUE);
@@ -3087,6 +3132,7 @@ register struct obj* omonwep;
         damage = 0;
         break;
     }
+
     if ((Upolyd ? u.mh : u.uhp) < 1) {
         /* already dead? call rehumanize() or done_in_by() as appropriate */
         mdamageu(mtmp, 1, FALSE);
@@ -3195,8 +3241,15 @@ register struct obj* omonwep;
         permdmg = 0;
         permdmg2 = 0;
     }
+    else if (isinstakilled)
+    {
+        if (Upolyd)
+            u.mh = 0;
+        else
+            u.uhp = 0;
+    }
 
-    if (damage > 0)
+    if (damage > 0 || isinstakilled)
     {
         if (permdmg > 0) 
         { /* Death's life force drain */
@@ -3506,7 +3559,7 @@ struct attack *mattk;
 
     switch (mattk->adtyp) {
     case AD_DGST:
-        if (Slow_digestion) 
+        if (Slow_digestion || Invulnerable) 
         {
             /* Messages are handled below */
             u.uswldtim = 0;
@@ -3523,6 +3576,7 @@ struct attack *mattk;
                   (u.uswldtim == 2) ? " thoroughly"
                                     : (u.uswldtim == 1) ? " utterly" : "");
             exercise(A_STR, FALSE);
+            standard_hint("If being digested by a monster, you can use a wand of digging to reduce the monster to one hit point, or wear a ring of slow digestion.", &u.uhint.got_digested);
         }
         break;
     case AD_PHYS:
@@ -3627,7 +3681,9 @@ struct attack *mattk;
         break;
     case AD_ROTS:
         if (!mummyrotmu(mtmp))
-            damage = 0;
+        {
+            //damage = 0;
+        }
         break;
     case AD_DREN:
         /* AC magic cancellation doesn't help when engulfed */
@@ -3794,6 +3850,8 @@ boolean ufound;
                 destroy_item(POTION_CLASS, (int)mattk->adtyp);
                 destroy_item(RING_CLASS, (int)mattk->adtyp);
                 destroy_item(WAND_CLASS, (int)mattk->adtyp);
+
+                item_destruction_hint((int)mattk->adtyp, FALSE);
             }
             break;
 
@@ -3963,6 +4021,7 @@ struct attack *mattk;
                 break;
             play_sfx_sound(SFX_PETRIFY);
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "turn to stone...");
+            killer.hint_idx = HINT_KILLED_MEDUSA_GAZE;
             killer.format = KILLED_BY;
             Strcpy(killer.name, mon_monster_name(mtmp));
             done(STONING);
@@ -3977,7 +4036,7 @@ struct attack *mattk;
             } else {
                 int conf = d(3, 4);
 
-                mtmp->mspec_used = mtmp->mspec_used + (conf + rn2(6));
+                mtmp->mspec_used = mtmp->mspec_used + (conf + rn2(6)) / mon_spec_cooldown_divisor(mtmp);
                 if (!Confusion)
                     pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s gaze confuses you!", s_suffix(Monnam(mtmp)));
                 else
@@ -4005,7 +4064,7 @@ struct attack *mattk;
                 {
                     int stun = d(2, 6);
 
-                    mtmp->mspec_used = mtmp->mspec_used + (stun + rn2(6));
+                    mtmp->mspec_used = mtmp->mspec_used + (stun + rn2(6)) / mon_spec_cooldown_divisor(mtmp);
                     if (!Stunned)
                         play_sfx_sound(SFX_ACQUIRE_STUN);
                     make_stunned((HStun & TIMEOUT) + (long)stun, TRUE);
@@ -4092,6 +4151,7 @@ struct attack *mattk;
                     destroy_item(SPBOOK_CLASS, AD_FIRE);
                 if (damage > 0)
                     mdamageu_with_hit_tile(mtmp, damage, TRUE, HIT_ON_FIRE);
+                item_destruction_hint(AD_FIRE, FALSE);
             }
         }
         break;
@@ -4517,7 +4577,7 @@ struct monst *mon;
     } 
     else 
     {
-        mon->mspec_used = rnd(100); /* monster is worn out */
+        mon->mspec_used = rnd(100) / mon_spec_cooldown_divisor(mon); /* monster is worn out */
         You("seem to have enjoyed it more than %s...", noit_mon_nam(mon));
         switch (rn2(5)) {
         case 0:
@@ -4587,7 +4647,8 @@ struct monst *mon;
         }
     }
     if (!rn2(25))
-        mon->mspec_used = max(mon->mspec_used, 10 + rnd(40)); // increase_mon_property(mon, CANCELLED, 10 + rnd(40)); /* monster is worn out */
+        mon->mspec_used = max(mon->mspec_used, (10 + rnd(40)) / mon_spec_cooldown_divisor(mon)); // increase_mon_property(mon, CANCELLED, 10 + rnd(40)); /* monster is worn out */
+
     if (!tele_restrict(mon))
     {
         (void)rloc2(mon, TRUE, TRUE);

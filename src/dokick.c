@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    dokick.c    $NHDT-Date: 1551920353 2019/03/07 00:59:13 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.131 $ */
 /* Copyright (c) Izchak Miller, Mike Stephenson, Steve Linhart, 1989. */
@@ -830,6 +830,7 @@ boolean is_golf_swing;
                 /* normalize body shape here; foot, not body_part(FOOT) */
                 Sprintf(killer.name, "kicking %s barefoot",
                     killer_xname(kickedobj));
+                killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
                 instapetrify(killer.name);
             }
         }
@@ -1186,7 +1187,7 @@ dokick() {
     } 
     else if (u.usteed) 
     {
-        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, (const char*)0, "Kick your steed?", ynchars, 'y', yndescs) == 'y')
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, (const char*)0, "Kick your steed?", ynchars, 'y', yndescs, (const char*)0) == 'y')
         {
             You("kick %s.", mon_nam(u.usteed));
             kick_steed();
@@ -1341,7 +1342,7 @@ dokick() {
             && (!Is_airlevel(&u.uz) || !OBJ_AT(xx, yy))) 
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("have nothing to brace yourself against.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "have nothing to brace yourself against.");
             return 0;
         }
     }

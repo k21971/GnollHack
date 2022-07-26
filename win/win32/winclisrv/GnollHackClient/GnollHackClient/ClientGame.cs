@@ -27,6 +27,7 @@ namespace GnollHackClient
         private bool _guiTipsFinished = false;
         private bool _panicFinished = false;
         private bool _messageFinished = false;
+        private bool _characternameSet = false;
         private string _characterName = "";
         private object _characterNameLock = new object();
         private GamePage _gamePage;
@@ -83,6 +84,7 @@ namespace GnollHackClient
                     {
                         case GHRequestType.AskName:
                             CharacterName = response.ResponseStringValue;
+                            _characternameSet = true;
                             break;
                         case GHRequestType.GetChar:
                             _inputBufferLocation++;
@@ -244,7 +246,7 @@ namespace GnollHackClient
                 return 0;
 
             int handle = _lastWindowHandle;
-            GHWindow ghwin = new GHWindow((GHWinType)wintype, (ghwindow_styles)style, glyph, (dataflags & 8) != 0,
+            GHWindow ghwin = new GHWindow((GHWinType)wintype, (ghwindow_styles)style, glyph, (dataflags & 8) != 0, (dataflags & 16) != 0,
                 (dataflags & 1) == 0 ? null : new ObjectDataItem(objdata, otypdata, (dataflags & 4) != 0), _gamePage, handle);
 
             lock(_ghWindowsLock)
@@ -262,6 +264,8 @@ namespace GnollHackClient
         }
         public void ClientCallback_DestroyGHWindow(int winHandle)
         {
+            if (winHandle < 0)
+                return;
             lock (_ghWindowsLock)
             {
                 GHWindow ghwin = _ghWindows[winHandle];
@@ -274,6 +278,8 @@ namespace GnollHackClient
         }
         public void ClientCallback_ClearGHWindow(int winHandle)
         {
+            if (winHandle < 0)
+                return;
             lock (_ghWindowsLock)
             {
                 if (_ghWindows[winHandle] != null)
@@ -282,6 +288,8 @@ namespace GnollHackClient
         }
         public void ClientCallback_DisplayGHWindow(int winHandle, byte blocking)
         {
+            if (winHandle < 0)
+                return;
             bool ismenu = false;
             bool istext = false;
             bool ismap = false;
@@ -306,7 +314,7 @@ namespace GnollHackClient
             Debug.WriteLine("ClientCallback_ExitWindows");
             ClientCallback_RawPrint(str);
 
-            if (str != null && str != "")
+            if (!string.IsNullOrWhiteSpace(str))
                 Thread.Sleep(1100);
 
             lock (_ghWindowsLock)
@@ -357,14 +365,16 @@ namespace GnollHackClient
 
         }
 
-        public string ClientCallback_AskName()
+        public string ClientCallback_AskName(string modeName, string modeDescription)
         {
             Debug.WriteLine("ClientCallback_AskName");
             ConcurrentQueue<GHRequest> queue;
+            _characternameSet = false;
+            CharacterName = "";
             if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
             {
-                queue.Enqueue(new GHRequest(this, GHRequestType.AskName));
-                while (string.IsNullOrEmpty(CharacterName))
+                queue.Enqueue(new GHRequest(this, GHRequestType.AskName, modeName, modeDescription));
+                while (!_characternameSet)
                 {
                     Thread.Sleep(GHConstants.PollingInterval);
                     pollResponseQueue();
@@ -464,7 +474,7 @@ namespace GnollHackClient
                 return 0;
 
         }
-        public int ClientCallback_YnQuestion(int style, int attr, int color, int glyph, string title, string question, string responses, string def, string descriptions, ulong ynflags)
+        public int ClientCallback_YnFunction(int style, int attr, int color, int glyph, string title, string question, string responses, string def, string descriptions, string introline, ulong ynflags)
         {
             if(question != null)
                 RawPrintEx(question, attr, color);
@@ -474,12 +484,18 @@ namespace GnollHackClient
             {
                 if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                 {
-                    queue.Enqueue(new GHRequest(this, GHRequestType.ShowDirections));
+                    if((ynflags & 1UL) != 0)
+                        queue.Enqueue(new GHRequest(this, GHRequestType.ShowDirections)); //TODO: Show keyboard
+                    else
+                        queue.Enqueue(new GHRequest(this, GHRequestType.ShowDirections));
                 }
-                int res = ClientCallback_nhgetch(); /* Get direction */
+                int res = ClientCallback_nhgetch(); /* Get direction / letter */
                 if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                 {
-                    queue.Enqueue(new GHRequest(this, GHRequestType.HideDirections));
+                    if ((ynflags & 1UL) != 0)
+                        queue.Enqueue(new GHRequest(this, GHRequestType.HideDirections)); //TODO: Hide keyboard
+                    else
+                        queue.Enqueue(new GHRequest(this, GHRequestType.HideDirections));
                 }
                 return res;
             }
@@ -487,7 +503,7 @@ namespace GnollHackClient
             {
                 if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                 {
-                    queue.Enqueue(new GHRequest(this, GHRequestType.ShowYnResponses, style, attr, color, glyph, title, question, responses, descriptions, ynflags));
+                    queue.Enqueue(new GHRequest(this, GHRequestType.ShowYnResponses, style, attr, color, glyph, title, question, responses, descriptions, introline, ynflags));
                 }
 
                 int cnt = 0;
@@ -584,7 +600,7 @@ namespace GnollHackClient
         {
             if (ClientCallback_UIHasInput() > 0)
                 return;
-            Thread.Sleep(2 * GHConstants.DefaultAnimationInterval);
+            Thread.Sleep(GHConstants.DelayOutputDurationInMilliseconds);
         }
         public void ClientCallback_DelayOutputMilliseconds(int milliseconds)
         {
@@ -912,6 +928,7 @@ namespace GnollHackClient
             App.DebugWriteProfilingStopwatchTimeAndStart("SelectMenu");
             Debug.WriteLine("ClientCallback_SelectMenu");
             ConcurrentQueue<GHRequest> queue;
+            bool enqueued = false;
 
             lock (_ghWindowsLock)
             {
@@ -924,6 +941,7 @@ namespace GnollHackClient
                     if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                     {
                         queue.Enqueue(new GHRequest(this, GHRequestType.ShowMenuPage, _ghWindows[winid], _ghWindows[winid].MenuInfo));
+                        enqueued = true;
                     }
                 }
             }
@@ -933,21 +951,24 @@ namespace GnollHackClient
             //    _gamePage.RefreshScreen = false;
             //}
 
-            bool continuepolling = true;
-            while (continuepolling)
+            if(enqueued)
             {
-                lock (_ghWindowsLock)
+                bool continuepolling = true;
+                while (continuepolling)
                 {
-                    if (_ghWindows[winid] == null)
-                        continuepolling = false;
-                    else
-                        continuepolling = (_ghWindows[winid].SelectedMenuItems == null);
-                }
-                if (!continuepolling)
-                    break;
+                    lock (_ghWindowsLock)
+                    {
+                        if (_ghWindows[winid] == null)
+                            continuepolling = false;
+                        else
+                            continuepolling = (_ghWindows[winid].SelectedMenuItems == null);
+                    }
+                    if (!continuepolling)
+                        break;
 
-                Thread.Sleep(GHConstants.PollingInterval);
-                pollResponseQueue();
+                    Thread.Sleep(GHConstants.PollingInterval);
+                    pollResponseQueue();
+                }
             }
 
             //lock (_gamePage.RefreshScreenLock)
@@ -1035,7 +1056,7 @@ namespace GnollHackClient
             }
         }
 
-        public string ClientCallback_GetLine(int style, int attr, int color, string query, string placeholder, string linesuffix)
+        public string ClientCallback_GetLine(int style, int attr, int color, string query, string placeholder, string linesuffix, string introline)
         {
             Debug.WriteLine("ClientCallback_GetLine");
             if (query == null)
@@ -1045,7 +1066,7 @@ namespace GnollHackClient
             if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
             {
                 _getLineString = null;
-                queue.Enqueue(new GHRequest(this, GHRequestType.GetLine, query, placeholder, linesuffix, style, attr, color));
+                queue.Enqueue(new GHRequest(this, GHRequestType.GetLine, query, placeholder, linesuffix, introline, style, attr, color));
                 while (_getLineString == null)
                 {
                     Thread.Sleep(GHConstants.PollingInterval);
@@ -1182,35 +1203,35 @@ namespace GnollHackClient
                     data.tflags = tflags;
                     queue.Enqueue(new GHRequest(this, GHRequestType.DisplayScreenText, data));
                 }
-            }
 
-            if((tflags & 1UL) != 0)
-            {
-                /* Blocking call */
-                while (!_screenTextSet)
+                if ((tflags & 1UL) != 0)
                 {
-                    Thread.Sleep(GHConstants.PollingInterval);
-                    pollResponseQueue();
-                }
-
-                int cnt = 0;
-                long countervalue;
-                do
-                {
-                    countervalue = _gamePage.MainCounterValue;
-                    lock (_gamePage._screenTextLock)
+                    /* Blocking call */
+                    while (!_screenTextSet)
                     {
-                        if (_gamePage._screenText != null)
+                        Thread.Sleep(GHConstants.PollingInterval);
+                        pollResponseQueue();
+                    }
+
+                    int cnt = 0;
+                    long countervalue;
+                    do
+                    {
+                        countervalue = _gamePage.MainCounterValue;
+                        lock (_gamePage._screenTextLock)
                         {
-                            if (_gamePage._screenText.IsFinished(countervalue))
+                            if (_gamePage._screenText != null)
+                            {
+                                if (_gamePage._screenText.IsFinished(countervalue))
+                                    break;
+                            }
+                            else
                                 break;
                         }
-                        else
-                            break;
-                    }
-                    Thread.Sleep(GHConstants.PollingInterval);
-                    cnt++;
-                } while (cnt < 2000);
+                        Thread.Sleep(GHConstants.PollingInterval);
+                        cnt++;
+                    } while (cnt < 2000);
+                }
             }
         }
 
@@ -1393,7 +1414,7 @@ namespace GnollHackClient
                         }
                     }
                     break;
-                case (int)gui_command_types.GUI_CMD_BEFORE_COLLECT:
+                case (int)gui_command_types.GUI_CMD_FADE_TO_BLACK:
                     if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                     {
                         queue.Enqueue(new GHRequest(this, GHRequestType.FadeToBlack, 200));
@@ -1405,7 +1426,7 @@ namespace GnollHackClient
                     GC.WaitForPendingFinalizers();
                     GC.Collect();
                     break;
-                case (int)gui_command_types.GUI_CMD_AFTER_COLLECT:
+                case (int)gui_command_types.GUI_CMD_FADE_FROM_BLACK:
                     if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                     {
                         queue.Enqueue(new GHRequest(this, GHRequestType.FadeFromBlack, 200));
@@ -1449,7 +1470,7 @@ namespace GnollHackClient
                     _gamePage.EnableCasualMode = true;
                     _gamePage.ExtendedCommands = _gamePage.GnollHackService.GetExtendedCommands();
                     break;
-                case (int)gui_command_types.GUI_CMD_PETS:
+                case (int)gui_command_types.GUI_CMD_CLEAR_PET_DATA:
                     _gamePage.ClearPetData();
                     break;
                 case (int)gui_command_types.GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE:
@@ -1463,6 +1484,35 @@ namespace GnollHackClient
                     {
                         queue.Enqueue(new GHRequest(this, GHRequestType.RestoreTravelMode));
                     }
+                    break;
+                case (int)gui_command_types.GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE_ON_LEVEL:
+                    if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.SaveAndDisableTravelModeOnLevel));
+                    }
+                    break;
+                case (int)gui_command_types.GUI_CMD_RESTORE_TRAVEL_MODE_ON_LEVEL:
+                    if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.RestoreTravelModeOnLevel));
+                    }
+                    break;
+                case (int)gui_command_types.GUI_CMD_CLEAR_CONDITION_TEXTS:
+                    _gamePage.ClearConditionTexts();
+                    break;
+                case (int)gui_command_types.GUI_CMD_CLEAR_FLOATING_TEXTS:
+                    _gamePage.ClearFloatingTexts();
+                    break;
+                case (int)gui_command_types.GUI_CMD_CLEAR_GUI_EFFECTS:
+                    _gamePage.ClearGuiEffects();
+                    break;
+                case (int)gui_command_types.GUI_CMD_LOAD_INTRO_SOUND_BANK:
+                    if(App.LoadBanks)
+                        App.FmodService.LoadIntroSoundBank();
+                    break;
+                case (int)gui_command_types.GUI_CMD_UNLOAD_INTRO_SOUND_BANK:
+                    if (App.LoadBanks)
+                        App.FmodService.UnloadIntroSoundBank();
                     break;
                 default:
                     break;
@@ -1502,7 +1552,7 @@ namespace GnollHackClient
             return 0;
         }
 
-        public void ClientCallback_OpenSpecialView(int viewtype, string text, int param1, int param2)
+        public int ClientCallback_OpenSpecialView(int viewtype, string text, string title, int attr, int color)
         {
             switch (viewtype)
             {
@@ -1521,51 +1571,46 @@ namespace GnollHackClient
                             break;
 
                         ConcurrentQueue<GHRequest> queue;
-                        _guiTipsFinished = false;
                         if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                         {
+                            _guiTipsFinished = false;
                             queue.Enqueue(new GHRequest(this, GHRequestType.ShowGUITips));
-                        }
-
-                        while (!_guiTipsFinished)
-                        {
-                            Thread.Sleep(GHConstants.PollingInterval);
-                            pollResponseQueue();
+                            while (!_guiTipsFinished)
+                            {
+                                Thread.Sleep(GHConstants.PollingInterval);
+                                pollResponseQueue();
+                            }
                         }
                         break;
                     }
                 case (int)special_view_types.SPECIAL_VIEW_CRASH_DETECTED:
                     {
                         ConcurrentQueue<GHRequest> queue;
-                        _crashReportFinished = false;
                         if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                         {
+                            _crashReportFinished = false;
                             queue.Enqueue(new GHRequest(this, GHRequestType.CrashReport));
+                            while (!_crashReportFinished)
+                            {
+                                Thread.Sleep(GHConstants.PollingInterval);
+                                pollResponseQueue();
+                            }
                         }
-
-                        while (!_crashReportFinished)
-                        {
-                            Thread.Sleep(GHConstants.PollingInterval);
-                            pollResponseQueue();
-                        }
-
                         break;
                     }
                 case (int)special_view_types.SPECIAL_VIEW_PANIC:
                     {
                         ConcurrentQueue<GHRequest> queue;
-                        _panicFinished = false;
                         if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                         {
+                            _panicFinished = false;
                             queue.Enqueue(new GHRequest(this, GHRequestType.Panic, text));
+                            while (!_panicFinished)
+                            {
+                                Thread.Sleep(GHConstants.PollingInterval);
+                                pollResponseQueue();
+                            }
                         }
-
-                        while (!_panicFinished)
-                        {
-                            Thread.Sleep(GHConstants.PollingInterval);
-                            pollResponseQueue();
-                        }
-
                         break;
                     }
                 case (int)special_view_types.SPECIAL_VIEW_DEBUGLOG:
@@ -1575,23 +1620,47 @@ namespace GnollHackClient
                 case (int)special_view_types.SPECIAL_VIEW_MESSAGE:
                     {
                         ConcurrentQueue<GHRequest> queue;
-                        _messageFinished = false;
                         if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                         {
+                            _messageFinished = false;
                             queue.Enqueue(new GHRequest(this, GHRequestType.Message, text));
-                        }
-
-                        while (!_messageFinished)
-                        {
-                            Thread.Sleep(GHConstants.PollingInterval);
-                            pollResponseQueue();
+                            while (!_messageFinished)
+                            {
+                                Thread.Sleep(GHConstants.PollingInterval);
+                                pollResponseQueue();
+                            }
                         }
 
                         break;
                     }
+                case (int)special_view_types.SPECIAL_VIEW_YN_DIALOG:
+                    {
+                        ConcurrentQueue<GHRequest> queue;
+                        string responses = "yn";
+                        string descriptions = "Yes\nNo";
+                        if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
+                        {
+                            queue.Enqueue(new GHRequest(this, GHRequestType.ShowYnResponses, (int)yn_function_styles.YN_STYLE_GENERAL, attr, color, _gamePage.NoGlyph, title, text, responses, descriptions, null, 0UL));
+                        }
+                        else
+                            return 27;
+
+                        int val = ClientCallback_nhgetch();
+                        string res = Char.ConvertFromUtf32(val);
+                        if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
+                        {
+                            queue.Enqueue(new GHRequest(this, GHRequestType.HideYnResponses));
+                        }
+                        if (responses.Contains(res))
+                            return val;
+                        else
+                            return 27;
+
+                    }
                 default:
                     break;
             }
+            return 1;
         }
 
 

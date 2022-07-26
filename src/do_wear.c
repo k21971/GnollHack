@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    do_wear.c    $NHDT-Date: 1551138255 2019/02/25 23:44:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.108 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -56,7 +56,6 @@ STATIC_DCL struct obj *NDECL(do_takeoff);
 STATIC_PTR int NDECL(take_off);
 STATIC_DCL int FDECL(menu_remarm, (int));
 STATIC_DCL void FDECL(count_worn_stuff, (struct obj **, BOOLEAN_P));
-STATIC_PTR int FDECL(armor_or_accessory_off, (struct obj *));
 STATIC_PTR int FDECL(accessory_or_armor_on, (struct obj *, BOOLEAN_P));
 STATIC_DCL void FDECL(already_wearing, (const char *));
 #if 0
@@ -422,6 +421,7 @@ boolean voluntary; /* taking gloves off on purpose? */
             makeplural(body_part(HAND)));
         Sprintf(kbuf, "%s gloves while wielding %s",
                 voluntary ? "removing" : "losing", killer_xname(obj));
+        killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
         instapetrify(kbuf);
         /* life-saved; can't continue wielding cockatrice corpse though */
         remove_worn_item(obj, FALSE);
@@ -467,10 +467,7 @@ Shield_on(VOID_ARGS)
 
     uarms->known = 1; /* shield's +/- evident because of status line AC */
 
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+    status_reassess();
 
     return 0;
 }
@@ -485,11 +482,7 @@ Shield_off(VOID_ARGS)
 
     setworn((struct obj *) 0, W_ARMS);
     context.takeoff.cancelled_don = FALSE;
-
-#ifdef STATUS_HILITES
-    if (VIA_WINDOWPORT())
-        status_initialize(REASSESS_NO_UPDATE_ALL);
-#endif
+    status_reassess();
 
     return 0;
 }
@@ -704,7 +697,7 @@ Amulet_on()
     switch (uamul->otyp) {
     case AMULET_OF_UNCHANGING:
         if (Slimed)
-            make_slimed(0L, (char *) 0);
+            make_slimed(0L, (char *) 0, 0, (char*)0, 0);
         break;
     case AMULET_OF_CHANGE:
         item_change_sex_and_useup(uamul);
@@ -757,6 +750,7 @@ struct obj* uitem;
     if (!uitem)
         return;
 
+    char dcbuf[BUFSZ] = "";
     int orig_sex = poly_gender();
 
     if (Unchanging)
@@ -766,8 +760,9 @@ struct obj* uitem;
     if (orig_sex != poly_gender()) {
         makeknown(uitem->otyp);
         play_sfx_sound(SFX_SEX_CHANGE);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are suddenly very %s!",
+        Sprintf(dcbuf, "are suddenly very %s!",
             flags.female ? "feminine" : "masculine");
+        pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
         context.botl = 1;
     }
     else
@@ -775,14 +770,15 @@ struct obj* uitem;
         play_sfx_sound(SFX_UNKNOWN_ODD_EFFECT);
         /* already polymorphed into single-gender monster; only
            changed the character's base sex */
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "don't feel like yourself.");
+        Strcpy(dcbuf, "You don't feel like yourself.");
+        pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
     }
     play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s disintegrates!", The(cxname(uitem)));
     if (orig_sex == poly_gender() && uitem->dknown
         && !objects[uitem->otyp].oc_name_known
         && !objects[uitem->otyp].oc_uname)
-        docall(uitem);
+        docall(uitem, dcbuf);
     useup(uitem);
     newsym(u.ux, u.uy);
 }
@@ -1236,13 +1232,13 @@ boolean accessorizing;
 
 /* take off one piece or armor or one accessory;
    shared by dotakeoff('T') and doremring('R') */
-STATIC_OVL int
+int
 armor_or_accessory_off(obj)
 struct obj *obj;
 {
     if (!(obj->owornmask & (W_ARMOR | W_ACCESSORY))) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("are not wearing that.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are not wearing that.");
         return 0;
     }
     if (obj == uskin
@@ -1366,7 +1362,7 @@ dotakeoff()
         /* assert( GRAY_DRAGON_SCALES > YELLOW_DRAGON_SCALE_MAIL ); */
         play_sfx_sound(SFX_GENERAL_CANNOT);
         if (uskin)
-            pline_The("%s merged with your skin!",
+            pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s merged with your skin!",
                       uskin->otyp >= GRAY_DRAGON_SCALES
                           ? "dragon scales are"
                           : "dragon scale mail is");
@@ -1546,14 +1542,14 @@ struct obj* obj, *curobj;
 
         char qbuf[BUFSIZ] = "";
         Sprintf(qbuf, "You are currently wearing %s. Exchange it for %s?", an(cxname(curobj)), the(cxname(obj)));
-        char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs);
+        char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
         if (ans == 'y')
             return exchange_worn_item(obj, curobj, curobj->owornmask);
     }
     else
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are already wearing %s%c", cc, (cc == c_that_) ? '!' : '.');
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are already wearing %s%c", cc, (cc == c_that_) ? '!' : '.');
     }
 
     return 0;
@@ -1605,12 +1601,12 @@ long mask;
     if (curobj && !curobj->owornmask) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s not worn.", Tobjnam(curobj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s not worn.", Tobjnam(curobj, "are"));
         return 0;
     }
     else if (obj->owornmask & W_ARMOR) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s already worn.", Tobjnam(obj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s already worn.", Tobjnam(obj, "are"));
         return 0;
     }
 
@@ -1732,7 +1728,7 @@ boolean noisy;
         if (noisy)
         {
             play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-            You_ex(ATR_NONE, CLR_MSG_WARNING, "can't wear any armor in your current form.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "can't wear any armor in your current form.");
         }
         return 0;
     }
@@ -1753,7 +1749,7 @@ boolean noisy;
         if (noisy)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s will not fit on your body.", which);
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "%s will not fit on your body.", which);
         }
         return 0;
     } else if (otmp->owornmask & W_ARMOR) {
@@ -1766,7 +1762,7 @@ boolean noisy;
         if (noisy)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot do that while holding your %s.",
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot do that while holding your %s.",
                 is_sword(uwep) ? c_sword : c_weapon);
         }
         return 0;
@@ -1789,7 +1785,7 @@ boolean noisy;
             if (noisy)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s won't fit over your horn%s.",
+                pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "%s won't fit over your horn%s.",
                     helm_simple_name(otmp),
                     plur(num_horns(youmonst.data)));
             }
@@ -1800,7 +1796,7 @@ boolean noisy;
             if (noisy)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_ex(ATR_NONE, CLR_MSG_WARNING, "have no place to put your %s on.",
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "have no place to put your %s on.",
                     helm_simple_name(otmp));
             }
             err++;
@@ -1819,7 +1815,7 @@ boolean noisy;
                 else
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are already holding something else in your left %s.", body_part(HAND));
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "are already holding something else in your left %s.", body_part(HAND));
                 }
             }
 
@@ -1830,7 +1826,7 @@ boolean noisy;
             if (noisy)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot wear a shield while wielding a two-handed %s.",
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wear a shield while wielding a two-handed %s.",
                     is_sword(uwep) ? c_sword : (uwep->otyp == BATTLE_AXE)
                     ? c_axe
                     : c_weapon);
@@ -1853,7 +1849,7 @@ boolean noisy;
             if (noisy)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_ex(ATR_NONE, CLR_MSG_WARNING, "have no feet..."); /* not body_part(FOOT) */
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "have no feet..."); /* not body_part(FOOT) */
             }
             err++;
         } 
@@ -1864,7 +1860,7 @@ boolean noisy;
             if (noisy)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                pline_ex(ATR_NONE, CLR_MSG_WARNING, "You have too many hooves to wear %s.",
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "You have too many hooves to wear %s.",
                     c_boots); /* makeplural(body_part(FOOT)) yields
                                  "rear hooves" which sounds odd */
             }
@@ -1917,7 +1913,7 @@ boolean noisy;
             if (noisy)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot wear gloves over your %s.",
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wear gloves over your %s.",
                     is_sword(uwep) ? c_sword : c_weapon);
             }
             err++;
@@ -1986,7 +1982,7 @@ boolean noisy;
 
                         char qbuf[BUFSIZ];
                         Sprintf(qbuf, "You cannot wear %s over %s. Take %s off and then wear the shirt?", an(cxname(otmp)), cbuf, many ? "them" : "it");
-                        char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs);
+                        char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
 
                         if (ans == 'y')
                         {
@@ -2029,7 +2025,7 @@ boolean noisy;
 
                         char qbuf[BUFSIZ];
                         Sprintf(qbuf, "You cannot wear %s over %s. Take it off and then wear the robe?", an(cxname(otmp)), cbuf);
-                        char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs);
+                        char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
                         if (ans == 'y')
                         {
                             (void)take_off_covering_and_wear(otmp, W_ARMO);
@@ -2091,7 +2087,7 @@ boolean noisy;
 
                     char qbuf[BUFSIZ];
                     Sprintf(qbuf, "You cannot wear %s over %s. Take %s off and then wear the armor?", an(cxname(otmp)), cbuf, many ? "them" : "it");
-                    char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs);
+                    char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
                     if (ans == 'y')
                     {
                         (void)take_off_covering_and_wear(otmp, W_ARM);
@@ -2100,12 +2096,12 @@ boolean noisy;
                 else if (uarmo)
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot wear armor over a %s.", robe_simple_name(uarmo));
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wear armor over a %s.", robe_simple_name(uarmo));
                 }
                 else
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot wear armor over a %s.", cloak_simple_name(uarmc));
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wear armor over a %s.", cloak_simple_name(uarmc));
                 }
             }
             err++;
@@ -2181,13 +2177,13 @@ boolean in_takeoff_wear;
             if (nolimbs(youmonst.data) || nohands(youmonst.data)) 
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot make the ring stick to your body.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot make the ring stick to your body.");
                 return 0;
             }
             if (uleft && uright) 
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                There_ex(ATR_NONE, CLR_MSG_ATTENTION, "are no more %s%s to fill.",
+                There_ex(ATR_NONE, CLR_MSG_FAIL, "are no more %s%s to fill.",
                       humanoid(youmonst.data) ? "ring-" : "",
                       makeplural(body_part(FINGER)));
 
@@ -2202,7 +2198,7 @@ boolean in_takeoff_wear;
                     You("have %s on the left %s and %s on the right.", an(cxname(uleft)), body_part(FINGER), an(cxname(uright)));
 
                     Sprintf(qbuf, "Remove Left or Right ring?");
-                    answer = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, "lrq", '\0', "Left\nRight\nCancel");
+                    answer = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, "lrq", '\0', "Left\nRight\nCancel", (const char*)0);
                     switch (answer)
                     {
                     case '\0':
@@ -2326,7 +2322,7 @@ boolean in_takeoff_wear;
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot wear more than five miscellanous items.");
                 if (flags.exchange_prompt)
                 {
-                    char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, "Already Wearing 5 Miscellaneous Items", "Do you want to remove some of them?", ynchars, 'n', yndescs);
+                    char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, "Already Wearing 5 Miscellaneous Items", "Do you want to remove some of them?", ynchars, 'n', yndescs, (const char*)0);
                     if (ans == 'y')
                     {
                         return doremring();
@@ -2342,7 +2338,7 @@ boolean in_takeoff_wear;
                 if (ublindf->otyp == TOWEL)
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    Your("%s is already covered by a towel.",
+                    Your_ex(ATR_NONE, CLR_MSG_FAIL, "%s is already covered by a towel.",
                         body_part(FACE));
                 }
                 else if (ublindf->otyp == BLINDFOLD) 
@@ -2503,7 +2499,7 @@ dowear()
     if (!can_operate_objects(youmonst.data))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("Don't even bother.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Don't even bother.");
         return 0;
     }
     if (uarm && uarmu && uarmc && uarmh && uarms && uarmg && uarmf && uarmo && uarmb && umisc && umisc2 && umisc3 && umisc4 && umisc5
@@ -2511,7 +2507,7 @@ dowear()
     {
         /* 'W' message doesn't mention accessories */
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("are already wearing a full complement of armor.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are already wearing a full complement of armor.");
         return 0;
     }
     otmp = getobj(clothes, "wear", 0, "");
@@ -2528,7 +2524,7 @@ doputon()
         && uarm && uarmu && uarmc && uarmh && uarms && uarmg && uarmf && uarmo && uarmb) {
         /* 'P' message doesn't mention armor */
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        Your("%s%s are full, and you're already wearing an amulet and %s.",
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "%s%s and miscellaneous magic item slots are full, and you're already wearing an amulet and %s.",
              humanoid(youmonst.data) ? "ring-" : "",
              makeplural(body_part(FINGER)),
              "a blindfold");
@@ -2580,7 +2576,11 @@ find_ac()
     if (uarmf)
         uac_armor_bonus += ARM_AC_BONUS(uarmf, youmonst.data);
     if (uarms && (is_wielded_item(uarms)))
+    {
         uac_armor_bonus += ARM_AC_BONUS(uarms, youmonst.data); /* Only a shield and a wielded weapon can give AC; exclude wielded other armor types */
+        if (is_shield(uarms))
+            uac_armor_bonus += shield_skill_ac_bonus(P_SKILL_LEVEL(P_SHIELD));
+    }
     if (uarmg)
         uac_armor_bonus += ARM_AC_BONUS(uarmg, youmonst.data);
     if (uarmu)
@@ -2589,7 +2589,11 @@ find_ac()
         uac_armor_bonus += ARM_AC_BONUS(uarmb, youmonst.data);
 
     if (uwep && (is_wielded_item(uwep)))
+    {
         uac_armor_bonus += ARM_AC_BONUS(uwep, youmonst.data); /* A wielded weapon can give AC, also a wielded shield (in right hand) */
+        if (is_shield(uwep))
+            uac_armor_bonus += shield_skill_ac_bonus(P_SKILL_LEVEL(P_SHIELD));
+    }
 
     uac_natural -= (uac_armor_bonus / 3);
     uac_armor -= (uac_armor_bonus + ((10 - uac_natural_base) / 3));
@@ -2608,6 +2612,9 @@ find_ac()
     if (uright && uright->otyp == RIN_PROTECTION)
         uac -= uright->enchantment;
     */
+
+    /* Dodge Skill Bonus */
+    uac -= dodge_skill_ac_bonus(P_SKILL_LEVEL(P_DODGE));
 
     /* DEX Bonus */
     if(!Paralyzed && !Sleeping)
@@ -2982,7 +2989,10 @@ do_takeoff()
     {
         if (!cursed(uwep)) {
             setuwep((struct obj *) 0, W_WEP);
-            You("are empty %s.", body_part(HANDED));
+            if(u.twoweap)
+                Your("right %s is now empty.", body_part(HAND));
+            else
+                You("are empty %s.", body_part(HANDED));
             //u.twoweap = FALSE;
         }
     }
@@ -2990,7 +3000,7 @@ do_takeoff()
     {
         if (!cursed(uarms)) {
             setuwep((struct obj*) 0, W_WEP2);
-            You("are empty %s.", body_part(HANDED));
+            Your("left %s is now empty.", body_part(HAND));
             //u.twoweap = FALSE;
         }
     }
@@ -3200,6 +3210,10 @@ take_off(VOID_ARGS)
         {
             don->delay = 1;
         }
+        else if (doff->what == W_SWAPWEP2)
+        {
+            don->delay = 1;
+        }
         else if (don->what == W_QUIVER)
         {
             don->delay = 1;
@@ -3288,7 +3302,11 @@ take_off(VOID_ARGS)
     {
         doff->delay = 1;
     }
-    else if (doff->what == W_QUIVER) 
+    else if (doff->what == W_SWAPWEP2)
+    {
+        doff->delay = 1;
+    }
+    else if (doff->what == W_QUIVER)
     {
         doff->delay = 1;
     }

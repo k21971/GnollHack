@@ -197,6 +197,7 @@ struct extended_create_window_info {
 
 #define WINDOW_CREATE_FLAGS_NONE                0x00000000
 #define WINDOW_CREATE_FLAGS_ACTIVE              0x00000001
+#define WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS 0x00000002 //For text window only; use menu flags for menu window
 
 #define MENU_FLAGS_NONE                         0x00000000
 #define MENU_FLAGS_IS_HEADING                   0x00000001
@@ -242,17 +243,19 @@ enum obj_material_types {
     MAT_MITHRIL = 24,
     MAT_PLASTIC = 25,
     MAT_GLASS = 26,
-    MAT_GEMSTONE = 27,
-    MAT_MINERAL = 28,
-    MAT_MODRONITE = 29,
-    MAT_PLANARRIFT = 30,
-    MAT_FORCEFIELD = 31,
-    MAT_AIR = 32,
-    MAT_FIRE = 33,
-    MAT_ENERGY = 34,
-    MAT_INCORPOREAL = 35,
-    MAT_ICE = 36,
-    MAT_SOIL = 37,
+    MAT_CRYSTAL = 27, //Brittle like glass
+    MAT_HARD_CRYSTAL = 28, //Strong like gemstone
+    MAT_GEMSTONE = 29,
+    MAT_MINERAL = 30,
+    MAT_MODRONITE = 31,
+    MAT_PLANARRIFT = 32,
+    MAT_FORCEFIELD = 33,
+    MAT_AIR = 34,
+    MAT_FIRE = 35,
+    MAT_ENERGY = 36,
+    MAT_INCORPOREAL = 37,
+    MAT_ICE = 38,
+    MAT_SOIL = 39,
     MAX_MATERIAL_TYPES
 };
 
@@ -418,6 +421,8 @@ enum ghwindow_styles
     GHWINDOW_STYLE_MEDIUM_WIDE_LIST,
     GHWINDOW_STYLE_SEMI_WIDE_LIST,
     GHWINDOW_STYLE_DISPLAY_FILE,
+    GHWINDOW_STYLE_HAS_INDENTED_TEXT,
+    GHWINDOW_STYLE_DISPLAY_FILE_WITH_INDENTED_TEXT,
     MAX_GHWINDOW_STYLES
 };
 
@@ -451,6 +456,8 @@ enum ghmenu_styles
     GHMENU_STYLE_SPELL_COMMAND,
     GHMENU_STYLE_GENERAL_COMMAND,
     GHMENU_STYLE_MONSTER_ABILITY,
+    GHMENU_STYLE_DELETE_SAVED_GAME,
+    GHMENU_STYLE_START_GAME_MENU,
     MAX_GHMENU_STYLES
 };
 
@@ -466,6 +473,8 @@ enum special_view_types
     SPECIAL_VIEW_PANIC,
     SPECIAL_VIEW_DEBUGLOG,
     SPECIAL_VIEW_MESSAGE,
+    SPECIAL_VIEW_YN_DIALOG,
+    SPECIAL_VIEW_SELFIE,
     MAX_SPECIAL_VIEW_TYPES
 };
 
@@ -473,8 +482,9 @@ enum special_view_types
 struct special_view_info {
     enum special_view_types viewtype;
     const char* text;
-    int param1;
-    int param2;
+    const char* title;
+    int attr;
+    int color;
 };
 
 /* Fountain types */
@@ -530,7 +540,7 @@ enum floating_text_types {
     FLOATING_TEXT_HEALING,
     FLOATING_TEXT_DAMAGE,
     FLOATING_TEXT_GOLD_ACQUIRED,
-    FLOATING_TEXT_GOLD_STOLEN,
+    FLOATING_TEXT_GOLD_REDUCED,
     FLOATING_TEXT_MANA_GAIN,
     FLOATING_TEXT_MANA_LOSS,
     FLOATING_TEXT_NUTRITION_GAIN,
@@ -683,9 +693,9 @@ enum context_menu_styles {
 #define MKOBJ_FLAGS_MONSTER_SPECIFIED                  0x00000002
 #define MKOBJ_FLAGS_ALSO_RARE                          0x00000004
 #define MKOBJ_FLAGS_SHOP_ITEM                          0x00000008
-#define MKOBJ_FLAGS_PARAM_IS_TITLE                 0x00000010
-
-#define RNDITEM_FLAGS_ALSO_RARE                        0x00000001
+#define MKOBJ_FLAGS_PARAM_IS_TITLE                     0x00000010
+#define MKOBJ_FLAGS_NORMAL_SPELLBOOK                   0x00000020
+#define MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY          0x00000040
 
 #define MONDIED_FLAGS_NONE                             0x00000000
 #define MONDIED_FLAGS_NO_DEATH_ACTION                  0x00000001
@@ -717,9 +727,9 @@ enum gui_command_types {
     GUI_CMD_PROGRAM_START = 0,
     GUI_CMD_PREFERENCE_SET,
     GUI_CMD_LOAD_GLYPHS,
-    GUI_CMD_BEFORE_COLLECT,
+    GUI_CMD_FADE_TO_BLACK,
     GUI_CMD_COLLECT_GARBAGE,
-    GUI_CMD_AFTER_COLLECT,
+    GUI_CMD_FADE_FROM_BLACK,
     GUI_CMD_FORCE_ASCII,
     GUI_CMD_UNFORCE_ASCII,
     GUI_CMD_START_FLUSH,
@@ -731,9 +741,16 @@ enum gui_command_types {
     GUI_CMD_DEACTIVATE_QUIETER_MODE,
     GUI_CMD_ENABLE_WIZARD_MODE,
     GUI_CMD_ENABLE_CASUAL_MODE,
-    GUI_CMD_PETS,
+    GUI_CMD_CLEAR_PET_DATA,
     GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE,
     GUI_CMD_RESTORE_TRAVEL_MODE,
+    GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE_ON_LEVEL,
+    GUI_CMD_RESTORE_TRAVEL_MODE_ON_LEVEL,
+    GUI_CMD_CLEAR_CONDITION_TEXTS,
+    GUI_CMD_CLEAR_FLOATING_TEXTS,
+    GUI_CMD_CLEAR_GUI_EFFECTS,
+    GUI_CMD_LOAD_INTRO_SOUND_BANK,
+    GUI_CMD_UNLOAD_INTRO_SOUND_BANK,
     GUI_CMD_GAME_START,
     GUI_CMD_PROGRAM_FINISH,
 };
@@ -755,7 +772,8 @@ enum yn_function_styles {
 #define DISREGARD_HEALTH_LEVEL_MULTIPLIER 2
 #define DISREGARD_HEALTH_LEVEL_DIFFERENCE_THRESHOLD 5
 #define ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER 30L
-#define CANDELABRUM_STARTING_AGE 6000L
+#define MAX_BURN_IN_CANDELABRUM 6000L
+#define MAX_OIL_IN_LAMP 1500L
 
 /* Artifact */
 #define ARTDMG_125PCT_DAMAGE -5
@@ -810,8 +828,24 @@ enum quest_states {
     QUEST_STATE_FAILED,
 };
 
+enum spl_sort_types {
+    SORTBY_NONE = 0,
+    SORTBY_LETTER = 0, //This is the same as none in fact
+    SORTBY_ALPHA,
+    SORTBY_LVL_LO,
+    SORTBY_LVL_HI,
+    SORTBY_SKL_AL,
+    SORTBY_SKL_LO,
+    SORTBY_SKL_HI,
+    SORTBY_CURRENT,
+    SORTRETAINORDER,
+
+    NUM_SPELL_SORTBY
+};
+
 
 #define AD_MODULO 4
+
 
 #endif /* GENERAL_H */
 

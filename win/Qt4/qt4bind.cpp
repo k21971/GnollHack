@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 // Copyright (c) Warwick Allison, 1999.
 // Qt4 conversion copyright (c) Ray Chason, 2012-2014.
@@ -179,14 +179,14 @@ void NetHackQtBind::qt_askname()
 
     // We do it all here, and nothing in askname
 
-    char** saved = get_saved_games();
+    struct save_game_data* saved = get_saved_games();
     int ch = -1;
-    if ( saved && *saved ) {
+    if ( saved && saved[0].playername) {
 	if ( splash ) splash->hide();
-	NetHackQtSavedGameSelector sgsel((const char**)saved);
+	NetHackQtSavedGameSelector sgsel((struct save_game_data*)saved);
 	ch = sgsel.choose();
 	if ( ch >= 0 )
-	    str_copy(plname, saved[ch], SIZE(plname));
+	    str_copy(plname, saved[ch].playername, SIZE(plname));
     }
     free_saved_games(saved);
 
@@ -516,7 +516,7 @@ int NetHackQtBind::qt_doprev_message()
     return 0;
 }
 
-char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question_, const char *choices, CHAR_P def, const char* resp_desc, unsigned long ynflags)
+char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question_, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
 {
     QString question(QString::fromLatin1(question_));
     QString message;
@@ -592,9 +592,10 @@ char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph,
     }
 }
 
-void NetHackQtBind::qt_getlin_ex(int style, int attr, int color, const char *prompt, char *line, const char* placeholder, const char* linesuffix)
+void NetHackQtBind::qt_getlin_ex(int style, int attr, int color, const char *prompt, char *line, const char* placeholder, const char* linesuffix, const char* introline)
 {
     char promptbuf[BUFSZ] = "";
+    //Do not show introline
     if (prompt)
         Sprintf(promptbuf, "%s", prompt);
     if (placeholder)

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	winX.c	$NHDT-Date: 1552441031 2019/03/13 01:37:11 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.73 $ */
 /* Copyright (c) Dean Luick, 1992                                 */
@@ -1922,9 +1922,12 @@ release_getline_widgets()
 }
 
 void
-X11_getlin_ex(style, attr, color, question, input)
+X11_getlin_ex(style, attr, color, question, input, placeholder, linesuffix, introline)
 int style, attr, color;
 const char *question;
+const char* placeholder;
+const char* linesuffix;
+const char* introline;
 char *input;
 {
     getline_input = input;
@@ -2166,13 +2169,14 @@ release_yn_widgets()
 /* X11-specific edition of yn_function(), the routine called by the core
    to show a prompt and get a single keystroke answer, often 'y' vs 'n' */
 char
-X11_yn_function_ex(style, attr, color, glyph, title, ques, choices, def, resp_desc, ynflags)
+X11_yn_function_ex(style, attr, color, glyph, title, ques, choices, def, resp_desc, introline, ynflags)
 int style, attr, color, glyph;
 const char* title;
 const char* ques;
 const char *choices; /* string of possible response chars; any char if Null */
 char def;            /* default response if user hits <space> or <return> */
 const char* resp_desc;
+const char* introline;
 unsigned long ynflags;
 {
     char buf[BUFSZ];

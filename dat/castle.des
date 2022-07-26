@@ -107,16 +107,46 @@ MONSTER:('z',"skeleton king"),(67,15)
 [50%]:OBJECT:'9',(67,15)
 OBJECT:('+',"manual"),(69,15),manual_type:manual_infernal_inhabitants
 
-OBJECT:('(',"sarcophagus"),(64,01)
-OBJECT:('(',"sarcophagus"),(70,15)
-OBJECT:('(',"sarcophagus"),(64,04)
-OBJECT:('(',"sarcophagus"),(70,04)
-OBJECT:('(',"sarcophagus"),(64,06)
-OBJECT:('(',"sarcophagus"),(70,06)
-OBJECT:('(',"sarcophagus"),(64,10)
-OBJECT:('(',"sarcophagus"),(70,10)
-OBJECT:('(',"sarcophagus"),(64,12)
-OBJECT:('(',"sarcophagus"),(70,12)
+
+$sarcophagus_place = { (64,01), (70,15), (64,04), (70,04), (64,06), (70,06), (64,10), (70,10), (64,12), (70,12) }
+#SHUFFLE: $sarcophagus_place
+
+
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[0]
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[1]
+CONTAINER:('(',"sarcophagus"),$sarcophagus_place[2] {
+    OBJECT:('/',"nothing")
+    OBJECT:('9',"human skull")
+    OBJECT:('9',"bone")
+    IF [50%] {
+        OBJECT:('[',"royal crown")
+    }
+}
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[3]
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[4]
+CONTAINER:('(',"sarcophagus"),$sarcophagus_place[5] {
+    OBJECT:('/',"town portal")
+    OBJECT:('9',"human skull")
+    OBJECT:('9',"bone")
+    IF [50%] {
+        OBJECT:('[',"royal crown")
+    }
+}
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[6]
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[7]
+CONTAINER:('(',"sarcophagus"),$sarcophagus_place[8] {
+    OBJECT:('9',"human skull")
+    OBJECT:('9',"bone")
+    IF [50%] {
+        OBJECT:('/',"trap detection")
+    } ELSE {
+        OBJECT:('(',"crystal ball")
+    }
+    IF [50%] {
+        OBJECT:('[',"royal crown")
+    }
+}
+OBJECT:('(',"sarcophagus"),$sarcophagus_place[9]
 
 FOUNTAIN:(10,08),fountain_power
 BRAZIER:(02,08)
@@ -263,14 +293,14 @@ LOOP [1d6] {
 }
 
 
-# THE WAND OF WISHING in 1 of the 2 towers
+# THE WAND OF WISHING
 CONTAINER:('(',"chest"),not_trapped,$place[0] {
     OBJECT:('/',"wishing")
 }
 # Prevent monsters from eating it.  (@'s never eat objects)
 ENGRAVING:$place[0],burn,"Gilthoniel"
 # The treasure of the lord
-CONTAINER:('(',"chest"),trapped,locked,(37,08) {
+CONTAINER:('(',"chest"),trapped,locked,no_pickup,(37,08) {
     OBJECT:artifact
     OBJECT:('(',"skeleton key")
     OBJECT:('$',"gold piece"), quantity:(500+(3d1000))
@@ -344,14 +374,14 @@ MONSTER:$monster[4],(30,11)
 MONSTER:$monster[5],(33,11)
 MONSTER:$monster[6],(36,11)
 MONSTER:('e',"gazer"),(37,08)
-OBJECT: ('`', "statue"), (29,06), montype:"dwarf king", 1
-OBJECT: ('`', "statue"), (35,06), montype:"elvenking", 1
-OBJECT: ('`', "statue"), (29,10), montype:"gnome king", 1
-OBJECT: ('`', "statue"), (35,10), montype:"gnoll king", 1
-OBJECT: ('(', "large five-branched candelabrum"), (27,05), special_quality:5, lit
-OBJECT: ('(', "large five-branched candelabrum"), (27,11), special_quality:5, lit
-OBJECT: ('(', "large five-branched candelabrum"), (37,05), special_quality:5, lit
-OBJECT: ('(', "large five-branched candelabrum"), (37,11), special_quality:5, lit
+OBJECT: ('`', "statue"), (29,06), no_pickup, montype:"dwarf king", 1
+OBJECT: ('`', "statue"), (35,06), no_pickup, montype:"elvenking", 1
+OBJECT: ('`', "statue"), (29,10), no_pickup, montype:"gnome king", 1
+OBJECT: ('`', "statue"), (35,10), no_pickup, montype:"gnoll king", 1
+OBJECT: ('(', "large five-branched candelabrum"), (27,05), no_pickup, special_quality:5, lit
+OBJECT: ('(', "large five-branched candelabrum"), (27,11), no_pickup, special_quality:5, lit
+OBJECT: ('(', "large five-branched candelabrum"), (37,05), no_pickup, special_quality:5, lit
+OBJECT: ('(', "large five-branched candelabrum"), (37,11), no_pickup, special_quality:5, lit
 
 # MazeWalks
 MAZEWALK:(00,10),west

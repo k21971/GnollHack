@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    explode.c    $NHDT-Date: 1545182146 2018/12/19 01:15:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright (C) 1990 by Ken Arromdee */
@@ -203,7 +203,7 @@ int expltype;
                     explmask[i][j] = 0;
                     break;
                 case AD_MAGM:
-                    explmask[i][j] = !!Antimagic_or_resistance;
+                    explmask[i][j] = !!Magic_missile_immunity;
                     break;
                 case AD_FIRE:
                     explmask[i][j] = !!Fire_immunity;
@@ -252,7 +252,7 @@ int expltype;
                     case AD_PHYS:
                         break;
                     case AD_MAGM:
-                        explmask[i][j] |= resists_magic(mtmp) || is_mon_immune_to_magic_missile(mtmp);
+                        explmask[i][j] |= is_mon_immune_to_magic_missile(mtmp);
                         break;
                     case AD_FIRE:
                         explmask[i][j] |= is_mon_immune_to_fire(mtmp);
@@ -682,6 +682,8 @@ int expltype;
         destroy_item(POTION_CLASS, (int) adtyp);
         destroy_item(RING_CLASS, (int) adtyp);
         destroy_item(WAND_CLASS, (int) adtyp);
+
+        item_destruction_hint((int)adtyp, FALSE);
 
         ugolemeffects((int) adtyp, damu);
         if (uhurt == 2 && damu) 

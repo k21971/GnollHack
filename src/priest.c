@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    priest.c    $NHDT-Date: 1545131519 2018/12/18 11:11:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.45 $ */
 /* Copyright (c) Izchak Miller, Steve Linhart, 1989.              */
@@ -357,6 +357,13 @@ int mtype;
         set_malign(priest); /* mpeaceful may have changed */
 
         /* now his/her goodies... */
+        if (montype == PM_HIGH_PRIEST)
+        {
+            otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_MANUAL_OF_THE_PLANES, MKOBJ_FLAGS_PARAM_IS_TITLE);
+            if (otmp)
+                (void)mpickobj(priest, otmp);
+        }
+
         if (sanctum && EPRI(priest)->shralign == A_NONE
             && on_level(&sanctum_level, &u.uz)) 
         {
@@ -380,28 +387,23 @@ int mtype;
         {
             priest->mpeaceful = 1;
 
-            /* 2 to 4 spellbooks */
-            //int cnt;
-            //for (cnt = rn1(3, 2); cnt > 0; --cnt) 
-            //{
-            //    (void)mpickobj(priest, mkobj(SPBOOK_CLASS, FALSE, FALSE));
-            //}
-
-            otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_GUIDE_TO_ALTARS_AND_SACRIFICE, MKOBJ_FLAGS_PARAM_IS_TITLE);
-            if (otmp)
-                (void)mpickobj(priest, otmp);
-
-            otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_GUIDE_TO_PRAYING, MKOBJ_FLAGS_PARAM_IS_TITLE);
-            if (otmp)
-                (void)mpickobj(priest, otmp);
-
-            if (context.game_difficulty < 0)
+            if (montype != PM_HIGH_PRIEST)
             {
-                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_INTRODUCTION_TO_BLESSED_AND_CURSED_ITEMS, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_GUIDE_TO_ALTARS_AND_SACRIFICE, MKOBJ_FLAGS_PARAM_IS_TITLE);
                 if (otmp)
                     (void)mpickobj(priest, otmp);
-            }
 
+                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_GUIDE_TO_PRAYING, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                if (otmp)
+                    (void)mpickobj(priest, otmp);
+
+                if (context.game_difficulty < 0)
+                {
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_INTRODUCTION_TO_BLESSED_AND_CURSED_ITEMS, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                    if (otmp)
+                        (void)mpickobj(priest, otmp);
+                }
+            }
         }
 
         /* robe [via makemon()] */
@@ -727,6 +729,12 @@ int roomno;
     /* don't do anything if hero is already in the room */
     if (temple_occupied(u.urooms0))
         return;
+
+    if (!u.uachieve.entered_temple)
+    {
+        //achievement_gained("Entered a Temple");
+        u.uachieve.entered_temple = 1;
+    }
 
     if ((priest = findpriest((char) roomno)) != 0) 
     {

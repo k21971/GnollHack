@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    invent.c    $NHDT-Date: 1555196229 2019/04/13 22:57:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.253 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -131,7 +131,7 @@ struct obj *obj;
         break;
     case TOOL_CLASS:
         if (seen && discovered
-            && (otyp == BAG_OF_TRICKS || otyp == HORN_OF_PLENTY))
+            && (Is_noncontainer(obj) /*otyp == BAG_OF_TRICKS*/ || otyp == HORN_OF_PLENTY))
             k = 2; /* known pseudo-container */
         else if (Is_container(obj))
             k = 1; /* regular container or unknown bag of tricks */
@@ -198,9 +198,11 @@ struct obj *obj;
          *  8) seen rocks ("rock").
          */
         switch (objects[obj->otyp].oc_material) {
+        case MAT_HARD_CRYSTAL:
         case MAT_GEMSTONE:
             k = !seen ? 1 : !discovered ? 2 : 3;
             break;
+        case MAT_CRYSTAL:
         case MAT_GLASS:
             k = !seen ? 1 : !discovered ? 2 : 4;
             break;
@@ -840,12 +842,24 @@ struct obj *obj;
         if (u.uhave.amulet)
             impossible("already have amulet?");
         u.uhave.amulet = 1;
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.amulet)
             context.botl = 1;
-#endif
         if (!u.uachieve.amulet)
+        {
             achievement_gained("Amulet of Yendor");
+            if (iflags.using_gui_sounds)
+            {
+                delay_output_milliseconds(500);
+                play_sfx_sound(SFX_HINT);
+            }
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE - Sacrifice the Amulet of Yendor on the Astral Plane");
+            if (iflags.using_gui_sounds)
+            {
+                delay_output_milliseconds(500);
+                play_sfx_sound(SFX_HINT);
+            }
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "HINT - Exit the dungeon on level 1 to enter the Elemental Planes");
+        }
         u.uachieve.amulet = 1;
     }
     else if (obj->otyp == CANDELABRUM_OF_INVOCATION) 
@@ -853,10 +867,8 @@ struct obj *obj;
         if (u.uhave.menorah)
             impossible("already have candelabrum?");
         u.uhave.menorah = 1;
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.menorah)
             context.botl = 1;
-#endif
         if (!u.uachieve.menorah)
             achievement_gained("Candelabrum of Invocation");
         u.uachieve.menorah = 1;
@@ -866,10 +878,8 @@ struct obj *obj;
         if (u.uhave.bell)
             impossible("already have silver bell?");
         u.uhave.bell = 1;
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.bell)
             context.botl = 1;
-#endif
         if (!u.uachieve.bell)
             achievement_gained("Bell of Opening");
         u.uachieve.bell = 1;
@@ -879,10 +889,8 @@ struct obj *obj;
         if (u.uhave.book)
             impossible("already have the book?");
         u.uhave.book = 1;
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.book)
             context.botl = 1;
-#endif
         if (!u.uachieve.bell)
             achievement_gained("Book of the Dead");
         u.uachieve.book = 1;
@@ -901,22 +909,70 @@ struct obj *obj;
             if (u.uhave.prime_codex)
                 impossible("already have Prime Codex?");
             u.uhave.prime_codex = 1;
-#ifdef SHOW_SCORE_ON_BOTL
             if (flags.showscore && !u.uachieve.prime_codex)
                 context.botl = 1;
-#endif
             if (!u.uachieve.prime_codex)
                 achievement_gained("Prime Codex");
             u.uachieve.prime_codex = 1;
+        }
+
+        boolean check_achievement = FALSE;
+        if (Role_if(PM_BARBARIAN))
+        {
+            check_achievement = TRUE;
+            if (u.ualignbase[A_ORIGINAL] == A_CHAOTIC)
+            {
+                if (obj->oartifact == ART_STORMBRINGER)
+                    u.uevent.role_achievement_1 = 1;
+                if (obj->oartifact == ART_MOURNBLADE)
+                    u.uevent.role_achievement_2 = 1;
+            }
+            else
+            {
+                if (obj->oartifact == ART_VORPAL_BLADE)
+                    u.uevent.role_achievement_1 = 1;
+                if (obj->oartifact == ART_CLEAVER)
+                    u.uevent.role_achievement_2 = 1;
+            }
+        }
+        else if (Role_if(PM_KNIGHT))
+        {
+            check_achievement = TRUE;
+            if (obj->oartifact == ART_EXCALIBUR)
+                u.uevent.role_achievement_1 = 1;
+            if (obj->oartifact == ART_HOLY_GRAIL)
+                u.uevent.role_achievement_2 = 1;
+        }
+        else if (Role_if(PM_PRIEST))
+        {
+            check_achievement = TRUE;
+            if (obj->oartifact == ART_MACE_OF_SAINT_CUTHBERT)
+                u.uevent.role_achievement_1 = 1;
+            if (obj->oartifact == ART_MACE_OF_SAINT_CUTHBERT)
+                u.uevent.role_achievement_2 = 1;
+        }
+        else if (Role_if(PM_SAMURAI))
+        {
+            check_achievement = TRUE;
+            if (obj->oartifact == ART_KUSANAGI)
+                u.uevent.role_achievement_1 = 1;
+            if (obj->oartifact == ART_KATANA_OF_MASAMUNE)
+                u.uevent.role_achievement_2 = 1;
+        }
+
+        if (check_achievement && u.uevent.role_achievement_1 && u.uevent.role_achievement_2 && !u.uachieve.role_achievement)
+        {
+            u.uachieve.role_achievement = 1;
+            char abuf[BUFSZ];
+            strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+            achievement_gained(abuf);
         }
     }
 
     if (is_mines_prize(obj))
     {
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.mines_luckstone)
             context.botl = 1;
-#endif
         if (!u.uachieve.mines_luckstone)
             achievement_gained("Gladstone");
         u.uachieve.mines_luckstone = 1;
@@ -925,15 +981,23 @@ struct obj *obj;
     }
     else if (is_soko_prize(obj)) 
     {
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.finish_sokoban)
             context.botl = 1;
-#endif
         if (!u.uachieve.finish_sokoban)
             achievement_gained("Sokoban Solved");
         u.uachieve.finish_sokoban = 1;
         obj->speflags &= ~(SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2);
         obj->nomerge = 0;
+    }
+    else if (obj->otyp == GRAIL_OF_HEALING && Role_if(PM_KNIGHT)) // Holy Grail
+    {
+        if (!u.uachieve.role_achievement)
+        {
+            if (flags.showscore)
+                context.botl = 1;
+            u.uachieve.role_achievement = 1;
+            achievement_gained("Found the Holy Grail");
+        }
     }
 }
 
@@ -997,7 +1061,7 @@ boolean verbose;
     boolean was_terminally_ill = !!Sick;
     boolean was_food_poisoned = !!FoodPoisoned;
     boolean was_stoned = !!Stoned;
-    boolean was_strangled = !!Strangled;
+    boolean was_strangled = (Strangled && !Breathless);
     boolean was_suffocating = (Airless_environment && !Survives_without_air);
     boolean was_vomiting = !!Vomiting;
     boolean was_slimed = !!Slimed;
@@ -1476,7 +1540,7 @@ boolean verbose;
         || (was_terminally_ill != !!Sick)
         || (was_food_poisoned != !!FoodPoisoned)
         || (was_stoned != !!Stoned)
-        || (was_strangled != !!Strangled)
+        || (was_strangled != (Strangled && !Breathless))
         || (was_suffocating != (Airless_environment && !Survives_without_air))
         || (was_vomiting != !!Vomiting)
         || (was_slimed != !!Slimed)
@@ -1769,6 +1833,7 @@ const char *drop_fmt, *drop_arg, *hold_msg;
                 prinv(hold_msg, obj, oquan);
         }
     }
+    newsym(u.ux, u.uy);
     return obj;
 
  drop_it:
@@ -2259,7 +2324,14 @@ register struct obj *objchn;
             if (!objchn->repowerleft)
                 reached_zero = TRUE;
         }
-        
+
+        if (objchn->invokeleft > 0)
+        {
+            objchn->invokeleft--;
+            if (!objchn->invokeleft)
+                reached_zero = TRUE;
+        }
+
         //If has contents, then reduce the cooldown of the contents, too
         if (Has_contents(objchn))
             reduce_item_cooldown(objchn->cobj);
@@ -3045,8 +3117,8 @@ struct obj* otmp_only;
                     && (otmp->owornmask & W_WEP))
 #endif
                 || (!strcmp(word, "ready")    /* exclude when wielded... */
-                    && ((otmp == uwep || (otmp == uarms && u.twoweap))
-                        && otmp->quan == 1L)) /* ...unless more than one */
+                    && (((otmp == uwep || (otmp == uarms && u.twoweap)) && otmp->quan == 1L)  /* ...unless more than one */
+                        || (uwep && is_launcher(uwep) && objects[uwep->otyp].oc_skill != -objects[otmp->otyp].oc_skill)))
                 || ((!strcmp(word, "dip") || !strcmp(word, "grease"))
                     && inaccessible_equipment(otmp, (const char*)0, FALSE))
                 )
@@ -3431,7 +3503,7 @@ int show_weights;
     for (;;) {
         Sprintf(qbuf, "What kinds of thing do you want to %s?", word);
         Sprintf(ebuf, "[%s]", ilets);
-        getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, qbuf, buf, (char*)0, ebuf);
+        getlin_ex(GETLINE_GENERAL, ATR_NONE, NO_COLOR, qbuf, buf, (char*)0, ebuf, (char*)0);
         if (buf[0] == '\033')
             return 0;
         if (index(buf, 'i')) {
@@ -5009,7 +5081,7 @@ char avoidlet;
                 continue;
             invdone = 1;
         }
-        end_menu(win, "Inventory letters used:");
+        end_menu(win, "Adjust letter to what?");
 
         n = select_menu(win, PICK_ONE, &selected);
         if (n > 0) {
@@ -6041,6 +6113,7 @@ boolean force_touch;
         /* normalize body shape here; hand, not body_part(HAND) */
         Sprintf(kbuf, "touching %s bare-handed", killer_xname(otmp));
         /* will call polymon() for the poly_when_stoned() case */
+        killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
         instapetrify(kbuf);
     }
 }
@@ -6578,7 +6651,6 @@ doorganize() /* inventory organizer by Del Lamb */
 #define GOLD_OFFSET 1
 #define OVRFLW_INDX (GOLD_OFFSET + 52) /* past gold and 2*26 letters */
     char lets[1 + 52 + 1 + 1]; /* room for '$a-zA-Z#\0' */
-    char qbuf[QBUFSZ];
     char allowall[4]; /* { ALLOW_COUNT, ALL_CLASSES, 0, 0 } */
     char *objname, *uobjname, *otmpname, *uotmpname;
     const char *adj_type;
@@ -6658,10 +6730,16 @@ doorganize() /* inventory organizer by Del Lamb */
         compactify(lets);
 
     /* get 'to' slot to use as destination */
-    Sprintf(qbuf, "Adjust letter to what [%s]%s?", lets,
-            invent ? " (? see used letters)" : "");
     for (trycnt = 1; ; ++trycnt) {
-        let = yn_function(qbuf, (char *)0, '\0', (char *)0);
+#if GNH_MOBILE
+        let = '?';
+#else
+        char qbuf[QBUFSZ];
+        Sprintf(qbuf, "Adjust letter to what [%s]%s?", lets,
+            invent ? " (? see used letters)" : "");
+        //let = yn_function(qbuf, (char *)0, '\0', (char *)0);
+        let = yn_function_ex(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, qbuf, (const char*)0, '\0', (const char*)0, (const char*)0, 1UL);
+#endif
         if (let == '?' || let == '*') {
             let = display_used_invlets(splitting ? obj->invlet : 0);
             if (!let)

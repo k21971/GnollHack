@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    dungeon.c    $NHDT-Date: 1554341477 2019/04/04 01:31:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -788,7 +788,7 @@ init_dungeons()
     if (!check_version(&vers_info, DUNGEON_FILE, TRUE))
     {
 #ifdef GNH_MOBILE
-        impossible("Dungeon description not valid. Check that GnollHack Android files are up-to-date.");
+        impossible("Dungeon description not valid. Check that the files of your GnollHack Cross-Platform Mobile port are up-to-date.");
 #else
         panic("Dungeon description not valid.");
         return;

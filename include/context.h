@@ -239,7 +239,6 @@ struct context_info
     boolean town_portal_return_level_set;
     d_level town_portal_return_level;
     long last_turn_when_took_damage;
-    struct gh_quest_status_data quest_status_info[NUM_QUESTS];
 
     boolean reviving;
     boolean quit_pressed;
@@ -248,6 +247,24 @@ struct context_info
     unsigned int view_pet_mid;
     boolean first_time_cmd;
     boolean starting_prayer_timeout_expired;
+    uchar dlords_summoned_via_altar;
+
+    /* Emergency reserved booleans to make non-save-game-breaking changes */
+    boolean reserved_bool1;
+    boolean reserved_bool2;
+    boolean reserved_bool3;
+    boolean reserved_bool4;
+
+    /* Emergency reserved variables to make non-save-game-breaking changes */
+    char reserved_char1;
+    char reserved_char2;
+    short reserved_short1;
+    short reserved_short2;
+    int reserved_int1;
+    int reserved_int2;
+    unsigned long reserved_ulong1;
+    unsigned long reserved_ulong2;
+
 };
 
 extern NEARDATA struct context_info context;

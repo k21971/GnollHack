@@ -27,5 +27,14 @@ namespace GnollHackClient
         {
             Style = style;
         }
+
+        public bool MenuCloseUponDestroy
+        {
+            get
+            {
+                return ClientUtils.StyleClosesMenuUponDestroy(Style);
+            }
+        }
+
     }
 }

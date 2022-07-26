@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    trampoli.h    $NHDT-Date: 1433806581 2015/06/08 23:36:21 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /* Copyright (c) 1989, by Norm Meluch and Stephen Spackman      */
@@ -216,6 +216,7 @@
 #define learn() learn_()
 #define docast() docast_()
 #define dovspell() dovspell_()
+#define dosortspell() dosortspell_()
 
 /* ### steal.c ### */
 #define stealarm() stealarm_()
@@ -239,7 +240,7 @@
 #define dozap() dozap_()
 
 /* ### getline.c ### */
-#define tty_getlin_ex(s, a, c, x, y, p, d) tty_getlin_ex_(s, a, c, x, y, p, d)
+#define tty_getlin_ex(s, a, c, x, y, p, d, i) tty_getlin_ex_(s, a, c, x, y, p, d, i)
 #define tty_get_ext_cmd() tty_get_ext_cmd_()
 
 /* ### termcap.c ### */
@@ -253,7 +254,7 @@
 
 /* ### topl.c ### */
 #define tty_doprev_message() tty_doprev_message_()
-#define tty_yn_function_ex(x, y, z, a, b, c, d, e, f, g) tty_yn_function_ex_(x, y, z, a, b, c, d, e, f, g)
+#define tty_yn_function_ex(x, y, z, a, b, c, d, e, f, g, h) tty_yn_function_ex_(x, y, z, a, b, c, d, e, f, g, h)
 
 /* ### wintty.c ### */
 #define tty_init_nhwindows(x, y) tty_init_nhwindows_(x, y)

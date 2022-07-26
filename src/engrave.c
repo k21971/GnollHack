@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    engrave.c    $NHDT-Date: 1456304550 2016/02/24 09:02:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.61 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1251,6 +1251,9 @@ doengrave()
 
     /* Put the engraving onto the map */
     make_engr_at(u.ux, u.uy, buf, moves - multi, type, ENGR_FLAGS_NONE);
+
+    if (!strcmp(buf, Elbereth_word))
+        u.uevent.elbereth_known = 1;
 
     if (post_engr_text[0])
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s", post_engr_text);

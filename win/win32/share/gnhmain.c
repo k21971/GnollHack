@@ -6,8 +6,6 @@
 #include "libproc.h"
 
 #include "dlb.h"
-#include <setjmp.h>
-
 #include <sys/stat.h>
 #include <pwd.h>
 #include <sys/types.h>
@@ -18,19 +16,16 @@
 
 #include <pthread.h>
 
-static jmp_buf env;
-
 extern struct passwd *FDECL( getpwuid, ( uid_t));
 extern struct passwd *FDECL( getpwnam, (const char *));
 
 #if 0
-static boolean NDECL( whoami);
+STATIC_DCL boolean NDECL( whoami);
 #endif
-static void FDECL( process_options, (int, char **));
+STATIC_DCL void FDECL( process_options, (int, char **));
 
-static void NDECL( wd_message);
-
-static char *make_lockname(filename, lockname)
+STATIC_OVL char*
+make_lockname(filename, lockname)
 const char *filename;
 char *lockname;
 {
@@ -45,7 +40,9 @@ char *lockname;
 	return lockname;
 }
 
-void remove_lock_file(const char *filename)
+STATIC_OVL void
+remove_lock_file(filename)
+const char* filename;
 {
 	char locknambuf[BUFSZ];
 	const char *lockname;
@@ -69,27 +66,14 @@ int code;
 #else
 	exit(code);
 #endif
-	//longjmp(env, code);
 }
 
-
-int GnollHackMain(int argc, char** argv)
+int
+GnollHackMain(argc, argv)
+int argc;
+char** argv;
 {
-	//debuglog("Starting GnollHack!");
-
-	int val;
-
-	val = setjmp(env);
-	if(val)
-	{
-		//debuglog("exiting...");
-		return 0;
-	}
-
-	register int fd;
-	//boolean exact_username;
 	FILE* fp;
-
     boolean resuming = FALSE; /* assume new game */
 
     sys_early_init();
@@ -138,6 +122,7 @@ int GnollHackMain(int argc, char** argv)
 //#ifdef MAIL
 //	getmailstatus();
 //#endif
+	display_gamewindows();
 	check_crash();
 	plnamesuffix(); /* strip suffix from name; calls askname() */
 					/* again if suffix was whole name */
@@ -145,23 +130,11 @@ int GnollHackMain(int argc, char** argv)
 
 	set_playmode(); /* sets plname to "wizard" for wizard mode */
 
-	if(!wizard)
+	if (!wizard)
 		Sprintf(lock, "%d%s", (int)getuid(), plname);
 	getlock();
 
-	/* Set up level 0 file to keep the game state.
-	 */
-	fd = create_levelfile(0, (char *)0);
-	if(fd < 0)
-	{
-		raw_print("Cannot create lock file");
-	}
-	else
-	{
-		hackpid = 1;
-		write(fd, (genericptr_t) & hackpid, sizeof(hackpid));
-		close(fd);
-	}
+	create_gamestate_levelfile();
 
 	dlb_init(); /* must be before newgame() */
 
@@ -169,12 +142,7 @@ int GnollHackMain(int argc, char** argv)
 	 * Initialization of the boundaries of the mazes
 	 * Both boundaries have to be even.
 	 */
-	x_maze_max = COLNO - 1;
-	if(x_maze_max % 2)
-		x_maze_max--;
-	y_maze_max = ROWNO - 1;
-	if(y_maze_max % 2)
-		y_maze_max--;
+	maze_init();
 
 	/*
 	 *  Initialize the vision system.  This must be before mklev() on a
@@ -182,60 +150,18 @@ int GnollHackMain(int argc, char** argv)
 	 */
 	vision_init();
 
-	display_gamewindows();
 	issue_gui_command(GUI_CMD_GAME_START);
 
-	if((fd = restore_saved_game()) >= 0)
+	if(!load_saved_game(0))
 	{
-		/* Since wizard is actually flags.debug, restoring might
-		 * overwrite it.
-		 */
-		boolean remember_wiz_mode = wizard;
-		const char *fq_save = fqname(SAVEF, SAVEPREFIX, 1);
-
-#ifdef NEWS
-		if(iflags.news)
-		{
-			display_file(NEWS, FALSE);
-			iflags.news = FALSE; /* in case dorecover() fails */
-		}
-#endif
-		pline("Restoring save file...");
-		mark_synch(); /* flush output */
-		if(!dorecover(fd))
-			goto not_recovered;
-		resuming = TRUE;
-
-		if(!wizard && remember_wiz_mode)
-			wizard = TRUE;
-
-		check_special_room(FALSE);
-		wd_message();
-
-		if(discover || wizard || CasualMode)
-		{
-			if(!CasualMode && yn_query("Do you want to keep the save file?") == 'n')
-			{
-				(void)delete_savefile();
-			}
-			else
-			{
-				nh_compress(fq_save);
-			}
-		}
-
-		encounter_init();
-	}
-	else
-	{
-		not_recovered: player_selection();
+		player_selection();
 		resuming = FALSE;
 
 		/* CHOOSE DIFFICULTY */
 		choose_game_difficulty();
 
 		newgame();
-		wd_message();
+		mode_message();
 	}
 
 	if(wizard)
@@ -250,14 +176,16 @@ int GnollHackMain(int argc, char** argv)
 	return (0);
 }
 
-boolean authorize_wizard_mode()
+boolean 
+authorize_wizard_mode(VOID_ARGS)
 {
 	return TRUE;
 }
 
-
-static void process_options(argc, argv)
-	int argc;char *argv[];
+STATIC_OVL void 
+process_options(argc, argv)
+int argc;
+char *argv[];
 {
 	int i;
 
@@ -276,6 +204,12 @@ static void process_options(argc, argv)
 		/* otherwise fall thru to discover */
 		case 'X':
 			discover = TRUE, wizard = FALSE;
+			break;
+		case 'M':
+			ModernMode = TRUE;
+			break;
+		case 'C':
+			CasualMode = TRUE;
 			break;
 #ifdef NEWS
 			case 'n':
@@ -340,7 +274,8 @@ static void process_options(argc, argv)
 }
 
 #if 0
-static boolean whoami()
+STATIC_OVL boolean
+whoami()
 {
 	/*
 	 * Who am i? Algorithm: 1. Use name as specified in NETHACKOPTIONS
@@ -374,18 +309,14 @@ port_help()
 }
 #endif
 
-static void wd_message()
-{
-	if (discover || CasualMode)
-		You_ex(ATR_NONE, CLR_MSG_HINT, "are in %s mode.", get_game_mode_text(TRUE));
-}
-
+#if 0
 /*
  * Add a slash to any name not ending in /. There must
  * be room for the /
  */
-void append_slash(name)
-	char *name;
+void 
+append_slash(name)
+char *name;
 {
 	char *ptr;
 
@@ -399,6 +330,7 @@ void append_slash(name)
 	}
 	return;
 }
+#endif
 
 unsigned long
 sys_random_seed()
@@ -430,10 +362,4 @@ sys_random_seed()
         }
     }
     return seed;
-}
-
-
-int DoSomeHackDroid()
-{
-	return (int)artilist[ART_HOWLING_FLAIL].cost;
 }

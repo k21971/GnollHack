@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    zap.c    $NHDT-Date: 1551395521 2019/02/28 23:12:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.307 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -36,6 +36,7 @@ STATIC_DCL int FDECL(m_spell_hit_skill_bonus, (struct monst*, int));
 STATIC_DCL int FDECL(m_spell_hit_dex_bonus, (struct monst*, int));
 STATIC_DCL int FDECL(m_wand_hit_skill_bonus, (struct monst*, int));
 STATIC_DCL void FDECL(wishcmdassist, (int));
+STATIC_DCL int FDECL(get_summon_monster_type, (int));
 
 #define ZT_MAGIC_MISSILE (AD_MAGM - 1)
 #define ZT_FIRE (AD_FIRE - 1)
@@ -182,6 +183,28 @@ struct monst* targetmonst;
     return dmg;
 }
 
+int
+get_obj_spell_duration(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return 0;
+
+    int otyp = obj->otyp;
+    int durdice = objects[otyp].oc_spell_dur_dice + (obj->speflags & SPEFLAGS_BEING_BROKEN ? obj->charges : 0);
+    int duration = d(durdice, objects[otyp].oc_spell_dur_diesize) + objects[otyp].oc_spell_dur_plus + bcsign(obj) * objects[otyp].oc_spell_dur_buc_plus;
+    return max(0, duration);
+}
+
+int
+get_otyp_spell_duration(otyp)
+int otyp;
+{
+    struct obj tempobj = { 0 };
+    tempobj.otyp = otyp;
+    return get_obj_spell_duration(&tempobj);
+}
+
 /*
  * Recognizing unseen wands by zapping:  in 3.4.3 and earlier, zapping
  * most wand types while blind would add that type to the discoveries
@@ -238,9 +261,9 @@ struct obj *obj;
 }
 
 int
-get_saving_throw_adjustment(otmp, origmonst)
+get_saving_throw_adjustment(otmp, targetmonst, origmonst)
 struct obj* otmp;
-struct monst* origmonst; 
+struct monst* targetmonst, *origmonst;
 {
     if (!otmp)
         return 0;
@@ -250,16 +273,46 @@ struct monst* origmonst;
     int res = 0;
     res += objects[otyp].oc_spell_saving_throw_adjustment;
 
+    /* Adjustment for blessed and cursed objects */
+    if (otmp->blessed)
+        res -= 5;
+    else if (otmp->cursed)
+        res += 5;
+
+    /* Extra penalties from negate/etc. magic resistance */
+    if (targetmonst)
+    {
+        if (targetmonst == &youmonst)
+        {
+            if (No_magic_resistance)
+                res -= 20;
+            else if (One_fourth_magic_resistance)
+                res -= 12;
+            else if (Half_magic_resistance)
+                res -= 8;
+            else if (Three_fourths_magic_resistance)
+                res -= 4;
+        }
+        else
+        {
+            if (targetmonst->mprops[NO_MAGIC_RESISTANCE])
+                res -= 20;
+            else if (targetmonst->mprops[ONE_FOURTH_MAGIC_RESISTANCE])
+                res -= 12;
+            else if (targetmonst->mprops[HALVED_MAGIC_RESISTANCE])
+                res -= 8;
+            else if (targetmonst->mprops[THREE_FOURTHS_MAGIC_RESISTANCE])
+                res -= 4;
+        }
+    }
+
     if (!origmonst)
         return res;
 
     int skill = P_NONE;
     if (otmp->oclass == SPBOOK_CLASS || otmp->oclass == WAND_CLASS || otmp->oclass == TOOL_CLASS)
     {
-        if(otmp->oclass == SPBOOK_CLASS)
-            skill = objects[otyp].oc_skill;
-        else 
-            skill = P_WAND;
+        skill = objects[otyp].oc_skill;
 
         int skill_level = P_UNSKILLED;
         if (origmonst == &youmonst)
@@ -275,19 +328,28 @@ struct monst* origmonst;
             else
                 skill_level = P_BASIC;
         }
-        res += get_skill_level_saving_throw_adjustment(skill_level);
+        if(skill == P_WAND)
+            res += get_wand_skill_level_saving_throw_adjustment(skill_level);
+        else
+            res += get_spell_skill_level_saving_throw_adjustment(skill_level);
     }
 
     return res;
 }
 
 int
-get_skill_level_saving_throw_adjustment(skill_level)
+get_spell_skill_level_saving_throw_adjustment(skill_level)
 int skill_level;
 {
-    return -4 * (max(0, skill_level - 1) - 1);
+    return -3 * (max(0, skill_level - 1) - 1);
 }
 
+int
+get_wand_skill_level_saving_throw_adjustment(skill_level)
+int skill_level;
+{
+    return -2 * (max(0, skill_level - 1) - 0);
+}
 
 /* Routines for IMMEDIATE wands and spells. */
 /* bhitm: monster mtmp was hit by the effect of wand or spell otmp */
@@ -306,9 +368,9 @@ struct monst* origmonst;
     struct obj *obj;
     boolean disguised_mimic = (is_mimic(mtmp->data)
                                && M_AP_TYPE(mtmp) != M_AP_NOTHING);
-    int duration = d(objects[otyp].oc_spell_dur_dice, objects[otyp].oc_spell_dur_diesize) + objects[otyp].oc_spell_dur_plus;
+    int duration = get_obj_spell_duration(otmp);
     int dmg = get_spell_damage(otyp, origmonst, mtmp);
-    int save_adj = get_saving_throw_adjustment(otmp, origmonst);
+    int save_adj = get_saving_throw_adjustment(otmp, mtmp, origmonst);
     boolean surpress_noeffect_message = FALSE;
     //boolean magic_resistance_success = check_magic_resistance_and_inflict_damage(mtmp, otmp, 0, 0, 0, NOTELL);
     boolean magic_cancellation_success = check_magic_cancellation_success(mtmp, save_adj);
@@ -683,7 +745,7 @@ struct monst* origmonst;
                 seemimic(mtmp);
 
             play_sfx_sound_at_location(SFX_ACQUIRE_SLOW, mtmp->mx, mtmp->my);
-            increase_mon_property_verbosely(mtmp, SLOWED, otmp->oclass == WAND_CLASS ? rn1(10, 100 + 60 * bcsign(otmp)) : duration);
+            increase_mon_property_verbosely(mtmp, SLOWED, duration);
             m_dowear(mtmp, FALSE); /* might want speed boots */
             if (u.uswallow && (mtmp == u.ustuck) && is_whirly(mtmp->data)) {
                 You_ex(ATR_NONE, CLR_MSG_SPELL, "disrupt %s!", mon_nam(mtmp));
@@ -789,7 +851,7 @@ struct monst* origmonst;
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
         play_sfx_sound_at_location(SFX_ACQUIRE_HASTE, mtmp->mx, mtmp->my);
         special_effect_wait_until_action(0);
-        boolean visible_effect = increase_mon_property_verbosely(mtmp, VERY_FAST, 150 + rnd(50));
+        boolean visible_effect = increase_mon_property_verbosely(mtmp, VERY_FAST, duration);
         if (visible_effect)
             makeknown(WAN_SPEED_MONSTER);
         m_dowear(mtmp, FALSE); /* might want speed boots */
@@ -1007,7 +1069,7 @@ struct monst* origmonst;
         {
             play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
             special_effect_wait_until_action(0);
-            (void)cancel_monst(mtmp, otmp, TRUE, TRUE, FALSE, d(objects[otmp->otyp].oc_spell_dur_dice, objects[otmp->otyp].oc_spell_dur_diesize) + objects[otmp->otyp].oc_spell_dur_plus);
+            (void)cancel_monst(mtmp, otmp, TRUE, TRUE, FALSE, duration);
             (void)nonadditive_increase_mon_property_verbosely(mtmp, CANCELLATION_RESISTANCE, 10);
             special_effect_wait_until_end(0);
         }
@@ -1020,7 +1082,7 @@ struct monst* origmonst;
         /* Unaffected by cancellation resistance */
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
         special_effect_wait_until_action(0);
-        (void)cancel_monst(mtmp, otmp, TRUE, TRUE, FALSE, d(objects[otmp->otyp].oc_spell_dur_dice, objects[otmp->otyp].oc_spell_dur_diesize) + objects[otmp->otyp].oc_spell_dur_plus);
+        (void)cancel_monst(mtmp, otmp, TRUE, TRUE, FALSE, duration);
         special_effect_wait_until_end(0);
         break;
     case SPE_LOWER_MAGIC_RESISTANCE:
@@ -1050,7 +1112,7 @@ struct monst* origmonst;
         
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
         special_effect_wait_until_action(0);
-        increase_mon_property_verbosely(mtmp, INVISIBILITY, 100 + rn2(50));
+        increase_mon_property_verbosely(mtmp, INVISIBILITY, duration);
         special_effect_wait_until_end(0);
 
         if (!oldinvis && knowninvisible(mtmp)) {
@@ -1065,7 +1127,7 @@ struct monst* origmonst;
         if(wake)
             res = 1;
         break;
-    case SPE_PROBE_MONSTER:
+    case SPE_PROBE:
     case WAN_PROBING:
         res = 1;
         wake = FALSE;
@@ -1379,7 +1441,7 @@ cure_petrification_here:
         reveal_invis = TRUE;
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
         special_effect_wait_until_action(0);
-        if (sleep_monst(mtmp, otmp, origmonst, d(1 + otmp->charges, 8), 0, TRUE))
+        if (sleep_monst(mtmp, otmp, origmonst, duration, 0, TRUE))
             slept_monst(mtmp);
         special_effect_wait_until_end(0);
         if (!Blind)
@@ -1849,6 +1911,100 @@ struct monst* mtmp;
         putstr(datawin, 0, txt);
     }
 
+}
+
+void print_monster_status(datawin, mtmp)
+winid datawin;
+struct monst* mtmp;
+{
+    if (!mtmp || datawin == WIN_ERR || !iflags.using_gui_tiles)
+        return;
+
+    xchar sx = mtmp == &youmonst ? u.ux : mtmp->mx;
+    xchar sy = mtmp == &youmonst ? u.uy : mtmp->my;
+    struct layer_info li = isok(sx, sy) ? layers_at(sx, sy) : zerolayerinfo;
+    unsigned long layerflags = li.layer_flags;
+    boolean loc_is_you = mtmp == &youmonst; // (layerflags& LFLAGS_UXUY) != 0; //So you can separately see your steed stats properly
+    boolean ispeaceful = is_peaceful(mtmp) && !is_tame(mtmp); // (layerflags& LFLAGS_M_PEACEFUL) != 0;
+    boolean ispet = is_tame(mtmp); //  (layerflags& LFLAGS_M_PET) != 0;
+    boolean isdetected = (layerflags & LFLAGS_M_DETECTED) != 0;
+    int condition_count = 0;
+
+    char buf[BUFSZ];
+    char sbuf[BUFSZ] = "";
+    Strcpy(buf, "Status marks:");
+    putstr(datawin, ATR_HEADING, buf);
+    
+    /* Petmark and other status marks */
+    unsigned long m_status_bits = get_m_status_bits(mtmp, loc_is_you, ispeaceful, ispet, isdetected);
+    for (int statusorder_idx = 0; statusorder_idx < SIZE(statusmarkorder); statusorder_idx++)
+    {
+        int status_mark = (int)statusmarkorder[statusorder_idx];
+        if (status_mark < MAX_STATUS_MARKS && status_names[status_mark])
+        {
+            unsigned long status_bit = 1UL << status_mark;
+            if(m_status_bits & status_bit)
+            {
+                condition_count++;
+                if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0)
+                    Sprintf(sbuf, " &status-%d;", status_mark);
+                else
+                    *sbuf = 0;
+
+                Sprintf(buf, " %2d - %s%s", condition_count, status_names[status_mark], sbuf);
+                putstr(datawin, ATR_INDENT_AT_DASH, buf);
+            }
+        }
+    }
+
+    /* Conditions */
+    unsigned long m_conditions = get_m_condition_bits(mtmp);
+    for (int cond = 0; cond < ui_tile_component_array[CONDITION_MARKS].number; cond++)
+    {
+        int condition_bit = 1 << cond;
+        if (m_conditions & condition_bit)
+        {
+            if (cond < NUM_BL_CONDITIONS && condition_names[cond])
+            {
+                condition_count++;
+                if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0)
+                    Sprintf(sbuf, " &cond-%d;", cond);
+                else
+                    *sbuf = 0;
+                Sprintf(buf, " %2d - %s%s", condition_count, condition_names[cond], sbuf);
+                putstr(datawin, ATR_INDENT_AT_DASH, buf);
+            }
+        }
+    }
+
+    /* Buffs */
+    for (int propidx = 1; propidx <= LAST_PROP; propidx++)
+    {
+        if (!property_definitions[propidx].show_buff)
+            continue;
+
+        long duration = loc_is_you ? (u.uprops[propidx].intrinsic & TIMEOUT) : (long)(mtmp->mprops[propidx] & M_TIMEOUT);
+        if (duration == 0L)
+            continue;
+
+        condition_count++;
+        if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0)
+            Sprintf(sbuf, " &buff-%d;", propidx);
+        else
+            *sbuf = 0;
+
+        char pbuf[BUFSZ];
+        Strcpy(pbuf, get_property_name(propidx));
+        *pbuf = highc(*pbuf);
+        Sprintf(buf, " %2d - %s%s", condition_count, pbuf, sbuf);
+        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+    }
+
+    if (!condition_count)
+    {
+        putstr(datawin, ATR_NONE, " (None)");
+    }
+    
 }
 
 void print_monster_statistics(datawin, mtmp)
@@ -2838,8 +2994,9 @@ struct monst *mon;
 
 /* cancel obj, possibly carried by you or a monster */
 void
-cancel_item(obj)
+cancel_item(obj, update_inv)
 register struct obj *obj;
+boolean update_inv;
 {
     int otyp = obj->otyp;
 
@@ -2903,7 +3060,7 @@ register struct obj *obj;
     updatemaxen();
     updatemaxhp();
 
-    if (obj->where == OBJ_INVENT)
+    if (update_inv && obj->where == OBJ_INVENT)
         update_inventory();
 
     return;
@@ -3020,10 +3177,8 @@ int mat, minwt;
             continue;
         if (obj_resists(otmp, 0, 0))
             continue; /* preserve unique objects */
-#ifdef MAIL
         if (otmp->otyp == SCR_MAIL)
             continue;
-#endif
 
         if (((int) objects[otmp->otyp].oc_material == mat)
             == (rn2(minwt + 1) != 0)) {
@@ -3126,6 +3281,10 @@ int okind;
         pm_index = PM_GLASS_GOLEM;
         material = "glassy ";
         break;
+    case MAT_CRYSTAL:
+        pm_index = PM_GLASS_GOLEM;
+        material = "crystal ";
+        break;
     case MAT_PAPER:
         pm_index = PM_PAPER_GOLEM;
         material = "paper ";
@@ -3133,6 +3292,10 @@ int okind;
     case MAT_GEMSTONE:
         pm_index = PM_GEMSTONE_GOLEM;
         material = "gemstone ";
+        break;
+    case MAT_HARD_CRYSTAL:
+        pm_index = PM_GEMSTONE_GOLEM;
+        material = "crystal ";
         break;
     case MAT_MODRONITE:
         pm_index = PM_MODRON_PENTADRONE;
@@ -3164,10 +3327,9 @@ struct obj *obj;
 {
     long i;
 
-#ifdef MAIL
     if (obj->otyp == SCR_MAIL)
         return;
-#endif
+
     obj_zapped = TRUE;
 
     if (poly_zapped < 0) {
@@ -3274,7 +3436,6 @@ int id;
     if (obj_location == OBJ_INVENT)
         otmp->invlet = obj->invlet;
 
-#ifdef MAIL
     /* You can't send yourself 100 mail messages and then
      * polymorph them into useful scrolls
      */
@@ -3283,7 +3444,6 @@ int id;
         otmp->otyp = SCR_MAIL;
         otmp->special_quality = 1;
     }
-#endif
 
     /* avoid abusing eggs laid by you */
     if (obj->otyp == EGG && (obj->speflags & SPEFLAGS_YOURS))
@@ -3813,6 +3973,7 @@ struct monst* origmonst;
             obj = poly_obj(obj, STRANGE_OBJECT);
             newsym(obj->ox, obj->oy);
             break;
+        case SPE_PROBE:
         case WAN_PROBING:
             res = probe_object(obj);
             if (res)
@@ -3871,7 +4032,7 @@ struct monst* origmonst;
         case WAN_DISJUNCTION:
         case SPE_DISJUNCTION:
             res = 1;
-            cancel_item(obj);
+            cancel_item(obj, TRUE);
 #ifdef TEXTCOLOR
             newsym(obj->ox, obj->oy); /* might change color */
 #endif
@@ -4072,6 +4233,28 @@ struct monst* origmonst;
                 }
             }
             break;
+        case SPE_CREATE_ELDER_DRACOLICH:
+            if (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM)
+            {
+                int zombietype = NON_PM;
+                if ((obj->corpsenm >= PM_ANCIENT_GRAY_DRAGON && obj->corpsenm <= PM_ANCIENT_YELLOW_DRAGON)
+                    || obj->corpsenm == PM_ANCIENT_GOLD_DRAGON
+                    || obj->corpsenm == PM_BAHAMUT || obj->corpsenm == PM_TIAMAT
+                    )
+                {
+                    zombietype = PM_ELDER_DRACOLICH;
+                }
+
+                if (zombietype > NON_PM && animate_corpse(obj, zombietype))
+                {
+                    res = 1;
+                }
+                else
+                {
+                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                }
+            }
+            break;
         case WAN_OPENING:
         case SPE_KNOCK:
         case WAN_LOCKING:
@@ -4237,6 +4420,7 @@ register struct obj *obj;
     char archonbuf[BUFSZ];
     struct monst* mtmp = (struct monst*)0;
     struct obj* otmp = (struct obj*)0;
+    int duration = get_obj_spell_duration(obj);
 
     switch (obj->otyp)
     {
@@ -4252,7 +4436,8 @@ register struct obj *obj;
         known = TRUE;
         You_ex(ATR_NONE, CLR_MSG_SPELL, "chant an invocation:");
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Sword of Cold and Darkness, free yourself from the heaven's bonds.");
-        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Become one with my power, one with my body, and let us walk the path of destruction together!");
+        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Become one with my power, one with my body,");
+        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "And let us walk the path of destruction together!");
         pline_ex(ATR_NONE, CLR_MSG_SPELL, "A sword-shaped planar rift forms before you!");
         summonblackblade(obj);
         break;
@@ -4340,7 +4525,7 @@ register struct obj *obj;
         break;
     case SPE_TIME_STOP:
         known = TRUE;
-        timestop();
+        timestop(duration);
         break;
     case SPE_ANIMATE_AIR:
         known = TRUE;
@@ -4470,7 +4655,8 @@ register struct obj *obj;
         You_ex(ATR_NONE, CLR_MSG_SPELL, "chant an invocation:");
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Lord of the Abyss, Prince of Demons,");
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "I call to thee, and I pledge myself to thee!");
-        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "By the deluge of this blood sacrifice, come forth and walk this plane once more!");
+        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "By the deluge of this blood sacrifice,");
+        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Come forth and walk this plane once more!");
         summondemogorgon(obj->otyp);
         break;
     case SPE_FAITHFUL_HOUND:
@@ -4495,6 +4681,10 @@ register struct obj *obj;
         break;
     case SPE_STICK_TO_BOA:
         mtmp = summoncreature(obj->otyp, PM_BOA_CONSTRICTOR, "You throw the stick you prepared in the front of you. It turns into %s!", MM_NEUTRAL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
+            SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_FAITHFUL);
+        break;
+    case SPE_STICK_TO_GIANT_ANACONDA:
+        mtmp = summoncreature(obj->otyp, PM_GIANT_ANACONDA, "You throw the stick you prepared in the front of you. It turns into %s!", MM_NEUTRAL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
             SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
     case SPE_CELESTIAL_DOVE:
@@ -4532,6 +4722,27 @@ register struct obj *obj;
     case SPE_SUMMON_ELDER_TREANT:
         mtmp = summoncreature(obj->otyp, PM_ELDER_TREANT, "%s appears before you.", MM_NEUTRAL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
             SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_PACIFIST | SUMMONCREATURE_FLAGS_FAITHFUL);
+        break;
+    case SPE_SUMMON_GIANT_ANT:
+    case SPE_SUMMON_SOLDIER_ANT:
+    case SPE_SUMMON_DIRE_WOLF:
+    case SPE_SUMMON_BISON:
+    case SPE_SUMMON_PEGASUS:
+    case SPE_SUMMON_ROC:
+    case SPE_SUMMON_GRIZZLY_BEAR:
+    case SPE_SUMMON_OWLBEAR:
+    case SPE_SUMMON_OWLBEAR_PATRIARCH:
+    case SPE_SUMMON_COCKATRICE:
+    case SPE_SUMMON_GIANT_COCKATRICE:
+    case SPE_SUMMON_GARGANTUAN_COCKATRICE:
+    case SPE_SUMMON_GIANT_SPIDER:
+    case SPE_SUMMON_PHASE_SPIDER:
+    case SPE_SUMMON_PURPLE_WORM:
+    case SPE_SUMMON_GARGANTUAN_BEETLE:
+    case SPE_SUMMON_RAVEN:
+    case SPE_SUMMON_WINTER_WOLF:
+        mtmp = summoncreature(obj->otyp, get_summon_monster_type(obj->otyp), "%s appears before you.", MM_NEUTRAL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
+            SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
     case SPE_GUARDIAN_ANGEL:
         You_ex(ATR_NONE, CLR_MSG_SPELL, "recite an ancient prayer to %s.", u_gname());
@@ -4847,7 +5058,7 @@ register struct obj *obj;
                         || obj->corpsenm == PM_BAHAMUT || obj->corpsenm == PM_TIAMAT
                         )
                     {
-                        if ((mons[obj->corpsenm].geno & G_UNIQ))
+                        if ((mons[obj->corpsenm].geno & G_UNIQ) || (obj->corpsenm >= PM_ANCIENT_GRAY_DRAGON && obj->corpsenm <= PM_ANCIENT_YELLOW_DRAGON) || obj->corpsenm == PM_ANCIENT_GOLD_DRAGON)
                             zombietype = PM_ELDER_DRACOLICH;
                         else
                             zombietype = PM_DRACOLICH;
@@ -5122,7 +5333,6 @@ register struct obj *obj;
     case SPE_DETECT_UNSEEN:
     {
         int msg = Invisib && !Blind;
-        int duration = d(objects[obj->otyp].oc_spell_dur_dice, objects[obj->otyp].oc_spell_dur_diesize) + objects[obj->otyp].oc_spell_dur_plus;
         incr_itimeout(&HSee_invisible, duration);
         set_mimic_blocking(); /* do special mimic handling */
         see_monsters();       /* see invisible monsters */
@@ -5497,6 +5707,7 @@ struct obj *otmp;
     int dmg;
 
     otmp->in_use = TRUE; /* in case losehp() is fatal */
+    play_sfx_sound(SFX_EXPLOSION_MAGICAL);
     pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s suddenly explodes!", The(xname(otmp)));
     dmg = d(otmp->charges + 2, 6);
     losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_NONE), "exploding wand", KILLED_BY_AN);
@@ -5542,6 +5753,70 @@ dozap()
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
         pline1(nothing_happens);
+
+        //Mark empty query
+        if((obj->speflags & SPEFLAGS_EMPTY_NOTICED) == 0)
+        {
+            obj->speflags |= SPEFLAGS_EMPTY_NOTICED;
+            boolean canstash = can_stash_objs();
+            boolean markempty = TRUE;
+            char markbuf[BUFSZ];
+            char querybuf[BUFSZ];
+            if (obj->dknown && obj->known)
+            {
+                Sprintf(markbuf, "%s empty. ", Tobjnam(obj, "are"));
+                markempty = FALSE;
+            }
+            else if (has_uoname(obj) && strstri(UONAME(obj), "empty"))
+            {
+                Sprintf(markbuf, "%s marked empty. ", Tobjnam(obj, "are"));
+                markempty = FALSE;
+            }
+            else
+                Sprintf(markbuf, "Mark %s empty and then ", the(cxname(obj)));
+
+            Sprintf(querybuf, "%s%sDrop it?", markbuf, canstash ? "Stash or " : "");
+            char ans = yn_function_es(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, 
+                markempty ? "Mark Empty" : obj->oclass == WAND_CLASS ? "Wand Empty" : "Item Empty", 
+                querybuf, markempty ? (!canstash ? "dmq" : "sdmq") : (!canstash ? "dq" : "sdq"), 'q', 
+                markempty ? (!canstash ? "Drop\nMark Only\nQuit" : "Stash\nDrop\nMark Only\nQuit") : (!canstash ? "Drop\nQuit" : "Stash\nDrop\nQuit"), 
+                (const char*)0);
+
+            if (ans != 'q' && markempty && !(has_uoname(obj) && strstri(UONAME(obj), "empty")))
+            {
+                //Name it empty
+                if (has_uoname(obj))
+                {
+                    char emptybuf[PL_PSIZ + 10];
+                    Sprintf(emptybuf, "%s empty", UONAME(obj));
+                    (void)uoname(obj, emptybuf);
+                }
+                else
+                    (void)uoname(obj, "empty");
+
+                if (ans == 'm')
+                    prinv("Marked empty:", obj, 0L);
+            }
+
+            switch (ans)
+            {
+            case 'd':
+                taketurn = TRUE;
+                getobj_autoselect_obj = obj;
+                (void)dodrop();
+                getobj_autoselect_obj = (struct obj*)0;
+                break;
+            case 's':
+                taketurn = TRUE;
+                getobj_autoselect_obj = obj;
+                (void)dostash();
+                getobj_autoselect_obj = (struct obj*)0;
+                break;
+            case 'q':
+            default:
+                break;
+            }
+        }
     }
     else if (obj->cursed && !rn2(WAND_BACKFIRE_CHANCE)) 
     {
@@ -5606,10 +5881,10 @@ boolean ordinary;
 
     boolean learn_it = FALSE;
     int basedmg = get_spell_damage(obj->otyp, &youmonst, &youmonst);
-    int duration = d(objects[obj->otyp].oc_spell_dur_dice, objects[obj->otyp].oc_spell_dur_diesize) + objects[obj->otyp].oc_spell_dur_plus;
+    int duration = get_obj_spell_duration(obj);
     double damage = 0;
     //boolean magic_resistance_success = check_magic_resistance_and_inflict_damage(&youmonst, obj, FALSE, 0, 0, NOTELL);
-    int save_adj = get_saving_throw_adjustment(obj, obj->oclass == SPBOOK_CLASS && !(obj->speflags & SPEFLAGS_SERVICED_SPELL) ? &youmonst : (struct monst*)0);
+    int save_adj = get_saving_throw_adjustment(obj, &youmonst, obj->oclass == SPBOOK_CLASS && !(obj->speflags & SPEFLAGS_SERVICED_SPELL) ? &youmonst : (struct monst*)0);
 
     switch (obj->otyp) {
     case WAN_STRIKING:
@@ -5761,6 +6036,7 @@ boolean ordinary;
         destroy_item(WAND_CLASS, AD_ELEC);
         destroy_item(RING_CLASS, AD_ELEC);
         (void) flashburn((long) rnd(100));
+        item_destruction_hint(AD_ELEC, TRUE);
         break;
     case SPE_FIREBALL:
     case SPE_FIRE_STORM:
@@ -5804,11 +6080,12 @@ boolean ordinary;
         destroy_item(POTION_CLASS, AD_FIRE);
         destroy_item(SPBOOK_CLASS, AD_FIRE);
         destroy_item(FOOD_CLASS, AD_FIRE); /* only slime for now */
+        item_destruction_hint(AD_FIRE, TRUE);
         break;
 
     case SPE_LOWER_WATER:
     case WAN_EVAPORATION:
-        if (youmonst.data == &mons[PM_WATER_ELEMENTAL] || youmonst.data == &mons[PM_ELDER_WATER_ELEMENTAL])
+        if (is_watery(youmonst.data))
         {
             if (!Upolyd || Unchanging)
             {
@@ -5844,6 +6121,7 @@ boolean ordinary;
             display_u_being_hit(HIT_FROZEN, 0, 0UL);
         }
         destroy_item(POTION_CLASS, AD_COLD);
+        item_destruction_hint(AD_COLD, TRUE);
         break;
 
     case WAN_MAGIC_MISSILE:
@@ -5851,7 +6129,7 @@ boolean ordinary;
     case SPE_GREATER_MAGIC_MISSILE:
         learn_it = TRUE;
         damage = adjust_damage(basedmg, &youmonst, &youmonst, AD_MAGM, ADFLAGS_SPELL_DAMAGE);
-        if (Magic_missile_immunity || Antimagic_or_resistance || Invulnerable) 
+        if (Magic_missile_immunity || Invulnerable) 
         {
             play_sfx_sound(SFX_GENERAL_REFLECTS);
             u_shieldeff();
@@ -5878,7 +6156,7 @@ boolean ordinary;
     case WAN_DISJUNCTION:
     case SPE_DISJUNCTION:
         damage = 0;
-        (void) cancel_monst(&youmonst, obj, TRUE, TRUE, TRUE, d(objects[obj->otyp].oc_spell_dur_dice, objects[obj->otyp].oc_spell_dur_diesize) + objects[obj->otyp].oc_spell_dur_plus);
+        (void) cancel_monst(&youmonst, obj, TRUE, TRUE, TRUE, duration);
         if (obj->otyp != SPE_DISJUNCTION && obj->otyp != WAN_DISJUNCTION)
         {
             set_itimeout(&HCancellation_resistance, max(HCancellation_resistance & TIMEOUT, 10));
@@ -5919,7 +6197,7 @@ boolean ordinary;
             You_feel("rather itchy under %s.", yname(uarmo));
         }
 
-        incr_itimeout(&HInvis, 100 + rn2(50));
+        incr_itimeout(&HInvis, duration);
         refresh_u_tile_gui_info(TRUE);
 
 #if 0
@@ -5945,7 +6223,7 @@ boolean ordinary;
         damage = 0;
         //boolean was_fast = Fast;
         boolean was_very_fast = Very_fast;
-        incr_itimeout(&HVery_fast, 150 + rnd(50));
+        incr_itimeout(&HVery_fast, duration);
         context.botl = context.botlx = TRUE;
         refresh_u_tile_gui_info(TRUE);
         if (Very_fast && !was_very_fast && !Ultra_fast && !Super_fast && !Lightning_fast)
@@ -5980,7 +6258,7 @@ boolean ordinary;
     case SPE_MASS_SLOW:
         damage = 0;
         boolean was_slowed = Slowed;
-        incr_itimeout(&HSlowed, obj->oclass == WAND_CLASS ? rn1(10, 100 + 60 * bcsign(obj)) : duration);
+        incr_itimeout(&HSlowed, duration);
         context.botl = context.botlx = TRUE;
         refresh_u_tile_gui_info(TRUE);
         if (Slowed && !was_slowed)
@@ -6102,7 +6380,7 @@ boolean ordinary;
             int kformat = NO_KILLER_PREFIX;
             char kname[BUFSZ] = "";
             Sprintf(kname, "casting a petrification spell on %sself", uhim());
-            make_stoned(5L, (char*)0, kformat, kname);
+            make_stoned(5L, (char*)0, kformat, kname, HINT_KILLED_PETRIFICATION);
         }
         break;
     case SPE_GAZE_OF_PETRIFICATION:
@@ -6185,7 +6463,7 @@ boolean ordinary;
         if (is_undead(youmonst.data)) {
             You_feel("frightened and %sstunned.",
                      Stunned ? "even more " : "");
-            make_stunned((HStun & TIMEOUT) + (long) rnd(30), FALSE);
+            make_stunned((HStun & TIMEOUT) + (long) rnd(30), FALSE); //Not strictly the same effect, so keep hard coding for the time being
         } else
             You("don't feel much different than you did before.");
         break;
@@ -6232,7 +6510,7 @@ boolean ordinary;
                     fix_petrification();
 
                 if (Slimed)
-                    make_slimed(0L, (char*)0);
+                    make_slimed(0L, (char*)0, 0, (char*)0, 0);
             }
             special_effect_wait_until_end(0);
 
@@ -6282,7 +6560,7 @@ boolean ordinary;
                 you_unwere(TRUE);
 
             if(Stoned)
-                make_stoned(0L, (char*)0, 0, (char*)0);
+                make_stoned(0L, (char*)0, 0, (char*)0, 0);
 
             if (u.uhunger < 500)
             {
@@ -6318,7 +6596,7 @@ boolean ordinary;
         if (Sick || FoodPoisoned || MummyRot)
             You_ex(ATR_NONE, CLR_MSG_POSITIVE, "are no longer ill.");
         if (Slimed)
-            make_slimed(0L, "The slime disappears!");
+            make_slimed(0L, "The slime disappears!", 0, (char*)0, 0);
         healup(0, 0, TRUE, FALSE, FALSE, FALSE, FALSE);
         special_effect_wait_until_end(0);
         break;
@@ -6399,7 +6677,7 @@ boolean ordinary;
     case WAN_NOTHING:
         damage = 0;
         break;
-    case SPE_PROBE_MONSTER:
+    case SPE_PROBE:
     case WAN_PROBING: 
     {
         if (obj->otyp == WAN_PROBING && !objects[obj->otyp].oc_name_known)
@@ -6603,7 +6881,7 @@ struct obj *obj; /* wand or spell */
      * moved here from the bottom section.
      */
     case WAN_PROBING:
-    case SPE_PROBE_MONSTER:
+    case SPE_PROBE:
         probe_monster(u.usteed);
         learnwand(obj);
         steedhit = TRUE;
@@ -6718,18 +6996,17 @@ int duration;
 
     if (self_cancel)
     {
-#if 0
         /* 1st cancel inventory */
         struct obj* otmp;
         for (otmp = (youdefend ? invent : mdef->minvent); otmp;
              otmp = otmp->nobj)
-            cancel_item(otmp);
+            cancel_item(otmp, FALSE);
         if (youdefend) {
             context.botl = 1; /* potential AC change */
             find_ac();
             find_mc();
+            update_inventory();
         }
-#endif
     }
 
     /* now handle special cases */
@@ -6793,6 +7070,7 @@ int duration;
         /* [not 'else if'; chameleon might have been hiding as a mimic] */
         if (mdef->cham >= LOW_PM) {
             /* note: newcham() uncancels shapechangers (resets m->mcancelled
+               to 0), but only for shapechangers whose m->cham is already
                to 0), but only for shapechangers whose m->cham is already
                NON_PM and we just verified that it's LOW_PM or higher */
             newcham(mdef, &mons[mdef->cham], FALSE, FALSE);
@@ -6913,7 +7191,7 @@ struct obj *obj; /* wand or spell */
 
     switch (obj->otyp) {
     case WAN_PROBING:
-    case SPE_PROBE_MONSTER:
+    case SPE_PROBE:
         ptmp = 0;
         if (u.dz < 0) {
             You("probe towards the %s.", ceiling(x, y));
@@ -7853,7 +8131,7 @@ boolean stop_at_first_hit_object;
         } 
         else 
         {
-            if (weapon == ZAPPED_WAND && (obj->otyp == WAN_PROBING || obj->otyp == SPE_PROBE_MONSTER)
+            if (weapon == ZAPPED_WAND && (obj->otyp == WAN_PROBING || obj->otyp == SPE_PROBE)
                 && glyph_is_invisible(levl[bhitpos.x][bhitpos.y].hero_memory_layers.glyph))
             {
                 unmap_object(bhitpos.x, bhitpos.y);
@@ -8426,7 +8704,7 @@ const char *fltxt;
 
             if (origobj)
             {
-                Sprintf(killername, "%s from %s %s", fltxt, hisbuf, killer_xname_flags(origobj, KXNFLAGS_NO_ARTICLE));
+                Sprintf(killername, "%s from %s %s", fltxt, hisbuf, killer_xname_flags(origobj, KXNFLAGS_NO_ARTICLE | KXNFLAGS_SPELL));
             }
             else
             {
@@ -8493,6 +8771,7 @@ const char *fltxt;
             if (!rn2(5))
                 destroy_item(SPBOOK_CLASS, AD_FIRE);
             destroy_item(FOOD_CLASS, AD_FIRE);
+            item_destruction_hint(AD_FIRE, TRUE);
         }
         break;
     case ZT_COLD:
@@ -8510,7 +8789,10 @@ const char *fltxt;
             //dam = d(nd, 6);
         }
         if (!rn2(3))
+        {
             destroy_item(POTION_CLASS, AD_COLD);
+            item_destruction_hint(AD_COLD, TRUE);
+        }
         break;
     case ZT_SLEEP:
         damage = 0;
@@ -8559,6 +8841,7 @@ const char *fltxt;
             (void)destroy_arm(uarmo);
         if (uarmu)
             (void) destroy_arm(uarmu);
+        killer.hint_idx = HINT_KILLED_DISINTEGRATION_RAY;
         killer.format = KILLED_BY_AN;
         strcpy(killer.name, killername);
         /* when killed by disintegration attack, don't leave corpse */
@@ -8587,6 +8870,7 @@ const char *fltxt;
 #endif
         killer.format = KILLED_BY_AN;
         Strcpy(killer.name, killername);
+        killer.hint_idx = HINT_KILLED_DEATH_RAY;
         display_u_being_hit(HIT_DEATH, 0, 0UL);
         done(DIED);
         return; /* lifesaved */
@@ -8623,7 +8907,7 @@ const char *fltxt;
                 int kformat = KILLED_BY_AN;
                 char kname[BUFSZ];
                 Strcpy(kname, killername);
-                make_stoned(5L, (char*)0, kformat, kname);
+                make_stoned(5L, (char*)0, kformat, kname, HINT_KILLED_PETRIFICATION_RAY);
             }
         }
         return;
@@ -8646,6 +8930,7 @@ const char *fltxt;
             destroy_item(WAND_CLASS, AD_ELEC);
         if (!rn2(3))
             destroy_item(RING_CLASS, AD_ELEC);
+        item_destruction_hint(AD_ELEC, TRUE);
         break;
     case ZT_POISON_GAS:
         damage = 0;
@@ -10269,7 +10554,6 @@ const char *const destroy_strings[][3] = {
 /* guts of destroy_item(), which ought to be called maybe_destroy_items();
    caller must decide whether obj is eligible */
 void
-
 destroy_one_item(obj, osym, dmgtyp, forcedestroy)
 struct obj *obj;
 int osym, dmgtyp;
@@ -10400,13 +10684,15 @@ boolean forcedestroy;
                                                : "All of your"); /* N of N */
 
         play_simple_object_sound(obj, obj_sound_type);
-        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s %s!", mult, xname(obj),
+        char dcbuf[BUFSZ] = "";
+        Sprintf(dcbuf, "%s %s %s!", mult, xname(obj),
               destroy_strings[dindx][(cnt > 1L)]);
+        pline_ex1(ATR_NONE, CLR_MSG_NEGATIVE, dcbuf);
 
         if (osym == POTION_CLASS && dmgtyp != AD_COLD) 
         {
             if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data))
-                potionbreathe(obj);
+                potionbreathe(obj, dcbuf);
         }
 
         if (obj->owornmask) 
@@ -10680,18 +10966,27 @@ int osym, dmgtyp;
 
 boolean
 is_obj_protected_by_property(otmp, mtmp, adtyp)
-struct obj* otmp;
+struct obj* otmp; // Can be null
 struct monst* mtmp;
 int adtyp;
 {
-    if (!otmp || !mtmp)
+    if (!mtmp)
         return FALSE;
 
-    /* Worn items only, but including any wielded items (even if improperly like wielded rings and potions) */
-    if ((otmp->owornmask & ~(W_SWAP_WEAPON | W_QUIVER)) == 0L)
-        return FALSE;
+    ///* Worn items only, but including any wielded items (even if improperly like wielded rings and potions) */
+    //if (otmp && (otmp->owornmask & ~(W_SWAP_WEAPON | W_QUIVER)) == 0L)
+    //    return FALSE;
     
     boolean isyou = (mtmp == &youmonst);
+
+    //Check that mtmp is carrying the item
+    if (otmp)
+    {
+        if (isyou && !carried(otmp))
+            return FALSE;
+        else if (mcarried(otmp) && mtmp != otmp->ocarry)
+            return FALSE;
+    }
 
     switch (adtyp)
     {
@@ -10746,6 +11041,20 @@ int adtyp;
                 return TRUE;
         }
         else if (isyou ? Acid_resistance : mon_resists_acid_weakly(mtmp))
+        {
+            if (rn2(2))
+                return TRUE;
+        }
+        break;
+    case AD_MAGM:
+        if (isyou ? Magic_missile_immunity : is_mon_immune_to_magic_missile(mtmp))
+            return TRUE;
+        else if (isyou ? Improved_magic_missile_resistance : mon_resists_magic_missile_strongly(mtmp))
+        {
+            if (rn2(4))
+                return TRUE;
+        }
+        else if (isyou ? Magic_missile_resistance : mon_resists_magic_missile_weakly(mtmp))
         {
             if (rn2(2))
                 return TRUE;
@@ -11080,7 +11389,7 @@ retry:
     if (iflags.cmdassist && tries > 0)
         Strcat(promptbuf, " (enter 'help' for assistance)");
     Strcat(promptbuf, "?");
-    getlin_ex(GETLINE_WISHING, ATR_NONE, NO_COLOR, promptbuf, buf, (char*)0, (char*)0);
+    getlin_ex(GETLINE_WISHING, ATR_NONE, NO_COLOR, promptbuf, buf, (char*)0, (char*)0, (char*)0);
     (void) mungspaces(buf);
     if (buf[0] == '\033') {
         buf[0] = '\0';
@@ -11188,6 +11497,9 @@ const char* message_fmt; //input the summoning message with one %s, which is for
 unsigned long mmflags;
 unsigned long scflags;
 {
+    if (monst_id < LOW_PM)
+        return (struct monst*)0;
+
     struct monst* mon = (struct monst*)0;
     boolean capitalize = !!(scflags & SUMMONCREATURE_FLAGS_CAPITALIZE); //capitalize the monster name for %s
     boolean markassummoned = !!(scflags & SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED); //mark as summoned
@@ -11198,7 +11510,7 @@ unsigned long scflags;
     boolean faithful = !!(scflags & SUMMONCREATURE_FLAGS_FAITHFUL);
     boolean protector = !!(scflags & SUMMONCREATURE_FLAGS_PROTECTOR);
 
-    mon = makemon(&mons[monst_id], u.ux, u.uy, MM_NOCOUNTBIRTH | MM_PLAY_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | mmflags);
+    mon = makemon(&mons[monst_id], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | mmflags);
     if (mon)
     {
         mon->issummoned = markassummoned;
@@ -11213,7 +11525,7 @@ unsigned long scflags;
 
         (void)tamedog(mon, (struct obj*) 0, TAMEDOG_FORCE_ALL, FALSE, 0, FALSE, FALSE);
 
-        if((objects[spl_otyp].oc_spell_dur_dice > 1 && objects[spl_otyp].oc_spell_dur_diesize > 1) || objects[spl_otyp].oc_spell_dur_plus)
+        if(spl_otyp > STRANGE_OBJECT && ((objects[spl_otyp].oc_spell_dur_dice > 1 && objects[spl_otyp].oc_spell_dur_diesize > 1) || objects[spl_otyp].oc_spell_dur_plus))
             mon->summonduration = d(objects[spl_otyp].oc_spell_dur_dice, objects[spl_otyp].oc_spell_dur_diesize) + objects[spl_otyp].oc_spell_dur_plus;
         else
             mon->summonduration = 0;
@@ -11238,7 +11550,7 @@ int spl_otyp;
     monindex = ndemon(A_NONE);
     
     if(monindex)
-        mon = makemon(&mons[monindex], u.ux, u.uy, MM_NO_MONSTER_INVENTORY | MM_NOCOUNTBIRTH | MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+        mon = makemon(&mons[monindex], u.ux, u.uy, MM_NO_MONSTER_INVENTORY | MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
 
     if (mon)
     {
@@ -11273,7 +11585,7 @@ int spl_otyp;
         return;
     }
 
-    mon = makemon(&mons[monindex], u.ux, u.uy, MM_NOCOUNTBIRTH | MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+    mon = makemon(&mons[monindex], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
 
     if (mon)
     {
@@ -11326,7 +11638,7 @@ int spl_otyp UNUSED;
         return;
     }
 
-    mon = makemon(&mons[monindex], u.ux, u.uy, MM_NOCOUNTBIRTH | MM_PLAY_SUMMON_ANIMATION | MM_LAWFUL_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+    mon = makemon(&mons[monindex], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_LAWFUL_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
 
     if (mon)
     {
@@ -11390,11 +11702,12 @@ armageddon()
 
 
 void
-timestop()
+timestop(duration)
+int duration;
 {
     pline_ex(ATR_NONE, CLR_MSG_SPELL, "The flow of time seems to slow down!");
     context.time_stopped = TRUE;
-    begin_timestoptimer(d(objects[SPE_TIME_STOP].oc_spell_dur_dice, objects[SPE_TIME_STOP].oc_spell_dur_diesize) + objects[SPE_TIME_STOP].oc_spell_dur_plus);
+    begin_timestoptimer((long)duration);
 
 }
 
@@ -11453,5 +11766,54 @@ int montype;
     return zombietype;
 }
 
+
+STATIC_OVL int
+get_summon_monster_type(otyp)
+int otyp;
+{
+    switch(otyp)
+    {
+    case SPE_SUMMON_GRIZZLY_BEAR:
+        return PM_GRIZZLY_BEAR;
+    case SPE_SUMMON_OWLBEAR:
+        return PM_OWLBEAR;
+    case SPE_SUMMON_OWLBEAR_PATRIARCH:
+        return PM_OWLBEAR_PATRIARCH;
+    case SPE_SUMMON_COCKATRICE:
+        return PM_COCKATRICE;
+    case SPE_SUMMON_GIANT_COCKATRICE:
+        return PM_GIANT_COCKATRICE;
+    case SPE_SUMMON_GARGANTUAN_COCKATRICE:
+        return PM_GARGANTUAN_COCKATRICE;
+    case SPE_SUMMON_GIANT_SPIDER:
+        return PM_GIANT_SPIDER;
+    case SPE_SUMMON_PHASE_SPIDER:
+        return PM_PHASE_SPIDER;
+    case SPE_SUMMON_PURPLE_WORM:
+        return PM_PURPLE_WORM;
+    case SPE_SUMMON_GARGANTUAN_BEETLE:
+        return PM_GARGANTUAN_BEETLE;
+    case SPE_SUMMON_RAVEN:
+        return PM_RAVEN;
+    case SPE_SUMMON_WINTER_WOLF:
+        return PM_WINTER_WOLF;
+    case SPE_SUMMON_DIRE_WOLF:
+        return PM_DIREWOLF;
+    case SPE_SUMMON_GIANT_ANT:
+        return PM_GIANT_ANT;
+    case SPE_SUMMON_SOLDIER_ANT:
+        return PM_SOLDIER_ANT;
+    case SPE_SUMMON_BISON:
+        return PM_BISON;
+    case SPE_SUMMON_PEGASUS:
+        return PM_PEGASUS;
+    case SPE_SUMMON_ROC:
+        return PM_ROC;
+    default:
+        break;
+    }
+    return NON_PM;
+
+}
 
 /*zap.c*/

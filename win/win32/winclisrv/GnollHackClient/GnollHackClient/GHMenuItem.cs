@@ -41,7 +41,7 @@ namespace GnollHackClient
         public string LabelString { get { return (MaxCount <= 0 ? "N/A" : Count == -1 ? "All" : Count.ToString()); } }
         public int ConvertedCount { get { return (Count + 1); } set { Count = value - 1; } }
         public bool IsSwipeVisible { get { return (Count != 0 && MaxCount > 1); } }
-        public double MinimumRowHeight { get { return Identifier != 0 || HeadingGroupAccelerator != 0 ? 30.0 : 12.0; } }
+        public float MinimumTouchableTextSize { get { return GHConstants.MenuDefaultRowHeight; } }
         public string EntryString { get; set; }
         public Color EntryTextColor { get; set; }
         public int MaxCount { get; set; }
@@ -49,9 +49,9 @@ namespace GnollHackClient
         public char GroupAccelerator { get; set; }
         public char SpecialMark { get; set; }
         public string FormattedAccelerator
-        { 
+        {
             get
-            { string res = Accelerator.ToString(); 
+            { string res = Accelerator.ToString();
                 if (res == "" || res == "\0")
                     return "";
                 else
@@ -92,6 +92,9 @@ namespace GnollHackClient
                 else
                     _mainText = "";
 
+                string trimmed_maintext = _mainText.Trim();
+                _mainTextSplit = trimmed_maintext.Split(' ');
+
                 if (first_parenthesis_open > 0 && !(_menuInfo.Style == ghmenu_styles.GHMENU_STYLE_ITEM_COMMAND))  /* Ignore cases where the entire row is in parentheses */
                 {
                     _suffixText = ParseSuffixText(value, false);
@@ -102,6 +105,10 @@ namespace GnollHackClient
                     _suffixText = "";
                     _suffix2Text = "";
                 }
+                string trimmed_suffixtext = _suffixText.Trim();
+                _suffixTextSplit = trimmed_suffixtext.Split(' ');
+                string trimmed_suffix2text = _suffix2Text.Trim();
+                _suffix2TextSplit = trimmed_suffix2text.Split(' ');
             }
         }
         public int SuffixParseStyle
@@ -140,6 +147,10 @@ namespace GnollHackClient
                         break;
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                         break;
+                    case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        res = 1;
+                        break;
+                    case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
                         break;
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
@@ -190,7 +201,7 @@ namespace GnollHackClient
                 if (pcidx > 0)
                 {
                     string sufstr = searchstr.Substring(0, pcidx);
-                    if(!string.IsNullOrWhiteSpace(sufstr))
+                    if (!string.IsNullOrWhiteSpace(sufstr))
                     {
                         if (res != "")
                             res = res + ", ";
@@ -203,7 +214,7 @@ namespace GnollHackClient
                     break;
                 str = searchstr.Substring(pcidx + 1);
             }
-            
+
             return res;
         }
         public LayoutOptions MainTextVerticalOptions { get { return IsSuffixTextVisible ? LayoutOptions.EndAndExpand : LayoutOptions.CenterAndExpand; } }
@@ -226,6 +237,45 @@ namespace GnollHackClient
         public ulong MenuFlags { get; set; }
         public UInt64 Oid { get; set; }
         public UInt64 Mid { get; set; }
+
+        public bool TextRowCountsSet { get; set;}
+        public int MainTextRows { get; set; }
+        public int SuffixTextRows { get; set; }
+        public int Suffix2TextRows { get; set; }
+
+        private string[] _mainTextSplit;
+        public string[] MainTextSplit 
+        {
+            get
+            {
+                if (_mainTextSplit == null)
+                    return new string[1] {""};
+                else
+                    return _mainTextSplit;
+            }
+        }
+        private string[] _suffixTextSplit;
+        public string[] SuffixTextSplit
+        {
+            get
+            {
+                if (_suffixTextSplit == null)
+                        return new string[1] { "" };
+                else
+                    return _suffixTextSplit;
+            }
+        }
+        private string[] _suffix2TextSplit;
+        public string[] Suffix2TextSplit
+        {
+            get
+            {
+                if (_suffix2TextSplit == null)
+                    return new string[1] { "" };
+                else
+                    return _suffix2TextSplit;
+            }
+        }
 
         public string FontFamily {
             get 
@@ -264,7 +314,10 @@ namespace GnollHackClient
                             break;
                         case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                             break;
+                        case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                         case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
+                            res = "Immortal";
                             break;
                         case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
                             break;
@@ -329,6 +382,8 @@ namespace GnollHackClient
                             break;
                         case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                             break;
+                        case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                         case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
                             break;
                         case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
@@ -417,8 +472,12 @@ namespace GnollHackClient
                         break;
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                         break;
+                    case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        res = res * 16.0 / 15.0;
+                        break;
+                    case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
-                        res = res * 17.0 / 15.0;
+                        res = res * 15.0 / 15.0;
                         break;
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
                         res = res * 18.0 / 15.0;
@@ -473,6 +532,9 @@ namespace GnollHackClient
                     case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                         res = 0.775;
                         break;
+                    case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        res = 0.70;
+                        break;
                     default:
                         break;
                 }
@@ -492,6 +554,11 @@ namespace GnollHackClient
                 double res;
                 switch (_menuInfo.Style)
                 {
+                    case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
+                    case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
+                        res = 18;
+                        break;
                     default:
                         res = 12;
                         break;
@@ -557,5 +624,106 @@ namespace GnollHackClient
         }
 
         public bool Selected { get; set; }
+
+        public float BottomPadding
+        {
+            get
+            {
+                float bottomPadding = 0;
+                if (((ulong)MenuFlags & (ulong)GnollHackCommon.MenuFlags.MENU_FLAGS_IS_HEADING) != 0)
+                {
+                    bottomPadding = 3;
+                }
+                else
+                {
+                    switch (_menuInfo.Style)
+                    {
+                        case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
+                        case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
+                            bottomPadding = 3;
+                            break;
+                        case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        default:
+                            if (IsSuffixTextVisible && IsSuffix2TextVisible)
+                                bottomPadding = 6;
+                            else
+                                bottomPadding = 3;
+                            break;
+                    }
+                }
+                return bottomPadding;
+            }
+        }
+
+        public float TopPadding
+        {
+            get
+            {
+                float topPadding = 0;  
+                if (((ulong) MenuFlags & (ulong)GnollHackCommon.MenuFlags.MENU_FLAGS_IS_HEADING) != 0)
+                {
+                    topPadding = (float) HeadingTopMargin;
+                }
+                else
+                {
+                    switch (_menuInfo.Style)
+                    {
+                        case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
+                        case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
+                            topPadding = 0;
+                            break;
+                        case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                        default:
+                            if (IsSuffixTextVisible && IsSuffix2TextVisible)
+                                topPadding = 6;
+                            else
+                                topPadding = 3;
+                            break;
+                    }
+                }
+                return topPadding;
+            }
+        }
+
+        public bool UsesMinRowHeight
+        {
+            get
+            {
+                bool res = true;
+                switch(_menuInfo.Style)
+                {
+                    case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
+                    case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
+                        if (Identifier == 0 && HeadingGroupAccelerator == 0)
+                            res = false;
+                        break;
+                    case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    default:
+                        break;
+                }
+                return res;
+            }
+        }
+
+        public float MinimumRowHeight(float fontspacing, float bottompadding, float toppadding, float canvaswidth, float canvasheight)
+        {
+            float res = 0;
+
+            if (UsesMinRowHeight)
+            {
+                res = fontspacing;
+                switch (_menuInfo.Style)
+                {
+                    case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
+                            float altsize = Math.Min((float)GHConstants.TileHeight, (Math.Min(canvaswidth, canvasheight) / 15.25f - bottompadding - toppadding));
+                            if(altsize > fontspacing)
+                                res = altsize;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            return res;
+        }
     }
 }

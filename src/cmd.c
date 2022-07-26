@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    cmd.c    $NHDT-Date: 1557088405 2019/05/05 20:33:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.333 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -121,6 +121,7 @@ extern int NDECL(dosit);              /**/
 extern int NDECL(dotalk);             /**/
 extern int NDECL(docast);             /**/
 extern int NDECL(dovspell);           /**/
+extern int NDECL(dosortspell);        /**/
 extern int NDECL(dotelecmd);          /**/
 extern int NDECL(dountrap);           /**/
 extern int NDECL(doversion);          /**/
@@ -204,7 +205,7 @@ STATIC_DCL int FDECL(doviewpetstatistics, (struct monst*));
 
 STATIC_DCL void FDECL(enlght_out, (const char *, int));
 STATIC_DCL void FDECL(enlght_line, (const char *, const char *, const char *,
-                                    const char *));
+                                    const char *, BOOLEAN_P));
 STATIC_DCL char *FDECL(enlght_combatinc, (const char *, int, int, char *));
 STATIC_DCL void FDECL(enlght_halfdmg, (int, int));
 STATIC_DCL boolean NDECL(walking_on_water);
@@ -227,6 +228,7 @@ STATIC_DCL boolean FDECL(help_dir, (CHAR_P, int, const char *));
 STATIC_DCL void FDECL(add_command_menu_items, (winid, int));
 STATIC_DCL void NDECL(check_gui_special_effect);
 STATIC_DCL void FDECL(print_monster_abilities, (winid, int*, BOOLEAN_P));
+STATIC_DCL void FDECL(print_weapon_skill_line, (struct obj*, BOOLEAN_P, int));
 
 
 static const char *readchar_queue = "";
@@ -388,12 +390,12 @@ doextcmd(VOID_ARGS)
         func = extcmdlist[idx].ef_funct;
         if (!wizard && (extcmdlist[idx].flags & WIZMODECMD)) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("can't do that.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "can't do that.");
             return 0;
         }
         if (!(wizard || discover || CasualMode) && (extcmdlist[idx].flags & CASUALMODECMD)) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("can't do that.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "can't do that.");
             return 0;
         }
         if (iflags.menu_requested && !accept_menu_prefix(func)) {
@@ -907,19 +909,7 @@ doability(VOID_ARGS)
     abilitynum++;
     */
 
-    strcpy(available_ability_list[abilitynum].name, "Dungeon overview");
-    available_ability_list[abilitynum].function_ptr = &dooverview;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-    strcpy(available_ability_list[abilitynum].name, "Conduct");
+    strcpy(available_ability_list[abilitynum].name, "Goals and achievements");
     available_ability_list[abilitynum].function_ptr = &doconduct;
 
     any = zeroany;
@@ -931,6 +921,17 @@ doability(VOID_ARGS)
 
     abilitynum++;
 
+    strcpy(available_ability_list[abilitynum].name, "Dungeon overview");
+    available_ability_list[abilitynum].function_ptr = &dooverview;
+
+    any = zeroany;
+    any.a_int = abilitynum + 1;
+
+    add_menu(win, NO_GLYPH, &any,
+        0, 0, ATR_NONE,
+        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+    abilitynum++;
 
     strcpy(available_ability_list[abilitynum].name, "Killed monsters");
     available_ability_list[abilitynum].function_ptr = &dokilledmonsters;
@@ -956,7 +957,7 @@ doability(VOID_ARGS)
 
     abilitynum++;
 
-    strcpy(available_ability_list[abilitynum].name, "Discovered Items");
+    strcpy(available_ability_list[abilitynum].name, "Discovered items");
     available_ability_list[abilitynum].function_ptr = &dodiscovered;
 
     any = zeroany;
@@ -1092,7 +1093,7 @@ domonsterability(VOID_ARGS)
     if (abilitynum <= 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("don't have any monster abilities at your disposal.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have any monster abilities at your disposal.");
         destroy_nhwindow(win);
         return 0;
     }
@@ -1764,7 +1765,7 @@ wiz_level_change(VOID_ARGS)
     int newlevel = 0;
     int ret;
 
-    getlin_ex(GETLINE_LEVEL_CHANGE, ATR_NONE, NO_COLOR, "To what experience level do you want to be set?", buf, (char*)0, (char*)0);
+    getlin_ex(GETLINE_LEVEL_CHANGE, ATR_NONE, NO_COLOR, "To what experience level do you want to be set?", buf, (char*)0, (char*)0, (char*)0);
     (void) mungspaces(buf);
     if (buf[0] == '\033' || buf[0] == '\0')
         ret = 0;
@@ -2755,23 +2756,23 @@ wiz_intrinsic(VOID_ARGS)
                 make_hallucinated(newtimeout, TRUE, 0L);
                 break;
             case SICK:
-                make_sick(newtimeout, wizintrinsic, TRUE);
+                make_sick(newtimeout, wizintrinsic, TRUE, 0);
                 break;
             case FOOD_POISONED:
-                make_food_poisoned(newtimeout, wizintrinsic, TRUE);
+                make_food_poisoned(newtimeout, wizintrinsic, TRUE, 0);
                 break;
             case MUMMY_ROT:
-                make_mummy_rotted(newtimeout, wizintrinsic, TRUE);
+                make_mummy_rotted(newtimeout, wizintrinsic, TRUE, 0);
                 break;
             case SLIMED:
                 Sprintf(buf, fmt,
                         !Slimed ? "" : " still", "turning into slime");
-                make_slimed(newtimeout, buf);
+                make_slimed(newtimeout, buf, KILLED_BY, wizintrinsic, 0);
                 break;
             case STONED:
                 Sprintf(buf, fmt,
                         !Stoned ? "" : " still", "turning into stone");
-                make_stoned(newtimeout, buf, KILLED_BY, wizintrinsic);
+                make_stoned(newtimeout, buf, KILLED_BY, wizintrinsic, 0);
                 break;
             case STUNNED:
                 make_stunned(newtimeout, TRUE);
@@ -2917,14 +2918,18 @@ static winid en_win = WIN_ERR;
 static boolean en_via_menu = FALSE;
 static const char You_[] = "You ", are[] = "are ", were[] = "were ",
                   have[] = "have ", had[] = "had ", can[] = "can ",
-                  could[] = "could ", cannot[] = "cannot ", could_not[] = "could_not ";
-static const char have_been[] = "have been ", have_never[] = "have never ",
+                  could[] = "could ", cannot[] = "cannot ", could_not[] = "could not ";
+static const char have_been[] = "have been ", have_never[] = "have never ", have_not[] = "have not ", had_not[] = "had not ",
                   never[] = "never ";
 
 #define enl_msg(prefix, present, past, suffix, ps) \
-    enlght_line(prefix, final ? past : present, suffix, ps)
+    enlght_line(prefix, final ? past : present, suffix, ps, FALSE)
+#define enl_msg2(prefix, present, past, suffix, ps) \
+    enlght_line(prefix, final ? past : present, suffix, ps, TRUE)
 #define you_are(attr, ps) enl_msg(You_, are, were, attr, ps)
 #define you_have(attr, ps) enl_msg(You_, have, had, attr, ps)
+#define you_have_not(attr, ps) enl_msg(You_, have_not, had_not, attr, ps)
+#define you_have_not2(attr) enl_msg2(You_, have_not, had_not, attr, "")
 #define you_can(attr, ps) enl_msg(You_, can, could, attr, ps)
 #define you_cannot(attr, ps) enl_msg(You_, cannot, could_not, attr, ps)
 #define you_have_been(goodthing) enl_msg(You_, have_been, were, goodthing, "")
@@ -2948,12 +2953,13 @@ int attr;
 }
 
 static void
-enlght_line(start, middle, end, ps)
+enlght_line(start, middle, end, ps, parentheses)
 const char *start, *middle, *end, *ps;
+boolean parentheses;
 {
     char buf[BUFSZ];
 
-    Sprintf(buf, " %s%s%s%s.", start, middle, end, ps);
+    Sprintf(buf, " %s%s%s%s%s.%s", parentheses ? "(" : "", start, middle, end, ps, parentheses ? ")" : "");
     enlght_out(buf, ATR_NONE);
 }
 
@@ -3334,7 +3340,7 @@ int final;
         /* 'turns' grates on the nerves in this context... */
         Sprintf(buf, "the dungeon %ld turn%s ago", moves, plur(moves));
         /* same phrasing for current and final: "entered" is unconditional */
-        enlght_line(You_, "entered ", buf, "");
+        enlght_line(You_, "entered ", buf, "", FALSE);
     }
     if (!Upolyd) {
         /* flags.showexp does not matter */
@@ -3468,7 +3474,9 @@ int final;
     Sprintf(difficultybuf, " (%d%% damage by monsters, %d%% by player)", pct_monster_dmg_mult, pct_player_dmg_mult);
     enl_msg("Your game difficulty ", "is ", "was ", buf, difficultybuf);
 
-    enl_msg("You ", "are playing in ", "were playing in ", get_game_mode_text(TRUE), " mode");
+    char modebuf[BUFSIZ];
+    Sprintf(modebuf, " mode (%s)", get_game_mode_description());
+    enl_msg("You ", "are playing in ", "were playing in ", get_game_mode_text(TRUE), modebuf);
 
 }
 
@@ -3876,14 +3884,34 @@ int final;
     }
 
     /* report being weaponless; distinguish whether gloves are worn */
-    if (!uwep) {
-        you_are(uarmg ? "empty handed" /* gloves imply hands */
-                      : humanoid(youmonst.data)
-                         /* hands but no weapon and no gloves */
-                         ? "bare handed"
-                         /* alternate phrasing for paws or lack of hands */
-                         : "not wielding anything",
+    if (!uwep) 
+    {
+        if (!uarms)
+        {
+            you_are(uarmg ? "empty handed" /* gloves imply hands */
+                : humanoid(youmonst.data)
+                /* hands but no weapon and no gloves */
+                ? "bare handed"
+                /* alternate phrasing for paws or lack of hands */
+                : "not wielding anything",
                 "");
+        }
+        else
+        {
+            if (is_shield(uarms))
+            {
+                Sprintf(buf, "wielding a shield in your left %s", body_part(HAND));
+                you_are(buf, "");
+            }
+            else
+            {
+                const char* what = weapon_descr(uarms);
+                Sprintf(buf, "wielding %s in your left %s",
+                    (uarms->quan == 1L) ? an(what) : makeplural(what), body_part(HAND));
+                you_are(buf, "");
+            }
+
+        }
     /* two-weaponing implies hands (can't be polymorphed) and
        a weapon or wep-tool (not other odd stuff) in each hand */
     } else if (u.twoweap) {
@@ -3900,6 +3928,10 @@ int final;
         else
             Sprintf(buf, "wielding %s",
                     (uwep->quan == 1L) ? an(what) : makeplural(what));
+
+        if (uarms && is_shield(uarms))
+            Strcat(buf, " and a shield");
+
         you_are(buf, "");
     }
     /*
@@ -3908,6 +3940,8 @@ int final;
      *
      * TODO?  Maybe merge wielding line and skill line into one sentence.
      */
+    print_weapon_skill_line(uwep, TRUE, final);
+#if 0
     if ((wtype = uwep_skill_type()) != P_NONE) 
     {
         if (wtype == P_MARTIAL_ARTS)
@@ -3938,6 +3972,7 @@ int final;
         else
             you_are(buf, "");
     }
+#endif
 
     if (!uwep && P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_UNSKILLED)
     {
@@ -3986,7 +4021,11 @@ int final;
         you_are(buf, "");
     }
 
-    if (u.twoweap) {
+    if (uarms)
+        print_weapon_skill_line(uarms, u.twoweap && is_weapon(uarms), final);
+
+    if (u.twoweap) 
+    {
         wtype = P_TWO_WEAPON_COMBAT;
         char sklvlbuf[20];
         int sklvl = P_SKILL_LEVEL(wtype);
@@ -4021,7 +4060,76 @@ int final;
         else
             you_are("not wearing any armor", "");
     }
+
+    if (u.ublessed > 0)
+    {
+        char protbuf[BUFSZ];
+        Sprintf(protbuf, "endowed with divine protection (-%d to AC and +%d to MC)", u.ublessed, u.ublessed / 3);
+        you_are(protbuf, "");
+    }
 }
+
+STATIC_OVL
+void
+print_weapon_skill_line(wep, printweaponstats, final)
+struct obj* wep;
+boolean printweaponstats;
+int final;
+{
+    char buf[BUFSZ];
+
+    enum p_skills wtype = weapon_skill_type(wep);
+    if (wtype != P_NONE)
+    {
+        if (wtype == P_MARTIAL_ARTS)
+            wtype = P_BARE_HANDED_COMBAT; /* Martial arts is separately below */
+
+        char sklvlbuf[20];
+        int sklvl = P_SKILL_LEVEL(wtype);
+        boolean hav = (sklvl != P_UNSKILLED && sklvl != P_SKILLED);
+
+        if (sklvl == P_ISRESTRICTED)
+            Strcpy(sklvlbuf, "no");
+        else
+            (void)lcase(skill_level_name(wtype, sklvlbuf, FALSE));
+        /* "you have no/basic/expert/master/grand-master skill with <skill>"
+           or "you are unskilled/skilled in <skill>" */
+
+        char ebuf[BUFSZ] = "";
+        if (printweaponstats)
+        {
+            int hitbonus = weapon_skill_hit_bonus(wep, wtype, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+            int dmgbonus = weapon_skill_dmg_bonus(wep, wtype, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+            Sprintf(ebuf, "%s%d to hit%s%s%d to damage",
+                hitbonus >= 0 ? "+" : "", hitbonus,
+                wtype == P_SHIELD ? ", " : " and ",
+                dmgbonus >= 0 ? "+" : "", dmgbonus);
+        }
+        if (wtype == P_SHIELD)
+        {
+            int acbonus = -shield_skill_ac_bonus(P_SKILL_LEVEL(wtype));
+            int mcbonus = shield_skill_mc_bonus(P_SKILL_LEVEL(wtype));
+            if (printweaponstats)
+                Strcat(ebuf, ", ");
+            Sprintf(eos(ebuf), "%s%d to AC and %s%d to MC", acbonus >= 0 ? "+" : "", acbonus, mcbonus >= 0 ? "+" : "", mcbonus);
+        }
+        char pbuf[BUFSZ] = "";
+        if (*ebuf)
+            Sprintf(pbuf, " (%s)", ebuf);
+
+        Sprintf(buf, "%s %s %s%s", sklvlbuf, hav ? "skill with" : "in", 
+            skill_name(wtype, TRUE), pbuf);
+
+        if (can_advance(wtype, FALSE))
+            Sprintf(eos(buf), " and %s that",
+                !final ? "can enhance" : "could have enhanced");
+        if (hav)
+            you_have(buf, "");
+        else
+            you_are(buf, "");
+    }
+}
+
 
 /* attributes: intrinsics and the like, other non-obvious capabilities */
 void
@@ -4041,9 +4149,6 @@ int final;
     enlght_out(final ? "Final Attributes:" : "Current Attributes:", ATR_HEADING);
 
     if (u.uevent.uhand_of_elbereth) {
-        static const char* const hofe_titles[3] = { "the Hand of Elbereth",
-                                                    "the Envoy of Balance",
-                                                    "the Glory of Arioch" };
         you_are(hofe_titles[u.uevent.uhand_of_elbereth - 1], "");
     }
 
@@ -4176,6 +4281,8 @@ int final;
         you_are("petrification resistant", from_what(STONE_RESISTANCE));
     if (Stun_resistance)
         you_are("stun resistant", from_what(STUN_RESISTANCE));
+    if (Slime_resistance)
+        you_are("sliming resistant", from_what(SLIME_RESISTANCE));
     if (Bisection_resistance)
         you_cannot("be bisected", from_what(BISECTION_RESISTANCE));
     if (Halluc_resistance)
@@ -4239,7 +4346,7 @@ int final;
     }
     if (Warn_of_mon && context.warntype.speciesidx >= LOW_PM) {
         Sprintf(buf, "aware of the presence of %s",
-                makeplural(pm_common_name(&mons[context.warntype.speciesidx])));
+                pm_plural_name(&mons[context.warntype.speciesidx], 0));
         you_are(buf, from_what(WARN_OF_MON));
     }
     if (Undead_warning)
@@ -4469,13 +4576,6 @@ int final;
     if (Melee_life_leech)
         enl_msg("You leech", "", "d", " life in melee", from_what(MELEE_LIFE_LEECH));
 
-
-    if (u.ublessed > 0)
-    {
-        char protbuf[BUFSZ];
-        Sprintf(protbuf, "endowed with divine protection (-%d to AC and +%d to MC)", u.ublessed, u.ublessed / 3);
-        you_are(protbuf, "");
-    }
 
     int role_ac_bonus = get_role_AC_bonus();
     int role_mc_bonus = get_role_MC_bonus();
@@ -5163,6 +5263,186 @@ int final;
 
     /* Create the conduct window */
     en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_SEMI_WIDE_LIST, NO_GLYPH, zerocreatewindowinfo);
+
+    if (!u.uachieve.ascended || !u.uachieve.amulet || !u.uachieve.role_achievement)
+    {
+        putstr(en_win, ATR_TITLE, "Goals:");
+        if (!final)
+            putstr(en_win, ATR_HALF_SIZE, " ");
+
+        if (!u.uachieve.amulet)
+        {
+            char goalbuf[BUFSZ];
+            Sprintf(goalbuf, "on a mission to recover the Amulet of Yendor for %s", u_gname());
+            you_are(goalbuf, "");
+        }
+        else if (!u.uachieve.ascended)
+        {
+            char goalbuf[BUFSZ];
+            Sprintf(goalbuf, "on a mission to sacrifice the Amulet of Yendor on the high altar to %s on the Astral Plane", u_gname());
+            you_are(goalbuf, "");
+            if (!u.uachieve.entered_elemental_planes && !u.uachieve.entered_astral_plane)
+            {
+                Strcpy(goalbuf, "seeking to exit the Dungeons of Doom on level 1 in order to enter the Elemental Planes");
+                you_are(goalbuf, "");
+            }
+        }
+        if (!u.uachieve.role_achievement)
+        {
+            char goalbuf[BUFSZ];
+            Sprintf(goalbuf, "an optional quest to %s", get_role_achievement_description(FALSE));
+            you_have(goalbuf, "");
+        }
+    }
+
+    int num_achievements = 0;
+    putstr(en_win, ATR_NONE, " ");
+    putstr(en_win, ATR_TITLE, "Achievements:");
+    if (!final)
+        putstr(en_win, ATR_HALF_SIZE, " ");
+    if (u.uachieve.ascended)
+    {
+        you_have("ascended to demigodhood", "");
+        num_achievements++;
+    }
+    if (u.uachieve.amulet)
+    {
+        you_have("found the Amulet of Yendor", "");
+        num_achievements++;
+    }
+    if (u.uachieve.crowned && u.uevent.uhand_of_elbereth > 0)
+    {
+        char achbuf[BUFSZ];
+        Sprintf(achbuf, "become %s", hofe_titles[u.uevent.uhand_of_elbereth - 1]);
+        you_have(achbuf, "");
+        num_achievements++;
+    }
+    if (u.uachieve.role_achievement)
+    {
+        you_have(get_role_achievement_description(TRUE), "");
+        num_achievements++;
+    }
+    if (u.uachieve.bell)
+    {
+        you_have("found the Bell of Opening", "");
+        num_achievements++;
+    }
+    if (u.uachieve.book)
+    {
+        you_have("found the Book of the Dead", "");
+        num_achievements++;
+    }
+    if (u.uachieve.menorah)
+    {
+        you_have("found the Candelabrum of Invocation", "");
+        num_achievements++;
+    }
+    if (u.uachieve.prime_codex)
+    {
+        you_have("found the Prime Codex", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_astral_plane)
+    {
+        you_have("entered the Astral Plane", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_elemental_planes)
+    {
+        you_have("entered the Elemental Planes", "");
+        num_achievements++;
+    }
+    if (u.uachieve.enter_gehennom)
+    {
+        you_have("entered Gehennom", "");
+        num_achievements++;
+    }
+    if (u.uachieve.killed_medusa)
+    {
+        you_have("defeated Medusa", "");
+        num_achievements++;
+    }
+    if (u.uachieve.consulted_oracle)
+    {
+        you_have("consulted the Oracle", "");
+        num_achievements++;
+    }
+    if (u.uachieve.read_discworld_novel)
+    {
+        you_have("read a Discworld novel", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_gnomish_mines)
+    {
+        you_have("descended to the Gnomish Mines", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_mine_town)
+    {
+        you_have("visited Mine Town", "");
+        num_achievements++;
+    }
+    if (u.uachieve.mines_luckstone)
+    {
+        you_have("found the Gladstone", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_shop)
+    {
+        you_have("visited a shop", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_temple)
+    {
+        you_have("visited a temple", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_sokoban)
+    {
+        you_have("found Sokoban", "");
+        num_achievements++;
+    }
+    if (u.uachieve.finish_sokoban)
+    {
+        you_have("solved Sokoban", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_bigroom)
+    {
+        you_have("found the Big Room", "");
+        num_achievements++;
+    }
+    if (u.uachieve.learned_castle_tune)
+    {
+        you_have("learned the castle tune", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_large_circular_dungeon)
+    {
+        you_have("entered the Large Circular Dungeon", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_plane_of_modron)
+    {
+        you_have("entered the Plane of the Modron", "");
+        num_achievements++;
+    }
+    if (u.uachieve.entered_hellish_pastures)
+    {
+        you_have("entered Hellish Pastures", "");
+        num_achievements++;
+    }
+    if (u.uachieve.killed_yacc)
+    {
+        you_have("defeated Yacc, the Demon Lord of Bovines", "");
+        num_achievements++;
+    }
+    if (!num_achievements)
+    {
+        you_have_not("earned any achievements", "");
+    }
+
+    putstr(en_win, ATR_NONE, " ");
     putstr(en_win, ATR_TITLE, "Voluntary challenges:");
     if(!final)
         putstr(en_win, ATR_HALF_SIZE, " ");
@@ -5258,6 +5538,16 @@ int final;
                     " for any artifacts", "");
     }
 
+    if (Role_if(PM_TOURIST))
+    {
+        putstr(en_win, ATR_NONE, " ");
+        putstr(en_win, ATR_TITLE, "Selfies taken with:");
+        if (!final)
+            putstr(en_win, ATR_HALF_SIZE, " ");
+
+        print_selfies(en_win);
+    }
+
     /* Pop up the window and wait for a key */
     display_nhwindow(en_win, TRUE);
     destroy_nhwindow(en_win);
@@ -5271,7 +5561,7 @@ struct ext_func_tab extcmdlist[] = {
     { M('?'), "?", "list all extended commands",
             doextlist, IFBURIED | GENERALCMD },
     { M('a'), "adjust", "adjust inventory letters",
-            doorganize, IFBURIED | AUTOCOMPLETE },
+            doorganize, IFBURIED | AUTOCOMPLETE | INCMDMENU },
     { M('A'), "annotate", "name current level",
             donamelevel, IFBURIED | AUTOCOMPLETE },
     { 'a', "apply", "apply (use) a tool (pick-axe, key, lamp...)",
@@ -5486,7 +5776,9 @@ struct ext_func_tab extcmdlist[] = {
     { M('z'), "viewspell", "view spells", dospellview, IFBURIED | AUTOCOMPLETE | INSPELLMENU },
     { '\0', "managespell", "manage spells",
             dospellmanage, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
-    { '\0', "reorderspells", "sort and reorder known spells",
+    { '\0', "sortspells", "sort known spells",
+            dosortspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
+    { '\0', "reorderspells", "reorder known spells",
             dovspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M('.'), "zoomnormal", "revert to normal zoom level",
@@ -6300,7 +6592,7 @@ wiz_migrate_mons()
     struct monst *mtmp;
     d_level tolevel;
 
-    getlin_ex(GETLINE_NUMBERS_ONLY, ATR_NONE, NO_COLOR, "How many random monsters to migrate?", inbuf, (char*)0, "[0]");
+    getlin_ex(GETLINE_NUMBERS_ONLY, ATR_NONE, NO_COLOR, "How many random monsters to migrate?", inbuf, (char*)0, "[0]", (char*)0);
     if (*inbuf == '\033')
         return 0;
     mcount = atoi(inbuf);
@@ -6782,10 +7074,11 @@ register char *cmd;
 
     create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
     update_here_window();
-    issue_gui_command(GUI_CMD_PETS);
+    issue_gui_command(GUI_CMD_CLEAR_PET_DATA);
 
     //reset_all_monster_origin_coordinates();
     check_gui_special_effect();
+    check_mobbed_hint();
 
     iflags.menu_requested = FALSE;
 #ifdef SAFERHANGUP
@@ -6819,7 +7112,7 @@ register char *cmd;
 
     /* handle most movement commands */
     prefix_seen = FALSE;
-    context.travel = context.travel1 = context.travel_mode = 0;
+    context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
     spkey = ch2spkeys(*cmd, NHKF_RUN, NHKF_CLICKLOOK);
 
     if (flags.prefer_fast_move)
@@ -7097,7 +7390,7 @@ check_gui_special_effect()
             struct special_view_info info = { 0 };
             info.viewtype = SPECIAL_VIEW_SHOW_SPECIAL_EFFECT;
             info.text = 0;
-            open_special_view(info);
+            (void)open_special_view(info);
             special_effect_shown = TRUE;
         }
     }
@@ -8341,9 +8634,9 @@ dotravel(VOID_ARGS)
  *   window port causing a buffer overflow there.
  */
 char
-yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags)
+yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 int style, attr, color, glyph;
-const char *title, *query, *resp, *resp_desc;
+const char *title, *query, *resp, *resp_desc, * introline;
 char def;
 unsigned long ynflags; /* 1 means use upper side for half-sized tile */
 {
@@ -8365,7 +8658,7 @@ unsigned long ynflags; /* 1 means use upper side for half-sized tile */
         Strcpy(&qbuf[QBUFSZ - 1 - 3], "...");
         query = qbuf;
     }
-    res = (*windowprocs.win_yn_function_ex)(style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags);
+    res = (*windowprocs.win_yn_function_ex)(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags);
 #ifdef DUMPLOG
     if (idx == saved_pline_index) {
         /* when idx is still the same as saved_pline_index, the interface
@@ -8384,7 +8677,7 @@ yn_function(query, resp, def, resp_desc)
 const char* query, *resp, *resp_desc;
 char def;
 {
-    return yn_function_ex(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, 0UL);
+    return yn_function_ex(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, (const char*)0, 0UL);
 }
 
 char
@@ -8401,7 +8694,7 @@ char def;
     char namebuf[BUFSZ];
     strcpy_capitalized_for_title(namebuf, Monnam(mtmp));
 
-    return yn_function_ex(YN_STYLE_MONSTER_QUESTION, ATR_NONE, NO_COLOR, glyph, namebuf, query, chars, def, descs, 0UL);
+    return yn_function_ex(YN_STYLE_MONSTER_QUESTION, ATR_NONE, NO_COLOR, glyph, namebuf, query, chars, def, descs, (const char*)0, 0UL);
 }
 
 char
@@ -8463,7 +8756,7 @@ const char *prompt, *title;
            (except we won't loop if response is ESC; it means no) */
         do {
             Sprintf(qbuf, "%s%s", promptprefix, prompt);
-            getlin_ex(GETLINE_PARANOID, attr, color, qbuf, ans, (char*)0, responsetype);
+            getlin_ex(GETLINE_PARANOID, attr, color, qbuf, ans, (char*)0, responsetype, (char*)0);
             (void) mungspaces(ans);
             confirmed_ok = !strcmpi(ans, "yes");
             if (confirmed_ok || *ans == '\033')
@@ -8727,7 +9020,7 @@ dolight(VOID_ARGS)
     else
     {
         play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-        pline("There's nothing to light or snuff out.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "There's nothing to light or snuff out.");
     }
 
     return 0;
@@ -8801,6 +9094,7 @@ enum create_context_menu_types menu_type;
 
         struct obj* otmp = level.objects[u.ux][u.uy];
         struct rm* lev = &levl[u.ux][u.uy];
+        struct trap* t = 0;
         if (IS_ALTAR(lev->typ))
         {
             add_context_menu(M('o'), cmd_from_func(dosacrifice), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Offer", 0, 0, NO_COLOR);
@@ -8809,6 +9103,10 @@ enum create_context_menu_types menu_type;
         else if (IS_FOUNTAIN(lev->typ) || IS_SINK(lev->typ))
         {
             add_context_menu('q', cmd_from_func(dodrink), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Drink", 0, 0, NO_COLOR);
+            add_context_menu(M('d'), cmd_from_func(dodip), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Dip", 0, 0, NO_COLOR);
+        }
+        else if (IS_POOL(lev->typ))
+        {
             add_context_menu(M('d'), cmd_from_func(dodip), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Dip", 0, 0, NO_COLOR);
         }
         else if (IS_THRONE(lev->typ))
@@ -8828,6 +9126,12 @@ enum create_context_menu_types menu_type;
         {
             add_context_menu('>', cmd_from_func(dodown), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Go Down",
                 (u.ux == xdnladder && u.uy == ydnladder) ? "Ladder" : "Stairs", 0, NO_COLOR);
+        }
+        else if ((Flying || (Levitation && Levitation_control)) && (t = t_at(u.ux, u.uy)) != 0 && t->tseen && is_hole(t->ttyp)
+            && Can_fall_thru(&u.uz))
+        {
+            add_context_menu('>', cmd_from_func(dodown), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Go Down",
+                t->ttyp == HOLE ? "Hole" : "Trap Door", 0, NO_COLOR);
         }
 
         struct monst* shkp = can_pay_to_shkp();

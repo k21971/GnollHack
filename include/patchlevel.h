@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    patchlevel.h    $NHDT-Date: 1557254337 2019/05/07 18:38:57 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.126 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -19,13 +19,13 @@
  * EDITLEVEL is also used to indicate the pre-alpha / alpha / beta version if PRE_RELEASE compiler preprocessor option is on.
  * Change EDITLEVEL when the changes to the game are save-file-breaking.
  */
-#define EDITLEVEL 24
+#define EDITLEVEL 27
 
 /*
  * HOTFIXLEVEL indicates the hot fix number. 
  * It does not invalidate save files and is meant to address non-save-file-breaking bugs during PRE_RELEASE
  */
-#define HOTFIXLEVEL 0
+#define HOTFIXLEVEL 3
 #define PRE_RELEASE
 
 #define COPYRIGHT_BANNER_A "GnollHack, Copyright 2022 by Sound Mind Games"
@@ -43,7 +43,7 @@
  * PP = patch level, ee = edit level, L = literal suffix "L",
  * with all four numbers specified as two hexadecimal digits.
  */
-#define VERSION_COMPATIBILITY 0x03060002L
+#define VERSION_COMPATIBILITY 0x0401001BL
 
 /****************************************************************************/
 /* Version 0.1.x */

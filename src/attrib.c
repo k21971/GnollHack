@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    attrib.c    $NHDT-Date: 1553363417 2019/03/23 17:50:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.65 $ */
 /*      Copyright 1988, 1989, 1990, 1992, M. Stephenson           */
@@ -733,7 +733,7 @@ object_uses_spellbook_wand_flags_and_properties(uitem)
 struct obj* uitem;
 {
     return ((uitem->oclass == SPBOOK_CLASS)  /* && !(objects[uitem->otyp].oc_flags & O1_NON_SPELL_SPELLBOOK) */
-        || uitem->oclass == WAND_CLASS || (uitem->oclass == TOOL_CLASS && is_wand_like_tool(uitem))
+        || uitem->oclass == WAND_CLASS || (uitem->oclass == TOOL_CLASS && is_spelltool(uitem))
         || uitem->oclass == POTION_CLASS || uitem->oclass == SCROLL_CLASS
         );
 }
@@ -895,7 +895,7 @@ update_extrinsics()
         {
             u.uprops[AIRLESS_ENVIRONMENT].extrinsic |= W_STUCK;
         }
-        if (is_constrictor(mtmp->data) && (!hug_throttles(mtmp->data) || (hug_throttles(mtmp->data) && has_neck(youmonst.data))))
+        if (is_constrictor(mtmp->data) && (!hug_throttles(mtmp->data) || has_neck(youmonst.data)))
         {
             u.uprops[STRANGLED].extrinsic |= W_STUCK;
         }
@@ -2194,7 +2194,7 @@ struct monst* mon;
         boolean cursed_plus_cursed_good = uitem->cursed && cursed_are_good;
         long applicable_enchantment = (long)(cursed_plus_cursed_good ? abs(uitem->enchantment) : uitem->enchantment);
         boolean worn = is_you ? is_obj_worn(uitem) :
-            ((!is_wielded_item(uitem) && (uitem->owornmask & ~W_WEAPON) != 0)
+            ((!is_wielded_item(uitem) && (uitem->owornmask & W_WORN_NOT_WIELDED) != 0)
                 || ((is_wielded_item(uitem)) && (uitem->owornmask & W_WIELDED_WEAPON)));
 
         /* Following are for non-spellbooks and non-wands */
@@ -2318,9 +2318,10 @@ struct monst* mon;
                         }
                         else if (i == A_MAX + 3)
                         {
-                            *mcbonus_ptr += (schar)(multiplier * objects[otyp].oc_attribute_bonus / 3);
+                            //Note this is not currently used, instead magic_negation recalculates this
+                            *mcbonus_ptr += (schar)(multiplier * objects[otyp].oc_attribute_bonus / ((objects[otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3));
                             if (objects[otyp].oc_enchantable && !(objects[otyp].oc_bonus_attributes & IGNORE_ENCHANTMENT))
-                                *mcbonus_ptr += (schar)(applicable_enchantment / 3);
+                                *mcbonus_ptr += (schar)(applicable_enchantment / ((objects[otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3));
                         }
                         else if (i == A_MAX + 4 && is_you)
                         {

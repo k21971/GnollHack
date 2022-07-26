@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0	winreq.c	$NHDT-Date: 1432512796 2015/05/25 00:13:16 $  $NHDT-Branch: master $:$NHDT-Revision: 1.8 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993. */
@@ -812,16 +812,24 @@ amii_setpens(int count)
 /* Generate a requester for a string value. */
 
 void
-amii_getlin_ex(style, attr, color, prompt, bufp, placeholder, linesuffix)
+amii_getlin_ex(style, attr, color, prompt, bufp, placeholder, linesuffix, introline)
 int style, attr, color;
 const char *prompt;
 const char* placeholder;
 const char* linesuffix;
+const char* introline;
 char *bufp;
 {
     char promptbuf[BUFSZ] = "";
+    //Do not show introline
+    //if (introline && *introline)
+    //    Sprintf(promptbuf, "%s", introline);
     if (prompt)
-        Sprintf(promptbuf, "%s", prompt);
+    {
+        if (*promptbuf)
+            Strcat(promptbuf, " ");
+        Sprintf(eos(promptbuf), "%s", prompt);
+    }
     if (placeholder)
         Sprintf(eos(promptbuf), " [%s]", placeholder);
     if (linesuffix)

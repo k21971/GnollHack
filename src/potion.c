@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    potion.c    $NHDT-Date: 1549074254 2019/02/02 02:24:14 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -109,6 +109,8 @@ boolean talk;
             else
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s...", stagger(youmonst.data, "stagger"));
         }
+
+        standard_hint("You can cure stun by using a unicorn horn.", &u.uhint.got_stunned);
     }
 
     set_itimeout(&HStun, xtime);
@@ -125,10 +127,11 @@ boolean talk;
    u.usick_type bit mask), but delayed killer can only support one or
    the other at a time.  They should become separate intrinsics.... */
 void
-make_sick(xtime, cause, talk)
+make_sick(xtime, cause, talk, killerhintidx)
 long xtime;
 const char *cause; /* sickness cause */
 boolean talk;
+int killerhintidx;
 {
     struct kinfo *kptr;
     long old = Sick;
@@ -147,6 +150,7 @@ boolean talk;
         {
             /* newly sick */
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "deathly sick.");
+            pray_hint("cure terminal illness", "eating an eucalyptus leaf or a fig", &u.uhint.got_terminal_illness);
         }
         else
         {
@@ -186,7 +190,7 @@ boolean talk;
             int kpfx = ((cause && !strcmp(cause, "#wizintrinsic"))
                         ? KILLED_BY : KILLED_BY_AN);
 
-            delayed_killer(SICK, kpfx, cause);
+            delayed_killer(SICK, kpfx, cause, killerhintidx);
         }
     } 
     else
@@ -198,10 +202,11 @@ boolean talk;
    u.usick_type bit mask), but delayed killer can only support one or
    the other at a time.  They should become separate intrinsics.... */
 void
-make_food_poisoned(xtime, cause, talk)
+make_food_poisoned(xtime, cause, talk, killerhintidx)
 long xtime;
 const char* cause; /* sickness cause */
 boolean talk;
+int killerhintidx;
 {
     struct kinfo* kptr;
     long old = FoodPoisoned;
@@ -220,6 +225,7 @@ boolean talk;
         {
             /* newly sick */
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "terminally ill from food poisoning.");
+            pray_hint("cure food poisoning", "eating an eucalyptus leaf or a fig", &u.uhint.got_food_poisoning);
         }
         else
         {
@@ -259,7 +265,7 @@ boolean talk;
             int kpfx = ((cause && !strcmp(cause, "#wizintrinsic"))
                 ? KILLED_BY : KILLED_BY_AN);
 
-            delayed_killer(FOOD_POISONED, kpfx, cause);
+            delayed_killer(FOOD_POISONED, kpfx, cause, killerhintidx);
         }
     }
     else
@@ -270,10 +276,11 @@ boolean talk;
 /* xtime = -1 makes it a permanent intrinsic */
 
 void
-make_mummy_rotted(xtime, cause, talk)
+make_mummy_rotted(xtime, cause, talk, killerhintidx)
 long xtime;
 const char* cause; /* sickness cause */
 boolean talk;
+int killerhintidx;
 {
     struct kinfo* kptr;
     long old = MummyRot;
@@ -292,6 +299,8 @@ boolean talk;
         {
             /* newly sick */
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "severely ill.");
+            context.mummyrot_advancement = 0;
+            pray_hint("cure mummy rot", "eating an eucalyptus leaf or a fig", &u.uhint.got_mummy_rot);
         }
         else
         {
@@ -337,62 +346,85 @@ boolean talk;
             int kpfx = ((cause && !strcmp(cause, "#wizintrinsic"))
                 ? KILLED_BY : KILLED_BY_AN);
 
-            delayed_killer(MUMMY_ROT, kpfx, cause);
+            delayed_killer(MUMMY_ROT, kpfx, cause, killerhintidx);
         }
     }
     else
         dealloc_killer(kptr);
 }
 
-
-
 void
-make_slimed(xtime, msg)
+make_slimed(xtime, msg, killedby, killername, killerhintidx)
 long xtime;
 const char *msg;
+int killedby;
+const char* killername;
+int killerhintidx;
 {
     long old = Slimed;
+    struct kinfo* kptr;
 
 #if 0   /* tell player even if hero is unconscious */
     if (Unaware)
         msg = 0;
 #endif
     set_itimeout(&Slimed, xtime);
-    if ((xtime != 0L) ^ (old != 0L)) {
+    if ((xtime != 0L) ^ (old != 0L)) 
+    {
         context.botl = context.botlx = TRUE;
         refresh_u_tile_gui_info(TRUE);
         if (msg)
             pline_ex(ATR_NONE, !xtime ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, "%s", msg);
     }
+
+    kptr = find_delayed_killer(SLIMED);
     if (!Slimed)
-        dealloc_killer(find_delayed_killer(SLIMED));
+        dealloc_killer(kptr);
+    else
+    {
+        if (!old || !kptr)
+            delayed_killer(SLIMED, killedby, killername, killerhintidx);
+
+        if (!old)
+            pray_hint("cure sliming", "burning it with fire", &u.uhint.got_sliming);
+    }
 }
 
 /* start or stop petrification */
 void
-make_stoned(xtime, msg, killedby, killername)
+make_stoned(xtime, msg, killedby, killername, killhintidx)
 long xtime;
 const char *msg;
-int killedby;
+int killedby, killhintidx;
 const char *killername;
 {
     long old = Stoned;
+    struct kinfo* kptr;
 
 #if 0   /* tell player even if hero is unconscious */
     if (Unaware)
         msg = 0;
 #endif
     set_itimeout(&Stoned, xtime);
-    if ((xtime != 0L) ^ (old != 0L)) {
+    if ((xtime != 0L) ^ (old != 0L)) 
+    {
         context.botl = context.botlx = TRUE;
         refresh_u_tile_gui_info(TRUE);
         if (msg)
             pline_ex(ATR_NONE, !xtime ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, "%s", msg);
     }
+
+    kptr = find_delayed_killer(STONED);
     if (!Stoned)
-        dealloc_killer(find_delayed_killer(STONED));
-    else if (!old)
-        delayed_killer(STONED, killedby, killername);
+        dealloc_killer(kptr);
+    else
+    {
+        if (!old || !kptr)
+            delayed_killer(STONED, killedby, killername, killhintidx);
+
+        if (!old)
+            pray_hint("cure stoning", "eating a lizard corpse or a dragon fruit", &u.uhint.got_stoning);
+    }
 }
 
 void
@@ -447,7 +479,7 @@ boolean talk;
         /* clearing temporary blindness without toggling blindness */
         if (talk) {
             if (!haseyes(youmonst.data)) {
-                strange_feeling((struct obj *) 0, (char *) 0);
+                strange_feeling((struct obj *) 0, (char *) 0, FALSE);
             } else if (Blindfolded) {
                 eyes = body_part(EYE);
                 if (eyecount(youmonst.data) != 1)
@@ -473,7 +505,7 @@ boolean talk;
         /* setting temporary blindness without toggling blindness */
         if (talk) {
             if (!haseyes(youmonst.data)) {
-                strange_feeling((struct obj *) 0, (char *) 0);
+                strange_feeling((struct obj *) 0, (char *) 0, FALSE);
             } else if (Blindfolded) {
                 eyes = body_part(EYE);
                 if (eyecount(youmonst.data) != 1)
@@ -584,7 +616,7 @@ long mask; /* nonzero if resistance status should change by mask */
         /* clearing temporary hallucination without toggling vision */
         if (!changed && !HHallucination && old && talk) {
             if (!haseyes(youmonst.data)) {
-                strange_feeling((struct obj *) 0, (char *) 0);
+                strange_feeling((struct obj *) 0, (char *) 0, FALSE);
             } else if (Blind) {
                 const char *eyes = body_part(EYE);
 
@@ -691,7 +723,7 @@ dodrink()
 
     if (Strangled) {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "If you can't breathe air, how can you drink liquid?");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "If you can't breathe air, how can you drink liquid?");
         return 0;
     }
     if (!getobj_autoselect_obj)
@@ -888,7 +920,7 @@ struct obj *otmp;
             //more_experienced(0, 10);
         }
         else if (!objects[otmp->otyp].oc_uname)
-            docall(otmp);
+            docall(otmp, (char*)0);
     }
 
     useup(otmp);
@@ -915,8 +947,9 @@ struct obj *otmp;
             otmp->oclass == POTION_CLASS ? (objects[otmp->otyp].oc_potion_normal_diesize == 0 ? 0 : d(max(0, objects[otmp->otyp].oc_potion_normal_dice + dicebuc * bcsign(otmp)), max(1, objects[otmp->otyp].oc_potion_normal_diesize))) + objects[otmp->otyp].oc_potion_normal_plus + bcsign(otmp) * objects[otmp->otyp].oc_potion_normal_buc_multiplier :
             d(objects[otmp->otyp].oc_spell_dur_dice, objects[otmp->otyp].oc_spell_dur_diesize) + objects[otmp->otyp].oc_spell_dur_plus
            );
+    int nutrdicebuc = (int)(otmp->oclass == POTION_CLASS ? objects[otmp->otyp].oc_potion_nutrition_dice_buc_multiplier : 0);
     int nutrition = (int)(
-        otmp->oclass == POTION_CLASS ? d(max(0, objects[otmp->otyp].oc_potion_nutrition_dice), max(1, objects[otmp->otyp].oc_potion_nutrition_diesize)) + objects[otmp->otyp].oc_potion_nutrition_plus + bcsign(otmp) * objects[otmp->otyp].oc_potion_nutrition_buc_multiplier :
+        otmp->oclass == POTION_CLASS ? d(max(0, objects[otmp->otyp].oc_potion_nutrition_dice + nutrdicebuc * bcsign(otmp)), max(1, objects[otmp->otyp].oc_potion_nutrition_diesize)) + objects[otmp->otyp].oc_potion_nutrition_plus + bcsign(otmp) * objects[otmp->otyp].oc_potion_nutrition_buc_multiplier :
         0);
 
     int extra_data1 = otmp->oclass == POTION_CLASS ? (int)objects[otmp->otyp].oc_potion_extra_data1 : 0;
@@ -1018,9 +1051,9 @@ struct obj *otmp;
             {
                 play_sfx_sound(SFX_CURE_DISEASE);
                 You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "full of awe.");
-                make_sick(0L, (char *) 0, TRUE);
-                make_food_poisoned(0L, (char*)0, TRUE);
-                make_mummy_rotted(0L, (char*)0, TRUE);
+                make_sick(0L, (char *) 0, TRUE, 0);
+                make_food_poisoned(0L, (char*)0, TRUE, 0);
+                make_mummy_rotted(0L, (char*)0, TRUE, 0);
                 exercise(A_WIS, TRUE);
                 exercise(A_CON, TRUE);
                 if (u.ulycn >= LOW_PM)
@@ -1210,6 +1243,7 @@ struct obj *otmp;
             incr_itimeout(&HParalyzed, duration);
             context.botl = context.botlx = 1;
             refresh_u_tile_gui_info(TRUE);
+            standard_hint("Identify potions before drinking.", &u.uhint.drank_potion_of_paralysis_or_sleep);
 #if 0
             nomul(-d(5 - 2 * bcsign(otmp), 4)); // (rn1(9 - 6 * bcsign(otmp), 8 - 4 * bcsign(otmp))));
             multi_reason = "frozen by a potion";
@@ -1227,6 +1261,7 @@ struct obj *otmp;
         {
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "suddenly fall asleep!");
             fall_asleep(-duration, TRUE);
+            standard_hint("Identify potions before drinking.", &u.uhint.drank_potion_of_paralysis_or_sleep);
         }
         break;
     case POT_MONSTER_DETECTION:
@@ -1312,10 +1347,11 @@ struct obj *otmp;
                     play_sfx_sound(SFX_CATCH_FOOD_POISONING);
                 
                 make_food_poisoned(FoodPoisoned ? FoodPoisoned / 3L + 1L : (long)rn1(ACURR(max(2, A_CON)), 20),
-                    contaminant, TRUE);
+                    contaminant, TRUE, HINT_KILLED_POTION_OF_SICKNESS);
 
                 exercise(A_CON, FALSE);
             }
+            standard_hint("Identify potions to avoid drinking contaminated potions.", &u.uhint.drank_potion_of_sickness);
         }
         break;
     case POT_POISON:
@@ -1335,6 +1371,7 @@ struct obj *otmp;
             }
             losehp(adjust_damage(duration, (struct monst*)0, &youmonst, AD_DRST, ADFLAGS_NONE), "drinking poison", KILLED_BY);
             exercise(A_CON, FALSE);
+            standard_hint("Identify potions to avoid drinking poisonous potions. Get poison resistance as early as possible.", &u.uhint.drank_potion_of_poison);
         }
 
         if (Hallucination) 
@@ -1744,6 +1781,7 @@ struct obj *otmp;
         break;
     case POT_GREATER_ENERGY:
     case POT_FULL_ENERGY:
+    case POT_EXTRA_ENERGY:
     case POT_GAIN_ENERGY:
     { /* M. Stephenson */
         int num = 0, numxtra = 0;
@@ -1895,7 +1933,8 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
 {
     if (nxtra > 0) 
     {
-        if (Upolyd) 
+        int max_hp_before = (Upolyd ? u.mhmax : u.uhpmax);
+        if (Upolyd)
         {
             u.basemhmax += nxtra;
         }
@@ -1904,6 +1943,15 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
             u.ubasehpmax += nxtra;
         }
         updatemaxhp();
+        int max_hp_after = (Upolyd ? u.mhmax : u.uhpmax);
+        int max_hp_gain = max_hp_after - max_hp_before;
+        if (max_hp_gain > 0)
+        {
+            char fbuf[BUFSZ];
+            Sprintf(fbuf, "+%d max HP", max_hp_gain);
+            display_floating_text(u.ux, u.uy, fbuf, FLOATING_TEXT_ATTRIBUTE_GAIN, ATR_NONE, NO_COLOR, 0UL);
+        }
+
     }
 
     if (nhp > 0)
@@ -1922,9 +1970,9 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
     if (curesick)
     {
         make_vomiting(0L, TRUE);
-        make_sick(0L, (char *) 0, TRUE);
-        make_food_poisoned(0L, (char*)0, TRUE);
-        make_mummy_rotted(0L, (char*)0, TRUE);
+        make_sick(0L, (char *) 0, TRUE, 0);
+        make_food_poisoned(0L, (char*)0, TRUE, 0);
+        make_mummy_rotted(0L, (char*)0, TRUE, 0);
     }
 
     if (curehallucination) 
@@ -1949,15 +1997,19 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
 }
 
 void
-strange_feeling(obj, txt)
+strange_feeling(obj, txt, dopopup)
 struct obj *obj;
 const char *txt;
+boolean dopopup;
 {
+    char buf[BUFSZ] = "";
     if (flags.beginner || !txt)
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "have a %s feeling for a moment, then it passes.",
+        Sprintf(buf, "You have a %s feeling for a moment, then it passes.",
             Hallucination ? "normal" : "strange");
     else
-        pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, txt);
+        Strcpy(buf, txt);
+
+    pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, buf, "Strange Feeling", dopopup);
 
     if (!obj) /* e.g., crystal ball finds no traps */
         return;
@@ -1967,7 +2019,7 @@ const char *txt;
 
     if (obj->dknown && !objects[obj->otyp].oc_name_known
         && !objects[obj->otyp].oc_uname)
-        docall(obj);
+        docall(obj, buf);
 
     if (obj->unpaid && costly_spot(u.ux, u.uy))
     {
@@ -2120,6 +2172,7 @@ int how;
     struct obj *saddle = (struct obj *) 0;
     boolean hit_saddle = FALSE, your_fault = (how <= POTHIT_HERO_THROW);
     struct obj* obj = *obj_ptr;
+    char dcbuf[BUFSZ] = "";
 
     if (!obj)
         return;
@@ -2207,7 +2260,8 @@ int how;
                 explode_oil(obj, u.ux, u.uy);
             break;
         case POT_POLYMORPH:
-            You_feel("a little %s.", Hallucination ? "normal" : "strange");
+            Sprintf(dcbuf, "You feel a little %s.", Hallucination ? "normal" : "strange");
+            pline1(dcbuf);
             if (!Unchanging && !Antimagic)
                 polyself(0);
             break;
@@ -2216,9 +2270,10 @@ int how;
             {
                 int dmg;
 
-                pline("This burns%s!",
+                Sprintf(dcbuf, "This burns%s!",
                       obj->blessed ? " a little"
                                    : obj->cursed ? " a lot" : "");
+                pline1(dcbuf);
                 dmg = duration;
                 losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_ACID, FALSE), "potion of acid", KILLED_BY_AN);
             }
@@ -2246,7 +2301,10 @@ int how;
             break;
         }
         if (useeit && !affected)
-            pline("%s %s wet.", buf, aobjnam(saddle, "get"));
+        {
+            Sprintf(dcbuf, "%s %s wet.", buf, aobjnam(saddle, "get"));
+            pline1(dcbuf);
+        }
     } 
     else 
     {
@@ -2276,7 +2334,10 @@ int how;
             {
                 mon->mhp = mon->mhpmax;
                 if (canseemon(mon))
-                    pline("%s looks sound and hale again.", Monnam(mon));
+                {
+                    Sprintf(dcbuf, "%s looks sound and hale again.", Monnam(mon));
+                    pline1(dcbuf);
+                }
             }
             if (cureblind)
                 mcureblindness(mon, canseemon(mon));
@@ -2326,14 +2387,20 @@ do_illness: /* Pestilence's potion of healing effect */
             if (mon->mhp > mon->mhpmax)
                 mon->mhp = mon->mhpmax;
             if (canseemon(mon))
-                pline("%s looks rather ill.", Monnam(mon));
+            {
+                Sprintf(dcbuf, "%s looks rather ill.", Monnam(mon));
+                pline1(dcbuf);
+            }
             break;
         case POT_CONFUSION:
             (void)increase_mon_property_verbosely(mon, CONFUSION, duration);
             break;
         case POT_URINE:
             if (canseemon(mon) && !is_incorporeal(mon->data))
-                pline("%s looks concerened of %s body odor.", Monnam(mon), mhis(mon));
+            {
+                Sprintf(dcbuf, "%s looks concerened of %s body odor.", Monnam(mon), mhis(mon));
+                pline1(dcbuf);
+            }
             break;
         case POT_DWARVEN_MUSHROOM_BREW:
             if (canseemon(mon))
@@ -2357,7 +2424,8 @@ do_illness: /* Pestilence's potion of healing effect */
             /* wakeup() doesn't rouse victims of temporary sleep */
             if (sleep_monst(mon, obj, (struct monst*)0, duration, 0, FALSE)) 
             {
-                pline("%s falls asleep.", Monnam(mon));
+                Sprintf(dcbuf, "%s falls asleep.", Monnam(mon));
+                pline1(dcbuf);
                 slept_monst(mon);
             }
             break;
@@ -2403,11 +2471,12 @@ do_illness: /* Pestilence's potion of healing effect */
             {
                 if (obj->blessed) 
                 {
-                    pline("%s %s in pain!", Monnam(mon),
+                    Sprintf(dcbuf, "%s %s in pain!", Monnam(mon),
                           is_silent(mon->data) ? "writhes" : "shrieks");
+                    pline1(dcbuf);
                     if (!is_silent(mon->data))
                         wake_nearto(tx, ty, mon->data->mlevel * 10);
-                    deduct_monster_hp(mon, adjust_damage(d(2, 6), &youmonst, mon, AD_CLRC, ADFLAGS_NONE));
+                    deduct_monster_hp(mon, adjust_damage(duration, &youmonst, mon, AD_CLRC, ADFLAGS_NONE));
                     /* should only be by you */
                     if (DEADMONSTER(mon))
                         killed(mon);
@@ -2418,8 +2487,11 @@ do_illness: /* Pestilence's potion of healing effect */
                 {
                     angermon = FALSE;
                     if (canseemon(mon))
-                        pline("%s looks healthier.", Monnam(mon));
-                    deduct_monster_hp(mon, adjust_damage(-d(2, 6), &youmonst, mon, AD_CLRC, ADFLAGS_NONE));
+                    {
+                        Sprintf(dcbuf, "%s looks healthier.", Monnam(mon));
+                        pline1(dcbuf);
+                    }
+                    deduct_monster_hp(mon, adjust_damage(-duration, &youmonst, mon, AD_CLRC, ADFLAGS_NONE));
                     if (is_were(mon->data) && is_human(mon->data)
                         && !Protection_from_shape_changers)
                         new_were(mon); /* transform into beast */
@@ -2433,8 +2505,11 @@ do_illness: /* Pestilence's potion of healing effect */
             else if (is_iron(mon->data)) 
             {
                 if (canseemon(mon))
-                    pline("%s rusts.", Monnam(mon));
-                deduct_monster_hp(mon, adjust_damage(d(1, 6), &youmonst, mon, AD_PHYS, ADFLAGS_NONE));
+                {
+                    Sprintf(dcbuf, "%s rusts.", Monnam(mon));
+                    pline1(dcbuf);
+                }
+                deduct_monster_hp(mon, adjust_damage(duration / 2, &youmonst, mon, AD_PHYS, ADFLAGS_NONE));
                 /* should only be by you */
                 if (DEADMONSTER(mon))
                     killed(mon);
@@ -2446,8 +2521,9 @@ do_illness: /* Pestilence's potion of healing effect */
             break;
         case POT_ACID:
             if (!is_mon_immune_to_acid(mon) && !check_ability_resistance_success(mon, A_DEX, objects[obj->otyp].oc_mc_adjustment)) {
-                pline("%s %s in pain!", Monnam(mon),
+                Sprintf(dcbuf, "%s %s in pain!", Monnam(mon),
                       is_silent(mon->data) ? "writhes" : "shrieks");
+                pline1(dcbuf);
                 if (!is_silent(mon->data))
                     wake_nearto(tx, ty, mon->data->mlevel * 10);
                 deduct_monster_hp(mon, adjust_damage(d(obj->cursed ? 4 : 3, obj->blessed ? 6 : 8), &youmonst, mon, AD_ACID, ADFLAGS_NONE));
@@ -2489,10 +2565,10 @@ do_illness: /* Pestilence's potion of healing effect */
     /* Note: potionbreathe() does its own docall() */
     if ((distance == 0 || (distance < 3 && rn2(5)))
         && (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data)))
-        potionbreathe(obj);
+        potionbreathe(obj, dcbuf);
     else if (obj->dknown && !objects[obj->otyp].oc_name_known
              && !objects[obj->otyp].oc_uname && cansee(tx, ty))
-        docall(obj);
+        docall(obj, dcbuf);
 
     if (*u.ushops && obj->unpaid) {
         struct monst *shkp = shop_keeper(*in_rooms(u.ux, u.uy, SHOPBASE));
@@ -2515,14 +2591,16 @@ do_illness: /* Pestilence's potion of healing effect */
 
 /* vapors are inhaled or get in your eyes */
 void
-potionbreathe(obj)
+potionbreathe(obj, introline)
 struct obj *obj;
+const char* introline;
 {
+    if (!obj || obj->oclass != POTION_CLASS)
+        return;
+
     int i, kn = 0;
     boolean cureblind = FALSE;
-
-    if (obj->oclass != POTION_CLASS)
-        return;
+    char dcbuf[BUFSZ] = "";
 
     /* potion of unholy water might be wielded; prevent
        you_were() -> drop_weapon() from dropping it so that it
@@ -2542,13 +2620,17 @@ struct obj *obj;
         if (obj->cursed) 
         {
             if (!has_innate_breathless(youmonst.data))
-                pline("Ulch!  That potion smells terrible!");
+            {
+                Strcpy(dcbuf, "Ulch!  That potion smells terrible!");
+                pline1(dcbuf);
+            }
             else if (haseyes(youmonst.data)) {
                 const char *eyes = body_part(EYE);
 
                 if (eyecount(youmonst.data) != 1)
                     eyes = makeplural(eyes);
-                Your("%s %s!", eyes, vtense(eyes, "sting"));
+                Sprintf(dcbuf, "Your %s %s!", eyes, vtense(eyes, "sting"));
+                pline1(dcbuf);
             }
             break;
         } 
@@ -2606,7 +2688,10 @@ struct obj *obj;
     case POT_SICKNESS:
         /* No bad effect, just smell */
         if (!has_innate_breathless(youmonst.data))
-            pline("Ulch!  That potion smells contaminated!");
+        {
+            Strcpy(dcbuf, "Ulch!  That potion smells contaminated!");
+            pline1(dcbuf);
+        }
         break;
     case POT_POISON:
         if (!Poison_resistance)
@@ -2630,38 +2715,48 @@ struct obj *obj;
         }
         break;
     case POT_HALLUCINATION:
-        You("have a momentary vision.");
+        Strcpy(dcbuf, "You have a momentary vision.");
+        pline1(dcbuf);
         break;
     case POT_ELVEN_HERBAL_BREW:
         if (!Confusion)
         {
             play_sfx_sound(SFX_ACQUIRE_CONFUSION);
-            You_feel("somewhat dizzy.");
+            Strcpy(dcbuf, "You feel somewhat dizzy.");
+            pline1(dcbuf);
         }
         make_confused(itimeout_incr(HConfusion, duration), FALSE);
         break;
     case POT_URINE:
         if (!has_innate_breathless(youmonst.data))
-            pline("Ooph!  That potion smells like urine!");
+        {
+            Strcpy(dcbuf, "Ooph!  That potion smells like urine!");
+            pline1(dcbuf);
+        }
         break;
     case POT_DWARVEN_MUSHROOM_BREW:
         if (!has_innate_breathless(youmonst.data))
-            pline("That smells like finely brewed non-alcoholic beverage!");
+        {
+            Strcpy(dcbuf, "That smells like finely brewed non-alcoholic beverage!");
+            pline1(dcbuf);
+        }
         break;
     case POT_CONFUSION:
         if (!Confusion)
         {
             play_sfx_sound(SFX_ACQUIRE_CONFUSION);
-            You_feel("somewhat dizzy.");
+            Strcpy(dcbuf, "You feel somewhat dizzy.");
+            pline1(dcbuf);
         }
         make_confused(itimeout_incr(HConfusion, duration), FALSE);
         break;
     case POT_INVISIBILITY:
         if (!Blind && !Invis) {
             kn++;
-            pline("For an instant you %s!",
-                  See_invisible ? "could see right through yourself"
-                                : "couldn't see yourself");
+            Sprintf(dcbuf, "For an instant you %s!",
+                See_invisible ? "could see right through yourself"
+                : "couldn't see yourself");
+            pline1(dcbuf);
         }
         break;
     case POT_PARALYSIS:
@@ -2669,10 +2764,12 @@ struct obj *obj;
         if (!Free_action) 
         {
             play_sfx_sound(SFX_ACQUIRE_PARALYSIS);
-            pline("%s seems to be holding you.", Something);
+            Sprintf(dcbuf, "%s seems to be holding you.", Something);
+            pline1(dcbuf);
             incr_itimeout(&HParalyzed, duration);
             refresh_u_tile_gui_info(TRUE);
             context.botl = context.botlx = 1;
+            standard_hint("You should acquire free action as early as possible. Keep pets around to protect you while paralyzed.", &u.uhint.paralyzed_by_thrown_potion);
 #if 0
             nomul(-d(3 - 1 * bcsign(obj), 4)); // rnd(5));
             multi_reason = "frozen by a potion";
@@ -2681,28 +2778,40 @@ struct obj *obj;
 #endif
         }
         else
-            You("stiffen momentarily.");
+        {
+            Strcpy(dcbuf, "You stiffen momentarily.");
+            pline1(dcbuf);
+        }
         break;
     case POT_SLEEPING:
         kn++;
         if (!Free_action && !Sleep_resistance) {
             play_sfx_sound(SFX_ACQUIRE_SLEEP);
-            You_feel("rather tired.");
+            Strcpy(dcbuf, "You feel rather tired.");
+            pline1(dcbuf);
             fall_asleep(-duration, FALSE);
+            standard_hint("You should acquire sleep resistance as early as possible. Keep pets around to protect you while sleeping.", &u.uhint.paralyzed_by_thrown_potion);
 #if 0
             nomul(-d(3 - 1 * bcsign(obj), 4));
             multi_reason = "sleeping off a magical draught";
             nomovemsg = You_can_move_again;
             exercise(A_DEX, FALSE);
 #endif
-        } else
-            You("yawn.");
+        }
+        else
+        {
+            Strcpy(dcbuf, "You yawn.");
+            pline1(dcbuf);
+        }
         break;
     case POT_SPEED:
     case POT_GREATER_SPEED:
     case POT_LIGHTNING_SPEED:
         if (obj->otyp == POT_LIGHTNING_SPEED ? !Lightning_fast : obj->otyp == POT_LIGHTNING_SPEED ? !Lightning_fast && !Super_fast : !Lightning_fast && !Super_fast && !Ultra_fast)
-            Your("knees seem more flexible now.");
+        {
+            Strcpy(dcbuf, "Your knees seem more flexible now.");
+            pline1(dcbuf);
+        }
         play_sfx_sound(SFX_ACQUIRE_HASTE);
         incr_itimeout(obj->otyp == POT_LIGHTNING_SPEED ? &HLightning_fast : obj->otyp == POT_GREATER_SPEED ? &HSuper_fast : &HUltra_fast, duration);
         refresh_u_tile_gui_info(TRUE);
@@ -2710,35 +2819,50 @@ struct obj *obj;
         break;
     case POT_MAGIC_RESISTANCE:
         if (!Antimagic)
-            You("feel a bit more protected now.");
+        {
+            Strcpy(dcbuf, "You feel a bit more protected now.");
+            pline1(dcbuf);
+        }
         incr_itimeout(&HAntimagic, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
         break;
     case POT_TITAN_STRENGTH:
         if (!Titan_strength)
-            You("feel a bit stronger than before.");
+        {
+            Strcpy(dcbuf, "You feel a bit stronger than before.");
+            pline1(dcbuf);
+        }
         incr_itimeout(&HTitan_strength, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
         break;
     case POT_FIRE_IMMUNITY:
         if (!Fire_immunity)
-            You("feel a bit more fire-protected now.");
+        {
+            Strcpy(dcbuf, "You feel a bit more fire-protected now.");
+            pline1(dcbuf);
+        }
         incr_itimeout(&HFire_immunity, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
         break;
     case POT_COLD_IMMUNITY:
         if (!Cold_immunity)
-            You("feel a bit more cold-protected now.");
+        {
+            Strcpy(dcbuf, "You feel a bit more cold-protected now.");
+            pline1(dcbuf);
+        }
         incr_itimeout(&HCold_immunity, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
         break;
     case POT_SHOCK_IMMUNITY:
         if (!Shock_immunity)
-            You("feel a bit more electricity-protected now.");
+        {
+            Strcpy(dcbuf, "You feel a bit more electricity-protected now.");
+            pline1(dcbuf);
+        }
         incr_itimeout(&HShock_immunity, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
@@ -2746,7 +2870,10 @@ struct obj *obj;
     case POT_HEROISM:
     case POT_SUPER_HEROISM:
         if (obj->otyp == POT_SUPER_HEROISM ? !Super_heroism : !Super_heroism && !Heroism)
-            You("feel a bit more heroic.");
+        {
+            Strcpy(dcbuf, "You feel a bit more heroic.");
+            pline1(dcbuf);
+        }
         incr_itimeout(obj->otyp == POT_SUPER_HEROISM ? &HSuper_heroism : &HHeroism, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
@@ -2756,7 +2883,10 @@ struct obj *obj;
     case POT_GREATER_REGENERATION:
         if (obj->otyp == POT_GREATER_REGENERATION ? !Divine_regeneration :
             obj->otyp == POT_REGENERATION ? !Divine_regeneration && !Rapidest_regeneration : !Super_heroism && !Heroism)
-            You("feel a bit more heroic.");
+        {
+            Strcpy(dcbuf, "You feel a bit more heroic.");
+            pline1(dcbuf);
+        }
         incr_itimeout(obj->otyp == POT_SUPER_HEROISM ? &HSuper_heroism : &HHeroism, duration);
         refresh_u_tile_gui_info(TRUE);
         exercise(A_WIS, TRUE);
@@ -2769,7 +2899,8 @@ struct obj *obj;
         {
             kn++;
             play_sfx_sound(SFX_ACQUIRE_BLINDNESS);
-            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "It suddenly gets dark.");
+            Strcpy(dcbuf, "It suddenly gets dark.");
+            pline_ex1(ATR_NONE, CLR_MSG_NEGATIVE, dcbuf);
         }
         //if (!Blind && !Unaware)
         //    Your1(vision_clears);
@@ -2801,13 +2932,26 @@ struct obj *obj;
         break;
      */
     }
+
+    char dcbuf2[BUFSZ * 2] = "";
+    if (introline && *introline)
+    {
+        Strcpy(dcbuf2, introline);
+    }
+    if (*dcbuf)
+    {
+        if(*dcbuf2)
+            Strcat(dcbuf2, " ");
+        Strcat(dcbuf2, dcbuf);
+    }
+
     /* note: no obfree() -- that's our caller's responsibility */
     if (obj->dknown) {
         if (kn)
             makeknown(obj->otyp);
         else if (!objects[obj->otyp].oc_name_known
                  && !objects[obj->otyp].oc_uname)
-            docall(obj);
+            docall(obj, dcbuf2);
     }
 }
 
@@ -2818,7 +2962,7 @@ struct obj *o1, *o2;
 {
     /* cut down on the number of cases below */
     if (o1->oclass == POTION_CLASS
-        && (o2->otyp == POT_GAIN_LEVEL || o2->otyp == POT_GAIN_ENERGY || o2->otyp == POT_GREATER_ENERGY || o2->otyp == POT_FULL_ENERGY
+        && (o2->otyp == POT_GAIN_LEVEL || o2->otyp == POT_GAIN_ENERGY || o2->otyp == POT_EXTRA_ENERGY || o2->otyp == POT_GREATER_ENERGY || o2->otyp == POT_FULL_ENERGY
             || o2->otyp == POT_HEALING || o2->otyp == POT_EXTRA_HEALING || o2->otyp == POT_GREATER_HEALING
             || o2->otyp == POT_FULL_HEALING || o2->otyp == POT_ENLIGHTENMENT
             || o2->otyp == POT_FRUIT_JUICE)) {
@@ -2834,6 +2978,7 @@ struct obj *o1, *o2;
         switch (o2->otyp) {
         case POT_SPEED:
         case POT_GAIN_ENERGY:
+        case POT_EXTRA_ENERGY:
             return POT_EXTRA_HEALING;
         case POT_GREATER_ENERGY:
             return POT_GREATER_HEALING;
@@ -2846,6 +2991,7 @@ struct obj *o1, *o2;
     case POT_EXTRA_HEALING:
         switch (o2->otyp) {
         case POT_GAIN_ENERGY:
+        case POT_EXTRA_ENERGY:
             return POT_GREATER_HEALING;
         case POT_GREATER_ENERGY:
         case POT_FULL_ENERGY:
@@ -2857,6 +3003,7 @@ struct obj *o1, *o2;
     case POT_GREATER_HEALING:
         switch (o2->otyp) {
         case POT_GAIN_ENERGY:
+        case POT_EXTRA_ENERGY:
         case POT_GREATER_ENERGY:
         case POT_FULL_ENERGY:
             return POT_FULL_HEALING;
@@ -2868,6 +3015,7 @@ struct obj *o1, *o2;
         switch (o2->otyp) {
         case POT_GAIN_LEVEL:
         case POT_GAIN_ENERGY:
+        case POT_EXTRA_ENERGY:
         case POT_GREATER_ENERGY:
         case POT_FULL_ENERGY:
             return POT_GAIN_ABILITY;
@@ -2903,6 +3051,7 @@ struct obj *o1, *o2;
         }
         break;
     case POT_GAIN_ENERGY:
+    case POT_EXTRA_ENERGY:
         switch (o2->otyp) {
         case POT_CONFUSION:
             return (rn2(3) ? POT_ELVEN_HERBAL_BREW : POT_ENLIGHTENMENT);
@@ -2965,6 +3114,9 @@ struct obj *o1, *o2;
             return POT_ELVEN_HERBAL_BREW;
         case POT_GAIN_LEVEL:
         case POT_GAIN_ENERGY:
+        case POT_EXTRA_ENERGY:
+        case POT_GREATER_ENERGY:
+        case POT_FULL_ENERGY:
             return POT_SEE_INVISIBLE;
         }
         break;
@@ -3164,6 +3316,7 @@ dodip()
     {
         int amt = (int) obj->quan;
         boolean magic;
+        char dcbuf[BUFSZ] = "";
 
         mixture = mixtype(obj, potion);
 
@@ -3186,24 +3339,29 @@ dodip()
             }
         }
         /* [N of] the {obj(s)} mix(es) with [one of] {the potion}... */
-        pline("%s %s %s with %s%s...", qbuf, simpleonames(obj),
+        Sprintf(dcbuf, "%s %s %s with %s%s...", qbuf, simpleonames(obj),
               otense(obj, "mix"), (potion->quan > 1L) ? "one of " : "",
               thesimpleoname(potion));
+        pline1(dcbuf);
         /* get rid of 'dippee' before potential perm_invent updates */
         useup(potion); /* now gone */
         /* Mixing potions is dangerous...
            KMH, balance patch -- acid is particularly unstable */
         if (obj->cursed || obj->otyp == POT_ACID || !rn2(10)) {
+            char dcbuf2[BUFSZ] = "";
+            char dcbuf3[BUFSZ * 2] = "";
             /* it would be better to use up the whole stack in advance
                of the message, but we can't because we need to keep it
                around for potionbreathe() [and we can't set obj->in_use
                to 'amt' because that's not implemented] */
             obj->in_use = 1;
-            pline("BOOM!  They explode!");
+            Strcpy(dcbuf2, "BOOM!  They explode!");
+            pline1(dcbuf2);
+            Sprintf(dcbuf3, "%s %s", dcbuf, dcbuf2);
             wake_nearto(u.ux, u.uy, EXPLOSION_SOUND_RADIUS * EXPLOSION_SOUND_RADIUS);
             exercise(A_STR, FALSE);
             if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data))
-                potionbreathe(obj);
+                potionbreathe(obj, dcbuf3);
             useupall(obj);
             losehp(adjust_damage(amt + rnd(9), (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_NONE), /* not physical damage */
                    "alchemic blast", KILLED_BY_AN);
@@ -3462,7 +3620,7 @@ dodip()
                 fakeobj.dknown = 1;
                 fakeobj.otyp = old_otyp;
                 fakeobj.oclass = POTION_CLASS;
-                docall(&fakeobj);
+                docall(&fakeobj, (char*)0);
             }
         }
         obj_extract_self(singlepotion);
@@ -3481,7 +3639,7 @@ dodip()
  poof:
     if (!objects[potion->otyp].oc_name_known
         && !objects[potion->otyp].oc_uname)
-        docall(potion);
+        docall(potion, (char*)0);
     useup(potion);
     return 1;
 }

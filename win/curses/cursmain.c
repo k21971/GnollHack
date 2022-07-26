@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursmain.c */
@@ -90,7 +90,7 @@ struct window_procs curses_procs = {
     genl_can_suspend_yes,
     genl_stretch_window,
     genl_set_animation_timer_interval,
-    genl_open_special_view,
+    curses_open_special_view,
     genl_stop_all_sounds,
     genl_play_immediate_ghsound,
     genl_play_ghsound_occupation_ambient,
@@ -847,7 +847,7 @@ char yn_function(const char *ques, const char *choices, char default)
                    ports might use a popup.
 */
 char
-curses_yn_function_ex(int style UNUSED, int attr, int color, int glyph UNUSED, const char* title UNUSED, const char *question, const char *choices, CHAR_P def, const char* resp_desc UNUSED, unsigned long ynflags UNUSED)
+curses_yn_function_ex(int style UNUSED, int attr, int color, int glyph UNUSED, const char* title UNUSED, const char *question, const char *choices, CHAR_P def, const char* resp_desc UNUSED, const char* introline UNUSED, unsigned long ynflags UNUSED)
 {
     return (char) curses_character_input_dialog(attr, color, question, choices, def);
 }
@@ -863,7 +863,7 @@ getlin(const char *ques, char *input)
                ports might use a popup.
 */
 void
-curses_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix)
+curses_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline UNUSED)
 {
     char promptbuf[BUFSZ] = "";
     if (question)
@@ -1009,5 +1009,22 @@ curs_reset_windows(boolean redo_main, boolean redo_status)
         doredraw();
     }
 }
+
+int
+curses_open_special_view(struct special_view_info info)
+{
+    switch (info.viewtype)
+    {
+    case SPECIAL_VIEW_CHAT_MESSAGE:
+        genl_chat_message();
+        break;
+    case SPECIAL_VIEW_YN_DIALOG:
+        return curses_yn_function_ex(YN_STYLE_GENERAL, info.attr, info.color, NO_GLYPH, info.title, info.text, "yn", 'n', "Yes\nNo", (const char*)0, 0UL);
+    default:
+        break;
+    }
+    return 0;
+}
+
 
 /*cursmain.c*/

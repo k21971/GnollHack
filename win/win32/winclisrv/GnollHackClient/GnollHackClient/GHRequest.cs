@@ -16,6 +16,7 @@ namespace GnollHackClient
         AskName,
         ReturnToMainMenu,
         ShowMenuPage,
+        HideMenuPage,
         ShowYnResponses,
         HideYnResponses,
         ShowDirections,
@@ -46,6 +47,8 @@ namespace GnollHackClient
         SetPetMID,
         SaveAndDisableTravelMode,
         RestoreTravelMode,
+        SaveAndDisableTravelModeOnLevel,
+        RestoreTravelModeOnLevel,
     }
 
     public struct AddContextMenuData
@@ -116,8 +119,10 @@ namespace GnollHackClient
         public GHMenuInfo RequestMenuInfo { get; set; }
         public GHOutRipInfo RequestOutRipInfo { get; set; }
         public string RequestString { get; set; }
+        public string RequestString2 { get; set; }
         public string PlaceHolderString { get; set; }
         public string DefValueString { get; set; }
+        public string IntroLineString { get; set; }
         public string TitleString { get; set; }
         public uint RequestStringAttributes { get; set; }
         public int RequestInt { get; set; }
@@ -189,6 +194,13 @@ namespace GnollHackClient
             RequestType = requesttype;
             RequestString = requeststring;
         }
+        public GHRequest(ClientGame clientgame, GHRequestType requesttype, string requeststring, string requeststring2)
+        {
+            RequestingClientGame = clientgame;
+            RequestType = requesttype;
+            RequestString = requeststring;
+            RequestString2 = requeststring2;
+        }
         public GHRequest(ClientGame clientgame, GHRequestType requesttype, string requeststring, int requestint, int requestint2)
         {
             RequestingClientGame = clientgame;
@@ -206,13 +218,14 @@ namespace GnollHackClient
             RequestAttr = attr;
             RequestNhColor = color;
         }
-        public GHRequest(ClientGame clientgame, GHRequestType requesttype, string requeststring, string placeholderstring, string defvaluestring, int style, int attr, int color)
+        public GHRequest(ClientGame clientgame, GHRequestType requesttype, string requeststring, string placeholderstring, string defvaluestring, string introlinestring, int style, int attr, int color)
         {
             RequestingClientGame = clientgame;
             RequestType = requesttype;
             RequestString = requeststring;
             PlaceHolderString = placeholderstring;
             DefValueString = defvaluestring;
+            IntroLineString = introlinestring;
             RequestInt = style;
             RequestAttr = attr;
             RequestNhColor = color;
@@ -231,7 +244,7 @@ namespace GnollHackClient
             RequestType = requesttype;
             MessageHistory = msgHistory;
         }
-        public GHRequest(ClientGame clientgame, GHRequestType requesttype, int style, int attr, int color, int glyph, string titlestring, string requeststring, string responses, string descriptions, ulong ynflags)
+        public GHRequest(ClientGame clientgame, GHRequestType requesttype, int style, int attr, int color, int glyph, string titlestring, string requeststring, string responses, string descriptions, string introline, ulong ynflags)
         {
             RequestingClientGame = clientgame;
             RequestInt = style;
@@ -243,6 +256,7 @@ namespace GnollHackClient
             RequestString = requeststring;
             Responses = responses;
             ResponseDescriptions = descriptions;
+            IntroLineString = introline;
             RequestFlags = ynflags;
         }
         public GHRequest(ClientGame clientgame, GHRequestType requesttype, AddContextMenuData data)

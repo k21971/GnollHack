@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    trap.c    $NHDT-Date: 1545259936 2018/12/19 22:52:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.313 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -116,7 +116,7 @@ struct monst *victim;
     }
 
 #define burn_dmg(obj, descr) erode_obj(obj, descr, ERODE_BURN, EF_GREASE)
-    while (1) {
+    do {
         switch (rn2(6)) {
         case 0:
             item = hitting_u ? uarmh : which_armor(victim, W_ARMH);
@@ -170,7 +170,9 @@ struct monst *victim;
             break;
         }
         break; /* Out of while loop */
-    }
+    } 
+    while (!is_obj_protected_by_property((struct obj*)0, &youmonst, AD_FIRE)); //To limit the effect of continue statements when having fire resistance
+
 #undef burn_dmg
 
     return FALSE;
@@ -204,6 +206,7 @@ int ef_flags;
             uvictim, vismon, visobj;
     int erosion, cost_type;
     struct monst *victim;
+    int adtyp = AD_NONE;
 
     if (!otmp)
         return ER_NOTHING;
@@ -220,6 +223,7 @@ int ef_flags;
         vulnerable = is_flammable(otmp);
         check_grease = FALSE;
         cost_type = COST_BURN;
+        adtyp = AD_FIRE;
         break;
     case ERODE_RUST:
         vulnerable = is_rustprone(otmp);
@@ -266,7 +270,7 @@ int ef_flags;
                   ostr, vtense(ostr, "are"), bythe[type]);
         return ER_NOTHING;
     }
-    else if (otmp->oerodeproof || (otmp->blessed && !rnl(4))) 
+    else if (otmp->oerodeproof || (otmp->blessed && !rnl(4)) || is_obj_protected_by_property(otmp, victim, adtyp))
     {
         if (flags.verbose && (print || otmp->oerodeproof)
             && (uvictim || vismon || visobj))
@@ -1407,6 +1411,7 @@ unsigned short trflags;
         {
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "A cloud of gas puts you to sleep!");
             fall_asleep(-rn1(7,8), TRUE);
+            standard_hint("You should acquire sleep resistance as early as possible. Keep pets around to protect you while sleeping.", &u.uhint.fell_asleep_by_trap);
         }
 
         (void) steedintrap(trap, (struct obj *) 0);
@@ -1862,6 +1867,7 @@ unsigned short trflags;
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "a change coming over you.");
             polyself(0);
             newsym(u.ux, u.uy); /* get rid of trap symbol */
+            standard_hint("You should acquire magic resistance, polymorph control, or an amulet of unchanging before dungeon level 8.", &u.uhint.polymorphed_by_trap);
         }
         context.global_newsym_flags = 0UL;
         special_effect_wait_until_end(0);
@@ -3380,7 +3386,7 @@ register struct monst *mtmp;
                 if (!is_cancelled(mtmp) && (attacktype(mptr, AT_MAGC)
                                     || attacktype(mptr, AT_BREA))) 
                 {
-                    mtmp->mspec_used += d(2, 20);
+                    mtmp->mspec_used += d(2, 20) / mon_spec_cooldown_divisor(mtmp);
                     if (in_sight && can_see_trap)
                     {
                         seetrap(trap);
@@ -3680,6 +3686,7 @@ const char *arg;
         && !Stone_resistance) {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s touch the %s corpse.", arg, corpse_monster_name(uwep));
         Sprintf(kbuf, "%s corpse", an(corpse_monster_name(uwep)));
+        killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
         instapetrify(kbuf);
         /* life-saved; unwield the corpse if we can't handle it */
         if (!uarmg && !Stone_resistance)
@@ -3689,6 +3696,7 @@ const char *arg;
         && touch_petrifies(&mons[uarms->corpsenm]) && !Stone_resistance) {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s touch the %s corpse.", arg, corpse_monster_name(uarms));
         Sprintf(kbuf, "%s corpse", an(corpse_monster_name(uarms)));
+        killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
         instapetrify(kbuf);
         /* life-saved; unwield the corpse */
         if (!uarmg && !Stone_resistance)
@@ -4113,11 +4121,13 @@ int dice; /* of d6 */
 
     burn_away_slime();
 
-    if (burnarmor(&youmonst) || rn2(3)) 
+    if (burnarmor(&youmonst) || rn2(3))
     {
         destroy_item(SCROLL_CLASS, AD_FIRE);
         destroy_item(SPBOOK_CLASS, AD_FIRE);
         destroy_item(POTION_CLASS, AD_FIRE);
+
+        item_destruction_hint(AD_FIRE, FALSE);
 
         /* Check for the Ruling Ring of Yendor */
         for (struct obj* oring = invent; oring; oring = oring->nobj)
@@ -4408,6 +4418,9 @@ xchar x, y;
     } 
     else if (obj->oclass == POTION_CLASS)
     {
+        if (oresist_fire(obj))
+            return FALSE;
+
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_BURNT);
         dindx = (obj->otyp != POT_OIL) ? 1 : 2;
         if (in_sight)
@@ -4513,9 +4526,7 @@ struct obj *obj;
         grease_protect(obj, (char *) 0, victim);
     } else if (obj->oclass == SCROLL_CLASS && obj->otyp != SCR_BLANK_PAPER) {
         if (obj->otyp != SCR_BLANK_PAPER
-#ifdef MAIL
             && obj->otyp != SCR_MAIL
-#endif
             ) {
             if (!Blind) {
                 if (victim == &youmonst)
@@ -4615,9 +4626,7 @@ boolean force;
     else if (obj->oclass == SCROLL_CLASS)
     {
         if (obj->otyp == SCR_BLANK_PAPER
-#ifdef MAIL
             || obj->otyp == SCR_MAIL
-#endif
            ) return 0;
         else if (is_obj_indestructible(obj))
         {
@@ -5065,17 +5074,17 @@ dountrap()
 {
     if (near_capacity() >= HVY_ENCUMBER) {
         play_sfx_sound(SFX_GENERAL_TOO_MUCH_ENCUMBRANCE);
-        pline_ex(ATR_NONE, CLR_MSG_WARNING, "You're too strained to do that.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You're too strained to do that.");
         return 0;
     }
     if ((nohands(youmonst.data) && !webmaker(youmonst.data))
         || !youmonst.data->mmove) {
         play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-        pline_ex(ATR_NONE, CLR_MSG_WARNING, "And just how do you expect to do that?");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "And just how do you expect to do that?");
         return 0;
     } else if (u.ustuck && sticks(youmonst.data)) {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        pline_ex(ATR_NONE, CLR_MSG_WARNING, "You'll have to let go of %s first.", mon_nam(u.ustuck));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You'll have to let go of %s first.", mon_nam(u.ustuck));
         return 0;
     }
     if (u.ustuck || (welded(uwep, &youmonst) && bimanual(uwep))) {
@@ -5594,7 +5603,7 @@ struct trap* ttmp;
             genotyp = WAN_POLYMORPH;
             break;
         case MAGIC_TRAP:
-            genotyp = random_objectid_from_class(WAND_CLASS, 0UL);
+            genotyp = random_objectid_from_class(WAND_CLASS, (struct monst*)0, 0UL);
             break;
         case LEVEL_TELEP:
             genotyp = CUBIC_GATE;
@@ -5844,6 +5853,7 @@ struct trap *ttmp;
 
             Sprintf(kbuf, "trying to help %s out of a pit",
                     an(mon_monster_name(mtmp)));
+            killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
             instapetrify(kbuf);
             return 1;
         }
@@ -6840,6 +6850,7 @@ boolean disarm;
                 int hp_after = Upolyd ? u.mh : u.uhp;
                 display_u_being_hit(HIT_ELECTROCUTED, hp_before - hp_after, 0UL);
             }
+            item_destruction_hint(AD_ELEC, FALSE);
             break;
         } /* case 6 */
         case 5:
@@ -7202,13 +7213,13 @@ boolean nocorpse;
         }
     }
 
-    if (obj && (!strike || d_override)) 
+    if (obj && (!strike || d_override))
     {
         place_object(obj, mon->mx, mon->my);
         stackobj(obj);
     }
     else if (obj)
-        dealloc_obj(obj);
+        obfree(obj, (struct obj*)0);
 
     return trapkilled;
 }
@@ -7365,6 +7376,7 @@ burn_stuff:
     destroy_item(SCROLL_CLASS, AD_FIRE);
     destroy_item(SPBOOK_CLASS, AD_FIRE);
     destroy_item(POTION_CLASS, AD_FIRE);
+    item_destruction_hint(AD_FIRE, FALSE);
     return FALSE;
 }
 

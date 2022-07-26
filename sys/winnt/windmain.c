@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    windmain.c    $NHDT-Date: 1543465755 2018/11/29 04:29:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.101 $ */
 /* Copyright (c) Derek S. Ray, 2015. */
@@ -45,8 +45,8 @@ int NDECL(windows_nhgetch);
 void NDECL(windows_nhbell);
 int FDECL(windows_nh_poskey, (int *, int *, int *));
 void FDECL(windows_raw_print, (const char *));
-char FDECL(windows_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, unsigned long));
-static void FDECL(windows_getlin_ex, (int, int, int, const char *, char *, const char*, const char*));
+char FDECL(windows_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+static void FDECL(windows_getlin_ex, (int, int, int, const char *, char *, const char*, const char*, const char*));
 extern int NDECL(windows_console_custom_nhgetch);
 void NDECL(safe_routines);
 
@@ -329,6 +329,8 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
     if (WINDOWPORT("tty"))
         toggle_mouse_support();
 
+    display_gamewindows();
+
     /* strip role,race,&c suffix; calls askname() if plname[] is empty
        or holds a generic user name like "player" or "games" */
 
@@ -369,7 +371,6 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
      *  new game or before a level restore on a saved game.
      */
     vision_init();
-    display_gamewindows();
 
     /*
      * First, try to find and restore a save file for specified character.
@@ -395,6 +396,9 @@ attempt_restore:
 
             if (discover || wizard || CasualMode)
             {
+                if (CasualMode)
+                    pline("Keeping the save file.");
+
                 if (!CasualMode && yn_query("Do you want to keep the save file?") == 'n')
                     (void) delete_savefile();
                 else 
@@ -535,6 +539,12 @@ char *argv[];
             break;
         case 'X':
             discover = TRUE, wizard = FALSE;
+            break;
+        case 'M':
+            ModernMode = TRUE;
+            break;
+        case 'C':
+            CasualMode = TRUE;
             break;
 #ifdef NEWS
         case 'n':
@@ -812,12 +822,13 @@ int *x, *y, *mod;
 
 /*ARGSUSED*/
 char
-windows_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, ynflags)
+windows_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 int style, attr, color, glyph;
 const char *title;
 const char *query;
 const char *resp;
 const char* resp_desc;
+const char* introline;
 char def;
 unsigned long ynflags;
 {
@@ -826,11 +837,12 @@ unsigned long ynflags;
 
 /*ARGSUSED*/
 static void
-windows_getlin_ex(style, attr, color, prompt, outbuf, placeholder, linesuffix)
+windows_getlin_ex(style, attr, color, prompt, outbuf, placeholder, linesuffix, introline)
 int style UNUSED, attr UNUSED, color UNUSED;
 const char *prompt UNUSED;
 const char* placeholder UNUSED;
 const char* linesuffix UNUSED;
+const char* introline UNUSED;
 char *outbuf;
 {
     Strcpy(outbuf, "\033");

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
 
 /* GnollHack 4.0    objnam.c    $NHDT-Date: 1551138256 2019/02/25 23:44:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.235 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -37,6 +37,8 @@ struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     {"mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
     {"plastic",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE  },
     {"glass",       PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE  },
+    {"crystal",     PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE  },
+    {"hard crystal",PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE },
     {"gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE },
     {"stone",       PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
     {"modronite",   PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE  },
@@ -55,11 +57,12 @@ const char* multishot_style_names[MAX_MULTISHOT_TYPES] = {
     "None",
     "1+1/4 per skill level after basic when firing",
     "2 when firing",
+    "1/1.5/2 for basic/skilled/expert when firing",
     "1+1/4 per skill level after expert when thrown",
     "1+1/4 per skill level after skilled when thrown",
     "1+1/4 per skill level after basic when thrown",
     "1/1.5/2 for basic/skilled/expert in melee",
-    "1/2/3 for expert/master/grand master in melee",
+    "1+1/2 per skill level after basic in melee",
 };
 
 const char* armor_type_names[MAX_ARMOR_TYPES] = {
@@ -114,7 +117,6 @@ STATIC_DCL char *FDECL(strprepend, (char *, const char *));
 STATIC_DCL short FDECL(rnd_otyp_by_wpnskill, (SCHAR_P));
 STATIC_DCL short FDECL(rnd_otyp_by_namedesc, (const char *, CHAR_P, int));
 STATIC_DCL boolean FDECL(wishymatch, (const char *, const char *, BOOLEAN_P));
-STATIC_DCL char *NDECL(nextobuf);
 STATIC_DCL void FDECL(releaseobuf, (char *));
 STATIC_DCL char *FDECL(minimal_xname, (struct obj *));
 STATIC_DCL char *FDECL(doname_base, (struct obj *obj, unsigned));
@@ -170,7 +172,7 @@ register const char *pref;
 static char NEARDATA obufs[NUMOBUF][BUFSZ];
 static int obufidx = 0;
 
-STATIC_OVL char *
+char *
 nextobuf()
 {
     obufidx = (obufidx + 1) % NUMOBUF;
@@ -565,85 +567,88 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     if (obj_is_pname(obj))
         goto nameit;
 
+    /* General prefixes */
+    if (is_poisonable(obj) && obj->opoisoned && dknown)
+        Strcpy(buf, "poisoned ");
+
+    if (dknown)
+    {
+        if (obj->elemental_enchantment == COLD_ENCHANTMENT)
+            Strcat(buf, "freezing ");
+        else if (obj->elemental_enchantment == FIRE_ENCHANTMENT)
+            Strcat(buf, "flaming ");
+        else if (obj->elemental_enchantment == LIGHTNING_ENCHANTMENT)
+            Strcat(buf, "electrified ");
+        else if (obj->elemental_enchantment == DEATH_ENCHANTMENT)
+            Strcat(buf, "death-magical ");
+    }
+
+    if (obj->oclass == ARMOR_CLASS && (is_boots(obj) || is_gloves(obj) || is_bracers(obj)))
+        Strcat(buf, "pair of ");
+    else if (obj->oclass == MISCELLANEOUS_CLASS && (
+        objects[obj->otyp].oc_subtyp == MISC_EARRINGS
+        || objects[obj->otyp].oc_subtyp == MISC_EYEGLASSES
+        || objects[obj->otyp].oc_subtyp == MISC_PANTS
+        || objects[obj->otyp].oc_subtyp == MISC_BRACERS
+        || objects[obj->otyp].oc_subtyp == MISC_WINGS
+        || objects[obj->otyp].oc_subtyp == MISC_EXTRA_ARMS
+        ))
+        Strcat(buf, "pair of ");
+    else if (is_wet_towel(obj))
+        Strcat(buf, (obj->special_quality < 3) ? "moist " : "wet ");
+    else if (is_key(obj) && obj->special_quality > 0)
+    {
+        const char* desc = get_key_special_quality_description(obj);
+        if (desc && strcmp(desc, ""))
+        {
+            Strcat(buf, desc);
+            Strcat(buf, " ");
+        }
+    }
+
+    if (dknown && (obj->mythic_prefix || obj->mythic_suffix))
+    {
+        if (!mknown)
+            Strcat(buf, (obj->mythic_prefix && obj->mythic_suffix) ? "legendary " : "mythic ");
+        else if (obj->mythic_prefix)
+            Strcat(buf, mythic_prefix_qualities[obj->mythic_prefix].mythic_affix);
+    }
+
+    if (dknown)
+    {
+        if (obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL)
+            Strcat(buf, "exceptional ");
+        else if (obj->exceptionality == EXCEPTIONALITY_ELITE)
+            Strcat(buf, "elite ");
+        else if (obj->exceptionality == EXCEPTIONALITY_CELESTIAL)
+            Strcat(buf, "celestial ");
+        else if (obj->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+            Strcat(buf, "primordial ");
+        else if (obj->exceptionality == EXCEPTIONALITY_INFERNAL)
+            Strcat(buf, "infernal ");
+    }
+
     switch (obj->oclass) {
     case AMULET_CLASS:
         if (!dknown)
-            Strcpy(buf, "amulet");
+            Strcat(buf, "amulet");
         else if (typ == AMULET_OF_YENDOR || typ == FAKE_AMULET_OF_YENDOR)
             /* each must be identified individually */
-            Strcpy(buf, known ? actualn : dn);
+            Strcat(buf, known ? actualn : dn);
         else if (nn)
-            Strcpy(buf, actualn);
+            Strcat(buf, actualn);
         else if (un)
-            Sprintf(buf, "amulet called %s", un);
+            Sprintf(eos(buf), "amulet called %s", un);
         else
-            Sprintf(buf, "%s amulet", dn);
+            Sprintf(eos(buf), "%s amulet", dn);
         break;
     case WEAPON_CLASS:
-        if (is_poisonable(obj) && obj->opoisoned && dknown)
-            Strcpy(buf, "poisoned ");
-        /*FALLTHRU*/
     case VENOM_CLASS:
     case REAGENT_CLASS:
     case MISCELLANEOUS_CLASS:
     case TOOL_CLASS:
     case GEM_CLASS:
     {
-        if (dknown)
-        {
-            if (obj->elemental_enchantment == COLD_ENCHANTMENT)
-                Strcat(buf, "freezing ");
-            else if (obj->elemental_enchantment == FIRE_ENCHANTMENT)
-                Strcat(buf, "flaming ");
-            else if (obj->elemental_enchantment == LIGHTNING_ENCHANTMENT)
-                Strcat(buf, "electrified ");
-            else if (obj->elemental_enchantment == DEATH_ENCHANTMENT)
-                Strcat(buf, "death-magical ");
-        }
-
-        if (obj->oclass == MISCELLANEOUS_CLASS && (
-            objects[obj->otyp].oc_subtyp == MISC_EARRINGS
-            || objects[obj->otyp].oc_subtyp == MISC_EYEGLASSES
-            || objects[obj->otyp].oc_subtyp == MISC_PANTS
-            || objects[obj->otyp].oc_subtyp == MISC_BRACERS
-            || objects[obj->otyp].oc_subtyp == MISC_WINGS
-            || objects[obj->otyp].oc_subtyp == MISC_EXTRA_ARMS
-            ))
-            Strcpy(buf, "pair of ");
-        else if (is_wet_towel(obj))
-            Strcpy(buf, (obj->special_quality < 3) ? "moist " : "wet ");
-        else if (is_key(obj) && obj->special_quality > 0)
-        {
-            const char* desc = get_key_special_quality_description(obj);
-            if (desc && strcmp(desc, ""))
-            {
-                Strcpy(buf, desc);
-                Strcat(buf, " ");
-            }
-        }
-
-        if (dknown && (obj->mythic_prefix || obj->mythic_suffix))
-        {
-            if (!mknown)
-                Strcat(buf, (obj->mythic_prefix && obj->mythic_suffix) ? "legendary " : "mythic ");
-            else if (obj->mythic_prefix)
-                Strcat(buf, mythic_prefix_qualities[obj->mythic_prefix].mythic_affix);
-        }
-
-        if (dknown)
-        {
-            if (obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL)
-                Strcat(buf, "exceptional ");
-            else if (obj->exceptionality == EXCEPTIONALITY_ELITE)
-                Strcat(buf, "elite ");
-            else if (obj->exceptionality == EXCEPTIONALITY_CELESTIAL)
-                Strcat(buf, "celestial ");
-            else if (obj->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
-                Strcat(buf, "primordial ");
-            else if (obj->exceptionality == EXCEPTIONALITY_INFERNAL)
-                Strcat(buf, "infernal ");
-        }
-
         const char* rock = is_ore(obj) ? "nugget of ore" : is_graystone(obj) ? "stone" : (ocl->oc_material == MAT_MINERAL) ? "stone" : "gem";
         boolean isgem = (obj->oclass == GEM_CLASS);
 
@@ -694,13 +699,11 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         break;
     }
     case ARMOR_CLASS:
-        /* depends on order of the dragon scales objects */
+        /* depends on order of the dragon scales objects -- Special case, ignores the modifiers above */
         if (typ >= GRAY_DRAGON_SCALES && typ <= YELLOW_DRAGON_SCALES) {
             Sprintf(buf, "set of %s", actualn);
             break;
         }
-        if (is_boots(obj) || is_gloves(obj) || is_bracers(obj))
-            Strcpy(buf, "pair of ");
 
         if (obj->otyp >= ELVEN_SHIELD && obj->otyp <= ORCISH_SHIELD
             && !dknown) {
@@ -710,14 +713,6 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         if (obj->otyp == SHIELD_OF_REFLECTION && !dknown) {
             Strcpy(buf, "smooth shield");
             break;
-        }
-
-        if (dknown && (obj->mythic_prefix || obj->mythic_suffix))
-        {
-            if (!mknown)
-                Strcat(buf, (obj->mythic_prefix && obj->mythic_suffix) ? "legendary " : "mythic ");
-            else if (obj->mythic_prefix)
-                Strcat(buf, mythic_prefix_qualities[obj->mythic_prefix].mythic_affix);
         }
 
         if (!dknown)
@@ -1306,9 +1301,7 @@ unsigned doname_flags;
                       || obj->oclass == RING_CLASS
                       || obj->oclass == MISCELLANEOUS_CLASS
                      )
-#ifdef MAIL
                      && obj->otyp != SCR_MAIL
-#endif
                      && obj->otyp != FAKE_AMULET_OF_YENDOR
                      && obj->otyp != AMULET_OF_YENDOR
                      //&& !Role_if(PM_PRIEST)
@@ -1569,7 +1562,7 @@ weapon_here:
                    || obj->otyp == BRASS_LANTERN || is_candle(obj)) 
         {
             if ((is_candle(obj) && obj->otyp != MAGIC_CANDLE
-                && obj->age < 30L * objects[obj->otyp].oc_cost)
+                && obj->age < candle_maximum_burn_time(obj))
                 || (obj->otyp == MAGIC_CANDLE && obj->special_quality < 2)
                 )
                 Strcat(prefix, "partly used ");
@@ -1668,7 +1661,7 @@ weapon_here:
     const char* hand_s = body_part(HAND);
     const char* hands_s = makeplural(hand_s);
     if ((obj->owornmask & W_WEP) && !mrg_to_wielded) {
-        if (obj->quan != 1L || !is_wielded_weapon(obj))
+        if (obj->quan != 1L || !is_wieldable_weapon(obj))
         {
             if (u.twoweap)
             {
@@ -1688,7 +1681,7 @@ weapon_here:
     }
 
     if ((obj->owornmask & W_WEP2) && obj->oclass != ARMOR_CLASS && !mrg_to_wielded) {
-        if (obj->quan != 1L || !is_wielded_weapon(obj))
+        if (obj->quan != 1L || !is_wieldable_weapon(obj))
         {
             if (u.twoweap)
                 if (bimanual(obj))
@@ -1795,13 +1788,13 @@ weapon_here:
     bp = strprepend(bp, prefix);
 
     /* Mark if invoke, repower, cooling down */
-    if (obj->invokeon > 0 || obj->repowerleft > 0 || obj->cooldownleft > 0)
+    if (obj->invokeon > 0 || obj->invokeleft > 0 || obj->repowerleft > 0 || obj->cooldownleft > 0)
     {
         boolean addcomma = FALSE;
         Strcat(bp, " (");
-        if (obj->invokeon > 0)
+        if (obj->invokeon > 0 || obj->invokeleft > 0)
         {
-            Strcat(bp, "invoke on");
+            Strcat(bp, "invoked");
             addcomma = TRUE;
         }
         if (obj->repowerleft > 0)
@@ -2024,11 +2017,7 @@ struct obj *otmp;
 
     /* check fundamental ID hallmarks first */
     if (!otmp->known || !otmp->dknown
-#ifdef MAIL
         || (!otmp->bknown && otmp->otyp != SCR_MAIL)
-#else
-        || !otmp->bknown
-#endif
         || !objects[otmp->otyp].oc_name_known)
         return TRUE;
     if ((!otmp->cknown && (Is_container(otmp) || otmp->otyp == STATUE))
@@ -2260,6 +2249,10 @@ unsigned kxnflags;
            those can be used to fake other objects and dungeon features */
         buf = nextobuf();
         Sprintf(buf, "deadly slime mold%s", plur(obj->quan));
+    } else if (obj->oclass == SPBOOK_CLASS && (kxnflags & KXNFLAGS_SPELL) != 0) {
+        /* It is a spell rather than the book itself */
+        buf = nextobuf();
+        Sprintf(buf, "spell of %s", OBJ_NAME(objects[obj->otyp]));
     } else {
         buf = xname(obj);
     }
@@ -3166,7 +3159,9 @@ const char *oldstr;
 
     /* Ends in z, x, s, ch, sh; add an "es" */
     if (index("zxs", lo_c)
-        || (len >= 2 && lo_c == 'h' && index("cs", lowc(*(spot - 1))))
+        || (len >= 2 && lo_c == 'h' && index("cs", lowc(*(spot - 1))) 
+            /* Unlike the base rule, words "patriarch" and "matriarch" do not end with "es" */
+            && !(len >= 5 && !strcmpi(spot - 4, "iarch")))
         /* Kludge to get "tomatoes" and "potatoes" right */
         || (len >= 4 && !strcmpi(spot - 2, "ato"))
         || (len >= 5 && !strcmpi(spot - 4, "dingo"))) {
@@ -3479,7 +3474,7 @@ STATIC_OVL NEARDATA const struct o_range o_ranges[] = {
     { "shoes", ARMOR_CLASS, LOW_BOOTS, IRON_SHOES },
     { "cloak", ARMOR_CLASS, ELVEN_CLOAK, CLOAK_OF_DISPLACEMENT },
     { "shirt", ARMOR_CLASS, HAWAIIAN_SHIRT, T_SHIRT },
-    { "robe", ARMOR_CLASS, ROBE, MUMMY_WRAPPING },
+    { "robe", ARMOR_CLASS, MEDIEVAL_ROBE, MUMMY_WRAPPING },
     { "bracers", ARMOR_CLASS, LEATHER_BRACERS, BRACERS_OF_REFLECTION },
     { "dragon scales", ARMOR_CLASS, GRAY_DRAGON_SCALES, YELLOW_DRAGON_SCALES },
     { "dragon scale mail", ARMOR_CLASS, GRAY_DRAGON_SCALE_MAIL, YELLOW_DRAGON_SCALE_MAIL },
@@ -3495,6 +3490,9 @@ STATIC_OVL NEARDATA const struct o_range o_ranges[] = {
     { "goggles", MISCELLANEOUS_CLASS, GOGGLES_OF_NIGHT, GOGGLES_OF_EYE_PROTECTION },
     { "gray stone", GEM_CLASS, LUCKSTONE, FLINT },
     { "grey stone", GEM_CLASS, LUCKSTONE, FLINT },
+    { "nugget of ore", GEM_CLASS, NUGGET_OF_IRON_ORE, NUGGET_OF_MITHRIL_ORE },
+    { "nugget", GEM_CLASS, NUGGET_OF_IRON_ORE, NUGGET_OF_MITHRIL_ORE },
+    { "ore", GEM_CLASS, NUGGET_OF_IRON_ORE, NUGGET_OF_MITHRIL_ORE },
     { "mushroom", FOOD_CLASS, CHAMPIGNON, ORACULAR_TOADSTOOL },
     { "whistle", TOOL_CLASS, TIN_WHISTLE, MAGIC_WHISTLE },
     { "flute", TOOL_CLASS, WOODEN_FLUTE, MAGIC_FLUTE },
@@ -3550,6 +3548,7 @@ static const struct alt_spellings {
     { "amulet of poison resistance", AMULET_VERSUS_POISON },
     { "potion of sleep", POT_SLEEPING },
     { "potion of mana", POT_GAIN_ENERGY },
+    { "potion of extra mana", POT_EXTRA_ENERGY },
     { "potion of greater mana", POT_GREATER_ENERGY },
     { "potion of full mana", POT_FULL_ENERGY },
     { "stone", STONE_PEBBLE },
@@ -4100,7 +4099,7 @@ boolean is_wiz_wish;
         *p = 0;
         dn = p + 10;
     }
-    if ((p = strstri(bp, " of spinach")) != 0) {
+    if ((p = strstri(bp, " of spinach")) != 0 && strstri(bp, " of spinach leaves") == 0) {
         *p = 0;
         contents = CONTAINER_SPINACH;
     }
@@ -4135,6 +4134,15 @@ boolean is_wiz_wish;
 
     /* Mythic suffixes */
     char* mythic_sng = makesingular(bp);
+    if (mythic_sng != 0)
+    {
+        //make all lower case
+        char* lp;
+        for (lp = mythic_sng; *lp; lp++)
+        {
+            *lp = lowc(*lp);
+        }
+    }
     int mythic_idx;
     for (mythic_idx = 1; mythic_idx < MAX_MYTHIC_SUFFIXES; mythic_idx++)
     {
@@ -4158,7 +4166,7 @@ boolean is_wiz_wish;
             Sprintf(scrollbuf, "scroll%s", mythic_suffix_qualities[mythic_idx].mythic_affix);
             Sprintf(spellbookbuf, "spellbook%s", mythic_suffix_qualities[mythic_idx].mythic_affix);
 
-            if (!(p == mythic_sng + 4 && !strcmp(p - 4, ringbuf)) /* No rings and other standard itmes etc. */
+            if (!(p == mythic_sng + 4 && !strcmp(p - 4, ringbuf)) /* No rings and other standard items etc. */
                 && !(p == mythic_sng + 4 && !strcmp(p - 4, robebuf))
                 && !(p == mythic_sng + 5 && !strcmp(p - 5, bootsbuf))
                 && !(p == mythic_sng + 5 && !strcmp(p - 5, cloakbuf))
@@ -4250,6 +4258,7 @@ boolean is_wiz_wish;
     /* Find corpse type w/o "of" (red dragon scale mail, yeti corpse) */
     if (strncmpi(bp, "samurai sword", 13)  /* not the "samurai" monster! */
         && strncmpi(bp, "wizard lock", 11) /* not the "wizard" monster! */
+        && strncmpi(bp, "wizard's robe", 13) /* not the "wizard" monster! */
         && strncmpi(bp, "bat guano", 9) /* not the "bat" monster! */
         && strncmpi(bp, "ninja-to", 8)     /* not the "ninja" rank */
         && strncmpi(bp, "master key", 10)  /* not the "master" rank */
@@ -5055,13 +5064,11 @@ boolean is_wiz_wish;
     case STATUE:
         /* otmp->cobj already done in mksobj() */
         break;
-#ifdef MAIL
     case SCR_MAIL:
         /* 0: delivered in-game via external event (or randomly for fake mail);
            1: from bones or wishing; 2: written with marker */
         otmp->special_quality = 1;
         break;
-#endif
     default:
         break;
     }
@@ -5104,9 +5111,7 @@ boolean is_wiz_wish;
             break;
         case FIGURINE:
             if (!(mons[mntmp].geno & G_UNIQ) && !is_human(&mons[mntmp])
-#ifdef MAIL
                 && mntmp != PM_MAIL_DAEMON
-#endif
                 )
                 otmp->corpsenm = mntmp;
             break;
@@ -5257,11 +5262,11 @@ boolean is_wiz_wish;
     }
     else if (uncursed) {
         otmp->blessed = 0;
-        otmp->cursed = (Luck < 0 && !wiz_wishing);
+        otmp->cursed = (Luck < 0 && !wiz_wishing && !is_obj_uncurseable(otmp));
     }
     else if (blessed) {
         otmp->blessed = (Luck >= 0 || wiz_wishing);
-        otmp->cursed = (Luck < 0 && !wiz_wishing);
+        otmp->cursed = (Luck < 0 && !wiz_wishing && !is_obj_uncurseable(otmp));
     }
     else if (spesgn < 0) {
         curse(otmp);
@@ -5453,7 +5458,7 @@ struct obj* robe;
 {
     if (robe) {
         switch (robe->otyp) {
-        case ROBE: //special types here
+        case MEDIEVAL_ROBE: //special types here
             return "robe";
         case MUMMY_WRAPPING:
             return "wrapping";

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
 
 /* GnollHack 4.0    wintty.c    $NHDT-Date: 1557088734 2019/05/05 20:38:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.203 $ */
 /* Copyright (c) David Cohrs, 1991                                */
@@ -140,7 +140,7 @@ struct window_procs tty_procs = {
     genl_can_suspend_yes,
     genl_stretch_window,
     genl_set_animation_timer_interval,
-    genl_open_special_view,
+    tty_open_special_view,
     genl_stop_all_sounds,
     genl_play_immediate_ghsound,
     genl_play_ghsound_occupation_ambient,
@@ -1283,6 +1283,7 @@ tty_askname()
         case -1:
             bail("Until next time then..."); /* quit */
             /*NOTREACHED*/
+        case 2:
         case 0:
             break; /* no game chosen; start new game */
         case 1:
@@ -2246,7 +2247,7 @@ struct WinDesc *cw;
                 boolean on_curr_page = FALSE;
                 int lineno = 0;
 
-                tty_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", tmpbuf, (char*)0, (char*)0);
+                tty_getlin_ex(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", tmpbuf, (char*)0, (char*)0, (char*)0);
                 if (!tmpbuf[0] || tmpbuf[0] == '\033')
                     break;
                 Sprintf(searchbuf, "*%s*", tmpbuf);
@@ -3826,6 +3827,24 @@ int *x, *y, *mod;
 #endif /* ?WIN32CON */
     return i;
 }
+
+int
+tty_open_special_view(info)
+struct special_view_info info;
+{
+    switch (info.viewtype)
+    {
+    case SPECIAL_VIEW_CHAT_MESSAGE:
+        genl_chat_message();
+        break;
+    case SPECIAL_VIEW_YN_DIALOG:
+        return tty_yn_function_ex(YN_STYLE_GENERAL, info.attr, info.color, NO_GLYPH, info.title, info.text, "yn", 'n', "Yes\nNo", (const char*)0, 0UL);
+    default:
+        break;
+    }
+    return 0;
+}
+
 
 void
 win_tty_init(dir)
