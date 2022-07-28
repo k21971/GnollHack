@@ -30,7 +30,8 @@ namespace GnollHackClient
         private bool _characternameSet = false;
         private string _characterName = "";
         private object _characterNameLock = new object();
-        private GamePage _gamePage;
+        private readonly GamePage _gamePage;
+        public GamePage GamePage { get { return _gamePage; } }
 
         private bool _touchLocSet = false;
         private int _touchLocX;
@@ -74,6 +75,19 @@ namespace GnollHackClient
 
         private void pollResponseQueue()
         {
+            /* Makes sure that whatever is happening, the game gets saved and then restored upon sleep / restore */
+            if(_saveRequested)
+            {
+                _saveRequested = false;
+                if(!App.CancelSaveGame)
+                {
+                    App.SavingGame = true;
+                    App.GnollHackService.SaveAndRestoreSavedGame();
+                }
+                App.GameSaved = false;
+                App.SavingGame = false;
+            }
+
             ConcurrentQueue<GHResponse> queue;
             GHResponse response;
             if(ClientGame.ResponseDictionary.TryGetValue(this, out queue))
@@ -133,6 +147,12 @@ namespace GnollHackClient
                         case GHRequestType.Message:
                             _messageFinished = true;
                             break;
+                        case GHRequestType.SaveGameAndWaitForResume:
+                            RequestSaveGame();
+                            break;
+                        case GHRequestType.StopWaitAndRestoreSavedGame:
+                            RequestRestoreSavedGame();
+                            break;
                         default:
                             break;
                     }
@@ -165,60 +185,60 @@ namespace GnollHackClient
             _gamePage.GnollHackService.GetGlyphArrays(out gl2ti_ptr, out gl2ti_size, out gltifl_ptr, out gltifl_size);
             _gamePage.GnollHackService.GetTileArrays(out ti2an_ptr, out ti2an_size, out ti2en_ptr, out ti2en_size, out ti2ad_ptr, out ti2ad_size,
                 out anoff_ptr, out anoff_size, out enoff_ptr, out enoff_size, out reoff_ptr, out reoff_size);
-            lock (_gamePage.Glyph2TileLock)
+            lock (App.Glyph2TileLock)
             {
                 if (gl2ti_ptr != null && gl2ti_size > 0)
                 {
-                    _gamePage.Glyph2Tile = new int[gl2ti_size];
-                    Marshal.Copy(gl2ti_ptr, _gamePage.Glyph2Tile, 0, gl2ti_size);
+                    App.Glyph2Tile = new int[gl2ti_size];
+                    Marshal.Copy(gl2ti_ptr, App.Glyph2Tile, 0, gl2ti_size);
                 }
                 if (gltifl_ptr != null && gltifl_size > 0)
                 {
-                    _gamePage.GlyphTileFlags = new byte[gltifl_size];
-                    Marshal.Copy(gltifl_ptr, _gamePage.GlyphTileFlags, 0, gltifl_size);
+                    App.GlyphTileFlags = new byte[gltifl_size];
+                    Marshal.Copy(gltifl_ptr, App.GlyphTileFlags, 0, gltifl_size);
                 }
                 if (ti2an_ptr != null && ti2an_size > 0)
                 {
-                    _gamePage.Tile2Animation = new short[ti2an_size];
-                    Marshal.Copy(ti2an_ptr, _gamePage.Tile2Animation, 0, ti2an_size);
+                    App.Tile2Animation = new short[ti2an_size];
+                    Marshal.Copy(ti2an_ptr, App.Tile2Animation, 0, ti2an_size);
                 }
                 if (ti2en_ptr != null && ti2en_size > 0)
                 {
-                    _gamePage.Tile2Enlargement = new short[ti2en_size];
-                    Marshal.Copy(ti2en_ptr, _gamePage.Tile2Enlargement, 0, ti2en_size);
+                    App.Tile2Enlargement = new short[ti2en_size];
+                    Marshal.Copy(ti2en_ptr, App.Tile2Enlargement, 0, ti2en_size);
                 }
                 if (ti2ad_ptr != null && ti2ad_size > 0)
                 {
-                    _gamePage.Tile2Autodraw = new short[ti2ad_size];
-                    Marshal.Copy(ti2ad_ptr, _gamePage.Tile2Autodraw, 0, ti2ad_size);
+                    App.Tile2Autodraw = new short[ti2ad_size];
+                    Marshal.Copy(ti2ad_ptr, App.Tile2Autodraw, 0, ti2ad_size);
                 }
                 if (anoff_ptr != null && anoff_size > 0)
                 {
-                    _gamePage.AnimationOffsets = new int[anoff_size];
-                    Marshal.Copy(anoff_ptr, _gamePage.AnimationOffsets, 0, anoff_size);
+                    App.AnimationOffsets = new int[anoff_size];
+                    Marshal.Copy(anoff_ptr, App.AnimationOffsets, 0, anoff_size);
                 }
                 if (enoff_ptr != null && enoff_size > 0)
                 {
-                    _gamePage.EnlargementOffsets = new int[enoff_size];
-                    Marshal.Copy(enoff_ptr, _gamePage.EnlargementOffsets, 0, enoff_size);
+                    App.EnlargementOffsets = new int[enoff_size];
+                    Marshal.Copy(enoff_ptr, App.EnlargementOffsets, 0, enoff_size);
                 }
                 if (reoff_ptr != null && reoff_size > 0)
                 {
-                    _gamePage.ReplacementOffsets = new int[reoff_size];
-                    Marshal.Copy(reoff_ptr, _gamePage.ReplacementOffsets, 0, reoff_size);
+                    App.ReplacementOffsets = new int[reoff_size];
+                    Marshal.Copy(reoff_ptr, App.ReplacementOffsets, 0, reoff_size);
                 }
             }
 
             int total_tiles_used = _gamePage.GnollHackService.GetTotalTiles();
             int total_sheets_used = Math.Min(GHConstants.MaxTileSheets, (total_tiles_used - 1) / GHConstants.NumberOfTilesPerSheet + 1);
 
-            lock (_gamePage.Glyph2TileLock)
+            lock (App.Glyph2TileLock)
             {
-                _gamePage.UsedTileSheets = total_sheets_used;
-                _gamePage.TotalTiles = total_tiles_used;
+                App.UsedTileSheets = total_sheets_used;
+                App.TotalTiles = total_tiles_used;
                 for (int i = 0; i < total_sheets_used; i++)
                 {
-                    _gamePage.TilesPerRow[i] = _gamePage.TileMap[i].Width / GHConstants.TileWidth;
+                    App.TilesPerRow[i] = _gamePage.TileMap[i].Width / GHConstants.TileWidth;
                 }
             }
 
@@ -877,7 +897,7 @@ namespace GnollHackClient
             {
                 if (_ghWindows[winid] != null && _ghWindows[winid].MenuInfo != null)
                 {
-                    GHMenuItem mi = new GHMenuItem(_ghWindows[winid].MenuInfo, _gamePage.NoGlyph, _gamePage);
+                    GHMenuItem mi = new GHMenuItem(_ghWindows[winid].MenuInfo, App.NoGlyph, _gamePage);
                     mi.Identifier = identifier;
                     if (accel == 0 && identifier != 0)
                         mi.Accelerator = _ghWindows[winid].MenuInfo.AutoAccelerator;
@@ -1398,19 +1418,19 @@ namespace GnollHackClient
                     int gltifl_size;
 
                     _gamePage.GnollHackService.GetGlyphArrays(out gl2ti_ptr, out gl2ti_size, out gltifl_ptr, out gltifl_size);
-                    lock (_gamePage.Glyph2TileLock)
+                    lock (App.Glyph2TileLock)
                     {
                         if (gl2ti_ptr != null && gl2ti_size > 0)
                         {
-                            if(_gamePage.Glyph2Tile == null || gl2ti_size != _gamePage.Glyph2Tile.Length)
-                                _gamePage.Glyph2Tile = new int[gl2ti_size];
-                            Marshal.Copy(gl2ti_ptr, _gamePage.Glyph2Tile, 0, gl2ti_size);
+                            if(App.Glyph2Tile == null || gl2ti_size != App.Glyph2Tile.Length)
+                                App.Glyph2Tile = new int[gl2ti_size];
+                            Marshal.Copy(gl2ti_ptr, App.Glyph2Tile, 0, gl2ti_size);
                         }
                         if (gltifl_ptr != null && gltifl_size > 0)
                         {
-                            if (_gamePage.GlyphTileFlags == null || gltifl_size != _gamePage.GlyphTileFlags.Length)
-                                _gamePage.GlyphTileFlags = new byte[gltifl_size];
-                            Marshal.Copy(gltifl_ptr, _gamePage.GlyphTileFlags, 0, gltifl_size);
+                            if (App.GlyphTileFlags == null || gltifl_size != App.GlyphTileFlags.Length)
+                                App.GlyphTileFlags = new byte[gltifl_size];
+                            Marshal.Copy(gltifl_ptr, App.GlyphTileFlags, 0, gltifl_size);
                         }
                     }
                     break;
@@ -1506,6 +1526,13 @@ namespace GnollHackClient
                 case (int)gui_command_types.GUI_CMD_CLEAR_GUI_EFFECTS:
                     _gamePage.ClearGuiEffects();
                     break;
+                case (int)gui_command_types.GUI_CMD_CLEAR_MESSAGE_HISTORY:
+                    _message_history.Clear();
+                    if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.PrintHistory, new List<GHMsgHistoryItem>()));
+                    }
+                    break;
                 case (int)gui_command_types.GUI_CMD_LOAD_INTRO_SOUND_BANK:
                     if(App.LoadBanks)
                         App.FmodService.LoadIntroSoundBank();
@@ -1513,6 +1540,17 @@ namespace GnollHackClient
                 case (int)gui_command_types.GUI_CMD_UNLOAD_INTRO_SOUND_BANK:
                     if (App.LoadBanks)
                         App.FmodService.UnloadIntroSoundBank();
+                    break;
+                case (int)gui_command_types.GUI_CMD_WAIT_FOR_RESUME:
+                    App.GameSaved = true;
+                    App.SavingGame = false;
+                    while (!_restoreRequested)
+                    {
+                        Thread.Sleep(GHConstants.PollingInterval);
+                        _saveRequested = false; //Should be the case. but just in case there is some sort of a mixup going on so that we do not save and restore again in pollResponseQueue
+                        pollResponseQueue();
+                    }
+                    _restoreRequested = false;
                     break;
                 default:
                     break;
@@ -1640,7 +1678,7 @@ namespace GnollHackClient
                         string descriptions = "Yes\nNo";
                         if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                         {
-                            queue.Enqueue(new GHRequest(this, GHRequestType.ShowYnResponses, (int)yn_function_styles.YN_STYLE_GENERAL, attr, color, _gamePage.NoGlyph, title, text, responses, descriptions, null, 0UL));
+                            queue.Enqueue(new GHRequest(this, GHRequestType.ShowYnResponses, (int)yn_function_styles.YN_STYLE_GENERAL, attr, color, App.NoGlyph, title, text, responses, descriptions, null, 0UL));
                         }
                         else
                             return 27;
@@ -1793,6 +1831,20 @@ namespace GnollHackClient
         public void ClientCallback_VoidIntConstCharPtrConstCharPtrBooleanDummy(int value1, string value2, string value3, byte value4)
         {
             return;
+        }
+
+
+        bool _saveRequested = false;
+        bool _restoreRequested = false;
+        /* Other functions */
+        private void RequestSaveGame()
+        {
+            _saveRequested = true;
+        }
+
+        private void RequestRestoreSavedGame()
+        {
+            _restoreRequested = true;
         }
     }
 }

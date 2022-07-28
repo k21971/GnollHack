@@ -415,7 +415,7 @@ int *attk_count, *role_roll_penalty;
             tmp += weapon_to_hit_value(weapon, mtmp, &youmonst, 0);
         else if(uarmg)
             tmp += weapon_to_hit_value(uarmg, mtmp, &youmonst, 0);
-        nonpolytmp += weapon_skill_hit_bonus(weapon, P_NONE, FALSE, TRUE, 0);
+        nonpolytmp += weapon_skill_hit_bonus(weapon, P_NONE, FALSE, TRUE, TRUE, 0);
     } 
     else if (aatyp == AT_KICK && martial_bonus()) 
     {
@@ -423,7 +423,7 @@ int *attk_count, *role_roll_penalty;
             tmp += weapon_to_hit_value(weapon, mtmp, &youmonst, 0);
         else if (uarmf)
             tmp += weapon_to_hit_value(uarmf, mtmp, &youmonst, 0);
-        nonpolytmp += weapon_skill_hit_bonus((struct obj *) 0, P_NONE, FALSE, TRUE, 0);
+        nonpolytmp += weapon_skill_hit_bonus((struct obj *) 0, P_NONE, FALSE, TRUE, TRUE, 0);
     }
 
     tmp += maybe_polyd(max(polytmp, nonpolytmp), nonpolytmp);
@@ -1283,7 +1283,7 @@ boolean* obj_destroyed;
                     lightobj = TRUE;
 
                 if (u.usteed && !thrown && damage > 0
-                    && obj && objects[obj->otyp].oc_subtyp == WEP_LANCE && mon != u.ustuck) 
+                    && obj && can_obj_joust(obj) && mon != u.ustuck)
                 {
                     jousting = joust(mon, obj);
                     /* exercise skill even for minimal damage hits */
@@ -1696,7 +1696,7 @@ boolean* obj_destroyed;
     {
 
         /* to be valid a projectile must have had the correct projector */
-        damage += adjust_damage(weapon_skill_dmg_bonus(wep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, !is_golf_swing_with_stone, 0), &youmonst, mon, wep ? objects[wep->otyp].oc_damagetype : AD_PHYS, ADFLAGS_NONE);
+        damage += adjust_damage(weapon_skill_dmg_bonus(wep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, !is_golf_swing_with_stone, TRUE, 0), &youmonst, mon, wep ? objects[wep->otyp].oc_damagetype : AD_PHYS, ADFLAGS_NONE);
         /* [this assumes that `!thrown' implies wielded...] */
         use_skill(wtype, 1);
 
@@ -1884,6 +1884,9 @@ boolean* obj_destroyed;
                 already_killed = TRUE;
         }
         hittxt = TRUE;
+
+        //Exercise also riding in addtion to thrusting weapon already exercised
+        use_skill(P_RIDING, 1);
     }
     else if (unarmed && damage > 1 && !thrown && !obj && !Upolyd) 
     {
@@ -2591,7 +2594,7 @@ joust(mon, obj)
 struct monst *mon; /* target */
 struct obj *obj;   /* weapon */
 {
-    int skill_rating, joust_dieroll;
+    int skill_chance = 0, joust_dieroll;
 
     if (Fumbling || Stunned)
         return 0;
@@ -2599,16 +2602,18 @@ struct obj *obj;   /* weapon */
     if (obj != uwep && obj != uarms)
         return 0;
 
-    /* if using two weapons, use worse of lance and two-weapon skills */
-    skill_rating = P_SKILL_LEVEL(weapon_skill_type(obj)); /* lance skill */
-    if (u.twoweap && P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT) < skill_rating)
-        skill_rating = P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT);
-    if (skill_rating == P_ISRESTRICTED)
-        skill_rating = P_UNSKILLED; /* 0=>1 */
+    int skill_level = P_SKILL_LEVEL(weapon_skill_type(obj));
+    if (u.twoweap && skill_level > P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT))
+        skill_level = P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT);
 
-    /* odds to joust are expert:80%, skilled:60%, basic:40%, unskilled:20% */
-    if ((joust_dieroll = rn2(5)) < skill_rating) {
-        if (joust_dieroll == 0 && rnl(50) == (50 - 1) && !unsolid(mon->data) && !is_incorporeal(mon->data)
+    skill_chance += spear_skill_jousting_bonus(skill_level); /* thrusting weapon skill */
+    skill_chance += spear_skill_jousting_bonus(P_SKILL_LEVEL(P_RIDING)); /* riding skill */
+
+    if ((joust_dieroll = rn2(100)) < skill_chance)
+    {
+        int roll_threshold = 5 - min(obj->exceptionality, EXCEPTIONALITY_CELESTIAL) + 10 * greatest_erosion(obj);        
+        if (joust_dieroll < roll_threshold && rnl(50) == (50 - 1) 
+            && !unsolid(mon->data) && !is_incorporeal(mon->data)
             && !obj_resists(obj, 0, 100))
             return -1; /* hit that breaks lance */
         return 1;      /* successful joust */

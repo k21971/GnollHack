@@ -52,6 +52,15 @@ namespace GnollHackClient
             StartLocalGameButton.TextColor = Color.Gray;
             StartLocalGoneLabel.IsVisible = true;
         }
+
+        public void ActivateLocalGameButton()
+        {
+            StartLocalGrid.IsEnabled = true;
+            StartLocalGameButton.TextColor = Color.White;
+            StartLocalGameButton.IsVisible = true;
+            StartLocalGoneLabel.IsVisible = false;
+        }
+
         private async void localButton_Clicked(object sender, EventArgs e)
         {
             StartServerGrid.IsEnabled = false;
@@ -126,6 +135,11 @@ namespace GnollHackClient
                 await StartFadeIn();
                 StartLogoImage.IsVisible = false;
                 FmodLogoImage.IsVisible = false;
+                if(App.InformAboutGameTermination)
+                {
+                    App.InformAboutGameTermination = false;
+                    await DisplayAlert("Unexpected Game Termination", "GnollHack was unexpectedly terminated when running on background. This may have been instructed by the operating system or the user. Your game may have been saved before the termination.", "OK");
+                }
             }
             else if (!GameStarted)
             {
