@@ -52,8 +52,9 @@ WINTTYLIB=-lncurses -ltinfo
 #WINSRC += tile.c
 #WINOBJ += tile.o
 
-CHOWN=chown
-CHGRP=chgrp
+CHOWN=true
+CHGRP=true
+
 GAMEUID=games
 GAMEGRP=games
 

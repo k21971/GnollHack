@@ -9,10 +9,6 @@
 # autonamed chroot directory. Can rename.
 DATESTAMP=`date +%Y%m%d-%H%M%S`
 NAO_CHROOT="/opt/nethack/chroot"
-# config outside of chroot
-DGL_CONFIG="/opt/nethack/dgamelaunch.conf"
-# already compiled versions of dgl and nethack
-DGL_GIT="/home/build/dgamelaunch"
 NETHACK_GIT="/home/build/GnollHack"
 # the user & group from dgamelaunch config file.
 USRGRP="games:games"
@@ -25,8 +21,6 @@ NH_BRANCH="master"
 NHSUBDIR="gnollhack-4.1.0.29"
 # VAR_PLAYGROUND from include/unixconf.h
 NH_VAR_PLAYGROUND="/gnollhack-4.1.0.29/var/"
-# only define this if dgl was configured with --enable-sqlite
-SQLITE_DBFILE="/dgldir/dgamelaunch.db"
 # END OF CONFIG
 ##############################################################################
 
