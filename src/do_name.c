@@ -3875,8 +3875,8 @@ const void* q;
     int oclsp = objects[sp].oc_class;
     int oclsq = objects[sq].oc_class;
     int ocldiff = oclsp - oclsq;
-    int skillp = objects[sp].oc_skill;
-    int skillq = objects[sq].oc_skill;
+    int skillp = objects[sp].oc_class == ARMOR_CLASS ? 0 : objects[sp].oc_skill;
+    int skillq = objects[sq].oc_class == ARMOR_CLASS ? 0 : objects[sq].oc_skill;
     int skilldiff = skillp - skillq;
     int subtypp = objects[sp].oc_subtyp;
     int subtypq = objects[sq].oc_subtyp;
@@ -3919,7 +3919,7 @@ struct obj* obj;
 int objectclass;
 unsigned long cflags;
 {
-    int i, cnt = 0;
+    short i, cnt = 0;
     char buf[BUFSZ];
     char objbuf[BUFSZ];
     const char magicschools[8] = {
@@ -3952,9 +3952,9 @@ unsigned long cflags;
             continue;
 
         if (obj && obj->cursed && (
-            (i % 3) == (obj->o_id % 3)
-            || ((i + obj->o_id) % 7) == 0
-            || ((i + obj->o_id + 1) % 11) == 0
+            (i % 3) == (short)(obj->o_id % 3)
+            || (((unsigned int)i + obj->o_id) % 7) == 0
+            || (((unsigned int)i + obj->o_id + 1) % 11) == 0
             ))
             continue;
 
@@ -3969,7 +3969,7 @@ unsigned long cflags;
     int skill = -1;
     int magiccnt = 0;
     boolean checkmagic = FALSE;
-    if (objectclass == WEAPON_CLASS || objectclass == WEAPON_CLASS)
+    if (objectclass == WEAPON_CLASS || objectclass == ARMOR_CLASS)
         checkmagic = TRUE;
 
     for (i = 0; i < cnt; i++) 
@@ -4019,6 +4019,7 @@ unsigned long cflags;
     }
     if (checkmagic && magiccnt > 0)
     {
+        putstr(datawin, 0, "");
         putstr(datawin, ATR_INDENT_AT_DASH, "* Magical item");
     }
 }
@@ -4028,7 +4029,7 @@ print_artifact_catalogue(datawin, obj)
 winid datawin;
 struct obj* obj;
 {
-    int i, cnt = 0;
+    short i, cnt = 0;
     char buf[BUFSZ];
     char objbuf[BUFSZ];
 
@@ -4038,9 +4039,9 @@ struct obj* obj;
             continue;
 
         if (obj && obj->cursed && (
-            (i % 3) == (obj->o_id % 3)
-            || ((i + obj->o_id) % 7) == 0
-            || ((i + obj->o_id + 1) % 11) == 0
+            (i % 3) == (short)(obj->o_id % 3)
+            || (((unsigned int)i + obj->o_id) % 7) == 0
+            || (((unsigned int)i + obj->o_id + 1) % 11) == 0
             ))
             continue;
 
@@ -4065,6 +4066,7 @@ struct obj* obj;
     }
     if (nowishcnt > 0)
     {
+        putstr(datawin, 0, "");
         putstr(datawin, ATR_INDENT_AT_DASH, "* Not wishable");
     }
 }
@@ -4101,7 +4103,6 @@ struct obj* obj;
         }
         else
         {
-            char typebuf[BUFSZ] = "items";
             int itemclass = ILLOBJ_CLASS;
             unsigned long cflags = 0UL;
             switch (mnlidx)

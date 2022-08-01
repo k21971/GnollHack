@@ -609,16 +609,15 @@ int mtype;
             if (otmp)
                 (void)mpickobj(npc, otmp);
 
+            otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_INFERNAL_INHABITANTS_OF_GEHENNOM, MKOBJ_FLAGS_PARAM_IS_TITLE);
+            if (otmp)
+                (void)mpickobj(npc, otmp);
+
             otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_CATALOGUE_OF_RINGS, MKOBJ_FLAGS_PARAM_IS_TITLE);
             if (otmp)
                 (void)mpickobj(npc, otmp);
 
-            int cnt = 1 + rnd(2);
-            for (i = 0; i < cnt; i++)
-            {
-                mongets(npc, SPE_MANUAL);
-            }
-
+            mongets(npc, SPE_MANUAL);
             mongets(npc, RIN_LEVITATION);
             mongets(npc, RIN_FIRE_RESISTANCE);
             mongets(npc, RIN_PROTECTION_FROM_UNDEATH);
