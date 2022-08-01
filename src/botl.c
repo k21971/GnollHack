@@ -22,6 +22,10 @@ STATIC_DCL void NDECL(stat_update_time);
 STATIC_DCL void FDECL(compose_partystatline, (char*, char*, char*, char*, char*));
 STATIC_DCL char* FDECL(conditionbitmask2str, (unsigned long));
 
+
+static struct _status_hilite_line_str* status_hilite_str = 0;
+static int status_hilite_str_id = 0;
+
 char*
 get_strength_string(st)
 int st;
@@ -1356,13 +1360,14 @@ stat_update_time()
     return;
 }
 
+static int oldrndencode = 0;
+static nhsym oldgoldsym = 0;
+
 STATIC_OVL boolean
 eval_notify_windowport_field(fld, valsetlist, idx)
 int fld, idx;
 boolean *valsetlist;
 {
-    static int oldrndencode = 0;
-    static nhsym oldgoldsym = 0;
     int pc, chg, chgmax = 0, color = NO_COLOR;
     unsigned anytype;
     boolean updated = FALSE, reset;
@@ -1609,28 +1614,34 @@ status_reassess(VOID_ARGS)
 #endif
 }
 
+static boolean initalready = FALSE;
+
 STATIC_OVL void
 init_blstats()
 {
-    static boolean initalready = FALSE;
     int i, j;
 
-    if (initalready) {
+    if (initalready)
+    {
         impossible("init_blstats called more than once.");
         return;
     }
-    for (i = 0; i <= 1; ++i) {
-        for (j = 0; j < MAXBLSTATS; ++j) {
+    for (i = 0; i <= 1; ++i) 
+    {
+        for (j = 0; j < MAXBLSTATS; ++j) 
+        {
 #ifdef STATUS_HILITES
             struct hilite_s *keep_hilite_chain = blstats[i][j].thresholds;
 #endif
 
             blstats[i][j] = initblstats[j];
             blstats[i][j].a = zeroany;
-            if (blstats[i][j].valwidth) {
+            if (blstats[i][j].valwidth) 
+            {
                 blstats[i][j].val = (char *) alloc((size_t)blstats[i][j].valwidth);
                 blstats[i][j].val[0] = '\0';
-            } else
+            } 
+            else
                 blstats[i][j].val = (char *) 0;
 #ifdef STATUS_HILITES
             blstats[i][j].thresholds = keep_hilite_chain;
@@ -1638,6 +1649,40 @@ init_blstats()
         }
     }
     initalready = TRUE;
+}
+
+
+void
+reset_blstats(VOID_ARGS)
+{
+    int i, j;
+    for (i = 0; i <= 1; ++i)
+    {
+        for (j = 0; j < MAXBLSTATS; ++j) 
+        {
+            if (blstats[i][j].valwidth && blstats[i][j].val)
+                free(blstats[i][j].val);
+            blstats[i][j].val = (char*)0;
+            memset((genericptr_t)&blstats[i][j], 0, sizeof(struct istat_s));
+            blstats[i][j].a = zeroany;
+#ifdef STATUS_HILITES
+            blstats[i][j].thresholds = 0;
+#endif
+        }
+    }
+    memset((genericptr_t)&valset, 0, sizeof(valset));
+#ifdef STATUS_HILITES
+    bl_hilite_moves = 0L;
+#endif
+    memset((genericptr_t)&cond_hilites, 0, sizeof(cond_hilites));
+    now_or_before_idx = 0;
+    oldrndencode = 0;
+    oldgoldsym = 0;
+    status_hilite_str = 0;
+    status_hilite_str_id = 0;
+
+    initalready = FALSE;
+    blinit = FALSE;
 }
 
 /*
@@ -1957,7 +2002,7 @@ int idx;
 
 struct hilite_s status_hilites[MAXBLSTATS];
 
-static struct fieldid_t {
+static const struct fieldid_t {
     const char *fieldname;
     enum statusfields fldid;
 } fieldids_alias[] = {
@@ -3248,9 +3293,6 @@ struct _status_hilite_line_str {
     char str[BUFSZ];
     struct _status_hilite_line_str *next;
 };
-
-static struct _status_hilite_line_str *status_hilite_str = 0;
-static int status_hilite_str_id = 0;
 
 STATIC_OVL void
 status_hilite_linestr_add(fld, hl, mask, str)

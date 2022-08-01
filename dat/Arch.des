@@ -13,6 +13,8 @@
 MAZE: "Arc-strt",'T'
 FLAGS: noteleport,hardfloor
 GEOMETRY:center,center
+#         1         2         3         4         5         6         7         8
+#12345678901234567890123456789012345678901234567890123456789012345678901234567890
 MAP
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -74,6 +76,9 @@ DOOR:closed,(38,13)
 DOOR:locked,(24,14)
 DOOR:closed,(31,14)
 DOOR:locked,(49,14)
+# Braziers
+BRAZIER:(31,10)
+BRAZIER:(52,07)
 # Lord Carnarvon
 MONSTER:('@',"Lord Carnarvon"),(25,10)
 # The treasure of Lord Carnarvon,protector
@@ -96,13 +101,16 @@ MONSTER:(';',"giant eel"),(45,04)
 MONSTER:(';',"giant eel"),(33,16)
 # Non diggable walls
 NON_DIGGABLE:(00,00,75,19)
-# Random traps
-TRAP:random,random
-TRAP:random,random
-TRAP:random,random
-TRAP:random,random
-TRAP:random,random
-TRAP:random,random
+# Bookshelves
+OBJECT:('(',"bookshelf"),(51,12)
+OBJECT:('(',"bookshelf"),(53,12)
+OBJECT:('(',"bookshelf"),(55,12)
+OBJECT:('(',"bookshelf"),(26,08)
+OBJECT:('(',"bookshelf"),(31,08)
+OBJECT:('(',"bookshelf"),(36,08)
+OBJECT:('(',"large box"),(40,08)
+OBJECT:('(',"large box"),(40,12)
+
 # Monsters on siege duty.
 MONSTER: 'S',(60,09)
 MONSTER: 'Z',(60,10)
@@ -128,6 +136,8 @@ MAZE: "Arc-loca",'T'
 FLAGS: hardfloor
 TILESET:undead_tileset
 GEOMETRY:center,center
+#         1         2         3         4         5         6         7         8
+#12345678901234567890123456789012345678901234567890123456789012345678901234567890
 MAP
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -191,6 +201,30 @@ ALTAR:(26,10),align[1],altar
 ALTAR:(26,15),align[2],altar
 # Non diggable walls
 NON_DIGGABLE:(00,00,75,19)
+# Sarcophaguses
+OBJECT:('(',"sarcophagus"),(25,05)
+OBJECT:('(',"sarcophagus"),(25,10)
+OBJECT:('(',"sarcophagus"),(25,15)
+OBJECT:('(',"sarcophagus"),(49,07)
+OBJECT:('(',"sarcophagus"),(49,14)
+OBJECT:('(',"sarcophagus"),(36,06)
+OBJECT:('(',"sarcophagus"),(36,08)
+OBJECT:('(',"sarcophagus"),(36,12)
+OBJECT:('(',"sarcophagus"),(36,14)
+# Candelabra
+OBJECT:('(',"large five-branched candelabrum"),(44,06),special_quality:0,unlit
+OBJECT:('(',"large five-branched candelabrum"),(44,09),special_quality:0,unlit
+OBJECT:('(',"large five-branched candelabrum"),(44,11),special_quality:0,unlit
+OBJECT:('(',"large five-branched candelabrum"),(44,14),special_quality:0,unlit
+OBJECT:('(',"large five-branched candelabrum"),(41,09),special_quality:0,unlit
+OBJECT:('(',"large five-branched candelabrum"),(41,11),special_quality:0,unlit
+# Braziers
+BRAZIER:(53,04),brazier_normal,unlit
+BRAZIER:(53,16),brazier_normal,unlit
+BRAZIER:(46,06),brazier_normal,unlit
+BRAZIER:(51,06),brazier_normal,unlit
+BRAZIER:(46,09),brazier_normal,unlit
+BRAZIER:(51,09),brazier_normal,unlit
 # Objects
 OBJECT:random,random
 OBJECT:random,random
@@ -264,6 +298,12 @@ MONSTER:('Z',"human mummy"),random
 MONSTER:('Z',"human mummy"),random
 MONSTER:('Z',"human mummy"),random
 MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
 
 #
 #	The "goal" level for the quest.
@@ -276,6 +316,8 @@ MONSTER:'Z',random
 MAZE: "Arc-goal", ' '
 TILESET:undead_tileset
 GEOMETRY:center,center
+#         1         2         3         4         5         6         7         8
+#12345678901234567890123456789012345678901234567890123456789012345678901234567890
 MAP
                                                                             
                                   ---------                                 
@@ -345,6 +387,64 @@ OBJECT:random,random
 OBJECT:random,random
 OBJECT:random,random
 OBJECT:random,random
+# Sarcophaguses
+OBJECT:('(',"sarcophagus"),(21,08)
+OBJECT:('(',"sarcophagus"),(21,11)
+OBJECT:('(',"sarcophagus"),(24,04)
+OBJECT:('(',"sarcophagus"),(24,06)
+OBJECT:('(',"sarcophagus"),(24,13)
+OBJECT:('(',"sarcophagus"),(24,15)
+OBJECT:('(',"sarcophagus"),(52,04)
+OBJECT:('(',"sarcophagus"),(52,06)
+OBJECT:('(',"sarcophagus"),(52,13)
+OBJECT:('(',"sarcophagus"),(52,15)
+OBJECT:('(',"sarcophagus"),(55,08)
+OBJECT:('(',"sarcophagus"),(55,11)
+
+# Candelabra
+OBJECT:('(',"large five-branched candelabrum"),(26,04),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(33,04),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(26,06),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(33,06),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(26,13),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(33,13),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(26,15),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(33,15),special_quality:0,unlit,no_pickup
+
+OBJECT:('(',"large five-branched candelabrum"),(43,04),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(50,04),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(43,06),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(50,06),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(43,13),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(50,13),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(43,15),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(50,15),special_quality:0,unlit,no_pickup
+
+OBJECT:('(',"large five-branched candelabrum"),(24,08),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(33,08),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(24,11),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(33,11),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(43,08),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(52,08),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(43,11),special_quality:0,unlit,no_pickup
+OBJECT:('(',"large five-branched candelabrum"),(52,11),special_quality:0,unlit,no_pickup
+
+# Chests
+OBJECT:('(',"golden chest"),(30,05),no_pickup,locked,trapped
+OBJECT:('(',"golden chest"),(46,05),no_pickup,locked,trapped
+OBJECT:('(',"golden chest"),(30,14),no_pickup,locked,trapped
+OBJECT:('(',"golden chest"),(46,14),no_pickup,locked,trapped
+
+# Braziers
+BRAZIER: (28,09), brazier_normal, unlit
+BRAZIER: (28,10), brazier_normal, unlit
+BRAZIER: (48,09), brazier_normal, unlit
+BRAZIER: (48,10), brazier_normal, unlit
+BRAZIER: (35,08), brazier_normal, unlit
+BRAZIER: (41,08), brazier_normal, unlit
+BRAZIER: (35,11), brazier_normal, unlit
+BRAZIER: (41,11), brazier_normal, unlit
+
 # Random traps
 TRAP:random,random
 TRAP:random,random
@@ -381,6 +481,13 @@ MONSTER:('Z',"human mummy"),random
 MONSTER:('Z',"human mummy"),random
 MONSTER:('Z',"human mummy"),random
 MONSTER:('Z',"human mummy"),random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
+MONSTER:'Z',random
 MONSTER:'Z',random
 
 #

@@ -87,6 +87,11 @@ namespace GnollHackClient
                 App.GameSaved = false;
                 App.SavingGame = false;
             }
+            if (_timeTallyRequested)
+            {
+                _timeTallyRequested = false;
+                App.GnollHackService.TallyRealTime();
+            }
 
             ConcurrentQueue<GHResponse> queue;
             GHResponse response;
@@ -152,6 +157,9 @@ namespace GnollHackClient
                             break;
                         case GHRequestType.StopWaitAndRestoreSavedGame:
                             RequestRestoreSavedGame();
+                            break;
+                        case GHRequestType.TallyRealTime:
+                            RequestTallyRealTime();
                             break;
                         default:
                             break;
@@ -1058,6 +1066,31 @@ namespace GnollHackClient
                 Preferences.Set("LastUsedPlayerName", used_player_name);
         }
 
+        private readonly object _gamePlayTimeLock = new object();
+        private long _gamePlayTime = 0;
+        public long GamePlayTime { get { lock (_gamePlayTimeLock) { return _gamePlayTime; } } set { lock (_gamePlayTimeLock) { _gamePlayTime = value; } } }
+
+        private readonly object _sessionPlayTimeLock = new object();
+        private long _sessionPlayTime = 0L;
+        public long SessionPlayTime { get { lock (_sessionPlayTimeLock) { return _sessionPlayTime; } } set { lock (_sessionPlayTimeLock) { _sessionPlayTime = value; } } }
+        public void AddSessionPlayTime(long addition)
+        {
+            lock (_sessionPlayTimeLock)
+            {
+                _sessionPlayTime = _sessionPlayTime + addition;
+            }
+        }
+
+        public void ClientCallback_ReportPlayTime(long timePassed, long currentPlayTime)
+        {
+            long playedalready = Preferences.Get("RealPlayTime", 0L);
+            long totaltime = playedalready + timePassed;
+            Preferences.Set("RealPlayTime", totaltime);
+            GamePlayTime = currentPlayTime;
+            AddSessionPlayTime(timePassed);
+            App.AddAggragateSessionPlayTime(timePassed);
+        }
+
         public void ClientCallback_SendObjectData(int x, int y, IntPtr otmp_ptr, int cmdtype, int where, IntPtr otypdata_ptr, ulong oflags)
         {
             obj otmp = otmp_ptr == IntPtr.Zero ? new obj() : (obj)Marshal.PtrToStructure(otmp_ptr, typeof(obj));
@@ -1460,20 +1493,12 @@ namespace GnollHackClient
                     break;
                 case (int)gui_command_types.GUI_CMD_MUTE_SOUNDS:
                     _gamePage.MuteSounds = true;
-                    App.FmodService.AdjustVolumes(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+                    App.MuteSounds();
                     break;
                 case (int)gui_command_types.GUI_CMD_UNMUTE_SOUNDS:
-                    {
-                        float generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
-                        float musicVolume = Preferences.Get("MusicVolume", GHConstants.DefaultMusicVolume);
-                        float ambientVolume = Preferences.Get("AmbientVolume", GHConstants.DefaultAmbientVolume);
-                        float dialogueVolume = Preferences.Get("DialogueVolume", GHConstants.DefaultDialogueVolume);
-                        float effectsVolume = Preferences.Get("EffectsVolume", GHConstants.DefaultEffectsVolume);
-                        float UIVolume = Preferences.Get("UIVolume", GHConstants.DefaultUIVolume);
-                        _gamePage.MuteSounds = false;
-                        App.FmodService.AdjustVolumes(generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume);
-                        break;
-                    }
+                    _gamePage.MuteSounds = false;
+                    App.UnmuteSounds();
+                    break;
                 case (int)gui_command_types.GUI_CMD_ACTIVATE_QUIETER_MODE:
                     App.FmodService.SetQuieterMode(true);
                     break;
@@ -1671,34 +1696,12 @@ namespace GnollHackClient
 
                         break;
                     }
-                case (int)special_view_types.SPECIAL_VIEW_YN_DIALOG:
-                    {
-                        ConcurrentQueue<GHRequest> queue;
-                        string responses = "yn";
-                        string descriptions = "Yes\nNo";
-                        if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
-                        {
-                            queue.Enqueue(new GHRequest(this, GHRequestType.ShowYnResponses, (int)yn_function_styles.YN_STYLE_GENERAL, attr, color, App.NoGlyph, title, text, responses, descriptions, null, 0UL));
-                        }
-                        else
-                            return 27;
-
-                        int val = ClientCallback_nhgetch();
-                        string res = Char.ConvertFromUtf32(val);
-                        if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
-                        {
-                            queue.Enqueue(new GHRequest(this, GHRequestType.HideYnResponses));
-                        }
-                        if (responses.Contains(res))
-                            return val;
-                        else
-                            return 27;
-
-                    }
+                case (int)special_view_types.SPECIAL_VIEW_HELP_DIR:
+                    break;
                 default:
                     break;
             }
-            return 1;
+            return 0;
         }
 
 
@@ -1845,6 +1848,12 @@ namespace GnollHackClient
         private void RequestRestoreSavedGame()
         {
             _restoreRequested = true;
+        }
+
+        bool _timeTallyRequested = false;
+        private void RequestTallyRealTime()
+        {
+            _timeTallyRequested = true;
         }
     }
 }

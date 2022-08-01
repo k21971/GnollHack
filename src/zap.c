@@ -3358,17 +3358,6 @@ struct obj *obj;
     delobj(obj);
 }
 
-#if 0
-// OBSOLETE -- JG
-/* classes of items whose current charge count carries over across polymorph
- */
-static const char charged_objs[] = { WAND_CLASS, 
-                                     '\0' };
-
-static const char enchanted_objs[] = { WEAPON_CLASS, ARMOR_CLASS,
-                                     '\0' };
-#endif
-
 /*
  * Polymorph the object to the given object ID.  If the ID is STRANGE_OBJECT
  * then pick random object from the source's class (this is the standard
@@ -4061,7 +4050,6 @@ struct monst* origmonst;
         case SPE_POWER_WORD_BLIND:
         case SPE_SUNLIGHT_BEAM:
         case SPE_RAY_OF_RADIANCE:
-            //Effect moved to resurrection
             break;
         case WAN_RESURRECTION:
         case SPE_RESURRECTION:
@@ -4101,7 +4089,7 @@ struct monst* origmonst;
                             if (newcorpsetype && corpsname && strcmp(corpsname, ""))
                                 Sprintf(cbuf, " from %s", the(corpsname));
 
-                            pline("%s is resurrected%s!",
+                            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is resurrected%s!",
                                 upstart(noname_monnam(mtmp, newcorpsetype ? ARTICLE_A : ARTICLE_THE)),
                                 cbuf);
 
@@ -4153,7 +4141,7 @@ struct monst* origmonst;
                 }
                 else
                 {
-                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
                 }
             }
             break;
@@ -4169,7 +4157,7 @@ struct monst* origmonst;
                 }
                 else
                 {
-                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
                 }
             }
             break;
@@ -4185,7 +4173,7 @@ struct monst* origmonst;
                 }
                 else
                 {
-                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
                 }
             }
             break;
@@ -4201,7 +4189,7 @@ struct monst* origmonst;
                 }
                 else
                 {
-                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
                 }
             }
             break;
@@ -4226,7 +4214,7 @@ struct monst* origmonst;
                 }
                 else
                 {
-                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
                 }
             }
             break;
@@ -4248,7 +4236,7 @@ struct monst* origmonst;
                 }
                 else
                 {
-                    pline("%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s twitches for a moment, but nothing else happens.", The(cxname(obj)));
                 }
             }
             break;
@@ -4722,7 +4710,7 @@ register struct obj *obj;
         break;
     case SPE_SUMMON_GIANT_ANT:
     case SPE_SUMMON_SOLDIER_ANT:
-    case SPE_SUMMON_DIRE_WOLF:
+    case SPE_SUMMON_DIREWOLF:
     case SPE_SUMMON_BISON:
     case SPE_SUMMON_PEGASUS:
     case SPE_SUMMON_ROC:
@@ -9829,7 +9817,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
         }
 
         if (origobj)
-            explode(sx, sy, type, origmonst, objects[origobj_copy.otyp].oc_wsdice, objects[origobj_copy.otyp].oc_wsdam, objects[origobj_copy.otyp].oc_wsdice, otyp, oclass, expltype);
+            explode(sx, sy, type, origmonst, objects[origobj_copy.otyp].oc_wsdice, objects[origobj_copy.otyp].oc_wsdam, objects[origobj_copy.otyp].oc_wsdmgplus, otyp, oclass, expltype);
         else
             explode(sx, sy, type, origmonst, dmgdice, dicesize, dmgplus, otyp, oclass, expltype);
     }
@@ -11095,47 +11083,6 @@ int dmg, adtyp, tell;
         resisted = FALSE;
     else
     {
-#if 0
-        /* attack level */
-        switch (oclass) {
-        case WAND_CLASS:
-            alev = 12;
-            break;
-        case TOOL_CLASS:
-            alev = 10;
-            break; /* instrument */
-        case WEAPON_CLASS:
-            alev = 10;
-            break; /* artifact */
-        case SCROLL_CLASS:
-            alev = 9;
-            break;
-        case POTION_CLASS:
-            alev = 6;
-            break;
-        case RING_CLASS:
-            alev = 5;
-            break;
-        case ILLOBJ_CLASS:
-            alev = lvl;
-            break;
-        default:
-            alev = u.ulevel;
-            break; /* spell */
-        }
-        /* defense level */
-        if (is_you)
-            dlev = u.ulevel;
-        else
-        {
-            dlev = (int) mtmp->m_lev;
-            if (dlev > 50)
-                dlev = 50;
-            else if (dlev < 1)
-                dlev = 1; //  is_mplayer(mtmp->data) ? u.ulevel : 1;
-        }
-#endif
-
         boolean nomr = is_you ? No_magic_resistance : has_no_magic_resistance(mtmp);
         boolean quartermr = is_you ? One_fourth_magic_resistance : has_one_fourth_magic_resistance(mtmp);
         boolean halfmr = is_you ? Half_magic_resistance : has_half_magic_resistance(mtmp);
@@ -11157,15 +11104,6 @@ int dmg, adtyp, tell;
             applicable_mr = max(0, mtmp->data->mr - 50);
         else if (threequartersmr)
             applicable_mr = max(0, mtmp->data->mr - 25);
-
-#if 0
-        if (otmp && (oclass == SPBOOK_CLASS || oclass == WAND_CLASS))
-        {
-            if ((objects[otmp->otyp].oc_aflags & S1_SPELL_BYPASSES_MAGIC_RESISTANCE)
-                && (mtmp->data->geno & G_UNIQ) && !(objects[otmp->otyp].oc_aflags & S1_SPELL_BYPASSES_UNIQUE_MONSTER_MAGIC_RESISTANCE))
-                applicable_mr = max(0, applicable_mr - mtmp->data->mr / 2);
-        }
-#endif
 
         if (applicable_mr <= 0)
             resisted = FALSE;
@@ -11297,7 +11235,6 @@ int dmg, adtyp, tell;
                     killed(mtmp);
             }
         }
-
     }
 
     return 0;
@@ -11794,7 +11731,7 @@ int otyp;
         return PM_RAVEN;
     case SPE_SUMMON_WINTER_WOLF:
         return PM_WINTER_WOLF;
-    case SPE_SUMMON_DIRE_WOLF:
+    case SPE_SUMMON_DIREWOLF:
         return PM_DIREWOLF;
     case SPE_SUMMON_GIANT_ANT:
         return PM_GIANT_ANT;

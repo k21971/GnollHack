@@ -662,7 +662,7 @@ int trap_type;
                             if (!m_carrying(mon, ORCISH_SHORT_BOW))
                                 mongets(mon, ORCISH_SHORT_BOW);
                             if (!m_carrying(mon, ORCISH_ARROW))
-                                m_initthrow(mon, ORCISH_ARROW, 10, 12, TRUE, 0, 0);
+                                m_initthrow(mon, ORCISH_ARROW, 10, 12, TRUE, -1, -1);
 
                             m_dowear(mon, TRUE);
                             mongets(mon, CREAM_PIE);
@@ -967,7 +967,7 @@ makelevel()
             ++room_threshold;
             fill_room(&rooms[nroom - 1], FALSE);
             mk_knox_portal(vault_x + w, vault_y + h);
-            if (!level.flags.noteleport && !rn2(3))
+            if (!level.flags.noteleport && !rn2(2))
                 makevtele();
         } else if (rnd_rect() && create_vault()) {
             vault_x = rooms[nroom].lx;
@@ -987,7 +987,7 @@ makelevel()
         if (wizard && nh_getenv("SHOPTYPE"))
             res = mkroom(SHOPBASE);
 
-        if (!res && u_depth >= 10 && u_depth <= 16 && !context.made_deserted_shop
+        if (!res && u_depth >= 10 && u_depth <= 20 && !context.made_deserted_shop
             && (nroom >= room_threshold && (rn2(2) || u_depth >= 12)))
             res = mkroom(DESERTEDSHOP);
 
@@ -1207,28 +1207,6 @@ makelevel()
                         (void)add_to_container(stash, otmp);
                     }
                 }
-
-#if 0
-                if (!carrying(AXE) && !carrying(BATTLE_AXE))
-                {
-                    otmp = mksobj(AXE, FALSE, FALSE, FALSE);
-                    uncurse(otmp);
-                    otmp->bknown = 1;
-                    (void)add_to_container(stash, otmp);
-                }
-                else
-                {
-                    otmp = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE);
-                    otmp->quan = rnd(200);
-                    otmp->owt = weight(otmp);
-                    otmp->bknown = 1;
-                    (void)add_to_container(stash, otmp);
-                }
-
-                otmp = mkobj(FOOD_CLASS, FALSE, FALSE);
-                otmp->bknown = 1;
-                (void)add_to_container(stash, otmp);
-#endif
             }
 
             /* Add hermit */
@@ -2473,7 +2451,7 @@ xchar x, y;
     extern int n_dgns; /* from dungeon.c */
     d_level *source;
     branch *br;
-    schar u_depth;
+    schar u_depth = depth(&u.uz);
 
     br = dungeon_branch("Fort Ludios");
     if (on_level(&knox_level, &br->end1)) {
@@ -2486,12 +2464,12 @@ xchar x, y;
     }
 
     /* Already set or 2/3 chance of deferring until a later level. */
-    if (source->dnum < n_dgns || (rn2(3) && !wizard))
+    if (source->dnum < n_dgns || (u_depth > 18 || rn2(3)))
         return;
 
     if (!(u.uz.dnum == oracle_level.dnum      /* in main dungeon */
           && !at_dgn_entrance("The Quest")    /* but not Quest's entry */
-          && (u_depth = depth(&u.uz)) > 10    /* beneath 10 */
+          && u_depth > 10    /* beneath 10 */
           && u_depth < depth(&medusa_level))) /* and above Medusa */
         return;
 
@@ -2504,14 +2482,14 @@ xchar x, y;
 }
 
 void
-create_level_light_sources()
+create_level_light_sources(VOID_ARGS)
 {
     for (xchar x = 1; x < COLNO; x++)
     {
         for (xchar y = 0; y < ROWNO; y++)
         {
             int lr = get_location_light_range(x, y);
-            if (lr != 0)
+            if (lr != 0 && (levl[x][y].flags & L_INITIALLY_UNLIT) == 0) // Altars are always on by default
             {
                 anything id;
                 coord c;
@@ -2543,7 +2521,7 @@ xchar x, y;
 }
 
 void
-create_level_sound_sources()
+create_level_sound_sources(VOID_ARGS)
 {
     for (xchar x = 1; x < COLNO; x++)
     {
@@ -2552,7 +2530,7 @@ create_level_sound_sources()
             double volume = 0.0f;
             enum soundsource_ambient_subtypes subtype = SOUNDSOURCE_AMBIENT_GENERAL;
             enum ghsound_types sound_type = get_location_ambient_sound_type(x, y, &volume, &subtype);
-            if (sound_type != GHSOUND_NONE && sound_type < MAX_GHSOUNDS)
+            if (sound_type != GHSOUND_NONE && sound_type < MAX_GHSOUNDS && (levl[x][y].flags & L_INITIALLY_UNLIT) == 0)
             {
                 anything id;
                 coord c;

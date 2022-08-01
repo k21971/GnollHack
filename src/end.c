@@ -68,6 +68,16 @@ STATIC_DCL void NDECL(dump_plines);
 STATIC_DCL void FDECL(dump_everything, (int, time_t));
 STATIC_DCL int NDECL(num_extinct);
 
+STATIC_DCL void FDECL(reset_objchn, (struct obj*));
+STATIC_DCL void FDECL(reset_monchn, (struct monst*));
+STATIC_DCL void FDECL(reset_trapchn, (struct trap*));
+STATIC_DCL void NDECL(reset_lev);
+STATIC_DCL void NDECL(reset_levchn);
+STATIC_DCL void NDECL(reset_damage);
+STATIC_OVL void NDECL(reset_msghistory);
+STATIC_OVL void NDECL(reset_remaining_dynamic_data);
+STATIC_OVL void NDECL(reset_remaining_static_variables);
+
 #define done_stopprint program_state.stopprint
 
 #ifndef PANICTRACE
@@ -780,11 +790,9 @@ time_t when; /* date+time at end of game */
             &datetimebuf[0], &datetimebuf[4], &datetimebuf[6],
             &datetimebuf[8], &datetimebuf[10], &datetimebuf[12]);
     Strcpy(datetimebuf, yyyymmddhhmmss(when));
-    Sprintf(eos(pbuf), ", ended %4.4s-%2.2s-%2.2s %2.2s:%2.2s:%2.2s.",
+    Sprintf(eos(pbuf), ", ended %4.4s-%2.2s-%2.2s %2.2s:%2.2s:%2.2s",
             &datetimebuf[0], &datetimebuf[4], &datetimebuf[6],
             &datetimebuf[8], &datetimebuf[10], &datetimebuf[12]);
-    putstr(0, 0, pbuf);
-    putstr(0, 0, "");
 
     /* character name and basic role info */
     Sprintf(pbuf, "%s, %s %s %s %s", plname,
@@ -807,6 +815,8 @@ time_t when; /* date+time at end of game */
     container_contents(invent, TRUE, TRUE, FALSE, 0);
     enlightenment((BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
                   (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
+    putstr(0, 0, "");
+    dump_skills();
     putstr(0, 0, "");
     dump_spells();
     putstr(0, 0, "");
@@ -1478,6 +1488,7 @@ int how;
        time or even day if player is slow responding to --More-- */
     urealtime.finish_time = endtime = getnow();
     urealtime.realtime += (long) (endtime - urealtime.start_timing);
+    issue_gui_command(GUI_CMD_REPORT_PLAY_TIME);
 
     /* Write dumplog */
     if(disclose_and_dumplog_ok)
@@ -1918,8 +1929,11 @@ int how;
         Sprintf(pbuf, "and %ld piece%s of gold, after %ld move%s.", umoney,
             plur(umoney), moves, plur(moves));
         dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-        Sprintf(pbuf, "You played on %s difficulty in %s mode.", get_game_difficulty_text(context.game_difficulty),
-            get_game_mode_text(TRUE));
+
+        char realtimebuf[BUFSZ] = "";
+        print_realtime(realtimebuf, urealtime.realtime);
+        Sprintf(pbuf, "You played on %s difficulty in %s mode for %s.", get_game_difficulty_text(context.game_difficulty),
+            get_game_mode_text(TRUE), realtimebuf);
         dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
         if (!n_game_recoveries)
             Strcpy(pbuf, "The dungeon never collapsed on you.");
@@ -1949,6 +1963,8 @@ int how;
 
     if (CasualMode && how == ASCENDED && has_existing_save_file)
         (void)delete_savefile(); /* The casual mode character gets deleted only upon ascension */
+
+    issue_gui_command(GUI_CMD_GAME_ENDED);
 
     if (have_windows)
         exit_nhwindows((char*)0);
@@ -2068,6 +2084,30 @@ int show_weights;
 }
 
 /* should be called with either EXIT_SUCCESS or EXIT_FAILURE */
+/* called between displaying gamewindows and before newgame / restore, after getlock doclearlocks must be set to TRUE */
+void
+nh_bail(status, mesg, fullterminate)
+int status;
+const char* mesg;
+boolean fullterminate;
+{
+    clearlocks();
+    exit_nhwindows(mesg);
+    if (fullterminate)
+    {
+        //nh_terminate resets blstats
+        nh_terminate(status);
+    }
+    else
+    {
+        if (VIA_WINDOWPORT()) {
+            reset_blstats();
+        }
+        gnollhack_exit(status);
+    }
+}
+
+/* should be called with either EXIT_SUCCESS or EXIT_FAILURE */
 void
 nh_terminate(status)
 int status;
@@ -2087,7 +2127,6 @@ int status;
     //}
 
     reset_game();
-    dlb_cleanup();
 
     /*
      *  This is liable to draw a warning if compiled with gcc, but it's
@@ -2878,6 +2917,272 @@ get_current_game_score()
 
     utotal = (long)(round((double)Base_Score * Ascension_Multiplier * Difficulty_Multiplier * Modern_Multiplier));
     return utotal;
+}
+
+
+
+STATIC_OVL void
+reset_objchn(otmp)
+struct obj* otmp;
+{
+    struct obj* otmp2;
+    while (otmp) {
+        otmp2 = otmp->nobj;
+        if (Has_contents(otmp))
+            reset_objchn(otmp->cobj);
+        otmp->where = OBJ_FREE; /* set to free so dealloc will work */
+        otmp->nobj = NULL;      /* nobj saved into otmp2 */
+        otmp->cobj = NULL;      /* contents handled above */
+        otmp->timed = 0;        /* not timed any more */
+        otmp->lamplit = 0;      /* caller handled lights */
+        dealloc_obj(otmp);
+        otmp = otmp2;
+    }
+}
+
+STATIC_OVL void
+reset_monchn(mtmp)
+struct monst* mtmp;
+{
+    struct monst* mtmp2;
+    while (mtmp)
+    {
+        mtmp2 = mtmp->nmon;
+        if (mtmp->minvent)
+            reset_objchn(mtmp->minvent);
+        mtmp->nmon = NULL;  /* nmon saved into mtmp2 */
+        dealloc_monst(mtmp);
+        mtmp = mtmp2;
+    }
+}
+
+void
+reset_cemetery(cemeteryaddr)
+struct cemetery** cemeteryaddr;
+{
+    struct cemetery* thisbones, * nextbones;
+
+    nextbones = *cemeteryaddr;
+    while ((thisbones = nextbones) != 0) {
+        nextbones = thisbones->next;
+        free((genericptr_t)thisbones);
+    }
+    *cemeteryaddr = 0;
+}
+
+/* save traps; ftrap is the only trap chain so the 2nd arg is superfluous */
+STATIC_OVL void
+reset_trapchn(trap)
+struct trap* trap;
+{
+    struct trap* trap2;
+    while (trap) {
+        trap2 = trap->ntrap;
+        dealloc_trap(trap);
+        trap = trap2;
+    }
+}
+
+STATIC_OVL void
+reset_damage(VOID_ARGS)
+{
+    register struct damage* damageptr, * tmp_dam;
+    unsigned int xl = 0;
+
+    damageptr = level.damagelist;
+    for (tmp_dam = damageptr; tmp_dam; tmp_dam = tmp_dam->next)
+        xl++;
+
+    while (xl--) {
+        tmp_dam = damageptr;
+        damageptr = damageptr->next;
+        free((genericptr_t)tmp_dam);
+    }
+    level.damagelist = 0;
+}
+
+
+STATIC_OVL void
+reset_lev(VOID_ARGS)
+{
+    reset_cemetery(&level.bonesinfo);
+    memset((genericptr_t)levl, 0, sizeof levl);
+    memset((genericptr_t)lastseentyp, 0, sizeof(lastseentyp));
+    memset((genericptr_t)&monstermoves, 0, sizeof(monstermoves));
+    memset((genericptr_t)&upstair, 0, sizeof(stairway));
+    memset((genericptr_t)&dnstair, 0, sizeof(stairway));
+    memset((genericptr_t)&upladder, 0, sizeof(stairway));
+    memset((genericptr_t)&dnladder, 0, sizeof(stairway));
+    memset((genericptr_t)&sstairs, 0, sizeof(stairway));
+    memset((genericptr_t)&updest, 0, sizeof(dest_area));
+    memset((genericptr_t)&dndest, 0, sizeof(dest_area));
+    memset((genericptr_t)&noteledest, 0, sizeof(dest_area));
+    memset((genericptr_t)&level.flags, 0, sizeof(level.flags));
+    memset((genericptr_t)doors, 0, sizeof(doors));
+
+    reset_rooms();
+    doorindex = 0;
+
+    //Already reset before
+    //reset_timers();
+    //reset_light_sources();
+    //reset_sound_sources();
+
+    reset_monchn(fmon);
+    reset_worm();
+    reset_trapchn(ftrap);
+    reset_objchn(fobj);
+    reset_objchn(level.buriedobjlist);
+    reset_objchn(billobjs);
+    reset_objchn(memoryobjs);
+
+    int x, y;
+    for (y = 0; y < ROWNO; y++)
+        for (x = 0; x < COLNO; x++)
+            level.monsters[x][y] = 0;
+    fmon = 0;
+    ftrap = 0;
+    fobj = 0;
+    level.buriedobjlist = 0;
+    billobjs = 0;
+    memoryobjs = 0;
+
+    /* level.bonesinfo = 0; -- handled by savecemetery() */
+    reset_engravings();
+    reset_damage();
+    clear_regions();
+}
+
+STATIC_OVL void
+reset_levchn(VOID_ARGS)
+{
+    s_level* tmplev, * tmplev2;
+    int cnt = 0;
+
+    for (tmplev = sp_levchn; tmplev; tmplev = tmplev->next)
+        cnt++;
+
+    for (tmplev = sp_levchn; tmplev; tmplev = tmplev2) {
+        tmplev2 = tmplev->next;
+        free((genericptr_t)tmplev);
+    }
+    sp_levchn = 0;
+}
+
+STATIC_OVL void
+reset_msghistory(VOID_ARGS)
+{
+    issue_gui_command(GUI_CMD_CLEAR_MESSAGE_HISTORY);
+
+    /* Let's clean something else, too, here just in case */
+    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
+    issue_gui_command(GUI_CMD_CLEAR_FLOATING_TEXTS);
+    issue_gui_command(GUI_CMD_CLEAR_GUI_EFFECTS);
+}
+
+
+STATIC_OVL void
+reset_gamestate(VOID_ARGS)
+{
+    memset((genericptr_t)&context, 0, sizeof(struct context_info));
+    memset((genericptr_t)&flags, 0, sizeof(struct flag));
+#ifdef SYSFLAGS
+    memset((genericptr_t)&sysflags, 0, sizeof(struct sysflag));
+#endif
+    memset((genericptr_t)&spl_orderindx, 0, sizeof(spl_orderindx));
+    memset((genericptr_t)&u, 0, sizeof(struct you));
+    ubirthday = 0;
+    memset((genericptr_t)&urealtime.realtime, 0, sizeof urealtime.realtime);
+    reset_killers();
+
+    /* must come before migrating_objs and migrating_mons are freed */
+    reset_timers();
+    reset_light_sources();
+    reset_sound_sources();
+
+    reset_objchn(invent);
+    if (BALL_IN_MON) {
+        /* prevent loss of ball & chain when swallowed */
+        uball->nobj = uchain;
+        uchain->nobj = (struct obj*)0;
+        reset_objchn(uball);
+    }
+
+    reset_objchn(migrating_objs);
+    reset_monchn(migrating_mons);
+    reset_monchn(mydogs);
+
+    invent = 0;
+    migrating_objs = 0;
+    migrating_mons = 0;
+    mydogs = 0;
+    uball = 0;
+    uchain = 0;
+
+    memset((genericptr_t)mvitals, 0, sizeof(mvitals));
+
+    reset_dungeon();
+    reset_levchn();
+    memset((genericptr_t)&moves, 0, sizeof moves);
+    memset((genericptr_t)&monstermoves, 0, sizeof monstermoves);
+    memset((genericptr_t)&quest_status, 0, sizeof(struct q_score));
+    memset((genericptr_t)spl_book, 0, sizeof(spl_book));
+    reset_artifacts();
+    reset_oracles();
+    *pl_character = 0;
+    *pl_fruit = 0;
+    reset_fruitchn();
+    reset_names();
+    reset_waterlevel();
+    reset_msghistory();
+}
+
+STATIC_DCL void
+reset_remaining_static_variables()
+{
+    reset_hunger_status();
+    reset_display();
+    reset_dogs();
+    reset_hack();
+    reset_inventory();
+    reset_traps();
+    reset_spells();
+    reset_vision();
+    reset_urolerace();
+}
+
+STATIC_DCL void
+reset_remaining_dynamic_data()
+{
+    free_dynamic_data_A();
+    free_dynamic_data_B();
+    free_dynamic_data_C();
+}
+
+void
+reset_game(VOID_ARGS)
+{
+    dmonsfree();
+    *plname = 0;
+    *recovery_plname = 0;
+    reset_lev();
+    reset_rooms(); /* no dynamic memory to reclaim */
+    reset_gamestate();
+    n_game_recoveries = 0;
+    reset_blstats();
+    reset_occupations();
+    reset_remaining_static_variables();
+    reset_remaining_dynamic_data();
+    dlb_cleanup();
+}
+
+void
+tally_realtime(VOID_ARGS)
+{
+    urealtime.finish_time = getnow();
+    urealtime.realtime += (long)(urealtime.finish_time - urealtime.start_timing);
+    issue_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+    urealtime.start_timing = urealtime.finish_time;
 }
 
 /*end.c*/

@@ -3523,7 +3523,7 @@ dochat()
 
                 chatnum++;
             }
-            if(invent && count_unpaid(invent))
+            if(invent && count_unpaid(invent, FALSE))
             {
                 strcpy(available_chat_list[chatnum].name, "Pay items");
                 available_chat_list[chatnum].function_ptr = &do_chat_shk_payitems;
@@ -5680,7 +5680,7 @@ struct monst* mtmp;
     start_menu_ex(win, GHMENU_STYLE_OTHERS_INVENTORY);
 
     
-    static char def_srt_order[MAX_OBJECT_CLASSES] = {
+    static const char def_srt_order[MAX_OBJECT_CLASSES] = {
     COIN_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
     SCROLL_CLASS, SPBOOK_CLASS, GEM_CLASS, FOOD_CLASS, REAGENT_CLASS, TOOL_CLASS,
     WEAPON_CLASS, ARMOR_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
@@ -5929,7 +5929,7 @@ struct monst* mtmp;
     start_menu_ex(win, GHMENU_STYLE_OTHERS_INVENTORY);
 
 
-    static char def_srt_order[MAX_OBJECT_CLASSES] = {
+    static const char def_srt_order[MAX_OBJECT_CLASSES] = {
     COIN_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
     SCROLL_CLASS, SPBOOK_CLASS, GEM_CLASS, FOOD_CLASS, REAGENT_CLASS, TOOL_CLASS,
     WEAPON_CLASS, ARMOR_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
@@ -8288,15 +8288,15 @@ long minor_id_cost;
         return 0;
     }
 
-    context.shop_identify_type = id_idx;
+    context.npc_identify_type = id_idx;
     if (count_unidentified(invent) == 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         You_ex1_popup("have nothing to identify.", "Nothing to Identify", ATR_NONE, CLR_MSG_ATTENTION, NO_GLYPH, POPUP_FLAGS_NONE);
-        context.shop_identify_type = 0;
+        context.npc_identify_type = 0;
         return 0;
     }
-    context.shop_identify_type = 0;
+    context.npc_identify_type = 0;
 
     char qbuf[QBUFSZ];
     int res = 0;

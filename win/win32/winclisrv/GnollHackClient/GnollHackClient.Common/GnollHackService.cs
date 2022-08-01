@@ -150,6 +150,7 @@ namespace GnollHackClient.Unknown
 
             FreeMemoryCallback callback_free_memory,
             ReportPlayerNameCallback callback_report_player_name,
+            ReportPlayTimeCallback callback_report_play_time,
             SendObjectDataCallback callback_send_object_data,
             SendMonsterDataCallback callback_send_monster_data
         );
@@ -249,14 +250,13 @@ namespace GnollHackClient.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern int LibZapGlyphToCornerGlyph(int adjglyph, ulong adjflags, int source_dir);
         [DllImport(PlatformConstants.dll)]
-        public static extern void LibSwitchDemoVersion(int state);
-        [DllImport(PlatformConstants.dll)]
         public static extern void LibSetPetMID(uint m_id);
         [DllImport(PlatformConstants.dll)]
         public static extern int LibChmod(string filename, uint mode);
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSaveAndRestoreSavedGame();
-
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibTallyRealTime();
 
         private void LoadNativeLibrary(string libName)
         {
@@ -851,11 +851,6 @@ namespace GnollHackClient.Unknown
             return ret;
         }
 
-        public void SwitchDemoVersion(bool active)
-        {
-            LibSwitchDemoVersion(active ? 1 : 0);
-        }
-
         public void SetPetMID(uint m_id)
         {
             LibSetPetMID(m_id);
@@ -870,6 +865,10 @@ namespace GnollHackClient.Unknown
         public void SaveAndRestoreSavedGame()
         {
             LibSaveAndRestoreSavedGame();
+        }
+        public void TallyRealTime()
+        {
+            LibTallyRealTime();
         }
 
         public int StartGnollHack(ClientGame clientGame)
@@ -982,6 +981,7 @@ namespace GnollHackClient.Unknown
 
                 clientGame.ClientCallback_FreeMemory,
                 clientGame.ClientCallback_ReportPlayerName,
+                clientGame.ClientCallback_ReportPlayTime,
                 clientGame.ClientCallback_SendObjectData,
                 clientGame.ClientCallback_SendMonsterData
                 );

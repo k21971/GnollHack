@@ -423,15 +423,6 @@ boolean digest_meal;
 
     if (mon->mhpmax > 0 && mon->mhp < mon->mhpmax)
     {
-#if 0
-        int basispointchancetogetextrahp = (10000 * (mon->mhpmax % roundstofull)) / roundstofull;
-        mon->mhp += fixedhpperround;
-        if (basispointchancetogetextrahp > 0 && rn2(10000) < basispointchancetogetextrahp)
-            mon->mhp += 1;
-
-        if (mon->mhp > mon->mhpmax)
-            mon->mhp = mon->mhpmax;
-#endif
         mon->mhp += fixedhpperround;
         mon->mhp_fraction += fractional_hp;
         if (mon->mhp_fraction >= 10000 || mon->mhp_fraction < 0)
@@ -858,7 +849,7 @@ register struct monst *mtmp;
                 pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s gets angry!", Amonnam(mtmp));
                 mtmp->mpeaceful = 0;
                 newsym(mtmp->mx, mtmp->my);
-                set_malign(mtmp);
+                set_mhostility(mtmp);
                 update_game_music();
                 /* since no way is an image going to pay it off */
             }
@@ -2029,7 +2020,9 @@ register int after;
                 newsym(mtmp->mx, mtmp->my);
         }
 
-        if (OBJ_AT(mtmp->mx, mtmp->my) && mon_can_move(mtmp) && !mtmp->issummoned && mon_can_reach_floor(mtmp) && !onnopickup(mtmp->mx, mtmp->my, mtmp))
+        struct obj* objhere = o_at(mtmp->mx, mtmp->my);
+        if (OBJ_AT(mtmp->mx, mtmp->my) && mon_can_move(mtmp) && !mtmp->issummoned && mon_can_reach_floor(mtmp) && !onnopickup(mtmp->mx, mtmp->my, mtmp)
+            && !(couldsee(mtmp->mx, mtmp->my) && objhere && objhere->was_thrown)) //Do not pick up ammo or other stuff that the player shoots / throws (this checks just the first item, but that's probably good enough)
         {
             /* recompute the likes tests, in case we polymorphed
              * or if the "likegold" case got taken above */
@@ -2427,6 +2420,7 @@ long allowflags;
         (void)memset((genericptr_t)travel, 0, sizeof travel);
         travelstepx[0][0] = tx;
         travelstepy[0][0] = ty;
+        const int ordered[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
 
         while (n != 0)
         {
@@ -2437,7 +2431,6 @@ long allowflags;
                 int dir;
                 int x = travelstepx[set][i];
                 int y = travelstepy[set][i];
-                static int ordered[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
                 /* no diagonal movement for grid bugs */
                 int dirmax = NODIAG(mon->mnum) ? 4 : 8;
                 boolean alreadyrepeated = FALSE;

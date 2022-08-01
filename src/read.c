@@ -609,20 +609,11 @@ struct obj *obj;
     if (obj->oclass == WAND_CLASS)
         return TRUE;
 
-    /* known && !oc_name_known is possible after amnesia/tentacled one */
-//    if (obj->oclass == RING_CLASS)
-        return (boolean) (objects[obj->otyp].oc_charged
-                          && (obj->known
-                              || (obj->dknown
-                                  && objects[obj->otyp].oc_name_known)));
+    return (boolean) (objects[obj->otyp].oc_charged
+                        && (obj->known
+                            || (obj->dknown
+                                && objects[obj->otyp].oc_name_known)));
 
-#if 0
-    if (is_weptool(obj)) /* specific check before general tools */
-        return FALSE;
-    if (obj->oclass == TOOL_CLASS)
-        return (boolean) (objects[obj->otyp].oc_charged != 0);
-    return FALSE; /* why are weapons/armor considered charged anyway? */
-#endif
 }
 
 /* recharge an object; curse_bless is -1 if the recharging implement
@@ -1565,6 +1556,7 @@ struct monst* origmonst;
             {
                 play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
                 special_effect_wait_until_action(0);
+                play_sfx_sound_at_location(SFX_TAMING, mtmp->mx, mtmp->my);
                 special_effect_wait_until_end(0);
             }
         }
@@ -2398,6 +2390,7 @@ boolean *effect_happened_ptr;
             You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "like a rabble-rouser.");
             known = TRUE;
         }
+        play_sfx_sound(SFX_CONFLICT);
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
         special_effect_wait_until_action(0);
         incr_itimeout(&HConflict, duration);
@@ -3373,7 +3366,50 @@ boolean *effect_happened_ptr;
             u_wait_until_action();
             u.dx = 0;
         }
-        (void)explode(cc.x, cc.y, RAY_FIRE, &youmonst, 6, 6, 0, otyp, SPBOOK_CLASS, EXPL_FIERY);
+        (void)explode(cc.x, cc.y, RAY_FIRE, &youmonst, objects[otyp].oc_wsdice, objects[otyp].oc_wsdam, objects[otyp].oc_wsdmgplus, otyp, SPBOOK_CLASS, EXPL_FIERY);
+        break;
+    }
+    case SPE_DEATHSPELL:
+    {
+        coord cc;
+        known = TRUE;
+        pline("Where do you want to center the deathspell?");
+        cc.x = u.ux;
+        cc.y = u.uy;
+        int trycnt = 0;
+        while (trycnt < 10)
+        {
+
+            if (getpos(&cc, TRUE, "the desired position", CURSOR_STYLE_SPELL_CURSOR) < 0) {
+                pline1(Never_mind);
+                break;
+            }
+            if (!get_valid_targeted_position(cc.x, cc.y, otyp))
+            {
+                play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
+                pline("Not a valid target position.");
+                if (trycnt > 4)
+                {
+                    cc.x = u.ux;
+                    cc.y = u.uy;
+                    break;
+                }
+            }
+            else
+                break;
+
+            trycnt++;
+        }
+        if (objects[otyp].oc_dir == TARGETED)
+        {
+            u.dx = cc.x - u.ux;
+            update_u_facing(TRUE);
+            update_u_action(ACTION_TILE_CAST_NODIR);
+            play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
+            u_wait_until_action();
+            u.dx = 0;
+        }
+        (void)explode(cc.x, cc.y, RAY_DEATH, &youmonst, objects[otyp].oc_wsdice, objects[otyp].oc_wsdam, objects[otyp].oc_wsdmgplus, otyp, SPBOOK_CLASS, EXPL_MAGICAL);
         break;
     }
     case SPE_STINKING_CLOUD:
@@ -4428,7 +4464,7 @@ struct _create_particular_data *d;
         {
             mtmp->mtame = 0; /* sanity precaution */
             mtmp->mpeaceful = d->makepeaceful ? 1 : 0;
-            set_malign(mtmp);
+            set_mhostility(mtmp);
             newsym(mtmp->mx, mtmp->my);
         }
 

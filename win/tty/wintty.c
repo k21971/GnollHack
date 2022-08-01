@@ -310,9 +310,7 @@ STATIC_OVL void
 bail(mesg)
 const char *mesg;
 {
-    clearlocks();
-    tty_exit_nhwindows(mesg);
-    nh_terminate(EXIT_SUCCESS);
+    nh_bail(EXIT_SUCCESS, mesg, TRUE);
     /*NOTREACHED*/
 }
 
@@ -446,7 +444,7 @@ char **argv UNUSED;
      *
      *  gettty() must be called before tty_startup()
      *    due to ordering of LI/CO settings
-     *  tty_startup() must be called before initoptions()
+     *  tty_startup() must be called before read_options()
      *    due to ordering of graphics settings
      */
 #if defined(UNIX) || defined(VMS)
@@ -3837,8 +3835,6 @@ struct special_view_info info;
     case SPECIAL_VIEW_CHAT_MESSAGE:
         genl_chat_message();
         break;
-    case SPECIAL_VIEW_YN_DIALOG:
-        return tty_yn_function_ex(YN_STYLE_GENERAL, info.attr, info.color, NO_GLYPH, info.title, info.text, "yn", 'n', "Yes\nNo", (const char*)0, 0UL);
     default:
         break;
     }

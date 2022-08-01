@@ -163,7 +163,14 @@ typedef struct {
 static gbuf_entry gbuf[ROWNO][COLNO];
 static char gbuf_start[ROWNO];
 static char gbuf_stop[ROWNO];
-static gbuf_entry nul_gbuf = { 0, nul_layerinfo };
+static const gbuf_entry nul_gbuf = { 0, nul_layerinfo };
+static boolean in_cls = 0;
+static boolean dela;
+static boolean delagr;
+static xchar lastx, lasty;
+static xchar lastswx, lastswy; /* last swallowed position */
+static int flushing = 0;
+static int delay_flushing = 0;
 
 //{ base_cmap_to_glyph(S_unexplored), NO_GLYPH, { NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH, NO_GLYPH }, 0UL, (genericptr_t)0, 0}
 
@@ -1830,7 +1837,6 @@ int first;
     if (!u.ustuck)
         return;
 
-    static xchar lastx, lasty; /* last swallowed position */
     int swallower, left_ok, rght_ok;
 
     if (first)
@@ -1843,8 +1849,8 @@ int first;
         register int x, y;
 
         /* Clear old location */
-        for (y = lasty - 1; y <= lasty + 1; y++)
-            for (x = lastx - 1; x <= lastx + 1; x++)
+        for (y = lastswy - 1; y <= lastswy + 1; y++)
+            for (x = lastswx - 1; x <= lastswx + 1; x++)
                 if (isok(x, y))
                     clear_glyph_buffer_at(x, y);
     }
@@ -1886,8 +1892,8 @@ int first;
     }
 
     /* Update the swallowed position. */
-    lastx = u.ux;
-    lasty = u.uy;
+    lastswx = u.ux;
+    lastswy = u.uy;
 
     play_environment_ambient_sounds();
 }
@@ -1907,6 +1913,20 @@ int x, y;
     }
 }
 
+void
+reset_display(VOID_ARGS)
+{
+    dela = delagr = FALSE;
+    lastx = lasty = 0;
+    lastswx = lastswy = 0;
+    memset((genericptr_t)gbuf, 0 , sizeof(gbuf));
+    memset((genericptr_t)gbuf_start, 0, sizeof(gbuf_start));
+    memset((genericptr_t)gbuf_stop, 0, sizeof(gbuf_stop));
+    in_cls = 0;
+    flushing = 0;
+    delay_flushing = 0;
+}
+
 /*
  * under_water()
  *
@@ -1917,8 +1937,6 @@ void
 under_water(mode)
 int mode;
 {
-    static xchar lastx, lasty;
-    static boolean dela;
     register int x, y;
 
     /* swallowing has a higher precedence than under water */
@@ -1970,20 +1988,18 @@ void
 under_ground(mode)
 int mode;
 {
-    static boolean dela;
-
     /* swallowing has a higher precedence than under ground */
     if (u.uswallow)
         return;
 
     /* full update */
-    if (mode == 1 || dela) {
+    if (mode == 1 || delagr) {
         cls();
-        dela = FALSE;
+        delagr = FALSE;
 
     /* delayed full update */
     } else if (mode == 2) {
-        dela = TRUE;
+        delagr = TRUE;
         return;
 
     /* limited update */
@@ -2912,164 +2928,11 @@ unsigned long layer_flags;
 
     gbuf[y][x].layers.status_bits = get_m_status_bits(mtmp, loc_is_you, ispeaceful, ispet, isdetected);
 
-    //gbuf[y][x].layers.status_bits = 0UL;
-    //for (int status_mark = STATUS_MARK_PET; status_mark < MAX_STATUS_MARKS; status_mark++)
-    //{
-    //    boolean display_this_status_mark = FALSE;
-    //    switch (status_mark)
-    //    {
-    //    case STATUS_MARK_TOWNGUARD_PEACEFUL:
-    //        if (!loc_is_you && ispeaceful && !ispet && is_watch(mtmp->data))
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_TOWNGUARD_HOSTILE:
-    //        if (!loc_is_you && !ispeaceful && !ispet && is_watch(mtmp->data))
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_PET:
-    //        if (!loc_is_you && ispet)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_PEACEFUL:
-    //        if (!loc_is_you && ispeaceful && !is_watch(mtmp->data))
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_DETECTED:
-    //        if (!loc_is_you && (layer_flags & LFLAGS_M_DETECTED) != 0)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_PILE:
-    //        //if (!loc_is_you && data->map[i][j].layer_flags & LFLAGS_O_PILE)
-    //        //    display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_SATIATED:
-    //        if (loc_is_you && u.uhs == SATIATED)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_HUNGRY:
-    //        if ((loc_is_you && u.uhs == HUNGRY)
-    //            || (!loc_is_you && ispet && mtmp->mextra && EDOG(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty == 0)
-    //            )
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_WEAK:
-    //        if ((loc_is_you && u.uhs == WEAK)
-    //            || (!loc_is_you && ispet && mtmp->mextra && EDOG(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty > 0)
-    //            )
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_FAINTING:
-    //        if (loc_is_you && u.uhs >= FAINTING)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_BURDENED:
-    //        if (loc_is_you && u.carrying_capacity_level == SLT_ENCUMBER)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_STRESSED:
-    //        if (loc_is_you && u.carrying_capacity_level == MOD_ENCUMBER)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_STRAINED:
-    //        if (loc_is_you && u.carrying_capacity_level == HVY_ENCUMBER)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_OVERTAXED:
-    //        if (loc_is_you && u.carrying_capacity_level == EXT_ENCUMBER)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_OVERLOADED:
-    //        if (loc_is_you && u.carrying_capacity_level == OVERLOADED)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_2WEP:
-    //        if (loc_is_you && u.twoweap)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_SKILL:
-    //        if (loc_is_you && u.canadvanceskill)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_SADDLED:
-    //        if (!loc_is_you && (mtmp->worn_item_flags & W_SADDLE) && !Hallucination)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_LOW_HP:
-    //    case STATUS_MARK_CRITICAL_HP:
-    //    {
-    //        if ((loc_is_you && !flags.show_tile_u_hp_bar) || (ispet && !flags.show_tile_pet_hp_bar))
-    //        {
-    //            int relevant_hp_max = loc_is_you ? (Upolyd ? u.mhmax : u.uhpmax) : mtmp->mhpmax;
-    //            int low_threshold = min(relevant_hp_max / 2, max(4, relevant_hp_max / 3));
-    //            if (relevant_hp_max < 4)
-    //                low_threshold = 0;
-    //            int critical_threshold = max(1, min(relevant_hp_max / 4, max(4, relevant_hp_max / 6)));
-    //            if (relevant_hp_max < 2)
-    //                critical_threshold = 0;
-
-    //            int relevant_hp = loc_is_you ? (Upolyd ? u.mh : u.uhp) : mtmp->mhp;
-    //            if (status_mark == STATUS_MARK_CRITICAL_HP && relevant_hp <= critical_threshold)
-    //                display_this_status_mark = TRUE;
-    //            if (status_mark == STATUS_MARK_LOW_HP && relevant_hp <= low_threshold && relevant_hp > critical_threshold)
-    //                display_this_status_mark = TRUE;
-    //        }
-    //        break;
-    //    }
-    //    case STATUS_MARK_SPEC_USED:
-    //        if (!loc_is_you && ispet && any_spec_used(mtmp))
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_TRAPPED:
-    //        if ((loc_is_you && u.utrap) || (!loc_is_you && mtmp->mtrapped))
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_USTUCK:
-    //        if (mtmp == u.ustuck && !u.uswallow)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    case STATUS_MARK_INVENTORY:
-    //        if (!loc_is_you && ispet && !mtmp->ispartymember && count_unworn_items(mtmp->minvent) > 0)
-    //            display_this_status_mark = TRUE;
-    //        break;
-    //    default:
-    //        break;
-    //    }
-
-    //    if (display_this_status_mark)
-    //    {
-    //        gbuf[y][x].layers.status_bits |= 1UL << status_mark;
-
-    //    }
-    //}
-
     /* Conditions */
     gbuf[y][x].layers.condition_bits = get_m_condition_bits(loc_is_you ? &youmonst : mtmp);
 
     /* Buffs */
     get_m_buff_bits(mtmp, gbuf[y][x].layers.buff_bits, loc_is_you);
-
-    //int i;
-    //for (i = 0; i < NUM_BUFF_BIT_ULONGS; i++)
-    //    gbuf[y][x].layers.buff_bits[i] = 0UL;
-
-    //int ulongidx = 0;
-    //unsigned long buffbit = 0UL;
-    //for (int propidx = 1; propidx <= LAST_PROP; propidx++)
-    //{
-    //    if (!property_definitions[propidx].show_buff)
-    //        continue;
-
-    //    long duration = loc_is_you ? (u.uprops[propidx].intrinsic & TIMEOUT) : (long)(mtmp->mprops[propidx] & M_TIMEOUT);
-    //    if (duration == 0L)
-    //        continue;
-
-    //    ulongidx = propidx / 32;
-    //    if (ulongidx >= NUM_BUFF_BIT_ULONGS)
-    //        break;
-
-    //    buffbit = 1UL << (propidx - ulongidx * 32);
-    //    gbuf[y][x].layers.buff_bits[ulongidx] |= buffbit;
-    //}
 
     /* Steed mark (you as small) */
     if (loc_is_you && issteed)
@@ -3386,8 +3249,6 @@ int start, stop, y;
 void
 cls()
 {
-    static boolean in_cls = 0;
-
     if (in_cls)
         return;
     in_cls = TRUE;
@@ -3446,8 +3307,7 @@ int cursor_on_u;
     /* Prevent infinite loops on errors:
      *      flush_screen->print_glyph->impossible->pline->flush_screen
      */
-    static int flushing = 0;
-    static int delay_flushing = 0;
+
     register int x, y;
 
     if (cursor_on_u == -1)
@@ -5212,8 +5072,6 @@ get_current_cmap_type_index()
         return CMAP_UNDEAD_STYLE;
     else if (In_modron_level(&u.uz))
         return CMAP_MODRON;
-    else if (Is_bovine_level(&u.uz))
-        return CMAP_BOVINE;
     else if (In_sokoban(&u.uz))
         return CMAP_SOKOBAN;
     else if (On_W_tower_level(&u.uz))
@@ -5221,7 +5079,7 @@ get_current_cmap_type_index()
     else if (Is_astralevel(&u.uz))
         return CMAP_ASTRAL;
     else if (In_endgame(&u.uz))
-        return CMAP_ASTRAL;
+        return CMAP_ELEMENTAL_PLANES;
     else if (Inhell)
         return CMAP_GEHENNOM;
     else

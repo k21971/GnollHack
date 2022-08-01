@@ -233,6 +233,7 @@ STATIC_DCL void FDECL(print_weapon_skill_line, (struct obj*, BOOLEAN_P, int));
 
 static const char *readchar_queue = "";
 static coord clicklook_cc;
+static boolean special_effect_shown = FALSE;
 
 STATIC_PTR int
 doprev_message(VOID_ARGS)
@@ -365,7 +366,7 @@ void
 savech(ch)
 char ch;
 {
-    if (!in_doagain) {
+    if (!in_doagain && !skip_savech) {
         if (!ch)
             phead = ptail = shead = stail = 0;
         else if (shead < BSIZE)
@@ -2312,17 +2313,6 @@ wiz_save_glyph2tiles(VOID_ARGS) /* Save a csv file for tile data */
             case GLYPH_BODY_OFF:
                 header = "MON_BODY_OFF";
                 break;
-#if 0
-            case GLYPH_PET_OFF:
-                header = "MON_PET_OFF";
-                break;
-            case GLYPH_DETECT_OFF:
-                header = "MON_DETECT_OFF";
-                break;
-            case GLYPH_RIDDEN_OFF:
-                header = "MON_RIDDEN_OFF";
-                break;
-#endif
             case GLYPH_ATTACK_OFF:
                 header = "MON_ATTACK_OFF";
                 break;
@@ -2356,17 +2346,6 @@ wiz_save_glyph2tiles(VOID_ARGS) /* Save a csv file for tile data */
             case GLYPH_FEMALE_MON_OFF:
                 header = "FEMALE_MON_OFF";
                 break;
-#if 0
-            case GLYPH_FEMALE_PET_OFF:
-                header = "FEMALE_PET_MON_OFF";
-                break;
-            case GLYPH_FEMALE_DETECT_OFF:
-                header = "FEMALE_DETECT_MON_OFF";
-                break;
-            case GLYPH_FEMALE_RIDDEN_OFF:
-                header = "FEMALE_RIDDEN_MON_OFF";
-                break;
-#endif
             case GLYPH_FEMALE_BODY_OFF:
                 header = "FEMALE_BODY_MON_OFF";
                 break;
@@ -3037,7 +3016,7 @@ walking_on_water()
 {
     if (u.uinwater || Levitation || Flying)
         return FALSE;
-    return (boolean) (Wwalking
+    return (boolean) (Walks_on_water
                       && (is_pool(u.ux, u.uy) || is_lava(u.ux, u.uy)));
 }
 
@@ -3380,7 +3359,7 @@ basics_enlightenment(mode, final)
 int mode UNUSED;
 int final;
 {
-    static char Power[] = "mana";
+    static const char Power[] = "mana";
     char buf[BUFSZ];
     int pw = u.uen, hp = (Upolyd ? u.mh : u.uhp),
         pwmax = u.uenmax, hpmax = (Upolyd ? u.mhmax : u.uhpmax);
@@ -3941,38 +3920,6 @@ int final;
      * TODO?  Maybe merge wielding line and skill line into one sentence.
      */
     print_weapon_skill_line(uwep, TRUE, final);
-#if 0
-    if ((wtype = uwep_skill_type()) != P_NONE) 
-    {
-        if (wtype == P_MARTIAL_ARTS)
-            wtype = P_BARE_HANDED_COMBAT; /* Martial arts is separately below */
-
-        char sklvlbuf[20];
-        int sklvl = P_SKILL_LEVEL(wtype);
-        boolean hav = (sklvl != P_UNSKILLED && sklvl != P_SKILLED);
-
-        if (sklvl == P_ISRESTRICTED)
-            Strcpy(sklvlbuf, "no");
-        else
-            (void) lcase(skill_level_name(wtype, sklvlbuf, FALSE));
-        /* "you have no/basic/expert/master/grand-master skill with <skill>"
-           or "you are unskilled/skilled in <skill>" */
-
-        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
-        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
-
-        Sprintf(buf, "%s %s %s (%s%d to hit and %s%d to damage)", sklvlbuf,
-                hav ? "skill with" : "in", skill_name(wtype, TRUE), hitbonus >=0 ? "+" : "", hitbonus, dmgbonus >= 0 ? "+" : "", dmgbonus);
-
-        if (can_advance(wtype, FALSE))
-            Sprintf(eos(buf), " and %s that",
-                    !final ? "can enhance" : "could have enhanced");
-        if (hav)
-            you_have(buf, "");
-        else
-            you_are(buf, "");
-    }
-#endif
 
     if (!uwep && P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_UNSKILLED)
     {
@@ -4011,7 +3958,7 @@ int final;
             wtype = P_BARE_HANDED_COMBAT;
 
         char mbuf[BUFSZ];
-        strcpy(mbuf, "");
+        Strcpy(mbuf, "");
         if (martial_bonus())
         {
             int multihitchance = martial_arts_multishot_percentage_chance(limited_skill_level(wtype, FALSE, TRUE));
@@ -4477,7 +4424,7 @@ int final;
         }
     }
     /* actively walking on water handled earlier as a status condition */
-    if (Wwalking && !walking_on_water())
+    if (Wwalking)
         you_can("walk on water", from_what(WATER_WALKING));
     /* actively swimming (in water but not under it) handled earlier */
     if (Swimming && (Underwater || !u.uinwater))
@@ -5596,7 +5543,7 @@ struct ext_func_tab extcmdlist[] = {
     { 'd', "drop", "drop an item", dodrop, SINGLE_OBJ_CMD_GENERAL, 0, getobj_drop_types, "drop"},
     { '%', "dropmany", "drop many items", dodropmany },
     { 'D', "droptype", "drop specific item types", doddrop },
-    { 'e', "eat", "eat something", doeat, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_comestibles, "eat" },
+    { 'e', "eat", "eat something", doeat, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_allobj, "eat" },
     { 'E', "engrave", "engrave writing on the floor", doengrave, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_styluses, "write with" },
     { '\0', "enhance", "advance or check weapon and spell skills",
             enhance_weapon_skill, IFBURIED | AUTOCOMPLETE },
@@ -6814,6 +6761,8 @@ boolean condition;
     wait_synch();
 }
 
+static boolean backed_dir_cmd = FALSE;
+
 /* called at startup and after number_pad is twiddled */
 void
 reset_commands(initial)
@@ -6831,17 +6780,24 @@ boolean initial;
     const struct ext_func_tab *cmdtmp;
     boolean flagtemp;
     int c, i, updated = 0;
-    static boolean backed_dir_cmd = FALSE;
 
     if (initial)
     {
-        updated = 1;
+        backed_dir_cmd = FALSE;
+        en_via_menu = FALSE;
+        special_effect_shown = FALSE;
+        timed_occ_fn = 0;
+        readchar_queue = "";
+        memset((genericptr_t)&clicklook_cc, 0, sizeof(clicklook_cc));
+        struct ext_func_tab* efp;
+        for (efp = extcmdlist; efp->ef_txt; efp++)
+            efp->bound_key = 0;
         Cmd.num_pad = FALSE;
         Cmd.pcHack_compat = Cmd.phone_layout = Cmd.swap_yz = FALSE;
         for (i = 0; i < SIZE(spkeys_binds); i++)
             Cmd.spkeys[spkeys_binds[i].nhkf] = spkeys_binds[i].key;
         commands_init();
-
+        updated = 1;
     }
     else
     {
@@ -7378,7 +7334,6 @@ register char *cmd;
     return;
 }
 
-static boolean special_effect_shown = FALSE;
 
 STATIC_OVL void
 check_gui_special_effect()
@@ -7635,7 +7590,8 @@ const char *msg;
      */
     dothat = "do that";
     how = " at"; /* for "<action> at yourself"; not used for up/down */
-    switch (spkey) {
+    switch (spkey) 
+    {
     case NHKF_NOPICKUP:
         dothat = "move";
         break;
@@ -7668,11 +7624,14 @@ const char *msg;
        note: '-' for hands (inventory form of 'self') is not handled here */
     if (prefixhandling
         && (sym == Cmd.spkeys[NHKF_GETDIR_SELF]
-            || (Cmd.num_pad && sym == Cmd.spkeys[NHKF_GETDIR_SELF2]))) {
+            || (Cmd.num_pad && sym == Cmd.spkeys[NHKF_GETDIR_SELF2]))) 
+    {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         Sprintf(buf, "You can't %s%s yourself.", dothat, how);
     /* for movement prefix followed by up or down */
-    } else if (prefixhandling && (sym == '<' || sym == '>')) {
+    } 
+    else if (prefixhandling && (sym == '<' || sym == '>')) 
+    {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         Sprintf(buf, "You can't %s %s.", dothat,
                 /* was "upwards" and "downwards", but they're considered
@@ -7682,8 +7641,10 @@ const char *msg;
 
     /* if '!cmdassist', display via pline() and we're done (note: asking
        for help at getdir() prompt forces cmdassist for this operation) */
-    if (!viawindow) {
-        if (prefixhandling) {
+    if (!viawindow) 
+    {
+        if (prefixhandling) 
+        {
             if (!*buf)
                 Sprintf(buf, "Invalid direction for '%s' prefix.",
                         visctrl(Cmd.spkeys[spkey]));
@@ -7694,72 +7655,88 @@ const char *msg;
         return FALSE;
     }
 
-    win = create_nhwindow(NHW_TEXT);
-    if (!win)
-        return FALSE;
+    /* open_special_view may open a more appropriate screen; if not, do a normal window */
+    struct special_view_info info = { 0 };
+    info.viewtype = SPECIAL_VIEW_HELP_DIR;
+    info.text = *buf ? buf : msg;
+    info.title = "Invalid Direction";
+    if (!open_special_view(info))
+    {
 
-    if (*buf) {
-        /* show bad-prefix message instead of general invalid-direction one */
-        putstr(win, 0, buf);
-        putstr(win, 0, "");
-    } else if (msg) {
-        Sprintf(buf, "cmdassist: %s", msg);
-        putstr(win, 0, buf);
-        putstr(win, 0, "");
-    }
+        win = create_nhwindow(NHW_TEXT);
+        if (!win)
+            return FALSE;
 
-    if (!prefixhandling && (letter(sym) || sym == '[')) {
-        /* '[': old 'cmdhelp' showed ESC as ^[ */
-        sym = highc(sym); /* @A-Z[ (note: letter() accepts '@') */
-        ctrl = (sym - 'A') + 1; /* 0-27 (note: 28-31 aren't applicable) */
-        if ((explain = dowhatdoes_core(ctrl, buf2)) != 0
-            && (!index(wiz_only_list, sym) || wizard)) {
-            Sprintf(buf, "Are you trying to use ^%c%s?", sym,
-                    index(wiz_only_list, sym) ? ""
-                        : " as specified in the Guidebook");
-            putstr(win, 0, buf);
-            putstr(win, 0, "");
-            putstr(win, 0, explain);
-            putstr(win, 0, "");
-            putstr(win, 0,
-                  "To use that command, hold down the <Ctrl> key as a shift");
-            Sprintf(buf, "and press the <%c> key.", sym);
+        if (*buf) 
+        {
+            /* show bad-prefix message instead of general invalid-direction one */
             putstr(win, 0, buf);
             putstr(win, 0, "");
         }
-    }
+        else if (msg) 
+        {
+            Sprintf(buf, "cmdassist: %s", msg);
+            putstr(win, 0, buf);
+            putstr(win, 0, "");
+        }
 
-    Sprintf(buf, "Valid direction keys%s%s%s are:",
+        if (!prefixhandling && (letter(sym) || sym == '[')) 
+        {
+            /* '[': old 'cmdhelp' showed ESC as ^[ */
+            sym = highc(sym); /* @A-Z[ (note: letter() accepts '@') */
+            ctrl = (sym - 'A') + 1; /* 0-27 (note: 28-31 aren't applicable) */
+            if ((explain = dowhatdoes_core(ctrl, buf2)) != 0
+                && (!index(wiz_only_list, sym) || wizard)) 
+            {
+                Sprintf(buf, "Are you trying to use ^%c%s?", sym,
+                    index(wiz_only_list, sym) ? ""
+                    : " as specified in the Guidebook");
+                putstr(win, 0, buf);
+                putstr(win, 0, "");
+                putstr(win, 0, explain);
+                putstr(win, 0, "");
+                putstr(win, 0,
+                    "To use that command, hold down the <Ctrl> key as a shift");
+                Sprintf(buf, "and press the <%c> key.", sym);
+                putstr(win, 0, buf);
+                putstr(win, 0, "");
+            }
+        }
+
+        Sprintf(buf, "Valid direction keys%s%s%s are:",
             prefixhandling ? " to " : "", prefixhandling ? dothat : "",
             NODIAG(u.umonnum) ? " in your current form" : "");
-    putstr(win, 0, buf);
-    show_direction_keys(win, !prefixhandling ? '.' : ' ', NODIAG(u.umonnum));
+        putstr(win, 0, buf);
+        show_direction_keys(win, !prefixhandling ? '.' : ' ', NODIAG(u.umonnum));
 
-    if (!prefixhandling || spkey == NHKF_NOPICKUP) {
-        /* NOPICKUP: unlike the other prefix keys, 'm' allows up/down for
-           stair traversal; we won't get here when "m<" or "m>" has been
-           given but we include up and down for 'm'+invalid_direction;
-           self is excluded as a viable direction for every prefix */
-        putstr(win, 0, "");
-        putstr(win, 0, "          <  up");
-        putstr(win, 0, "          >  down");
-        if (!prefixhandling) {
-            int selfi = Cmd.num_pad ? NHKF_GETDIR_SELF2 : NHKF_GETDIR_SELF;
+        if (!prefixhandling || spkey == NHKF_NOPICKUP) 
+        {
+            /* NOPICKUP: unlike the other prefix keys, 'm' allows up/down for
+               stair traversal; we won't get here when "m<" or "m>" has been
+               given but we include up and down for 'm'+invalid_direction;
+               self is excluded as a viable direction for every prefix */
+            putstr(win, 0, "");
+            putstr(win, 0, "          <  up");
+            putstr(win, 0, "          >  down");
+            if (!prefixhandling) {
+                int selfi = Cmd.num_pad ? NHKF_GETDIR_SELF2 : NHKF_GETDIR_SELF;
 
-            Sprintf(buf,   "       %4s  direct at yourself",
+                Sprintf(buf, "       %4s  direct at yourself",
                     visctrl(Cmd.spkeys[selfi]));
-            putstr(win, 0, buf);
+                putstr(win, 0, buf);
+            }
         }
-    }
 
-    if (msg) {
-        /* non-null msg means that this wasn't an explicit user request */
-        putstr(win, 0, "");
-        putstr(win, 0,
-               "(Suppress this message with !cmdassist in config file.)");
+        if (msg) 
+        {
+            /* non-null msg means that this wasn't an explicit user request */
+            putstr(win, 0, "");
+            putstr(win, 0,
+                "(Suppress this message with !cmdassist in config file.)");
+        }
+        display_nhwindow(win, FALSE);
+        destroy_nhwindow(win);
     }
-    display_nhwindow(win, FALSE);
-    destroy_nhwindow(win);
     return TRUE;
 }
 

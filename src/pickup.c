@@ -33,11 +33,21 @@ STATIC_DCL int FDECL(lift_object, (struct obj *, struct obj *, long *,
                                    BOOLEAN_P));
 STATIC_DCL boolean FDECL(mbag_explodes, (struct obj *, struct obj*, int));
 STATIC_DCL long FDECL(boh_loss, (struct obj *container, int));
+STATIC_PTR int FDECL(in_container_core, (struct obj*, BOOLEAN_P));
+STATIC_PTR int FDECL(out_container_core, (struct obj*, BOOLEAN_P));
+STATIC_PTR int FDECL(move_container_core, (struct obj*, BOOLEAN_P));
+STATIC_PTR int FDECL(out_container_and_drop_core, (struct obj*, BOOLEAN_P));
+STATIC_PTR int FDECL(pickup_and_in_container_core, (struct obj*, BOOLEAN_P));
 STATIC_PTR int FDECL(in_container, (struct obj*));
 STATIC_PTR int FDECL(out_container, (struct obj*));
 STATIC_PTR int FDECL(move_container, (struct obj*));
 STATIC_PTR int FDECL(out_container_and_drop, (struct obj*));
 STATIC_PTR int FDECL(pickup_and_in_container, (struct obj*));
+STATIC_PTR int FDECL(in_container_nobot, (struct obj*));
+STATIC_PTR int FDECL(out_container_nobot, (struct obj*));
+STATIC_PTR int FDECL(move_container_nobot, (struct obj*));
+STATIC_PTR int FDECL(out_container_and_drop_nobot, (struct obj*));
+STATIC_PTR int FDECL(pickup_and_in_container_nobot, (struct obj*));
 STATIC_DCL void FDECL(removed_from_icebox, (struct obj *));
 STATIC_DCL long FDECL(mbag_item_gone, (int, struct obj *));
 STATIC_DCL void FDECL(explain_container_prompt, (BOOLEAN_P));
@@ -153,7 +163,7 @@ int *menu_on_demand;
     char qbuf[QBUFSZ];
     char ebuf[QBUFSZ];
     boolean m_seen;
-    int itemcount, bcnt, ucnt, ccnt, xcnt, ocnt;
+    int itemcount, bcnt, ucnt, ccnt, xcnt, ocnt, tcnt;
 
     oclasses[oclassct = 0] = '\0';
     *one_at_a_time = *everything = m_seen = FALSE;
@@ -176,10 +186,10 @@ int *menu_on_demand;
     }
     if (itemcount && menu_on_demand)
         ilets[iletct++] = 'm';
-    if (count_unpaid(objs))
+    if (count_unpaid(objs, here))
         ilets[iletct++] = 'u';
 
-    tally_BUCX(objs, here, &bcnt, &ucnt, &ccnt, &xcnt, &ocnt);
+    tally_BUCX(objs, here, &bcnt, &ucnt, &ccnt, &xcnt, &ocnt, &tcnt);
     if (bcnt)
         ilets[iletct++] = 'B';
     if (ucnt)
@@ -190,7 +200,12 @@ int *menu_on_demand;
         ilets[iletct++] = 'X';
     ilets[iletct] = '\0';
 
-    if (iletct > 1) {
+    if (tcnt == 1)
+    {
+        *everything = TRUE;
+    }
+    else if (iletct > 1) 
+    {
         const char *where = 0;
         char sym, oc_of_sym, *p;
 
@@ -442,7 +457,7 @@ struct obj *obj;
     /* if unpaid is expected and obj isn't unpaid, reject (treat a container
        holding any unpaid object as unpaid even if isn't unpaid itself) */
     if (shop_filter && !obj->unpaid
-        && !(Has_contents(obj) && count_unpaid(obj->cobj) > 0))
+        && !(Has_contents(obj) && count_unpaid(obj->cobj, FALSE) > 0))
         return FALSE;
     /* check for particular bless/curse state */
     if (bucx_filter) {
@@ -1104,35 +1119,36 @@ int how;               /* type of query */
     boolean do_blessed = FALSE, do_cursed = FALSE, do_uncursed = FALSE,
             do_buc_unknown = FALSE;
     int num_buc_types = 0;
+    int objcnt = count_objects(olist, (qflags & BY_NEXTHERE) != 0);
 
     *pick_list = (menu_item *) 0;
     if (!olist)
         return 0;
-    if ((qflags & UNPAID_TYPES) && count_unpaid(olist))
+    if ((qflags & UNPAID_TYPES) && count_unpaid(olist, (qflags & BY_NEXTHERE) != 0))
         do_unpaid = TRUE;
     if (qflags & WORN_TYPES)
         ofilter = is_worn;
-    if ((qflags & BUC_BLESSED) && count_buc(olist, BUC_BLESSED, ofilter)) {
+    if ((qflags & BUC_BLESSED) && count_buc(olist, BUC_BLESSED, ofilter, (qflags & BY_NEXTHERE) != 0)) {
         do_blessed = TRUE;
         num_buc_types++;
     }
-    if ((qflags & BUC_CURSED) && count_buc(olist, BUC_CURSED, ofilter)) {
+    if ((qflags & BUC_CURSED) && count_buc(olist, BUC_CURSED, ofilter, (qflags & BY_NEXTHERE) != 0)) {
         do_cursed = TRUE;
         num_buc_types++;
     }
-    if ((qflags & BUC_UNCURSED) && count_buc(olist, BUC_UNCURSED, ofilter)) {
+    if ((qflags & BUC_UNCURSED) && count_buc(olist, BUC_UNCURSED, ofilter, (qflags & BY_NEXTHERE) != 0)) {
         do_uncursed = TRUE;
         num_buc_types++;
     }
-    if ((qflags & BUC_UNKNOWN) && count_buc(olist, BUC_UNKNOWN, ofilter)) {
+    if ((qflags & BUC_UNKNOWN) && count_buc(olist, BUC_UNKNOWN, ofilter, (qflags & BY_NEXTHERE) != 0)) {
         do_buc_unknown = TRUE;
         num_buc_types++;
     }
 
     ccount = count_categories(olist, qflags);
     /* no point in actually showing a menu for a single category */
-    if (ccount == 1 && !do_unpaid && num_buc_types <= 1
-        && !(qflags & BILLED_TYPES)) {
+    if ((objcnt == 1 || ccount == 1) && !(qflags & BILLED_TYPES)) 
+    {
         for (curr = olist; curr; curr = FOLLOW(curr, qflags)) {
             if (ofilter && !(*ofilter)(curr))
                 continue;
@@ -1140,7 +1156,7 @@ int how;               /* type of query */
         }
         if (curr) {
             *pick_list = (menu_item *) alloc(sizeof(menu_item));
-            (*pick_list)->item.a_int = curr->oclass;
+            (*pick_list)->item.a_int = do_unpaid ? 'u' : curr->oclass;
             return 1;
         } else {
             debugpline0("query_category: no single object match");
@@ -2459,7 +2475,22 @@ struct obj* obj, *container;
 /* Returns: -1 to stop, 1 item was inserted, 0 item was not inserted. */
 STATIC_PTR int
 in_container(obj)
+register struct obj* obj;
+{
+    return in_container_core(obj, TRUE);
+}
+
+STATIC_PTR int
+in_container_nobot(obj)
+register struct obj* obj;
+{
+    return in_container_core(obj, FALSE);
+}
+
+STATIC_PTR int
+in_container_core(obj, dobot)
 register struct obj *obj;
+boolean dobot;
 {
     if (!current_container) 
     {
@@ -2714,7 +2745,8 @@ register struct obj *obj;
      * the encumbrance to disappear from the status, so just always
      * update status immediately.
      */
-    bot();
+    if(dobot)
+        bot();
     return (current_container ? 1 : -1);
 }
 
@@ -2735,12 +2767,27 @@ STATIC_PTR int
 move_container(obj)
 register struct obj* obj;
 {
+    return move_container_core(obj, TRUE);
+}
+
+STATIC_PTR int
+move_container_nobot(obj)
+register struct obj* obj;
+{
+    return move_container_core(obj, FALSE);
+}
+
+STATIC_PTR int
+move_container_core(obj, dobot)
+register struct obj* obj;
+boolean dobot;
+{
     if (!obj || !move_target_container)
         return -1;
 
     obj->nomerge = 1;
     int res = 0;
-    if ((res = out_container(obj)) <= 0)
+    if ((res = out_container_core(obj, dobot)) <= 0)
     {
         obj->nomerge = 0;
         return res;
@@ -2759,7 +2806,7 @@ register struct obj* obj;
 
     struct obj* savedcontainer = current_container;
     current_container = move_target_container;
-    res = in_container(obj);
+    res = in_container_core(obj, dobot);
     current_container = savedcontainer;
     return res;
 }
@@ -2769,12 +2816,27 @@ STATIC_PTR int
 out_container_and_drop(obj)
 register struct obj* obj;
 {
+    return out_container_and_drop_core(obj, TRUE);
+}
+
+STATIC_PTR int
+out_container_and_drop_nobot(obj)
+register struct obj* obj;
+{
+    return out_container_and_drop_core(obj, FALSE);
+}
+
+STATIC_PTR int
+out_container_and_drop_core(obj, dobot)
+register struct obj* obj;
+boolean dobot;
+{
     if (!obj)
         return -1;
 
     obj->nomerge = 1;
     int res = 0;
-    if ((res = out_container(obj)) <= 0)
+    if ((res = out_container_core(obj, dobot)) <= 0)
     {
         obj->nomerge = 0;
         return res;
@@ -2796,6 +2858,21 @@ STATIC_PTR int
 pickup_and_in_container(obj)
 register struct obj* obj;
 {
+    return pickup_and_in_container_core(obj, TRUE);
+}
+
+STATIC_PTR int
+pickup_and_in_container_nobot(obj)
+register struct obj* obj;
+{
+    return pickup_and_in_container_core(obj, FALSE);
+}
+
+STATIC_PTR int
+pickup_and_in_container_core(obj, dobot)
+register struct obj* obj;
+boolean dobot;
+{
     if (!obj)
         return -1;
 
@@ -2812,9 +2889,7 @@ register struct obj* obj;
     if (obj->where != OBJ_INVENT)
         return 0;
 
-
-    res = in_container(obj);
-
+    res = in_container_core(obj, dobot);
     return res;
 }
 
@@ -2822,7 +2897,22 @@ register struct obj* obj;
 /* Returns: -1 to stop, 1 item was removed, 0 item was not removed. */
 STATIC_PTR int
 out_container(obj)
+register struct obj* obj;
+{
+    return out_container_core(obj, TRUE);
+}
+
+STATIC_PTR int
+out_container_nobot(obj)
+register struct obj* obj;
+{
+    return out_container_core(obj, FALSE);
+}
+
+STATIC_PTR int
+out_container_core(obj, dobot)
 register struct obj *obj;
+boolean dobot;
 {
     register struct obj *otmp;
     boolean is_gold = (obj->oclass == COIN_CLASS);
@@ -2881,7 +2971,7 @@ register struct obj *obj;
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_PICK_UP);
         delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
     }
-    if (is_gold) 
+    if (dobot && is_gold) 
     {
         bot(); /* update character's gold piece count immediately */
     }
@@ -2955,7 +3045,7 @@ boolean makecat, givemsg;
         if (livecat) 
         {
             livecat->mpeaceful = 1;
-            set_malign(livecat);
+            set_mhostility(livecat);
             if (givemsg) 
             {
                 if (!canspotmon(livecat))
@@ -3627,11 +3717,15 @@ struct obj* other_container UNUSED;
             for (otmp = current_container->cobj; otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
-                res = out_container(otmp);
+                res = out_container_nobot(otmp);
                 if (res < 0)
+                {
+                    bot();
                     break;
+                }
                 n_looted += res;
             }
+            bot();
             if (res == -2 && flags.knapsack_prompt)
                 more_action = handle_knapsack_full();
             break;
@@ -3639,44 +3733,60 @@ struct obj* other_container UNUSED;
             for (otmp = invent; otmp && current_container; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
-                res = in_container(otmp);
+                res = in_container_nobot(otmp);
                 if (res < 0)
+                {
+                    bot();
                     break;
+                }
                 n_looted += res;
             }
+            bot();
             break;
         case 2:
             current_container->cknown = 1;
             for (otmp = current_container->cobj; otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
-                res = move_container(otmp);
+                res = move_container_nobot(otmp);
                 if (res < 0)
+                {
+                    bot();
                     break;
+                }
                 n_looted += res;
             }
+            bot();
             break;
         case 3:
             current_container->cknown = 1;
             for (otmp = current_container->cobj; otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
-                res = move_container(otmp);
+                res = move_container_nobot(otmp);
                 if (res < 0)
+                {
+                    bot();
                     break;
+                }
                 n_looted += res;
             }
+            bot();
             break;
         case 4:
             current_container->cknown = 1;
             for (otmp = current_container->cobj; otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
-                res = out_container_and_drop(otmp);
+                res = out_container_and_drop_nobot(otmp);
                 if (res < 0)
+                {
+                    bot();
                     break;
+                }
                 n_looted += res;
             }
+            bot();
             break;
         case 5:
             current_container->cknown = 1;
@@ -3685,9 +3795,13 @@ struct obj* other_container UNUSED;
                 otmp2 = otmp->nexthere;
                 res = pickup_and_in_container(otmp);
                 if (res < 0)
+                {
+                    bot();
                     break;
+                }
                 n_looted += res;
             }
+            bot();
             break;
         default:
             break;
@@ -3730,24 +3844,27 @@ struct obj* other_container UNUSED;
                 switch (command_id)
                 {
                 case 0:
-                    res = out_container(otmp);
+                    res = out_container_nobot(otmp);
                     if (res == -2 && flags.knapsack_prompt)
+                    {
+                        bot();
                         more_action = handle_knapsack_full();
+                    }
                     break;
                 case 1:
-                    res = in_container(otmp);
+                    res = in_container_nobot(otmp);
                     break;
                 case 2:
-                    res = move_container(otmp);
+                    res = move_container_nobot(otmp);
                     break;
                 case 3:
-                    res = move_container(otmp);
+                    res = move_container_nobot(otmp);
                     break;
                 case 4:
-                    res = out_container_and_drop(otmp);
+                    res = out_container_and_drop_nobot(otmp);
                     break;
                 case 5:
-                    res = pickup_and_in_container(otmp);
+                    res = pickup_and_in_container_nobot(otmp);
                     break;
                 default:
                     res = -1;
@@ -3775,6 +3892,7 @@ struct obj* other_container UNUSED;
             }
             free((genericptr_t) pick_list);
             context.quit_pressed = FALSE;
+            bot();
         }
     }
 

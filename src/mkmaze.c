@@ -186,7 +186,7 @@ int x1, y1, x2, y2;
      * so even though this table says VWALL, we actually leave whatever
      * typ was there alone.
      */
-    static xchar spine_array[16] = { VWALL, HWALL,    HWALL,    HWALL,
+    static const xchar spine_array[16] = { VWALL, HWALL,    HWALL,    HWALL,
                                      VWALL, TRCORNER, TLCORNER, TDWALL,
                                      VWALL, BRCORNER, BLCORNER, TUWALL,
                                      VWALL, TLWALL,   TRWALL,   CROSSWALL };
@@ -644,18 +644,6 @@ fixup_special()
 
         create_secret_door(croom, W_ANY);
     } 
-#if 0
-    else if (on_level(&u.uz, &orcus_level)) {
-        struct monst *mtmp, *mtmp2;
-
-        /* it's a ghost town, get rid of shopkeepers */
-        for (mtmp = fmon; mtmp; mtmp = mtmp2) {
-            mtmp2 = mtmp->nmon;
-            if (mtmp->isshk)
-                mongone(mtmp);
-        }
-    } 
-#endif
     else if (on_level(&u.uz, &baalzebub_level)) {
         /* custom wallify the "beetle" potion of the level */
         baalz_fixup();

@@ -175,9 +175,6 @@ int mndx;
     case PM_VAMPIRE:
     case PM_VAMPIRE_LORD:
     case PM_VAMPIRE_MAGE:
-#if 0 /* DEFERRED */
-    case PM_VAMPIRE_MAGE:
-#endif
     case PM_HUMAN_ZOMBIE:
     case PM_HUMAN_MUMMY:
         mndx = PM_HUMAN;
@@ -2146,23 +2143,6 @@ struct monst *mtmp;
      * and human weights.  Corpseless monsters are given a capacity
      * proportional to their size instead of weight.
      */
-
-#if 0
-    if (!mtmp->data->cwt)
-        maxload = (MAX_CARR_CAP * (long) mtmp->data->msize) / MZ_HUMAN;
-    else if (!strongmonst(mtmp->data)
-             || (strongmonst(mtmp->data) && (mtmp->data->cwt > WT_HUMAN)))
-        maxload = (MAX_CARR_CAP * (long) mtmp->data->cwt) / WT_HUMAN;
-    else
-        maxload = MAX_CARR_CAP; //strong monsters w/cwt <= WT_HUMAN
-
-    if (!strongmonst(mtmp->data))
-        maxload /= 2;
-
-    if (maxload < 1)
-        maxload = 1;
-#endif
-
     carrcap = 50 * (m_acurr(mtmp, A_STR) + m_acurr(mtmp, A_CON)) + 50;
     if (mtmp->data->mlet == S_NYMPH)
         carrcap = MAX_CARR_CAP;
@@ -3829,15 +3809,15 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
 
 cleanup:
     /* punish bad behaviour */
-    if (is_human(mdat) && !is_undead(mdat) && !is_were(mdat) 
+    if (is_human(mdat) && !is_not_living(mdat) && !is_were(mdat) 
         && !(mtmp->ispriest && has_epri(mtmp) && EPRI(mtmp)->shralign == A_NONE) /* Killing Moloch's (high) priests do not make you murderer */
-        && (!always_hostile(mdat) && mtmp->malign <= 0)
+        && (!always_hostile(mdat) && mtmp->mhostility <= 0)
         && (mndx < PM_ARCHAEOLOGIST || mndx > PM_WIZARD)
         && u.ualign.type != A_CHAOTIC) 
     {
         HTelepat &= ~INTRINSIC;
         HBlind_telepat &= ~INTRINSIC;
-        You("murderer!");
+        You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "murderer!");
         if (Blind && !(Blind_telepat || Unblind_telepat || Detect_monsters))
             see_monsters(); /* Can't sense monsters any more. */
         luck_change += -2;
@@ -3912,8 +3892,8 @@ cleanup:
     else if (is_peaceful(mtmp))
         adjalign(-5);
 
-    /* malign was already adjusted for u.ualign.type and randomization */
-    adjalign(mtmp->malign);
+    /* mhostility was already adjusted for u.ualign.type and randomization */
+    adjalign(mtmp->mhostility);
 }
 
 /* changes the monster into a stone monster of the same type

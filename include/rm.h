@@ -557,8 +557,8 @@ enum cmap_types {
     CMAP_ELEMENTAL_PLANES = 5,
     CMAP_ASTRAL = 6,
     CMAP_GEHENNOM_CAVERNOUS = 7,
-    CMAP_MODRON = 8,
-    CMAP_BOVINE = 9,
+    CMAP_GARDEN = 8,
+    CMAP_MODRON = 9,
     CMAP_CITYSCAPE = 10,
     CMAP_SEWERS = 11,
     CMAP_MAZE = 12,
@@ -869,6 +869,7 @@ extern struct symsetentry symset[NUM_GRAPHICS]; /* from drawing.c */
 #define L_INDESTRUCTIBLE    0x0100  /* Currently used just for doors */
 #define L_USES_UP_KEY       0x0200  /* Currently used just for doors */
 #define L_NON_PASSDOOR      0x0400  /* Currently used just for doors */
+#define L_INITIALLY_UNLIT   0x0800
 
 
 /*
@@ -1169,7 +1170,9 @@ extern dlevel_t level; /* structure describing the current level */
 #define defsym_to_trap(d) ((d) -S_arrow_trap + 1)
 
 #define OBJ_AT(x, y) (level.objects[x][y] != (struct obj *) 0)
-/*
+#define o_at(x, y) (OBJ_AT(x, y) ? level.objects[x][y] : (struct obj *) 0)
+ 
+ /*
  * Macros for encapsulation of level.monsters references.
  */
 #define MON_AT(x, y)                            \

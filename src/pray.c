@@ -2206,6 +2206,7 @@ dosacrifice()
     boolean highaltar, molochaltar, godlessaltar;
     aligntyp altaralign = a_align(u.ux, u.uy);
     int altarsubtyp = levl[u.ux][u.uy].subtyp;
+    int luck_change = 0;
 
     if (!on_altar() || u.uswallow) 
     {
@@ -2259,7 +2260,6 @@ dosacrifice()
 
         if (your_race(ptr)) 
         {
-            int luck_change = 0;
             if (is_demon(youmonst.data)) 
             {
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find the idea very satisfying.");
@@ -2535,7 +2535,6 @@ dosacrifice()
         }
     } /* real Amulet */
 
-    int luck_change = 0;
     if (otmp->otyp == FAKE_AMULET_OF_YENDOR)
     {
         if (!highaltar && !otmp->known)
@@ -3289,7 +3288,7 @@ doturn()
                     if (u.ulevel >= xlev && !check_magic_resistance_and_inflict_damage(mtmp, (struct obj*)0, (struct monst*)0, u.ulevel, 0, 0, NOTELL)) {
                         if (u.ualign.type == A_CHAOTIC) {
                             mtmp->mpeaceful = 1;
-                            set_malign(mtmp);
+                            set_mhostility(mtmp);
                             newsym(mtmp->mx, mtmp->my);
                         } else { /* damn them */
                             killed(mtmp);

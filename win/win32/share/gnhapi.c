@@ -323,11 +323,6 @@ int LibZapGlyphToCornerGlyph(int adjglyph, unsigned long adjflags, int source_di
     return zap_glyph_to_corner_glyph(adjglyph, adjflags, source_dir);
 }
 
-void
-LibSwitchDemoVersion(int state)
-{
-    In_Demo = (state != 0);
-}
 
 int
 LibChmod(const char* filename, unsigned int mode)
@@ -338,34 +333,85 @@ LibChmod(const char* filename, unsigned int mode)
 void
 LibSaveAndRestoreSavedGame(void)
 {
-    if (dosave0(TRUE))
+    if (!CasualMode && program_state.something_worth_saving 
+        && !program_state.gameover && !program_state.panicking 
+        && !program_state.exiting && !program_state.freeing_dynamic_data)
     {
-        issue_gui_command(GUI_CMD_WAIT_FOR_RESUME);
-        if (!load_saved_game(2))
+        if (dosave0(TRUE))
         {
-            u.uhp = -1; /* universal game's over indicator */
-            /* make sure they see the Saving message */
-            display_nhwindow(WIN_MESSAGE, TRUE);
-            exit_nhwindows("Cannot continue the game...");
-            nh_terminate(EXIT_SUCCESS);
+            issue_gui_command(GUI_CMD_WAIT_FOR_RESUME);
+            if (!load_saved_game(2))
+            {
+                u.uhp = -1; /* universal game's over indicator */
+                /* make sure they see the Saving message */
+                display_nhwindow(WIN_MESSAGE, TRUE);
+                exit_nhwindows("Cannot continue the game...");
+                nh_terminate(EXIT_SUCCESS);
+            }
         }
+        else
+            (void)doredraw();
     }
-    else
-        (void)doredraw();
+}
+
+void
+LibTallyRealTime()
+{
+    tally_realtime();
 }
 
 int GnollHackStart(cmdlineargs)
 char* cmdlineargs;
 {
+#define MAX_CMD_PARAMS 16
 
-	char* params[2] = { 0 };
+    char cmdbuf[BUFSZ + MAX_CMD_PARAMS * PL_NSIZ];
+    Strcpy(cmdbuf, cmdlineargs);
+    char parambufs[MAX_CMD_PARAMS][PL_NSIZ + 10] = { "" };
 
-	params[0] = "gnollhack";
-	params[1] = 0;
+	Strcpy(parambufs[0], "gnollhack");
 
-	/* Parse more args here */
+    int curparamcnt = 1;
+    if (cmdlineargs)
+    {
+        boolean isend = FALSE;
+        char* bp = cmdbuf;
+        char* ebp = bp;
+        while (*bp)
+        {         
+            do
+            {
+                ebp++;
+            } while (*ebp != 0 && *ebp != ' ');
 
-	return GnollHackMain(1, params);
+            if (!*ebp)
+                isend = TRUE;
+            else
+                *ebp = 0;
+
+            if (*bp)
+            {
+                Strcpy(parambufs[curparamcnt], bp);
+                curparamcnt++;
+            }
+
+            if (isend || curparamcnt >= MAX_CMD_PARAMS)
+                break;
+
+            ebp++;
+            bp = ebp;
+        }
+    }
+
+    /* Make a null terminated array just in case */
+    char* params[MAX_CMD_PARAMS + 1] = { 0 };
+    int i;
+    for (i = 0; i < curparamcnt; i++)
+    {
+        params[i] = parambufs[i];
+    }    
+
+	return GnollHackMain(curparamcnt, params);
 }
 
 extern struct callback_procs lib_callbacks;
@@ -474,46 +520,61 @@ int RunGnollHack(
 
     FreeMemoryCallback callback_free_memory,
     ReportPlayerNameCallback callback_report_player_name,
+    ReportPlayTimeCallback callback_report_play_time,
     SendObjectDataCallback callback_send_object_data,
     SendMonsterDataCallback callback_send_monster_data
 )
 {
+    char cmdbuf[BUFSZ] = "";
+    if(cmdlineargs)
+        strcpy(cmdbuf, cmdlineargs);
+
     /* Set wincaps */
     if(runflags & GHRUNFLAGS_SET_WINCAPS)
         set_wincaps(wincap1, wincap2);
 
     /* Set names */
-    if (preset_player_name && strcmp(preset_player_name, ""))
+    /* Authorize wizard mode */
+    if (runflags & GHRUNFLAGS_WIZARD_MODE)
     {
-        strncpy(plname, preset_player_name, PL_NSIZ - 1);
-        plname[PL_NSIZ - 1] = '\0';
+        //wizard = TRUE, discover = FALSE;
+        //strcpy(plname, "wizard");
+        if (*cmdbuf)
+            Strcat(cmdbuf, " ");
+        Sprintf(eos(cmdbuf), "-D -u %s", "wizard");
     }
+    else if (preset_player_name && strcmp(preset_player_name, ""))
+    {
+        char plbuf[PL_NSIZ];
+        strncpy(plbuf, preset_player_name, PL_NSIZ - 1);
+        plbuf[PL_NSIZ - 1] = '\0';
+
+        if (*cmdbuf)
+            Strcat(cmdbuf, " ");
+        Sprintf(eos(cmdbuf), "-u %s", plbuf);
+    }
+
+    if (runflags & GHRUNFLAGS_MODERN_MODE)
+    {
+        //ModernMode = TRUE;
+        if (*cmdbuf)
+            Strcat(cmdbuf, " ");
+        Strcat(cmdbuf, "-M");
+    }
+
+    if (runflags & GHRUNFLAGS_CASUAL_MODE)
+    {
+        //CasualMode = TRUE;
+        if (*cmdbuf)
+            Strcat(cmdbuf, " ");
+        Strcat(cmdbuf, "-C");
+    }
+
+    /* Set directly, as other parts of GnollHack do not purposedly set this */
     if (recovery_name && strcmp(recovery_name, ""))
     {
         strncpy(recovery_plname, recovery_name, PL_NSIZ - 1);
         recovery_plname[PL_NSIZ - 1] = '\0';
-    }
-
-    /* Authorize wizard mode */
-    if (runflags & GHRUNFLAGS_WIZARD_MODE)
-    {
-        wizard = TRUE, discover = FALSE;
-        strcpy(plname, "wizard");
-    }
-
-    if (!(runflags & GHRUNFLAGS_FULL_VERSION))
-    {
-        In_Demo = TRUE;
-    }
-
-    if (!discover && (runflags & GHRUNFLAGS_MODERN_MODE))
-    {
-        ModernMode = TRUE;
-    }
-
-    if (!discover && (runflags & GHRUNFLAGS_CASUAL_MODE))
-    {
-        CasualMode = TRUE;
     }
 
     /* Set callback function pointers here */
@@ -608,6 +669,7 @@ int RunGnollHack(
 
     lib_callbacks.callback_free_memory = callback_free_memory;
     lib_callbacks.callback_report_player_name = callback_report_player_name;
+    lib_callbacks.callback_report_play_time = callback_report_play_time;
     lib_callbacks.callback_send_object_data = callback_send_object_data;
     lib_callbacks.callback_send_monster_data = callback_send_monster_data;
 
@@ -623,5 +685,5 @@ int RunGnollHack(
     }
 
     /* Start GnollHack by calling main */
-    return GnollHackStart(cmdlineargs);
+    return GnollHackStart(cmdbuf);
 }

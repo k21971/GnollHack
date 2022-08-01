@@ -204,6 +204,10 @@ mswin_init_nhwindows(int *argc, char **argv)
     /* Set menu check mark for interface mode */
     mswin_menu_check_intf_mode();
 
+    /* GUI tiles and sounds on */
+    iflags.using_gui_tiles = TRUE; /* Default is TRUE (mode 0) until set to a different value */
+    iflags.using_gui_sounds = TRUE;
+
     /* check default values */
     if (iflags.wc_fontsiz_status < NHFONT_SIZE_MIN
         || iflags.wc_fontsiz_status > NHFONT_SIZE_MAX)
@@ -2485,9 +2489,7 @@ mswin_wait_loop_intervals(int intervals)
 void
 bail(const char *mesg)
 {
-    clearlocks();
-    mswin_exit_nhwindows(mesg);
-    nh_terminate(EXIT_SUCCESS);
+    nh_bail(EXIT_SUCCESS, mesg, TRUE);
     /*NOTREACHED*/
 }
 
@@ -3590,8 +3592,6 @@ mswin_open_special_view(struct special_view_info info)
     case SPECIAL_VIEW_CHAT_MESSAGE:
         genl_chat_message();
         break;
-    case SPECIAL_VIEW_YN_DIALOG:
-        return mswin_yn_function_ex(YN_STYLE_GENERAL, info.attr, info.color, NO_GLYPH, info.title, info.text, "yn", 'n', "Yes\nNo", (const char*)0, 0UL);
     default:
         break;
     }

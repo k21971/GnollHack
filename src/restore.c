@@ -785,7 +785,7 @@ unsigned int *stuckid, *steedid;
     mread(fd, (genericptr_t) pl_character, sizeof pl_character);
 
     mread(fd, (genericptr_t) pl_fruit, sizeof pl_fruit);
-    freefruitchn(ffruit); /* clean up fruit(s) made by initoptions() */
+    freefruitchn(ffruit); /* clean up fruit(s) made by read_options() */
     ffruit = loadfruitchn(fd);
 
     restnames(fd);
@@ -1042,15 +1042,15 @@ register int fd;
     /* Set up the vision internals, after levl[] data is loaded
        but before docrt(). */
     reglyph_darkroom();
+    run_timers(); /* expire all timers that have gone off while away */
+
     vision_reset();
     vision_full_recalc = 1; /* recompute vision (not saved) */
-
-    run_timers(); /* expire all timers that have gone off while away */
     docrt();
-    restoring = FALSE;
-
     clear_nhwindow(WIN_MESSAGE);
     status_reassess();
+
+    restoring = FALSE;
 
     /* Play ambient sounds for the dungeon; check_special_room will play music */
     play_level_ambient_sounds();
@@ -1241,7 +1241,7 @@ boolean ghostly;
         if (!u.uz.dlevel)
             continue;
         if (ghostly) {
-            /* reset peaceful/malign relative to new character;
+            /* reset peaceful/mhostility relative to new character;
                shopkeepers will reset based on name */
             if (!mtmp->isshk)
                 mtmp->mpeaceful =
@@ -1249,7 +1249,7 @@ boolean ghostly;
                      && sgn(u.ualign.type) == sgn(mtmp->data->maligntyp))
                         ? TRUE
                         : peace_minded(mtmp->data);
-            set_malign(mtmp);
+            set_mhostility(mtmp);
             newsym(mtmp->mx, mtmp->my);
         } else if (elapsed > 0L) {
             mon_catchup_elapsed_time(mtmp, elapsed);
@@ -1786,14 +1786,7 @@ struct save_game_data* saved;
             char qbuf[BUFSZ], tbuf[BUFSZ];
             Sprintf(qbuf, "Are you sure to delete the saved game for \'%s\'?", plname);
             Strcpy(tbuf, "Delete Saved Game?");
-            //char ans = yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_RED, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
-            struct special_view_info info = { 0 };
-            info.viewtype = SPECIAL_VIEW_YN_DIALOG;
-            info.text = qbuf;
-            info.title = tbuf;
-            info.attr = ATR_NONE;
-            info.color = CLR_RED;
-            int ans = open_special_view(info); //Replaces yn_function, since appriate window for yn_function may not be initialized
+            int ans = yn_query_ex(ATR_NONE, CLR_RED, tbuf, qbuf);
             if (ans == 'y')
             {
                 set_savefile_name(TRUE);

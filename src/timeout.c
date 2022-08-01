@@ -1371,23 +1371,6 @@ boolean wakeup_msg;
     {
         /* Do nothing at the moment */
     }
-
-#if 0
-    nomul(how_long);
-    multi_reason = "sleeping";
-    /* generally don't notice sounds while sleeping */
-    if (wakeup_msg && multi == how_long) {
-        /* caller can follow with a direct call to Hear_again() if
-           there's a need to override this when wakeup_msg is true */
-        incr_itimeout(&HDeaf, how_long);
-        context.botl = context.botlx = TRUE;
-        refresh_u_tile_gui_info(TRUE);
-        afternmv = Hear_again; /* this won't give any messages */
-    }
-    /* early wakeup from combat won't be possible until next monster turn */
-    u.usleep = monstermoves;
-    nomovemsg = wakeup_msg ? "You wake up." : You_can_move_again;
-#endif
 }
 
 /* Attach an egg hatch timeout to the given egg.
@@ -3444,6 +3427,7 @@ reset_timers(VOID_ARGS)
     }
 
     timer_base = 0;
+    timer_id = 1;
 }
 
 /* to support '#stats' wizard-mode command */
@@ -3690,7 +3674,7 @@ boolean was_flying;
         if (!Sick_resistance)
         {
             play_sfx_sound(SFX_PROTECTION_END_WARNING);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel like you might be catching a cold.");
+            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel like you might be catching a cold easier now.");
         }
         break;
     case INVULNERABLE:

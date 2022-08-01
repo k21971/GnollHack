@@ -794,7 +794,7 @@ int *fail_reason;
         mon->mtame = 0; /* (might be petrified pet tossed onto trap) */
         mon->mpeaceful = 0;
         mon->ispartymember = FALSE;
-        set_malign(mon);
+        set_mhostility(mon);
     }
 
     if (isok(mon->mx, mon->my))
@@ -3900,7 +3900,7 @@ long hmask, emask; /* might cancel timeout */
          * Use knowledge of the two routines as a hack -- this
          * should really be handled differently -dlc
          */
-        if (is_pool(u.ux, u.uy) && !Wwalking && !Swimming && !u.uinwater)
+        if (is_pool(u.ux, u.uy) && !Walks_on_water && !Swimming && !u.uinwater)
             no_msg = drown();
 
         if (is_lava(u.ux, u.uy)) {
@@ -5514,7 +5514,7 @@ struct monst *mtmp;
             && mtmp->data->mlet != S_HUMAN)
         {
             mtmp->mpeaceful = 1;
-            set_malign(mtmp); /* reset alignment */
+            set_mhostility(mtmp); /* reset alignment */
             newsym(mtmp->mx, mtmp->my);
             pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s is grateful.", Monnam(mtmp));
         }
@@ -5843,7 +5843,7 @@ boolean stuff;
             && rnl(10) < 3) 
         {
             mtmp->mpeaceful = 1;
-            set_malign(mtmp); /* reset alignment */
+            set_mhostility(mtmp); /* reset alignment */
             newsym(mtmp->mx, mtmp->my);
             pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s thinks it was nice of you to try.", Monnam(mtmp));
         }
@@ -7304,7 +7304,7 @@ lava_effects()
     if (likes_lava(youmonst.data))
         return FALSE;
 
-    usurvive = Fire_immunity || (Wwalking && dmg < u.uhp);
+    usurvive = Fire_immunity || (Walks_on_water && dmg < u.uhp);
     /*
      * A timely interrupt might manage to salvage your life
      * but not your gear.  For scrolls and potions this
@@ -7339,7 +7339,7 @@ lava_effects()
 
     if (!Fire_immunity)
     {
-        if (Wwalking) 
+        if (Walks_on_water)
         {
             pline_The("%s here burns you!", hliquid("lava"));
             if (usurvive) 
@@ -7411,7 +7411,7 @@ lava_effects()
         You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find yourself back on solid %s.", surface(u.ux, u.uy));
         return TRUE;
     } 
-    else if (!Wwalking && (!u.utrap || u.utraptype != TT_LAVA)) 
+    else if (!Walks_on_water && (!u.utrap || u.utraptype != TT_LAVA))
     {
         boil_away = !Fire_immunity;
         /* if not fire resistant, sink_into_lava() will quickly be fatal;
@@ -7556,6 +7556,13 @@ struct trap* trap;
         return ROCK;
 
     return 0;
+}
+
+void
+reset_traps(VOID_ARGS)
+{
+    memset((genericptr_t)&launchplace, 0, sizeof(launchplace));
+    memset((genericptr_t)&acid_ctx, 0, sizeof(acid_ctx));
 }
 
 /*trap.c*/

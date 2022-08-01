@@ -14,10 +14,14 @@ namespace GnollHackClient.Pages.Game
     [XamlCompilation(XamlCompilationOptions.Compile)]
     public partial class VersionPage : ContentPage
     {
-        public VersionPage()
+        private GamePage _gamePage = null;
+        public VersionPage(GamePage gamePage)
         {
             InitializeComponent();
             On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
+
+            _gamePage = gamePage;
+
             //string platver = App.PlatformService.GetVersionString();
             //string text = "";
             string manufacturer = DeviceInfo.Manufacturer;
@@ -31,6 +35,46 @@ namespace GnollHackClient.Pages.Game
             ulong TotalDiskSpaceInBytes = App.PlatformService.GetDeviceTotalDiskSpaceInBytes();
             ulong TotalDiskSpaceInGB = ((TotalDiskSpaceInBytes / 1024) / 1024) / 1024;
 
+            long TotalPlayTime = Preferences.Get("RealPlayTime", 0L);
+            long TotalPlayHours = TotalPlayTime / 3600;
+            long TotalPlayMinutes = (TotalPlayTime % 3600) / 60;
+            long TotalPlaySeconds = TotalPlayTime - TotalPlayHours * 3600 - TotalPlayMinutes * 60;
+
+            long CurrentPlayTime = App.AggregateSessionPlayTime;
+            long CurrentPlayHours = CurrentPlayTime / 3600;
+            long CurrentPlayMinutes = (CurrentPlayTime % 3600) / 60;
+            long CurrentPlaySeconds = CurrentPlayTime - CurrentPlayHours * 3600 - CurrentPlayMinutes * 60;
+
+            if (_gamePage != null && _gamePage.ClientGame != null)
+            {
+                long GameDurationTime = _gamePage.ClientGame.GamePlayTime;
+                long GameDurationHours = GameDurationTime / 3600;
+                long GameDurationMinutes = (GameDurationTime % 3600) / 60;
+                long GameDurationSeconds = GameDurationTime - GameDurationHours * 3600 - GameDurationMinutes * 60;
+                GameDurationLabel.Text = GameDurationHours + " h " + GameDurationMinutes + " min " + GameDurationSeconds + " s";
+
+                long SessionPlayTime = _gamePage.ClientGame.SessionPlayTime;
+                long SessionPlayHours = SessionPlayTime / 3600;
+                long SessionPlayMinutes = (SessionPlayTime % 3600) / 60;
+                long SessionPlaySeconds = SessionPlayTime - SessionPlayHours * 3600 - SessionPlayMinutes * 60;
+                SessionTimeLabel.Text = SessionPlayHours + " h " + SessionPlayMinutes + " min " + SessionPlaySeconds + " s";
+            }
+            else
+            {
+                GameDurationLabel.Text = "";
+                GameDurationLabel.IsVisible = false;
+                GameDurationTitleLabel.IsVisible = false;
+                VersionInfoGrid.Children.Remove(GameDurationLabel);
+                VersionInfoGrid.Children.Remove(GameDurationTitleLabel);
+                VersionInfoGrid.RowDefinitions.Remove(GameDurationRowDefinition);
+
+                SessionTimeLabel.Text = "";
+                SessionTimeLabel.IsVisible = false;
+                SessionTitleLabel.IsVisible = false;
+                VersionInfoGrid.Children.Remove(SessionTimeLabel);
+                VersionInfoGrid.Children.Remove(SessionTitleLabel);
+                VersionInfoGrid.RowDefinitions.Remove(SessionPlayTimeRowDefinition);
+            }
 
             PortVersionTitleLabel.Text = Device.RuntimePlatform + " Port Version:";
             PortBuildTitleLabel.Text = Device.RuntimePlatform + " Port Build:";
@@ -43,6 +87,8 @@ namespace GnollHackClient.Pages.Game
             DeviceLabel.Text = manufacturer + " " + DeviceInfo.Model;
             TotalMemoryLabel.Text = TotalMemInMB + " MB";
             DiskSpaceLabel.Text = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
+            TotalPlayTimeLabel.Text = TotalPlayHours + " h " + TotalPlayMinutes + " min " + TotalPlaySeconds + " s";
+            CurrentPlayTimeLabel.Text = CurrentPlayHours + " h " + CurrentPlayMinutes + " min " + CurrentPlaySeconds + " s";
 
             //text += Environment.NewLine + VersionTracking.CurrentVersion;
             //text += Environment.NewLine + VersionTracking.CurrentBuild;

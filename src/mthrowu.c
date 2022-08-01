@@ -236,94 +236,6 @@ struct obj *otmp, *mwep;
     {
 
         multishot = get_multishot_stats(mtmp, otmp, mwep, TRUE, (double*)0);
-
-#if 0
-        struct obj* otmpmulti = (struct obj*)0;
-        if (otmp && is_ammo(otmp) && mwep && matching_launcher(otmp, mwep))
-            otmpmulti = mwep;
-        else if (otmp)
-            otmpmulti = otmp;
-
-
-        if (otmpmulti && objects[otmpmulti->otyp].oc_multishot_style > 1)
-        {
-            int skilllevel = 0;
-            boolean multishotok = TRUE;
-
-            /* Assumes lords are skilled, princes are expert */
-            if (is_prince(mtmp->data))
-                skilllevel = P_EXPERT;
-            else if (is_lord(mtmp->data))
-                skilllevel = P_SKILLED;
-            /* fake players treated as skilled (regardless of role limits) */
-            else if (is_mplayer(mtmp->data))
-                skilllevel = P_SKILLED;
-
-            /* Monks and ninjas are also assumed to be experts in certain weapons */
-            switch (mtmp->mnum) 
-            {
-            case PM_MONK:
-                if (skill == -P_THROWN_WEAPON)
-                    skilllevel = P_EXPERT;
-                break;
-            case PM_NINJA:
-                if (skill == -P_THROWN_WEAPON)
-                    skilllevel = P_EXPERT;
-                else if (otmp->otyp == YA && mwep->otyp == YUMI)
-                    skilllevel = P_EXPERT;
-                break;
-            default:
-                break;
-            }
-
-            /*
-            if ((objects[otmpmulti->otyp].oc_flags3 & O3_MULTISHOT_REQUIRES_SKILL_MASK) == O3_MULTISHOT_REQUIRES_EXPERT_SKILL && skilllevel < P_EXPERT)
-                multishotok = FALSE;
-            else if ((objects[otmpmulti->otyp].oc_flags3 & O3_MULTISHOT_REQUIRES_SKILL_MASK) == O3_MULTISHOT_REQUIRES_SKILLED_SKILL && skilllevel < P_SKILLED)
-                multishotok = FALSE;
-            else if ((objects[otmpmulti->otyp].oc_flags3 & O3_MULTISHOT_REQUIRES_SKILL_MASK) == O3_MULTISHOT_REQUIRES_BASIC_SKILL && skilllevel < P_BASIC)
-                multishotok = FALSE;
-            */
-
-            if(multishotok)
-            {
-                multishot = (int)objects[otmpmulti->otyp].oc_multishot_style;
-            }
-        }
-
-#endif
-
-        /* this portion is different from hero multishot; from slash'em?
-         */
-        /* Elven Craftsmanship makes for light, quick bows */
-        /*
-        if (otmp->otyp == ELVEN_ARROW && !otmp->cursed)
-            multishot++;
-        if (ammo_and_launcher(otmp, uwep) && mwep->otyp == ELVEN_BOW
-            && !mwep->cursed)
-            multishot++;
-        if (ammo_and_launcher(otmp, mwep) && mwep->enchantment > 1)
-            multishot += (long) rounddiv(mwep->enchantment, 3);*/
-
-        /* 1/3 of launcher enchantment */
-
-        /* class bonus */
-        /* racial bonus */
-        /*
-        if ((is_elf(mtmp->data) && otmp->otyp == ELVEN_ARROW
-            && mwep->otyp == ELVEN_LONG_BOW)
-            || (is_orc(mtmp->data) && otmp->otyp == ORCISH_ARROW
-                && mwep->otyp == ORCISH_SHORT_BOW)
-            || (is_gnoll(mtmp->data) && otmp->otyp == CROSSBOW_BOLT
-                && mwep->otyp == CROSSBOW))
-            multishot++;*/
-
-        /*
-        if ((otmp && mwep && ammo_and_launcher(otmp, mwep) && mtmp->mstr < objects[mwep->otyp].oc_multishot_str)
-            || (otmp && throwing_weapon(otmp) && mtmp->mstr < objects[otmp->otyp].oc_multishot_str)
-            )
-            multishot = 1;
-        */
     }
 
     if (otmp->quan < multishot)
@@ -1246,7 +1158,9 @@ struct attack *mattk;
                   s_suffix(mon_nam(mtmp)));
         return 0;
     }
-    if (m_lined_up(mtarg, mtmp, TRUE, mattk->adtyp, FALSE, range)) {
+    if (m_lined_up(mtarg, mtmp, TRUE, mattk->adtyp, FALSE, range)
+        && !is_immune(mtarg, mattk->adtyp))
+    {
         update_m_facing(mtmp, mtarg->mx - mtmp->mx, TRUE);
 
         switch (mattk->adtyp) {
@@ -1301,7 +1215,8 @@ struct attack  *mattk;
     int typ = get_ray_adtyp(mattk->adtyp); // Does not include death ray
     int range = mattk->range ? mattk->range : M_BREATH_WEAPON_RANGE;
 
-    if (m_lined_up(mtarg, mtmp, TRUE, typ, TRUE, range))
+    if (m_lined_up(mtarg, mtmp, TRUE, typ, TRUE, range)
+        && (typ != mattk->adtyp || !is_immune(mtarg, typ)))
     {
         update_m_facing(mtmp, mtarg->mx - mtmp->mx, TRUE);
         if (is_cancelled(mtmp))
@@ -1358,7 +1273,8 @@ struct attack* mattk;
     int typ = get_ray_adtyp(mattk->adtyp);
     int range = mattk->range ? mattk->range : M_RAY_RANGE;
 
-    if (m_lined_up(mtarg, mtmp, TRUE, typ, TRUE, range))
+    if (m_lined_up(mtarg, mtmp, TRUE, typ, TRUE, range)
+        && (typ != mattk->adtyp || !is_immune(mtarg, typ)))
     {
         update_m_facing(mtmp, mtarg->mx - mtmp->mx, TRUE);
         if (is_cancelled(mtmp) || is_blinded(mtmp))
@@ -1778,7 +1694,8 @@ struct attack *mattk;
                   s_suffix(mon_nam(mtmp)));
         return 0;
     }
-    if (lined_up(mtmp, TRUE, mattk->adtyp, FALSE, range))
+    if (lined_up(mtmp, TRUE, mattk->adtyp, FALSE, range)
+        && !is_immune(&youmonst, mattk->adtyp))
     {
         update_m_facing(mtmp, u.ux - mtmp->mx, TRUE);
         switch (mattk->adtyp)
@@ -1837,7 +1754,8 @@ struct attack *mattk;
     int typ = get_ray_adtyp(mattk->adtyp);
     int range = mattk->range ? mattk->range : M_RAY_RANGE;
 
-    if (lined_up(mtmp, TRUE, typ, TRUE, range))
+    if (lined_up(mtmp, TRUE, typ, TRUE, range)
+        && (typ != mattk->adtyp || !is_immune(&youmonst, typ)))
     {
         update_m_facing(mtmp, u.ux - mtmp->mx, TRUE);
         if (is_cancelled(mtmp) || is_blinded(mtmp))
@@ -1888,7 +1806,8 @@ struct attack* mattk;
     int typ = get_ray_adtyp(mattk->adtyp); //NOTE: Does not include death ray
     int range = mattk->range ? mattk->range : M_BREATH_WEAPON_RANGE;
 
-    if (lined_up(mtmp, TRUE, typ, TRUE, range))
+    if (lined_up(mtmp, TRUE, typ, TRUE, range) 
+        && (typ != mattk->adtyp || !is_immune(&youmonst, typ)))
     {
         update_m_facing(mtmp, u.ux - mtmp->mx, TRUE);
         if (is_cancelled(mtmp))

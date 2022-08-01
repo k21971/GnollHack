@@ -99,25 +99,39 @@ namespace GnollHackClient
             CurrentSecrets = JsonConvert.DeserializeObject<Secrets>(json);
         }
 
-        public static readonly object _cancelSaveGameLock = new object();
-        public static bool _cancelSaveGame = false;
+
+
+        private static readonly object _aggregateSessionPlayTimeLock = new object();
+        private static long _aggregateSessionPlayTime = 0L;
+        public static long AggregateSessionPlayTime { get { lock (_aggregateSessionPlayTimeLock) { return _aggregateSessionPlayTime; } } set { lock (_aggregateSessionPlayTimeLock) { _aggregateSessionPlayTime = value; } } }
+        public static void AddAggragateSessionPlayTime(long addition)
+        {
+            lock (_aggregateSessionPlayTimeLock)
+            {
+                _aggregateSessionPlayTime = _aggregateSessionPlayTime + addition;
+            }
+        }
+
+        private static readonly object _cancelSaveGameLock = new object();
+        private static bool _cancelSaveGame = false;
         public static bool CancelSaveGame { get { lock (_cancelSaveGameLock) { return _cancelSaveGame; } } set { lock (_cancelSaveGameLock) { _cancelSaveGame = value; } } }
 
-        public static readonly object _savingGameLock = new object();
-        public static bool _savingGame = false;
+        private static readonly object _savingGameLock = new object();
+        private static bool _savingGame = false;
         public static bool SavingGame { get { lock (_savingGameLock) { return _savingGame; } } set { lock (_savingGameLock) { _savingGame = value; } } }
 
-        public static readonly object _gameSavedLock = new object();
-        public static bool _gameSaved = false;
+        private static readonly object _gameSavedLock = new object();
+        private static bool _gameSaved = false;
         public static bool GameSaved { get { lock (_gameSavedLock) { return _gameSaved; } } set { lock (_gameSavedLock) { _gameSaved = value; } } }
 
         protected override void OnStart()
         {
-            App.CancelSaveGame = true;
             if (PlatformService != null)
                 PlatformService.OverrideAnimationDuration();
 
-            if (App.CurrentClientGame != null)
+            App.CancelSaveGame = true;
+            App.UnmuteSounds();
+            if (App.CurrentClientGame != null && !App.CurrentClientGame.CasualMode)
             {
                 //Detect background app killing OS, check if last exit is through going to sleep, and notify player that the app probably had been terminated by OS but game has been saved
                 bool wenttosleep = Preferences.Get("WentToSleepWithGameOn", false);
@@ -135,7 +149,8 @@ namespace GnollHackClient
                 PlatformService.RevertAnimationDuration(false);
 
             App.CancelSaveGame = false;
-            if (App.CurrentClientGame != null)
+            App.MuteSounds();
+            if (App.CurrentClientGame != null && !App.CurrentClientGame.CasualMode)
             {
                 //Detect background app killing OS, mark that exit has been through going to sleep, and save the game
                 Preferences.Set("WentToSleepWithGameOn", true);
@@ -149,7 +164,8 @@ namespace GnollHackClient
                 PlatformService.OverrideAnimationDuration();
 
             App.CancelSaveGame = true;
-            if (App.CurrentClientGame != null)
+            App.UnmuteSounds();
+            if (App.CurrentClientGame != null && !App.CurrentClientGame.CasualMode)
             {
                 //Detect background app killing OS, check if last exit is through going to sleep & game has been saved, and load previously saved game
                 bool wenttosleep = Preferences.Get("WentToSleepWithGameOn", false);
@@ -157,6 +173,43 @@ namespace GnollHackClient
                 if (wenttosleep && (App.GameSaved || App.SavingGame))
                 {
                     App.CurrentClientGame.GamePage.StopWaitAndResumeSavedGame();
+                }
+            }
+        }
+
+        public static void MuteSounds()
+        {
+            try
+            {
+                if (FmodService != null)
+                    FmodService.AdjustVolumes(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+        }
+
+        public static void UnmuteSounds()
+        {
+            if (FmodService != null)
+            {
+                if (CurrentClientGame != null && CurrentClientGame.GamePage != null && CurrentClientGame.GamePage.MuteSounds)
+                    return;
+
+                try
+                {
+                    float generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
+                    float musicVolume = Preferences.Get("MusicVolume", GHConstants.DefaultMusicVolume);
+                    float ambientVolume = Preferences.Get("AmbientVolume", GHConstants.DefaultAmbientVolume);
+                    float dialogueVolume = Preferences.Get("DialogueVolume", GHConstants.DefaultDialogueVolume);
+                    float effectsVolume = Preferences.Get("EffectsVolume", GHConstants.DefaultEffectsVolume);
+                    float UIVolume = Preferences.Get("UIVolume", GHConstants.DefaultUIVolume);
+                    FmodService.AdjustVolumes(generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
                 }
             }
         }

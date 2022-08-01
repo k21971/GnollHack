@@ -22,6 +22,7 @@ STATIC_DCL void FDECL(maybe_smudge_engr, (int, int, int, int));
 STATIC_DCL void NDECL(domove_core);
 
 #define IS_SHOP(x) (rooms[x].rtype >= SHOPBASE)
+static int skates = 0;
 
 static anything tmp_anything;
 
@@ -1277,6 +1278,7 @@ int mode;
         (void) memset((genericptr_t) travel, 0, sizeof travel);
         travelstepx[0][0] = tx;
         travelstepy[0][0] = ty;
+        const int ordered[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
 
         while (n != 0) {
             int nn = 0;
@@ -1285,7 +1287,6 @@ int mode;
                 int dir;
                 int x = travelstepx[set][i];
                 int y = travelstepy[set][i];
-                static int ordered[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
                 /* no diagonal movement for grid bugs */
                 int dirmax = NODIAG(u.umonnum) ? 4 : 8;
                 boolean alreadyrepeated = FALSE;
@@ -1786,8 +1787,6 @@ domove_core()
         on_ice = !Levitation && is_ice(u.ux, u.uy);
         if (on_ice)
         {
-            static int skates = 0;
-
             if (!skates)
                 skates = find_skates();
             if ((uarmf && uarmf->otyp == skates) || is_mon_immune_to_cold(&youmonst)
@@ -1888,27 +1887,28 @@ domove_core()
 
         if(levl[x][y].seenv && !Stunned && !Confusion && !Hallucination && !m_at(x, y))
         {
+            boolean blocksflying = loc_blocks_flying_and_leviation(x, y);
             if (is_pool_or_lava(x, y))
             {
                 if (
                     (is_pool(x, y) && 
-                        (Wwalking 
+                        (Walks_on_water
                             || Amphibious 
                             || Breathless
                             || Swimming
-                            || Flying 
-                            || Levitation
+                            || (Flying && !blocksflying)
+                            || (Levitation && !blocksflying)
                             || is_swimmer(youmonst.data)
-                            || is_flyer(youmonst.data)
-                            || is_floater(youmonst.data)
+                            || (is_flyer(youmonst.data) && !blocksflying)
+                            || (is_floater(youmonst.data) && !blocksflying)
                         )
                     )
                     || 
                     (is_lava(x, y) && 
-                        (Levitation 
-                            || Flying
+                        ((Levitation && !blocksflying)
+                            || (Flying && !blocksflying)
                             || likes_lava(youmonst.data)
-                            || is_flyer(youmonst.data)
+                            || (is_flyer(youmonst.data) && !blocksflying)
                         )
                     )
                 )
@@ -1920,9 +1920,9 @@ domove_core()
                     /* If blind, you still get the question */
 
                     char ynqbuf[BUFSZ] = "";
-                    Sprintf(ynqbuf, "Are you sure you want to enter the %s?", is_pool(x, y) ? "pool" : is_lava(x, y) ? "lava" : "location");
+                    Sprintf(ynqbuf, "Are you sure you want to enter the %s?", is_pool(x, y) ? (Is_waterlevel(&u.uz) ? "water" : "pool") : is_lava(x, y) ? "lava" : "location");
                     char tbuf[BUFSZ] = "";
-                    Sprintf(tbuf, "Entering %s?", is_pool(x, y) ? "Pool" : is_lava(x, y) ? "Lava" : "Location");
+                    Sprintf(tbuf, "Entering %s?", is_pool(x, y) ? (Is_waterlevel(&u.uz) ? "Water" : "Pool") : is_lava(x, y) ? "Lava" : "Location");
 
                     if (!paranoid_query_ex(ATR_NONE, CLR_MSG_WARNING, ParanoidWater, tbuf, ynqbuf))
                     {
@@ -2434,15 +2434,6 @@ domove_core()
                 delay_output_milliseconds(flags.crawl_interval_in_milliseconds <= 0 ? DEFAULT_CRAWL_INTERVAL : flags.crawl_interval_in_milliseconds);
             else
                 delay_output_milliseconds(flags.move_interval_in_milliseconds <= 0 ? DEFAULT_MOVE_INTERVAL : flags.move_interval_in_milliseconds);
-#if 0
-            adjusted_delay_output();
-            if (flags.runmode == RUN_CRAWL) {
-                adjusted_delay_output();
-                adjusted_delay_output();
-                adjusted_delay_output();
-                adjusted_delay_output();
-            }
-#endif
         }
     }
 }
@@ -2514,9 +2505,7 @@ invocation_message()
 void
 switch_terrain()
 {
-    struct rm *lev = &levl[u.ux][u.uy];
-    boolean blocklev = (IS_ROCK(lev->typ) || closed_door(u.ux, u.uy)
-                        || (Is_waterlevel(&u.uz) && lev->typ == WATER)),
+    boolean blocklev = loc_blocks_flying_and_leviation(u.ux, u.uy),
             was_levitating = !!Levitation, was_flying = !!Flying;
 
     if (blocklev) {
@@ -2574,7 +2563,7 @@ boolean newspot;             /* true if called by spoteffects */
             You("pop out of the %s like a cork!", hliquid("water"));
         } else if (Flying) {
             You("fly out of the %s.", hliquid("water"));
-        } else if (Wwalking) {
+        } else if (Walks_on_water) {
             You("slowly rise above the surface.");
         } else {
             still_inwater = TRUE;
@@ -2619,7 +2608,7 @@ boolean newspot;             /* true if called by spoteffects */
         if (is_lava(u.ux, u.uy)) {
             if (lava_effects())
                 return TRUE;
-        } else if (!Wwalking
+        } else if (!Walks_on_water
                    && (newspot || !u.uinwater || !(Swimming || Amphibious))) {
             if (drown())
                 return TRUE;
@@ -2628,15 +2617,16 @@ boolean newspot;             /* true if called by spoteffects */
     return FALSE;
 }
 
+static int inspoteffects = 0;
+static coord spotloc;
+static int spotterrain;
+static struct trap* spottrap = (struct trap*)0;
+static unsigned spottraptyp = NO_TRAP;
+
 void
 spoteffects(pick)
 boolean pick;
 {
-    static int inspoteffects = 0;
-    static coord spotloc;
-    static int spotterrain;
-    static struct trap *spottrap = (struct trap *) 0;
-    static unsigned spottraptyp = NO_TRAP;
 
     struct monst *mtmp;
     struct trap *trap = t_at(u.ux, u.uy);
@@ -3229,7 +3219,7 @@ pickup_checks()
         }
     }
     if (is_pool(u.ux, u.uy)) {
-        if (Wwalking || is_floater(youmonst.data) || is_clinger(youmonst.data)
+        if (Walks_on_water || is_floater(youmonst.data) || is_clinger(youmonst.data)
             || (Flying && !Breathless)) {
             play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
             You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot dive into the %s to pick things up.",
@@ -3242,7 +3232,7 @@ pickup_checks()
         }
     }
     if (is_lava(u.ux, u.uy)) {
-        if (Wwalking || is_floater(youmonst.data) || is_clinger(youmonst.data)
+        if (Walks_on_water || is_floater(youmonst.data) || is_clinger(youmonst.data)
             || (Flying && !Breathless)) {
             play_sfx_sound(SFX_GENERAL_CANNOT_REACH);
             You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "reach the bottom to pick things up.");
@@ -3641,7 +3631,7 @@ const char *msg_override;
 STATIC_OVL void
 maybe_wail()
 {
-    static short powers[] = { TELEPORT, SEE_INVISIBLE, POISON_RESISTANCE, COLD_IMMUNITY,
+    static const short powers[] = { TELEPORT, SEE_INVISIBLE, POISON_RESISTANCE, COLD_IMMUNITY,
                               SHOCK_IMMUNITY, FIRE_IMMUNITY, SLEEP_RESISTANCE, DISINTEGRATION_RESISTANCE,
                               TELEPORT_CONTROL, STEALTH, FAST, INVISIBILITY };
 
@@ -3675,7 +3665,7 @@ maybe_wail()
 void
 you_die(knam, k_format)
 register const char* knam;
-boolean k_format;
+int k_format;
 {
     killer.format = k_format;
     if (killer.name != knam) /* the thing that killed you */
@@ -3688,7 +3678,7 @@ boolean k_format;
 void
 kill_player(knam, k_format)
 register const char* knam;
-boolean k_format;
+int k_format;
 {
     context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
     if (Upolyd)
@@ -3706,7 +3696,7 @@ void
 losehp(n, knam, k_format)
 double n;
 register const char *knam;
-boolean k_format;
+int k_format;
 {
     if (Invulnerable) //Note you must set damage to zero so it does not get displayed to the player
         return;
@@ -4005,6 +3995,18 @@ adjusted_delay_output()
     {
         delay_output();
     }
+}
+
+void
+reset_hack(VOID_ARGS)
+{
+    skates = 0;
+    inspoteffects = 0;
+    memset((genericptr_t)&spotloc, 0 , sizeof(spotloc));
+    spotterrain = 0;
+    spottrap = (struct trap*)0;
+    spottraptyp = NO_TRAP;
+    wc = 0;
 }
 
 

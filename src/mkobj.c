@@ -515,61 +515,72 @@ STATIC_OVL void
 mkbox_cnts(box)
 struct obj *box;
 {
+    if (!box)
+        return;
+
     register int n;
     register struct obj *otmp;
 
     //box->cobj = (struct obj *) 0; /* Box may have previous contents, such as a coffin corpse */
 
-    switch (box->otyp) 
+    if (box->oartifact)
     {
-    case ICE_BOX:
-        n = 20;
-        break;
-    case BOOKSHELF:
-        n = !rn2(100) ? 10 : (level_difficulty() >= 13) ? 5 : (level_difficulty() >= 10) ? 4 : 3;
-        break;
-    case MINE_CART:
-        n = !rn2(3) ? 0 : 8; /* At least one third of the mine carts are empty */
-        break;
-    case WEAPON_RACK:
-        n = 4;
-        break;
-    case CHEST:
-        n = box->olocked ? 7 : 5;
-        break;
-    case LARGE_BOX:
-        n = box->olocked ? 5 : 3;
-        break;
-    case COFFIN:
-        n = 3;
-        break;
-    case SARCOPHAGUS:
-        n = 4;
-        break;
-    case SACK:
-    case OILSKIN_SACK:
-    case BACKPACK:
-    case LEATHER_BAG:
-    case ORIENTAL_SILK_SACK:
-    case EXPENSIVE_HANDBAG:
-    case BAG_OF_WIZARDRY:
-    case BAG_OF_TREASURE_HAULING:
-    case BAG_OF_THE_GLUTTON:
-        /* initial inventory: sack starts out empty */
-        if (moves <= 1 && !in_mklev) {
+        n = 0;
+    }
+    else
+    {
+        switch (box->otyp)
+        {
+        case ICE_BOX:
+            n = 20;
+            break;
+        case BOOKSHELF:
+            n = !rn2(100) ? 10 : (level_difficulty() >= 13) ? 5 : (level_difficulty() >= 10) ? 4 : 3;
+            break;
+        case MINE_CART:
+            n = !rn2(3) ? 0 : 8; /* At least one third of the mine carts are empty */
+            break;
+        case WEAPON_RACK:
+            n = 4;
+            break;
+        case GOLDEN_CHEST:
+        case CHEST:
+            n = box->olocked ? 7 : 5;
+            break;
+        case LARGE_BOX:
+            n = box->olocked ? 5 : 3;
+            break;
+        case COFFIN:
+            n = 3;
+            break;
+        case SARCOPHAGUS:
+            n = 4;
+            break;
+        case SACK:
+        case OILSKIN_SACK:
+        case BACKPACK:
+        case LEATHER_BAG:
+        case ORIENTAL_SILK_SACK:
+        case EXPENSIVE_HANDBAG:
+        case BAG_OF_WIZARDRY:
+        case BAG_OF_TREASURE_HAULING:
+        case BAG_OF_THE_GLUTTON:
+            /* initial inventory: sack starts out empty */
+            if (moves <= 1 && !in_mklev) {
+                n = 0;
+                break;
+            }
+            /*FALLTHRU*/
+        case QUIVER_OF_INFINITE_ARROWS:
+        case POUCH_OF_ENDLESS_BOLTS:
+        case BAG_OF_INFINITE_SLING_BULLETS:
+        case BAG_OF_HOLDING:
+            n = 1;
+            break;
+        default:
             n = 0;
             break;
         }
-        /*FALLTHRU*/
-    case QUIVER_OF_INFINITE_ARROWS:
-    case POUCH_OF_ENDLESS_BOLTS:
-    case BAG_OF_INFINITE_SLING_BULLETS:
-    case BAG_OF_HOLDING:
-        n = 1;
-        break;
-    default:
-        n = 0;
-        break;
     }
 
     for (n = rn2(n + 1); n > 0; n--) 
@@ -590,7 +601,12 @@ struct obj *box;
         }
         else if (box->otyp == BOOKSHELF) 
         {
-            if (rn2(3))
+            if (!rn2(5))
+            {
+                /* A random catalogue */
+                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, FIRST_CATALOGUE + rn2(NUM_CATALOGUES), MKOBJ_FLAGS_PARAM_IS_TITLE);
+            }
+            else if (rn2(3))
                 otmp = mkobj(SCROLL_CLASS, FALSE, TRUE);
             else
                 otmp = mkobj(SPBOOK_CLASS, FALSE, TRUE);
@@ -1341,6 +1357,7 @@ unsigned long mkflags;
     struct obj *otmp;
     char let = objects[otyp].oc_class;
     boolean forcemythic = (mkflags & MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY) != 0;
+    boolean forcelegendary = (mkflags & MKOBJ_FLAGS_FORCE_LEGENDARY) != 0;
 
     otmp = newobj();
     *otmp = zeroobj;
@@ -1910,7 +1927,11 @@ unsigned long mkflags;
     /* Exceptionality */
     if (can_have_exceptionality(otmp) && !(objects[otmp->otyp].oc_flags4 & O4_NEVER_GENERATED_WITH_EXCEPTIONALITY) && mkobj_type < 2 && otmp->oartifact == 0)
     {
-        if (objects[otmp->otyp].oc_flags4 & O4_GENERATED_CELESTIAL)
+        if ((mkflags & MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY) && param >= 0)
+        {
+            otmp->exceptionality = (uchar) param;
+        }
+        else if (objects[otmp->otyp].oc_flags4 & O4_GENERATED_CELESTIAL)
         {
             otmp->exceptionality = EXCEPTIONALITY_CELESTIAL;
         }
@@ -1977,7 +1998,7 @@ unsigned long mkflags;
     }
 
     /* Mythic quality */
-    if (can_obj_have_mythic(otmp) && (forcemythic || (level_difficulty() >= 3 && mkobj_type < 2)) && otmp->oartifact == 0)
+    if (can_obj_have_mythic(otmp) && (forcemythic || forcelegendary || (level_difficulty() >= 3 && mkobj_type < 2)) && otmp->oartifact == 0)
     {
         boolean doublechance = !!(objects[otmp->otyp].oc_flags4 & O4_DOUBLE_MYTHIC_CHANCE);
         boolean makemythic = FALSE;
@@ -1992,9 +2013,9 @@ unsigned long mkflags;
         else
             makemythic = otmp->exceptionality ? !rn2(doublechance ? 6 : 12) : !rn2(doublechance ? 12 : 24);
 
-        if (makemythic || forcemythic)
+        if (makemythic || forcemythic || forcelegendary)
         {
-            randomize_mythic_quality(otmp, FALSE, &otmp->mythic_prefix, &otmp->mythic_suffix);
+            randomize_mythic_quality(otmp, forcelegendary ? 2 : 0, &otmp->mythic_prefix, &otmp->mythic_suffix);
         }
     }
 
@@ -3162,7 +3183,7 @@ register struct obj *obj;
          *  The macro DELTA_CWT in pickup.c also implements these
          *  weight equations.
          */
-        if (obj->otyp == BAG_OF_HOLDING || obj->otyp == GOLDEN_CHEST)
+        if (obj->otyp == BAG_OF_HOLDING)
             cwt = obj->cursed ? (cwt * 2) : obj->blessed ? ((cwt + 3) / 4)
                                                          : ((cwt + 1) / 2);
 
@@ -3187,7 +3208,7 @@ register struct obj *obj;
     return (wt ? wt * (int) obj->quan : ((int) obj->quan + 1) >> 1);
 }
 
-static int treefruits[] = { APPLE, ORANGE, PEAR, BANANA, POMEGRANATE, EUCALYPTUS_LEAF, FIG, DRAGON_FRUIT };
+static const int treefruits[] = { APPLE, ORANGE, PEAR, BANANA, POMEGRANATE, EUCALYPTUS_LEAF, FIG, DRAGON_FRUIT };
 
 struct obj *
 rnd_treefruit_at(x, y)
@@ -4359,7 +4380,7 @@ sanity_check_worn(obj)
 struct obj *obj;
 {
 #if defined(BETA) || defined(DEBUG)
-    static unsigned long wearbits[] = {
+    static const unsigned long wearbits[] = {
         W_ARM,    W_ARMC,   W_ARMH,    W_ARMS,     W_ARMG, W_ARMF,  W_ARMU,  W_ARMO,      W_ARMB,
         W_WEP,    W_QUIVER, W_SWAPWEP, W_SWAPWEP2, W_AMUL, W_RINGL, W_RINGR, W_BLINDFOLD,
         W_MISC,   W_MISC2,  W_MISC3,   W_MISC4,    W_MISC5,

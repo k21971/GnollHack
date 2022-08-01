@@ -1938,8 +1938,8 @@ struct mkroom *croom;
         if (m->peaceful >= 0)
         {
             mtmp->mpeaceful = m->peaceful;
-            /* changed mpeaceful again; have to reset malign */
-            set_malign(mtmp);
+            /* changed mpeaceful again; have to reset mhostility */
+            set_mhostility(mtmp);
         }
 
         if (m->asleep >= 0) 
@@ -4909,6 +4909,8 @@ struct sp_coder* coder;
         else
             levl[x][y].lamplit = rn2(2);
 
+        if (!levl[x][y].lamplit)
+            levl[x][y].flags |= L_INITIALLY_UNLIT;
     }
 
     opvar_free(gcoord);

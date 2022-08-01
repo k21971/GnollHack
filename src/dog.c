@@ -45,7 +45,7 @@ boolean set_tameness;
     }
     mtmp->ispartymember = 0;
     mtmp->mavenge = 0;
-    set_malign(mtmp); /* recalc alignment now that it's tamed */
+    set_mhostility(mtmp); /* recalc alignment now that it's tamed */
     mtmp->mleashed = 0;
     mtmp->meating = 0;
     EDOG(mtmp)->droptime = 0;
@@ -156,7 +156,7 @@ boolean quietly;
                 if (!quietly)
                     You("get a bad feeling about this.");
                 mtmp->mpeaceful = 0;
-                set_malign(mtmp);
+                set_mhostility(mtmp);
                 newsym(mtmp->mx, mtmp->my);
             }
         }
@@ -172,7 +172,7 @@ boolean quietly;
             mtmp = u_name_monst(mtmp, UONAME(otmp));
         }
     }
-    set_malign(mtmp); /* more alignment changes */
+    set_mhostility(mtmp); /* more alignment changes */
     newsym(mtmp->mx, mtmp->my);
 
     /* must wield weapon immediately since pets will otherwise drop it */
@@ -183,6 +183,8 @@ boolean quietly;
     return mtmp;
 }
 
+static int petname_used = 0;
+
 struct monst *
 makedog()
 {
@@ -191,7 +193,6 @@ makedog()
     const char *petname;
     const char* petname_female = "";
     int pettype;
-    static int petname_used = 0;
 
     if (preferred_pet == 'n')
         return ((struct monst *) 0);
@@ -1157,7 +1158,7 @@ boolean thrown;
     {
         /* worst case, at least it'll be peaceful. */
         mtmp->mpeaceful = 1;
-        set_malign(mtmp);
+        set_mhostility(mtmp);
         newsym_with_flags(mtmp->mx, mtmp->my, NEWSYM_FLAGS_KEEP_OLD_EFFECT_GLYPHS);
     }
 
@@ -1439,6 +1440,12 @@ struct monst *mtmp;
         if (!mtmp->mtame)
             newsym(mtmp->mx, mtmp->my);
     }
+}
+
+void
+reset_dogs(VOID_ARGS)
+{
+    petname_used = 0;
 }
 
 /*dog.c*/

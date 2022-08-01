@@ -2035,8 +2035,8 @@ namespace GnollHackClient.Pages.Game
         }
 
         private readonly object _menuDrawOnlyLock = new object();
-        private bool _menuDrawOnlyClear = false;
-        private bool _menuRefresh = true;
+        private bool _menuDrawOnlyClear = true;
+        private bool _menuRefresh = false;
 
         private void ShowMenuCanvas(GHMenuInfo menuinfo, GHWindow ghwindow)
         {
@@ -2153,7 +2153,6 @@ namespace GnollHackClient.Pages.Game
             }
 
             //canvasView.MenuItems = newmis;
-            RefreshMenuRowCounts = true;
             lock (MenuCanvas.MenuItemLock)
             {
                 MenuCanvas.MenuItems = newmis;
@@ -2281,6 +2280,7 @@ namespace GnollHackClient.Pages.Game
             else
             {
                 var menu = new GameMenuPage(this);
+                TallyRealTime();
                 await App.Current.MainPage.Navigation.PushModalAsync(menu);
             }
 
@@ -2289,6 +2289,7 @@ namespace GnollHackClient.Pages.Game
         public async void ShowGameMenu(object sender, EventArgs e)
         {
             var menu = new GameMenuPage(this);
+            TallyRealTime();
             await App.Current.MainPage.Navigation.PushModalAsync(menu);
         }
 
@@ -2470,8 +2471,14 @@ namespace GnollHackClient.Pages.Game
             SKImageInfo info = e.Info;
             SKSurface surface = e.Surface;
             SKCanvas canvas = surface.Canvas;
+            float canvaswidth = canvasView.CanvasSize.Width;
+            float canvasheight = canvasView.CanvasSize.Height;
 
             canvas.Clear(SKColors.Black);
+
+            if (canvaswidth <= 16 || canvasheight <= 16)
+                return;
+
             double canvas_scale = GetCanvasScale();
             float inverse_canvas_scale = canvas_scale == 0 ? 0.0f : 1.0f / (float)canvas_scale;
             long generalcountervalue, maincountervalue;
@@ -2559,8 +2566,6 @@ namespace GnollHackClient.Pages.Game
 
 
                 /* Map */
-                float canvaswidth = canvasView.CanvasSize.Width;
-                float canvasheight = canvasView.CanvasSize.Height;
                 float textscale = GetTextScale();
                 float UsedFontSize = ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
                 textPaint.Typeface = App.DejaVuSansMonoTypeface;
@@ -6636,6 +6641,18 @@ namespace GnollHackClient.Pages.Game
                 else if (App._autodraws[autodraw].draw_type == (int)autodraw_drawing_types.AUTODRAW_DRAW_CANDELABRUM_CANDLES && otmp_round != null)
                 {
                     float y_start = scaled_y_padding;
+                    if (!is_inventory)
+                    {
+                        if (tileflag_normalobjmissile)
+                        {
+                            if (!tileflag_fullsizeditem)
+                                y_start += (height - scaled_tile_height) / 2;
+                        }
+                        else if (tileflag_halfsize)
+                        {
+                            y_start += height / 2;
+                        }
+                    }
                     float x_start = scaled_x_padding;
                     int x_padding = 13;
                     int item_width = 6;
@@ -8304,6 +8321,7 @@ namespace GnollHackClient.Pages.Game
         private int _firstDrawnMenuItemIdx = -1;
         private int _lastDrawnMenuItemIdx = -1;
         private float _totalMenuHeight = 0;
+
         private bool _refreshMenuRowCounts = true;
         private readonly object _refreshMenuRowCountLock = new object();
         private bool RefreshMenuRowCounts { get { lock (_refreshMenuRowCountLock) { return _refreshMenuRowCounts; } } set { lock (_refreshMenuRowCountLock) { _refreshMenuRowCounts = value; } } }
@@ -8329,6 +8347,9 @@ namespace GnollHackClient.Pages.Game
                 if (_menuDrawOnlyClear)
                     return;
             }
+
+            if (canvaswidth <= 16 || canvasheight <= 16)
+                return;
 
             lock (MenuCanvas.MenuItemLock)
             {
@@ -9409,6 +9430,9 @@ namespace GnollHackClient.Pages.Game
 
             canvas.Clear();
 
+            if (canvaswidth <= 16 || canvasheight <= 16)
+                return;
+
             lock (TextCanvas.MenuItemLock)
             {
                 if (TextCanvas.PutStrItems == null || TextCanvas.PutStrItems.Count == 0)
@@ -9721,6 +9745,9 @@ namespace GnollHackClient.Pages.Game
             bool isLandscape = canvaswidth > canvasheight;
 
             canvas.Clear();
+            if (canvaswidth <= 16 || canvasheight <= 16)
+                return;
+
             CmdBtnMatrixRect = new SKRect();
 
             using (SKPaint textPaint = new SKPaint())
@@ -10723,6 +10750,18 @@ namespace GnollHackClient.Pages.Game
                 if (ClientGame.ResponseDictionary.TryGetValue(_clientGame, out queue))
                 {
                     queue.Enqueue(new GHResponse(_clientGame, GHRequestType.SaveGameAndWaitForResume));
+                }
+            }
+        }
+
+        public void TallyRealTime()
+        {
+            if (_clientGame != null)
+            {
+                ConcurrentQueue<GHResponse> queue;
+                if (ClientGame.ResponseDictionary.TryGetValue(_clientGame, out queue))
+                {
+                    queue.Enqueue(new GHResponse(_clientGame, GHRequestType.TallyRealTime));
                 }
             }
         }

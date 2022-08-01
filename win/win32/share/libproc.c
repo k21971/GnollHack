@@ -546,11 +546,19 @@ void lib_issue_gui_command(int initid)
         }
         break;
     }
+    case GUI_CMD_REPORT_PLAY_TIME:
+    {
+        long timePassed = (long)(urealtime.finish_time - urealtime.start_timing);
+        lib_callbacks.callback_report_play_time(timePassed, urealtime.realtime);
+        break;
+    }
     case GUI_CMD_GAME_START:
     {
         lib_callbacks.callback_report_player_name(plname);
         break;
     }
+    case GUI_CMD_GAME_ENDED:
+        break;
     default:
         break;
     }
@@ -1351,9 +1359,7 @@ lib_ui_has_input(VOID_ARGS)
 /* Helper functions */
 void lib_bail(const char* mesg)
 {
-    clearlocks();
-    lib_exit_nhwindows(mesg);
-    gnollhack_exit(EXIT_SUCCESS);
+    nh_bail(EXIT_SUCCESS, mesg, FALSE);
 }
 
 void lib_init_platform(VOID_ARGS)

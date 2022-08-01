@@ -43,12 +43,12 @@ namespace GnollHackClient
         string GetPropertyName(int prop_index);
         List<string> GetExtendedCommands();
         string DumplogDateString(long startdate);
-        void SwitchDemoVersion(bool active);
         void SetPetMID(uint m_id);
         int Chmod(string filename, uint mode);
 
         int StartGnollHack(ClientGame clientGame);
 
         void SaveAndRestoreSavedGame();
+        void TallyRealTime();
     }
 }

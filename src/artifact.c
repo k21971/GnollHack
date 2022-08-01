@@ -52,6 +52,8 @@ STATIC_OVL int spec_dbon_applies = 0;
 static boolean artiexist[1 + NUM_ARTIFACTS + 1];
 /* and a discovery list for them (no dummy first entry here) */
 STATIC_OVL short artidisco[NUM_ARTIFACTS];
+static int nesting = 0; /* recursion control */
+static int mkot_trap_warn_count = 0;
 
 STATIC_DCL void NDECL(hack_artifacts);
 STATIC_DCL boolean FDECL(artifact_attack_type, (int, struct obj *));
@@ -110,6 +112,9 @@ reset_artifacts(VOID_ARGS)
 {
     memset((genericptr_t)artiexist, 0, sizeof artiexist);
     memset((genericptr_t)artidisco, 0, sizeof artidisco);
+    mkot_trap_warn_count = 0;
+    nesting = 0;
+    spec_dbon_applies = 0;
 }
 
 
@@ -952,6 +957,9 @@ is_immune(mtmp, dmgtype)
 struct monst* mtmp;
 int dmgtype;
 {
+    if (!mtmp)
+        return FALSE;
+
     boolean yours = (mtmp == &youmonst);
 
     switch (dmgtype)
@@ -990,10 +998,10 @@ int dmgtype;
     case AD_PLYS:
         return (yours ? Free_action : resists_paralysis(mtmp));
     case AD_PHYS:
-        return 0;
+        return FALSE;
     }
 
-    return 0;
+    return FALSE;
 
 }
 /* return the M2 flags of monster that an artifact's special attacks apply
@@ -3000,7 +3008,10 @@ struct obj *obj;
         switch (oart->inv_prop) {
         case CONFLICT:
             if ((!temporary_effect && switch_on) || temporary_effect)
+            {
+                play_sfx_sound(SFX_CONFLICT);
                 You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "like a rabble-rouser.");
+            }
             else
                 You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "the tension decrease around you.");
             break;
@@ -3008,14 +3019,20 @@ struct obj *obj;
             if (obj->oartifact == ART_MAGIC_MIRROR_OF_MERLIN)
             {
                 if ((!temporary_effect && switch_on) || temporary_effect)
+                {
+                    play_sfx_sound(SFX_MIRROR_IMAGE);
                     pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s an illusionary image of yourself near you.", Tobjnam(obj, "project"));
+                }
                 else
                     Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "illusionary double disappears.");
             }
             else
             {
                 if ((!temporary_effect && switch_on) || temporary_effect)
+                {
+                    play_sfx_sound(SFX_MIRROR_IMAGE);
                     You_feel_ex(ATR_NONE, CLR_MSG_SUCCESS, "your image becomes displaced.");
+                }
                 else
                     You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "your image is in its right place again.");
             }
@@ -3057,6 +3074,9 @@ struct obj* obj;
     if (obj && obj->oartifact && !obj->nknown && (artilist[obj->oartifact].aflags & (AF_FAMOUS | AF_NAME_KNOWN_WHEN_INVOKED)))
     {
         play_sfx_sound(SFX_ARTIFACT_NAME_KNOWN);
+        if(obj->oartifact == ART_HOWLING_FLAIL)
+            play_sfx_sound(SFX_HOWLING_FLAIL_HOWL);
+
         pline_ex(ATR_NONE, CLR_MSG_HINT, "As you invoke %s, %syou become aware that %s named %s!", the(cxname(obj)),
             obj->oartifact == ART_HOWLING_FLAIL ? "it lets loose a majestic howl and " : "",
             (pair_of(obj) || obj->quan > 1) ? "they are" : "it is", bare_artifactname(obj));
@@ -3758,16 +3778,15 @@ boolean drop_untouchable;
     return FALSE;
 }
 
+
 /* check all items currently in use (mostly worn) for touchability */
 void
 retouch_equipment(dropflag)
 int dropflag; /* 0==don't drop, 1==drop all, 2==drop weapon */
 {
-    static int nesting = 0; /* recursion control */
     struct obj *obj;
     boolean dropit, had_gloves = (uarmg != 0);
     int had_rings = (!!uleft + !!uright);
-
     /*
      * We can potentially be called recursively if losing/unwearing
      * an item causes worn helm of opposite alignment to come off or
@@ -3827,7 +3846,6 @@ int dropflag; /* 0==don't drop, 1==drop all, 2==drop weapon */
         clear_bypasses(); /* reset upon final exit */
 }
 
-static int mkot_trap_warn_count = 0;
 
 STATIC_OVL int
 count_surround_traps(x, y)

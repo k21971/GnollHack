@@ -1318,9 +1318,7 @@ choose_game_difficulty()
         if (selected->item.a_int == QUIT_DUMMY)
         {
             /* Quit */
-            clearlocks();
-            exit_nhwindows((char*)0);
-            gnollhack_exit(EXIT_SUCCESS);
+            nh_bail(EXIT_SUCCESS, "Until next time, then...", TRUE);
         }
         context.game_difficulty = selected->item.a_int + MIN_DIFFICULTY_LEVEL - 1;
         free((genericptr_t)selected);
@@ -1328,9 +1326,7 @@ choose_game_difficulty()
     else
     {
         /* Quit upon ESC, too */
-        clearlocks();
-        exit_nhwindows((char*)0);
-        gnollhack_exit(EXIT_SUCCESS);
+        nh_bail(EXIT_SUCCESS, "Until next time, then...", TRUE);
     }
 }
 
@@ -1400,15 +1396,16 @@ newgame()
         obj_delivery(FALSE); /* finish wizkit */
     vision_reset();          /* set up internals for level (after mklev) */
     
+    if (MON_AT(u.ux, u.uy))
+        mnexto(m_at(u.ux, u.uy));
+    (void) makedog();
+
     /* Change to intro music */
     update_game_music();
 
     /* Mark game as started; check special room plays intro here */
     context.game_started = TRUE;
 
-    if (MON_AT(u.ux, u.uy))
-        mnexto(m_at(u.ux, u.uy));
-    (void) makedog();
     docrt();
     status_reassess();
 
@@ -1569,7 +1566,7 @@ const char *msg;
  *
  */
 
-static struct early_opt earlyopts[] = {
+static const struct early_opt earlyopts[] = {
     {ARG_DEBUG, "debug", 5, TRUE},
     {ARG_VERSION, "version", 4, TRUE},
 #ifdef WIN32

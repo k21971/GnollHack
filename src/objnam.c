@@ -79,12 +79,12 @@ const char* weapon_type_names[MAX_WEAPON_TYPES] = {
 };
 
 const char* food_type_names[MAX_FOOD_TYPES] = {
-    "general food", "ration", "fruit", "vegetable", "nuts", "seeds", "leaf", "kelp",  "bread",
+    "general food", "ration", "fruit", "vegetable", "nut", "seed", "leaf", "kelp",  "bread",
     "cake", "candy", "mushroom", "mold", "glob", "egg", "meat", "jelly", "corpse",  "tin"
 };
 
 const char* misc_type_names[MAX_MISC_TYPES] = {
-    "", "set of wings", "pair of pants", "skirt", "wrist watch",
+    "general item", "set of wings", "pair of pants", "skirt", "wrist watch",
     "nose ring", "headband", "pair of earrings",
     "ioun stone", "bracelet", "pair of bracers", "belt", "pair of eyeglasses", "blindfold", "scarf", "set of extra arms", "brooch", "mask", "necktie"
 };
@@ -228,14 +228,6 @@ register int otyp;
                 Strcpy(buf, "book");
             nn = 0;
         }
-#if 0
-        if (otyp != SPE_NOVEL) {
-            Strcpy(buf, "spellbook");
-        } else {
-            Strcpy(buf, !nn ? "book" : "novel");
-            nn = 0;
-        }
-#endif
         break;
     case RING_CLASS:
         Strcpy(buf, "ring");
@@ -721,24 +713,6 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             Strcat(buf, actualn);
         } else if (un) {
             Strcat(buf, dn);
-#if 0
-            if (is_boots(obj))
-                Strcat(buf, "boots");
-            else if (is_gloves(obj))
-                Strcat(buf, "gloves");
-            else if (is_cloak(obj))
-                Strcpy(buf, "cloak");
-            else if (is_robe(obj))
-                Strcpy(buf, "robe");
-            else if (is_bracers(obj))
-                Strcpy(buf, "bracers");
-            else if (is_helmet(obj))
-                Strcpy(buf, "helmet");
-            else if (is_shield(obj))
-                Strcpy(buf, "shield");
-            else
-                Strcpy(buf, "armor");
-#endif
             Strcat(buf, " called ");
             Strcat(buf, un);
         } else
@@ -1864,15 +1838,7 @@ weapon_here:
         printweight(weightbuf, objweight_oz, TRUE, TRUE);
         char buf[BUFSZ];
         Sprintf(buf, "%s - %s", weightbuf, bp);
-#if 0
-        if (objweight >= 1000)
-            Sprintf(buf, "%3.0f cwt - %s", objweight / 100, bp);
-        else if (objweight >= 10)
-            Sprintf(buf, "%3.0f lbs - %s", objweight, bp);
-        else
-            Sprintf(buf, "%1.1f %s - %s", objweight, objweight == 1 ? "lb " : "lbs", bp);
-#endif
-        strcpy(bp, buf);
+        Strcpy(bp, buf);
 
     }
     
@@ -1882,13 +1848,7 @@ weapon_here:
         printweight(weightbuf, objweight_oz, FALSE, FALSE);
         char buf[BUFSZ];
         Sprintf(buf, "%s (%s)", bp, weightbuf);
-#if 0
-        if (objweight >= 10)// || ((int)(objweight / 10)) * 10 == (int)objweight)
-            Sprintf(buf, "%s (%3.0f %s)", bp, (int)objweight, objweight == 1 ? "lb" : "lbs");
-        else
-            Sprintf(buf, "%s (%.1f %s)", bp, objweight, objweight == 1 ? "lb" : "lbs");
-#endif
-        strcpy(bp, buf);
+        Strcpy(bp, buf);
     }
 
     return bp;
@@ -2861,7 +2821,7 @@ struct sing_plur {
 /* word pairs that don't fit into formula-based transformations;
    also some suffices which have very few--often one--matches or
    which aren't systematically reversible (knives, staves) */
-static struct sing_plur one_off[] = {
+static const struct sing_plur one_off[] = {
     { "child",
       "children" },      /* (for wise guys who give their food funny names) */
     { "cubus", "cubi" }, /* in-/suc-cubus */
@@ -3532,6 +3492,9 @@ static const struct alt_spellings {
     { "potion of superheroism", POT_SUPER_HEROISM },
     { "smooth shield", SHIELD_OF_REFLECTION },
     { "gauntlets of power", GAUNTLETS_OF_OGRE_POWER },
+    { "helmet of telepathy", HELM_OF_TELEPATHY },
+    { "helmet of opposite alignment", HELM_OF_OPPOSITE_ALIGNMENT },
+    { "helmet of brilliance", HELM_OF_BRILLIANCE },
     { "grey dragon scale mail", GRAY_DRAGON_SCALE_MAIL },
     { "grey dragon scales", GRAY_DRAGON_SCALES },
     { "iron ball", HEAVY_IRON_BALL },
@@ -4977,17 +4940,6 @@ boolean is_wiz_wish;
     }
     else 
     {
-#if 0
-        if (oclass == WAND_CLASS) {
-            if (enchantment > 1 && spesgn == -1)
-                enchantment = 1;
-        } else {
-            if (enchantment > 0 && spesgn == -1)
-                enchantment = 0;
-        }
-        if (enchantment > otmp->enchantment)
-            enchantment = otmp->enchantment;
-#endif
         if (enchantment > 0 && spesgn == -1)
             enchantment = 0;
         if (enchantment > otmp->enchantment)

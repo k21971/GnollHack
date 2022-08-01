@@ -149,7 +149,7 @@ int x, y, n, mmflags;
             {
                 mon->mpeaceful = FALSE;
                 mon->mavenge = 0;
-                set_malign(mon);
+                set_mhostility(mon);
                 /* Undo the second peace_minded() check in makemon(); if the
                  * monster turned out to be peaceful the first time we
                  * didn't create it at all; we don't want a second check.
@@ -165,7 +165,7 @@ m_initthrow(mtmp, otyp, oquan_const, oquan_rnd, poisoned, elemental_enchantment,
 struct monst *mtmp;
 int otyp, oquan_const, oquan_rnd;
 boolean poisoned;
-uchar elemental_enchantment, exceptionality;
+int elemental_enchantment, exceptionality;
 {
     register struct obj *otmp;
 
@@ -175,8 +175,10 @@ uchar elemental_enchantment, exceptionality;
     otmp->owt = weight(otmp);
     if (is_poisonable(otmp) && poisoned)
         otmp->opoisoned = TRUE;
-    otmp->elemental_enchantment = elemental_enchantment;
-    otmp->exceptionality = exceptionality;
+    if(is_elemental_enchantable(otmp) && elemental_enchantment >= 0)
+        otmp->elemental_enchantment = elemental_enchantment;
+    if (can_have_exceptionality(otmp) && exceptionality >= 0)
+        otmp->exceptionality = exceptionality;
     (void) mpickobj(mtmp, otmp);
 }
 
@@ -382,7 +384,7 @@ register struct monst *mtmp;
             if (!rn2(5))
             {
                 (void)mongets(mtmp, CROSSBOW);
-                m_initthrow(mtmp, GNOLLISH_QUARREL, 6, 20, !rn2(20), 0, 0);
+                m_initthrow(mtmp, GNOLLISH_QUARREL, 6, 20, !rn2(20), -1, -1);
             }
             break;
         case PM_GNOLL_LORD:
@@ -408,7 +410,7 @@ register struct monst *mtmp;
                 else
                     (void)mongets(mtmp, CROSSBOW);
 
-                m_initthrow(mtmp, GNOLLISH_QUARREL, 11, 15, !rn2(10), 0, 0);
+                m_initthrow(mtmp, GNOLLISH_QUARREL, 11, 15, !rn2(10), -1, -1);
             }
             break;
         case PM_GNOLL_KING:
@@ -420,7 +422,7 @@ register struct monst *mtmp;
             else
                 (void)mongets(mtmp, FLAIL);
             (void)mongets(mtmp, HEAVY_CROSSBOW);
-            m_initthrow(mtmp, GNOLLISH_QUARREL, 21, 10, !rn2(5), 0, 0);
+            m_initthrow(mtmp, GNOLLISH_QUARREL, 21, 10, !rn2(5), -1, -1);
             break;
         case PM_FLIND:
             if (!rn2(2))
@@ -531,7 +533,7 @@ register struct monst *mtmp;
                 if (rn2(3))
                     (void) mongets(mtmp, ELVEN_SHORT_SWORD);
                 (void) mongets(mtmp, ELVEN_LONG_BOW);
-                m_initthrow(mtmp, ELVEN_ARROW, 10, 12, FALSE, 0, 0);
+                m_initthrow(mtmp, ELVEN_ARROW, 10, 12, FALSE, -1, -1);
                 break;
             case 1:
                 (void) mongets(mtmp, ELVEN_BROADSWORD);
@@ -613,7 +615,7 @@ register struct monst *mtmp;
                 if (!rn2(3)) 
                 {
                     (void) mongets(mtmp, SHORT_BOW);
-                    m_initthrow(mtmp, ARROW, 10, 12, FALSE, 0, 0);
+                    m_initthrow(mtmp, ARROW, 10, 12, FALSE, -1, -1);
                 }
                 break;
             case PM_HUNTER:
@@ -622,7 +624,7 @@ register struct monst *mtmp;
                     (void) mongets(mtmp, rn2(2) ? LEATHER_JACKET
                                                 : LEATHER_ARMOR);
                 (void) mongets(mtmp, LONG_BOW);
-                m_initthrow(mtmp, ARROW, 10, 12, FALSE, 0, 0);
+                m_initthrow(mtmp, ARROW, 10, 12, FALSE, -1, -1);
                 break;
             case PM_THUG:
                 (void) mongets(mtmp, CLUB);
@@ -698,26 +700,6 @@ register struct monst *mtmp;
             {
                 int weaptype = !rn2(3) || is_lord(ptr) || is_prince(ptr) ? SWORD_OF_HOLY_VENGEANCE : !rn2(3) ? LONG_SWORD : SILVER_LONG_SWORD;
                 short artifacttype = 0;
-
-#if 0
-                if (!rn2(4))
-                {
-                    switch (rn2(2))
-                    {
-                    case 0:
-                        weaptype = LONG_SWORD;
-                        artifacttype = ART_SUNSWORD;
-                        break;
-                    case 1:
-                        weaptype = SILVER_LONG_SWORD;
-                        artifacttype = ART_DEMONBANE;
-                        break;
-                    default:
-                        break;
-                    }
-                }
-#endif
-
                 otmp = mksobj(weaptype, FALSE, FALSE, FALSE);
 
                 /* maybe make it special */
@@ -783,7 +765,8 @@ register struct monst *mtmp;
                 break;
             }
             case 2:
-                (void) mongets(mtmp, SLING);
+                (void) mongets(mtmp, !rn2(7) ? STAFF_SLING : SLING);
+                (void) mongets(mtmp, !rn2(20) ? SILVER_SLING_BULLET : !rn2(5) ? IRON_SLING_BULLET : LEADEN_SLING_BULLET);
                 break;
             }
             if (!rn2(10))
@@ -844,7 +827,7 @@ register struct monst *mtmp;
         /* create Keystone Kops with cream pies to
            throw. As suggested by KAA.     [MRS] */
         if (!rn2(4))
-            m_initthrow(mtmp, CREAM_PIE, 1, 2, FALSE, 0, 0);
+            m_initthrow(mtmp, CREAM_PIE, 1, 2, FALSE, -1, -1);
         if (!rn2(3))
             (void) mongets(mtmp, (rn2(2)) ? CLUB : RUBBER_HOSE);
         break;
@@ -874,7 +857,7 @@ register struct monst *mtmp;
             if (!rn2(3))
             {
                 (void) mongets(mtmp, ORCISH_SHORT_BOW);
-                m_initthrow(mtmp, ORCISH_ARROW, 10, 12, TRUE, 0, 0);
+                m_initthrow(mtmp, ORCISH_ARROW, 10, 12, TRUE, -1, -1);
             }
             if (!rn2(3))
                 (void) mongets(mtmp, GREAT_ORCISH_SHIELD);
@@ -889,11 +872,27 @@ register struct monst *mtmp;
             if(!rn2(2))
                 (void)mongets(mtmp, GINSENG_ROOT);
             break;
+        case PM_GOBLIN_KING:
+            if (!rn2(2))
+            {
+                (void)mongets(mtmp, !rn2(2) ? STAFF_SLING : SLING);
+                m_initthrow(mtmp, !rn2(5) ? SILVER_SLING_BULLET : !rn2(2) ? IRON_SLING_BULLET : LEADEN_SLING_BULLET, 10, 12, FALSE, -1, -1);
+            }
+            (void)mongets(mtmp, SCIMITAR);
+            break;
+        case PM_GOBLIN:
+        case PM_HOBGOBLIN:
+            if (!rn2(mm == PM_GOBLIN ? 6 : 3))
+            {
+                (void)mongets(mtmp, !rn2( 6) ? STAFF_SLING : SLING);
+                m_initthrow(mtmp, !rn2(5) ? IRON_SLING_BULLET : LEADEN_SLING_BULLET, 10, 12, FALSE, -1, -1);
+            }
+            if (rn2(2))
+                (void)mongets(mtmp, (mm == PM_GOBLIN || !rn2(2)) ? ORCISH_DAGGER : SCIMITAR);
+            break;
         default:
             if (mm != PM_ORC_SHAMAN && rn2(2))
-                (void) mongets(mtmp, (mm == PM_GOBLIN || rn2(2) == 0)
-                                         ? ORCISH_DAGGER
-                                         : SCIMITAR);
+                (void) mongets(mtmp, (mm == PM_GOBLIN || !rn2(2)) ? ORCISH_DAGGER : SCIMITAR);
         }
         break;
     case S_OGRE:
@@ -901,7 +900,7 @@ register struct monst *mtmp;
         {
             if (ptr != &mons[PM_OGRE] && ptr != &mons[PM_OGRE_MAGE] && ptr != &mons[PM_OGRE_ARCHMAGE]) {
                 (void)mongets(mtmp, HEAVY_CROSSBOW);
-                m_initthrow(mtmp, CROSSBOW_BOLT, 10, 12, FALSE, 0, 0);
+                m_initthrow(mtmp, CROSSBOW_BOLT, 10, 12, FALSE, -1, -1);
             }
             (void)mongets(mtmp, CLUB);
         }
@@ -941,7 +940,7 @@ register struct monst *mtmp;
         break;
     case S_KOBOLD:
         if (!rn2(4))
-            m_initthrow(mtmp, DART, 5, 12, !rn2(20), 0, 0);
+            m_initthrow(mtmp, DART, 5, 12, !rn2(20), -1, -1);
         break;
 
     case S_CENTAUR:
@@ -950,12 +949,12 @@ register struct monst *mtmp;
             if (ptr == &mons[PM_FOREST_CENTAUR]) 
             {
                 (void) mongets(mtmp, SHORT_BOW);
-                m_initthrow(mtmp, ARROW, 10, 12, FALSE, 0, 0);
+                m_initthrow(mtmp, ARROW, 10, 12, FALSE, -1, -1);
             } 
             else
             {
                 (void) mongets(mtmp, CROSSBOW);
-                m_initthrow(mtmp, CROSSBOW_BOLT, 10, 12, FALSE, 0, 0);
+                m_initthrow(mtmp, CROSSBOW_BOLT, 10, 12, FALSE, -1, -1);
             }
         }
         break;
@@ -1021,6 +1020,14 @@ register struct monst *mtmp;
             }
         }
         break;
+    case S_MODRON:
+        if (mm < PM_MODRON_QUINTON && !rn2(3))
+        {
+            (void)mongets(mtmp, !rn2(2) ? STAFF_SLING : SLING);
+            m_initthrow(mtmp, !rn2(15) ? SILVER_SLING_BULLET : IRON_SLING_BULLET, 10, 12, FALSE, -1, -1);
+            goto default_equipment_here;
+        }
+        break;
     case S_TREANT:
         break;
     case S_DEMON:
@@ -1056,6 +1063,13 @@ register struct monst *mtmp;
         }
         case PM_HORNED_DEVIL:
             (void) mongets(mtmp, rn2(4) ? TRIDENT : BULLWHIP);
+            break;
+        case PM_BARBED_DEVIL:
+            if (!rn2(3))
+            {
+                (void)mongets(mtmp, !rn2(2) ? STAFF_SLING : SLING);
+                m_initthrow(mtmp, IRON_SLING_BULLET, 10, 12, FALSE, -1, -1);
+            }
             break;
         case PM_MARILITH:
             (void)mongets(mtmp, !rn2(5) ? LONG_SWORD : !rn2(4) ? SCIMITAR : !rn2(3) ? SHORT_SWORD : !rn2(2) ? BONE_DAGGER : AXE);
@@ -1101,6 +1115,7 @@ register struct monst *mtmp;
         if (!is_demon(ptr))
             break;
         /*FALLTHRU*/
+default_equipment_here:
     default:
         /*
          * Now the general case, some chance of getting some type
@@ -1114,7 +1129,7 @@ register struct monst *mtmp;
             if (strongmonst(ptr))
                 (void) mongets(mtmp, BATTLE_AXE);
             else
-                m_initthrow(mtmp, DART, 5, 12, !rn2(20), 0, 0);
+                m_initthrow(mtmp, DART, 5, 12, !rn2(20), -1, -1);
             break;
         case 2:
             if (strongmonst(ptr))
@@ -1122,18 +1137,18 @@ register struct monst *mtmp;
             else 
             {
                 (void) mongets(mtmp, CROSSBOW);
-                m_initthrow(mtmp, CROSSBOW_BOLT, 10, 12, FALSE, 0, 0);
+                m_initthrow(mtmp, CROSSBOW_BOLT, 10, 12, FALSE, -1, -1);
             }
             break;
         case 3:
             (void) mongets(mtmp, SHORT_BOW);
-            m_initthrow(mtmp, ARROW, 10, 12, FALSE, 0, 0);
+            m_initthrow(mtmp, ARROW, 10, 12, FALSE, -1, -1);
             break;
         case 4:
             if (strongmonst(ptr))
                 (void) mongets(mtmp, LONG_SWORD);
             else
-                m_initthrow(mtmp, DAGGER, 1, 3, FALSE, 0, 0);
+                m_initthrow(mtmp, DAGGER, 1, 3, FALSE, -1, -1);
             break;
         case 5:
             if (strongmonst(ptr))
@@ -1539,6 +1554,19 @@ register struct monst *mtmp;
             }
 
         }
+        else if (ptr == &mons[PM_VLAD_THE_IMPALER])
+        {
+            otmp = mksobj_with_flags(SPEAR, TRUE, FALSE, 0, EXCEPTIONALITY_INFERNAL, MKOBJ_FLAGS_FORCE_LEGENDARY | MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY);
+            if (otmp)
+            {
+                otmp->enchantment = 4 + rn2(4);
+                curse(otmp);
+                (void)mpickobj(mtmp, otmp);
+            }
+            (void) mongets(mtmp, POT_FULL_HEALING);
+            (void) mongets(mtmp, POT_SPEED);
+            (void) mongets(mtmp, AMULET_OF_REFLECTION);
+        }
         break;
     case S_LICH:
         //Weapons
@@ -1641,6 +1669,14 @@ register struct monst *mtmp;
         {
             if (!rn2(2))
                 (void)mongetsgold(mtmp, 5 + rn2(11));
+
+            if (!rn2(12))
+            {
+                struct obj* otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, MANUAL_CATALOGUE_OF_COMESTIBLES, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                if (otmp)
+                    (void)mpickobj(mtmp, otmp);
+            }
+
         }
         else if (ptr == &mons[PM_DWARF])
         {
@@ -2251,7 +2287,7 @@ boolean origin_at_mon;
     else
         m2->isminion = FALSE;
 
-    set_malign(m2);
+    set_mhostility(m2);
 
     if (!m2->mtame)
         m2->ispartymember = FALSE;
@@ -2328,28 +2364,16 @@ int
 monbasehp_per_lvl(mon)
 struct monst* mon;
 {
-    //struct permonst* ptr = mon->data;
+    if (!mon)
+        return 1;
+
     int hp = rnd(8); /* default is d8 */
 
-#if 0
-    /* like newmonhp, but home elementals are ignored, riders use normal d8 */
-    if (is_golem(ptr)) {
-        /* draining usually won't be applicable for these critters */
-        hp = golemhp(monsndx(ptr)) / (int)ptr->mlevel;
-        //    } else if (ptr->mlevel > MAX_MONSTER_LEVEL) {
-                /* arbitrary; such monsters won't be involved in draining anyway */
-        //        hp = 4 + rnd(4); /* 5..8 */
-        //    } else if (ptr->mlet == S_DRAGON && monsndx(ptr) >= PM_GRAY_DRAGON) {
-                /* adult dragons; newmonhp() uses In_endgame(&u.uz) ? 8 : 4 + rnd(4)
-                 */
-                 //        hp = rnd(8) + constitution_hp_bonus(mon->mcon); /* 4..8 */
+    if (!mon->m_lev) {
+        /* level 0 monsters use 1d4 instead of Nd8 */
+        hp = rnd(4);
     }
-    else
-#endif        
-        if (!mon->m_lev) {
-            /* level 0 monsters use 1d4 instead of Nd8 */
-            hp = rnd(4);
-        }
+
     if (hp < 1)
         hp = 1;
 
@@ -2384,34 +2408,11 @@ unsigned long mmflags;
     struct permonst *ptr = &mons[mndx];
     boolean use_maxhp = !!(mmflags & MM_MAX_HP);
     boolean use_normalhd = !!(mmflags & MM_NORMAL_HIT_DICE);
-
-    mon->m_lev = use_normalhd ? ptr->mlevel : adj_lev(ptr, level_adjustment);
-
     boolean dragonmaxhp = !!(ptr->mlet == S_DRAGON && mndx >= PM_GRAY_DRAGON && In_endgame(&u.uz));
-
-#if 0
-    /*
-    if (is_golem(ptr)) 
-    {
-        mon->mhpmax = mon->mhp = golemhp(mndx);
-    } else */
-    if (is_rider(ptr)) {
-        /* we want low HP, but a high mlevel so they can attack well */
-        mon->mhpmax = mon->mhp = d(10, 8);
- //   } else if (ptr->mlevel > MAX_MONSTER_LEVEL) {
-        /* "special" fixed hp monster
-         * the hit points are encoded in the mlevel in a somewhat strange
-         * way to fit in the 50..127 positive range of a signed character
-         * above the 1..49 that indicate "normal" monster levels */
-        //ABOVE is obsolete, since hp's are now ints
-//        mon->mhpmax = mon->mhp = 2 * (ptr->mlevel - 6);
-//        mon->m_lev = mon->mhp / 4; /* approximation */
-}
-    else
-#endif
-
     int hp = 0;
     int basemaxhp = 0;
+
+    mon->m_lev = use_normalhd ? ptr->mlevel : adj_lev(ptr, level_adjustment);
 
     if (mon->m_lev <= 0) 
     {
@@ -2423,14 +2424,6 @@ unsigned long mmflags;
         basemaxhp = (int)mon->m_lev * 8; // +mon->m_lev * constitution_hp_bonus(m_acurr(mon, A_CON));
         hp = use_maxhp || dragonmaxhp ? basemaxhp : d((int)mon->m_lev, 8); // +mon->m_lev * constitution_hp_bonus(m_acurr(mon, A_CON));
     }
-
-#if 0
-    /* Override hp if adjusting */
-    if (adj_existing_hp && mon->max_hp_percentage > 0)
-    {
-        hp = (mon->max_hp_percentage * basemaxhp) / 100;
-    }
-#endif
 
     if (hp < 1)
         hp = 1;
@@ -2448,17 +2441,6 @@ unsigned long mmflags;
     update_mon_maxhp(mon);
 
     mon->mhp = mon->mhpmax;
-
-#if 0
-    /* If adjusting, new hp = old_hp proportionally to old and new mhpmax's */
-    if (adj_existing_hp && old_hp > 0 && old_maxhp > 0 && mon->mhpmax > 0)
-    {
-        unsigned long result = ((unsigned long)old_hp * (unsigned long)mon->mhpmax) / (unsigned long)old_maxhp;
-        mon->mhp = (int)result;
-    }
-    else
-        mon->mhp = mon->mhpmax;
-#endif
 
     if (mon->mhp < 1)
         mon->mhp = 1;
@@ -3067,7 +3049,7 @@ int level_limit, level_adjustment;
                               : eminp->renegade;
     }
 
-    set_malign(mtmp); /* having finished peaceful changes */
+    set_mhostility(mtmp); /* having finished peaceful changes */
 
 #if 0
     if (anymon && !(mmflags & MM_NOGRP)) { //Small and large groups deactivated due to new encounter system -- JG
@@ -3527,29 +3509,16 @@ int difficulty_level_adjustment;
         /* Try first with a tighter range */
         minmlev = (int)min(25.0, max(0.0, (zlevel_formin + (double)u.ulevel) * min_multiplier / 1.66 - 1.0));
         maxmlev = (int)max(1.0, (zlevel_formax + (double)u.ulevel) * max_multiplier + 0.5);
-#if 0
-        midmlev = (zlevel * 2 + u.ulevel) / 3;
-        maxmlev = ((zlevel * 2 + u.ulevel) * max_multiplier) / (2 * max_divisor);
-        minmlev = (max(0, midmlev - (maxmlev - midmlev)) * min_multiplier) / min_divisor; //equates to midmlev/2 = (2z+c)/6
-#endif
     }
     else if (i == 2)
     {
         minmlev = (int)min(15.0, max(0.0, (zlevel_formin + (double)u.ulevel) * min_multiplier / 2.5 - 1.0));
         maxmlev = (int)max(1.0, (zlevel_formax + (double)u.ulevel) * 1.189 * max_multiplier + 0.5);
-#if 0
-        minmlev = ((zlevel * 2 + u.ulevel) * min_multiplier) / (12 * min_divisor);
-        maxmlev = ((zlevel * 2 + u.ulevel) * max_multiplier) / (2 * max_divisor);
-#endif
     }
     else
     {
         minmlev = 0;
         maxmlev = (int)max(1.0, (zlevel_formax + (double)u.ulevel) * 1.414 * max_multiplier + 0.5);
-#if 0
-        minmlev = 0;
-        maxmlev = max((zlevel * 2 + u.ulevel), ((zlevel * 2 + u.ulevel) * max_multiplier) / (max_divisor));
-#endif
     }
 
     *minlvl = minmlev;
@@ -3828,12 +3797,6 @@ struct monst *mtmp, *victim;
         hp_threshold = mtmp->m_lev * 8; /* normal limit */
         if (!mtmp->m_lev)
             hp_threshold = 4;
-#if 0
-        else if (is_golem(ptr)) /* strange creatures */
-            hp_threshold = ((mtmp->mhpmax / 10) + 1) * 10 - 1;
-        else if (is_home_elemental(ptr))
-            hp_threshold *= 2;
-#endif
 
         lev_limit = 3 * (int) ptr->mlevel / 2; /* same as adj_lev() */
         /* If they can grow up, be sure the level is high enough for that */
@@ -4231,12 +4194,11 @@ register struct permonst *ptr;
      * hostile.  This chance is greater if the player has strayed
      * (u.ualign.record negative) or the monster is not strongly aligned.
      */
-    return (boolean) (!!rn2(16 + (u.ualign.record < -15 ? -15
-                                                        : u.ualign.record))
+    return (boolean) (!!rn2(16 + (u.ualign.record < -15 ? -15 : u.ualign.record))
                       && !!rn2(2 + abs(mal)));
 }
 
-/* Set malign to have the proper effect on player alignment if monster is
+/* Set mhostility to have the proper effect on player alignment if monster is
  * killed.  Negative numbers mean it's bad to kill this monster; positive
  * numbers mean it's good.  Since there are more hostile monsters than
  * peaceful monsters, the penalty for killing a peaceful monster should be
@@ -4247,7 +4209,7 @@ register struct permonst *ptr;
  *   it's never bad to kill a hostile monster, although it may not be good.
  */
 void
-set_malign(mtmp)
+set_mhostility(mtmp)
 struct monst *mtmp;
 {
     schar mal = mtmp->data->maligntyp;
@@ -4269,41 +4231,41 @@ struct monst *mtmp;
     coaligned = (sgn(mal) == sgn(u.ualign.type));
     if (mtmp->data->msound == MS_LEADER)
     {
-        mtmp->malign = -20;
+        mtmp->mhostility = -20;
     } 
     else if (mal == A_NONE) 
     {
         if (is_peaceful(mtmp))
-            mtmp->malign = 0;
+            mtmp->mhostility = 0;
         else
-            mtmp->malign = 20; /* really hostile */
+            mtmp->mhostility = 20; /* really hostile */
     }
     else if (always_peaceful(mtmp->data))
     {
         int absmal = abs(mal);
         if (is_peaceful(mtmp))
-            mtmp->malign = -3 * max(5, absmal);
+            mtmp->mhostility = -3 * max(5, absmal);
         else
-            mtmp->malign = 3 * max(5, absmal); /* renegade */
+            mtmp->mhostility = 3 * max(5, absmal); /* renegade */
     } 
     else if (always_hostile(mtmp->data)) 
     {
         int absmal = abs(mal);
         if (coaligned)
-            mtmp->malign = 0;
+            mtmp->mhostility = 0;
         else
-            mtmp->malign = max(5, absmal);
+            mtmp->mhostility = max(5, absmal);
     }
     else if (coaligned) 
     {
         int absmal = abs(mal);
         if (is_peaceful(mtmp))
-            mtmp->malign = -3 * max(3, absmal);
+            mtmp->mhostility = -3 * max(3, absmal);
         else /* renegade */
-            mtmp->malign = max(3, absmal);
+            mtmp->mhostility = max(3, absmal);
     } 
     else /* not coaligned and therefore hostile */
-        mtmp->malign = abs(mal);
+        mtmp->mhostility = abs(mal);
 }
 
 /* allocate a new mcorpsenm field for a monster; only need mextra itself */

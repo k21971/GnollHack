@@ -35,6 +35,7 @@ int x_maze_max = (COLNO - 1) & ~1, y_maze_max = (ROWNO - 1) & ~1;
 int otg_temp; /* used by object_to_glyph() [otg] */
 
 NEARDATA int in_doagain = 0;
+NEARDATA int skip_savech = 0;
 
 /*
  *      The following structure will be initialized at startup time with
@@ -287,7 +288,7 @@ boolean disallow_keyboard_commands_in_wait_loop = FALSE;
 NEARDATA struct obj* getobj_autoselect_obj = (struct obj*)0;
 
 /* getobj class definitions */
-NEARDATA const char getobj_comestibles[] = { FOOD_CLASS, 0 };
+NEARDATA const char getobj_comestibles[] = { FOOD_CLASS, REAGENT_CLASS, 0 };
 NEARDATA const char getobj_offerfodder[] = { FOOD_CLASS, AMULET_CLASS,
                                                  0 };
 

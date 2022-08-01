@@ -760,9 +760,9 @@ const char *ev;
 
 /* process options, possibly including SYSCF */
 void
-initoptions()
+read_options()
 {
-    initoptions_init();
+    init_options();
 #ifdef SYSCF
 /* someday there may be other SYSCF alternatives besides text file */
 #ifdef SYSCF_FILE
@@ -785,18 +785,19 @@ initoptions()
      */
 #endif
 #endif /* SYSCF */
-    initoptions_finish();
+    finish_options();
 
 }
 
 void
-initoptions_init()
+init_options()
 {
 #if (defined(UNIX) || defined(VMS)) && defined (TTY_GRAPHICS)
     char *opts;
 #endif
     int i;
 
+    n_menu_mapped = 0;
     /* set up the command parsing */
     reset_commands(TRUE); /* init */
 
@@ -950,7 +951,7 @@ initoptions_init()
 }
 
 void
-initoptions_finish()
+finish_options()
 {
 #ifndef MAC
     char *opts = getenv("NETHACKOPTIONS");
@@ -2926,8 +2927,8 @@ boolean tinitial, tfrom_file;
             (void) fruitadd(pl_fruit, forig);
             pline("Fruit is now \"%s\".", pl_fruit);
         }
-        /* If initial, then initoptions is allowed to do it instead
-         * of here (initoptions always has to do it even if there's
+        /* If initial, then read_options is allowed to do it instead
+         * of here (read_options always has to do it even if there's
          * no fruit option at all.  Also, we don't want people
          * setting multiple fruits in their options.)
          */
@@ -2942,7 +2943,7 @@ boolean tinitial, tfrom_file;
             iflags.getpos_coords = GPCOORDS_NONE;
             return retval;
         } else if ((op = string_for_env_opt(fullname, opts, FALSE)) != 0) {
-            static char gpcoords[] = { GPCOORDS_NONE, GPCOORDS_COMPASS,
+            static const char gpcoords[] = { GPCOORDS_NONE, GPCOORDS_COMPASS,
                                        GPCOORDS_COMFULL, GPCOORDS_MAP,
                                        GPCOORDS_SCREEN, '\0' };
             char c = lowc(*op);
@@ -3040,7 +3041,7 @@ boolean tinitial, tfrom_file;
              */
             iflags.bouldersym = outstr[0];
             /* for 'initial', update_bouldersym() is done in
-               initoptions_finish(), after all symset options
+               finish_options(), after all symset options
                have been processed */
             if (!initial) {
                 update_bouldersym();
@@ -3465,7 +3466,7 @@ boolean tinitial, tfrom_file;
         num = 0;
         prefix_val = -1;
         while (*op && num < sizeof flags.end_disclose - 1) {
-            static char valid_settings[] = {
+            static const char valid_settings[] = {
                 DISCLOSE_PROMPT_DEFAULT_YES, DISCLOSE_PROMPT_DEFAULT_NO,
                 DISCLOSE_PROMPT_DEFAULT_SPECIAL,
                 DISCLOSE_YES_WITHOUT_PROMPT, DISCLOSE_NO_WITHOUT_PROMPT,
@@ -7623,7 +7624,7 @@ char *class_select;
     return ret;
 }
 
-static struct wc_Opt wc_options[] = {
+static const struct wc_Opt wc_options[] = {
     { "ascii_map", WC_ASCII_MAP },
     { "color", WC_COLOR },
     { "eight_bit_tty", WC_EIGHT_BIT_IN },
@@ -7660,7 +7661,7 @@ static struct wc_Opt wc_options[] = {
     { "mouse_support", WC_MOUSE_SUPPORT },
     { (char *) 0, 0L }
 };
-static struct wc_Opt wc2_options[] = {
+static const struct wc_Opt wc2_options[] = {
     { "fullscreen", WC2_FULLSCREEN },
     { "softkeyboard", WC2_SOFTKEYBOARD },
     { "wraptext", WC2_WRAPTEXT },

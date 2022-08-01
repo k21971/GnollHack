@@ -113,6 +113,29 @@ int skill;
 }
 
 const char*
+get_skill_name(skill_id)
+int skill_id;
+{
+    int absid = abs(skill_id);
+    if (absid >= P_NUM_SKILLS)
+        return "";
+    else
+        return P_NAME(absid);
+}
+
+const char*
+get_skill_plural_name(skill_id)
+int skill_id;
+{
+    int absid = abs(skill_id);
+    if (absid >= P_NUM_SKILLS)
+        return "";
+    else
+        return P_NAME_PLURAL(absid);
+}
+
+
+const char*
 weapon_skill_name(obj)
 struct obj* obj;
 {
@@ -197,90 +220,6 @@ struct obj* launcher;
         return 0;
 
     return m_weapon_range(&youmonst, ammo, launcher);
-
-#if 0
-    int baserange = 0, range = 0;
-    boolean thrown = TRUE;
-
-    /* Ammunition range */
-    if (!ammo && launcher && is_launcher(launcher)) {
-        if(objects[launcher->otyp].oc_range > 0)
-            baserange = objects[launcher->otyp].oc_range;                                        /* Crossbows and the like */
-        else if (objects[launcher->otyp].oc_range < 0)
-            baserange = max(1, (int)((ACURRSTR * -objects[launcher->otyp].oc_range) /100));        /* Bows */
-
-        /* No more info supplied */
-        range = baserange;
-    }
-    else if (ammo && is_ammo(ammo) && launcher && ammo_and_launcher(ammo, launcher)) {
-            thrown = FALSE;
-            if (objects[launcher->otyp].oc_range > 0)
-                baserange = objects[launcher->otyp].oc_range;                                        /* Crossbows and the like */
-            else if (objects[launcher->otyp].oc_range < 0)
-                baserange = max(1, (int)((ACURRSTR * -objects[launcher->otyp].oc_range) / 100));        /* Bows */
-
-            range = baserange;
-            if(!(objects[launcher->otyp].oc_flags & O1_WEIGHT_DOES_NOT_REDUCE_RANGE || objects[ammo->otyp].oc_flags & O1_WEIGHT_DOES_NOT_REDUCE_RANGE))
-                range = range - (int)(ammo->owt / 100);
-    }
-    else if(ammo) //Normal thrown weapons are half distance
-    {
-        boolean overriden = FALSE;
-
-        /* oc_range can be used to override usual throwing range for non-launchers */
-        if (!is_launcher(ammo) && objects[ammo->otyp].oc_range != 0)
-        {
-            overriden = TRUE;
-            if (objects[ammo->otyp].oc_range > 0)
-                baserange = objects[ammo->otyp].oc_range;                                        /* Crossbows and the like */
-            else if (objects[ammo->otyp].oc_range < 0)
-                baserange = max(1, (int)((ACURRSTR * -objects[ammo->otyp].oc_range) / 100));        /* Bows */
-        }
-
-        if(!overriden)
-        {
-            if(objects[ammo->otyp].oc_flags & O1_THROWN_WEAPON_ONLY)
-                baserange = (int)(ACURRSTR / 2);
-            else
-                baserange = (int)(ACURRSTR / 3);
-        }
-
-        //Weight of the object reduces range
-        if (objects[ammo->otyp].oc_flags & O1_WEIGHT_DOES_NOT_REDUCE_RANGE)
-            range = baserange;
-        else
-        {
-            if (objects[ammo->otyp].oc_flags & O1_THROWN_WEAPON_ONLY)
-                range = baserange - (int)(ammo->owt / 100);
-            else
-                range = baserange - (int)(ammo->owt / 40);
-        }
-    }
-
-    if (ammo && uball && ammo == uball) {
-        if (u.ustuck || (u.utrap && u.utraptype == TT_INFLOOR))
-            range = 1;
-        else if (range >= 5)
-            range = 5;
-    }
-
-#if 0
-    /* Kludges removed by JG; Items and monsters should have the right weight and strength */
-    if (ammo->otyp == BOULDER)
-        if (throws_rocks(youmonst.data))
-            range = 20; /* you must be giant */
-        else
-            range = 10; /* non-giant */
-    else if (ammo->oartifact == ART_MJOLLNIR)
-        range = (range + 1) / 2; /* it's heavy */
-#endif
-
-    if (range < 1)
-        range = 1;
-
-
-    return range;
-#endif
 }
 
 
@@ -771,9 +710,9 @@ struct monst* mattacker;
                 || ((objects[otyp].oc_flags3 & O3_TARGET_PERMISSION_IS_M4_FLAG) && (ptr->mflags4 & objects[otyp].oc_target_permissions))
                 || ((objects[otyp].oc_flags3 & O3_TARGET_PERMISSION_IS_M5_FLAG) && (ptr->mflags5 & objects[otyp].oc_target_permissions))
                 || (((objects[otyp].oc_flags3 & (O3_TARGET_PERMISSION_IS_M1_FLAG | O3_TARGET_PERMISSION_IS_M2_FLAG | O3_TARGET_PERMISSION_IS_M3_FLAG | O3_TARGET_PERMISSION_IS_M4_FLAG)) == 0) && ((unsigned long)ptr->mlet == objects[otyp].oc_target_permissions))
-                || ((objects[otyp].oc_flags3 & O3_PERMTTED_TARGET_CHAOTIC) && mon->malign < 0)
-                || ((objects[otyp].oc_flags3 & O3_PERMTTED_TARGET_NEUTRAL) && mon->malign == 0)
-                || ((objects[otyp].oc_flags3 & O3_PERMTTED_TARGET_LAWFUL) && mon->malign > 0)
+                || ((objects[otyp].oc_flags3 & O3_PERMTTED_TARGET_CHAOTIC) && mon->data->maligntyp < 0)
+                || ((objects[otyp].oc_flags3 & O3_PERMTTED_TARGET_NEUTRAL) && mon->data->maligntyp == 0)
+                || ((objects[otyp].oc_flags3 & O3_PERMTTED_TARGET_LAWFUL) && mon->data->maligntyp > 0)
                 )
            )
         )
@@ -954,8 +893,10 @@ int otyp, exceptionality;
 /* TODO: have monsters use aklys' throw-and-return */
 static NEARDATA const int rwep[] = {
     DWARVISH_SPEAR, SILVER_SPEAR, ELVEN_SPEAR, SPEAR, ORCISH_SPEAR, JAVELIN,
-    SHURIKEN, YA, SILVER_ARROW, ELVEN_ARROW, ARROW, ORCISH_ARROW,
-    CROSSBOW_BOLT, SILVER_DAGGER, ELVEN_DAGGER, DAGGER, ORCISH_DAGGER, BONE_DAGGER, KNIFE,
+    SHURIKEN, YA, SILVER_ARROW, BONE_ARROW, ELVEN_ARROW, ARROW, ORCISH_ARROW,
+    SILVER_CROSSBOW_BOLT, BONE_QUARREL, CROSSBOW_BOLT, GNOLLISH_QUARREL, 
+    SILVER_SLING_BULLET, IRON_SLING_BULLET, LEADEN_SLING_BULLET,
+    SILVER_DAGGER, BONE_DAGGER, ELVEN_DAGGER, DAGGER, ORCISH_DAGGER, SILVER_KNIFE, KNIFE,
     FLINT, ROCK, STONE_PEBBLE, CLAY_PEBBLE, LOADSTONE, LUCKSTONE, DART,
     /* BOOMERANG, */ CREAM_PIE
 };
@@ -1075,7 +1016,9 @@ register struct monst *mtmp;
                         propellor = oselect_with_exceptionality(mtmp, ORCISH_SHORT_BOW, exc);
                     break;
                 case P_SLING:
-                    propellor = oselect_with_exceptionality(mtmp, SLING, exc);
+                    propellor = oselect_with_exceptionality(mtmp, STAFF_SLING, exc);
+                    if (!propellor)
+                        propellor = oselect_with_exceptionality(mtmp, SLING, exc);
                     break;
                 case P_CROSSBOW:
                     propellor = oselect_with_exceptionality(mtmp, REPEATING_HEAVY_CROSSBOW, exc);
@@ -4022,39 +3965,6 @@ const struct def_skill* class_skill_max;
             P_SKILL_LEVEL(skill) = min(P_MAX_SKILL_LEVEL(skill), P_BASIC);
     }
 
-#if 0
-    /* High potential fighters already know how to use their hands. */
-    if (P_MAX_SKILL_LEVEL(P_BARE_HANDED_COMBAT) > P_EXPERT)
-        P_SKILL_LEVEL(P_BARE_HANDED_COMBAT) = P_BASIC;
-
-    /* Roles that start with a horse know how to ride it */
-    if (urole.petnum == PM_PONY)
-        P_SKILL_LEVEL(P_RIDING) = P_BASIC;
-
-    /* Rogues and rangers know how to disarm traps */
-    if (Role_if(PM_ROGUE) || Role_if(PM_RANGER))
-        P_SKILL_LEVEL(P_DISARM_TRAP) = P_BASIC;
-
-
-    /* set skills for magic */
-    if (Role_if(PM_HEALER) || Role_if(PM_MONK)) {
-        P_SKILL_LEVEL(P_HEALING_SPELL) = P_BASIC;
-    }
-    else if (Role_if(PM_PRIEST))
-    {
-        if (u.ualign.type == A_CHAOTIC)
-            P_SKILL_LEVEL(P_NECROMANCY_SPELL) = P_BASIC;
-        else
-            P_SKILL_LEVEL(P_HEALING_SPELL) = P_BASIC;
-
-        P_SKILL_LEVEL(P_CLERIC_SPELL) = P_BASIC;
-    }
-    else if (Role_if(PM_WIZARD)) {
-        P_SKILL_LEVEL(P_ARCANE_SPELL) = P_BASIC;
-        P_SKILL_LEVEL(P_ENCHANTMENT_SPELL) = P_BASIC;
-    }
-#endif
-
     /*
      * Make sure we haven't missed setting the max on a skill
      * & set advance
@@ -4363,5 +4273,30 @@ struct obj* obj;
     return min(EXCEPTIONALITY_CELESTIAL, obj->exceptionality);
 }
 
+void
+dump_skills(VOID_ARGS)
+{
+    int i;
+    char buf[BUFSZ];
+    char skillnamebufC[BUFSZ];
+    char skilllevelbuf[BUFSZ];
+    char skillmaxbuf[BUFSZ];
+    putstr(0, 0, "Final Skills:");
+    for (i = 1; i < P_NUM_SKILLS; i++)
+    {
+        if (P_RESTRICTED(i))
+            continue;
+
+        Sprintf(skillnamebufC, "%s", P_NAME(i));
+        *skillnamebufC = highc(*skillnamebufC);
+        (void)skill_level_name(i, skilllevelbuf, FALSE);
+        (void)skill_level_name(i, skillmaxbuf, TRUE);
+
+        Sprintf(buf, " %-34s %s / %s", skillnamebufC, skilllevelbuf, skillmaxbuf);
+        putstr(0, 0, buf);
+    }
+    Sprintf(buf, "You had %d skill slot%s available", u.weapon_slots, plur(u.weapon_slots));
+    putstr(0, 0, buf);
+}
 
 /*weapon.c*/

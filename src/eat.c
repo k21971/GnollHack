@@ -50,7 +50,7 @@ char msgbuf[BUFSZ];
    will be sure to reach the stage of eating where that meal is fatal */
 /* non-rotting non-corpses; unlike lizard corpses, these items will behave
    as if rotten if they are cursed (fortune cookies handled elsewhere) */
-STATIC_OVL NEARDATA const char comestibles[] = { FOOD_CLASS, 0 };
+STATIC_OVL NEARDATA const char comestibles[] = { FOOD_CLASS, REAGENT_CLASS, 0 };
 STATIC_OVL NEARDATA const char offerfodder[] = { FOOD_CLASS, AMULET_CLASS,
                                                  0 };
 
@@ -950,61 +950,6 @@ register struct permonst *ptr;
 {
     unsigned long conveyed = prop_to_conveyed(type);
     return !!(ptr->mconveys & conveyed);
-
-#if 0
-    int res = 0;
-    
-    switch (type) {
-    case FIRE_IMMUNITY:
-        res = (ptr->mconveys & MC_FIRE) != 0;
-        break;
-    case SLEEP_RESISTANCE:
-        res = (ptr->mconveys & MC_SLEEP) != 0;
-        break;
-    case COLD_IMMUNITY:
-        res = (ptr->mconveys & MC_COLD) != 0;
-        break;
-    case DISINTEGRATION_RESISTANCE:
-        res = (ptr->mconveys & MC_DISINT) != 0;
-        break;
-    case DEATH_RESISTANCE:
-        res = (ptr->mconveys & MC_DEATH) != 0;
-        break;
-    case DRAIN_RESISTANCE:
-        res = (ptr->mconveys & MC_DRAIN) != 0;
-        break;
-    case CHARM_RESISTANCE:
-        res = (ptr->mconveys & MC_CHARM) != 0;
-        break;
-    case FEAR_RESISTANCE:
-        res = (ptr->mconveys & MC_FEAR) != 0;
-        break;
-    case SHOCK_IMMUNITY: /* shock (electricity) resistance */
-        res = (ptr->mconveys & MC_ELEC) != 0;
-        break;
-    case POISON_RESISTANCE:
-        res = (ptr->mconveys & MC_POISON) != 0;
-        break;
-    case TELEPORT:
-        res = (ptr->mconveys & MC_TELEPORT) != 0;
-        break;
-    case TELEPORT_CONTROL:
-        res = (ptr->mconveys & MC_TELEPORT_CONTROL) != 0;
-        break;
-    case BLIND_TELEPATHY:
-        res = (ptr->mconveys & MC_BLIND_TELEPATHY) != 0;
-        break;
-    case TELEPAT:
-        res = (ptr->mconveys & MC_TELEPATHY) != 0;
-        break;
-    default:
-        /* res stays 0 */
-        break;
-    }
-
-    return res;
-#endif
-
 }
 
 STATIC_OVL void
@@ -4050,14 +3995,22 @@ reset_faint()
         unmul("You revive.");
 }
 
+static unsigned save_hs;
+static boolean saved_hs = FALSE;
+
+void
+reset_hunger_status(VOID_ARGS)
+{
+    save_hs = 0;
+    saved_hs = FALSE;
+}
+
 /* compute and comment on your (new?) hunger status */
 void
 update_hunger_status(incr)
 boolean incr;
 {
     unsigned newhs;
-    static unsigned save_hs;
-    static boolean saved_hs = FALSE;
     int h = u.uhunger;
 
     newhs = (h > 1000)
@@ -4236,7 +4189,7 @@ int corpsecheck; /* 0, no check, 1, corpses, 2, tinnable corpses */
     if (iflags.menu_requested /* command was preceded by 'm' prefix */
         || !can_reach_floor(TRUE) || (feeding && u.usteed)
         || (is_pool_or_lava(u.ux, u.uy)
-            && (Wwalking || is_clinger(youmonst.data)
+            && (Walks_on_water || is_clinger(youmonst.data)
                 || (Flying && !Breathless))))
         goto skipfloor;
 

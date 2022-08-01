@@ -473,8 +473,8 @@ enum special_view_types
     SPECIAL_VIEW_PANIC,
     SPECIAL_VIEW_DEBUGLOG,
     SPECIAL_VIEW_MESSAGE,
-    SPECIAL_VIEW_YN_DIALOG,
     SPECIAL_VIEW_SELFIE,
+    SPECIAL_VIEW_HELP_DIR,
     MAX_SPECIAL_VIEW_TYPES
 };
 
@@ -696,6 +696,8 @@ enum context_menu_styles {
 #define MKOBJ_FLAGS_PARAM_IS_TITLE                     0x00000010
 #define MKOBJ_FLAGS_NORMAL_SPELLBOOK                   0x00000020
 #define MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY          0x00000040
+#define MKOBJ_FLAGS_FORCE_LEGENDARY                    0x00000080
+#define MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY            0x00000100
 
 #define MONDIED_FLAGS_NONE                             0x00000000
 #define MONDIED_FLAGS_NO_DEATH_ACTION                  0x00000001
@@ -753,8 +755,9 @@ enum gui_command_types {
     GUI_CMD_LOAD_INTRO_SOUND_BANK,
     GUI_CMD_UNLOAD_INTRO_SOUND_BANK,
     GUI_CMD_WAIT_FOR_RESUME,
+    GUI_CMD_REPORT_PLAY_TIME,
     GUI_CMD_GAME_START,
-    GUI_CMD_PROGRAM_FINISH,
+    GUI_CMD_GAME_ENDED,
 };
 
 enum takeoff_wear_commands {

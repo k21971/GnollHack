@@ -7,7 +7,7 @@
 #include "hack.h"
 
 /* Note: Arrays are column first, while the screen is row first */
-static int explosion[3][3] = { { S_explode1, S_explode4, S_explode7 },
+static const int explosion[3][3] = { { S_explode1, S_explode4, S_explode7 },
                                { S_explode2, S_explode5, S_explode8 },
                                { S_explode3, S_explode6, S_explode9 } };
 
@@ -54,15 +54,15 @@ int expltype;
     coord grabxy;
     char hallu_buf[BUFSZ], killr_buf[BUFSZ];
     short exploding_wand_typ = objtype;
-    struct obj* otmp = (struct obj*)0;
-    struct obj tempobj = { 0 };
+    //struct obj* otmp = (struct obj*)0;
+    //struct obj tempobj = { 0 };
 
-    if (objtype > STRANGE_OBJECT)
-    {
-        tempobj.otyp = objtype;
-        tempobj.oclass = objects[objtype].oc_class;
-        otmp = &tempobj;
-    }
+    //if (objtype > STRANGE_OBJECT)
+    //{
+    //    tempobj.otyp = objtype;
+    //    tempobj.oclass = objects[objtype].oc_class;
+    //    otmp = &tempobj;
+    //}
 
     /* muse_unslime: SCR_FIRE */
     if (expltype < 0) {
@@ -551,6 +551,7 @@ int expltype;
                 {
                     golemeffects(mtmp, (int) adtyp, ddam + idamres);
                     deduct_monster_hp(mtmp, idamnonres);
+                    instadeath = FALSE;
                 } 
                 else
                 {
@@ -560,6 +561,7 @@ int expltype;
                      */
                     double mdam = ddam;
 
+#if 0
                     if (check_magic_resistance_and_inflict_damage(mtmp, otmp, origmonst, FALSE, 0, 0, FALSE)) 
                     {
                         /* inside_engulfer: <i+x-1,j+y-1> == <u.ux,u.uy> */
@@ -574,23 +576,23 @@ int expltype;
                         }
                     }
                     else
+#endif
                     /* if grabber is reaching into hero's spot and
                        hero's spot is within explosion radius, grabber
                        gets hit by double damage */
                     if (grabbed && mtmp == u.ustuck && distu(x, y) <= 2)
                         mdam *= 2;
-#if 0
-                    /* being resistant to opposite type of damage makes
-                       target more vulnerable to current type of damage
-                       (when target is also resistant to current type,
-                       we won't get here) */
-                    if (is_mon_immune_to_cold(mtmp) && adtyp == AD_FIRE)
-                        mdam *= 2;
-                    else if (is_mon_immune_to_fire(mtmp) && adtyp == AD_COLD)
-                        mdam *= 2;
-#endif
+
                     if (instadeath)
-                        mtmp->mhp = 0;
+                    {
+                        if (adtyp == AD_DRAY)
+                        {
+                            if (!check_rider_death_absorption(mtmp, (const char*)0))
+                            {
+                                mtmp->mhp = 0;
+                            }
+                        }
+                    }
                     else
                     {
                         int hp_before = mtmp->mhp;
@@ -604,7 +606,12 @@ int expltype;
                         //mtmp->mhp -= (idamres + idamnonres);
                     }
                 }
-                if (DEADMONSTER(mtmp))
+
+                if (instadeath && adtyp == AD_DISN)
+                {
+                    maybe_disintegrate_mon(mtmp, 0 , str);
+                }
+                else if (DEADMONSTER(mtmp))
                 {
                     int xkflg = ((adtyp == AD_FIRE
                                   && completelyburns(mtmp->data))
@@ -686,7 +693,7 @@ int expltype;
         item_destruction_hint((int)adtyp, FALSE);
 
         ugolemeffects((int) adtyp, damu);
-        if (uhurt == 2 && damu) 
+        if (uhurt == 2 && (damu || instadeath)) 
         {
             /* if poly'd hero is grabbing another victim, hero takes
                double damage (note: don't rely on u.ustuck here because
@@ -697,51 +704,55 @@ int expltype;
 
             if (instadeath)
             {
-                if (Upolyd)
-                    damu = (double)u.mh + 1;
-                else
-                    damu = (double)u.uhp + 1;
+                if (instadeath && adtyp == AD_DISN)
+                    You("are disintegrated!");
             }
-
-            int hp_before = Upolyd ? u.mh : u.uhp;
-            deduct_player_hp(damu);
-            int hp_after = Upolyd ? u.mh : u.uhp;
-            int damage_dealt = hp_before - hp_after;
-            if (damage_dealt > 0)
-                You("sustain %d damage!", damage_dealt);
+            else
+            {
+                int hp_before = Upolyd ? u.mh : u.uhp;
+                deduct_player_hp(damu);
+                int hp_after = Upolyd ? u.mh : u.uhp;
+                int damage_dealt = hp_before - hp_after;
+                if (damage_dealt > 0)
+                    You("sustain %d damage!", damage_dealt);
+            }
         }
 
-        if (u.uhp <= 0 || (Upolyd && u.mh <= 0)) 
+        if ((!Upolyd && u.uhp <= 0) || (Upolyd && u.mh <= 0) || (instadeath && uhurt == 2))
         {
-            if (Upolyd) 
+            if (olet == MON_EXPLODE)
+            {
+                if (generic) /* explosion was unseen; str=="explosion", */
+                    ;        /* killer.name=="gas spore's explosion"    */
+                else if (str != killer.name && str != hallu_buf)
+                    Strcpy(killer.name, str);
+                killer.format = KILLED_BY_AN;
+            }
+            else if (type >= 0 && olet != SCROLL_CLASS)
+            {
+                killer.format = NO_KILLER_PREFIX;
+                Sprintf(killer.name, "caught %sself in %s own %s", uhim(),
+                    uhis(), str);
+            }
+            else
+            {
+                killer.format = (!strcmpi(str, "tower of flame")
+                    || !strcmpi(str, "fireball"))
+                    ? KILLED_BY_AN
+                    : KILLED_BY;
+                Strcpy(killer.name, str);
+            }
+
+            if (instadeath)
+            {
+                kill_player(killer.name, killer.format);
+            }
+            else if (Upolyd)
             {
                 rehumanize();
             }
             else
             {
-                if (olet == MON_EXPLODE) 
-                {
-                    if (generic) /* explosion was unseen; str=="explosion", */
-                        ;        /* killer.name=="gas spore's explosion"    */
-                    else if (str != killer.name && str != hallu_buf)
-                        Strcpy(killer.name, str);
-                    killer.format = KILLED_BY_AN;
-                } 
-                else if (type >= 0 && olet != SCROLL_CLASS) 
-                {
-                    killer.format = NO_KILLER_PREFIX;
-                    Sprintf(killer.name, "caught %sself in %s own %s", uhim(),
-                            uhis(), str);
-                } 
-                else 
-                {
-                    killer.format = (!strcmpi(str, "tower of flame")
-                                     || !strcmpi(str, "fireball"))
-                                        ? KILLED_BY_AN
-                                        : KILLED_BY;
-                    Strcpy(killer.name, str);
-                }
-
                 if (iflags.last_msg == PLNMSG_CAUGHT_IN_EXPLOSION
                     || iflags.last_msg == PLNMSG_TOWER_OF_FLAME) /*seffects()*/
                     pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "It is fatal.");
@@ -766,7 +777,11 @@ int expltype;
     }
 
     /* explosions are noisy */
-    i = damui * damui;
+    if (instadeath)
+        i = 100;
+    else
+        i = damui * damui;
+
     if (i < 50)
         i = 50; /* in case random damage is very small */
     if (inside_engulfer)
