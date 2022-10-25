@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    artifact.c    $NHDT-Date: 1553363416 2019/03/23 17:50:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -16,6 +16,11 @@
  */
 
 extern boolean notonhead; /* for long worms */
+
+/* touch_artifact()'s return value isn't sufficient to tell whether it
+   dished out damage, and tracking changes to u.uhp, u.mh, Lifesaved
+   when trying to avoid second wounding is too cumbersome */
+STATIC_VAR boolean touch_blasted; /* for retouch_object() */
 
 const char* artifact_invoke_names[NUM_ARTINVOKES] = {
     "taming", "healing", "mana replenishment", "untrapping", "charging",
@@ -46,14 +51,14 @@ STATIC_DCL void FDECL(check_arti_name_discovery, (struct obj*));
 #define FATAL_DAMAGE_MODIFIER 200
 
 /* coordinate effects from spec_dbon() with messages in artifact_hit() */
-STATIC_OVL int spec_dbon_applies = 0;
+STATIC_VAR int spec_dbon_applies = 0;
 
 /* flags including which artifacts have already been created */
-static boolean artiexist[1 + NUM_ARTIFACTS + 1];
+STATIC_VAR boolean artiexist[1 + NUM_ARTIFACTS + 1];
 /* and a discovery list for them (no dummy first entry here) */
-STATIC_OVL short artidisco[NUM_ARTIFACTS];
-static int nesting = 0; /* recursion control */
-static int mkot_trap_warn_count = 0;
+STATIC_VAR short artidisco[NUM_ARTIFACTS];
+STATIC_VAR int nesting = 0; /* recursion control */
+STATIC_VAR int mkot_trap_warn_count = 0;
 
 STATIC_DCL void NDECL(hack_artifacts);
 STATIC_DCL boolean FDECL(artifact_attack_type, (int, struct obj *));
@@ -107,14 +112,30 @@ int fd;
     bwrite(fd, (genericptr_t) artidisco, sizeof artidisco);
 }
 
+
+STATIC_VAR boolean artivaluessaved = FALSE;
+STATIC_VAR struct artifact saved_artilist[NUM_ARTIFACTS + 2];
+
+void
+save_initial_artifact_values(VOID_ARGS)
+{
+    if (!artivaluessaved)
+    {
+        memcpy((genericptr_t)saved_artilist, (genericptr_t)artilist, sizeof(struct artifact) * (NUM_ARTIFACTS + 2));
+        artivaluessaved = TRUE;
+    }
+}
+
 void
 reset_artifacts(VOID_ARGS)
 {
     memset((genericptr_t)artiexist, 0, sizeof artiexist);
     memset((genericptr_t)artidisco, 0, sizeof artidisco);
+    memcpy((genericptr_t)artilist, (genericptr_t)saved_artilist, sizeof(struct artifact) * (NUM_ARTIFACTS + 2));
     mkot_trap_warn_count = 0;
     nesting = 0;
     spec_dbon_applies = 0;
+    touch_blasted = 0;
 }
 
 
@@ -720,11 +741,6 @@ long wp_mask;
 
 }
 
-/* touch_artifact()'s return value isn't sufficient to tell whether it
-   dished out damage, and tracking changes to u.uhp, u.mh, Lifesaved
-   when trying to avoid second wounding is too cumbersome */
-STATIC_VAR boolean touch_blasted; /* for retouch_object() */
-
 /*
  * creature (usually hero) tries to touch (pick up or wield) an artifact obj.
  * Returns 0 if the object refuses to be touched.
@@ -819,7 +835,7 @@ struct monst *mon;
                 dmg += rnd(10);
             damage = adjust_damage(dmg, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE);
 
-            Sprintf(buf, "touching %s", (oart ? oart->name : an(cxname(obj))));
+            Sprintf(buf, "touching %s", (oart ? oart->name : acxname(obj)));
             losehp(damage, buf, KILLED_BY); /* magic damage, not physical */
             exercise(A_WIS, FALSE);
     }
@@ -1169,7 +1185,7 @@ enum mb_effect_indices {
 };
 
 #define MB_MAX_DIEROLL 8 /* rolls above this aren't magical */
-static const char *const mb_verb[2][NUM_MB_INDICES] = {
+STATIC_VAR const char *const mb_verb[2][NUM_MB_INDICES] = {
     { "probe", "stun", "scare", "cancel" },
     { "prod", "amaze", "tickle", "purge" },
 };
@@ -2502,8 +2518,8 @@ short* adtyp_ptr; /* return value is the type of damage caused */
     return (isdisintegrated ? -2 : lethaldamage ? -1 : totaldamagedone);
 }
 
-static NEARDATA const char recharge_type[] = { ALLOW_COUNT, ALL_CLASSES, 0 };
-static NEARDATA const char invoke_types[] = { ALL_CLASSES, 0 };
+STATIC_VAR NEARDATA const char recharge_type[] = { ALLOW_COUNT, ALL_CLASSES, 0 };
+STATIC_VAR NEARDATA const char invoke_types[] = { ALL_CLASSES, 0 };
 /* #invoke: an "ugly check" filters out most objects */
 
 /* the #invoke command */
@@ -2613,7 +2629,7 @@ struct obj *obj;
             pseudo = zeroobj; /* neither cursed nor blessed, zero oextra too */
             pseudo.otyp = SCR_TAMING;
             boolean effect_happened = 0;
-            (void) seffects(&pseudo, &effect_happened);
+            (void) seffects(&pseudo, &effect_happened, &youmonst);
             break;
         }
         case ARTINVOKE_HEALING:
@@ -2778,8 +2794,8 @@ struct obj *obj;
         case ARTINVOKE_WAND_OF_DEATH:
         {
             struct obj pseudo = zeroobj;
-            pseudo.otyp = SPE_FINGER_OF_DEATH;
-            pseudo.quan = 20L; /* do not let useup get it */
+            pseudo.otyp = WAN_DEATH;
+            pseudo.quan = 1L; /* do not let useup get it */
             double damage = 0;
 
             if (!getdir((char*)0)) 
@@ -3303,7 +3319,7 @@ uchar adtyp_index;
     return 0;
 }
 
-static const struct abil2spfx_tag {
+STATIC_VAR const struct abil2spfx_tag {
     int prop;
     unsigned long spfx;
 } abil2spfx[] = {
@@ -3540,7 +3556,7 @@ int arti_indx;
 }
 
 /* glow verb; [0] holds the value used when blind */
-static const char *glow_verbs[] = {
+STATIC_VAR const char *glow_verbs[] = {
     "quiver", "flicker", "glimmer", "gleam"
 };
 

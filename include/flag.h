@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    flag.h    $NHDT-Date: 1554155745 2019/04/01 21:55:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.150 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -77,6 +77,7 @@ struct flag {
     boolean classic_colors; /* use normal coloring scheme */
     boolean blinking_cursor_on_tiles;    /* cursor blinks on tiles */
     boolean detailed_weights; /* use ounces and grams instead of lbs and kg */
+    boolean long_charge_text; /* long charge / recharge text used on mobile */
     boolean show_cursor_on_u; /* force show cursor on you even with tiles */
     boolean force_paint_at_cursor; /* force paint at cursor (normally, because the cursor appears on you) */
     uchar active_cursor_style;
@@ -236,9 +237,9 @@ struct flag {
     int runmode;       /* update screen display during run moves */
     uchar spellorder;
     schar max_hint_difficulty; /* Maximum difficulty level where hints are shown */
+    boolean non_scoring; /* The game has been, for example, loaded from an imported save file and has thereby become non-scoring */
 
     /* Emergency reserved variables to make non-save-game-breaking changes */
-    char reserved_char1;
     char reserved_char2;
     short reserved_short1;
     short reserved_short2;
@@ -454,9 +455,11 @@ struct instance_flags {
     boolean vt_tiledata;     /* output console codes for tile support in TTY */
 #endif
     boolean clicklook;       /* allow right-clicking for look */
+    boolean clickfire;       /* allow right-clicking for look */
     boolean cmdassist;       /* provide detailed assistance for some comnds */
     boolean time_botl;       /* context.botl for 'time' (moves) only */
     boolean wizweight;       /* display weight of everything in wizard mode */
+    boolean takeoff_uses_all;/* takeoff command is implemented using takeoffall command with a single item */
 
     /* Is the system in demo version */
     boolean demo_version;  /* OBSOLETE */
@@ -552,21 +555,7 @@ struct instance_flags {
                                     it in the midst of options processing */
     boolean obsolete;  /* obsolete options can point at this, it isn't used */
 
-    /* Emergency reserved booleans to make non-save-game-breaking changes */
-    boolean reserved_bool1;
-    boolean reserved_bool2;
-    boolean reserved_bool3;
-    boolean reserved_bool4;
-
-    /* Emergency reserved variables to make non-save-game-breaking changes */
-    char reserved_char1;
-    char reserved_char2;
-    short reserved_short1;
-    short reserved_short2;
-    int reserved_int1;
-    int reserved_int2;
-    unsigned long reserved_ulong1;
-    unsigned long reserved_ulong2;
+    struct monst* spell_target_monster;
 
 };
 
@@ -676,6 +665,7 @@ enum nh_keyfunc {
     NHKF_TRAVEL,
     NHKF_TRAVEL_ATTACK,
     NHKF_TRAVEL_WALK,
+    NHKF_CLICKFIRE,
     NHKF_CLICKLOOK,
 
     NHKF_REDRAW,

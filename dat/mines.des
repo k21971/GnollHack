@@ -1,4 +1,4 @@
-# GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05
+# GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14
 
 # GnollHack 4.0	mines.des	$NHDT-Date: 1548631704 2019/01/27 23:28:24 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.30 $
 #	Copyright (c) 1989-95 by Jean-Christophe Collet
@@ -1140,7 +1140,7 @@ OBJECT:('*',"ruby"),$place[4]
 OBJECT:('*',"loadstone"),$place[4]
 OBJECT:('*',"ruby"),$place[5]
 OBJECT:('*',"worthless piece of red glass"),$place[5]
-OBJECT:('*',"luckstone"),$place[5],name:"The Gladstone"
+OBJECT:('*',"luckstone"),$place[5],no_pickup,name:"The Gladstone"
 # Random objects
 OBJECT:'*',random
 OBJECT:'*',random
@@ -1176,7 +1176,7 @@ TRAP:random,random
 TRAP:random,random
 TRAP:random,random
 # Random monsters
-MONSTER:('g',"gnome king"),random,hostile {
+MONSTER:('g',"gnome king"),random,maxhp,hostile {
   OBJECT: class_treasure_weapon, notcursed
   OBJECT: ('[', "royal crown")
 }
@@ -1307,7 +1307,7 @@ OBJECT:('*',"ruby"),(70,05)
 OBJECT:('*',"amethyst"),(70,05)
 OBJECT:'*',(70,05)
 OBJECT:('*',"amethyst"),(70,05)
-OBJECT:('*',"luckstone"),(70,05),name:"The Gladstone"
+OBJECT:('*',"luckstone"),(70,05),no_pickup,name:"The Gladstone"
 # Scattered gems...
 OBJECT:'*',random
 OBJECT:'*',random
@@ -1343,7 +1343,7 @@ TRAP:random,random
 TRAP:random,random
 TRAP:random,random
 # Random monsters.
-MONSTER:('g',"gnome king"),random,hostile {
+MONSTER:('g',"gnome king"),random,maxhp,hostile {
   OBJECT: class_treasure_weapon, notcursed
   OBJECT: ('[', "royal crown")
 }
@@ -1429,10 +1429,10 @@ OBJECT:('*',"ruby"),random
 OBJECT:('*',"amethyst"),random
 OBJECT:'*',random
 OBJECT:('*',"amethyst"),random
-OBJECT:('*',"luckstone"),$place[0],name:"The Gladstone"
+OBJECT:('*',"luckstone"),$place[0],no_pickup,name:"The Gladstone"
 OBJECT:('*',"flint"),$place[1]
-OBJECT:class_treasure_weapon,$place[2],notcursed
-OBJECT: ('[', "royal crown"),$place[2],cursed
+OBJECT:class_treasure_weapon,$place[2],no_pickup,notcursed
+OBJECT: ('[', "royal crown"),$place[2],no_pickup,cursed
 OBJECT:'?',random
 OBJECT:'?',random
 OBJECT:'?',random

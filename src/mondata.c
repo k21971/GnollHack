@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mondata.c    $NHDT-Date: 1550525093 2019/02/18 21:24:53 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.72 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -20,7 +20,7 @@ struct ability_conversion_table {
 };
 
 
-static NEARDATA struct ability_conversion_table prop2innate[] = {
+STATIC_VAR const NEARDATA struct ability_conversion_table prop2innate[] = {
     { FIRE_IMMUNITY, MR_FIRE, MR2_NONE, MC_NONE, AD_FIRE },
     { COLD_IMMUNITY, MR_COLD, MR2_NONE, MC_NONE, AD_COLD },
     { SLEEP_RESISTANCE, MR_SLEEP, MR2_NONE, MC_SLEEP, AD_SLEE },
@@ -37,14 +37,14 @@ static NEARDATA struct ability_conversion_table prop2innate[] = {
     { CHARM_RESISTANCE, MR_CHARM, MR2_NONE, MC_CHARM, AD_SSEX },
     { CHARM_RESISTANCE, MR_CHARM, MR2_NONE, MC_CHARM, AD_SEDU }, /* Doubles for AD_SEDU*/
     { HALLUC_RES, MR_NONE, MR2_NONE, MC_NONE, AD_HALU },
-    { FEAR_RESISTANCE, MR_FEAR, MR2_NONE, MC_FEAR, -1 },
+    { FEAR_RESISTANCE, MR_FEAR, MR2_NONE, MC_NONE, -1 },
     { SICK_RESISTANCE, MR_SICK, MR2_NONE, MC_SICK, AD_DISE },
     { SICK_RESISTANCE, MR_SICK, MR2_NONE, MC_SICK, AD_ROTS }, /* Doubles for AD_ROTS */
     { DRAIN_RESISTANCE, MR_DRAIN, MR2_NONE, MC_DRAIN, AD_DRLI },
     { FLASH_RESISTANCE, MR_FLASH, MR2_NONE, MC_NONE, AD_BLND },
     { REFLECTING, MR_REFLECTING, MR2_NONE, MC_NONE, -1 },
-    { INVISIBILITY, MR_INVISIBLE, MR2_NONE, MC_NONE, -1 },
-    { SEE_INVISIBLE, MR_SEE_INVISIBLE, MR2_NONE, MC_NONE, -1 },
+    { INVISIBILITY, MR_INVISIBLE, MR2_NONE, MC_INVISIBILITY, -1 },
+    { SEE_INVISIBLE, MR_SEE_INVISIBLE, MR2_NONE, MC_SEE_INVISIBLE, -1 },
     { REGENERATION, MR_REGENERATION, MR2_NONE, MC_NONE, -1 },
     { TELEPORT, MR_TELEPORT, MR2_NONE, MC_TELEPORT, -1 },
     { TELEPORT_CONTROL, MR_TELEPORT_CONTROL, MR2_NONE, MC_TELEPORT_CONTROL, -1 },
@@ -73,7 +73,7 @@ struct mflag_description {
     const char* plural_noun;
 };
 
-static NEARDATA struct mflag_description m1flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m1flag_descriptions[] = {
     { M1_AMORPHOUS, "amorphous", "amorphous monsters" },
     { M1_AMPHIBIOUS, "amphibious", "amphibious monsters" },
     { M1_BREATHLESS, "breathless", "breathless monsters" },
@@ -106,7 +106,7 @@ static NEARDATA struct mflag_description m1flag_descriptions[] = {
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m2flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m2flag_descriptions[] = {
     { M2_DEMON, "demon", "demons" },
     { M2_ANGEL, "angelic being", "angelic beings" },
     { M2_DWARF, "dwarf", "dwarves" },
@@ -127,7 +127,7 @@ static NEARDATA struct mflag_description m2flag_descriptions[] = {
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m3flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m3flag_descriptions[] = {
     { M3_CONSTRICTOR, "constrictor", "constrictors" },
     { M3_INFRAVISION, "infravision", "monsters with infravision" },
     { M3_INCORPOREAL, "incorporeal", "incorporeal monsters" },
@@ -138,7 +138,7 @@ static NEARDATA struct mflag_description m3flag_descriptions[] = {
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m4flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m4flag_descriptions[] = {
     { M4_PITWALK, "pitwalking", "pitwalkers" },
     { M4_SLURPS_ITEMS, "item-engulfing", "item-engulfing monsters" },
     { M4_STONY, "stony", "monsters made of stone" },
@@ -156,20 +156,21 @@ static NEARDATA struct mflag_description m4flag_descriptions[] = {
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m5flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m5flag_descriptions[] = {
     { M5_HATES_LIGHT, "vulnerable to light", "monsters vulnerable to light" },
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m6flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m6flag_descriptions[] = {
     { M6_NON_EATER, "non-eating living monster", "non-eating living monsters" },
     { M6_CORPSE_EATER, "corpse-eating monster", "corpse-eating monsters" },
+    { M6_LITHOVORE, "lithovore", "lithovores" },
     { M6_SHADE, "impervious to physical weapons", "monsters impervious to physical weapons" },
     { M6_TELEPORT_HEAL_TACTICS, "using teleport and heal tactics", "monsters using teleport and heal tactics" },
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m7flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m7flag_descriptions[] = {
     { M7_ARCHAEOLOGIST, "archaeologist", "archaeologists" },
     { M7_BARBARIAN, "barbarian", "barbarians" },
     { M7_CAVEMAN, "cavaman", "cavamen" },
@@ -186,7 +187,7 @@ static NEARDATA struct mflag_description m7flag_descriptions[] = {
     { 0 , "", "" }
 };
 
-static NEARDATA struct mflag_description m8flag_descriptions[] = {
+STATIC_VAR const NEARDATA struct mflag_description m8flag_descriptions[] = {
     { 0 , "", "" }
 };
 
@@ -196,7 +197,7 @@ unsigned long mflag_bit;
 boolean plural;
 uchar mindex;
 {
-    struct mflag_description* mtable = m1flag_descriptions;
+    const struct mflag_description* mtable = m1flag_descriptions;
 
     if (mindex == 2)
         mtable = m2flag_descriptions;
@@ -1233,12 +1234,12 @@ int *mndx_p;
        such partial matches must start at beginning of a word.  Some
        class descriptions include "foo or bar" and "foo or other foo"
        so we don't want to accept "or", "other", "or other" there. */
-    static NEARDATA const char *const falsematch[] = {
+    STATIC_VAR NEARDATA const char *const falsematch[] = {
         /* multiple-letter input which matches any of these gets rejected */
         "an", "the", "or", "other", "or other", 0
     };
     /* positive pm_val => specific monster; negative => class */
-    static NEARDATA const struct alt_spl truematch[] = {
+    STATIC_VAR NEARDATA const struct alt_spl truematch[] = {
         /* "long worm" won't match "worm" class but would accidentally match
            "long worm tail" class before the comparison with monster types */
         { "long worm", PM_LONG_WORM, 0 },
@@ -1362,7 +1363,7 @@ struct monst *mtmp;
                       && (!is_fleeing(mtmp) || u.uhave.amulet));
 }
 
-static const short grownups[][2] = {
+STATIC_VAR const short grownups[][2] = {
     { PM_CHICKATRICE, PM_COCKATRICE },
     { PM_COCKATRICE, PM_GIANT_COCKATRICE },
     { PM_GIANT_COCKATRICE, PM_GARGANTUAN_COCKATRICE },
@@ -1537,13 +1538,13 @@ struct monst *mtmp;
         return mtmp->data;
 }
 
-static const char *levitate[4] = { "float", "Float", "wobble", "Wobble" };
-static const char *flys[4] = { "fly", "Fly", "flutter", "Flutter" };
-static const char *flyl[4] = { "fly", "Fly", "stagger", "Stagger" };
-static const char *slither[4] = { "slither", "Slither", "falter", "Falter" };
-static const char *ooze[4] = { "ooze", "Ooze", "tremble", "Tremble" };
-static const char *immobile[4] = { "wiggle", "Wiggle", "pulsate", "Pulsate" };
-static const char *crawl[4] = { "crawl", "Crawl", "falter", "Falter" };
+STATIC_VAR const char *levitate[4] = { "float", "Float", "wobble", "Wobble" };
+STATIC_VAR const char *flys[4] = { "fly", "Fly", "flutter", "Flutter" };
+STATIC_VAR const char *flyl[4] = { "fly", "Fly", "stagger", "Stagger" };
+STATIC_VAR const char *slither[4] = { "slither", "Slither", "falter", "Falter" };
+STATIC_VAR const char *ooze[4] = { "ooze", "Ooze", "tremble", "Tremble" };
+STATIC_VAR const char *immobile[4] = { "wiggle", "Wiggle", "pulsate", "Pulsate" };
+STATIC_VAR const char *crawl[4] = { "crawl", "Crawl", "falter", "Falter" };
 
 const char *
 locomotion(ptr, def)

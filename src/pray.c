@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    pray.c    $NHDT-Date: 1549074257 2019/02/02 02:24:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.110 $ */
 /* Copyright (c) Benson I. Margulies, Mike Stephenson, Steve Linhart, 1989. */
@@ -45,14 +45,14 @@ STATIC_DCL boolean FDECL(blocked_boulder, (int, int));
  *      responsible for the theft of the Amulet from Marduk, the Creator.
  *      Moloch is unaligned.
  */
-static const char *godvoices[] = {
+STATIC_VAR const char *godvoices[] = {
     "booms out", "thunders", "rings out", "booms",
 };
 
 /* values calculated when prayer starts, and used when completed */
-static aligntyp p_aligntyp;
-static int p_trouble;
-static int p_type; /* (-1)-3: (-1)=really naughty, 3=really good */
+STATIC_VAR aligntyp p_aligntyp;
+STATIC_VAR int p_trouble;
+STATIC_VAR int p_type; /* (-1)-3: (-1)=really naughty, 3=really good */
 
 #define PIOUS 20
 #define DEVOUT 14
@@ -388,7 +388,7 @@ int trouble;
     int i;
     struct obj *otmp = 0;
     const char *what = (const char *) 0;
-    static NEARDATA const char leftglow[] = "Your left ring softly glows",
+    STATIC_VAR NEARDATA const char leftglow[] = "Your left ring softly glows",
                                rightglow[] = "Your right ring softly glows";
 
     switch (trouble) {
@@ -891,7 +891,7 @@ aligntyp resp_god;
 }
 
 /* helper to print "str appears at your feet", or appropriate */
-static void
+STATIC_OVL void
 at_your_feet(str)
 const char *str;
 {
@@ -1538,7 +1538,7 @@ gcrownu()
             }
             /* Acquire two-weapon combat for dual-wielding Stormbringer and Mournblade  */
             if (chaotic_crowning_gift_oartifact == ART_STORMBRINGER || chaotic_crowning_gift_oartifact == ART_MOURNBLADE)
-                unrestrict_weapon_skill(P_TWO_WEAPON_COMBAT);
+                unrestrict_weapon_skill(P_DUAL_WEAPON_COMBAT);
             /* acquire weapon skill regardless of weapon or gift */
             unrestrict_weapon_skill(chaotic_crowning_gift_skill);
             if (obj && obj->oartifact == chaotic_crowning_gift_oartifact)
@@ -1886,7 +1886,7 @@ aligntyp g_align;
         }
         case 5: 
         {
-            static NEARDATA const char msg[] =
+            STATIC_VAR NEARDATA const char msg[] =
                 "\"and thus I grant thee the gift of %s!\"";
 
             play_sfx_sound(SFX_PRAY_GIFT);
@@ -2199,7 +2199,7 @@ register struct obj *otmp;
 int
 dosacrifice()
 {
-    static NEARDATA const char cloud_of_smoke[] =
+    STATIC_VAR NEARDATA const char cloud_of_smoke[] =
         "A cloud of %s smoke surrounds you...";
     register struct obj* otmp;
     int value = 0, pm;
@@ -2341,6 +2341,7 @@ dosacrifice()
                     }
                     if (!Fear_resistance)
                     {
+                        play_sfx_sound(SFX_ACQUIRE_FEAR);
                         You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are terrified, and unable to move.");
                         nomul(-3);
                         multi_reason = "being terrified of a demon";
@@ -3223,7 +3224,7 @@ doturn()
             if (spl_book[sp_no].sp_id == NO_SPELL)
                 break;
             else if (spl_book[sp_no].sp_id == SPE_TURN_UNDEAD)
-                return spelleffects(sp_no, FALSE);
+                return spelleffects(sp_no, FALSE, &youmonst);
         }
         play_sfx_sound(SFX_GENERAL_DO_NOT_KNOW_HOW);
         You("don't know how to turn undead!");
@@ -3445,7 +3446,7 @@ u_ghisher()
 }
 
 
-static const char *hallu_gods[] = {
+STATIC_VAR const char *hallu_gods[] = {
     "the Flying Spaghetti Monster", /* Church of the FSM */
     "Eris",                         /* Discordianism */
     "the Martians",                 /* every science fiction ever */

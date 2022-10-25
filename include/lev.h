@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    lev.h    $NHDT-Date: 1432512781 2015/05/25 00:13:01 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -92,6 +92,7 @@ struct save_game_stats {
     boolean explore_mode;
     boolean modern_mode;
     boolean casual_mode;
+    boolean non_scoring;
     time_t time_stamp;
 
     /* Other information */
@@ -100,7 +101,10 @@ struct save_game_stats {
 
 struct save_game_data {
     char* playername;
+    char filename[256];
     boolean is_running;
+    boolean is_error_save_file;
+    boolean is_imported_save_file;
     struct save_game_stats gamestats;
 };
 

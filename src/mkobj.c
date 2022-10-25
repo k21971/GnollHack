@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mkobj.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.142 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -28,7 +28,7 @@ struct icp {
     char iclass; /* item class */
 };
 
-static const struct icp mkobjprobs[] = { { 12, WEAPON_CLASS },
+STATIC_VAR const struct icp mkobjprobs[] = { { 12, WEAPON_CLASS },
                                          { 12, ARMOR_CLASS },
                                          { 11, FOOD_CLASS },
                                          { 5, TOOL_CLASS },
@@ -42,7 +42,7 @@ static const struct icp mkobjprobs[] = { { 12, WEAPON_CLASS },
                                          { 5, MISCELLANEOUS_CLASS },
                                          { 2, AMULET_CLASS } };
 
-static const struct icp boxiprobs[] = { { 12, GEM_CLASS },
+STATIC_VAR const struct icp boxiprobs[] = { { 12, GEM_CLASS },
                                         { 12, FOOD_CLASS },
                                         { 10, POTION_CLASS },
                                         { 12, SCROLL_CLASS },
@@ -51,10 +51,10 @@ static const struct icp boxiprobs[] = { { 12, GEM_CLASS },
                                         { 12, WAND_CLASS },
                                         { 6, RING_CLASS },
                                         { 4, REAGENT_CLASS },
-                                           { 6, MISCELLANEOUS_CLASS },
+                                        { 6, MISCELLANEOUS_CLASS },
                                         { 2, AMULET_CLASS } };
 
-static const struct icp rogueprobs[] = { { 12, WEAPON_CLASS },
+STATIC_VAR const struct icp rogueprobs[] = { { 12, WEAPON_CLASS },
                                          { 12, ARMOR_CLASS },
                                          { 22, FOOD_CLASS },
                                          { 22, POTION_CLASS },
@@ -62,7 +62,7 @@ static const struct icp rogueprobs[] = { { 12, WEAPON_CLASS },
                                          { 5, WAND_CLASS },
                                          { 5, RING_CLASS } };
 
-static const struct icp hellprobs[] = { { 15, WEAPON_CLASS },
+STATIC_VAR const struct icp hellprobs[] = { { 15, WEAPON_CLASS },
                                         { 15, ARMOR_CLASS },
                                         { 12, FOOD_CLASS },
                                         { 12, TOOL_CLASS },
@@ -251,13 +251,14 @@ mksobj_at(otyp, x, y, init, artif)
 int otyp, x, y;
 boolean init, artif;
 {
-    return mksobj_at_with_flags(otyp, x, y, init, artif, 0, 0, 0UL);
+    return mksobj_at_with_flags(otyp, x, y, init, artif, 0, 0L, 0L, 0UL);
 }
 
 struct obj*
-mksobj_at_with_flags(otyp, x, y, init, artif, mkobj_type, param, mkflags)
-int otyp, x, y, mkobj_type, param;
+mksobj_at_with_flags(otyp, x, y, init, artif, mkobj_type, param, param2, mkflags)
+int otyp, x, y, mkobj_type;
 boolean init, artif;
+long param, param2;
 unsigned long mkflags;
 {
     if (!isok(x, y))
@@ -265,7 +266,7 @@ unsigned long mkflags;
 
     struct obj* otmp;
 
-    otmp = mksobj_with_flags(otyp, init, artif, mkobj_type, param, mkflags);
+    otmp = mksobj_with_flags(otyp, init, artif, mkobj_type, param, param2, mkflags);
     if (otmp)
     {
         place_object(otmp, x, y);
@@ -317,6 +318,7 @@ unsigned long mkflags;
 {
     int tprob;
     int i = 0;
+    Strcpy(debug_buf_1, "mkobj_with_flags");
 
     for (int try_ct = 0; try_ct < 20; try_ct++)
     {
@@ -340,7 +342,7 @@ unsigned long mkflags;
         else
             break;
     }
-    return mksobj_with_flags(i, TRUE, artif, mkobj_type, 0, mkflags);
+    return mksobj_with_flags(i, TRUE, artif, mkobj_type, 0L, 0L, mkflags);
 }
 
 int
@@ -349,6 +351,13 @@ char oclass;
 struct monst* mowner;
 unsigned long rndflags;
 {
+    if (oclass < 0 || oclass >= MAX_OBJECT_CLASSES)
+    {
+        impossible("probtype error, oclass=%d, buf1=%s, buf1=%s", (int)oclass, debug_buf_1, debug_buf_2);
+        oclass = WEAPON_CLASS;
+    }
+    *debug_buf_1 = *debug_buf_2 = 0;
+
     int i = 0;
     boolean also_rare = !!(rndflags & MKOBJ_FLAGS_ALSO_RARE);
     int leveldif = level_difficulty();
@@ -508,6 +517,7 @@ unsigned long rndflags;
     }
 
 random_spellbook_here:
+    Strcpy(debug_buf_1, "random_spellbook_objectid");
     return random_objectid_from_class(SPBOOK_CLASS, mowner, rndflags | MKOBJ_FLAGS_NORMAL_SPELLBOOK);
 }
 
@@ -535,7 +545,7 @@ struct obj *box;
             n = 20;
             break;
         case BOOKSHELF:
-            n = !rn2(50) ? 10 : level_difficulty() >= 10 ? 6 : 5;
+            n = !rn2(50) ? 8 : level_difficulty() >= 10 ? 5 : 4;
             break;
         case MINE_CART:
             n = !rn2(3) ? 0 : 8; /* At least one third of the mine carts are empty */
@@ -604,7 +614,7 @@ struct obj *box;
             if (!rn2(4))
             {
                 /* A random catalogue */
-                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, FIRST_CATALOGUE + rn2(NUM_CATALOGUES), MKOBJ_FLAGS_PARAM_IS_TITLE);
+                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, FIRST_CATALOGUE + rn2(NUM_CATALOGUES), 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
             }
             else if (rn2(3))
                 otmp = mkobj(SCROLL_CLASS, FALSE, TRUE);
@@ -632,6 +642,7 @@ struct obj *box;
         }
         else if (box->otyp == SARCOPHAGUS || box->otyp == COFFIN)
         {
+            Sprintf(debug_buf_2, "mkbox_cnts, otyp=%d", box->otyp);
             char item_classes[6] = { COIN_CLASS, GEM_CLASS, MISCELLANEOUS_CLASS, AMULET_CLASS, RING_CLASS, WEAPON_CLASS };
             otmp = mkobj(item_classes[rn2(6)], TRUE, TRUE);
             if (otmp->oclass == COIN_CLASS)
@@ -648,6 +659,7 @@ struct obj *box;
 
             for (tprob = rnd(100); (tprob -= iprobs->iprob) > 0; iprobs++)
                 ;
+            Sprintf(debug_buf_2, "mkbox_cnts iprobs, otyp=%d", box->otyp);
             if (!(otmp = mkobj(iprobs->iclass, TRUE, TRUE)))
                 continue;
 
@@ -1215,7 +1227,7 @@ int x, y;
 }
 
 /* alteration types; must match COST_xxx macros in hack.h */
-static const char *const alteration_verbs[] = {
+STATIC_VAR const char *const alteration_verbs[] = {
     "cancel", "drain", "uncharge", "unbless", "uncurse", "disenchant",
     "degrade", "dilute", "erase", "burn", "neutralize", "destroy", "splatter",
     "bite", "open", "break the lock on", "rust", "rot", "tarnish"
@@ -1328,7 +1340,7 @@ int alter_type;
 }
 
 /* These are the classes where dknown is zero by default! */
-static const char dknowns[] = { WAND_CLASS,   RING_CLASS, POTION_CLASS, ARMOR_CLASS, MISCELLANEOUS_CLASS, REAGENT_CLASS,
+STATIC_VAR const char dknowns[] = { WAND_CLASS,   RING_CLASS, POTION_CLASS, ARMOR_CLASS, MISCELLANEOUS_CLASS, REAGENT_CLASS,
                                 SCROLL_CLASS, GEM_CLASS,  SPBOOK_CLASS,
                                 WEAPON_CLASS, TOOL_CLASS, FOOD_CLASS, 0 };
 
@@ -1341,16 +1353,16 @@ boolean init;
 boolean artif;
 int mkobj_type;
 {
-    return mksobj_with_flags(otyp, init, artif, mkobj_type, 0, 0UL);
+    return mksobj_with_flags(otyp, init, artif, mkobj_type, 0L, 0L, 0UL);
 }
 
 struct obj *
-mksobj_with_flags(otyp, init, artif, mkobj_type, param, mkflags)
+mksobj_with_flags(otyp, init, artif, mkobj_type, param, param2, mkflags)
 int otyp;
 boolean init;
 boolean artif;
 int mkobj_type; /* 0 = floor, 1 = box, 2 = wishing, -1 = special level preset item */
-int param;
+long param, param2;
 unsigned long mkflags;
 {
     int mndx, tryct;
@@ -1358,6 +1370,12 @@ unsigned long mkflags;
     char let = objects[otyp].oc_class;
     boolean forcemythic = (mkflags & MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY) != 0;
     boolean forcelegendary = (mkflags & MKOBJ_FLAGS_FORCE_LEGENDARY) != 0;
+    unsigned long excludedtitles = 0UL, excludedtitles2 = 0UL;
+    if (mkflags & MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS)
+    {
+        excludedtitles = (unsigned long)param;
+        excludedtitles2 = (unsigned long)param2;
+    }
 
     otmp = newobj();
     *otmp = zeroobj;
@@ -1400,8 +1418,9 @@ unsigned long mkflags;
     if ((objects[otmp->otyp].oc_flags4 & O4_CONTAINER_HAS_LID) && (mkflags & MKOBJ_FLAGS_OPEN_COFFIN))
         otmp->speflags |= SPEFLAGS_LID_OPENED;
 
+    int leveldiff = level_difficulty();
     /* Change type before init if need be*/
-    if (mkobj_type == 0 && (In_mines(&u.uz) || level_difficulty() < 10))
+    if (mkobj_type == 0 && (In_mines(&u.uz) || leveldiff < 10))
     {
         if (otyp == FROST_HORN || otyp == FIRE_HORN)
             otmp->otyp = !rn2(3) ? HORN_OF_CHAOS : !rn2(2) ? BRASS_HORN : TOOLED_HORN;
@@ -1415,7 +1434,7 @@ unsigned long mkflags;
             otmp->otyp = !rn2(2) ? WAN_LIGHTNING : WAN_FIRE;
     }
 
-    if (mkobj_type >= 0 && mkobj_type < 2 && (depth(&u.uz) == 1 || depth(&u.uz) == 2 || level_difficulty() < 5))
+    if (mkobj_type >= 0 && mkobj_type < 2 && (depth(&u.uz) == 1 || depth(&u.uz) == 2 || leveldiff < 5))
     {
         if (otmp->otyp == WAN_WISHING)
             otmp->otyp = WAN_POLYMORPH;
@@ -1470,7 +1489,7 @@ unsigned long mkflags;
                 else
                 {
                     otmp->elemental_enchantment = (objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED) ? COLD_ENCHANTMENT :
-                        level_difficulty() > 11 ? (!rn2(7) ? COLD_ENCHANTMENT : !rn2(3) ? LIGHTNING_ENCHANTMENT  : FIRE_ENCHANTMENT) :
+                        leveldiff > 11 ? (!rn2(7) ? COLD_ENCHANTMENT : !rn2(3) ? LIGHTNING_ENCHANTMENT  : FIRE_ENCHANTMENT) :
                         (!rn2(3) ? LIGHTNING_ENCHANTMENT : FIRE_ENCHANTMENT);
 
                     if (is_multigen(otmp))
@@ -1635,16 +1654,16 @@ unsigned long mkflags;
                             cnm = NON_PM;
                         else
                         {
-                            boolean low_level = ((level_difficulty() + u.ulevel) / 2 < mons[PM_LICH].difficulty);
+                            boolean low_level = ((leveldiff + u.ulevel) / 2 < mons[PM_LICH].difficulty);
                             int classmonster = NON_PM;
                             ptr = mkclass(rn2(3) || low_level ? S_GREATER_UNDEAD : S_LICH, 0);
                             if (ptr)
                                 classmonster = monsndx(ptr);
 
                             int tmp = ((low_level || rn2(3)) && classmonster > NON_PM ? classmonster :
-                                ((level_difficulty() + u.ulevel) / 2 < mons[PM_SKELETON_WARRIOR].difficulty - 2 ? PM_SKELETON :
-                                    !rn2(2) || (level_difficulty() + u.ulevel) / 2 < mons[PM_SKELETON_LORD].difficulty - 3 ? PM_SKELETON_WARRIOR :
-                                    !rn2(2) || (level_difficulty() + u.ulevel) / 2 < mons[PM_SKELETON_KING].difficulty - 4 ? PM_SKELETON_LORD : PM_SKELETON_KING));
+                                ((leveldiff + u.ulevel) / 2 < mons[PM_SKELETON_WARRIOR].difficulty - 2 ? PM_SKELETON :
+                                    !rn2(2) || (leveldiff + u.ulevel) / 2 < mons[PM_SKELETON_LORD].difficulty - 3 ? PM_SKELETON_WARRIOR :
+                                    !rn2(2) || (leveldiff + u.ulevel) / 2 < mons[PM_SKELETON_KING].difficulty - 4 ? PM_SKELETON_LORD : PM_SKELETON_KING));
 
                             if (tmp >= LOW_PM && !(mvitals[tmp].mvflags & MV_GONE))
                                 cnm = tmp;
@@ -1672,8 +1691,8 @@ unsigned long mkflags;
                                 cnm = NON_PM;
                             else
                             {
-                                boolean low_level = ((level_difficulty() + u.ulevel) / 2 < mons[PM_VAMPIRE].difficulty);
-                                boolean very_low_level = ((level_difficulty() + u.ulevel) / 2 < mons[PM_BARROW_WIGHT].difficulty - 1);
+                                boolean low_level = ((leveldiff + u.ulevel) / 2 < mons[PM_VAMPIRE].difficulty);
+                                boolean very_low_level = ((leveldiff + u.ulevel) / 2 < mons[PM_BARROW_WIGHT].difficulty - 1);
                                 ptr = mkclass(rn2(3) && !low_level ? S_VAMPIRE : S_LESSER_UNDEAD, 0);
                                 if (ptr)
                                     classmonster = monsndx(ptr);
@@ -1894,7 +1913,7 @@ unsigned long mkflags;
                 }
 
                 if (!verysmall(&mons[otmp->corpsenm])
-                    && rn2(level_difficulty() / 2 + 10) > 10)
+                    && rn2(leveldiff / 2 + 10) > 10)
                     (void) add_to_container(otmp, mkobj(SPBOOK_CLASS, FALSE, TRUE));
             }
             break;
@@ -1925,7 +1944,7 @@ unsigned long mkflags;
         curse(otmp);
 
     /* Exceptionality */
-    if (can_have_exceptionality(otmp) && !(objects[otmp->otyp].oc_flags4 & O4_NEVER_GENERATED_WITH_EXCEPTIONALITY) && mkobj_type < 2 && otmp->oartifact == 0)
+    if (can_have_exceptionality(otmp) && mkobj_type < 2 && otmp->oartifact == 0)
     {
         if ((mkflags & MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY) && param >= 0)
         {
@@ -1953,52 +1972,69 @@ unsigned long mkflags;
         }
         else
         {
+            boolean halfchance = !!(objects[otmp->otyp].oc_flags5 & O5_HALF_EXCEPTIONALITY_CHANCE);
+            boolean doublechance = !!(objects[otmp->otyp].oc_flags5 & O5_DOUBLE_EXCEPTIONALITY_CHANCE);
+            uchar ownerimpliedexcep = (mkflags & MKOBJ_FLAGS_OWNER_IS_LAWFUL) ? EXCEPTIONALITY_CELESTIAL :
+                (mkflags & MKOBJ_FLAGS_OWNER_IS_NEUTRAL) ? EXCEPTIONALITY_PRIMORDIAL : (mkflags & MKOBJ_FLAGS_OWNER_IS_LAWFUL) ? EXCEPTIONALITY_INFERNAL : 
+                (mkflags & MKOBJ_FLAGS_OWNER_IS_NONALIGNED) ? EXCEPTIONALITY_ELITE : 0;
             if (In_endgame(&u.uz))
             {
-                if (!rn2(4))
-                    otmp->exceptionality = (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
-                else if (!rn2(3))
+                if (doublechance || !rn2(halfchance ? 4 : 2))
+                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
+                else if (!rn2(halfchance ? 4 : 2))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
-                else if (!rn2(2))
+                else if (halfchance ? rn2(2) : doublechance ? rn2(8) : rn2(4))
                     otmp->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
             }
             else if (Inhell)
             {
-                if (!rn2(10) && objects[otmp->otyp].oc_material != MAT_SILVER)
-                    otmp->exceptionality = EXCEPTIONALITY_INFERNAL;
-                else if (!rn2(4))
+                if (!rn2(halfchance ? 20 : doublechance ? 5 : 10))
+                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
+                else if (!rn2(halfchance ? 8 : doublechance ? 2 : 4))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
-                else if (!rn2(2))
+                else if (halfchance ? !rn2(4) : doublechance ? rn2(4) : !rn2(2))
                     otmp->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
             }
-            else if (depth(&u.uz) >= 20)
+            else if (leveldiff >= 16)
             {
-                if (!rn2(Is_stronghold(&u.uz) ? 20 : 40))
-                    otmp->exceptionality = (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
-                else if (!rn2(6))
+                if (!rn2(halfchance ? 400 : doublechance ? 100 : 200))
+                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
+                else if (!rn2(halfchance ? 20 : doublechance ? 5 : 10))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
-                else if (!rn2(3))
+                else if (!rn2(halfchance ? 8 : doublechance ? 2 : 4))
                     otmp->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
             }
-            else if (depth(&u.uz) >= 10)
+            else if (leveldiff >= 8)
             {
-                if (!rn2(20))
+                if (!rn2(halfchance ? 100 : doublechance ? 25 : 50))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
-                else if (!rn2(4))
+                else if (!rn2(halfchance ? 16 : doublechance ? 4 : 8))
+                    otmp->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
+            }
+            else if (leveldiff < 2)
+            {
+                if (!rn2(halfchance ? 400 : doublechance ? 100 : 200))
                     otmp->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
             }
             else
             {
-                if (!rn2(100))
+                if (!rn2(halfchance ? 400 : doublechance ? 100 : 200))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
-                else if (!rn2(20))
+                else if (!rn2(halfchance ? 40 : doublechance ? 10 : 20))
                     otmp->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
             }
         }
+
+        if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_CELESTIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_UNDEAD_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_CELESTIAL)
+            otmp->exceptionality = EXCEPTIONALITY_ELITE;
+        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGELIC_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+            otmp->exceptionality = EXCEPTIONALITY_ELITE;
+        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || objects[otmp->otyp].oc_material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+            otmp->exceptionality = EXCEPTIONALITY_ELITE;
     }
 
     /* Mythic quality */
-    if (can_obj_have_mythic(otmp) && (forcemythic || forcelegendary || (level_difficulty() >= 3 && mkobj_type < 2)) && otmp->oartifact == 0)
+    if (can_obj_have_mythic(otmp) && (forcemythic || forcelegendary || (leveldiff >= 3 && mkobj_type < 2)) && otmp->oartifact == 0)
     {
         boolean doublechance = !!(objects[otmp->otyp].oc_flags4 & O4_DOUBLE_MYTHIC_CHANCE);
         boolean makemythic = FALSE;
@@ -2006,10 +2042,12 @@ unsigned long mkflags;
             makemythic = otmp->exceptionality || otmp->oclass == ARMOR_CLASS ? !rn2(doublechance ? 2 : 4) : !rn2(doublechance ? 4 : 8);
         else if (Inhell)
             makemythic = otmp->exceptionality || otmp->oclass == ARMOR_CLASS ? !rn2(doublechance ? 3 : 5) : !rn2(doublechance ? 5 : 10);
-        else if (level_difficulty() >= 20)
+        else if (leveldiff >= 20)
             makemythic = otmp->exceptionality || otmp->oclass == ARMOR_CLASS ? !rn2(doublechance ? 3 : 6) : !rn2(doublechance ? 6 : 12);
-        else if (level_difficulty() >= 10)
+        else if (leveldiff >= 10)
             makemythic = otmp->exceptionality ? !rn2(doublechance ? 4 : 8) : !rn2(doublechance ? 8 : 16);
+        else if (leveldiff < 2)
+            makemythic = otmp->exceptionality ? !rn2(doublechance ? 100 : 200) : !rn2(doublechance ? 200 : 400);
         else
             makemythic = otmp->exceptionality ? !rn2(doublechance ? 6 : 12) : !rn2(doublechance ? 12 : 24);
 
@@ -2056,7 +2094,7 @@ unsigned long mkflags;
             otmp->novelidx = (short)param;
         else
             otmp->novelidx = -1; /* "none of the above"; will be changed */
-        otmp = oname(otmp, noveltitle(&otmp->novelidx));
+        otmp = oname(otmp, noveltitle(&otmp->novelidx, excludedtitles, excludedtitles2));
         otmp->nknown = TRUE;
         break;
     case SPE_MANUAL:
@@ -2064,7 +2102,8 @@ unsigned long mkflags;
             otmp->manualidx = (short)param;
         else
             otmp->manualidx = -1; /* "none of the above"; will be changed */
-        otmp = oname(otmp, manualtitle(&otmp->manualidx));
+
+        otmp = oname(otmp, manualtitle(&otmp->manualidx, excludedtitles, excludedtitles2));
         otmp->nknown = TRUE;
         otmp->cursed = otmp->blessed = 0; /* Never blessed or cursed */
         break;
@@ -2410,6 +2449,7 @@ int spe_type_index;
         initspe = 0;
         break;
     case ENCHTYPE_GENERAL_WEAPON:
+    case ENCHTYPE_GENERAL_WEAPON_ARMOR:
         initspe = Inhell ? rngh(2, 6) : rngh(3, 3);
         break;
     case ENCHTYPE_GENERAL_ARMOR:
@@ -2502,6 +2542,7 @@ int spe_type_index;
         break;
     case ENCHTYPE_GENERAL_WEAPON:
     case ENCHTYPE_GENERAL_WEAPON_ALWAYS_START_0:
+    case ENCHTYPE_GENERAL_WEAPON_ARMOR:
         maxspe = 10;
         break;
     case ENCHTYPE_GENERAL_ARMOR:
@@ -2859,7 +2900,7 @@ int old_range;
 {
     char buf[BUFSZ];
     xchar ox, oy;
-    int new_range = arti_light_radius(obj), delta = new_range - old_range;
+    int new_range = current_arti_light_radius(obj), delta = new_range - old_range;
 
     /* radius of light emitting artifact varies by curse/bless state
        so will change after blessing or cursing */
@@ -2942,7 +2983,7 @@ register struct obj *otmp;
     if (otmp->oclass == COIN_CLASS)
         return;
     if (otmp->lamplit)
-        old_light = arti_light_radius(otmp);
+        old_light = current_arti_light_radius(otmp);
     if (otmp->makingsound)
         old_volume = obj_ambient_sound_volume(otmp);
     otmp->cursed = 0;
@@ -2971,7 +3012,7 @@ register struct obj *otmp;
     double old_volume = 0;
 
     if (otmp->lamplit)
-        old_light = arti_light_radius(otmp);
+        old_light = current_arti_light_radius(otmp);
     if (otmp->makingsound)
         old_volume = obj_ambient_sound_volume(otmp);
     otmp->blessed = 0;
@@ -2999,7 +3040,7 @@ register struct obj *otmp;
     if (otmp->oclass == COIN_CLASS)
         return;
     if (otmp->lamplit)
-        old_light = arti_light_radius(otmp);
+        old_light = current_arti_light_radius(otmp);
     if (otmp->makingsound)
         old_volume = obj_ambient_sound_volume(otmp);
     already_cursed = otmp->cursed;
@@ -3049,7 +3090,7 @@ register struct obj *otmp;
     double old_volume = 0;
 
     if (otmp->lamplit)
-        old_light = arti_light_radius(otmp);
+        old_light = current_arti_light_radius(otmp);
     if (otmp->makingsound)
         old_volume = obj_ambient_sound_volume(otmp);
     otmp->cursed = 0;
@@ -3208,7 +3249,7 @@ register struct obj *obj;
     return (wt ? wt * (int) obj->quan : ((int) obj->quan + 1) >> 1);
 }
 
-static const int treefruits[] = { APPLE, ORANGE, PEAR, BANANA, POMEGRANATE, EUCALYPTUS_LEAF, FIG, DRAGON_FRUIT };
+STATIC_VAR const int treefruits[] = { APPLE, ORANGE, PEAR, BANANA, POMEGRANATE, EUCALYPTUS_LEAF, FIG, DRAGON_FRUIT };
 
 struct obj *
 rnd_treefruit_at(x, y)
@@ -3346,7 +3387,7 @@ unsigned mid;
     return obj;
 }
 
-static struct obj *
+STATIC_OVL struct obj *
 save_mtraits(obj, mtmp)
 struct obj *obj;
 struct monst *mtmp;
@@ -4122,7 +4163,7 @@ boolean tipping; /* caller emptying entire contents; affects shop handling */
 
 /* support for wizard-mode's `sanity_check' option */
 
-static const char NEARDATA /* pline formats for insane_object() */
+STATIC_VAR const char NEARDATA /* pline formats for insane_object() */
     ofmt0[] = "%s obj %s %s: %s",
     ofmt3[] = "%s [not null] %s %s: %s",
     /* " held by mon %p (%s)" will be appended, filled by M,mon_nam(M) */
@@ -4272,7 +4313,7 @@ const char *mesg;
 }
 
 /* This must stay consistent with the defines in obj.h. */
-static const char *obj_state_names[NOBJ_STATES] = { "free",      "floor",
+STATIC_VAR const char *obj_state_names[NOBJ_STATES] = { "free",      "floor",
                                                     "contained", "invent",
                                                     "minvent",   "migrating",
                                                     "buried",    "onbill",

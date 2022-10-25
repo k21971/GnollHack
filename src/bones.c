@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    bones.c    $NHDT-Date: 1557092711 2019/05/05 21:45:11 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.75 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985,1993. */
@@ -94,6 +94,7 @@ boolean restore;
                         }
                         else
                         {
+                            Strcpy(debug_buf_1, "resetobjs");
                             otmp->otyp = random_objectid_from_class(otmp->oclass, (struct monst*)0, MKOBJ_FLAGS_ALSO_RARE);
                             otmp->elemental_enchantment = 0;
                             otmp->exceptionality = 0;
@@ -391,7 +392,7 @@ can_make_bones()
         return FALSE;
     /* don't let multiple restarts generate multiple copies of objects
        in bones files */
-    if (discover || ModernMode || CasualMode) // In ModernMode bones files could work, but the player is not supposed to die in that mode, so something odd would have happened to get here
+    if (discover || ModernMode || CasualMode || flags.non_scoring) // In ModernMode bones files could work, but the player is not supposed to die in that mode, so something odd would have happened to get here
         return FALSE;
     return TRUE;
 }
@@ -436,11 +437,19 @@ make_bones:
     program_state.in_bones = 1; /* Stays on until program termination */
     unleash_all();
     /* in case these characters are not in their home bases */
+    int minmlev = 0, maxmlev = 0;
+    get_generated_monster_minmax_levels(0, &minmlev, &maxmlev, 0);
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
         if (DEADMONSTER(mtmp))
             continue;
         mptr = mtmp->data;
-        if (mtmp->iswiz || mptr == &mons[PM_MEDUSA]
+        if (((mptr->difficulty > maxmlev || (mptr->geno & G_UNIQ) != 0)
+            && !(mtmp->mon_flags & MON_FLAGS_SPLEVEL_RESIDENT)
+            && !(Invocation_lev(&u.uz) && mptr == &mons[PM_BAPHOMET])
+            && !(Inhell && mptr == &mons[PM_DEMOGORGON])
+            && !(Inhell && mptr == &mons[PM_ASMODEUS])
+            )
+            || mtmp->iswiz || mptr == &mons[PM_MEDUSA]
             || mptr->msound == MS_NEMESIS || mptr->msound == MS_LEADER
             || mptr == &mons[PM_VLAD_THE_IMPALER]
             || (mptr == &mons[PM_ORACLE] && !fixuporacle(mtmp)))

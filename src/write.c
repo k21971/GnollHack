@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    write.c    $NHDT-Date: 1450261366 2015/12/16 10:22:46 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.17 $ */
 /* GnollHack may be freely redistributed.  See license for details. */
@@ -93,7 +93,7 @@ struct obj *objlist;
     return FALSE;
 }
 
-static NEARDATA const char write_on[] = { SCROLL_CLASS, SPBOOK_CLASS, 0 };
+STATIC_VAR NEARDATA const char write_on[] = { SCROLL_CLASS, SPBOOK_CLASS, 0 };
 
 /* write -- applying a magic marker */
 int

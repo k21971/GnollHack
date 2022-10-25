@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    region.c    $NHDT-Date: 1543455828 2018/11/29 01:43:48 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) 1996 by Jean-Christophe Collet  */
@@ -13,9 +13,9 @@
  * structure eventually.
  */
 
-static NhRegion **regions;
-static int n_regions = 0;
-static int max_regions = 0;
+STATIC_VAR NhRegion **regions;
+STATIC_VAR int n_regions = 0;
+STATIC_VAR int max_regions = 0;
 
 boolean FDECL(enter_special_level_seen, (genericptr, genericptr));
 boolean FDECL(enter_special_level_true_nature_revealed, (genericptr, genericptr));

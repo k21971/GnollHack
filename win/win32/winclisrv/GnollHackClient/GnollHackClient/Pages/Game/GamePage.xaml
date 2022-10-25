@@ -108,7 +108,7 @@
                             <controls:LabeledImageButton Grid.Column="3" x:Name="lDropManyButton" LblText="Drop Items" BtnLetter="%" ImgSourcePath="resource://GnollHackClient.Assets.UI.dropmany.png" BtnClicked="GHButton_Clicked" />
                             <controls:LabeledImageButton Grid.Column="4" x:Name="lChatButton" LblText="Chat" BtnLetter="C" ImgSourcePath="resource://GnollHackClient.Assets.UI.chat.png" BtnClicked="GHButton_Clicked" />
                             <controls:LabeledImageButton Grid.Column="5" x:Name="lKickButton" LblText="Kick" BtnLetter="k" ImgSourcePath="resource://GnollHackClient.Assets.UI.kick.png" BtnClicked="GHButton_Clicked" />
-                            <controls:LabeledImageButton Grid.Column="6" x:Name="lApplyButton" LblText="Apply" BtnLetter="a" ImgSourcePath="resource://GnollHackClient.Assets.UI.apply.png" BtnClicked="GHButton_Clicked" />
+                            <controls:LabeledImageButton Grid.Column="6" x:Name="lRepeatButton" LblText="Repeat" BtnLetter="A" BtnCtrl="True" ImgSourcePath="resource://GnollHackClient.Assets.UI.repeat.png" BtnClicked="GHButton_Clicked" />
                         </Grid>
                         <Grid x:Name="LowerCmdGrid" HeightRequest="60" HorizontalOptions="CenterAndExpand">
                             <Grid.RowDefinitions>
@@ -128,7 +128,7 @@
                             <controls:LabeledImageButton Grid.Column="2" x:Name="lThrowButton" LblText="Throw" BtnLetter="t" ImgSourcePath="resource://GnollHackClient.Assets.UI.throw.png" BtnClicked="GHButton_Clicked" />
                             <controls:LabeledImageButton Grid.Column="3" x:Name="lCastButton" LblText="Cast" BtnLetter="Z" ImgSourcePath="resource://GnollHackClient.Assets.UI.cast.png" BtnClicked="GHButton_Clicked" />
                             <controls:LabeledImageButton Grid.Column="4" x:Name="lZapButton" LblText="Zap" BtnLetter="z" ImgSourcePath="resource://GnollHackClient.Assets.UI.zap.png" BtnClicked="GHButton_Clicked" />
-                            <controls:LabeledImageButton Grid.Column="5" x:Name="lRepeatButton" LblText="Repeat" BtnLetter="A" BtnCtrl="True" ImgSourcePath="resource://GnollHackClient.Assets.UI.repeat.png" BtnClicked="GHButton_Clicked" />
+                            <controls:LabeledImageButton Grid.Column="5" x:Name="lApplyButton" LblText="Apply" BtnLetter="a" ImgSourcePath="resource://GnollHackClient.Assets.UI.apply.png" BtnClicked="GHButton_Clicked" />
                             <controls:LabeledImageButton Grid.Column="6" x:Name="lMoreButton" LblText="More" ImgSourcePath="resource://GnollHackClient.Assets.UI.more.png" BtnClicked="MoreButton_Clicked" />
                         </Grid>
                     </StackLayout>
@@ -155,7 +155,7 @@
                     </gnollhackclient:CustomLabel>
                     <Grid HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand">
                         <ff:CachedImage x:Name="MenuWindowGlyphImage" HorizontalOptions="End" VerticalOptions="Start" Margin="15,15" WidthRequest="75" HeightRequest="75" Aspect="AspectFit" />
-                        <controls:SwitchableCanvasView x:Name="MenuCanvas" UseGL="True" CanvasType="MenuCanvas" RevertBlackAndWhite="True" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="MenuCanvas_PaintSurface" Touch="MenuCanvas_Touch" EnableTouchEvents="True" />
+                        <controls:SwitchableCanvasView x:Name="MenuCanvas" UseGL="False" CanvasType="MenuCanvas" RevertBlackAndWhite="True" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="MenuCanvas_PaintSurface" Touch="MenuCanvas_Touch" EnableTouchEvents="True" />
                     </Grid>
 
                     <Grid x:Name="MenuCloseGrid" BackgroundColor="Transparent" >
@@ -168,7 +168,22 @@
                         </Grid.ColumnDefinitions>
                         <Grid x:Name="MenuOKGrid" HorizontalOptions="End" WidthRequest="215" HeightRequest="60" Grid.Column="0">
                             <ff:CachedImage x:Name="MenuOKButtonImage" Source="resource://GnollHackClient.Assets.button_normal.png" Aspect="Fill" HorizontalOptions="CenterAndExpand" VerticalOptions="CenterAndExpand" WidthRequest="215" HeightRequest="60" />
-                            <Button Text="OK" x:Name="MenuOKButton" Clicked="MenuOKButton_Clicked" FontFamily="Diablo" FontSize="20" TextColor="White" BackgroundColor="Transparent" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand"  />
+                            <Button Text="OK" x:Name="MenuOKButton" Clicked="MenuOKButton_Clicked" FontFamily="Diablo" FontSize="20" TextColor="White" BackgroundColor="Transparent" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" >
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal">
+                                            <VisualState.Setters>
+                                                <Setter Property="TextColor" Value="White" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Property="TextColor" Value="Gray" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </Button>
                         </Grid>
                         <Grid x:Name="MenuCancelGrid" HorizontalOptions="Start" WidthRequest="215" HeightRequest="60" Grid.Column="1">
                             <ff:CachedImage x:Name="MenuCancelButtonImage" Source="resource://GnollHackClient.Assets.button_normal.png" Aspect="Fill" HorizontalOptions="CenterAndExpand" VerticalOptions="CenterAndExpand" WidthRequest="215" HeightRequest="60" />
@@ -245,7 +260,7 @@
                 <gnollhackclient:BackgroundView BackgroundStyle="StretchedBitmap" BackgroundBitmap="OldPaper" BorderStyle="Small" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand"/>
                 <Grid x:Name="TextStack" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand">
                     <ff:CachedImage x:Name="TextWindowGlyphImage" HorizontalOptions="End" VerticalOptions="Start" Margin="15" WidthRequest="75" HeightRequest="75" Aspect="AspectFit" />
-                    <controls:SwitchableCanvasView x:Name="TextCanvas" UseGL="True" CanvasType="TextCanvas" RevertBlackAndWhite="True" UseTextOutline="False" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="TextCanvas_PaintSurface" Touch="TextCanvas_Touch" EnableTouchEvents="True" />
+                    <controls:SwitchableCanvasView x:Name="TextCanvas" UseGL="False" CanvasType="TextCanvas" RevertBlackAndWhite="True" UseTextOutline="False" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="TextCanvas_PaintSurface" Touch="TextCanvas_Touch" EnableTouchEvents="True" />
                 </Grid>
             </Grid>
             <Grid x:Name="GetLineGrid" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" 
@@ -345,9 +360,11 @@
                 </Grid>
             </Grid>
             <Grid x:Name="MoreCommandsGrid" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" BackgroundColor="#FF000000" IsVisible="False">
-                <controls:SwitchableCanvasView x:Name="CommandCanvas" UseGL="True" CanvasType="CommandCanvas" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="CommandCanvas_PaintSurface" Touch="CommandCanvas_Touch" EnableTouchEvents="True" />
+                <controls:SwitchableCanvasView x:Name="CommandCanvas" UseGL="False" CanvasType="CommandCanvas" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="CommandCanvas_PaintSurface" Touch="CommandCanvas_Touch" EnableTouchEvents="True" />
             </Grid>
-            <controls:SwitchableCanvasView x:Name="TipView" IsVisible="false"
+            <controls:SwitchableCanvasView x:Name="TipView" 
+                                           IsVisible="False"
+                                           UseGL="False"
                                           CanvasType="TipCanvas"
                                           EnableTouchEvents="True"
                                           PaintSurface="TipView_PaintSurface" 

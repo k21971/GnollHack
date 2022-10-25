@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    objnam.c    $NHDT-Date: 1551138256 2019/02/25 23:44:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.235 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -10,48 +10,47 @@
 /* NOTE: the order of these exactly corresponds to the
    order of oc_material values #define'd in objclass.h. */
 struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
-    {"mysterious",  PHASE_VOID,     HIT_SURFACE_NONE,       FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"liquid",      PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, TRUE },
-    {"oil",         PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"wax",         PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"vegetable",   PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_GRASS,    TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE },
-    {"flesh",       PHASE_SOLID,    HIT_SURFACE_FLESH,      FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE },
-    {"organic",     PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"paper",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"cloth",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"silk",        PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"leather",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"wooden",      PHASE_SOLID,    HIT_SURFACE_WOOD,       FLOOR_SURFACE_WOOD,     TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"bone",        PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"chitin",      PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE },
-    {"tooth",       PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE },
-    {"dragonhide",  PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE },
-    {"iron",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, TRUE,  TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"metal",       PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"copper",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"silver",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"gold",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"platinum",    PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"orichalcum",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"adamantium",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"plastic",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE  },
-    {"glass",       PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE  },
-    {"crystal",     PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE  },
-    {"hard crystal",PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"stone",       PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"modronite",   PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE  },
-    {"planar rift", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"force field", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"air",         PHASE_GAS,      HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"fire",        PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"energy",      PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"incorporeal", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
-    {"ice",         PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE  },
-    {"soil",        PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_GROUND,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE },
+    {"mysterious",  PHASE_VOID,     HIT_SURFACE_NONE,       FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "meal" },
+    {"liquid",      PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, TRUE,       "liquid" },
+    {"oil",         PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "wax" },
+    {"wax",         PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "food" },
+    {"vegetable",   PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_GRASS,    TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,       "meat" },
+    {"flesh",       PHASE_SOLID,    HIT_SURFACE_FLESH,      FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,       "food" },
+    {"organic",     PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "food" },
+    {"paper",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "paper" },
+    {"cloth",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "cloth" },
+    {"silk",        PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "silk" },
+    {"leather",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "leather" },
+    {"wooden",      PHASE_SOLID,    HIT_SURFACE_WOOD,       FLOOR_SURFACE_WOOD,     TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "wood" },
+    {"bone",        PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "bone" },
+    {"chitin",      PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,       "chitin" },
+    {"tooth",       PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "ivory" },
+    {"dragonhide",  PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE,      "scale" },
+    {"iron",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, TRUE,  TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
+    {"metal",       PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
+    {"copper",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "copper" },
+    {"silver",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "silver" },
+    {"gold",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "gold" },
+    {"platinum",    PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
+    {"orichalcum",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
+    {"adamantium",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
+    {"mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
+    {"plastic",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,       "plastic"  },
+    {"glass",       PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE,       "glass"  },
+    {"crystal",     PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE,       "crystal"  },
+    {"hard crystal",PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE,      "crystal" },
+    {"gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE,      "gemstone" },
+    {"stone",       PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "rock"},
+    {"modronite",   PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,       "alien food" },
+    {"planar rift", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "nothingness" },
+    {"force field", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "force field" },
+    {"air",         PHASE_GAS,      HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "air" },
+    {"fire",        PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "flames" },
+    {"energy",      PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "energy" },
+    {"incorporeal", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "incorporeal foodstuff" },
+    {"ice",         PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,       "ice"  },
+    {"soil",        PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_GROUND,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "soil" },
 };
-
 
 const char* multishot_style_names[MAX_MULTISHOT_TYPES] = {
     "None",
@@ -169,8 +168,8 @@ register const char *pref;
 }
 
 /* manage a pool of BUFSZ buffers, so callers don't have to */
-static char NEARDATA obufs[NUMOBUF][BUFSZ];
-static int obufidx = 0;
+STATIC_VAR char NEARDATA obufs[NUMOBUF][BUFSZ];
+STATIC_VAR int obufidx = 0;
 
 char *
 nextobuf()
@@ -307,7 +306,7 @@ struct obj *obj;
 /* used by distant_name() to pass extra information to xname_flags();
    it would be much cleaner if this were a parameter, but that would
    require all of the xname() and doname() calls to be modified */
-static int distantname = 0;
+STATIC_VAR int distantname = 0;
 
 /* Give the name of an object seen at a distance.  Unlike xname/doname,
  * we don't want to set dknown if it's not set already.
@@ -984,6 +983,7 @@ struct obj *obj;
        are required in order for xname() to yield a sensible result */
     bareobj = zeroobj;
     bareobj.otyp = otyp;
+    bareobj.oartifact = obj->oartifact;
     bareobj.oclass = obj->oclass;
     bareobj.dknown = obj->dknown;
     /* suppress known except for amulets (needed for fakes and real A-of-Y) */
@@ -1340,7 +1340,14 @@ unsigned doname_flags;
 
     /* charges */
     if (objects[obj->otyp].oc_charged && known)
-        Sprintf(eos(bp), " (%d:%d)", (int)obj->recharged, (int)obj->charges);
+    {
+        if (flags.long_charge_text)
+        {
+            Sprintf(eos(bp), " (%d charge%s, %d recharging%s)", (int)obj->charges, plur(obj->charges), (int)obj->recharged, plur(obj->recharged));
+        }
+        else
+            Sprintf(eos(bp), " (%d:%d)", (int)obj->recharged, (int)obj->charges);
+    }
 
     /* post and prefixes */
     switch (is_weptool(obj) ? WEAPON_CLASS : obj->oclass) {
@@ -2131,6 +2138,15 @@ struct obj *obj;
     return xname(obj);
 }
 
+char*
+acxname(obj)
+struct obj* obj;
+{
+    if (obj->otyp == CORPSE)
+        return corpse_xname(obj, (const char*)0, CXN_ARTICLE);
+    return obj->oartifact && obj->aknown ? the(xname(obj)) : an(xname(obj));
+}
+
 /* like cxname, but ignores quantity */
 char *
 cxname_singular(obj)
@@ -2672,13 +2688,13 @@ struct obj *obj;
     return outbuf;
 }
 
-static const char *wrp[] = {
+STATIC_VAR const char *wrp[] = {
     "wand",   "ring",      "potion",     "scroll", "gem",
     "amulet", "spellbook", "spell book",
     /* for non-specific wishes */
     "weapon", "armor",     "tool",  "reagent",  "miscellaneous item",   "miscellaneous",     "food",   "comestible",
 };
-static const char wrpsym[] = { WAND_CLASS,   RING_CLASS,   POTION_CLASS,
+STATIC_VAR const char wrpsym[] = { WAND_CLASS,   RING_CLASS,   POTION_CLASS,
                                SCROLL_CLASS, GEM_CLASS,    AMULET_CLASS,
                                SPBOOK_CLASS, SPBOOK_CLASS, WEAPON_CLASS,
                                ARMOR_CLASS,  TOOL_CLASS, REAGENT_CLASS, MISCELLANEOUS_CLASS, MISCELLANEOUS_CLASS,
@@ -2707,7 +2723,7 @@ const char *verb;
 
 /* various singular words that vtense would otherwise categorize as plural;
    also used by makesingular() to catch some special cases */
-static const char *const special_subjs[] = {
+STATIC_VAR const char *const special_subjs[] = {
     "erinys",  "manes", /* this one is ambiguous */
     "Cyclops", "Hippocrates",     "Pelias",    "aklys",
     "amnesia", "detect monsters", "paralysis", "shape changers",
@@ -2821,7 +2837,7 @@ struct sing_plur {
 /* word pairs that don't fit into formula-based transformations;
    also some suffices which have very few--often one--matches or
    which aren't systematically reversible (knives, staves) */
-static const struct sing_plur one_off[] = {
+STATIC_VAR const struct sing_plur one_off[] = {
     { "child",
       "children" },      /* (for wise guys who give their food funny names) */
     { "cubus", "cubi" }, /* in-/suc-cubus */
@@ -2847,7 +2863,7 @@ static const struct sing_plur one_off[] = {
     { 0, 0 }
 };
 
-static const char *const as_is[] = {
+STATIC_VAR const char *const as_is[] = {
     /* makesingular() leaves these plural due to how they're used */
     "boots",   "shoes",     "gloves",    "lenses", "goggles", "glasses", "eye glasses", "scales",
     "eyes",    "gauntlets", "iron bars", "bracers", "wings", "earrings",
@@ -3325,7 +3341,7 @@ const char *u_str;      /* from user, so might be variant spelling */
 const char *o_str;      /* from objects[], so is in canonical form */
 boolean retry_inverted; /* optional extra "of" handling */
 {
-    static NEARDATA const char detect_SP[] = "detect ",
+    STATIC_VAR NEARDATA const char detect_SP[] = "detect ",
                                SP_detection[] = " detection";
     char *p, buf[BUFSZ];
 
@@ -3466,7 +3482,7 @@ STATIC_OVL NEARDATA const struct o_range o_ranges[] = {
    absence of spaces and/or hyphens (such as "pickaxe" vs "pick axe"
    vs "pick-axe") then there is no need for inclusion in this list;
    likewise for ``"of" inversions'' ("boots of speed" vs "speed boots") */
-static const struct alt_spellings {
+STATIC_VAR const struct alt_spellings {
     const char *sp;
     int ob;
 } spellings[] = {
@@ -4897,7 +4913,7 @@ boolean is_wiz_wish;
     if (open && typ > 0 && Is_otyp_container_with_lid(typ))
         mkflags |= MKOBJ_FLAGS_OPEN_COFFIN;
 
-    otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, 2, 0, mkflags) : mkobj(oclass, FALSE, 2);
+    otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, 2, 0L, 0L, mkflags) : mkobj(oclass, FALSE, 2);
     typ = otmp->otyp, oclass = otmp->oclass; /* what we actually got */
 
     if (islit && (typ == OIL_LAMP || typ == MAGIC_LAMP || typ == BRASS_LANTERN
@@ -5140,16 +5156,38 @@ boolean is_wiz_wish;
     {
         if (can_have_exceptionality(otmp) && otmp->oartifact == 0)
         {
-            if(wiz_wishing || exceptionality <= EXCEPTIONALITY_ELITE)
+            if(wiz_wishing)
                 otmp->exceptionality = (uchar)exceptionality;
             else
             {
-                /* Celestial / Primordial / Infernal */
-                if (rn2(3) && Luck >= 0)
-                    otmp->exceptionality = (uchar)exceptionality;
+                boolean halfchance = !!(objects[otmp->otyp].oc_flags5 & O5_HALF_EXCEPTIONALITY_CHANCE);
+                boolean doublechance = !!(objects[otmp->otyp].oc_flags5 & O5_DOUBLE_EXCEPTIONALITY_CHANCE);
+                if (is_weapon(otmp))
+                {
+                    if (exceptionality < EXCEPTIONALITY_ELITE)
+                        otmp->exceptionality = (uchar)exceptionality;
+                    else if (exceptionality == EXCEPTIONALITY_ELITE)
+                        otmp->exceptionality = (uchar)(((rn2(100) < (halfchance ? 40 : doublechance ? 100 : 80)) && (Luck >= 0 || doublechance)) ? exceptionality : EXCEPTIONALITY_NORMAL);
+                    else
+                        otmp->exceptionality = (uchar)((!rn2(halfchance ? 8 : doublechance ? 2 : 4) && Luck >= 0) ? exceptionality : EXCEPTIONALITY_NORMAL);
+                }
                 else
-                    otmp->exceptionality = EXCEPTIONALITY_NORMAL;
+                {
+                    if (exceptionality < EXCEPTIONALITY_ELITE)
+                        otmp->exceptionality = (uchar)((doublechance || (!rn2(2) && Luck >= 0)) ? exceptionality : EXCEPTIONALITY_NORMAL);
+                    else if (exceptionality == EXCEPTIONALITY_ELITE)
+                        otmp->exceptionality = (uchar)((!rn2(halfchance ? 8 : doublechance ? 2 : 4) && Luck >= 0) ? exceptionality : EXCEPTIONALITY_NORMAL);
+                    else
+                        otmp->exceptionality = (uchar)((!rn2(halfchance ? 40 : doublechance ? 10 : 20) && Luck >= 0) ? exceptionality : EXCEPTIONALITY_NORMAL);
+                }
             }
+
+            if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_CELESTIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_UNDEAD_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_CELESTIAL)
+                otmp->exceptionality = EXCEPTIONALITY_ELITE;
+            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGELIC_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+                otmp->exceptionality = EXCEPTIONALITY_ELITE;
+            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || objects[otmp->otyp].oc_material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+                otmp->exceptionality = EXCEPTIONALITY_ELITE;
         }
     }
 

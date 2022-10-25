@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    weapon.c    $NHDT-Date: 1548209744 2019/01/23 02:15:44 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.69 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -53,7 +53,8 @@ STATIC_DCL const char* FDECL(get_skill_range_name, (int, BOOLEAN_P));
 #define PN_SHIELDS (-27)
 #define PN_DIGGING (-28)
 #define PN_WANDS (-29)
-#define NUM_PN_CATEGORIES (30)
+#define PN_TWO_HANDED_WEAPON (-30)
+#define NUM_PN_CATEGORIES (31)
 
 
 NEARDATA const short skill_names_indices[P_NUM_SKILLS] = {
@@ -63,26 +64,26 @@ NEARDATA const short skill_names_indices[P_NUM_SKILLS] = {
     PN_ARCANE_SPELL, PN_CLERIC_SPELL, PN_HEALING_SPELL, PN_DIVINATION_SPELL,
     PN_ABJURATION_SPELL, PN_MOVEMENT_SPELL, PN_TRANSMUTATION_SPELL, PN_ENCHANTMENT_SPELL, PN_CONJURATION_SPELL,
     PN_CELESTIAL_SPELL, PN_NATURE_SPELL, PN_NECROMANCY_SPELL,
-    PN_BARE_HANDED, PN_MARTIAL_ARTS, PN_TWO_WEAPONS, PN_DODGE, PN_SHIELDS, PN_WANDS, PN_RIDING, PN_DIGGING, PN_DISARM_TRAP
+    PN_BARE_HANDED, PN_MARTIAL_ARTS, PN_TWO_WEAPONS, PN_TWO_HANDED_WEAPON, PN_DODGE, PN_SHIELDS, PN_WANDS, PN_RIDING, PN_DIGGING, PN_DISARM_TRAP
 };
 
 /* note: entry [0] isn't used */
 NEARDATA const char *const odd_skill_names[NUM_PN_CATEGORIES] = {
     "no skill", "bare handed combat", /* use barehands_or_martial[] instead */
-    "two weapon combat", "riding", "polearm", "saber", "hammer", "whip",
+    "dual wielding", "riding", "polearm", "saber", "hammer", "whip",
     "arcane spell", "clerical spell", "healing spell", "divination spell", "abjuration spell",
     "movement spell", "transmutation spell", "enchantment spell", "conjuration spell", 
     "celestial spell", "nature spell", "necromancy spell", "disarm trap", "sword",
-    "bludgeoning weapon", "thrusting weapon", "thrown weapon", "martial arts", "dodge", "shield", "digging", "wand",
+    "bludgeoning weapon", "thrusting weapon", "thrown weapon", "martial arts", "dodge", "shield", "digging", "wand", "two-handed weapon",
 };
 
 NEARDATA const char* const odd_skill_names_plural[NUM_PN_CATEGORIES] = {
     "no skill", "bare handed combat", /* use barehands_or_martial[] instead */
-    "two weapon combat", "riding", "polearms", "sabers", "hammers", "whips",
+    "dual wielding", "riding", "polearms", "sabers", "hammers", "whips",
     "arcane spells", "clerical spells", "healing spells", "divination spells", "abjuration spells",
     "movement spells", "transmutation spells", "enchantment spells", "conjuration spells", 
     "celestial spells", "nature spells", "necromancy spells", "disarm traps", "swords",
-    "bludgeoning weapons", "thrusting weapons", "thrown weapons", "martial arts", "dodge", "shields", "digging", "wands",
+    "bludgeoning weapons", "thrusting weapons", "thrown weapons", "martial arts", "dodge", "shields", "digging", "wands", "two-handed weapons",
 };
 
 #define P_NAME(type)                                    \
@@ -96,7 +97,7 @@ NEARDATA const char* const odd_skill_names_plural[NUM_PN_CATEGORIES] = {
                : odd_skill_names_plural[-skill_names_indices[type]])
 
 
-static NEARDATA const char kebabable[] = { S_XORN, S_DRAGON, S_JABBERWOCK,
+STATIC_VAR NEARDATA const char kebabable[] = { S_XORN, S_DRAGON, S_JABBERWOCK,
                                            S_NAGA, S_GIANT,  '\0' };
 
 STATIC_OVL void
@@ -891,7 +892,7 @@ int otyp, exceptionality;
 }
 
 /* TODO: have monsters use aklys' throw-and-return */
-static NEARDATA const int rwep[] = {
+STATIC_VAR NEARDATA const int rwep[] = {
     DWARVISH_SPEAR, SILVER_SPEAR, ELVEN_SPEAR, SPEAR, ORCISH_SPEAR, JAVELIN,
     SHURIKEN, YA, SILVER_ARROW, BONE_ARROW, ELVEN_ARROW, ARROW, ORCISH_ARROW,
     SILVER_CROSSBOW_BOLT, BONE_QUARREL, CROSSBOW_BOLT, GNOLLISH_QUARREL, 
@@ -901,13 +902,13 @@ static NEARDATA const int rwep[] = {
     /* BOOMERANG, */ CREAM_PIE
 };
 
-static NEARDATA const int pwep[] = { HALBERD,  BARDICHE, SPETUM,
+STATIC_VAR NEARDATA const int pwep[] = { HALBERD,  BARDICHE, SPETUM,
                                      BILL_GUISARME, VOULGE,   RANSEUR,
                                      GUISARME,      GLAIVE,   LUCERN_HAMMER,
                                      BEC_DE_CORBIN, FAUCHARD, PARTISAN,
                                      LANCE };
 
-static struct obj *propellor;
+STATIC_VAR struct obj *propellor;
 
 /* select a ranged weapon for the monster */
 struct obj *
@@ -1076,13 +1077,13 @@ struct obj *obj;
 }
 
 /* Weapons in order of preference */
-static const NEARDATA short hwep[] = 
+STATIC_VAR const NEARDATA short hwep[] = 
 {
     BLACK_BLADE_OF_DISINTEGRATION, GLASS_SWORD, SWORD_OF_NINE_LIVES_STEALING, WRAITHBLADE,
     TSURUGI, RUNESWORD,  RUNED_FLAIL, HEAVENLY_OAK_MACE, 
-    SWORD_OF_HOLY_VENGEANCE, SWORD_OF_UNHOLY_DESECRATION,  ELVEN_RUNEDAGGER,
+    SWORD_OF_HOLY_VENGEANCE, SWORD_OF_UNHOLY_DESECRATION,  ELVEN_RUNEDAGGER, MACE_OF_THE_UNDERWORLD, TRIPLE_HEADED_FLAIL,
     CORPSE, /* cockatrice corpse */
-    TRIPLE_HEADED_FLAIL, BROADSWORD, SILVER_LONG_SWORD,  CRYSTAL_LONG_SWORD, SILVER_SABER, JAGGED_TOOTHED_CLUB, BARDICHE,
+    BROADSWORD, SILVER_LONG_SWORD,  CRYSTAL_LONG_SWORD, SILVER_SABER, JAGGED_TOOTHED_CLUB, BARDICHE,
     ANCUS, DOUBLE_HEADED_FLAIL,
     SILVER_MACE, SILVER_SPEAR, 
     DWARVISH_MATTOCK, TWO_HANDED_SWORD, BATTLE_AXE,
@@ -1097,9 +1098,10 @@ static const NEARDATA short hwep[] =
 
 /* select a hand to hand weapon for the monster */
 struct obj *
-select_hwep(mtmp, poleok)
+select_hwep(mtmp, poleok, tx, ty)
 register struct monst *mtmp;
 boolean poleok;
+xchar tx, ty;
 {
     register struct obj *otmp;
     register int i;
@@ -1128,8 +1130,22 @@ boolean poleok;
             if (hwep[i] == CORPSE && !(mtmp->worn_item_flags & W_ARMG)
                 && !resists_ston(mtmp))
                 continue;
-            if(!poleok && is_otyp_appliable_pole_type_weapon(hwep[i]))
-                continue;
+            if (is_otyp_appliable_pole_type_weapon(hwep[i]))
+            {
+                if (!poleok)
+                    continue;
+
+                if (isok(tx, ty))
+                {
+                    int min_range = 0, max_range = 1;
+                    struct obj poledummy = { 0 };
+                    poledummy.otyp = hwep[i];
+                    get_pole_type_weapon_min_max_distances(&poledummy, mtmp, &min_range, &max_range);
+                    boolean poletooclose = dist2(mtmp->mx, mtmp->my, tx, ty) < min_range * min_range;
+                    if (poletooclose)
+                        continue;
+                }
+            }
             if (((strong && !wearing_shield) || !objects[hwep[i]].oc_bimanual)
                 && (objects[hwep[i]].oc_material != MAT_SILVER
                     || !mon_hates_silver(mtmp)))
@@ -1246,9 +1262,10 @@ boolean polyspot;
  * Returns 1 if the monster took time to do it, 0 if it did not.
  */
 int
-mon_wield_item(mon, verbose_fail)
+mon_wield_item(mon, verbose_fail, tx, ty)
 register struct monst *mon;
 boolean verbose_fail;
+xchar tx, ty;
 {
     if (!mon)
         return 0;
@@ -1267,7 +1284,7 @@ boolean verbose_fail;
     switch (mon->weapon_strategy) {
     case NEED_HTH_WEAPON:
     case NEED_HTH_NO_POLE:
-        obj = select_hwep(mon, mon->weapon_strategy == NEED_HTH_WEAPON);
+        obj = select_hwep(mon, mon->weapon_strategy == NEED_HTH_WEAPON, tx, ty);
         break;
     case NEED_RANGED_WEAPON:
         (void) select_rwep(mon);
@@ -1343,7 +1360,7 @@ boolean verbose_fail;
                     pline("%s cannot wield that %s.", mon_nam(mon),
                           xname(obj));
                 } else {
-                    pline("%s tries to wield %s.", Monnam(mon), doname(obj));
+                    pline("%s tries to wield %s.", Monnam(mon), acxname(obj));
                     pline("%s %s!", Yname2(mw_tmp), welded_buf);
                 }
                 mw_tmp->bknown = 1;
@@ -1355,7 +1372,7 @@ boolean verbose_fail;
         setmnotwielded(mon, mw_tmp);
         mon->weapon_strategy = NEED_WEAPON;
         if (canseemon(mon)) {
-            pline("%s wields %s!", Monnam(mon), doname(obj));
+            pline("%s wields %s!", Monnam(mon), acxname(obj));
             if (mwelded(mw_tmp, mon)) {
                 pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s to %s %s!", Tobjnam(obj, "weld"),
                       is_plural(obj) ? "themselves" : "itself",
@@ -1731,10 +1748,39 @@ boolean nextlevel, limit_by_twoweap;
         res++;
 
     if (limit_by_twoweap && u.twoweap)
-        res = min(P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT), res);
+        res = min(P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT), res);
 
     res = min(P_MAX_SKILL_LEVEL(skill), res);
     return res;
+}
+
+int
+two_handed_weapon_multishot_percentage_chance(skill_level)
+int skill_level;
+{
+    int percentage = 0;
+    switch (skill_level)
+    {
+    case P_BASIC:
+        percentage = 10;
+        break;
+    case P_SKILLED:
+        percentage = 25;
+        break;
+    case P_EXPERT:
+        percentage = 45;
+        break;
+    case P_MASTER:
+        percentage = 70;
+        break;
+    case P_GRAND_MASTER:
+        percentage = 100;
+        break;
+    default:
+        break;
+    }
+
+    return percentage;
 }
 
 int
@@ -1795,7 +1841,6 @@ int skill, lvl;
     switch (skill)
     {
     case P_BARE_HANDED_COMBAT:
-    case P_TWO_WEAPON_COMBAT:
     case P_DODGE:
     case P_SHIELD:
     case P_DIGGING:
@@ -1804,6 +1849,8 @@ int skill, lvl;
         return max(1, (tmp + 1) / 2);
     case P_MARTIAL_ARTS:
         return max(1, (tmp + 6) / 2);
+    case P_DUAL_WEAPON_COMBAT:
+    case P_TWO_HANDED_WEAPON:
     case P_WAND:
     default:
         return max(1, tmp);
@@ -1927,7 +1974,7 @@ int skill;
             || (Role_if(PM_HEALER) && skill == P_HEALING_SPELL && P_SKILL_LEVEL(skill) == P_GRAND_MASTER)
             || (Role_if(PM_MONK) && skill == P_MARTIAL_ARTS && P_SKILL_LEVEL(skill) == P_GRAND_MASTER)
             || (Role_if(PM_RANGER) && (skill == P_BOW || skill == P_CROSSBOW) && P_SKILL_LEVEL(skill) == P_GRAND_MASTER)
-            || (Role_if(PM_VALKYRIE) && skill == P_TWO_WEAPON_COMBAT && P_SKILL_LEVEL(skill) == P_GRAND_MASTER)
+            || (Role_if(PM_VALKYRIE) && skill == P_DUAL_WEAPON_COMBAT && P_SKILL_LEVEL(skill) == P_GRAND_MASTER)
             )
        )
     {
@@ -1940,7 +1987,7 @@ int skill;
     update_can_advance_any_skill();
 }
 
-static const struct skill_range {
+STATIC_VAR const struct skill_range {
     short first, last;
     const char *name;
     const char* singular;
@@ -2473,9 +2520,16 @@ int skill_id;
                         Sprintf(mcbuf, "%s%d", mcbonus >= 0 ? "+" : "", mcbonus);
                         break;
                     }
-                    case P_TWO_WEAPON_COMBAT:
+                    case P_DUAL_WEAPON_COMBAT:
                     {
                         Strcpy(limitbuf, lvlname);
+                        Strcpy(cbuf, "");
+                        break;
+                    }
+                    case P_TWO_HANDED_WEAPON:
+                    {
+                        int multihitpct = two_handed_weapon_multishot_percentage_chance(lvl);
+                        Sprintf(mbuf, "%d%%", multihitpct);
                         Strcpy(cbuf, "");
                         break;
                     }
@@ -2719,6 +2773,7 @@ enhance_weapon_skill()
             boolean shieldsshown = (P_SKILL_LEVEL(P_SHIELD) > P_ISRESTRICTED);
             boolean dodgeshown = (P_SKILL_LEVEL(P_DODGE) > P_ISRESTRICTED);
             boolean martialartsshown = (P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_ISRESTRICTED);
+            boolean twohandedshown = (P_SKILL_LEVEL(P_TWO_HANDED_WEAPON) > P_ISRESTRICTED);
             boolean diggingshown = (P_SKILL_LEVEL(P_DIGGING) > P_ISRESTRICTED);
             boolean ridingshown = (P_SKILL_LEVEL(P_RIDING) > P_ISRESTRICTED);
             any = zeroany;
@@ -2726,9 +2781,9 @@ enhance_weapon_skill()
             Strcpy(buf, "Bonuses are to-hit/damage/critical-% for weapons and combat,");
             add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NOTABS, buf, MENU_UNSELECTED);
 
-            if (martialartsshown)
+            if (martialartsshown || twohandedshown)
             {
-                Strcpy(buf, "to-hit/damage/double-hit-% for martial arts,");
+                Sprintf(buf, "to-hit/damage/double-hit-%% for %s%s%s,", martialartsshown ? "martial arts" : "", martialartsshown && twohandedshown ? " and " : "", twohandedshown ? "two-handed weapon" : "");
                 add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NOTABS, buf, MENU_UNSELECTED);
             }
 
@@ -3056,11 +3111,12 @@ enhance_weapon_skill()
                             Sprintf(nextbonusbuf, "%5s", acbuf2);
                         }
                     }
-                    else if (i == P_MARTIAL_ARTS)
+                    else if (i == P_MARTIAL_ARTS || i == P_TWO_HANDED_WEAPON)
                     {
                         int tohitbonus = weapon_skill_hit_bonus((struct obj*)0, i, FALSE, FALSE, FALSE, 0);
                         int dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, i, FALSE, FALSE, FALSE, 0);
-                        int multihitpct = martial_arts_multishot_percentage_chance(limited_skill_level(i, FALSE, FALSE));
+                        int multihitpct = i == P_TWO_HANDED_WEAPON ? two_handed_weapon_multishot_percentage_chance(limited_skill_level(i, FALSE, FALSE)) 
+                            : martial_arts_multishot_percentage_chance(limited_skill_level(i, FALSE, FALSE));
                         char hbuf[BUFSZ];
                         char dbuf[BUFSZ];
                         char mbuf[BUFSZ];
@@ -3081,7 +3137,8 @@ enhance_weapon_skill()
                         {
                             int tohitbonus2 = weapon_skill_hit_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0);
                             int dmgbonus2 = weapon_skill_dmg_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0);
-                            int multihitpct2 = martial_arts_multishot_percentage_chance(limited_skill_level(i, TRUE, FALSE));// min(P_MAX_SKILL_LEVEL(i), P_SKILL_LEVEL(i) + 1));
+                            int multihitpct2 = i == P_TWO_HANDED_WEAPON ? two_handed_weapon_multishot_percentage_chance(limited_skill_level(i, TRUE, FALSE)) 
+                                : martial_arts_multishot_percentage_chance(limited_skill_level(i, TRUE, FALSE));// min(P_MAX_SKILL_LEVEL(i), P_SKILL_LEVEL(i) + 1));
                             char hbuf2[BUFSZ] = "";
                             char dbuf2[BUFSZ] = "";
                             char mbuf2[BUFSZ] = "";
@@ -3447,7 +3504,7 @@ enum p_skills
 uwep_skill_type()
 {
     //if (u.twoweap)
-    //    return P_TWO_WEAPON_COMBAT;
+    //    return P_DUAL_WEAPON_COMBAT;
     return weapon_skill_type(uwep);
 }
 
@@ -3464,6 +3521,7 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
     int bonus = 0;
     static const char bad_skill[] = "weapon_skill_hit_bonus: bad skill %d";
     boolean apply_two_weapon_bonus = apply_extra_bonuses && (u.twoweap && (!weapon || (weapon && !bimanual(weapon) && (weapon == uwep || weapon == uarms))));
+    boolean apply_two_handed_weapon_bonus = apply_extra_bonuses && weapon && bimanual(weapon) && is_weapon(weapon) && !is_launcher(weapon);
     boolean Is_worn_gauntlets = (weapon && is_gloves(weapon) && (weapon->owornmask & W_ARMG));
     boolean apply_martial_arts_bonus = ((!weapon && (!uarmg || (uarmg && !is_metallic(uarmg)))) || (Is_worn_gauntlets && !is_metallic(weapon)));
     int wep_type = weapon_skill_type(weapon);
@@ -3525,11 +3583,41 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
         }
     } 
 
+    /* Two-handed weapon */
+    if (type == P_TWO_HANDED_WEAPON || (!use_this_skill && apply_two_handed_weapon_bonus))
+    {
+        int skill = min(P_MAX_SKILL_LEVEL(P_TWO_HANDED_WEAPON), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_TWO_HANDED_WEAPON) + (nextlevel ? 1 : 0));
+        switch (skill)
+        {
+        default:
+            impossible(bad_skill, skill); /* fall through */
+        case P_ISRESTRICTED:
+        case P_UNSKILLED:
+            bonus += 0;
+            break;
+        case P_BASIC:
+            bonus += 3;
+            break;
+        case P_SKILLED:
+            bonus += 6;
+            break;
+        case P_EXPERT:
+            bonus += 9;
+            break;
+        case P_MASTER:
+            bonus += 12;
+            break;
+        case P_GRAND_MASTER:
+            bonus += 15;
+            break;
+        }
+    }
+
 
     /* Two-weapon fighting */
-    if (type == P_TWO_WEAPON_COMBAT || (!use_this_skill && apply_two_weapon_bonus))
+    if (type == P_DUAL_WEAPON_COMBAT || (!use_this_skill && apply_two_weapon_bonus))
     {
-        int skill = min(P_MAX_SKILL_LEVEL(P_TWO_WEAPON_COMBAT), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT) + (nextlevel ? 1 : 0));
+        int skill = min(P_MAX_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT) + (nextlevel ? 1 : 0));
         int wep_skill = min(P_MAX_SKILL_LEVEL(wep_type), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(wep_type) + (nextlevel ? 1 : 0));
         if (wep_type != P_NONE && wep_skill < skill)
             skill = wep_skill;
@@ -3592,6 +3680,7 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
 {
     int bonus = 0;
     boolean apply_two_weapon_bonus = apply_extra_bonuses && (u.twoweap && (!weapon || (weapon && !bimanual(weapon) && (weapon == uwep || weapon == uarms))));
+    boolean apply_two_handed_weapon_bonus = apply_extra_bonuses && weapon && bimanual(weapon) && is_weapon(weapon) && !is_launcher(weapon);
     boolean Is_worn_gauntlets = (weapon && is_gloves(weapon) && (weapon->owornmask & W_ARMG));
     boolean apply_martial_arts_bonus = ((!weapon && (!uarmg || (uarmg && !is_metallic(uarmg)))) || (Is_worn_gauntlets && !is_metallic(weapon)));
     int wep_type = weapon_skill_type(weapon);
@@ -3653,9 +3742,38 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
         }
     } 
 
-    if ((!use_this_skill && apply_two_weapon_bonus) || type == P_TWO_WEAPON_COMBAT)
+    /* Two-handed weapon */
+    if (type == P_TWO_HANDED_WEAPON || (!use_this_skill && apply_two_handed_weapon_bonus))
     {
-        int skill = min(P_MAX_SKILL_LEVEL(P_TWO_WEAPON_COMBAT), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT) + (nextlevel ? 1 : 0));
+        int skill = min(P_MAX_SKILL_LEVEL(P_TWO_HANDED_WEAPON), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_TWO_HANDED_WEAPON) + (nextlevel ? 1 : 0));
+        switch (skill)
+        {
+        default:
+        case P_ISRESTRICTED:
+        case P_UNSKILLED:
+            bonus += 0;
+            break;
+        case P_BASIC:
+            bonus += 4;
+            break;
+        case P_SKILLED:
+            bonus += 8;
+            break;
+        case P_EXPERT:
+            bonus += 12;
+            break;
+        case P_MASTER:
+            bonus += 16;
+            break;
+        case P_GRAND_MASTER:
+            bonus += 20;
+            break;
+        }
+    }
+
+    if ((!use_this_skill && apply_two_weapon_bonus) || type == P_DUAL_WEAPON_COMBAT)
+    {
+        int skill = min(P_MAX_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT) + (nextlevel ? 1 : 0));
         int wep_skill = min(P_MAX_SKILL_LEVEL(wep_type), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(wep_type) + (nextlevel ? 1 : 0));
         if (wep_type != P_NONE && wep_skill < skill)
             skill = wep_skill;
@@ -3695,7 +3813,7 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
     }
 
     /* KMH -- Riding gives some thrusting damage */
-    if (apply_extra_bonuses && !use_this_skill && u.usteed && type != P_TWO_WEAPON_COMBAT)
+    if (apply_extra_bonuses && !use_this_skill && u.usteed && type != P_DUAL_WEAPON_COMBAT)
     {
         bonus += riding_skill_dmg_bonus(P_SKILL_LEVEL(P_RIDING));
     }

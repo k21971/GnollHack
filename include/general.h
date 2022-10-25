@@ -229,8 +229,8 @@ enum obj_material_types {
     MAT_LEATHER = 10, /* Flimsy materials stop here */
     MAT_WOOD = 11, /* Organics stop here */
     MAT_BONE = 12,
-    MAT_CHITIN = 13,
-    MAT_TOOTH = 14, /* Hard bone-like materials stop here */
+    MAT_CHITIN = 13, /* Chitin in insects' exoskeleton, or keratin in nails and horns */
+    MAT_IVORY = 14, /* Worm tooth, ivory, etc. Hard bone-like materials stop here */
     MAT_DRAGON_HIDE = 15, /* not leather! */
     MAT_IRON = 16, /* Fe - includes steel */
     MAT_METAL = 17, /* Sn, &c. */
@@ -475,6 +475,7 @@ enum special_view_types
     SPECIAL_VIEW_MESSAGE,
     SPECIAL_VIEW_SELFIE,
     SPECIAL_VIEW_HELP_DIR,
+    SPECIAL_VIEW_GUI_YN_CONFIRMATION,
     MAX_SPECIAL_VIEW_TYPES
 };
 
@@ -698,6 +699,11 @@ enum context_menu_styles {
 #define MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY          0x00000040
 #define MKOBJ_FLAGS_FORCE_LEGENDARY                    0x00000080
 #define MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY            0x00000100
+#define MKOBJ_FLAGS_OWNER_IS_LAWFUL                    0x00000200
+#define MKOBJ_FLAGS_OWNER_IS_NEUTRAL                   0x00000400
+#define MKOBJ_FLAGS_OWNER_IS_CHAOTIC                   0x00000800
+#define MKOBJ_FLAGS_OWNER_IS_NONALIGNED                0x00001000
+#define MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS       0x00002000
 
 #define MONDIED_FLAGS_NONE                             0x00000000
 #define MONDIED_FLAGS_NO_DEATH_ACTION                  0x00000001
@@ -742,7 +748,9 @@ enum gui_command_types {
     GUI_CMD_ACTIVATE_QUIETER_MODE,
     GUI_CMD_DEACTIVATE_QUIETER_MODE,
     GUI_CMD_ENABLE_WIZARD_MODE,
+    GUI_CMD_DISABLE_WIZARD_MODE,
     GUI_CMD_ENABLE_CASUAL_MODE,
+    GUI_CMD_DISABLE_CASUAL_MODE,
     GUI_CMD_CLEAR_PET_DATA,
     GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE,
     GUI_CMD_RESTORE_TRAVEL_MODE,
@@ -846,6 +854,12 @@ enum spl_sort_types {
     SORTRETAINORDER,
 
     NUM_SPELL_SORTBY
+};
+
+struct multishot_result {
+    int wielder_attacks; /* Multishot due to the wielder skill */
+    int weapon_attacks; /* Multishot due to the weapon */
+    double average;
 };
 
 

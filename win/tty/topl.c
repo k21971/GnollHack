@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    topl.c    $NHDT-Date: 1549333449 2019/02/05 02:24:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -388,7 +388,7 @@ unsigned long ynflags UNUSED;
     boolean digit_ok, allow_num, preserve_case = FALSE;
     struct WinDesc *cw = wins[WIN_MESSAGE];
     boolean doprev = 0;
-    char prompt[BUFSZ];
+    char prompt[BUFSZ + QBUFSZ];
 
     yn_number = 0L;
     if (ttyDisplay->toplin == 1 && !(cw->flags & WIN_STOP))

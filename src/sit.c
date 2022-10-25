@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    sit.c    $NHDT-Date: 1544442714 2018/12/10 11:51:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -583,6 +583,7 @@ attrcurse(VOID_ARGS)
         if (HInvis & INTRINSIC) {
             HInvis &= ~INTRINSIC;
             You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "paranoid.");
+            newsym(u.ux, u.uy);
             break;
         }
         /*FALLTHRU*/
@@ -627,6 +628,132 @@ attrcurse(VOID_ARGS)
     default:
         break;
     }
+    refresh_u_tile_gui_info(TRUE);
+}
+
+/* remove a random INTRINSIC ability */
+void
+m_attrcurse(mon)
+struct monst* mon;
+{
+    if (!mon)
+        return;
+
+    if (mon == &youmonst)
+    {
+        attrcurse();
+        return;
+    }
+
+    switch (rnd(12)) {
+    case 1:
+        if (mon->mprops[FIRE_IMMUNITY] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[FIRE_IMMUNITY] &= ~M_INTRINSIC_ACQUIRED;
+            if(canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems warmer.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 2:
+        if (mon->mprops[TELEPORT] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[TELEPORT] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s seems less jumpy.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 3:
+        if (mon->mprops[POISON_RESISTANCE] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[POISON_RESISTANCE] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems a little sick.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 4:
+        if (mon->mprops[BLIND_TELEPATHY] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[BLIND_TELEPATHY] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems senseless for a moment.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 5:
+        if (mon->mprops[TELEPAT] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[TELEPAT] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems senseless for a moment.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 6:
+        if (mon->mprops[COLD_IMMUNITY] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[COLD_IMMUNITY] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems cooler.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 7:
+        if (mon->mprops[INVISIBILITY] & M_INTRINSIC_ACQUIRED) {
+            boolean couldspot = canspotmon(mon);
+            mon->mprops[INVISIBILITY] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+            {
+                if(couldspot)
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems less trasparent.", Monnam(mon));
+                else
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s suddenly appears out of thin air.", Monnam(mon));
+            }
+            newsym(mon->mx, mon->my);
+            break;
+        }
+        /*FALLTHRU*/
+    case 8:
+        if (mon->mprops[SEE_INVISIBLE] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[SEE_INVISIBLE] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems like having seen something.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 9:
+        if (mon->mprops[FAST] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[FAST] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems slower.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 10:
+        if (mon->mprops[STEALTH] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[STEALTH] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems clumsy.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 11:
+        /* intrinsic protection is just disabled, not set back to 0 */
+        if (mon->mprops[MAGICAL_PROTECTION] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[MAGICAL_PROTECTION] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems vulnerable.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    case 12:
+        if (mon->mprops[AGGRAVATE_MONSTER] & M_INTRINSIC_ACQUIRED) {
+            mon->mprops[AGGRAVATE_MONSTER] &= ~M_INTRINSIC_ACQUIRED;
+            if (canspotmon(mon))
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems less attractive.", Monnam(mon));
+            break;
+        }
+        /*FALLTHRU*/
+    default:
+        break;
+    }
+    refresh_m_tile_gui_info(mon, TRUE);
 }
 
 /*sit.c*/

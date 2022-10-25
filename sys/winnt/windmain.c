@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    windmain.c    $NHDT-Date: 1543465755 2018/11/29 04:29:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.101 $ */
 /* Copyright (c) Derek S. Ray, 2015. */
@@ -391,6 +391,7 @@ attempt_restore:
         if (dorecover(fd))
         {
             resuming = TRUE; /* not starting new game */
+            boolean savefilekept = FALSE;
             if (discover || CasualMode)
                 You_ex(ATR_NONE, CLR_MSG_HINT, "are in %s mode.", get_game_mode_text(TRUE));
 
@@ -403,9 +404,13 @@ attempt_restore:
                     (void) delete_savefile();
                 else 
                 {
+                    savefilekept = TRUE;
                     nh_compress(fqname(SAVEF, SAVEPREFIX, 0));
                 }
             }
+
+            /* This must be added to main if the GnollHack port is using dorecover without load_saved_game */
+            reset_save_file_name(savefilekept);
         }
     }
 

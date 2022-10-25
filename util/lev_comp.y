@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0  lev_comp.y	$NHDT-Date: 1543371691 2018/11/28 02:21:31 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.22 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -90,7 +90,7 @@ extern void FDECL(vardef_used, (struct lc_vardefs *, char *));
 extern struct lc_vardefs *FDECL(add_vardef_type, (struct lc_vardefs *,
                                                   char *, long));
 
-extern int FDECL(reverse_jmp_opcode, (int));
+extern int FDECL(reverse_jmp_opcode, (long));
 
 struct coord {
     long x;
@@ -213,7 +213,7 @@ extern char curr_token[512];
 %token	<i> FOR_ID TO_ID
 %token	<i> SWITCH_ID CASE_ID BREAK_ID DEFAULT_ID
 %token	<i> ERODED_ID TRAPPED_STATE RECHARGED_ID INVIS_ID GREASED_ID INDESTRUCTIBLE_ID
-%token	<i> FEMALE_ID MALE_ID WAITFORU_ID PROTECTOR_ID CANCELLED_ID REVIVED_ID AVENGE_ID FLEEING_ID BLINDED_ID MAXHP_ID LEVEL_ADJUSTMENT_ID
+%token	<i> FEMALE_ID MALE_ID WAITFORU_ID PROTECTOR_ID CANCELLED_ID REVIVED_ID AVENGE_ID FLEEING_ID BLINDED_ID MAXHP_ID LEVEL_ADJUSTMENT_ID KEEP_ORIGINAL_INVENTORY_ID
 %token	<i> PARALYZED_ID STUNNED_ID CONFUSED_ID SEENTRAPS_ID ALL_ID
 %token	<i> MONTYPE_ID OBJTYPE_ID TERTYPE_ID TERTYPE2_ID LEVER_EFFECT_TYPE SWITCHABLE_ID CONTINUOUSLY_USABLE_ID TARGET_ID TRAPTYPE_ID EFFECT_FLAG_ID
 %token	<i> GRAVE_ID BRAZIER_ID SIGNPOST_ID TREE_ID ERODEPROOF_ID
@@ -1689,6 +1689,11 @@ monster_info	: string_expr
 		      add_opvars(splev, "i", VA_PASS1(SP_M_V_LEVEL_ADJUSTMENT));
 		      $$ = 0x00080000;
 		  }
+		| KEEP_ORIGINAL_INVENTORY_ID
+		  {
+		      add_opvars(splev, "ii", VA_PASS2(1, SP_M_V_KEEP_ORIGINAL_INVENTORY));
+		      $$ = 0x00100000;
+		  }
 		;
 
 seen_trap_mask	: STRING
@@ -3005,7 +3010,7 @@ func_call_param_list   	: func_call_param_part
 			  }
 			| func_call_param_list ',' func_call_param_part
 			  {
-			      long len = strlen( $1 );
+			      size_t len = strlen( $1 );
 			      char *tmp = (char *) alloc(len + 2);
 			      sprintf(tmp, "%c%s", (char) $3, $1 );
 			      Free( $1 );

@@ -63,6 +63,18 @@ namespace GnollHackClient.Pages.Game
             }
         }
 
+        private async void btnDeleteBones_Clicked(object sender, EventArgs e)
+        {
+            App.PlayButtonClickedSound();
+            bool answer = await DisplayAlert("Delete Bones Files?", "Are you sure to delete all bones files?", "Yes", "No");
+            if (answer)
+            {
+                App.GnollHackService.ClearBones();
+                btnDeleteBones.Text = "Done";
+                btnDeleteBones.TextColor = Color.Red;
+            }
+        }
+
         private async void btnDeleteAllMainFiles_Clicked(object sender, EventArgs e)
         {
             App.PlayButtonClickedSound();
@@ -199,28 +211,6 @@ namespace GnollHackClient.Pages.Game
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
             App.BackButtonPressed -= BackButtonPressed;
-        }
-
-        private async void btnViewPanicLog_Clicked(object sender, EventArgs e)
-        {
-            GameTableView.IsEnabled = false;
-            App.PlayButtonClickedSound();
-            string fulltargetpath = Path.Combine(App.GHPath, "paniclog");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "Panic Log");
-            string errormsg = "";
-            if (!File.Exists(fulltargetpath))
-            {
-                await DisplayAlert("No Panic Log", "Panic Log does not exist.", "OK");
-            }
-            else if (!displFilePage.ReadFile(out errormsg))
-            {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the paniclog file.", "OK");
-            }
-            else
-            {
-                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
-            }
-            GameTableView.IsEnabled = true;
         }
 
         private double _currentPageWidth = 0;

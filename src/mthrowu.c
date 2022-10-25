@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mthrowu.c    $NHDT-Date: 1542765360 2018/11/21 01:56:00 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.78 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -234,8 +234,8 @@ struct obj *otmp, *mwep;
                : otmp->oclass == WEAPON_CLASS)
         && !is_confused(mtmp)) 
     {
-
-        multishot = get_multishot_stats(mtmp, otmp, mwep, TRUE, (double*)0);
+        struct multishot_result msres = get_multishot_stats(mtmp, otmp, mwep, TRUE);
+        multishot = msres.wielder_attacks * msres.weapon_attacks;
     }
 
     if (otmp->quan < multishot)
@@ -1101,7 +1101,7 @@ struct monst *mtmp, *mtarg;
     if (mtmp->weapon_strategy == NEED_WEAPON || !MON_WEP(mtmp)) {
         mtmp->weapon_strategy = NEED_RANGED_WEAPON;
         /* mon_wield_item resets weapon_strategy as appropriate */
-        if (mon_wield_item(mtmp, FALSE) != 0)
+        if (mon_wield_item(mtmp, FALSE, mtarg->mx, mtarg->my) != 0)
             return 0;
     }
 
@@ -1241,7 +1241,7 @@ struct attack  *mattk;
                 /* breath runs out sometimes. Also, give monster some
                  * cunning; don't breath if the target fell asleep.
                  */
-                mtmp->mspec_used = (5 + rn2(10)) / mon_spec_cooldown_divisor(mtmp);
+                mtmp->mspec_used = (5 + rn2(10));
 
                 /* If this is a pet, it'll get hungry. Minions and
                  * spell beings won't hunger */
@@ -1597,7 +1597,7 @@ struct monst *mtmp;
     if (mtmp->weapon_strategy == NEED_WEAPON || !MON_WEP(mtmp)) {
         mtmp->weapon_strategy = NEED_RANGED_WEAPON;
         /* mon_wield_item resets weapon_strategy as appropriate */
-        if (mon_wield_item(mtmp, FALSE) != 0)
+        if (mon_wield_item(mtmp, FALSE, u.ux, u.uy) != 0)
             return;
     }
 
@@ -1847,10 +1847,10 @@ struct attack* mattk;
                  * cunning; don't breath if the player fell asleep.
                  */
                 //if (!rn2(3))
-                mtmp->mspec_used = (5 + rn2(10)) / mon_spec_cooldown_divisor(mtmp);
+                mtmp->mspec_used = (5 + rn2(10));
                 
                 if (typ == AD_SLEE && !Sleep_resistance)
-                    mtmp->mspec_used += rnd(20) / mon_spec_cooldown_divisor(mtmp);
+                    mtmp->mspec_used += rnd(20);
                 
                 if (action_taken)
                     update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
@@ -2132,6 +2132,13 @@ int whodidit;   /* 1==hero, 0=other, -1==just check whether it'll pass thru */
     }
 
     return hits;
+}
+
+void
+reset_mthrowu(VOID_ARGS)
+{
+    mesg_given = 0;
+    notonhead = FALSE;
 }
 
 /*mthrowu.c*/

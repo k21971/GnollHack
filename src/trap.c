@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    trap.c    $NHDT-Date: 1545259936 2018/12/19 22:52:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.313 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2108,7 +2108,7 @@ struct obj *otmp;
         steedhit = TRUE;
         break;
     case POLY_TRAP:
-        if (!resists_magic(steed) && !check_magic_resistance_and_inflict_damage(steed, (struct obj*) 0, (struct monst*)0, FALSE, 0, 0, NOTELL)) {
+        if (!resists_magic(steed) && !has_unchanging(steed) && !check_magic_resistance_and_inflict_damage(steed, (struct obj*)0, (struct monst*)0, FALSE, 0, 0, NOTELL)) {
             (void) newcham(steed, (struct permonst *) 0, FALSE, FALSE);
             if (!can_saddle(steed) || !can_ride(steed))
                 dismount_steed(DISMOUNT_POLY);
@@ -2177,7 +2177,7 @@ struct trap *trap;
  * prevent them from vanishing if you are killed. They
  * will reappear at the launchplace in bones files.
  */
-static struct {
+STATIC_VAR struct {
     struct obj *obj;
     xchar x, y;
 } launchplace;
@@ -3386,7 +3386,7 @@ register struct monst *mtmp;
                 if (!is_cancelled(mtmp) && (attacktype(mptr, AT_MAGC)
                                     || attacktype(mptr, AT_BREA))) 
                 {
-                    mtmp->mspec_used += d(2, 20) / mon_spec_cooldown_divisor(mtmp);
+                    mtmp->mspec_used += d(2, 20);
                     if (in_sight && can_see_trap)
                     {
                         seetrap(trap);
@@ -3510,7 +3510,7 @@ register struct monst *mtmp;
                 special_effect_wait_until_action(0);
             }
 
-            if (resists_magic(mtmp)) 
+            if (resists_magic(mtmp) || has_unchanging(mtmp))
             {
                 play_sfx_sound_at_location(SFX_POLYMORPH_FAIL, mtmp->mx, mtmp->my);
                 m_shieldeff(mtmp);
@@ -4308,7 +4308,7 @@ domagictrap()
             pseudo.otyp = SCR_REMOVE_CURSE;
             HConfusion = 0L;
             boolean effect_happened = 0;
-            (void)seffects(&pseudo, &effect_happened);
+            (void)seffects(&pseudo, &effect_happened, &youmonst);
             HConfusion = save_conf;
             break;
         }
@@ -4546,7 +4546,7 @@ struct obj *obj;
 /* context for water_damage(), managed by water_damage_chain();
    when more than one stack of potions of acid explode while processing
    a chain of objects, use alternate phrasing after the first message */
-static struct h2o_ctx {
+STATIC_VAR struct h2o_ctx {
     int dkn_boom, unk_boom; /* track dknown, !dknown separately */
     boolean ctx_valid;
 } acid_ctx = { 0, 0, FALSE };
@@ -5657,6 +5657,7 @@ struct trap* ttmp;
             genotyp = WAN_POLYMORPH;
             break;
         case MAGIC_TRAP:
+            Strcpy(debug_buf_1, "disarm_magical_trap");
             genotyp = random_objectid_from_class(WAND_CLASS, (struct monst*)0, 0UL);
             break;
         case LEVEL_TELEP:
@@ -5734,7 +5735,7 @@ struct trap *ttmp;
 
 /* getobj will filter down to cans of grease and known potions of oil */
 #if 0
-static NEARDATA const char oil[] = { ALL_CLASSES, TOOL_CLASS, POTION_CLASS,
+STATIC_VAR NEARDATA const char oil[] = { ALL_CLASSES, TOOL_CLASS, POTION_CLASS,
                                      0 };
 #endif
 
@@ -7291,7 +7292,7 @@ unconscious()
                               || !strncmp(nomovemsg, "You are consci", 14))));
 }
 
-static const char lava_killer[] = "molten lava";
+STATIC_VAR const char lava_killer[] = "molten lava";
 
 boolean
 lava_effects()
@@ -7563,6 +7564,7 @@ reset_traps(VOID_ARGS)
 {
     memset((genericptr_t)&launchplace, 0, sizeof(launchplace));
     memset((genericptr_t)&acid_ctx, 0, sizeof(acid_ctx));
+    force_mintrap = 0;
 }
 
 /*trap.c*/

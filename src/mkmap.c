@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    mkmap.c    $NHDT-Date: 1432512767 2015/05/25 00:12:47 $  $NHDT-Branch: master $:$NHDT-Revision: 1.16 $ */
 /* Copyright (c) J. C. Collet, M. Stephenson and D. Cohrs, 1992   */
@@ -21,9 +21,9 @@ STATIC_DCL void FDECL(finish_map, (lev_init*));
 STATIC_DCL void FDECL(remove_room, (unsigned));
 void FDECL(mkmap, (lev_init *));
 
-static char *new_locations;
+STATIC_VAR char *new_locations;
 int min_rx, max_rx, min_ry, max_ry; /* rectangle bounds for regions */
-static int n_loc_filled;
+STATIC_VAR int n_loc_filled;
 
 STATIC_OVL void
 init_map(init_lev)
@@ -81,7 +81,7 @@ schar bg_typ;
     return levl[col][row].typ;
 }
 
-static const int dirs[16] = { -1, -1 /**/, -1, 0 /**/,  -1, 1 /**/, 0, -1 /**/,
+STATIC_VAR const int dirs[16] = { -1, -1 /**/, -1, 0 /**/,  -1, 1 /**/, 0, -1 /**/,
                         0,  1 /**/,  1,  -1 /**/, 1,  0 /**/, 1, 1 };
 
 STATIC_OVL void

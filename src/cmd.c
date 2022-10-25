@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    cmd.c    $NHDT-Date: 1557088405 2019/05/05 20:33:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.333 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -30,6 +30,7 @@
 STATIC_VAR boolean alt_esc = FALSE;
 #endif
 STATIC_VAR boolean escape_sequence_key_start_allowed = FALSE;
+STATIC_VAR NEARDATA int last_multi;
 
 struct cmd Cmd = { 0 }; /* flag.h */
 
@@ -50,6 +51,7 @@ extern const char *enc_stat[]; /* encumbrance status from botl.c */
 #define CMD_CLICKLOOK (char) 0xFD //0x8F
 #define CMD_TRAVEL_ATTACK (char) 0xFE
 #define CMD_TRAVEL_WALK (char) 0xFB
+#define CMD_CLICKFIRE (char) 0xE0 //(Meta-0x60)
 
 #ifdef DEBUG
 extern int NDECL(wiz_debug_cmd_bury);
@@ -139,7 +141,7 @@ extern int NDECL(doorganize);         /**/
 extern void NDECL(quit_possible);
 #endif
 
-static int NDECL((*timed_occ_fn));
+STATIC_DCL int NDECL((*timed_occ_fn));
 
 STATIC_PTR int NDECL(dosuspend_core);
 STATIC_PTR int NDECL(dosh_core);
@@ -160,7 +162,9 @@ STATIC_PTR int NDECL(wiz_files);
 STATIC_PTR int NDECL(wiz_genesis);
 STATIC_PTR int NDECL(wiz_where);
 STATIC_PTR int NDECL(wiz_detect);
+#if defined(DEBUG)
 STATIC_PTR int NDECL(wiz_panic);
+#endif
 STATIC_PTR int NDECL(wiz_polyself);
 STATIC_PTR int NDECL(wiz_level_tele);
 STATIC_PTR int NDECL(wiz_level_change);
@@ -170,7 +174,7 @@ STATIC_PTR int NDECL(wiz_smell);
 STATIC_PTR int NDECL(wiz_intrinsic);
 STATIC_PTR int NDECL(wiz_show_wmodes);
 STATIC_DCL void NDECL(wiz_map_levltyp);
-#ifndef GNH_MOBILE
+#if !defined(GNH_MOBILE) && defined(DEBUG)
 STATIC_DCL int NDECL(wiz_save_monsters);
 STATIC_DCL int NDECL(wiz_save_tiledata);
 STATIC_DCL int NDECL(wiz_count_tiles);
@@ -228,12 +232,13 @@ STATIC_DCL boolean FDECL(help_dir, (CHAR_P, int, const char *));
 STATIC_DCL void FDECL(add_command_menu_items, (winid, int));
 STATIC_DCL void NDECL(check_gui_special_effect);
 STATIC_DCL void FDECL(print_monster_abilities, (winid, int*, BOOLEAN_P));
+STATIC_DCL void FDECL(print_weapon_skill_line_core, (enum p_skills, BOOLEAN_P, int));
 STATIC_DCL void FDECL(print_weapon_skill_line, (struct obj*, BOOLEAN_P, int));
 
-
-static const char *readchar_queue = "";
-static coord clicklook_cc;
-static boolean special_effect_shown = FALSE;
+STATIC_VAR const char *readchar_queue = "";
+STATIC_VAR coord clicklook_cc;
+//STATIC_VAR coord clickfire_cc;
+STATIC_VAR boolean special_effect_shown = FALSE;
 
 STATIC_PTR int
 doprev_message(VOID_ARGS)
@@ -316,8 +321,8 @@ STATIC_DCL char NDECL(popch);
  * TRUE, no keystrokes can be saved into the saveq.
  */
 #define BSIZE 20
-static char pushq[BSIZE], saveq[BSIZE];
-static NEARDATA int phead, ptail, shead, stail;
+STATIC_VAR char pushq[BSIZE], saveq[BSIZE];
+STATIC_VAR NEARDATA int phead, ptail, shead, stail;
 
 STATIC_OVL char
 popch()
@@ -757,7 +762,7 @@ struct available_ability
     struct monst* target_mtmp;
 };
 
-static struct available_ability available_ability_list[MAXABILITYNUM] = { {"", 0, 0, 0} };
+STATIC_VAR struct available_ability available_ability_list[MAXABILITYNUM] = { {"", 0, 0, 0} };
 
 int
 doability(VOID_ARGS)
@@ -1803,6 +1808,7 @@ wiz_level_change(VOID_ARGS)
 }
 
 /* #panic command - test program's panic handling */
+#if defined(DEBUG)
 STATIC_PTR int
 wiz_panic(VOID_ARGS)
 {
@@ -1815,6 +1821,7 @@ wiz_panic(VOID_ARGS)
         panic("Crash test.");
     return 0;
 }
+#endif
 
 /* #polyself command - change hero's form */
 STATIC_PTR int
@@ -2519,10 +2526,9 @@ wiz_save_quest_texts(VOID_ARGS) /* Save a csv file for monsters */
 }
 #endif /* ifndef GNH_MOBILE */
 
-
 /* temporary? hack, since level type codes aren't the same as screen
    symbols and only the latter have easily accessible descriptions */
-static const char *levltyp[MAX_TYPE + 2] = {
+STATIC_VAR const char *levltyp[MAX_TYPE + 2] = {
     "stone", 
     "vertical wall", 
     "horizontal wall", 
@@ -2893,12 +2899,12 @@ doterrain(VOID_ARGS)
 }
 
 /* -enlightenment and conduct- */
-static winid en_win = WIN_ERR;
-static boolean en_via_menu = FALSE;
-static const char You_[] = "You ", are[] = "are ", were[] = "were ",
+STATIC_VAR winid en_win = WIN_ERR;
+STATIC_VAR boolean en_via_menu = FALSE;
+STATIC_VAR const char You_[] = "You ", are[] = "are ", were[] = "were ",
                   have[] = "have ", had[] = "had ", can[] = "can ",
                   could[] = "could ", cannot[] = "cannot ", could_not[] = "could not ";
-static const char have_been[] = "have been ", have_never[] = "have never ", have_not[] = "have not ", had_not[] = "had not ",
+STATIC_VAR const char have_been[] = "have been ", have_never[] = "have never ", have_not[] = "have not ", had_not[] = "had not ",
                   never[] = "never ";
 
 #define enl_msg(prefix, present, past, suffix, ps) \
@@ -2917,7 +2923,7 @@ static const char have_been[] = "have been ", have_never[] = "have never ", have
 #define you_have_X(something) \
     enl_msg(You_, have, (const char *) "", something, "")
 
-static void
+STATIC_OVL void
 enlght_out(buf, attr)
 const char *buf;
 int attr;
@@ -2931,7 +2937,7 @@ int attr;
         putstr(en_win, attr, buf);
 }
 
-static void
+STATIC_OVL void
 enlght_line(start, middle, end, ps, parentheses)
 const char *start, *middle, *end, *ps;
 boolean parentheses;
@@ -2943,7 +2949,7 @@ boolean parentheses;
 }
 
 /* format increased chance to hit or damage or defense (Protection) */
-static char *
+STATIC_OVL char *
 enlght_combatinc(inctyp, incamt, final, outbuf)
 const char *inctyp;
 int incamt, final;
@@ -3921,6 +3927,9 @@ int final;
      */
     print_weapon_skill_line(uwep, TRUE, final);
 
+    if (two_handed_bonus_applies(uwep))
+        print_weapon_skill_line_core(P_TWO_HANDED_WEAPON, TRUE, final);
+
     if (!uwep && P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_UNSKILLED)
     {
         wtype = P_MARTIAL_ARTS;
@@ -3968,12 +3977,12 @@ int final;
         you_are(buf, "");
     }
 
-    if (uarms)
+    if (uarms && (!uwep || (weapon_skill_type(uwep) != weapon_skill_type(uarms))))
         print_weapon_skill_line(uarms, u.twoweap && is_weapon(uarms), final);
 
     if (u.twoweap) 
     {
-        wtype = P_TWO_WEAPON_COMBAT;
+        wtype = P_DUAL_WEAPON_COMBAT;
         char sklvlbuf[20];
         int sklvl = P_SKILL_LEVEL(wtype);
         boolean hav = (sklvl != P_UNSKILLED && sklvl != P_SKILLED);
@@ -4018,14 +4027,12 @@ int final;
 
 STATIC_OVL
 void
-print_weapon_skill_line(wep, printweaponstats, final)
-struct obj* wep;
+print_weapon_skill_line_core(wtype, printweaponstats, final)
+enum p_skills wtype;
 boolean printweaponstats;
 int final;
 {
     char buf[BUFSZ];
-
-    enum p_skills wtype = weapon_skill_type(wep);
     if (wtype != P_NONE)
     {
         if (wtype == P_MARTIAL_ARTS)
@@ -4045,12 +4052,18 @@ int final;
         char ebuf[BUFSZ] = "";
         if (printweaponstats)
         {
-            int hitbonus = weapon_skill_hit_bonus(wep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
-            int dmgbonus = weapon_skill_dmg_bonus(wep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+            int hitbonus = weapon_skill_hit_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+            int dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
             Sprintf(ebuf, "%s%d to hit%s%s%d to damage",
                 hitbonus >= 0 ? "+" : "", hitbonus,
                 wtype == P_SHIELD ? ", " : " and ",
                 dmgbonus >= 0 ? "+" : "", dmgbonus);
+            if (wtype == P_TWO_HANDED_WEAPON)
+            {
+                int multishotchance = two_handed_weapon_multishot_percentage_chance(P_SKILL_LEVEL(wtype));
+                Strcat(ebuf, ", ");
+                Sprintf(eos(ebuf), "%d%% double-hit chance", multishotchance);
+            }
         }
         if (wtype == P_SHIELD)
         {
@@ -4064,7 +4077,7 @@ int final;
         if (*ebuf)
             Sprintf(pbuf, " (%s)", ebuf);
 
-        Sprintf(buf, "%s %s %s%s", sklvlbuf, hav ? "skill with" : "in", 
+        Sprintf(buf, "%s %s %s%s", sklvlbuf, hav ? "skill with" : "in",
             skill_name(wtype, TRUE), pbuf);
 
         if (can_advance(wtype, FALSE))
@@ -4075,6 +4088,19 @@ int final;
         else
             you_are(buf, "");
     }
+}
+
+STATIC_OVL
+void
+print_weapon_skill_line(wep, printweaponstats, final)
+struct obj* wep;
+boolean printweaponstats;
+int final;
+{
+    if (!wep)
+        return;
+    enum p_skills wtype = weapon_skill_type(wep);
+    print_weapon_skill_line_core(wtype, printweaponstats, final);
 }
 
 
@@ -5603,8 +5629,10 @@ struct ext_func_tab extcmdlist[] = {
             doset, IFBURIED | GENERALCMD },
     { C('o'), "overview", "show a summary of the explored dungeon",
             dooverview, IFBURIED | AUTOCOMPLETE },
+#if defined(DEBUG)
     { '\0', "panic", "test panic routine (fatal to game)",
-            wiz_panic, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+            wiz_panic, IFBURIED },
+#endif
     { 'p', "pay", "pay your shopping bill", dopay },
     { ',', "pickup", "pick up things at the current location", dopickup },
     { M(1), "polyself", "polymorph self", /* Special hotkey launchable from GUI */
@@ -5768,7 +5796,7 @@ struct ext_func_tab extcmdlist[] = {
             wiz_makemap, IFBURIED | WIZMODECMD },
     { C('f'), "wizmap", "map the level",
             wiz_map, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-#ifndef GNH_MOBILE
+#if !defined(GNH_MOBILE) && defined(DEBUG)
     { '\0', "wizsavemon", "save monsters into a file",
             wiz_save_monsters, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { '\0', "wizsaveenc", "save encounters into a file",
@@ -5927,7 +5955,7 @@ boolean *keys_used; /* boolean keys_used[256] */
 {
     int i;
     char buf[BUFSZ];
-    char buf2[QBUFSZ];
+    char buf2[BUFSZ];
     int count = 0;
 
     for (i = 0; i < 256; i++) {
@@ -6102,9 +6130,9 @@ int NDECL((*fn));
  * wizard mode sanity_check code
  */
 
-static const char template[] = "%-27s  %4ld  %6zu";
-static const char stats_hdr[] = "                             count  bytes";
-static const char stats_sep[] = "---------------------------  ----- -------";
+STATIC_VAR const char template[] = "%-27s  %4ld  %6zu";
+STATIC_VAR const char stats_hdr[] = "                             count  bytes";
+STATIC_VAR const char stats_sep[] = "---------------------------  ----- -------";
 
 STATIC_OVL size_t
 size_obj(otmp)
@@ -6435,7 +6463,7 @@ size_t *total_size;
 /*
  * Display memory usage of all monsters and objects on the level.
  */
-static int
+STATIC_OVL int
 wiz_show_stats()
 {
     char buf[BUFSZ];
@@ -6530,7 +6558,7 @@ sanity_check()
 }
 
 #ifdef DEBUG_MIGRATING_MONS
-static int
+STATIC_OVL int
 wiz_migrate_mons()
 {
     int mcount = 0;
@@ -6585,6 +6613,7 @@ struct {
     { NHKF_TRAVEL,           CMD_TRAVEL, (char *) 0 }, /* no binding */
     { NHKF_TRAVEL_ATTACK,    CMD_TRAVEL_ATTACK, (char*)0 }, /* no binding */
     { NHKF_TRAVEL_WALK,      CMD_TRAVEL_WALK, (char*)0 }, /* no binding */
+    { NHKF_CLICKFIRE,        CMD_CLICKFIRE, (char*)0 }, /* no binding */
     { NHKF_CLICKLOOK,        CMD_CLICKLOOK, (char *) 0 }, /* no binding */
     { NHKF_REDRAW,           C('r'), "redraw" },
     { NHKF_REDRAW2,          C('l'), "redraw.numpad" },
@@ -6761,7 +6790,7 @@ boolean condition;
     wait_synch();
 }
 
-static boolean backed_dir_cmd = FALSE;
+STATIC_VAR boolean backed_dir_cmd = FALSE;
 
 /* called at startup and after number_pad is twiddled */
 void
@@ -6783,12 +6812,19 @@ boolean initial;
 
     if (initial)
     {
+#ifdef ALTMETA
+        alt_esc = FALSE;
+#endif
+        escape_sequence_key_start_allowed = FALSE;
+        last_multi = 0;
+        phead = ptail = shead = stail = 0;
         backed_dir_cmd = FALSE;
         en_via_menu = FALSE;
         special_effect_shown = FALSE;
         timed_occ_fn = 0;
         readchar_queue = "";
         memset((genericptr_t)&clicklook_cc, 0, sizeof(clicklook_cc));
+        //memset((genericptr_t)&clickfire_cc, 0, sizeof(clickfire_cc));
         struct ext_func_tab* efp;
         for (efp = extcmdlist; efp->ef_txt; efp++)
             efp->bound_key = 0;
@@ -7159,6 +7195,14 @@ register char *cmd;
         if (iflags.clicklook) {
             context.move = FALSE;
             do_look(2, &clicklook_cc);
+        }
+        return;
+    case NHKF_CLICKFIRE:
+        if (iflags.clickfire) {
+            context.move = FALSE;
+            int fireres = dofire();
+            if (!fireres)
+                readchar_queue = ""; //Prevent movement if firing failed.
         }
         return;
     case NHKF_TRAVEL:
@@ -8027,8 +8071,6 @@ boolean doit;
 }
 
 
-static NEARDATA int last_multi;
-
 /*
  * convert a MAP window position into a movecmd
  */
@@ -8039,11 +8081,14 @@ int x, y, mod;
     int dir;
     static char cmd[4];
     cmd[1] = 0;
+    int target_x = x;
+    int target_y = y;
+    memset(cmd, 0, sizeof(cmd));
 
     if (iflags.clicklook && mod == CLICK_2) 
     {
-        clicklook_cc.x = x;
-        clicklook_cc.y = y;
+        clicklook_cc.x = target_x;
+        clicklook_cc.y = target_y;
         cmd[0] = Cmd.spkeys[NHKF_CLICKLOOK];
         return cmd;
     }
@@ -8069,22 +8114,71 @@ int x, y, mod;
         }
         else 
         {
-            u.tx = u.ux + x;
-            u.ty = u.uy + y;
             struct monst* mtmp = 0;
-            //struct obj* otmp = 0;
-
-            if (isok(u.tx, u.ty))
+            if (isok(target_x, target_y))
             {
-                mtmp = m_at(u.tx, u.ty);
-                //otmp = cansee(u.tx, u.ty) ? level.objects[u.tx][u.ty] : 0;
+                mtmp = m_at(target_x, target_y);
             }
 
-            if(mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp))
-                cmd[0] = Cmd.spkeys[NHKF_TRAVEL_ATTACK];
+            if (mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp))
+            {
+                if (iflags.clickfire && uwep && (is_launcher(uwep) || is_thrown_weapon_only(uwep)) && dist2(u.ux, u.uy, target_x, target_y) > 2)
+                {
+                    if (!x || !y || abs(x) == abs(y)) /* straight line or diagonal */
+                    {
+                        boolean path_is_clear = clear_path(u.ux, u.uy, target_x, target_y);
+                        struct monst* mtmpinway = spotted_linedup_monster_in_way(u.ux, u.uy, target_x, target_y);
+                        if (path_is_clear && !mtmpinway)
+                        {
+                            //clickfire_cc.x = target_x;
+                            //clickfire_cc.y = target_y;
+                            cmd[0] = Cmd.spkeys[NHKF_CLICKFIRE];
+                            x = sgn(x), y = sgn(y);
+                            dir = xytod(x, y);
+                            cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                            cmd[2] = '\0';
+                        }
+                        else if(!path_is_clear)
+                        {
+                            play_sfx_sound(SFX_GENERAL_CANNOT);
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; the path to it is not clear.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                            cmd[0] = '\0';
+                        }
+                        else if (mtmpinway)
+                        {
+                            play_sfx_sound(SFX_GENERAL_CANNOT);
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; %s is in the way.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp), mon_nam(mtmpinway));
+                            cmd[0] = '\0';
+                        }
+                        else
+                        {
+                            play_sfx_sound(SFX_GENERAL_CANNOT);
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; there is something in the way.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                            cmd[0] = '\0';
+                        }
+                    }
+                    else
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; it is not lined up.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                }
+                else
+                {
+                    u.tx = target_x;
+                    u.ty = target_y;
+                    cmd[0] = Cmd.spkeys[NHKF_TRAVEL_ATTACK];
+                }
+            }
             else
+            {
+                /* Normal travel */
+                u.tx = target_x;
+                u.ty = target_y;
+                //struct obj* otmp = 0;
                 cmd[0] = Cmd.spkeys[NHKF_TRAVEL_WALK];
-
+            }
             return cmd;
         }
 
@@ -9205,6 +9299,47 @@ dounmarkautostash()
         obj->speflags &= ~SPEFLAGS_AUTOSTASH;
         pline("%s was unmarked as an auto-stash.", The(cxname(obj)));
     }
+
+    return 0;
+}
+
+struct monst*
+spotted_linedup_monster_in_way(x1, y1, x2, y2)
+int x1, y1, x2, y2;
+{
+    if(!isok(x1, y1) || !isok(x2,y2))
+        return 0;
+
+    if (x1 == x2 && y1 == y2)
+        return 0;
+
+    int dx = x2 - x1;
+    int dy = y2 - y1;
+    if (!(!dx || !dy || abs(dx) == abs(dy)))
+        return 0;
+
+    int sx = sgn(dx);
+    int sy = sgn(dy);
+
+    int x = x1;
+    int y = y1;
+    struct monst* mtmp = 0;
+
+    while(TRUE)
+    {
+        x += sx;
+        y += sy;
+        if (x == x2 && y == y2)
+            break;
+        if (!isok(x, y))
+            break;
+
+        mtmp = m_at(x, y);
+        if (mtmp && canspotmon(mtmp))
+        {
+            return mtmp;
+        }
+    };
 
     return 0;
 }

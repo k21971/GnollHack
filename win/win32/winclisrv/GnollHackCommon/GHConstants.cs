@@ -1174,7 +1174,9 @@ namespace GnollHackCommon
         GUI_CMD_ACTIVATE_QUIETER_MODE,
         GUI_CMD_DEACTIVATE_QUIETER_MODE,
         GUI_CMD_ENABLE_WIZARD_MODE,
+        GUI_CMD_DISABLE_WIZARD_MODE,
         GUI_CMD_ENABLE_CASUAL_MODE,
+        GUI_CMD_DISABLE_CASUAL_MODE,
         GUI_CMD_CLEAR_PET_DATA,
         GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE,
         GUI_CMD_RESTORE_TRAVEL_MODE,
@@ -1229,6 +1231,7 @@ namespace GnollHackCommon
         SPECIAL_VIEW_MESSAGE,
         SPECIAL_VIEW_SELFIE,
         SPECIAL_VIEW_HELP_DIR,
+        SPECIAL_VIEW_GUI_YN_CONFIRMATION,
         MAX_SPECIAL_VIEW_TYPES
     }
 
@@ -1293,6 +1296,22 @@ namespace GnollHackCommon
         public const float MoveDistanceThreshold = 25.0f;
         public const long MoveOrPressTimeThreshold = 200; /* Milliseconds */
         public const long SwipeTimeThreshold = 300; /* Milliseconds */
+        public const long FreeScrollingTime = 200; /* Milliseconds */
+        public const long ScrollRecordThreshold = 200; /* Milliseconds */
+        public const float ScrollConstantDeceleration = 0.5f; /* pixels in % of screen height per second squared */
+        public const float ScrollSpeedDeceleration = 2.0f; /* % of speed per second */
+        public const float ScrollConstantDecelerationOverEdgeMultiplier = 10f; /* multiplier for ScrollSpeedDeceleration when over edge */
+        public const float ScrollSpeedDecelerationOverEdgeMultiplier = 25f; /* % multiplier for ScrollSpeedDeceleration when over edge */
+        public const float ScrollOverEdgeDeceleration = 64f; /* constant multiplying distance in pixels from edge */
+        public const float ScrollDistanceAnchorFactor = 0.10f; /* % of screen height */
+        public const float ScrollCloseAnchorFactor = 0.025f; /* % of screen height */
+        public const float ScrollTargetSpeedAtDistanceAnchor = 0.25f; /* % of screen height per second */
+        public const float ScrollTargetSpeedAtCloseAnchor = 0.15f; /* % of screen height per second */
+        public const float ScrollTargetSpeedAtEdge = 0.05f; /* % of screen height per second */
+        public const float ScrollDistanceEdgeConstant = 0.05f; /* pixels in % of screen height added to distance in pixels from edge to determine acceleration */
+        public const float ScrollSpeedThreshold = 0.1f; /* pixels in % of screen height per second */
+        public const float ScrollStretchLimit = 0.10f; /* pixels in % of screen height */
+        public const float ScrollConstantStretch = 0.075f; /* pixels in % of screen height */
         public const double MoveByHoldingDownThreshold = 0.20; /* Seconds */
         public const double LongMenuTapThreshold = 0.75; /* Seconds */
         public const int TileWidth = 64;
@@ -1308,7 +1327,7 @@ namespace GnollHackCommon
         public const int MaxLeashed = 2;
         public const int MaxPlayedSpecialEffects = 12;
         public const int MaxPlayedZapAnimations = 16;
-        public const int MaxNormalImmediateSoundInstances = 24;
+        public const int MaxNormalImmediateSoundInstances = 36;
         public const int MaxLongImmediateSoundInstances = 48;
         //public const int DefaultPanTime = 5;
         public const int PIT_BOTTOM_BORDER = 2;
@@ -1330,7 +1349,7 @@ namespace GnollHackCommon
         public const float MapFontDefaultSize = 72.0f;
         public const float MapFontRelativeAlternateSize = 7.0f / 16.0f;
         public const int DefaultMessageRows = 5;
-        public const int AllMessageRows = 100;
+        public const int AllMessageRows = 250;
         public const int DefaultPetRows = 2;
         public const int IntroGHSound = 1;
         public const string IntroEventPath = "event:/Music/Start/Splash";

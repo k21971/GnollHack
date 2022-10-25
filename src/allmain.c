@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    allmain.c    $NHDT-Date: 1555552624 2019/04/18 01:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.100 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -417,6 +417,7 @@ boolean resuming;
         }
 
         /* Update the statusline */
+        context.skip_botl = FALSE; /* Shouldn't happen, but just for insurance */
         if (context.botl || context.botlx) 
         {
             bot();
@@ -1153,12 +1154,12 @@ const char*
 get_game_mode_text(display_nonscoring)
 boolean display_nonscoring;
 {
-    return get_game_mode_text_core(wizard, discover, ModernMode, CasualMode, display_nonscoring);
+    return get_game_mode_text_core(wizard, discover, ModernMode, CasualMode, flags.non_scoring, display_nonscoring);
 }
 
 const char*
-get_game_mode_text_core(iswizardmode, isexporemode, ismodernmode, iscasualmode, display_nonscoring)
-boolean display_nonscoring, iswizardmode, isexporemode, ismodernmode, iscasualmode;
+get_game_mode_text_core(iswizardmode, isexporemode, ismodernmode, iscasualmode, isnonscoring, display_nonscoring)
+boolean display_nonscoring, iswizardmode, isexporemode, ismodernmode, iscasualmode, isnonscoring;
 {
     if (iswizardmode)
     {
@@ -1219,9 +1220,9 @@ boolean display_nonscoring, iswizardmode, isexporemode, ismodernmode, iscasualmo
             return display_nonscoring ? "non-scoring reloadable" : "reloadable";
     }
     else if (ismodernmode)
-        return "modern";
+        return display_nonscoring && isnonscoring ? "non-scoring modern" : "modern";
     else
-        return "classic";
+        return display_nonscoring && isnonscoring ? "non-scoring classic" : "classic";
 }
 
 const char*

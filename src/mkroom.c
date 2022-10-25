@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mkroom.c    $NHDT-Date: 1446887530 2015/11/07 09:12:10 $  $NHDT-Branch: master $:$NHDT-Revision: 1.24 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -652,8 +652,8 @@ place_main_monst_here:
                                          ? &mons[PM_LEPRECHAUN]
                                          : (type == COCKNEST)
                                             ? (sx == tx && sy == ty
-                                                ? (hd >= 24 ? &mons[PM_GARGANTUAN_COCKATRICE] : &mons[PM_GIANT_COCKATRICE])
-                                                : (hd >= 24 && !rn2(4) ? &mons[PM_GIANT_COCKATRICE] : &mons[PM_COCKATRICE]))
+                                                ? (hd >= 23 ? &mons[PM_GARGANTUAN_COCKATRICE] : &mons[PM_GIANT_COCKATRICE])
+                                                : (hd >= 23 && !rn2(4) ? &mons[PM_GIANT_COCKATRICE] : &mons[PM_COCKATRICE]))
                                              : (type == ANTHOLE)
                                                  ? antholemon()
                                                  : (struct permonst *) 0,
@@ -1233,6 +1233,17 @@ mkgarden()
     int statue_base_type = levdiff >= 16 && rn2(2) ? PM_WINGED_GARGOYLE :
         levdiff >= 13 && rn2(3) ? PM_ROCK_TROLL : levdiff >= 7 && rn2(9) ? PM_GARGOYLE : PM_GNOME;
     sroom->rtype = GARDEN;
+    for (sx = sroom->lx - 1; sx <= sroom->hx + 1; sx++)
+    {
+        for (sy = sroom->ly - 1; sy <= sroom->hy + 1; sy++)
+        {
+            if (isok(sx, sy))
+            {
+                levl[sx][sy].use_special_tileset = TRUE;
+                levl[sx][sy].special_tileset = CMAP_GARDEN;
+            }
+        }
+    }
     for (sx = sroom->lx; sx <= sroom->hx; sx++)
     {
         for (sy = sroom->ly; sy <= sroom->hy; sy++)
@@ -2248,7 +2259,7 @@ courtmon()
 
 #define NSTYPES (PM_CAPTAIN - PM_SOLDIER + 1)
 
-static const struct {
+STATIC_VAR const struct {
     unsigned pm;
     unsigned prob;
 } squadprob[NSTYPES] = { { PM_SOLDIER, 80 },

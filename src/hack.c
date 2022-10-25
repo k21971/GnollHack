@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    hack.c    $NHDT-Date: 1551137618 2019/02/25 23:33:38 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.208 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,9 +22,9 @@ STATIC_DCL void FDECL(maybe_smudge_engr, (int, int, int, int));
 STATIC_DCL void NDECL(domove_core);
 
 #define IS_SHOP(x) (rooms[x].rtype >= SHOPBASE)
-static int skates = 0;
+STATIC_VAR int skates = 0;
 
-static anything tmp_anything;
+STATIC_VAR anything tmp_anything;
 
 anything *
 uint_to_any(ui)
@@ -140,6 +140,10 @@ const char *msg;
     return revived;
 }
 
+#ifndef LINT /* static long lastmovetime; */
+STATIC_VAR NEARDATA long lastmovetime;
+#endif
+
 STATIC_OVL int
 moverock()
 {
@@ -147,7 +151,7 @@ moverock()
     register struct obj *otmp;
     register struct trap *ttmp;
     register struct monst *mtmp;
-    char pushbuf[BUFSZ * 2] = "";
+    char pushbuf[QBUFSZ + BUFSZ * 2] = "";
     int pushcolor = NO_COLOR;
 
     play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_PUSH_EFFORT);
@@ -374,9 +378,6 @@ moverock()
 #ifdef LINT /* static long lastmovetime; */
                 long lastmovetime;
                 lastmovetime = 0;
-#else
-                /* note: reset to zero after save/restore cycle */
-                static NEARDATA long lastmovetime;
 #endif
  dopush:
                 play_object_floor_sound(otmp, OBJECT_SOUND_TYPE_PUSH, FALSE);
@@ -502,6 +503,14 @@ xchar x, y;
     struct obj *boulder = sobj_at(BOULDER, x, y);
     const char *digtxt = (char *) 0, *dmgtxt = (char *) 0;
     boolean no_unblock = FALSE;
+    enum object_soundset_types oss = 0;
+    if (!Upolyd || u.umonnum < LOW_PM)
+    {
+        enum player_soundset_types pss = get_player_soundset();
+        oss = player_soundsets[pss].attack_soundsets[PLAYER_ATTACK_SOUNDSET_BAREHANDED];
+    }
+    else
+        oss = monster_soundsets[flags.female ? mons[u.umonnum].female_soundset : mons[u.umonnum].soundset].attack_soundsets[0];
 
     if (context.digging.down) /* not continuing previous dig (w/ pick-axe) */
         (void) memset((genericptr_t) &context.digging, 0,
@@ -514,6 +523,7 @@ xchar x, y;
             || (IS_DOOR_OR_SDOOR(lev->typ) && !is_door_diggable_at_ptr(lev))
             )) 
     {
+        play_player_ouch_sound(MONSTER_OUCH_SOUND_OUCH);
         You("hurt your teeth on the %s.",
             (lev->typ == IRONBARS)
                 ? "bars"
@@ -536,6 +546,8 @@ xchar x, y;
         /* solid rock takes more work & time to dig through */
         context.digging.effort =
             (IS_ROCK(lev->typ) && !IS_TREE(lev->typ) ? 30 : 60) + u.ubasedaminc + u.udaminc;
+
+        play_occupation_immediate_sound(oss, OCCUPATION_DIGGING_ROCK, OCCUPATION_SOUND_TYPE_START);
         You("start chewing %s %s.",
             (boulder || IS_TREE(lev->typ) || lev->typ == IRONBARS)
                 ? "on a"
@@ -554,6 +566,7 @@ xchar x, y;
     }
     else if ((context.digging.effort += (30 + u.ubasedaminc + u.udaminc)) <= 100)
     {
+        play_occupation_immediate_sound(oss, OCCUPATION_DIGGING_ROCK, OCCUPATION_SOUND_TYPE_START);
         if (flags.verbose)
             You("%s chewing on the %s.",
                 context.digging.chew ? "continue" : "begin",
@@ -575,8 +588,10 @@ xchar x, y;
     u.uconduct.food++;
     u.uhunger += rnd(20);
 
-    if (boulder) 
+    play_occupation_immediate_sound(oss, OCCUPATION_DIGGING_ROCK, OCCUPATION_SOUND_TYPE_FINISH);
+    if (boulder)
     {
+        play_occupation_immediate_sound(oss, OCCUPATION_EATING, OCCUPATION_SOUND_TYPE_START);
         delobj(boulder);         /* boulder goes bye-bye */
         You("eat the boulder."); /* yum */
 
@@ -738,7 +753,7 @@ register xchar ox, oy;
     newsym(ox, oy);
 }
 
-static NEARDATA const char fell_on_sink[] = "fell onto a sink";
+STATIC_VAR NEARDATA const char fell_on_sink[] = "fell onto a sink";
 
 STATIC_OVL void
 dosinkfall()
@@ -2617,11 +2632,11 @@ boolean newspot;             /* true if called by spoteffects */
     return FALSE;
 }
 
-static int inspoteffects = 0;
-static coord spotloc;
-static int spotterrain;
-static struct trap* spottrap = (struct trap*)0;
-static unsigned spottraptyp = NO_TRAP;
+STATIC_VAR int inspoteffects = 0;
+STATIC_VAR coord spotloc;
+STATIC_VAR int spotterrain;
+STATIC_VAR struct trap* spottrap = (struct trap*)0;
+STATIC_VAR unsigned spottraptyp = NO_TRAP;
 
 void
 spoteffects(pick)
@@ -3813,7 +3828,7 @@ weight_cap()
     return (int) carrcap;
 }
 
-static int wc; /* current weight_cap(); valid after call to inv_weight() */
+STATIC_VAR int wc; /* current weight_cap(); valid after call to inv_weight() */
 
 /* returns how far beyond the normal capacity the player is currently. */
 /* inv_weight() is negative if the player is below normal capacity. */
@@ -4007,6 +4022,9 @@ reset_hack(VOID_ARGS)
     spottrap = (struct trap*)0;
     spottraptyp = NO_TRAP;
     wc = 0;
+#ifndef LINT /* static long lastmovetime; */
+    lastmovetime = 0;
+#endif
 }
 
 

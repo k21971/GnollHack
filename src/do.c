@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    do.c    $NHDT-Date: 1548978604 2019/01/31 23:50:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.189 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -20,11 +20,11 @@ STATIC_DCL int FDECL(menu_drop, (int));
 STATIC_DCL int NDECL(currentlevel_rewrite);
 STATIC_DCL void NDECL(final_level);
 STATIC_DCL void FDECL(print_corpse_properties, (winid, int, BOOLEAN_P));
-/* static boolean FDECL(badspot, (XCHAR_P,XCHAR_P)); */
+/* STATIC_DCL boolean FDECL(badspot, (XCHAR_P,XCHAR_P)); */
 
 extern int n_dgns; /* number of dungeons, from dungeon.c */
 
-static NEARDATA const char drop_types[] = { ALLOW_COUNT, COIN_CLASS,
+STATIC_VAR NEARDATA const char drop_types[] = { ALLOW_COUNT, COIN_CLASS,
                                             ALL_CLASSES, 0 };
 
 /* 'd' command: drop one inventory item */
@@ -361,7 +361,7 @@ docharacterstatistics()
 }
 
 
-static NEARDATA const char item_description_objects[] = { ALL_CLASSES, ALLOW_NONE, 0 };
+STATIC_VAR NEARDATA const char item_description_objects[] = { ALL_CLASSES, ALLOW_NONE, 0 };
 
 /* the M('x') command - Item descriptions*/
 int
@@ -581,20 +581,6 @@ boolean isprobing UNUSED;
             putstr(datawin, ATR_INDENT_AT_DASH, buf);
         }
 
-        if (is_bat(ptr) || mnum == PM_STALKER)
-        {
-            cnt++;
-            Sprintf(buf, "  %d - Causes stun", cnt);
-            putstr(datawin, ATR_INDENT_AT_DASH, buf);
-        }
-
-        if (mnum == PM_STALKER)
-        {
-            cnt++;
-            Sprintf(buf, "  %d - Confers invisibility", cnt);
-            putstr(datawin, ATR_INDENT_AT_DASH, buf);
-        }
-
         if (flesh_petrifies(ptr))
         {
             cnt++;
@@ -623,6 +609,12 @@ boolean isprobing UNUSED;
             putstr(datawin, ATR_INDENT_AT_DASH, buf);
         }
 
+        if (has_stunning_corpse(ptr))
+        {
+            cnt++;
+            Sprintf(buf, "  %d - Stunning", cnt);
+            putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        }
         if (has_poisonous_corpse(ptr))
         {
             cnt++;
@@ -942,7 +934,7 @@ register struct obj* obj;
         /* Nutritinal value */
         if (is_edible(obj))
         {
-            Sprintf(buf2, "%d rounds", obj->oeaten ? obj->oeaten : obj_nutrition(obj));
+            Sprintf(buf2, "%d rounds", obj->oeaten ? obj->oeaten : obj_nutrition(obj, &youmonst));
             Sprintf(buf, "Nutritional value:      %s", buf2);            
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
@@ -1643,12 +1635,15 @@ register struct obj* obj;
             );
 
 
-    if ((obj->oclass == ARMOR_CLASS
+    boolean nonexpeptionalarmor = nonexceptionality_armor(obj);
+
+    if (((obj->oclass == ARMOR_CLASS
         || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
         || has_obj_mythic_defense(obj)) 
-        && obj->exceptionality)
+        && obj->exceptionality) || nonexpeptionalarmor)
     {
-        const char* excep = obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL ? "Exceptional" :
+        const char* excep = nonexpeptionalarmor ? "Cannot have quality" : 
+            obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL ? "Exceptional" :
             obj->exceptionality == EXCEPTIONALITY_ELITE ? "Elite" :
             obj->exceptionality == EXCEPTIONALITY_CELESTIAL ? "Celestial" :
             obj->exceptionality == EXCEPTIONALITY_PRIMORDIAL ? "Primordial" :
@@ -1656,20 +1651,23 @@ register struct obj* obj;
             "Unknown quality";
 
         Sprintf(buf, "Armor quality:          %s", excep);
-        int acbon = get_obj_exceptionality_ac_bonus(obj);
-        int mcbon = get_obj_exceptionality_mc_bonus(obj);
-        if (acbon > 0 || mcbon > 0)
+        if (!nonexpeptionalarmor)
         {
-            Strcat(buf, " (");
-            if (acbon > 0)
-                Sprintf(eos(buf), "-%d AC", acbon);
-            if (mcbon > 0)
+            int acbon = get_obj_exceptionality_ac_bonus(obj);
+            int mcbon = get_obj_exceptionality_mc_bonus(obj);
+            if (acbon > 0 || mcbon > 0)
             {
+                Strcat(buf, " (");
                 if (acbon > 0)
-                    Strcat(buf, ", ");
-                Sprintf(eos(buf), "+%d MC", mcbon);
+                    Sprintf(eos(buf), "-%d AC", acbon);
+                if (mcbon > 0)
+                {
+                    if (acbon > 0)
+                        Strcat(buf, ", ");
+                    Sprintf(eos(buf), "+%d MC", mcbon);
+                }
+                Strcat(buf, ")");
             }
-            Strcat(buf, ")");
         }
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
@@ -1951,6 +1949,148 @@ register struct obj* obj;
 
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
             }
+
+            /* Impact on maximums */
+            int extra_data1 = (int)objects[obj->otyp].oc_potion_extra_data1;
+            if (objects[otyp].oc_flags5 & O5_EFFECT_IS_HEALING)
+            {
+                if (extra_data1 > 0)
+                {
+                    char maxhpbuf[BUFSZ] = "";
+                    if (obj->bknown)
+                    {
+                        if (obj->blessed)
+                            Sprintf(maxhpbuf, "+%d (if at max health)", extra_data1);
+                        else
+                            Sprintf(maxhpbuf, "0 (+%d if blessed at max)", extra_data1);
+                    }
+                    else
+                        Sprintf(maxhpbuf, "+%d if blessed at max", extra_data1);
+
+                    Sprintf(buf, "Maximum health gained:  %s", maxhpbuf);
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                }
+            }
+            else if (objects[otyp].oc_flags5 & O5_EFFECT_IS_MANA)
+            {
+                if (extra_data1 > 0)
+                {
+                    char maxmanabuf[BUFSZ] = "";
+                    if (obj->bknown)
+                    {
+                        if(obj->blessed)
+                            Sprintf(maxmanabuf, "+%d (if at max mana)", extra_data1);
+                        else if (obj->cursed)
+                            Sprintf(maxmanabuf, "-%d (+%d if blessed at max mana)", extra_data1, extra_data1);
+                        else
+                            Sprintf(maxmanabuf, "0 (+/-%d if blessed at max or cursed)", extra_data1);
+                    }
+                    else
+                        Sprintf(maxmanabuf, "+/-%d if blessed at max or cursed", extra_data1);
+
+                    Sprintf(buf, "Maximum mana gained:    %s", maxmanabuf);
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                }
+            }
+
+            /* Special cures on healing */
+            if (objects[otyp].oc_flags5 & O5_EFFECT_FLAGS_ARE_HEALING)
+            {
+                boolean cures_sick_blessed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_SICKNESS);
+                boolean cures_sick_uncursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_SICKNESS);
+                boolean cures_sick_cursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_SICKNESS);
+                boolean cures_sick_noncursed = (objects[otyp].oc_potion_effect_flags & POTFLAGS_NONCURSED_CURE_SICKNESS) == POTFLAGS_NONCURSED_CURE_SICKNESS;
+                boolean cures_sick_all = (objects[otyp].oc_potion_effect_flags & POTFLAGS_ALL_CURE_SICKNESS) == POTFLAGS_ALL_CURE_SICKNESS;
+
+                boolean cures_blindness_blessed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_BLINDNESS);
+                boolean cures_blindness_uncursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_BLINDNESS);
+                boolean cures_blindness_cursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_BLINDNESS);
+                boolean cures_blindness_noncursed = (objects[otyp].oc_potion_effect_flags & POTFLAGS_NONCURSED_CURE_BLINDNESS) == POTFLAGS_NONCURSED_CURE_BLINDNESS;
+                boolean cures_blindness_all = (objects[otyp].oc_potion_effect_flags & POTFLAGS_ALL_CURE_BLINDNESS) == POTFLAGS_ALL_CURE_BLINDNESS;
+
+                boolean cures_hallucination_blessed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_HALLUCINATION);
+                boolean cures_hallucination_uncursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_HALLUCINATION);
+                boolean cures_hallucination_cursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_HALLUCINATION);
+                boolean cures_hallucination_noncursed = (objects[otyp].oc_potion_effect_flags & POTFLAGS_NONCURSED_CURE_HALLUCINATION) == POTFLAGS_NONCURSED_CURE_HALLUCINATION;
+                boolean cures_hallucination_all = (objects[otyp].oc_potion_effect_flags & POTFLAGS_ALL_CURE_HALLUCINATION) == POTFLAGS_ALL_CURE_HALLUCINATION;
+
+                boolean cures_stun_blessed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_STUN);
+                boolean cures_stun_uncursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_STUN);
+                boolean cures_stun_cursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_STUN);
+                boolean cures_stun_noncursed = (objects[otyp].oc_potion_effect_flags & POTFLAGS_NONCURSED_CURE_STUN) == POTFLAGS_NONCURSED_CURE_STUN;
+                boolean cures_stun_all = (objects[otyp].oc_potion_effect_flags & POTFLAGS_ALL_CURE_STUN) == POTFLAGS_ALL_CURE_STUN;
+
+                boolean cures_confusion_blessed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_CONFUSION);
+                boolean cures_confusion_uncursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_CONFUSION);
+                boolean cures_confusion_cursed = !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_CONFUSION);
+                boolean cures_confusion_noncursed = (objects[otyp].oc_potion_effect_flags & POTFLAGS_NONCURSED_CURE_CONFUSION) == POTFLAGS_NONCURSED_CURE_CONFUSION;
+                boolean cures_confusion_all = (objects[otyp].oc_potion_effect_flags & POTFLAGS_ALL_CURE_CONFUSION) == POTFLAGS_ALL_CURE_CONFUSION;
+
+                if (obj->bknown)
+                {
+                    boolean cures_sick = FALSE;
+                    boolean cures_blind = FALSE;
+                    boolean cures_hallucination = FALSE;
+                    boolean cures_stun = FALSE;
+                    boolean cures_confusion = FALSE;
+                    cures_sick = obj->blessed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_SICKNESS) :
+                        obj->cursed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_SICKNESS) :
+                        !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_SICKNESS);
+                    cures_blind = obj->blessed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_BLINDNESS) :
+                        obj->cursed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_BLINDNESS) :
+                        !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_BLINDNESS);
+                    cures_hallucination = obj->blessed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_HALLUCINATION) :
+                        obj->cursed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_HALLUCINATION) :
+                        !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_HALLUCINATION);
+                    cures_stun = obj->blessed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_STUN) :
+                        obj->cursed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_STUN) :
+                        !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_STUN);
+                    cures_confusion = obj->blessed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_BLESSED_CURE_CONFUSION) :
+                        obj->cursed ? !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_CURSED_CURE_CONFUSION) :
+                        !!(objects[otyp].oc_potion_effect_flags & POTFLAGS_UNCURSED_CURE_CONFUSION);
+
+                    Sprintf(buf, "Cures sickness:         %s (%s)", cures_sick ? "Yes" : "No",
+                        cures_sick_all ? "always" : cures_sick_noncursed ? (cures_sick ? "when not cursed" : "yes if not cursed") : 
+                        cures_sick_blessed ? (cures_sick ? "when blessed" : "yes if blessed") : cures_sick_uncursed ? (cures_sick ? "when uncursed" : "yes if uncursed") : 
+                        cures_sick_cursed ? (cures_sick ? "when cursed" : "yes if cursed") : "never");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures blindness:        %s (%s)", cures_blind ? "Yes" : "No",
+                        cures_blindness_all ? "always" : cures_blindness_noncursed ? (cures_blind ? "when not cursed" : "yes if not cursed") :
+                        cures_blindness_blessed ? (cures_blind ? "when blessed" : "yes if blessed") : cures_blindness_uncursed ? (cures_blind ? "when uncursed" : "yes if uncursed") :
+                        cures_blindness_cursed ? (cures_blind ? "when cursed" : "yes if cursed") : "never");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures hallucination:    %s (%s)", cures_hallucination ? "Yes" : "No",
+                        cures_hallucination_all ? "always" : cures_hallucination_noncursed ? (cures_hallucination ? "when not cursed" : "yes if not cursed") :
+                        cures_hallucination_blessed ? (cures_hallucination ? "when blessed" : "yes if blessed") : cures_hallucination_uncursed ? (cures_hallucination ? "when uncursed" : "yes if uncursed") :
+                        cures_hallucination_cursed ? (cures_hallucination ? "when cursed" : "yes if cursed") : "never");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures stun:             %s (%s)", cures_stun ? "Yes" : "No",
+                        cures_stun_all ? "always" : cures_stun_noncursed ? (cures_stun ? "when not cursed" : "yes if not cursed") :
+                        cures_stun_blessed ? (cures_stun ? "when blessed" : "yes if blessed") : cures_stun_uncursed ? (cures_stun ? "when uncursed" : "yes if uncursed") :
+                        cures_stun_cursed ? (cures_stun ? "when cursed" : "yes if cursed") : "never");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures confusion:        %s (%s)", cures_confusion ? "Yes" : "No",
+                        cures_confusion_all ? "always" : cures_confusion_noncursed ? (cures_confusion ? "when not cursed" : "yes if not cursed") : 
+                        cures_confusion_blessed ? (cures_confusion ? "when blessed" : "yes if blessed") : cures_confusion_uncursed ? (cures_confusion ? "when uncursed" : "yes if uncursed") : 
+                        cures_confusion_cursed ? (cures_confusion ? "when cursed" : "yes if cursed") : "never");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                }
+                else
+                {
+                    Sprintf(buf, "Cures sickness:         %s", cures_sick_all ? "Yes" : cures_sick_noncursed ? "If not cursed" : cures_sick_blessed ? "If blessed" : cures_sick_uncursed ? "If uncursed" : cures_sick_cursed ? "If cursed" : "No");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures blindness:        %s", cures_blindness_all ? "Yes" : cures_blindness_noncursed ? "If not cursed" : cures_blindness_blessed ? "If blessed" : cures_blindness_uncursed ? "If uncursed" : cures_blindness_cursed ? "If cursed" : "No");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures hallucination:    %s", cures_hallucination_all ? "Yes" : cures_hallucination_noncursed ? "If not cursed" : cures_hallucination_blessed ? "If blessed" : cures_hallucination_uncursed ? "If uncursed" : cures_hallucination_cursed ? "If cursed" : "No");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures stun:             %s", cures_stun_all ? "Yes" : cures_stun_noncursed ? "If not cursed" : cures_stun_blessed ? "If blessed" : cures_stun_uncursed ? "If uncursed" : cures_stun_cursed ? "If cursed" : "No");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    Sprintf(buf, "Cures confusion:        %s", cures_confusion_all ? "Yes" : cures_confusion_noncursed ? "If not cursed" : cures_confusion_blessed ? "If blessed" : cures_confusion_uncursed ? "If uncursed" : cures_confusion_cursed ? "If cursed" : "No");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                }
+            }
+
+
             if (objects[otyp].oc_potion_nutrition_dice > 0 || objects[otyp].oc_potion_nutrition_diesize > 0 || objects[otyp].oc_potion_nutrition_plus != 0)
             {
                 boolean maindiceprinted = FALSE;
@@ -2055,8 +2195,9 @@ register struct obj* obj;
             {
                 Strcpy(buf, "");
 
-                char bonusbuf[BUFSZ];
-                Strcpy(bonusbuf, "");
+                char bonusbuf[BUFSZ] = "";
+                boolean display_ac = affectsac && !(objects[otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC);
+                boolean display_mc = affectsmc || (objects[otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC);
 
                 if (obj->oclass == WEAPON_CLASS || is_weptool(obj))
                 {
@@ -2076,34 +2217,44 @@ register struct obj* obj;
                         wep_all_extra_avg_dmg += enchplus;
                     }
                     if (tohitplus == dmgplus)
-                        Sprintf(bonusbuf, " (%s%d to hit and damage)", tohitplus >= 0 ? "+" : "", tohitplus);
+                        Sprintf(bonusbuf, " (%s%d to hit and damage", tohitplus >= 0 ? "+" : "", tohitplus);
                     else
-                        Sprintf(bonusbuf, " (%s%d to hit and %s%d to damage)", tohitplus >= 0 ? "+" : "", tohitplus, dmgplus >= 0 ? "+" : "", dmgplus);
+                        Sprintf(bonusbuf, " (%s%d to hit and %s%d to damage", tohitplus >= 0 ? "+" : "", tohitplus, dmgplus >= 0 ? "+" : "", dmgplus);
                 }
 
-                if (affectsac && !(objects[otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC) && (affectsmc || (objects[otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC)))
+                if (display_ac || display_mc)
                 {
-                    Sprintf(eos(bonusbuf), " (%s%d to AC and %s%d to MC)",
+                    if (!*bonusbuf)
+                        Strcpy(bonusbuf, " (");
+                    else
+                        Strcat(bonusbuf, ", ");
+                }
+
+                if (display_ac && display_mc)
+                {
+                    Sprintf(eos(bonusbuf), "%s%d to AC and %s%d to MC",
                         obj->enchantment <= 0 ? "+" : "",
                         -obj->enchantment,
                         obj->enchantment / 3 >= 0 ? "+" : "",
                         obj->enchantment / 3
                     );
                 }
-                else if (affectsac && !(objects[otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC))
+                else if (display_ac)
                 {
-                    Sprintf(eos(bonusbuf), " (%s%d %s to AC)",
+                    Sprintf(eos(bonusbuf), "%s%d %s to AC",
                         obj->enchantment <= 0 ? "+" : "",
                         -obj->enchantment,
                         obj->enchantment >= 0 ? "bonus" : "penalty");
                 }
-                else if (affectsmc || (objects[otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC))
+                else if (display_mc)
                 {
-                    Sprintf(eos(bonusbuf), " (%s%d %s to MC)",
+                    Sprintf(eos(bonusbuf), "%s%d %s to MC",
                         obj->enchantment / 3 >= 0 ? "+" : "",
                         obj->enchantment / 3,
                         obj->enchantment / 3 >= 0 ? "bonus" : "penalty");
                 }
+                if (*bonusbuf)
+                    Strcat(bonusbuf, ")");
 
                 Sprintf(buf, "Enchantment status:     %s%d%s", obj->enchantment >= 0 ? "+" : "", obj->enchantment, bonusbuf);
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -3914,8 +4065,8 @@ register struct obj* obj;
         Sprintf(buf, " %2d - You have 50%% chance to hit AC %d and 5%% AC %d", powercnt, ac_with_50_chance, ac_with_5_chance);
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
 
-        double average_multi_shot_times = 1.0;
-        (void)get_multishot_stats(&youmonst, obj, uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : obj, (is_ammo(obj) || throwing_weapon(obj)), &average_multi_shot_times);
+        struct multishot_result msres = get_multishot_stats(&youmonst, obj, uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : obj, (is_ammo(obj) || throwing_weapon(obj)));
+        double average_multi_shot_times = msres.average;
 
         powercnt++;
         const char* applicable_verb = throwing_weapon(obj) ? "throw" : ammo_and_launcher(obj, applicable_launcher) ? "fire" : "strike";
@@ -3991,7 +4142,7 @@ register struct obj* obj;
 
 
 
-static const char* damage_type_names[] = {
+STATIC_VAR const char* damage_type_names[] = {
     "physical", "magic", "fire", "cold", "sleep",
     "disintegrating", "electrical", "poisonous", "acidic", "deadly",
     "petrifying", "blinding", "stunning", "slowing", "paralyzing",
@@ -4005,7 +4156,7 @@ static const char* damage_type_names[] = {
 
 };
 
-static const char* damage_type_names_high[] = {
+STATIC_VAR const char* damage_type_names_high[] = {
     "fire or poison gas", "disintegration or cold", "ancient gold dragon", "celestial", "magic",
     "random draconic", "demon", "controlled creatures", "gnolls", "ghouls",
     "undead", "minotaurs", "random eye stalk", "random eye stalk", "bison",
@@ -4024,7 +4175,7 @@ short damagetype;
     return damage_type_names[damagetype];
 }
 
-static const char* defense_type_names[] = {
+STATIC_VAR const char* defense_type_names[] = {
     "physical damage resistance", "magic resistance", "fire resistance", "cold resistance", "",
     "", "", "shock resistance", "", "",
     "", "", "stun resistance", "", "",
@@ -4275,7 +4426,7 @@ register struct monst* mon;
 }
 
 
-static const char* monster_size_names[] = {
+STATIC_VAR const char* monster_size_names[] = {
     "tiny", "small", "medium-sized", "large", "huge",
     "gigantic", "gigantic", "gigantic",
 };
@@ -4290,7 +4441,7 @@ int monsize;
 }
 
 
-static const char* attack_type_names[] = {
+STATIC_VAR const char* attack_type_names[] = {
     "none", "claw", "bite", "kick", "ram",
     "tail", "butt", "touch", "sting", "grab", "spit",
     "engulf", "breath weapon", "explosion", "explosion",
@@ -5477,7 +5628,7 @@ int retry;
 }
 
 /* on a ladder, used in goto_level */
-static NEARDATA boolean at_ladder = FALSE;
+STATIC_VAR NEARDATA boolean at_ladder = FALSE;
 
 /* the '>' command */
 int
@@ -5771,7 +5922,7 @@ save_currentstate()
 #endif
 
 /*
-static boolean
+STATIC_OVL boolean
 badspot(x, y)
 register xchar x, y;
 {
@@ -6207,8 +6358,8 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         }
 
         set_itimeout(&HInvulnerable, 0L);
+        heal_ailments_upon_revival();
         displaywakeup = TRUE;
-
         if (isok(altar_x, altar_y))
         {
             u_on_newpos(altar_x, altar_y);
@@ -6398,12 +6549,12 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
 
     if (familiar) 
     {
-        static const char *const fam_msgs[4] = {
+        STATIC_VAR const char *const fam_msgs[4] = {
             "You have a sense of deja vu.",
             "You feel like you've been here before.",
             "This place %s familiar...", 0 /* no message */
         };
-        static const char *const halu_fam_msgs[4] = {
+        STATIC_VAR const char *const halu_fam_msgs[4] = {
             "Whoa!  Everything %s different.",
             "You are surrounded by twisty little passages, all alike.",
             "Gee, this %s like uncle Conan's place...", 0 /* no message */
@@ -6593,7 +6744,7 @@ final_level()
     gain_guardian_angel(FALSE);
 }
 
-static char *dfr_pre_msg = 0,  /* pline() before level change */
+STATIC_VAR char *dfr_pre_msg = 0,  /* pline() before level change */
             *dfr_post_msg = 0; /* pline() after level change */
 
 /* change levels at the end of this turn, after monsters finish moving */
@@ -7814,5 +7965,19 @@ death_hint(VOID_ARGS)
     }
 }
 
+void
+heal_ailments_upon_revival(VOID_ARGS)
+{
+    make_blinded(0L, FALSE);
+    make_mummy_rotted(0L, (char*)0, FALSE, 0);
+    make_stunned(0L, FALSE);
+    make_confused(0L, FALSE);
+    make_deaf(0L, FALSE);
+    make_mummy_rotted(0L, (char*)0, FALSE, 0);
+    make_slimed(0L, (char*)0, 0, FALSE, 0);
+    make_sick(0L, (char*)0, FALSE, 0);
+    make_food_poisoned(0L, (char*)0, FALSE, 0);
+    make_hallucinated(0L, FALSE, 0L);
+}
 
 /*do.c*/

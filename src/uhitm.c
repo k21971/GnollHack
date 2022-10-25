@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    uhitm.c    $NHDT-Date: 1555720104 2019/04/20 00:28:24 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.207 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -198,7 +198,7 @@ struct obj *wep; /* uwep for attack(), null for kick_monster() */
             play_sfx_sound(SFX_WAS_HIDING);
             if (!Blind && Hallucination)
                 pline("A %s %s appeared!",
-                      is_tame(mtmp) ? "tame" : "wild", l_monnam(mtmp));
+                      is_tame(mtmp) ? (call_mon_tame(mtmp) ? "allied" : "tame") : "wild", l_monnam(mtmp));
             else if (Blind || (is_pool(mtmp->mx, mtmp->my) && !Underwater))
                 pline("Wait!  There's a hidden monster there!");
             else if ((obj = level.objects[mtmp->mx][mtmp->my]) != 0)
@@ -745,55 +745,74 @@ struct attack *uattk;
     struct obj* wep = (uwep ? uwep : uarmg ? uarmg : (struct obj*)0);
     struct obj* wepbefore = wep;
 
-    int multistrike = get_multishot_stats(&youmonst, wep, wep, FALSE, (double*)0);
+    struct multishot_result msres = get_multishot_stats(&youmonst, wep, wep, FALSE);
+    int wieldermultistrike = msres.wielder_attacks;
+    int multistrike = msres.weapon_attacks;
+    int wielderstrikeindex;
+    int strikeindex;
 
-    for (int strikeindex = 0; strikeindex < multistrike; strikeindex++)
+    for (wielderstrikeindex = 0; wielderstrikeindex < wieldermultistrike; wielderstrikeindex++)
     {
-        update_u_action(ACTION_TILE_ATTACK);
-        play_monster_simple_weapon_sound(&youmonst, 0, wep, OBJECT_SOUND_TYPE_SWING_MELEE);
-        u_wait_until_action();
-
-        char strikebuf[BUFSIZ] = "";
-        if (uwep)
-            strcpy(strikebuf, Yobjnam2(uwep, "strike"));
-        else if (u.twoweap)
-            Sprintf(strikebuf, "You strike with your right %s%s", uarmg ? "gloved " : "", body_part(HAND));
-        else
-            Sprintf(strikebuf, "You strike");
-
-        if (strikeindex > 0)
-            pline("%s %s!", strikebuf, strikeindex == 1 ? "a second time" : strikeindex == 2 ? "a third time" : "once more");
-
-        //DETERMINE IF YOU HIT THE MONSTER
-        int tmp = find_roll_to_hit(mon, uattk->aatyp, wep, &attknum, &armorpenalty);
-        int dieroll = rnd(20);
-        int mhit = (tmp > dieroll || u.uswallow);
-        boolean uses_spell_flags = wep ? object_uses_spellbook_wand_flags_and_properties(wep) : FALSE;
-
-        if (wep && !uses_spell_flags &&((objects[wep->otyp].oc_aflags2 & A2_HITS_ADJACENT_SQUARES) || (wep->oartifact && artifact_has_flag(wep, AF_HITS_ADJACENT_SQUARES)))
-            && !u.uswallow && !u.ustuck && !NODIAG(u.umonnum))
+        boolean breakloop = FALSE;
+        if (wielderstrikeindex > 0)
         {
-            malive = hitum_cleave(mon, uattk, wep);
-            if (wepbefore && !wep)
-                wep_was_destroyed = TRUE;
-        }
-        else
-        {
-            if (tmp > dieroll)
-                exercise(A_DEX, TRUE);
-            /* bhitpos is set up by caller */
-            malive = known_hitum(mon, wep, &mhit, tmp, armorpenalty, uattk, dieroll);
-            if (wepbefore && !wep)
-                wep_was_destroyed = TRUE;
-            (void)passive(mon, wep, mhit, malive, AT_WEAP, wep_was_destroyed);
+            char wielderstrikebuf[BUFSIZ] = "";
+            if (uwep)
+                Sprintf(wielderstrikebuf, "You strike with %s", yname(uwep));
+            else if (u.twoweap)
+                Sprintf(wielderstrikebuf, "You strike with your right %s%s", uarmg ? "gloved " : "", body_part(HAND));
+            else
+                Sprintf(wielderstrikebuf, "You strike");
+
+            pline("%s %s!", wielderstrikebuf, wielderstrikeindex == 1 ? "a second time" : wielderstrikeindex == 2 ? "a third time" : "once more");
         }
 
-        update_u_action_revert(ACTION_TILE_NO_ACTION);
+        for (strikeindex = 0; strikeindex < multistrike; strikeindex++)
+        {
+            update_u_action(ACTION_TILE_ATTACK);
+            play_monster_simple_weapon_sound(&youmonst, 0, wep, OBJECT_SOUND_TYPE_SWING_MELEE);
+            u_wait_until_action();
 
-        if (!malive || m_at(x, y) != mon || wep_was_destroyed)
+            if (strikeindex > 0 && uwep)
+            {
+                pline("%s %s!", Yobjnam2(uwep, "strike"), strikeindex == 1 ? "a second time" : strikeindex == 2 ? "a third time" : "once more");
+            }
+
+            //DETERMINE IF YOU HIT THE MONSTER
+            int tmp = find_roll_to_hit(mon, uattk->aatyp, wep, &attknum, &armorpenalty);
+            int dieroll = rnd(20);
+            int mhit = (tmp > dieroll || u.uswallow);
+            boolean uses_spell_flags = wep ? object_uses_spellbook_wand_flags_and_properties(wep) : FALSE;
+
+            if (wep && !uses_spell_flags && ((objects[wep->otyp].oc_aflags2 & A2_HITS_ADJACENT_SQUARES) || (wep->oartifact && artifact_has_flag(wep, AF_HITS_ADJACENT_SQUARES)))
+                && !u.uswallow && !u.ustuck && !NODIAG(u.umonnum))
+            {
+                malive = hitum_cleave(mon, uattk, wep);
+                if (wepbefore && !wep)
+                    wep_was_destroyed = TRUE;
+            }
+            else
+            {
+                if (tmp > dieroll)
+                    exercise(A_DEX, TRUE);
+                /* bhitpos is set up by caller */
+                malive = known_hitum(mon, wep, &mhit, tmp, armorpenalty, uattk, dieroll);
+                if (wepbefore && !wep)
+                    wep_was_destroyed = TRUE;
+                (void)passive(mon, wep, mhit, malive, AT_WEAP, wep_was_destroyed);
+            }
+
+            update_u_action_revert(ACTION_TILE_NO_ACTION);
+
+            if (!malive || m_at(x, y) != mon || wep_was_destroyed)
+            {
+                breakloop = TRUE;
+                break;
+            }
+        }
+        if (breakloop)
             break;
     }
-
 
     /* second attack for two-weapon combat */
     wep_was_destroyed = FALSE;
@@ -808,52 +827,71 @@ struct attack *uattk;
         wep = (uarms ? uarms : uarmg ? uarmg : (struct obj*)0);
         wepbefore = wep;
 
-        int multistrike2 = get_multishot_stats(&youmonst, wep, wep, FALSE, (double*)0);
-
-        for (int strike2index = 0; strike2index < multistrike2; strike2index++)
+        struct multishot_result msres2 = get_multishot_stats(&youmonst, wep, wep, FALSE);
+        int wieldermultistrike2 = msres2.wielder_attacks;
+        int multistrike2 = msres2.weapon_attacks;
+        int wielderstrike2index;
+        for (wielderstrike2index = 0; wielderstrike2index < wieldermultistrike2; wielderstrike2index++)
         {
-            update_u_action(ACTION_TILE_ATTACK);
-            play_monster_simple_weapon_sound(&youmonst, 0, wep, OBJECT_SOUND_TYPE_SWING_MELEE);
-            u_wait_until_action();
-
-            char strikebuf[BUFSIZ] = "";
-            if (uarms)
-                strcpy(strikebuf, Yobjnam2(uarms, "strike"));
-            else
-                Sprintf(strikebuf, "You strike with your left %s%s", uarmg ? "gloved " : "", body_part(HAND));
-
-            if (strike2index > 0)
-                pline("%s %s!", strikebuf, strike2index == 1 ? "a second time" : strike2index == 2 ? "a third time" : "once more");
-
-            int tmp = find_roll_to_hit(mon, uattk->aatyp, wep, &attknum,
-                &armorpenalty);
-
-            int dieroll = rnd(20);
-            int mhit = (tmp > dieroll || u.uswallow);
-            boolean uses_spell_flags = wep ? object_uses_spellbook_wand_flags_and_properties(wep) : FALSE;
-
-            if (wep && !uses_spell_flags && ((objects[wep->otyp].oc_aflags2 & A2_HITS_ADJACENT_SQUARES) || (wep->oartifact && artifact_has_flag(wep, AF_HITS_ADJACENT_SQUARES)))
-                && !u.uswallow && !u.ustuck && !NODIAG(u.umonnum))
+            boolean breakloop = FALSE;
+            if (wielderstrike2index > 0)
             {
-                malive = hitum_cleave(mon, uattk, wep);
-                if (wepbefore && !wep)
-                    wep_was_destroyed = TRUE;
-            }
-            else
-            {
+                char wielderstrikebuf[BUFSIZ] = "";
+                if (uarms)
+                    Sprintf(wielderstrikebuf, "You strike with %s", yname(uarms));
+                else
+                    Sprintf(wielderstrikebuf, "You strike with your left %s%s", uarmg ? "gloved " : "", body_part(HAND));
 
-                malive = known_hitum(mon, wep, &mhit, tmp, armorpenalty, uattk,
-                    dieroll);
-                /* second passive counter-attack only occurs if second attack hits */
-                if (wepbefore && !wep)
-                    wep_was_destroyed = TRUE;
-                if (mhit)
-                    (void)passive(mon, wep, mhit, malive, AT_WEAP, wep_was_destroyed);
+                pline("%s %s!", wielderstrikebuf, wielderstrike2index == 1 ? "a second time" : wielderstrike2index == 2 ? "a third time" : "once more");
             }
 
-            update_u_action_revert(ACTION_TILE_NO_ACTION);
+            int strike2index;
+            for (strike2index = 0; strike2index < multistrike2; strike2index++)
+            {
+                update_u_action(ACTION_TILE_ATTACK);
+                play_monster_simple_weapon_sound(&youmonst, 0, wep, OBJECT_SOUND_TYPE_SWING_MELEE);
+                u_wait_until_action();
 
-            if (!malive || m_at(x, y) != mon || wep_was_destroyed)
+                if (strike2index > 0 && uarms)
+                {
+                    pline("%s %s!", Yobjnam2(uarms, "strike"), strike2index == 1 ? "a second time" : strike2index == 2 ? "a third time" : "once more");
+                }
+
+                int tmp = find_roll_to_hit(mon, uattk->aatyp, wep, &attknum,
+                    &armorpenalty);
+
+                int dieroll = rnd(20);
+                int mhit = (tmp > dieroll || u.uswallow);
+                boolean uses_spell_flags = wep ? object_uses_spellbook_wand_flags_and_properties(wep) : FALSE;
+
+                if (wep && !uses_spell_flags && ((objects[wep->otyp].oc_aflags2 & A2_HITS_ADJACENT_SQUARES) || (wep->oartifact && artifact_has_flag(wep, AF_HITS_ADJACENT_SQUARES)))
+                    && !u.uswallow && !u.ustuck && !NODIAG(u.umonnum))
+                {
+                    malive = hitum_cleave(mon, uattk, wep);
+                    if (wepbefore && !wep)
+                        wep_was_destroyed = TRUE;
+                }
+                else
+                {
+
+                    malive = known_hitum(mon, wep, &mhit, tmp, armorpenalty, uattk,
+                        dieroll);
+                    /* second passive counter-attack only occurs if second attack hits */
+                    if (wepbefore && !wep)
+                        wep_was_destroyed = TRUE;
+                    if (mhit)
+                        (void)passive(mon, wep, mhit, malive, AT_WEAP, wep_was_destroyed);
+                }
+
+                update_u_action_revert(ACTION_TILE_NO_ACTION);
+
+                if (!malive || m_at(x, y) != mon || wep_was_destroyed)
+                {
+                    breakloop = TRUE;
+                    break;
+                }
+            }
+            if (breakloop)
                 break;
         }
     }
@@ -1654,8 +1692,11 @@ boolean* obj_destroyed;
         /* [this assumes that `!thrown' implies wielded...] */
         use_skill(wtype, 1);
 
-        if(u.twoweap && obj && uarms && obj == uarms) /* Two weapon combat skill is increased when you successfully hit with a weapon in your left hand */
-            use_skill(P_TWO_WEAPON_COMBAT, 1);
+        if(u.twoweap && obj && uarms && obj == uarms) /* Dual weapon combat skill is increased when you successfully hit with a weapon in your left hand */
+            use_skill(P_DUAL_WEAPON_COMBAT, 1);
+
+        if (two_handed_bonus_applies(uwep))
+            use_skill(P_TWO_HANDED_WEAPON, 1);
     }
 
     if (ispoisoned && !isdisintegrated) 
@@ -2484,8 +2525,8 @@ struct obj *obj;   /* weapon */
         return 0;
 
     int skill_level = P_SKILL_LEVEL(weapon_skill_type(obj));
-    if (u.twoweap && skill_level > P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT))
-        skill_level = P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT);
+    if (u.twoweap && skill_level > P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT))
+        skill_level = P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT);
 
     skill_chance += spear_skill_jousting_bonus(skill_level); /* thrusting weapon skill */
     skill_chance += spear_skill_jousting_bonus(P_SKILL_LEVEL(P_RIDING)); /* riding skill */
@@ -3748,52 +3789,58 @@ register struct monst *mon;
             if (!weapon) /* no need to go beyond no-gloves to rings; not ...*/
                 originalweapon = &uarmg; /*... subject to erosion damage */
 
-            int multistrike = get_multishot_stats(&youmonst, weapon, weapon, FALSE, (double*)0);
-
-            for (int strikeindex = 0; strikeindex < multistrike; strikeindex++)
+            struct multishot_result msres = get_multishot_stats(&youmonst, weapon, weapon, FALSE);
+            int wieldermultistrike = msres.wielder_attacks;
+            int multistrike = msres.weapon_attacks;
+            int wielderstrikeindex;
+            int strikeindex;
+            for (wielderstrikeindex = 0; wielderstrikeindex < wieldermultistrike; wielderstrikeindex++)
             {
-                update_u_action(mattk->action_tile ? mattk->action_tile : ACTION_TILE_ATTACK);
-                play_monster_simple_weapon_sound(&youmonst, i, weapon, OBJECT_SOUND_TYPE_SWING_MELEE);
-                u_wait_until_action();
+                boolean breakloop = FALSE;
+                if (wielderstrikeindex > 0 && weapon)
+                    You("strike with %s %s!", yname(weapon), strikeindex == 1 ? "a second time" : strikeindex == 2 ? "a third time" : "once more");
 
-                char strikebuf[BUFSIZ] = "";
-                if (weapon)
-                    strcpy(strikebuf, Yobjnam2(weapon, "strike"));
-                else
-                    Sprintf(strikebuf, "You strike with the same %s", body_part(HAND));
+                for (strikeindex = 0; strikeindex < multistrike; strikeindex++)
+                {
+                    update_u_action(mattk->action_tile ? mattk->action_tile : ACTION_TILE_ATTACK);
+                    play_monster_simple_weapon_sound(&youmonst, i, weapon, OBJECT_SOUND_TYPE_SWING_MELEE);
+                    u_wait_until_action();
 
-                if (strikeindex > 0 && weapon)
-                    pline("%s %s!", Yobjnam2(weapon, "strike"), strikeindex == 1 ? "a second time" : strikeindex == 2 ? "a third time" : "once more");
+                    if (strikeindex > 0 && weapon)
+                        pline("%s %s!", Yobjnam2(weapon, "strike"), strikeindex == 1 ? "a second time" : strikeindex == 2 ? "a third time" : "once more");
 
+                    tmp = find_roll_to_hit(mon, AT_WEAP, weapon, &attknum, &armorpenalty);
+                    dieroll = rnd(20);
+                    dhit = (tmp > dieroll || u.uswallow);
+                    /* caller must set bhitpos */
+                    //DAMAGE IS DONE HERE FOR WEAPON
+                    if (!known_hitum(mon, weapon, &dhit, tmp,
+                        armorpenalty, mattk, dieroll)) {
+                        /* enemy dead, before any special abilities used */
+                        sum[i] = 2;
+                        breakloop = TRUE;
+                        break; // This used to be switch break, but works still by getting out of for loop
+                    }
+                    else
+                        sum[i] = dhit;
+                    /* originalweapon points to an equipment slot which might
+                       now be empty if the weapon was destroyed during the hit;
+                       passive(,weapon,...) won't call passive_obj() in that case */
+                    weapon = *originalweapon; /* might receive passive erosion */
+                    /* might be a worm that gets cut in half; if so, early return */
+                    if (m_at(u.ux + u.dx, u.uy + u.dy) != mon) {
+                        i = NATTK; /* skip additional attacks */
+                        /* proceed with uswapwep->cursed check, then exit loop */
+                        goto passivedone;
+                    }
+                    /* Do not print "You hit" message; known_hitum already did it. */
+                    if (dhit && mattk->adtyp != AD_SPEL && mattk->adtyp != AD_PHYS)
+                        sum[i] = damageum(mon, mattk, weapon, 0); //SPECIAL EFFECTS ARE DONE HERE FOR SPECIALS AFTER HITUM
 
-                tmp = find_roll_to_hit(mon, AT_WEAP, weapon, &attknum, &armorpenalty);
-                dieroll = rnd(20);
-                dhit = (tmp > dieroll || u.uswallow);
-                /* caller must set bhitpos */
-                //DAMAGE IS DONE HERE FOR WEAPON
-                if (!known_hitum(mon, weapon, &dhit, tmp,
-                    armorpenalty, mattk, dieroll)) {
-                    /* enemy dead, before any special abilities used */
-                    sum[i] = 2;
-                    break; // This used to be switch break, but works still by getting out of for loop
+                    update_u_action_revert(ACTION_TILE_NO_ACTION);
                 }
-                else
-                    sum[i] = dhit;
-                /* originalweapon points to an equipment slot which might
-                   now be empty if the weapon was destroyed during the hit;
-                   passive(,weapon,...) won't call passive_obj() in that case */
-                weapon = *originalweapon; /* might receive passive erosion */
-                /* might be a worm that gets cut in half; if so, early return */
-                if (m_at(u.ux + u.dx, u.uy + u.dy) != mon) {
-                    i = NATTK; /* skip additional attacks */
-                    /* proceed with uswapwep->cursed check, then exit loop */
-                    goto passivedone;
-                }
-                /* Do not print "You hit" message; known_hitum already did it. */
-                if (dhit && mattk->adtyp != AD_SPEL && mattk->adtyp != AD_PHYS)
-                    sum[i] = damageum(mon, mattk, weapon, 0); //SPECIAL EFFECTS ARE DONE HERE FOR SPECIALS AFTER HITUM
-
-                update_u_action_revert(ACTION_TILE_NO_ACTION);
+                if (breakloop)
+                    break;
             }
             break;
         case AT_CLAW:

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    do_wear.c    $NHDT-Date: 1551138255 2019/02/25 23:44:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.108 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -7,7 +7,7 @@
 
 #include "hack.h"
 
-static NEARDATA const char c_armor[] = "armor", c_suit[] = "suit",
+STATIC_VAR NEARDATA const char c_armor[] = "armor", c_suit[] = "suit",
                            c_shirt[] = "shirt", c_robe[] = "robe",
                            c_bracers[] = "bracers", c_cloak[] = "cloak",
                            c_gloves[] = "gloves", c_boots[] = "boots",
@@ -15,14 +15,14 @@ static NEARDATA const char c_armor[] = "armor", c_suit[] = "suit",
                            c_weapon[] = "weapon", c_sword[] = "sword",
                            c_axe[] = "axe", c_that_[] = "that";
 
-static NEARDATA const long takeoff_order[] = {
+STATIC_VAR NEARDATA const long takeoff_order[] = {
     WORN_BLINDF,  W_WEP,      WORN_SHIELD, WORN_GLOVES, LEFT_RING,
     RIGHT_RING,   W_MISC,     W_MISC2,     W_MISC3,     W_MISC4,      W_MISC5,  
     WORN_BRACERS, WORN_CLOAK, WORN_HELMET, WORN_AMUL,   WORN_ROBE,   WORN_ARMOR,
     WORN_SHIRT,   WORN_BOOTS, W_SWAPWEP,   W_SWAPWEP2,   W_QUIVER,    0L
 };
 
-static NEARDATA const long wear_order[] = {
+STATIC_VAR NEARDATA const long wear_order[] = {
     WORN_SHIRT,   WORN_ARMOR,  WORN_ROBE,    WORN_SHIELD,  WORN_CLOAK,
     WORN_HELMET,  WORN_BOOTS,  WORN_GLOVES,  WORN_BRACERS, LEFT_RING,
     RIGHT_RING,   W_MISC,      W_MISC2,      W_MISC3,      W_MISC4,      W_MISC5,
@@ -57,6 +57,9 @@ STATIC_DCL int FDECL(already_wearing_with_exchange_prompt, (const char*, struct 
 STATIC_DCL int FDECL(exchange_worn_item, (struct obj*, struct obj*, long));
 STATIC_DCL int FDECL(take_off_covering_and_wear, (struct obj*, long));
 STATIC_DCL int FDECL(add_wear_oid, (struct obj*, long));
+STATIC_DCL void NDECL(activate_take_off);
+STATIC_DCL void FDECL(print_covering_items, (struct obj*, char*));
+STATIC_DCL boolean FDECL(is_armor_covered, (struct obj*));
 
 void
 off_msg(otmp)
@@ -90,9 +93,78 @@ struct obj *otmp;
     }
 }
 
+STATIC_OVL boolean
+is_armor_covered(obj)
+struct obj* obj;
+{
+    return ((obj == uarmo) && uarmc)
+            || ((obj == uarm) && (uarmc || uarmo))
+            || ((obj == uarmu) && (uarmc || uarmo || uarm));
+}
+
+STATIC_DCL void
+print_covering_items(obj, printbuf)
+struct obj* obj;
+char* printbuf;
+{
+    if (!printbuf)
+        return;
+
+    char* what = printbuf;
+    *what = 0;
+
+    if ((obj == uarmu) && uarm && uarmo && uarmc)
+    {
+        Strcat(what, cloak_simple_name(uarmc));
+        Strcat(what, ", ");
+        Strcat(what, robe_simple_name(uarm));
+        Strcat(what, ", and ");
+        Strcat(what, suit_simple_name(uarm));
+    }
+    else
+    {
+        //First it must be a problem with the cloak if there is one
+        if (uarmc)
+        {
+            Strcat(what, cloak_simple_name(uarmc));
+            //Check if there is another culprit
+            if ((obj == uarmu) && uarm) {
+                Strcat(what, " and ");
+                Strcat(what, suit_simple_name(uarm));
+            }
+            else if ((obj == uarmu) && uarmo) {
+                Strcat(what, " and ");
+                Strcat(what, robe_simple_name(uarmo));
+            }
+            else if ((obj == uarm) && uarmo) {
+                Strcat(what, " and ");
+                Strcat(what, robe_simple_name(uarmo));
+            }
+        }
+        else
+        {
+            //If it wasn't the cloak then check if it is the robe
+            if (uarmo)
+            {
+                Strcat(what, robe_simple_name(uarmo));
+                //Check if there is another culprit
+                if ((obj == uarmu) && uarm) {
+                    Strcat(what, " and ");
+                    Strcat(what, suit_simple_name(uarm));
+                }
+            }
+            else
+            {
+                //If not the cloak or the robe, then it must be a shirt being taken out with an armor on
+                Strcat(what, suit_simple_name(uarm));
+            }
+        }
+    }
+}
+
 /* starting equipment gets auto-worn at beginning of new game,
    and we don't want stealth or displacement feedback then */
-static boolean initial_don = FALSE; /* manipulated in set_wear() */
+STATIC_VAR boolean initial_don = FALSE; /* manipulated in set_wear() */
 
 /* putting on or taking off an item which confers stealth;
    give feedback and discover it iff stealth state is changing */
@@ -205,6 +277,7 @@ Boots_off(VOID_ARGS)
     struct obj *otmp = uarmf;
     int otyp = otmp->otyp;
     long oldprop = u.uprops[objects[otyp].oc_oprop].extrinsic & ~WORN_BOOTS;
+    Strcpy(debug_buf_4, "Boots_off");
 
     if (flags.verbose && otmp)
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_TAKE_OFF);
@@ -271,6 +344,7 @@ Cloak_off(VOID_ARGS)
     struct obj *otmp = uarmc;
     int otyp = otmp->otyp;
     long oldprop = u.uprops[objects[otyp].oc_oprop].extrinsic & ~WORN_CLOAK;
+    Strcpy(debug_buf_4, "Cloak_off");
 
     if (flags.verbose && otmp)
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_TAKE_OFF);
@@ -360,6 +434,8 @@ Helmet_off(VOID_ARGS)
     if (!uarmh)
         return 0;
 
+    Strcpy(debug_buf_4, "Helmet_off");
+
     if (flags.verbose && uarmh)
         play_simple_object_sound(uarmh, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -423,6 +499,7 @@ int
 Gloves_off(VOID_ARGS)
 {
     boolean on_purpose = !context.mon_moving && !uarmg->in_use;
+    Strcpy(debug_buf_4, "Gloves_off");
 
     if (flags.verbose && uarmg)
         play_simple_object_sound(uarmg, OBJECT_SOUND_TYPE_TAKE_OFF);
@@ -466,6 +543,7 @@ Shield_on(VOID_ARGS)
 int
 Shield_off(VOID_ARGS)
 {
+    Strcpy(debug_buf_4, "Shield_off");
     if (flags.verbose && uarms)
         play_simple_object_sound(uarms, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -494,6 +572,7 @@ Shirt_on(VOID_ARGS)
 int
 Shirt_off(VOID_ARGS)
 {
+    Strcpy(debug_buf_4, "Shirt_off");
     if (flags.verbose && uarmu)
         play_simple_object_sound(uarmu, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -521,6 +600,7 @@ Robe_on(VOID_ARGS)
 int
 Robe_off(VOID_ARGS)
 {
+    Strcpy(debug_buf_4, "Robe_off");
     if (flags.verbose && uarmo)
         play_simple_object_sound(uarmo, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -547,6 +627,7 @@ Bracers_on(VOID_ARGS)
 int
 Bracers_off(VOID_ARGS)
 {
+    Strcpy(debug_buf_4, "Bracers_off");
     if (flags.verbose && uarmb)
         play_simple_object_sound(uarmb, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -566,6 +647,7 @@ long wearslotmask;
     if (!ud)
         return 0;
 
+    Strcpy(debug_buf_4, "MiscellaneousItem_on");
     if (flags.verbose && ud)
         play_simple_object_sound(ud, OBJECT_SOUND_TYPE_WEAR);
 
@@ -601,6 +683,7 @@ struct obj* ud;
     if (!ud)
         return 0;
 
+    Strcpy(debug_buf_4, "MiscellaneousItem_off");
     if (flags.verbose && ud)
         play_simple_object_sound(ud, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -625,6 +708,7 @@ Armor_on(VOID_ARGS)
     if (!uarm)
         return 0;
 
+    Strcpy(debug_buf_4, "Armor_on");
     if (flags.verbose && uarm)
         play_simple_object_sound(uarm, OBJECT_SOUND_TYPE_WEAR);
     /*
@@ -711,6 +795,7 @@ Amulet_off()
     if (!uamul)
         return;
 
+    Strcpy(debug_buf_4, "Amulet_off");
     if (flags.verbose && uamul)
         play_simple_object_sound(uamul, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -860,6 +945,7 @@ boolean gone;
     if (!obj)
         return;
 
+    Strcpy(debug_buf_4, "Ring_off_or_gone");
     if (flags.verbose && obj && !gone)
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -905,6 +991,7 @@ void
 Blindf_on(otmp)
 struct obj *otmp;
 {
+    Strcpy(debug_buf_4, "Blindf_on");
     /* blindfold might be wielded; release it for wearing */
     if (otmp->owornmask & W_WEAPON)
         remove_worn_item(otmp, FALSE);
@@ -933,7 +1020,6 @@ struct obj *otmp;
             You_ex(ATR_NONE, CLR_MSG_WARNING, "still cannot see.");
         }
     }
-
 }
 
 /* called in moveloop()'s prologue to set side-effects of worn start-up items;
@@ -1167,10 +1253,10 @@ struct obj *stolenobj; /* no message if stolenobj is already being doffing */
 
 /* both 'clothes' and 'accessories' now include both armor and accessories;
    TOOL_CLASS is for eyewear, FOOD_CLASS is for MEAT_RING */
-static NEARDATA const char clothes[] = {
+STATIC_VAR NEARDATA const char clothes[] = {
     ARMOR_CLASS, RING_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, TOOL_CLASS, FOOD_CLASS, 0
 };
-static NEARDATA const char accessories[] = {
+STATIC_VAR NEARDATA const char accessories[] = {
     RING_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, TOOL_CLASS, FOOD_CLASS, ARMOR_CLASS, 0
 };
 STATIC_VAR NEARDATA int Narmorpieces, Naccessories;
@@ -1232,64 +1318,18 @@ struct obj *obj;
         You_ex(ATR_NONE, CLR_MSG_FAIL, "are not wearing that.");
         return 0;
     }
-    if (obj == uskin
-        || ((obj == uarmo) && uarmc)
-        || ((obj == uarm) && (uarmc || uarmo))
-        || ((obj == uarmu) && (uarmc || uarmo || uarm))) {
+    if (obj == uskin || is_armor_covered(obj))
+    {
         char why[QBUFSZ], what[QBUFSZ];
 
         why[0] = what[0] = '\0';
         if (obj != uskin) 
         {
-            if ((obj == uarmu) && uarm && uarmo && uarmc)
-            {
-                Strcat(what, cloak_simple_name(uarmc));
-                Strcat(what, ", ");
-                Strcat(what, robe_simple_name(uarm));
-                Strcat(what, ", and ");
-                Strcat(what, suit_simple_name(uarm));
-            }
-            else
-            {
-                //First it must be a problem with the cloak if there is one
-                if (uarmc)
-                {
-                    Strcat(what, cloak_simple_name(uarmc));
-                    //Check if there is another culprit
-                    if ((obj == uarmu) && uarm) {
-                        Strcat(what, " and ");
-                        Strcat(what, suit_simple_name(uarm));
-                    }
-                    else if ((obj == uarmu) && uarmo) {
-                        Strcat(what, " and ");
-                        Strcat(what, robe_simple_name(uarmo));
-                    }
-                    else if ((obj == uarm) && uarmo) {
-                        Strcat(what, " and ");
-                        Strcat(what, robe_simple_name(uarmo));
-                    }
-                }
-                else
-                {
-                    //If it wasn't the cloak then check if it is the robe
-                    if (uarmo)
-                    {
-                        Strcat(what, robe_simple_name(uarmo));
-                        //Check if there is another culprit
-                        if ((obj == uarmu) && uarm) {
-                            Strcat(what, " and ");
-                            Strcat(what, suit_simple_name(uarm));
-                        }
-                    }
-                    else
-                    {
-                        //If not the cloak or the robe, then it must be a shirt being taken out with an armor on
-                        Strcat(what, suit_simple_name(uarm));
-                    }
-                }
-            }
+            print_covering_items(obj, what);
             Sprintf(why, " without taking off your %s first", what);
-        } else {
+        } 
+        else 
+        {
             Strcpy(why, "; it's embedded");
         }
         play_sfx_sound(SFX_GENERAL_CANNOT);
@@ -1366,7 +1406,29 @@ dotakeoff()
     if (!otmp)
         return 0;
 
-    return armor_or_accessory_off(otmp);
+    if (iflags.takeoff_uses_all)
+    {
+        if (context.takeoff.command == TAKEOFF_WEAR_CMD_TAKEOFF && context.takeoff.mask && context.takeoff.mask == otmp->owornmask)
+            return doddoremarm();
+
+        if (is_armor_covered(otmp))
+        {
+            char what[BUFSZ] = "", why[BUFSZ], qbuf[BUFSZ * 2], tbuf[BUFSZ];
+            print_covering_items(otmp, what);
+            Sprintf(why, " without taking off your %s first", what);
+            Sprintf(qbuf, "You cannot take %s off%s. Proceed with disrobing?", the(cxname(otmp)), why);
+            Strcpy(tbuf, "Disrobe Covering Items");
+            char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
+            if (ans != 'y')
+                return 0;
+        }
+        reset_remarm();
+        (void)select_off(otmp);
+        activate_take_off();
+        return 0;
+    }
+    else
+        return armor_or_accessory_off(otmp);
 }
 
 /* the 'R' command */
@@ -1416,6 +1478,7 @@ armoroff(otmp)
 register struct obj *otmp;
 {
     register int delay = -objects[otmp->otyp].oc_delay;
+    Strcpy(debug_buf_4, "armoroff");
 
     if (cursed(otmp))
         return 0;
@@ -1532,7 +1595,7 @@ struct obj* obj, *curobj;
         Sprintf(tbuf, "Already Wearing %s", abuf);
 
         char qbuf[BUFSIZ] = "";
-        Sprintf(qbuf, "You are currently wearing %s. Exchange it for %s?", an(cxname(curobj)), the(cxname(obj)));
+        Sprintf(qbuf, "You are currently wearing %s. Exchange it for %s?", acxname(curobj), the(cxname(obj)));
         char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
         if (ans == 'y')
             return exchange_worn_item(obj, curobj, curobj->owornmask);
@@ -1544,6 +1607,24 @@ struct obj* obj, *curobj;
     }
 
     return 0;
+}
+
+STATIC_OVL void
+activate_take_off(VOID_ARGS)
+{
+    if (context.takeoff.mask)
+    {
+        context.takeoff.command = TAKEOFF_WEAR_CMD_TAKEOFF;
+
+        /* default activity for armor and/or accessories,
+           possibly combined with weapons */
+        (void)strncpy(context.takeoff.disrobing, "disrobing", CONTEXTVERBSZ);
+        /* specific activity when handling weapons only */
+        if (!(context.takeoff.mask & ~W_WEAPON))
+            (void)strncpy(context.takeoff.disrobing, "disarming",
+                CONTEXTVERBSZ);
+        (void)take_off();
+    }
 }
 
 STATIC_OVL int
@@ -1694,10 +1775,11 @@ long bit;
  * output: mask (otmp's armor type)
  */
 int
-canwearobj(otmp, mask, noisy)
+canwearobj(otmp, mask, noisy, constructing_letters)
 struct obj *otmp;
 long *mask;
 boolean noisy;
+boolean constructing_letters;
 {
     int err = 0;
     const char *which;
@@ -1751,7 +1833,7 @@ boolean noisy;
 
     if (is_helmet(otmp)) 
     {
-        if (uarmh) 
+        if (uarmh && !constructing_letters)
         {
             if (noisy)
             {
@@ -1786,7 +1868,8 @@ boolean noisy;
     } 
     else if (is_shield(otmp)) 
     {
-        if (uarms) {
+        if (uarms && !constructing_letters)
+        {
             if (noisy)
             {
                 if (is_shield(uarms))
@@ -1818,7 +1901,7 @@ boolean noisy;
     } 
     else if (is_boots(otmp)) 
     {
-        if (uarmf) 
+        if (uarmf && !constructing_letters)
         {
             if (noisy)
                 (void)already_wearing_with_exchange_prompt(c_boots, otmp, uarmf);
@@ -1883,7 +1966,7 @@ boolean noisy;
     }
     else if (is_gloves(otmp)) 
     {
-        if (uarmg) 
+        if (uarmg && !constructing_letters)
         {
             if (noisy)
                 (void)!already_wearing_with_exchange_prompt(c_gloves, otmp, uarmg);
@@ -1903,7 +1986,7 @@ boolean noisy;
     }
     else if (is_bracers(otmp)) 
     {
-        if (uarmb) 
+        if (uarmb && !constructing_letters)
         {
             if (noisy)
                 (void)already_wearing_with_exchange_prompt(c_bracers, otmp, uarmb);
@@ -1915,10 +1998,9 @@ boolean noisy;
     } 
     else if (is_shirt(otmp)) 
     {
-        if (uarm || uarmc || uarmu || uarmo) 
+        if ((uarm || uarmc || uarmu || uarmo) && !constructing_letters)
         {
-
-            if (uarmu) 
+            if (uarmu)
             {
                 if (noisy)
                     (void)already_wearing_with_exchange_prompt(an(c_shirt), otmp, uarmu);
@@ -1962,7 +2044,7 @@ boolean noisy;
                         Sprintf(tbuf, "Cannot Wear Shirt Over %s", many ? "Covering Armor" : uarm ? "Suit" : uarmo ? "Robe" : "Cloak");
 
                         char qbuf[BUFSIZ];
-                        Sprintf(qbuf, "You cannot wear %s over %s. Take %s off and then wear the shirt?", an(cxname(otmp)), cbuf, many ? "them" : "it");
+                        Sprintf(qbuf, "You cannot wear %s over %s. Take %s off and then wear the shirt?", acxname(otmp), cbuf, many ? "them" : "it");
                         char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
 
                         if (ans == 'y')
@@ -1985,7 +2067,7 @@ boolean noisy;
     }
     else if (is_robe(otmp)) 
 {
-        if (uarmc || uarmo) 
+        if ((uarmc || uarmo) && !constructing_letters)
         {
             if (uarmo) 
             {
@@ -2005,7 +2087,7 @@ boolean noisy;
                         Sprintf(tbuf, "%s", "Cannot Wear Robe Over Cloak");
 
                         char qbuf[BUFSIZ];
-                        Sprintf(qbuf, "You cannot wear %s over %s. Take it off and then wear the robe?", an(cxname(otmp)), cbuf);
+                        Sprintf(qbuf, "You cannot wear %s over %s. Take it off and then wear the robe?", acxname(otmp), cbuf);
                         char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
                         if (ans == 'y')
                         {
@@ -2026,7 +2108,7 @@ boolean noisy;
     }
     else if (is_cloak(otmp)) 
     {
-        if (uarmc) 
+        if (uarmc && !constructing_letters)
         {
             if (noisy)
                 (void)already_wearing_with_exchange_prompt(an(cloak_simple_name(uarmc)), otmp, uarmc);
@@ -2037,7 +2119,7 @@ boolean noisy;
     } 
     else if (is_suit(otmp)) 
     {
-        if (uarm)
+        if (uarm && !constructing_letters)
         {
             if (noisy)
             {
@@ -2045,7 +2127,7 @@ boolean noisy;
             }
             err++;
         }
-        else if (uarmc || uarmo)
+        else if ((uarmc || uarmo) && !constructing_letters)
         {
             if (noisy)
             {
@@ -2067,7 +2149,7 @@ boolean noisy;
                     Sprintf(tbuf, "Cannot Wear Suit Over %s", many ? "Robe and Cloak" : uarmo ? "Robe" : "Cloak");
 
                     char qbuf[BUFSIZ];
-                    Sprintf(qbuf, "You cannot wear %s over %s. Take %s off and then wear the armor?", an(cxname(otmp)), cbuf, many ? "them" : "it");
+                    Sprintf(qbuf, "You cannot wear %s over %s. Take %s off and then wear the armor?", acxname(otmp), cbuf, many ? "them" : "it");
                     char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, ynchars, 'n', yndescs, (const char*)0);
                     if (ans == 'y')
                     {
@@ -2117,6 +2199,7 @@ boolean in_takeoff_wear;
 {
     long mask = 0L;
     boolean armor, ring, eyewear;
+    Strcpy(debug_buf_4, "accessory_or_armor_on");
 
     if (obj->owornmask & (W_ACCESSORY | W_ARMOR)) 
     {
@@ -2130,7 +2213,7 @@ boolean in_takeoff_wear;
     /* checks which are performed prior to actually touching the item */
     if (armor) 
     {
-        if (!canwearobj(obj, &mask, TRUE))
+        if (!canwearobj(obj, &mask, TRUE, FALSE))
             return 0;
 
         if (obj->otyp == HELM_OF_OPPOSITE_ALIGNMENT
@@ -2176,7 +2259,7 @@ boolean in_takeoff_wear;
                         humanoid(youmonst.data) ? "Ring-" : "",
                         makeplural(body_part(FINGER)));
 
-                    You("have %s on the left %s and %s on the right.", an(cxname(uleft)), body_part(FINGER), an(cxname(uright)));
+                    You("have %s on the left %s and %s on the right.", acxname(uleft), body_part(FINGER), acxname(uright));
 
                     Sprintf(qbuf, "Remove Left or Right ring?");
                     answer = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, tbuf, qbuf, "lrq", '\0', "Left\nRight\nCancel", (const char*)0);
@@ -2268,7 +2351,7 @@ boolean in_takeoff_wear;
             }
         }
         else if (obj->oclass == MISCELLANEOUS_CLASS) 
-{
+        {
             if (objects[obj->otyp].oc_subtyp != MISC_MULTIPLE_PERMITTED)
             {
                 if ((umisc && objects[umisc->otyp].oc_subtyp == objects[obj->otyp].oc_subtyp))
@@ -3187,11 +3270,11 @@ take_off(VOID_ARGS)
         {
             don->delay = 1;
         }
-        else if (doff->what == W_SWAPWEP)
+        else if (don->what == W_SWAPWEP)
         {
             don->delay = 1;
         }
-        else if (doff->what == W_SWAPWEP2)
+        else if (don->what == W_SWAPWEP2)
         {
             don->delay = 1;
         }
@@ -3395,6 +3478,7 @@ void
 reset_remarm()
 {
     context.takeoff.what = context.takeoff.mask = context.wear.what = context.wear.mask = 0L;
+    context.takeoff.command = 0;
     int i;
     for (i = 0; i < WEAR_OID_BITS; i++)
         context.wear.oid[i] = 0;
@@ -3425,19 +3509,7 @@ doddoremarm()
                              (unsigned *) 0, 0)) < -1)
         result = menu_remarm(result);
 
-    if (context.takeoff.mask) 
-    {
-        context.takeoff.command = TAKEOFF_WEAR_CMD_TAKEOFF;
-
-        /* default activity for armor and/or accessories,
-           possibly combined with weapons */
-        (void) strncpy(context.takeoff.disrobing, "disrobing", CONTEXTVERBSZ);
-        /* specific activity when handling weapons only */
-        if (!(context.takeoff.mask & ~W_WEAPON))
-            (void) strncpy(context.takeoff.disrobing, "disarming",
-                           CONTEXTVERBSZ);
-        (void) take_off();
-    }
+    activate_take_off();
     /* The time to perform the command is already completely accounted for
      * in take_off(); if we return 1, that would add an extra turn to each
      * disrobe.
@@ -3621,10 +3693,11 @@ register schar delta;
    used for dipping into liquid and applying grease;
    some criteria are different than select_off()'s */
 boolean
-inaccessible_equipment(obj, verb, only_if_known_cursed)
+inaccessible_equipment(obj, verb, only_if_known_cursed, constructing_letters_for_takeoff)
 struct obj *obj;
 const char *verb; /* "dip" or "grease", or null to avoid messages */
 boolean only_if_known_cursed; /* ignore covering unless known to be cursed */
+boolean constructing_letters_for_takeoff;
 {
     static NEARDATA const char need_to_take_off_outer_armor[] =
         "need to take off %s to %s %s.";
@@ -3632,7 +3705,7 @@ boolean only_if_known_cursed; /* ignore covering unless known to be cursed */
     boolean anycovering = !only_if_known_cursed; /* more comprehensible... */
 #define BLOCKSACCESS(x) (anycovering || ((x)->cursed && (x)->bknown))
 
-    if (!obj || !obj->owornmask)
+    if (!obj || !obj->owornmask || constructing_letters_for_takeoff)
         return FALSE; /* not inaccessible */
 
     /* check for robe covered by cloak */
@@ -3711,6 +3784,13 @@ boolean only_if_known_cursed; /* ignore covering unless known to be cursed */
     }
     /* item is not inaccessible */
     return FALSE;
+}
+
+void
+reset_dowear(VOID_ARGS)
+{
+    Narmorpieces = 0;
+    Naccessories = 0;
 }
 
 /*do_wear.c*/

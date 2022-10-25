@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    botl.c    $NHDT-Date: 1557094795 2019/05/05 22:19:55 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -23,8 +23,8 @@ STATIC_DCL void FDECL(compose_partystatline, (char*, char*, char*, char*, char*)
 STATIC_DCL char* FDECL(conditionbitmask2str, (unsigned long));
 
 
-static struct _status_hilite_line_str* status_hilite_str = 0;
-static int status_hilite_str_id = 0;
+STATIC_VAR struct _status_hilite_line_str* status_hilite_str = 0;
+STATIC_VAR int status_hilite_str_id = 0;
 
 char*
 get_strength_string(st)
@@ -317,6 +317,9 @@ do_statusline2()
 void
 bot()
 {
+    if (context.skip_botl)
+        return;
+
     /* dosave() flags completion by setting u.uhp to -1 */
     if ((u.uhp != -1) && youmonst.data && iflags.status_updates) {
         if (VIA_WINDOWPORT()) {
@@ -603,7 +606,7 @@ STATIC_DCL boolean FDECL(status_hilite_menu_add, (int));
       wid,  -1, currfld, fld INIT_THRESH }
 
 /* If entries are added to this, botl.h will require updating too */
-STATIC_VAR struct istat_s initblstats[MAXBLSTATS] = {
+STATIC_VAR const struct istat_s initblstats[MAXBLSTATS] = {
     INIT_BLSTAT("title", "%s", ANY_STR, MAXVALWIDTH, BL_TITLE),
     INIT_BLSTAT("strength", " St:%s", ANY_INT, 10, BL_STR),
     INIT_BLSTAT("dexterity", " Dx:%s", ANY_INT,  10, BL_DX),
@@ -649,10 +652,10 @@ STATIC_VAR struct istat_s initblstats[MAXBLSTATS] = {
 #undef INIT_THRESH
 
 struct istat_s blstats[2][MAXBLSTATS];
-static boolean blinit = FALSE, update_all = FALSE;
-static boolean valset[MAXBLSTATS];
+STATIC_VAR boolean blinit = FALSE, update_all = FALSE;
+STATIC_VAR boolean valset[MAXBLSTATS];
 #ifdef STATUS_HILITES
-static long bl_hilite_moves = 0L;
+STATIC_VAR long bl_hilite_moves = 0L;
 #endif
 
 /* we don't put this next declaration in #ifdef STATUS_HILITES.
@@ -662,8 +665,8 @@ static long bl_hilite_moves = 0L;
  * the final argument of status_update, with or
  * without STATUS_HILITES.
  */
-static unsigned long cond_hilites[BL_ATTCLR_MAX];
-static int now_or_before_idx = 0; /* 0..1 for array[2][] first index */
+STATIC_VAR unsigned long cond_hilites[BL_ATTCLR_MAX];
+STATIC_VAR int now_or_before_idx = 0; /* 0..1 for array[2][] first index */
 
 void
 bot_via_windowport()
@@ -1360,8 +1363,8 @@ stat_update_time()
     return;
 }
 
-static int oldrndencode = 0;
-static nhsym oldgoldsym = 0;
+STATIC_VAR int oldrndencode = 0;
+STATIC_VAR nhsym oldgoldsym = 0;
 
 STATIC_OVL boolean
 eval_notify_windowport_field(fld, valsetlist, idx)
@@ -1614,7 +1617,7 @@ status_reassess(VOID_ARGS)
 #endif
 }
 
-static boolean initalready = FALSE;
+STATIC_VAR boolean initalready = FALSE;
 
 STATIC_OVL void
 init_blstats()
@@ -2002,7 +2005,7 @@ int idx;
 
 struct hilite_s status_hilites[MAXBLSTATS];
 
-static const struct fieldid_t {
+STATIC_VAR const struct fieldid_t {
     const char *fieldname;
     enum statusfields fldid;
 } fieldids_alias[] = {
@@ -2037,7 +2040,7 @@ static const struct fieldid_t {
 };
 
 /* format arguments */
-static const char threshold_value[] = "hilite_status threshold ",
+STATIC_VAR const char threshold_value[] = "hilite_status threshold ",
                   is_out_of_range[] = " is out of range";
 
 

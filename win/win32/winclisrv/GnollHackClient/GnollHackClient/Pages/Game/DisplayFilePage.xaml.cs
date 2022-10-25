@@ -96,13 +96,27 @@ namespace GnollHackClient.Pages.Game
                 _currentPageHeight = height;
                 Thickness margins = new Thickness();
                 margins = TextLabel.Margin;
-
+                Thickness safearea = new Thickness();
+                bool usingsafe = On<Xamarin.Forms.PlatformConfiguration.iOS>().UsingSafeArea();
+                if(usingsafe)
+                {
+                    safearea = On<Xamarin.Forms.PlatformConfiguration.iOS>().SafeAreaInsets();
+                }
+                Thickness usedpadding = usingsafe ? safearea : MainGrid.Padding;
                 double bordermargin = ClientUtils.GetBorderWidth(bkgView.BorderStyle, width, height);
                 MainGrid.Margin = new Thickness(bordermargin, 0, bordermargin, 0);
-                double target_width = (Math.Min(width, MainGrid.WidthRequest) - MainGrid.Margin.Left - MainGrid.Margin.Right 
-                    - MainGrid.Padding.Left - MainGrid.Padding.Right - margins.Left - margins.Right);
-                double newsize = 12.5 * target_width / 640;
-
+                double limited_width = Math.Min(Math.Min(width, MainGrid.WidthRequest), DeviceDisplay.MainDisplayInfo.Width);
+                double target_width = limited_width - MainGrid.Margin.Left - MainGrid.Margin.Right
+                    - usedpadding.Left - usedpadding.Right - margins.Left - margins.Right;
+                double testsize = 12.5;
+                double newsize = testsize * target_width / 640;
+                if (_fixedWidth > 0)
+                {
+                    TextLabel.FontSize = testsize;
+                    double textwidth = TextLabel.MeasureWidth(new string('A', _fixedWidth));
+                    if(textwidth > 0)
+                        newsize = testsize * target_width / textwidth;
+                }
                 TextLabel.FontSize = newsize;
 
                 HeaderLabel.Margin = ClientUtils.GetHeaderMarginWithBorder(bkgView.BorderStyle, width, height);

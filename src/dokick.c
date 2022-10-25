@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    dokick.c    $NHDT-Date: 1551920353 2019/03/07 00:59:13 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.131 $ */
 /* Copyright (c) Izchak Miller, Mike Stephenson, Steve Linhart, 1989. */
@@ -11,8 +11,9 @@
     ((martial_bonus() && (Magical_kicking || !(uarmf && is_metallic(uarmf)))) || is_bigfoot(youmonst.data) \
      || Magical_kicking)
 
-static NEARDATA struct rm *maploc, nowhere;
-static NEARDATA const char *gate_str;
+STATIC_VAR NEARDATA struct rm* maploc;
+STATIC_VAR NEARDATA struct rm nowhere;
+STATIC_VAR NEARDATA const char *gate_str;
 
 /* kickedobj (decl.c) tracks a kicked object until placed or destroyed */
 
@@ -27,7 +28,7 @@ STATIC_DCL char *FDECL(kickstr, (char *, const char *));
 STATIC_DCL void FDECL(otransit_msg, (struct obj *, BOOLEAN_P, long));
 STATIC_DCL void FDECL(drop_to, (coord *, SCHAR_P));
 
-static const char kick_passes_thru[] = "kick passes harmlessly through";
+STATIC_VAR const char kick_passes_thru[] = "kick passes harmlessly through";
 
 /* kicking damage when not poly'd into a form with a kick attack */
 STATIC_OVL void
@@ -404,7 +405,8 @@ xchar x, y;
         return;
     }
 
-    int multistrike = get_multishot_stats(&youmonst, (struct obj*)0, (struct obj*)0, FALSE, (double*)0);
+    struct multishot_result msres = get_multishot_stats(&youmonst, (struct obj*)0, (struct obj*)0, FALSE);
+    int multistrike = msres.wielder_attacks * msres.weapon_attacks;
 
     for (int strikeindex = 0; strikeindex < multistrike; strikeindex++)
     {
@@ -1011,7 +1013,7 @@ boolean is_golf_swing;
         {
             if (rn2(20)) 
             {
-                static NEARDATA const char *const flyingcoinmsg[] = {
+                STATIC_VAR NEARDATA const char *const flyingcoinmsg[] = {
                     "scatter the coins", "knock coins all over the place",
                     "send coins flying in all directions",
                 };
@@ -2469,4 +2471,10 @@ xchar x, y;
     return MIGR_NOWHERE;
 }
 
+void
+reset_kick(VOID_ARGS)
+{
+    maploc = 0;
+    gate_str = 0;
+}
 /*dokick.c*/

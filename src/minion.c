@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    minion.c    $NHDT-Date: 1544998886 2018/12/16 22:21:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.40 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1089,7 +1089,7 @@ boolean fromspell;
                 d((int) mtmp->m_lev, 10) + 30 + rnd(30);
             update_mon_maxhp(mtmp);
             mtmp->mhp = mtmp->mhpmax;
-            if ((otmp = select_hwep(mtmp, TRUE)) == 0) {
+            if ((otmp = select_hwep(mtmp, TRUE, 0, 0)) == 0) {
                 otmp = mksobj(SILVER_SABER, FALSE, FALSE, FALSE);
                 if (mpickobj(mtmp, otmp))
                 {

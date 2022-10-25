@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    global.h    $NHDT-Date: 1557254325 2019/05/07 18:38:45 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.71 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -356,7 +356,7 @@ struct savefile_info {
 #define DOORMAX 120     /* max number of doors per level */
 
 #define BUFSZ 256  /* for getlin buffers */
-#define QBUFSZ 128 /* for building question text */
+#define QBUFSZ 256 /* for building question text */
 #define TBUFSZ 300 /* toplines[] buffer max msg: 3 81char names */
 /* plus longest prefix plus a few extra words */
 

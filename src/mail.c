@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    mail.c    $NHDT-Date: 1545597424 2018/12/23 20:37:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.39 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -63,9 +63,9 @@ extern struct passwd *FDECL(getpwuid, (int));
 #endif
 #endif
 #endif
-static struct stat omstat, nmstat;
-static char *mailbox = (char *) 0;
-static long laststattime;
+STATIC_VAR struct stat omstat, nmstat;
+STATIC_VAR char *mailbox = (char *) 0;
+STATIC_VAR long laststattime;
 
 #if !defined(MAILPATH) && defined(AMS) /* Just a placeholder for AMS */
 #define MAILPATH "/dev/null"
@@ -273,7 +273,7 @@ coord *startp; /* starting position (read only) */
 }
 
 /* Let the mail daemon have a larger vocabulary. */
-static NEARDATA const char *mail_text[] = { "Gangway!", "Look out!",
+STATIC_VAR NEARDATA const char *mail_text[] = { "Gangway!", "Look out!",
                                             "Pardon me!" };
 #define md_exclamations() (mail_text[rn2(3)])
 

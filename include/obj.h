@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    obj.h    $NHDT-Date: 1508827590 2017/10/24 06:46:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.60 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -309,6 +309,7 @@ struct obj {
 #define bimanual(otmp)                                            \
     (((otmp)->oclass == WEAPON_CLASS || (otmp)->oclass == TOOL_CLASS) \
      && objects[(otmp)->otyp].oc_bimanual)
+#define two_handed_bonus_applies(o) ((o) && bimanual(o) && is_weapon(o) && !is_launcher(o))
 #define is_multigen(otmp)                           \
     (objects[(otmp)->otyp].oc_multigen_type > MULTIGEN_SINGLE)
 
@@ -339,15 +340,22 @@ struct obj {
 
 #define is_death_enchantable(o)  (is_elemental_enchantable(o) && is_otyp_material_death_enchantable((o)->otyp))
 
-#define can_otyp_have_exceptionality(otyp)     \
-    (objects[(otyp)].oc_flags4 & O4_CAN_HAVE_EXCEPTIONALITY)
+#define is_otyp_specially_exceptional(otyp)     \
+    ((objects[(otyp)].oc_flags4 & O4_CAN_HAVE_EXCEPTIONALITY))
+
+#define is_otyp_non_exceptional(otyp)     \
+    ((objects[(otyp)].oc_flags4 & O4_NON_EXCEPTIONAL))
 
 /* Unusual definition to account for weapons appropriately */
-#define can_have_exceptionality(o)     (is_weapon(o) || can_otyp_have_exceptionality((o)->otyp))
+#define can_have_exceptionality(o)     ((is_weapon(o) || is_otyp_specially_exceptional((o)->otyp)) && !is_otyp_non_exceptional((o)->otyp))
+#define nonexceptionality_armor(o)     (is_armor(o) && !can_have_exceptionality(o))
 
 #define otyp_allows_specially_dipping_into(otyp) (objects[(otyp)].oc_flags4 & O4_ALLOWS_DIPPING_INTO)
 #define otyp_allows_object_to_be_dipped_into_it(otyp) (objects[(otyp)].oc_class == POTION_CLASS || otyp_allows_specially_dipping_into(otyp))
 #define obj_allows_object_to_be_dipped_into_it(o) otyp_allows_object_to_be_dipped_into_it((o)->otyp)
+#define otyp_expends_charges_when_dipped_into(otyp) (otyp_allows_specially_dipping_into(otyp) && objects[otyp].oc_charged > CHARGED_NOT_CHARGED)
+#define obj_currently_allows_object_to_be_dipped_into_it(o) \
+    (otyp_allows_object_to_be_dipped_into_it((o)->otyp) && (!otyp_expends_charges_when_dipped_into((o)->otyp) || (o)->charges > 0))
 
 #define is_cursed_magic_item(otmp)                                            \
     (objects[(otmp)->otyp].oc_flags2 & O2_CURSED_MAGIC_ITEM)
@@ -498,6 +506,8 @@ struct obj {
 /* Angel gear */
 #define is_angel_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_ANGEL_ITEM) != 0 || (otmp)->exceptionality == EXCEPTIONALITY_CELESTIAL)
 
+/* Demon gear */
+#define is_undead_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_UNDEAD_ITEM) != 0)
 
 /* Light sources */
 #define is_otyp_candle(otyp) \
@@ -653,7 +663,7 @@ struct obj {
 #define does_obj_drain_instead_of_explode(obj) \
     (does_otyp_drain_instead_of_explode((obj)->otyp))
 
-#define can_obj_cause_choking(o) (obj_nutrition(o) > 50)
+#define can_obj_cause_choking(o) (obj_nutrition(o, &youmonst) > 50)
 
 #define can_otyp_joust(otyp)                                 \
     ((objects[(otyp)].oc_flags5 & O5_JOUSTING_WEAPON) != 0)
@@ -972,7 +982,7 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
     ((objects[(o)->otyp].oc_flags& O1_NOT_CURSEABLE) || has_obj_mythic_uncurseable(o))
 
 #define is_obj_light_source(o) \
-   ((objects[(o)->otyp].oc_flags5 & O5_LIGHT_SOURCE) != 0 || artifact_light(o) ||obj_shines_magical_light(o) || has_obj_mythic_magical_light(o))
+   ((objects[(o)->otyp].oc_flags5 & O5_LIGHT_SOURCE) != 0 || artifact_light(o) || obj_shines_magical_light(o) || has_obj_mythic_magical_light(o))
 
 #define candle_starting_burn_time(o) (30L * objects[(o)->otyp].oc_cost)
 #define candle_maximum_burn_time(o) candle_starting_burn_time(o)
@@ -1007,7 +1017,7 @@ enum manual_types
     MANUAL_ITEM_IDENTIFICATION_101,
     MANUAL_ITEM_IDENTIFICATION_102,
     MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I,
-    MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II,
+    MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II, /* There must be at most 32 random manuals due to exclusion bit use in mksobj */
     /* Non-randomly generated below */
     MANUAL_GUIDE_TO_DRAGON_SCALE_MAILS, /* Start marker */
     MANUAL_GUIDE_TO_ALTARS_AND_SACRIFICE,

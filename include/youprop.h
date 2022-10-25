@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    youprop.h    $NHDT-Date: 1433291407 2015/06/03 00:30:07 $  $NHDT-Branch: master $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -184,7 +184,7 @@
 
 #define HBlindfolded u.uprops[BLINDFOLDED].intrinsic
 #define EBlindfolded u.uprops[BLINDFOLDED].extrinsic
-#define Blindfolded (HBlindfolded|| EBlindfolded)
+#define Blindfolded (HBlindfolded || EBlindfolded)
 
 /* Certain troubles act as timers only */
 #define Blinded u.uprops[BLINDED].intrinsic

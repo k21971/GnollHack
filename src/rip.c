@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    rip.c    $NHDT-Date: 1488788514 2017/03/06 08:21:54 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,7 +22,7 @@ STATIC_DCL void FDECL(center, (int, char *));
 
 #ifndef NH320_DEDICATION
 /* A normal tombstone for end of game display. */
-static const char *rip_txt[] = {
+STATIC_VAR const char *rip_txt[] = {
     "                       ----------",
     "                      /          \\",
     "                     /    REST    \\",
@@ -42,7 +42,7 @@ static const char *rip_txt[] = {
 #define STONE_LINE_CENT 28 /* char[] element of center of stone face */
 #else                      /* NH320_DEDICATION */
 /* GnollHack 3.2.x displayed a dual tombstone as a tribute to Izchak. */
-static const char *rip_txt[] = {
+STATIC_VAR const char *rip_txt[] = {
     "              ----------                      ----------",
     "             /          \\                    /          \\",
     "            /    REST    \\                  /    This    \\",
@@ -71,7 +71,7 @@ static const char *rip_txt[] = {
 #define DEATH_LINE 8 /* *char[] line # for death description */
 #define YEAR_LINE 12 /* *char[] line # for year */
 
-static char **rip;
+STATIC_VAR char **rip;
 
 STATIC_OVL void
 center(line, text)

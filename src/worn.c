@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    worn.c    $NHDT-Date: 1550524569 2019/02/18 21:16:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -49,6 +49,7 @@ setworn(obj, mask)
 register struct obj* obj;
 long mask;
 {
+    Sprintf(debug_buf_3, "setworn, hasobj=%d", obj != 0);
     setworncore(obj, mask, TRUE);
 }
 
@@ -58,6 +59,7 @@ setwornquietly(obj, mask)
 register struct obj* obj;
 long mask;
 {
+    Sprintf(debug_buf_3, "setwornquietly, hasobj=%d", obj != 0);
     setworncore(obj, mask, FALSE);
 }
 
@@ -103,8 +105,10 @@ boolean verbose_and_update_stats;
             {
                 oobj = *(wp->w_obj);
                 if (oobj && !(oobj->owornmask & wp->w_mask))
-                    impossible("Setworn: mask = %ld.", wp->w_mask);
-
+                {
+                    impossible("Setworn: mask = %ld, oworn = %ld, update = %d, buf3 = %s, buf4 = %s.", wp->w_mask, oobj->owornmask, verbose_and_update_stats, debug_buf_3, debug_buf_4);
+                    *debug_buf_3 = *debug_buf_4 = 0;
+                }
                 /* If old object remove wornmask */
                 if (oobj) 
                 {
@@ -724,6 +728,8 @@ boolean silently;
     default:
         break;
     }
+
+    refresh_m_tile_gui_info(mtmp, !silently);
 
     if (silently)
         return FALSE;

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    invent.c    $NHDT-Date: 1555196229 2019/04/13 22:57:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.253 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -728,6 +728,7 @@ merged(potmp, pobj)
 struct obj **potmp, **pobj;
 {
     register struct obj *otmp = *potmp, *obj = *pobj;
+    Strcpy(debug_buf_4, "merged");
 
     if (mergable(otmp, obj)) {
         /* Approximate age: we do it this way because if we were to
@@ -1989,7 +1990,6 @@ int x, y;
 }
 
 /* destroy object in fobj chain (if unpaid, it remains on the bill) */
-/* destroy object in fobj chain (if unpaid, it remains on the bill) */
 void
 delobj(obj)
 register struct obj* obj;
@@ -2607,7 +2607,7 @@ boolean (*validitemfunc)(struct obj*);
                  && ((otmp == uwep || (otmp == uarms && u.twoweap))
                      && otmp->quan == 1L)) /* ...unless more than one */
              || ((!strcmp(word, "dip") || !strcmp(word, "grease"))
-                 && inaccessible_equipment(otmp, (const char *) 0, FALSE))
+                 && inaccessible_equipment(otmp, (const char *) 0, FALSE, FALSE))
              ) 
             {
                 foo--;
@@ -2690,7 +2690,7 @@ boolean (*validitemfunc)(struct obj*);
             else if (
              /* ugly check for unworn armor that can't be worn */
                 (putting_on(word) && *let == ARMOR_CLASS
-                 && !canwearobj(otmp, &dummymask, FALSE))
+                 && !canwearobj(otmp, &dummymask, FALSE, TRUE))
              /* or armor with 'P' or 'R' or accessory with 'W' or 'T' */
              || ((putting_on(word) || taking_off(word))
                  && ((*let == ARMOR_CLASS) ^ (otmp->oclass == ARMOR_CLASS)))
@@ -2708,7 +2708,7 @@ boolean (*validitemfunc)(struct obj*);
                 or accessory (ring) covered by cursed worn armor (gloves) */
              || (taking_off(word)
                  && inaccessible_equipment(otmp, (const char *) 0,
-                                      (boolean) (otmp->oclass == RING_CLASS)))
+                                      (boolean) (otmp->oclass == RING_CLASS), TRUE))
              || (!strcmp(word, "write on")
                  && (!(otyp == SCR_BLANK_PAPER || otyp == SPE_BLANK_PAPER)
                      || !otmp->dknown || !objects[otyp].oc_name_known))
@@ -3120,7 +3120,7 @@ struct obj* otmp_only;
                     && (((otmp == uwep || (otmp == uarms && u.twoweap)) && otmp->quan == 1L)  /* ...unless more than one */
                         || (uwep && is_launcher(uwep) && objects[uwep->otyp].oc_skill != -objects[otmp->otyp].oc_skill)))
                 || ((!strcmp(word, "dip") || !strcmp(word, "grease"))
-                    && inaccessible_equipment(otmp, (const char*)0, FALSE))
+                    && inaccessible_equipment(otmp, (const char*)0, FALSE, FALSE))
                 )
             {
                 foo--;
@@ -3207,7 +3207,7 @@ struct obj* otmp_only;
             else if (
                 /* ugly check for unworn armor that can't be worn */
                 (putting_on(word) && *let == ARMOR_CLASS
-                    && (!flags.exchange_prompt && !canwearobj(otmp, &dummymask, FALSE)))
+                    && (!flags.exchange_prompt && !canwearobj(otmp, &dummymask, FALSE, TRUE)))
                 /* or armor with 'P' or 'R' or accessory with 'W' or 'T' */
                 || ((putting_on(word) || taking_off(word))
                     && ((*let == ARMOR_CLASS) ^ (otmp->oclass == ARMOR_CLASS)))
@@ -3225,7 +3225,7 @@ struct obj* otmp_only;
                    or accessory (ring) covered by cursed worn armor (gloves) */
                 || (taking_off(word)
                     && inaccessible_equipment(otmp, (const char*)0,
-                        (boolean)(otmp->oclass == RING_CLASS)))
+                        (boolean)(otmp->oclass == RING_CLASS), TRUE))
                 || (!strcmp(word, "write on")
                     && (!(otyp == SCR_BLANK_PAPER || otyp == SPE_BLANK_PAPER)
                         || !otmp->dknown || !objects[otyp].oc_name_known))
@@ -3434,7 +3434,7 @@ struct obj *obj;
                    safeq_xprn_ctx.dot, 0L, 0L);
 }
 
-static NEARDATA const char removeables[] = { ARMOR_CLASS, WEAPON_CLASS,
+STATIC_VAR NEARDATA const char removeables[] = { ARMOR_CLASS, WEAPON_CLASS,
                                              RING_CLASS,  AMULET_CLASS,
                                              TOOL_CLASS,  0 };
 
@@ -5901,7 +5901,7 @@ boolean picked_some, explicit_cmd;
     }
     else
     {
-        if (explicit_cmd) // No here window
+        if (explicit_cmd || flags.pile_limit == 0) // No here window
         {
             char buf[BUFSZ];
             char buf2[BUFSZ];
@@ -6516,7 +6516,7 @@ unsigned long newsym_flags;
  * This must match the object class order.
  */
 STATIC_VAR NEARDATA const char *names[MAX_OBJECT_CLASSES] = {
-    0, "Illegal objects", "Weapons", "Armor", "Rings", "Amulets", "Tools",
+    "Random objects", "Illegal objects", "Weapons", "Armor", "Rings", "Amulets", "Tools",
     "Comestibles", "Potions", "Scrolls", "Books", "Wands", "Coins",
     "Gems/Stones", "Boulders/Statues", "Iron balls", "Chains", "Venoms", "Reagents",  "Miscellaneous"
 };
@@ -6907,12 +6907,9 @@ const char *hdr, *txt;
 
     any = zeroany;
     win = create_nhwindow(NHW_MENU);
-    start_menu_ex(win, GHMENU_STYLE_OTHERS_INVENTORY);
-    add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings, hdr,
-             MENU_UNSELECTED);
-    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, "", MENU_UNSELECTED);
+    start_menu_ex(win, GHMENU_STYLE_PICK_ITEM_LIST);
     add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, txt, MENU_UNSELECTED);
-    end_menu(win, (char *) 0);
+    end_menu(win, hdr);
     if (select_menu(win, PICK_NONE, &selected) > 0)
         free((genericptr_t) selected);
     destroy_nhwindow(win);
@@ -7116,6 +7113,7 @@ reset_inventory(VOID_ARGS)
     lastinvnr = 51;
     this_type = 0;
     sortlootmode = 0;
+    memset((genericptr_t)&safeq_xprn_ctx, 0, sizeof(safeq_xprn_ctx));
 }
 
 /*invent.c*/

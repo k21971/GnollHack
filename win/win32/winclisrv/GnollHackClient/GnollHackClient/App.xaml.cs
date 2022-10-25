@@ -59,6 +59,7 @@ namespace GnollHackClient
             App.LoadBanks = Preferences.Get("LoadSoundBanks", true);
             App.InformAboutGameTermination = Preferences.Get("WentToSleepWithGameOn", false);
             Preferences.Set("WentToSleepWithGameOn", false);
+            App.UsesCarousel = App.IsiOS || Preferences.Get("UsesCarousel", App.IsiOS);
 
             App.BackButtonPressed += App.EmptyBackButtonPressed;
         }
@@ -130,7 +131,7 @@ namespace GnollHackClient
                 PlatformService.OverrideAnimationDuration();
 
             App.CancelSaveGame = true;
-            App.UnmuteSounds();
+            App.SleepMuteMode = false;
             if (App.CurrentClientGame != null && !App.CurrentClientGame.CasualMode)
             {
                 //Detect background app killing OS, check if last exit is through going to sleep, and notify player that the app probably had been terminated by OS but game has been saved
@@ -149,7 +150,7 @@ namespace GnollHackClient
                 PlatformService.RevertAnimationDuration(false);
 
             App.CancelSaveGame = false;
-            App.MuteSounds();
+            App.SleepMuteMode = true;
             if (App.CurrentClientGame != null && !App.CurrentClientGame.CasualMode)
             {
                 //Detect background app killing OS, mark that exit has been through going to sleep, and save the game
@@ -164,7 +165,7 @@ namespace GnollHackClient
                 PlatformService.OverrideAnimationDuration();
 
             App.CancelSaveGame = true;
-            App.UnmuteSounds();
+            App.SleepMuteMode = false;
             if (App.CurrentClientGame != null && !App.CurrentClientGame.CasualMode)
             {
                 //Detect background app killing OS, check if last exit is through going to sleep & game has been saved, and load previously saved game
@@ -174,6 +175,40 @@ namespace GnollHackClient
                 {
                     App.CurrentClientGame.GamePage.StopWaitAndResumeSavedGame();
                 }
+            }
+        }
+
+        public static bool IsMuted { get { return SilentMode || SleepMuteMode || GameMuteMode; } }
+
+        private readonly static object _silentModeLock = new object();
+        private static bool _silentMode = false;
+        public static bool SilentMode { get { lock (_silentModeLock) { return _silentMode; } } set { UpdateSoundMuteness(GameMuteMode, value, SleepMuteMode); lock (_silentModeLock) { _silentMode = value; } } }    /* Manual mute by user  */
+
+        private readonly static object _sleepMuteModeLock = new object();
+        private static bool _sleepMuteMode = false;
+        public static bool SleepMuteMode { get { lock (_sleepMuteModeLock) { return _sleepMuteMode; } } set { UpdateSoundMuteness(GameMuteMode, SilentMode, value); lock (_sleepMuteModeLock) { _sleepMuteMode = value; } } }    /* Muteness because switched apps */
+
+        private readonly static object _gameMuteModeLock = new object();
+        private static bool _gameMuteMode = false;
+        public static bool GameMuteMode { get { lock (_gameMuteModeLock) { return _gameMuteMode; } } set { UpdateSoundMuteness(value, SilentMode, SleepMuteMode); lock (_gameMuteModeLock) { _gameMuteMode = value; } } }    /* Muteness due to game state */
+        /* Game can also have mute mode */
+
+        public static void UpdateSoundMuteness(bool newGameMuted, bool newSilentMode, bool newSleepMuteMode)
+        {
+            UpdateSoundMutenessCore(newGameMuted, newSilentMode, newSleepMuteMode, GameMuteMode, SleepMuteMode, SilentMode);
+        }
+
+        public static void UpdateSoundMutenessCore(bool newGameMuted, bool newSilentMode, bool newSleepMuteMode, bool oldGameMuted, bool oldSilentMode, bool oldSleepMuteMode)
+        {
+            if (newGameMuted || newSilentMode || newSleepMuteMode)
+            {
+                if(!oldGameMuted && !oldSilentMode && !oldSleepMuteMode)
+                    MuteSounds();
+            }
+            else
+            {
+                if (oldGameMuted || oldSilentMode || oldSleepMuteMode)
+                    UnmuteSounds();
             }
         }
 
@@ -194,9 +229,6 @@ namespace GnollHackClient
         {
             if (FmodService != null)
             {
-                if (CurrentClientGame != null && CurrentClientGame.GamePage != null && CurrentClientGame.GamePage.MuteSounds)
-                    return;
-
                 try
                 {
                     float generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
@@ -282,6 +314,8 @@ namespace GnollHackClient
 
         public static string GHVersionId { get; set; }
         public static string GHVersionString { get; set; }
+        public static string SkiaVersionString { get; set; }
+        public static string SkiaSharpVersionString { get; set; }
         public static string FMODVersionString { get; set; }
         public static string GHPath { get; set; }
         //public static readonly string LogFile = "console.log";
@@ -317,6 +351,8 @@ namespace GnollHackClient
         public static readonly float DisplayScale = DeviceDisplay.MainDisplayInfo.Density <= 0 ? 1.0f : (float)DeviceDisplay.MainDisplayInfo.Density;
         public static readonly float DisplayWidth = (float)DeviceDisplay.MainDisplayInfo.Width * DisplayScale;
         public static readonly float DisplayHeight = (float)DeviceDisplay.MainDisplayInfo.Height * DisplayScale;
+
+        public static bool UsesCarousel { get; set; }
 
         public static async Task<bool> OnBackButtonPressed()
         {

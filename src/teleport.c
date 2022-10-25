@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    teleport.c    $NHDT-Date: 1553885439 2019/03/29 18:50:39 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.86 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -976,8 +976,8 @@ boolean break_the_rules; /* True: wizard mode ^T */
         boolean castit = FALSE;
         register int sp_no = 0, energy = 0;
 
-        if (!Teleportation || (u.ulevel < (Role_if(PM_WIZARD) ? 8 : 12)
-                               && !has_innate_teleportation(youmonst.data)))
+        if (!break_the_rules && (!Teleportation || (u.ulevel < (Role_if(PM_WIZARD) ? 8 : 12)
+                               && !has_innate_teleportation(youmonst.data))))
         {
             /* Try to use teleport away spell.
                3.6.2: this used to require that you know the spellbook
@@ -990,7 +990,7 @@ boolean break_the_rules; /* True: wizard mode ^T */
 
             /* casting isn't inhibited by being Stunned (...it ought to be) */
             castit = (sp_no < MAXSPELL && !Confusion);
-            if (!castit && !break_the_rules) 
+            if (!castit) 
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
                 You_ex(ATR_NONE, CLR_MSG_FAIL, "%s.",
@@ -1057,7 +1057,7 @@ boolean break_the_rules; /* True: wizard mode ^T */
         {
             /* energy cost is deducted in spelleffects() */
             exercise(A_WIS, TRUE);
-            if (spelleffects(sp_no, TRUE))
+            if (spelleffects(sp_no, TRUE, &youmonst))
                 return 1;
             else if (!break_the_rules)
                 return 0;
@@ -2186,6 +2186,12 @@ boolean give_feedback;
         special_effect_wait_until_end(1);
         return TRUE;
     }
+}
+
+void
+reset_teleport(VOID_ARGS)
+{
+    telescroll = 0;
 }
 
 /*teleport.c*/

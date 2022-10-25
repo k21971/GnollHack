@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    were.c    $NHDT-Date: 1550524568 2019/02/18 21:16:08 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -40,7 +40,12 @@ register struct monst *mon;
                     break;
                 }
                 if (howler)
-                    You_hear("a %s howling at the moon.", howler);
+                {
+                    context.global_minimum_volume = 0.2f;
+                    play_simple_monster_sound(mon, MONSTER_SOUND_TYPE_HOWL);
+                    context.global_minimum_volume = 0.0f;
+                    You_hear_ex(ATR_NONE, CLR_MSG_WARNING, "a %s howling at the moon.", howler);
+                }
             }
         }
     } else if (!rn2(30) || Protection_from_shape_changers) {

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    polyself.c    $NHDT-Date: 1556497911 2019/04/29 00:31:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.132 $ */
 /*      Copyright (C) 1987, 1988, 1989 by Ken Arromdee */
@@ -1156,6 +1156,7 @@ STATIC_OVL void
 break_armor()
 {
     register struct obj *otmp;
+    Strcpy(debug_buf_4, "break_armor");
 
     //Suit, cloak, robe, shirt
     if (breakarm(youmonst.data)) 
@@ -1584,9 +1585,9 @@ dosteedbreathe()
 
         buzz((int)(-(20 + typ - 1)), (struct obj*)0, u.usteed, (int)mattk->damn, (int)mattk->damd, (int)mattk->damp, u.ux, u.uy, u.dx, u.dy);
 
-        u.usteed->mspec_used = (5 + rn2(10)) / mon_spec_cooldown_divisor(u.usteed);
+        u.usteed->mspec_used = (5 + rn2(10));
         if (typ == AD_SLEE && !Sleep_resistance)
-            u.usteed->mspec_used += rnd(20) / mon_spec_cooldown_divisor(u.usteed);
+            u.usteed->mspec_used += rnd(20);
 
     }
     return 1;
@@ -2609,7 +2610,7 @@ int atyp;
 }
 
 /* some species have awareness of other species */
-static void
+STATIC_OVL void
 polysense()
 {
     short warnidx = NON_PM;
@@ -2659,6 +2660,12 @@ udeadinside()
              : is_undead(youmonst.data)
                  ? "condemned" /* undead plus manes */
                  : "empty";    /* golems plus vortices */
+}
+
+void
+reset_polyself(VOID_ARGS)
+{
+    sex_change_ok = 0;
 }
 
 /*polyself.c*/

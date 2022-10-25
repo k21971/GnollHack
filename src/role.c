@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    role.c    $NHDT-Date: 1547086250 2019/01/10 02:10:50 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
@@ -46,7 +46,7 @@ const struct Role roles[] = {
       "Arc",
       "the College of Archaeology",
       "the Tomb of the Toltec Kings",
-      0,
+      ROLE_ARCHAEOLOGIST,
       { "", "", "", "", ""},
       PM_ARCHAEOLOGIST,
       NON_PM,
@@ -73,7 +73,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -101,11 +100,13 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
@@ -123,7 +124,7 @@ const struct Role roles[] = {
       "Bar",
       "the Camp of the Duali Tribe",
       "the Duali Oasis",
-      1,
+      ROLE_BARBARIAN,
       { "", "", "", "", ""},
       PM_BARBARIAN,
       NON_PM,
@@ -150,7 +151,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -178,12 +178,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Caveman", "Cavewoman" },
@@ -200,7 +202,7 @@ const struct Role roles[] = {
       "Cav",
       "the Caves of the Ancestors",
       "the Dragon's Lair",
-      2,
+      ROLE_CAVEMAN,
       { "Can practice cannibalism", "", "", "", ""},
       PM_CAVEMAN,
       PM_LITTLE_DOG,
@@ -227,7 +229,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -255,12 +256,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Healer", 0 },
@@ -277,7 +280,7 @@ const struct Role roles[] = {
       "Hea",
       "the Temple of Epidaurus",
       "the Temple of Coeus",
-      3,
+      ROLE_HEALER,
       { "", "", "", "", ""},
       PM_HEALER,
       NON_PM,
@@ -303,7 +306,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -331,12 +333,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */       
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Knight", 0 },
@@ -353,7 +357,7 @@ const struct Role roles[] = {
       "Kni",
       "Camelot Castle",
       "the Isle of Glass",
-      4,
+      ROLE_KNIGHT,
       { "Alignment penalty if attacks disadvantaged monsters", "", "", "", ""},
       PM_KNIGHT,
       PM_PONY,
@@ -379,7 +383,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -407,12 +410,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_BASIC, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Monk", 0 },
@@ -429,7 +434,7 @@ const struct Role roles[] = {
       "Mon",
       "the Monastery of Chan-Sune",
       "the Monastery of the Earth-Lord",
-      5,
+      ROLE_MONK,
       { 
           "Vegetarianism", 
           "AC and MC bonus if without weapon, shield, and suit",
@@ -462,7 +467,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -490,12 +494,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_BASIC, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Priest", "Priestess" },
@@ -512,7 +518,7 @@ const struct Role roles[] = {
       "Pri",
       "the Great Temple",
       "the Temple of Nalzok",
-      6,
+      ROLE_PRIEST,
       { "Sees the beatitude of all objects", "Can pray twice as often as normal", "", "", ""},
       PM_PRIEST,
       NON_PM,
@@ -539,7 +545,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -567,12 +572,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     /* Note:  Rogue precedes Ranger so that use of `-R' on the command line
@@ -591,7 +598,7 @@ const struct Role roles[] = {
       "Rog",
       "the Thieves' Guild Hall",
       "the Assassins' Guild Hall",
-      7,
+      ROLE_ROGUE,
       { "Can backstab fleeing monsters", "", "", "", ""},
       PM_ROGUE,
       NON_PM,
@@ -617,7 +624,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -645,12 +651,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_BASIC, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Ranger", 0 },
@@ -681,7 +689,7 @@ const struct Role roles[] = {
       "Ran",
       "Orion's camp",
       "the cave of the wumpus",
-      8,
+      ROLE_RANGER,
       { "", "", "", "", ""},
       PM_RANGER,
       PM_LITTLE_DOG /* Orion & canis major */,
@@ -708,7 +716,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -736,12 +743,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Samurai", 0 },
@@ -758,7 +767,7 @@ const struct Role roles[] = {
       "Sam",
       "the Castle of the Taro Clan",
       "the Shogun's Castle",
-      9,
+      ROLE_SAMURAI,
       { "Starts with a faithful dog", "", "", "", ""},
       PM_SAMURAI,
       PM_LITTLE_DOG,
@@ -784,7 +793,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -812,12 +820,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Tourist", 0 },
@@ -834,7 +844,7 @@ const struct Role roles[] = {
       "Tou",
       "Ankh-Morpork",
       "the Thieves' Guild Hall",
-      10,
+      ROLE_TOURIST,
       { "Worse prices in shops below level 15", "", "", "", ""},
       PM_TOURIST,
       PM_SMALL_LUGGAGE,
@@ -860,7 +870,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -888,12 +897,14 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
-            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */        
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
+            SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
     { { "Valkyrie", 0 },
@@ -910,7 +921,7 @@ const struct Role roles[] = {
       "Val",
       "the Shrine of Destiny",
       "the cave of Surtur",
-      11,
+      ROLE_VALKYRIE,
       { "", "", "", "", ""},
       PM_VALKYRIE,
       PM_DIREWOLF_CUB,
@@ -936,7 +947,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -964,11 +974,13 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_BASIC, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
@@ -979,14 +991,14 @@ const struct Role roles[] = {
         { "Magician", 0 },
         { "Enchanter", "Enchantress" },
         { "Sorcerer", "Sorceress" },
-        { "Necromancer", 0 },
         { "Wizard", 0 },
-        { "Mage", 0 } },
+        { "Mage", 0 },
+        { "Arch-mage", 0 } },
       "Ptah", "Thoth", "Anhur", /* Egyptian */
       "Wiz",
       "the Lonely Tower",
       "the Tower of Darkness",
-      NUM_ROLES - 1,
+      ROLE_WIZARD,
       { "", "", "", "", ""},
       PM_WIZARD,
       PM_KITTEN,
@@ -1013,7 +1025,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_NONE */
             SKILL_PROGRESS_NONE, /* P_DAGGER */
             SKILL_PROGRESS_NONE, /* P_AXE */
-            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE, /* P_SWORD */
             SKILL_PROGRESS_NONE, /* P_BLUDGEONING_WEAPON */
             SKILL_PROGRESS_NONE, /* P_FLAIL */
@@ -1041,11 +1052,13 @@ const struct Role roles[] = {
 
             SKILL_PROGRESS_NONE, /* P_BARE_HANDED_COMBAT */
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
-            SKILL_PROGRESS_NONE, /* P_TWO_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
+            SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
             SKILL_PROGRESS_NONE, /* P_RIDING */
+            SKILL_PROGRESS_NONE, /* P_DIGGING */
             SKILL_PROGRESS_NONE  /* P_DISARM_TRAP */
         }
     },
@@ -1273,7 +1286,7 @@ const struct Align aligns[] = {
 };
 
 /* Filters */
-static struct {
+STATIC_VAR struct {
     boolean roles[SIZE(roles)];
     unsigned long mask;
 } rfilter;
@@ -1284,7 +1297,7 @@ STATIC_DCL int FDECL(role_gendercount, (int));
 STATIC_DCL int FDECL(race_alignmentcount, (int));
 
 /* used by str2XXX() */
-static char NEARDATA randomstr[] = "random";
+STATIC_VAR const char NEARDATA randomstr[] = "random";
 
 boolean
 validrole(rolenum)
@@ -1930,7 +1943,8 @@ clearrolefilter()
 #define BP_ROLE 3
 #define NUM_BP 4
 
-STATIC_VAR char pa[NUM_BP], post_attribs;
+STATIC_VAR char pa[NUM_BP];
+STATIC_VAR char post_attribs;
 
 STATIC_OVL char *
 promptsep(buf, num_post_attribs)
@@ -3121,7 +3135,7 @@ special_attack2_glyph_to_player_mon(int glyph)
 
 NEARDATA struct Role saved_urole;
 NEARDATA struct Race saved_urace;
-static boolean urolerace_values_saved = FALSE;
+STATIC_VAR boolean urolerace_values_saved = FALSE;
 
 void
 save_initial_urolerace_values(VOID_ARGS)
@@ -3144,6 +3158,8 @@ reset_urolerace(VOID_ARGS)
         sizeof(struct Role));
     memcpy((genericptr_t)&urace, (genericptr_t)&saved_urace,
         sizeof(struct Race));
+    memset((genericptr_t)&pa, 0, sizeof(pa));
+    post_attribs = 0;
 }
 
 

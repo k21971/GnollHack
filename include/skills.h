@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    skills.h    $NHDT-Date: 1547255911 2019/01/12 01:18:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.15 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
@@ -55,7 +55,8 @@ enum p_skills {
     /* Other types of combat */
     P_BARE_HANDED_COMBAT,      /* actually weaponless; gloves are ok */
     P_MARTIAL_ARTS,            /* actually weaponless; gloves are ok */
-    P_TWO_WEAPON_COMBAT,       /* pair of weapons, one in each hand */
+    P_DUAL_WEAPON_COMBAT,      /* pair of weapons, one in each hand */
+    P_TWO_HANDED_WEAPON,       /* two-handed weapons */
     P_DODGE,                   /* increases AC */
     P_SHIELD,                  /* increases AC and MC, and for figthing with weapon shields */
     P_WAND,                    /* shooting rays with wands */

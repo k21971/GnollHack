@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    end.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.170 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -28,12 +28,12 @@ struct valuable_data {
     int typ;
 };
 
-static struct valuable_data
+STATIC_VAR struct valuable_data
     gems[LAST_GEM + 1 - FIRST_GEM + 1], /* 1 extra for glass */
     amulets[LAST_AMULET + 1 - FIRST_AMULET],
     miscellaneousitems[LAST_MISCITEM + 1 - FIRST_MISCITEM];
 
-static struct val_list {
+STATIC_VAR struct val_list {
     struct valuable_data *list;
     int size;
 } valuables[] = { { gems, sizeof gems / sizeof *gems },
@@ -45,7 +45,7 @@ static struct val_list {
 #ifndef NO_SIGNAL
 STATIC_PTR void FDECL(done_intr, (int));
 #if defined(UNIX) || defined(VMS) || defined(__EMX__)
-static void FDECL(done_hangup, (int));
+STATIC_DCL void FDECL(done_hangup, (int));
 #endif
 #endif
 STATIC_DCL void FDECL(disclose, (int, BOOLEAN_P));
@@ -128,12 +128,12 @@ STATIC_OVL void NDECL(reset_remaining_static_variables);
 #endif
 #endif
 
-static void NDECL(NH_abort);
+STATIC_DCL void NDECL(NH_abort);
 #ifndef NO_SIGNAL
-static void FDECL(panictrace_handler, (int));
+STATIC_DCL void FDECL(panictrace_handler, (int));
 #endif
-static boolean NDECL(NH_panictrace_libc);
-static boolean NDECL(NH_panictrace_gdb);
+STATIC_DCL boolean NDECL(NH_panictrace_libc);
+STATIC_DCL boolean NDECL(NH_panictrace_gdb);
 
 #ifndef NO_SIGNAL
 /* called as signal() handler, so sent at least one arg */
@@ -187,12 +187,12 @@ boolean set;
 }
 #endif /* NO_SIGNAL */
 
-static void
+STATIC_VAR boolean aborting = FALSE;
+STATIC_OVL void
 NH_abort()
 {
     int gdb_prio = SYSOPT_PANICTRACE_GDB;
     int libc_prio = SYSOPT_PANICTRACE_LIBC;
-    static boolean aborting = FALSE;
 
     if (aborting)
         return;
@@ -223,7 +223,7 @@ NH_abort()
     NH_abort_();
 }
 
-static boolean
+STATIC_OVL boolean
 NH_panictrace_libc()
 {
 #ifdef PANICTRACE_LIBC
@@ -258,7 +258,7 @@ NH_panictrace_libc()
 #endif /* SYSCF */
 #endif /* PANICTRACE_GDB */
 
-static boolean
+STATIC_OVL boolean
 NH_panictrace_gdb()
 {
 #ifdef PANICTRACE_GDB
@@ -296,7 +296,7 @@ NH_panictrace_gdb()
 /*
  * The order of these needs to match the macros in hack.h.
  */
-static NEARDATA const char *deaths[NUM_GAME_END_TYPES] = {
+STATIC_VAR NEARDATA const char *deaths[NUM_GAME_END_TYPES] = {
     /* the array of death */
     "died", "choked", "poisoned", "starvation", "drowning", "drowned", "burning",
     "dissolving under the heat and pressure", "crushed", "strangled", "suffocated", "turned to stone", "disintegrated",
@@ -304,7 +304,7 @@ static NEARDATA const char *deaths[NUM_GAME_END_TYPES] = {
     "escaped", "ascended"
 };
 
-static NEARDATA const char *ends[NUM_GAME_END_TYPES] = {
+STATIC_VAR NEARDATA const char *ends[NUM_GAME_END_TYPES] = {
     /* "when you %s" */
     "died", "choked", "were poisoned",
     "starved", "drowned", "were drowned", "burned",
@@ -315,7 +315,7 @@ static NEARDATA const char *ends[NUM_GAME_END_TYPES] = {
     "escaped", "ascended"
 };
 
-static boolean Schroedingers_cat = FALSE;
+STATIC_VAR boolean Schroedingers_cat = FALSE;
 
 /*ARGSUSED*/
 void
@@ -413,7 +413,7 @@ int sig_unused UNUSED;
 
 #if (defined(UNIX) || defined(VMS) || defined(__EMX__))  && !defined(GNH_MOBILE)
 /* signal() handler */
-static void
+STATIC_OVL void
 done_hangup(sig)
 int sig;
 {
@@ -564,7 +564,7 @@ int how;
 }
 
 /* some special cases for overriding while-helpless reason */
-static const struct {
+STATIC_VAR const struct {
     int why, unmulti;
     const char *exclude, *include;
 } death_fixups[] = {
@@ -793,6 +793,8 @@ time_t when; /* date+time at end of game */
     Sprintf(eos(pbuf), ", ended %4.4s-%2.2s-%2.2s %2.2s:%2.2s:%2.2s",
             &datetimebuf[0], &datetimebuf[4], &datetimebuf[6],
             &datetimebuf[8], &datetimebuf[10], &datetimebuf[12]);
+    putstr(0, 0, pbuf);
+    putstr(0, 0, "");
 
     /* character name and basic role info */
     Sprintf(pbuf, "%s, %s %s %s %s", plname,
@@ -1958,6 +1960,7 @@ int how;
     if (have_windows && !iflags.toptenwin)
         exit_nhwindows((char*)0), have_windows = FALSE;
 
+    //Should exclude games from imported files?
     if(((!discover && !CasualMode) || (CasualMode && how == ASCENDED)) && (!wizard || yn_query("Write a top score entry?") == 'y'))
         topten(how, endtime);
 
@@ -2160,7 +2163,7 @@ enum vanq_order_modes {
 };
 
 
-static const char *vanqorders[NUM_VANQ_ORDER_MODES] = {
+STATIC_VAR const char *vanqorders[NUM_VANQ_ORDER_MODES] = {
     "traditional: by monster level, by internal monster index",
     "by monster toughness, by internal monster index",
     "alphabetically, first unique monsters, then others",
@@ -2170,7 +2173,7 @@ static const char *vanqorders[NUM_VANQ_ORDER_MODES] = {
     "by count, high to low, by internal index within tied count",
     "by count, low to high, by internal index within tied count",
 };
-static int vanq_sortmode = VANQ_MLVL_MNDX;
+STATIC_VAR int vanq_sortmode = VANQ_MLVL_MNDX;
 
 STATIC_PTR int CFDECLSPEC
 vanqsort_cmp(vptr1, vptr2)
@@ -2764,7 +2767,7 @@ int fd;
     }
 }
 
-static int
+STATIC_OVL int
 wordcount(p)
 char *p;
 {
@@ -2781,7 +2784,7 @@ char *p;
     return words;
 }
 
-static void
+STATIC_OVL void
 bel_copy1(inp, out)
 char **inp, *out;
 {
@@ -2854,7 +2857,7 @@ get_current_game_score()
         utotal = LONG_MAX; /* wrap around */
     return utotal;
 #endif
-    if (discover || CasualMode)
+    if (discover || CasualMode || flags.non_scoring)
         return 0L;
 
     long utotal = 0;
@@ -3140,15 +3143,38 @@ reset_gamestate(VOID_ARGS)
 STATIC_DCL void
 reset_remaining_static_variables()
 {
+#ifdef PANICTRACE
+    aborting = FALSE;
+#endif
     reset_hunger_status();
+    reset_drawbridge();
+    reset_dig();
     reset_display();
     reset_dogs();
+    reset_dogmove();
+    reset_doname();
+    reset_dowear();
     reset_hack();
     reset_inventory();
+    reset_kick();
+    reset_mhitm();
+    reset_mhitu();
+    reset_mon();
+    reset_mthrowu();
+    reset_pickup();
+    reset_polyself();
+    reset_potion();
+    reset_read();
+    reset_throw();
     reset_traps();
+    reset_shk();
     reset_spells();
+    reset_splev();
+    reset_teleport();
+    reest_track();
     reset_vision();
     reset_urolerace();
+    reset_zap();
 }
 
 STATIC_DCL void
@@ -3165,15 +3191,25 @@ reset_game(VOID_ARGS)
     dmonsfree();
     *plname = 0;
     *recovery_plname = 0;
-    reset_lev();
-    reset_rooms(); /* no dynamic memory to reclaim */
-    reset_gamestate();
+    plname_from_error_savefile = FALSE;
+    plname_from_imported_savefile = FALSE;
+    reset_gamestate_ex();
     n_game_recoveries = 0;
     reset_blstats();
     reset_occupations();
+    reset_pick();
     reset_remaining_static_variables();
     reset_remaining_dynamic_data();
     dlb_cleanup();
+}
+
+void
+reset_gamestate_ex(VOID_ARGS)
+{
+    reset_lev();
+    reset_rooms(); /* no dynamic memory to reclaim */
+    reset_gamestate();
+    reset_makemon();
 }
 
 void

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    shk.c    $NHDT-Date: 1555201699 2019/04/14 00:28:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.159 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -71,7 +71,7 @@ STATIC_DCL const char *FDECL(cad, (BOOLEAN_P));
                     obj->quan <= bp->bquan
  */
 
-static const char *angrytexts[] = { "quite upset", "ticked off", "furious" };
+STATIC_VAR const char *angrytexts[] = { "quite upset", "ticked off", "furious" };
 
 /*
  *  Transfer money from inventory to monster when paying
@@ -747,6 +747,8 @@ char *enterstring;
 }
 
 /* called when removing a pick-axe or mattock from a container */
+STATIC_VAR NEARDATA long pickmovetime = 0L;
+
 void
 pick_pick(obj)
 struct obj *obj;
@@ -757,7 +759,6 @@ struct obj *obj;
         return;
     shkp = shop_keeper(*u.ushops);
     if (shkp && inhishop(shkp)) {
-        static NEARDATA long pickmovetime = 0L;
 
         /* if you bring a sack of N picks into a shop to sell,
            don't repeat this N times when they're taken out */
@@ -1822,7 +1823,7 @@ boolean itemize;
     return buy;
 }
 
-static struct repo { /* repossession context */
+STATIC_VAR struct repo { /* repossession context */
     struct monst *shopkeeper;
     coord location;
 } repo;
@@ -3257,11 +3258,11 @@ boolean peaceful, silent;
 }
 
 /* auto-response flag for/from "sell foo?" 'a' => 'y', 'q' => 'n' */
-static char sell_response = 'a';
-static int sell_how = SELL_NORMAL;
+STATIC_VAR char sell_response = 'a';
+STATIC_VAR int sell_how = SELL_NORMAL;
 /* can't just use sell_response='y' for auto_credit because the 'a' response
    shouldn't carry over from ordinary selling to credit selling */
-static boolean auto_credit = FALSE;
+STATIC_VAR boolean auto_credit = FALSE;
 
 void
 sellobj_state(deliberate)
@@ -5526,6 +5527,13 @@ struct obj* obj;
 struct monst* shkp;
 {
     return !!onbill(obj, shkp, FALSE);
+}
+
+void
+reset_shk()
+{
+    pickmovetime = 0L;
+    followmsg = 0;
 }
 
 #ifdef __SASC

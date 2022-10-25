@@ -27,6 +27,8 @@ namespace GnollHackClient
         private bool _guiTipsFinished = false;
         private bool _panicFinished = false;
         private bool _messageFinished = false;
+        private bool _ynConfirmationFinished = false;
+        private bool _ynConfirmationResult = false;
         private bool _characternameSet = false;
         private string _characterName = "";
         private object _characterNameLock = new object();
@@ -127,6 +129,8 @@ namespace GnollHackClient
                                     response.RequestingGHWindow.SelectedMenuItems = response.SelectedMenuItems;
                                 else
                                     response.RequestingGHWindow.SelectedMenuItems = new List<GHMenuItem>(); /* Empty selection */
+
+                                response.RequestingGHWindow.WasCancelled = response.ResponseBoolValue;
                             }
                             else
                             {
@@ -151,6 +155,10 @@ namespace GnollHackClient
                             break;
                         case GHRequestType.Message:
                             _messageFinished = true;
+                            break;
+                        case GHRequestType.YnConfirmation:
+                            _ynConfirmationResult = response.ResponseBoolValue;
+                            _ynConfirmationFinished = true;
                             break;
                         case GHRequestType.SaveGameAndWaitForResume:
                             RequestSaveGame();
@@ -965,7 +973,10 @@ namespace GnollHackClient
                     SelectionMode smode = (SelectionMode)how;
                     _ghWindows[winid].MenuInfo.SelectionHow = smode;
 
-                    _ghWindows[winid].SelectedMenuItems = null; /* Clear menu response */
+                    /* Clear menu response */
+                    _ghWindows[winid].SelectedMenuItems = null;
+                    _ghWindows[winid].WasCancelled = false;
+
                     if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
                     {
                         queue.Enqueue(new GHRequest(this, GHRequestType.ShowMenuPage, _ghWindows[winid], _ghWindows[winid].MenuInfo));
@@ -1012,7 +1023,7 @@ namespace GnollHackClient
 
             lock (_ghWindowsLock)
             {
-                if (_ghWindows[winid] == null || _ghWindows[winid].SelectedMenuItems == null)
+                if (_ghWindows[winid] == null || _ghWindows[winid].SelectedMenuItems == null || _ghWindows[winid].WasCancelled)
                     cnt = -1;
                 else if (_ghWindows[winid].SelectedMenuItems.Count <= 0)
                     cnt = 0;
@@ -1333,7 +1344,7 @@ namespace GnollHackClient
 
         public int ClientCallback_PlayImmediateSound(int ghsound, string eventPath, int bankid, double eventVolume, double soundVolume, string[] parameterNames, float[] parameterValues, int arraysize, int sound_type, int play_group, uint dialogue_mid, ulong play_flags)
         {
-            if(App.FmodService != null && !_gamePage.MuteSounds)
+            if(App.FmodService != null && !App.IsMuted)
             {
                 return App.FmodService.PlayImmediateSound(ghsound, eventPath, bankid, (float)eventVolume, (float)soundVolume, parameterNames, parameterValues, arraysize, sound_type, play_group, dialogue_mid, play_flags);
             }
@@ -1492,12 +1503,10 @@ namespace GnollHackClient
                     _gamePage.ForceAscii = false;
                     break;
                 case (int)gui_command_types.GUI_CMD_MUTE_SOUNDS:
-                    _gamePage.MuteSounds = true;
-                    App.MuteSounds();
+                    App.GameMuteMode = true;
                     break;
                 case (int)gui_command_types.GUI_CMD_UNMUTE_SOUNDS:
-                    _gamePage.MuteSounds = false;
-                    App.UnmuteSounds();
+                    App.GameMuteMode = false;
                     break;
                 case (int)gui_command_types.GUI_CMD_ACTIVATE_QUIETER_MODE:
                     App.FmodService.SetQuieterMode(true);
@@ -1511,9 +1520,23 @@ namespace GnollHackClient
                     _gamePage.EnableWizardMode = true;
                     _gamePage.ExtendedCommands = _gamePage.GnollHackService.GetExtendedCommands();
                     break;
+                case (int)gui_command_types.GUI_CMD_DISABLE_WIZARD_MODE:
+                    if(_gamePage.EnableWizardMode)
+                    {
+                        _gamePage.EnableWizardMode = false;
+                        _gamePage.ExtendedCommands = _gamePage.GnollHackService.GetExtendedCommands();
+                    }
+                    break;
                 case (int)gui_command_types.GUI_CMD_ENABLE_CASUAL_MODE:
                     _gamePage.EnableCasualMode = true;
                     _gamePage.ExtendedCommands = _gamePage.GnollHackService.GetExtendedCommands();
+                    break;
+                case (int)gui_command_types.GUI_CMD_DISABLE_CASUAL_MODE:
+                    if (_gamePage.EnableCasualMode)
+                    {
+                        _gamePage.EnableCasualMode = false;
+                        _gamePage.ExtendedCommands = _gamePage.GnollHackService.GetExtendedCommands();
+                    }
                     break;
                 case (int)gui_command_types.GUI_CMD_CLEAR_PET_DATA:
                     _gamePage.ClearPetData();
@@ -1698,6 +1721,22 @@ namespace GnollHackClient
                     }
                 case (int)special_view_types.SPECIAL_VIEW_HELP_DIR:
                     break;
+                case (int)special_view_types.SPECIAL_VIEW_GUI_YN_CONFIRMATION:
+                    {
+                        ConcurrentQueue<GHRequest> queue;
+                        if (ClientGame.RequestDictionary.TryGetValue(this, out queue))
+                        {
+                            _ynConfirmationFinished = false;
+                            queue.Enqueue(new GHRequest(this, GHRequestType.YnConfirmation, title, text, "Yes", "No"));
+                            while (!_ynConfirmationFinished)
+                            {
+                                Thread.Sleep(GHConstants.PollingInterval);
+                                pollResponseQueue();
+                            }
+                            return _ynConfirmationResult ? 1 : 0;
+                        }
+                        break;
+                    }
                 default:
                     break;
             }

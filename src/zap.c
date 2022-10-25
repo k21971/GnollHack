@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    zap.c    $NHDT-Date: 1551395521 2019/02/28 23:12:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.307 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -15,8 +15,8 @@
  */
 #define DISINTEGRATION_DUMMY_DAMAGE 5000
 
-static NEARDATA boolean obj_zapped;
-static NEARDATA int poly_zapped;
+STATIC_VAR NEARDATA boolean obj_zapped;
+STATIC_VAR NEARDATA int poly_zapped;
 
 extern boolean notonhead; /* for long worms */
 
@@ -362,7 +362,7 @@ struct monst* origmonst;
     int res = 0;
     boolean wake = TRUE; /* Most 'zaps' should wake monster */
     boolean reveal_invis = FALSE, learn_it = FALSE;
-    boolean skilled_spell, helpful_gesture = FALSE;
+    boolean helpful_gesture = FALSE;
     int otyp = otmp->otyp;
     const char *zap_type_text = otmp && OBJ_CONTENT_NAME(otmp->otyp) ? OBJ_CONTENT_NAME(otmp->otyp) : otmp && otmp->oclass == SPBOOK_CLASS ? OBJ_NAME(objects[otmp->otyp]) : "spell";
     struct obj *obj;
@@ -378,7 +378,6 @@ struct monst* origmonst;
         reveal_invis = FALSE;
 
     notonhead = (mtmp->mx != bhitpos.x || mtmp->my != bhitpos.y);
-    skilled_spell = (otmp && otmp->oclass == SPBOOK_CLASS && otmp->blessed);
 
     switch (otyp) {
     case WAN_STRIKING:
@@ -1305,25 +1304,10 @@ cure_petrification_here:
         {
             play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
             wake = FALSE; /* wakeup() makes the target angry */
-            if (otyp == SPE_FULL_HEALING)
-            {
-                play_sfx_sound_at_location(SFX_FULL_HEALING, mtmp->mx, mtmp->my);
-                special_effect_wait_until_action(0);
-                deduct_monster_hp(mtmp, -1000);  //mtmp->mhp = mtmp->mhpmax;
-            }
-            else
-            {
-                play_sfx_sound_at_location(SFX_HEALING, mtmp->mx, mtmp->my);
-                special_effect_wait_until_action(0);
-                deduct_monster_hp(mtmp, -(d(objects[otyp].oc_wsdice, objects[otyp].oc_wsdam) + objects[otyp].oc_wsdmgplus));
-            }
 
-            /* plain healing must be blessed to cure blindness; extra
-               healing only needs to not be cursed, so spell always cures
-               [potions quaffed by monsters behave slightly differently;
-               we use the rules for the hero here...] */
-            if (skilled_spell || (otyp != SPE_MINOR_HEALING && otyp != SPE_HEALING))
-                mcureblindness(mtmp, canseemon(mtmp));
+            play_sfx_sound_at_location(SFX_HEALING, mtmp->mx, mtmp->my);
+            special_effect_wait_until_action(0);
+            deduct_monster_hp(mtmp, -(d(objects[otyp].oc_wsdice, objects[otyp].oc_wsdam) + objects[otyp].oc_wsdmgplus));
 
             if (canseemon(mtmp)) {
                 if (disguised_mimic) {
@@ -1400,8 +1384,7 @@ cure_petrification_here:
 
             if (mtmp->mhp > mtmp->mhpmax)
                 mtmp->mhp = mtmp->mhpmax;
-            if (skilled_spell || otyp == SPE_GREATER_UNDEATH_REPLENISHMENT)
-                mcureblindness(mtmp, canseemon(mtmp));
+
             if (canseemon(mtmp))
             {
                 if (disguised_mimic) 
@@ -1690,7 +1673,7 @@ struct monst* mtmp;
 
                 Strcat(endbuf, "extrinsic");
             }
-#if 0
+
             if (has_instrinsic_acquired)
             {
                 if (strcmp(endbuf, ""))
@@ -1698,7 +1681,7 @@ struct monst* mtmp;
 
                 Strcat(endbuf, "acquired");
             }
-#endif
+
             if (has_temporary)
             {
                 if (strcmp(endbuf, ""))
@@ -1709,6 +1692,7 @@ struct monst* mtmp;
 
             if (strcmp(endbuf, ""))
             {
+                *endbuf = highc(*endbuf);
                 Sprintf(endbuf2, " (%s)", endbuf);
             }
 
@@ -1938,7 +1922,8 @@ struct monst* mtmp;
     for (int statusorder_idx = 0; statusorder_idx < SIZE(statusmarkorder); statusorder_idx++)
     {
         int status_mark = (int)statusmarkorder[statusorder_idx];
-        if (status_mark < MAX_STATUS_MARKS && status_names[status_mark])
+        const char* statusname = 0;
+        if (status_mark < MAX_STATUS_MARKS && (statusname = get_status_name(mtmp, status_mark)) != 0)
         {
             unsigned long status_bit = 1UL << status_mark;
             if(m_status_bits & status_bit)
@@ -1949,7 +1934,7 @@ struct monst* mtmp;
                 else
                     *sbuf = 0;
 
-                Sprintf(buf, " %2d - %s%s", condition_count, status_names[status_mark], sbuf);
+                Sprintf(buf, " %2d - %s%s", condition_count, statusname, sbuf);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
         }
@@ -3261,6 +3246,7 @@ int okind;
         pm_index = PM_ROPE_GOLEM;
         material = "cloth ";
         break;
+    case MAT_IVORY:
     case MAT_CHITIN:
     case MAT_BONE:
         pm_index = PM_BONE_GOLEM;
@@ -3379,6 +3365,7 @@ int id;
     long old_wornmask, new_wornmask = 0L;
     boolean can_merge = (id == STRANGE_OBJECT);
     int obj_location = obj->where;
+    Strcpy(debug_buf_4, "poly_obj");
 
     if (obj->otyp == BOULDER)
         sokoban_guilt();
@@ -3397,6 +3384,7 @@ int id;
         {
             if (otmp)
                 delobj(otmp);
+            Strcpy(debug_buf_2, "polyobj");
             otmp = mkobj(obj->oclass, FALSE, FALSE);
         } while (--try_limit > 0
                  && objects[otmp->otyp].oc_magic != magic_obj);
@@ -4423,11 +4411,13 @@ register struct obj *obj;
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Sword of Cold and Darkness, free yourself from the heaven's bonds.");
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Become one with my power, one with my body,");
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "And let us walk the path of destruction together!");
+        play_sfx_sound(SFX_ITEM_APPEARS);
         pline_ex(ATR_NONE, CLR_MSG_SPELL, "A sword-shaped planar rift forms before you!");
         summonblackblade(obj);
         break;
     case SPE_MAGE_ARMOR:
         known = TRUE;
+        play_sfx_sound(SFX_ITEM_APPEARS);
         pline_ex(ATR_NONE, CLR_MSG_SPELL, "An armor-shaped force field forms before you!");
         summonmagearmor(obj);
         break;
@@ -4435,8 +4425,12 @@ register struct obj *obj;
     {
         known = TRUE;
         otmp = mksobj(FOOD_RATION, FALSE, FALSE, FALSE);
-        (void)hold_another_object(otmp, "You drop %s!",
-            doname(otmp), "A delicious food ration forms before you!");
+        if (otmp)
+        {
+            play_sfx_sound(SFX_ITEM_APPEARS);
+            (void)hold_another_object(otmp, "You drop %s!",
+                doname(otmp), "A delicious food ration forms before you!");
+        }
         break;
     }
     case SPE_CREATE_FRUITS:
@@ -4481,18 +4475,26 @@ register struct obj *obj;
         }
 
         otmp = mksobj(fruittype, FALSE, FALSE, FALSE);
-        otmp->quan = fruitnum;
-        otmp->owt = weight(otmp);
-        (void)hold_another_object(otmp, "You drop %s!",
-            doname(otmp), fruitnum == 1 ? "A delicious fruit appears out of nowhere!" : "Delicious fruits appear out of nowhere!");
+        if (otmp)
+        {
+            play_sfx_sound(SFX_ITEM_APPEARS);
+            otmp->quan = fruitnum;
+            otmp->owt = weight(otmp);
+            (void)hold_another_object(otmp, "You drop %s!",
+                doname(otmp), fruitnum == 1 ? "A delicious fruit appears out of nowhere!" : "Delicious fruits appear out of nowhere!");
+        }
         break;
     }
     case SPE_CREATE_WATER:
     {
         known = TRUE;
         otmp = mksobj(POT_WATER, FALSE, FALSE, FALSE);
-        (void)hold_another_object(otmp, "You drop %s!",
-            doname(otmp), "A potion appears out of thin air!");
+        if (otmp)
+        {
+            play_sfx_sound(SFX_ITEM_APPEARS);
+            (void)hold_another_object(otmp, "You drop %s!",
+                doname(otmp), "A potion appears out of thin air!");
+        }
         break;
     }
     case SPE_ARMAGEDDON:
@@ -5699,7 +5701,7 @@ struct obj *otmp;
     useup(otmp);
 }
 
-static NEARDATA const char zap_syms[] = { WAND_CLASS, 0 };
+STATIC_VAR NEARDATA const char zap_syms[] = { WAND_CLASS, 0 };
 
 /* 'z' command (or 'y' if numbed_pad==-1) */
 int
@@ -5780,7 +5782,10 @@ dozap()
                     (void)uoname(obj, "empty");
 
                 if (ans == 'm')
+                {
                     prinv("Marked empty:", obj, 0L);
+                    update_inventory();
+                }
             }
 
             switch (ans)
@@ -6680,7 +6685,7 @@ boolean ordinary;
         while(otmp)
         {
             char qbuf[BUFSZ];
-            Sprintf(qbuf, "There is %s here. Probe it?", an(cxname(otmp)));
+            Sprintf(qbuf, "There is %s here. Probe it?", acxname(otmp));
             int ans = cnt > 1 ? ynq(qbuf) : yn_query(qbuf);
             switch (ans)
             {
@@ -6979,7 +6984,7 @@ int duration;
                   : check_magic_resistance_and_inflict_damage(mdef, obj, youattack ? &youmonst : (struct monst*)0, FALSE, 0, 0, NOTELL))
         return FALSE; /* resisted cancellation */
 
-    if (self_cancel)
+    if (self_cancel || (youattack && !youdefend && is_tame(mdef)) || (!youattack && !youdefend && !is_peaceful(mdef)))
     {
         /* 1st cancel inventory */
         struct obj* otmp;
@@ -10486,12 +10491,12 @@ boolean verbose;
 
 /* handle statue hit by striking/force bolt/pick-axe */
 boolean
-break_statue(obj)
-register struct obj *obj;
+pre_break_statue(obj)
+register struct obj* obj;
 {
     /* [obj is assumed to be on floor, so no get_obj_location() needed] */
-    struct trap *trap = t_at(obj->ox, obj->oy);
-    struct obj *item;
+    struct trap* trap = t_at(obj->ox, obj->oy);
+    struct obj* item;
     boolean by_you = !context.mon_moving;
 
     if (trap && trap->ttyp == STATUE_TRAP
@@ -10509,8 +10514,21 @@ register struct obj *obj;
         adjalign(-1);
     }
     obj->speflags &= ~SPEFLAGS_STATUE_HISTORIC;
-    fracture_rock(obj, TRUE);
     return TRUE;
+}
+
+/* handle statue hit by striking/force bolt/pick-axe */
+boolean
+break_statue(obj)
+register struct obj *obj;
+{
+    if (pre_break_statue(obj))
+    {
+        fracture_rock(obj, TRUE); /* Make it into a rubble */
+        return TRUE;
+    }
+    else
+        return FALSE;
 }
 
 /*
@@ -11748,6 +11766,13 @@ int otyp;
     }
     return NON_PM;
 
+}
+
+void
+reset_zap(VOID_ARGS)
+{
+    obj_zapped = FALSE;
+    poly_zapped = 0;
 }
 
 /*zap.c*/

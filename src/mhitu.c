@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mhitu.c    $NHDT-Date: 1556649298 2019/04/30 18:34:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -21,13 +21,13 @@ STATIC_DCL int FDECL(hitmu, (struct monst *, struct attack *, struct obj*));
 STATIC_DCL int FDECL(gulpmu, (struct monst *, struct attack *));
 STATIC_DCL int FDECL(explmu, (struct monst *, struct attack *, BOOLEAN_P));
 STATIC_DCL void FDECL(missmu, (struct monst *, BOOLEAN_P, struct attack *));
-STATIC_DCL void FDECL(mswings, (struct monst *, struct obj *));
+STATIC_DCL void FDECL(mswings, (struct monst *, struct obj *, int));
 STATIC_DCL void FDECL(wildmiss, (struct monst *, struct attack *));
 STATIC_DCL void FDECL(hitmsg, (struct monst *, struct attack *, int, BOOLEAN_P));
 
 /* See comment in mhitm.c.  If we use this a lot it probably should be */
 /* changed to a parameter to mhitu. */
-static int dieroll;
+STATIC_VAR int dieroll;
 
 STATIC_OVL void
 hitmsg(mtmp, mattk, damage, display_hit_tile)
@@ -181,15 +181,17 @@ struct attack *mattk;
 
 /* monster swings obj */
 STATIC_OVL void
-mswings(mtmp, otemp)
+mswings(mtmp, otemp, strikeindex)
 struct monst *mtmp;
 struct obj *otemp;
+int strikeindex;
 {
     if (flags.verbose && !Blind && mon_visible(mtmp)) 
     {
-        pline("%s %s %s%s %s.", Monnam(mtmp),
+        pline("%s %s %s%s %s%s.", Monnam(mtmp),
               (objects[otemp->otyp].oc_dir & PIERCE) ? "thrusts" : "swings",
-              (otemp->quan > 1L) ? "one of " : "", mhis(mtmp), xname(otemp));
+              (otemp->quan > 1L) ? "one of " : "", mhis(mtmp), xname(otemp),
+            !strikeindex ? "" : strikeindex == 1 ? " a second time" : strikeindex == 2 ? " a third time" : " once more");
     }
 }
 
@@ -926,12 +928,12 @@ register struct monst *mtmp;
                 if (MON_WEP(mtmp) && is_appliable_pole_type_weapon(MON_WEP(mtmp)) && !mwelded(MON_WEP(mtmp), mtmp))
                 {
                     get_pole_type_weapon_min_max_distances(MON_WEP(mtmp), mtmp, &min_range, &max_range);
-                    poletooclose = dist2(mtmp->mx, mtmp->my, mtmp->mx, mtmp->my) < min_range * min_range;
+                    poletooclose = distu(mtmp->mx, mtmp->my) < min_range * min_range;
                 }
 
                 if (mtmp->weapon_strategy == NEED_WEAPON || !MON_WEP(mtmp) || is_nonwelded_launcher || poletooclose)
                 {
-                    if ((is_nonwelded_launcher || poletooclose) && !select_hwep(mtmp, FALSE))
+                    if ((is_nonwelded_launcher || poletooclose) && !select_hwep(mtmp, FALSE, u.ux, u.uy))
                     {
                         if(canseemon(mtmp))
                             pline("%s unwields %s.", Monnam(mtmp), the(cxname(MON_WEP(mtmp))));
@@ -939,7 +941,7 @@ register struct monst *mtmp;
                     }
                     mtmp->weapon_strategy = poletooclose ? NEED_HTH_NO_POLE : NEED_HTH_WEAPON;
                     /* mon_wield_item resets weapon_strategy as appropriate */
-                    if (mon_wield_item(mtmp, FALSE) != 0)
+                    if (mon_wield_item(mtmp, FALSE, u.ux, u.uy) != 0)
                         break;
                 }
 
@@ -958,40 +960,49 @@ register struct monst *mtmp;
                         mon_currwep = MON_WEP(mtmp);
 
                     int multistrike = 1;
+                    int wieldermultistrike = 1;
 
                     if (mon_currwep) 
                     {
                         hittmp = weapon_to_hit_value(mon_currwep, &youmonst, mtmp, 0);
                         tmp += hittmp;
 
-                        multistrike = get_multishot_stats(mtmp, mon_currwep, mon_currwep, FALSE, (double*)0);
-
+                        struct multishot_result msres = get_multishot_stats(mtmp, mon_currwep, mon_currwep, FALSE);
+                        wieldermultistrike = msres.wielder_attacks;
+                        multistrike = msres.weapon_attacks;
                     }
-
-                    for (int strikeindex = 0; strikeindex < multistrike; strikeindex++)
+                    int strikeindex;
+                    int wielderstrikeindex;
+                    for (wielderstrikeindex = 0; wielderstrikeindex < wieldermultistrike; wielderstrikeindex++)
                     {
                         play_monster_simple_weapon_sound(mtmp, i, mon_currwep, OBJECT_SOUND_TYPE_SWING_MELEE);
-                        if (mon_currwep)
+                        if (mon_currwep && flags.verbose && !Blind && mon_visible(mtmp))
                         {
-                            if (strikeindex == 0)
-                                mswings(mtmp, mon_currwep);
-                            else
-                                if (flags.verbose && !Blind && mon_visible(mtmp))
+                            mswings(mtmp, mon_currwep, wielderstrikeindex);
+                        }
+
+                        for (strikeindex = 0; strikeindex < multistrike; strikeindex++)
+                        {
+                            //play_monster_simple_weapon_sound(mtmp, i, mon_currwep, OBJECT_SOUND_TYPE_SWING_MELEE);
+                            if (mon_currwep)
+                            {
+                                if (flags.verbose && !Blind && mon_visible(mtmp) && strikeindex > 0)
                                 {
                                     /* To be consistent with mswings */
                                     pline("%s %s %s!", s_suffix(Monnam(mtmp)), aobjnam(mon_currwep, "strike"), strikeindex == 1 ? "a second time" : strikeindex == 2 ? "a third time" : "once more");
                                 }
+                            }
+
+                            if (strikeindex == 0)
+                                m_wait_until_action();
+
+                            //TO-HIT IS DONE HERE
+                            if (tmp > (j = dieroll = rnd(20 + i)))
+                                sum[i] = hitmu(mtmp, mattk, mon_currwep);
+                            else
+                                missmu(mtmp, (tmp == j), mattk);
+
                         }
-
-                        if(strikeindex == 0)
-                            m_wait_until_action();
-
-                        //TO-HIT IS DONE HERE
-                        if (tmp > (j = dieroll = rnd(20 + i)))
-                            sum[i] = hitmu(mtmp, mattk, mon_currwep);
-                        else
-                            missmu(mtmp, (tmp == j), mattk);
-
                     }
                 } 
                 else
@@ -2513,7 +2524,7 @@ register struct obj* omonwep;
 
     case AD_SSEX:
         if (SYSOPT_SEDUCE) {
-            if (could_seduce(mtmp, &youmonst, mattk) == 1 && uncancelled && !resists_charm(&youmonst) && !Charm_resistance)
+            if (could_seduce(mtmp, &youmonst, mattk) == 1 && uncancelled && !resists_charm(&youmonst) && !Charm_resistance && !Mind_shielding)
                 if (doseduce(mtmp))
                     return 3;
             break;
@@ -2523,7 +2534,6 @@ register struct obj* omonwep;
     case AD_SEDU:
     {
         boolean nymphcancelled = !uncancelled;
-
         if (is_animal(mtmp->data))
         {
             hitmsg(mtmp, mattk, -1, TRUE);
@@ -2548,7 +2558,7 @@ register struct obj* omonwep;
             }
             return 3;
         } 
-        else if (nymphcancelled || resists_charm(&youmonst) || Charm_resistance) 
+        else if (nymphcancelled || resists_charm(&youmonst) || Charm_resistance || Mind_shielding) 
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             if (!Blind)
@@ -2857,7 +2867,7 @@ register struct obj* omonwep;
         hitmsg(mtmp, mattk, -1, TRUE);
         if (!is_cancelled(mtmp) && !mtmp->mspec_used)
         {
-            mtmp->mspec_used = mtmp->mspec_used + ((int)ceil(damage) + rn2(6)) / mon_spec_cooldown_divisor(mtmp);
+            mtmp->mspec_used = mtmp->mspec_used + ((int)ceil(damage) + rn2(6));
             if (Confusion)
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are getting even more confused.");
             else
@@ -3853,7 +3863,7 @@ struct attack *mattk;
             } else {
                 int conf = d(3, 4);
 
-                mtmp->mspec_used = mtmp->mspec_used + (conf + rn2(6)) / mon_spec_cooldown_divisor(mtmp);
+                mtmp->mspec_used = mtmp->mspec_used + (conf + rn2(6));
                 if (!Confusion)
                     pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s gaze confuses you!", s_suffix(Monnam(mtmp)));
                 else
@@ -3881,7 +3891,7 @@ struct attack *mattk;
                 {
                     int stun = d(2, 6);
 
-                    mtmp->mspec_used = mtmp->mspec_used + (stun + rn2(6)) / mon_spec_cooldown_divisor(mtmp);
+                    mtmp->mspec_used = mtmp->mspec_used + (stun + rn2(6));
                     if (!Stunned)
                         play_sfx_sound(SFX_ACQUIRE_STUN);
                     make_stunned((HStun & TIMEOUT) + (long)stun, TRUE);
@@ -4163,6 +4173,7 @@ struct monst *mon;
     boolean seewho, naked; /* True iff no armor */
     int attr_tot, tried_gloves = 0;
     char qbuf[QBUFSZ], Who[QBUFSZ];
+    Strcpy(debug_buf_4, "doseduce");
 
     if (is_cancelled(mon) || mon->mspec_used) {
         pline("%s acts as though %s has got a %sheadache.", Monnam(mon),
@@ -4394,7 +4405,7 @@ struct monst *mon;
     } 
     else 
     {
-        mon->mspec_used = rnd(100) / mon_spec_cooldown_divisor(mon); /* monster is worn out */
+        mon->mspec_used = rnd(100); /* monster is worn out */
         You("seem to have enjoyed it more than %s...", noit_mon_nam(mon));
         switch (rn2(5)) {
         case 0:
@@ -4464,7 +4475,7 @@ struct monst *mon;
         }
     }
     if (!rn2(25))
-        mon->mspec_used = max(mon->mspec_used, (10 + rnd(40)) / mon_spec_cooldown_divisor(mon)); // increase_mon_property(mon, CANCELLED, 10 + rnd(40)); /* monster is worn out */
+        mon->mspec_used = max(mon->mspec_used, (10 + rnd(40))); // increase_mon_property(mon, CANCELLED, 10 + rnd(40)); /* monster is worn out */
 
     if (!tele_restrict(mon))
     {
@@ -4946,6 +4957,12 @@ enum action_tile_types action;
     unsigned long tile_mflag = (1UL << ((unsigned long)action - 1UL));
     boolean has_action_tile = (mtmp->data->mflags5 & tile_mflag) != 0UL;
     return has_action_tile;
+}
+
+void
+reset_mhitu(VOID_ARGS)
+{
+    mon_currwep = 0;
 }
 
 /*mhitu.c*/

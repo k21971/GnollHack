@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    light.c    $NHDT-Date: 1446191876 2015/10/30 07:57:56 $  $NHDT-Branch: master $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Dean Luick, 1994                                       */
@@ -45,7 +45,7 @@
 #define LSF_NEEDS_FIXUP 0x2 /* need oid fixup */
 #define LSF_DARKNESS_SOURCE 0x4 /* emits darkness rather than light */
 
-static light_source *light_base = 0;
+STATIC_VAR light_source *light_base = 0;
 
 STATIC_DCL void FDECL(write_ls, (int, light_source *));
 STATIC_DCL int FDECL(maybe_write_ls, (int, int, BOOLEAN_P));
@@ -64,9 +64,15 @@ anything *id;
     light_source *ls;
     int absrange = abs(range);
 
-    if (absrange > MAX_RADIUS || absrange < 1) {
+    if (absrange > MAX_RADIUS || absrange < 1) 
+    {
         impossible("new_light_source:  illegal range %d", range);
-        return;
+        if (absrange > MAX_RADIUS)
+            absrange = MAX_RADIUS;
+        if (absrange < 1)
+            absrange = 1;
+        range = sgn(range) * absrange;
+        //return;
     }
 
     ls = (light_source *) alloc(sizeof(light_source));
@@ -818,7 +824,15 @@ struct obj *obj;
 
 /* light emitting artifact's range depends upon its curse/bless state */
 int
-arti_light_radius(obj)
+artifact_light_range(obj)
+struct obj* obj;
+{
+    return (obj->blessed ? 3 : !obj->cursed ? 2 : 1);
+}
+
+/* light emitting artifact's range depends upon its curse/bless state */
+int
+current_arti_light_radius(obj)
 struct obj *obj;
 {
     /*
@@ -835,7 +849,7 @@ struct obj *obj;
     /* cursed radius of 1 is not noticeable for an item that's
        carried by the hero but is if it's carried by a monster
        or left lit on the floor (not applicable for Sunsword) */
-    return (obj->blessed ? 3 : !obj->cursed ? 2 : 1);
+    return artifact_light_range(obj);
 }
 
 
@@ -883,7 +897,7 @@ struct obj* obj;
     else if (obj->otyp == POTION_CLASS) //Potion of oil
         radius = 1;
     else if (artifact_light(obj) || (obj_shines_magical_light(obj) || has_obj_mythic_magical_light(obj)))
-        radius = arti_light_radius(obj);
+        radius = artifact_light_range(obj);
 
     return radius;
 }
@@ -935,7 +949,7 @@ const char *
 arti_light_description(obj)
 struct obj *obj;
 {
-    switch (arti_light_radius(obj)) {
+    switch (current_arti_light_radius(obj)) {
     case 3:
         return "brilliantly"; /* blessed */
     case 2:

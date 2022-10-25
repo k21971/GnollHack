@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    topten.c    $NHDT-Date: 1450451497 2015/12/18 15:11:37 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -26,7 +26,7 @@
  * which reads the scores will ignore it.
  */
 #ifdef UPDATE_RECORD_IN_PLACE
-static long final_fpos;
+STATIC_VAR long final_fpos;
 #endif
 
 #define done_stopprint program_state.stopprint
@@ -88,7 +88,7 @@ STATIC_DCL void FDECL(nsb_mung_line, (char *));
 STATIC_DCL void FDECL(nsb_unmung_line, (char *));
 #endif
 
-static winid toptenwin = WIN_ERR;
+STATIC_VAR winid toptenwin = WIN_ERR;
 
 /* "killed by",&c ["an"] 'killer.name' */
 void
@@ -98,7 +98,7 @@ size_t siz;
 int how;
 boolean incl_helpless;
 {
-    static NEARDATA const char *const killed_by_prefix[NUM_GAME_END_TYPES] = {
+    STATIC_VAR NEARDATA const char *const killed_by_prefix[NUM_GAME_END_TYPES] = {
         /* DIED, CHOKING, POISONING, STARVING, */
         "killed by ", "choked on ", "poisoned by ", "died of ",
         /* DROWNING, DROWNED, BURNING, DISSOLVED, CRUSHING, STRANGULATION, SUFFOCATION,*/
@@ -390,6 +390,7 @@ int how;
     Fprintf(rfile, "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
     Fprintf(rfile, "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
     Fprintf(rfile, "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
+    Fprintf(rfile, "%cscoring=%s", XLOG_SEP, discover || CasualMode || flags.non_scoring ? "no" : "yes");
     Fprintf(rfile, "\n");
 #undef XLOG_SEP
 }
@@ -409,6 +410,8 @@ encodexlogflags()
         e |= 1L << 3;
     if (CasualMode)
         e |= 1L << 4;
+    if (flags.non_scoring)
+        e |= 1L << 5;
 
     return e;
 }

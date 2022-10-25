@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mon.c    $NHDT-Date: 1556139724 2019/04/24 21:02:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.284 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1776,12 +1776,12 @@ register struct monst *mtmp;
             {
                 if (flags.verbose)
                 {
-                    play_sfx_sound_at_location_with_minimum_volume(SFX_CRUNCHING_SOUND, mtmp->mx, mtmp->my, 0.25);
+                    play_sfx_sound_at_location_with_minimum_volume(SFX_SCREECHING_SOUND, mtmp->mx, mtmp->my, 0.25);
                     if (cansee(mtmp->mx, mtmp->my))
                         pline("%s eats %s!", Monnam(mtmp),
                             distant_name(otmp, doname));
                     else
-                        You_hear("a crunching sound.");
+                        You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a screeching sound.");
                 }
                 mtmp->meating = otmp->owt / 2 + 1;
                 /* Heal up to the object's weight in hp */
@@ -1846,6 +1846,122 @@ register struct monst *mtmp;
                 newsym(mtmp->mx, mtmp->my);
                 return 1;
             }
+        }
+    }
+    return 0;
+}
+
+/*
+ * Maybe eat a rocky or stony object.
+ * Return value: 0 => nothing happened, 1 => monster ate something,
+ * 2 => monster died (it must have grown into a genocided form, but
+ * that can't happen at present because nothing which eats objects
+ * has young and old forms).
+ */
+int
+meatrock(mtmp)
+register struct monst* mtmp;
+{
+    register struct obj* otmp;
+    struct permonst* ptr;
+    int poly, grow, heal, mstone;
+
+    /* If a pet, eating is handled separately, in dog.c */
+    if (is_tame(mtmp))
+        return 0;
+
+    if (rn2(4)) /* Avoid eating all the rocks and boulders on the level */
+        return 0;
+
+    /* Eats topmost rocky object if it is there */
+    for (otmp = level.objects[mtmp->mx][mtmp->my]; otmp;
+        otmp = otmp->nexthere)
+    {
+        if (is_obj_no_pickup(otmp))
+            continue;
+
+        /* Don't eat indigestible/choking/inappropriate objects */
+        if (otmp->otyp == RIN_SLOW_DIGESTION || (In_sokoban(&u.uz) && otmp->otyp == BOULDER))
+            continue;
+
+        if (is_obj_stony(otmp) && !obj_resists(otmp, 5, 95)
+            && touch_artifact(otmp, mtmp))
+        {
+            boolean isrock = otmp->otyp == ROCK;
+            boolean isstatue = otmp->otyp == STATUE;
+            if (flags.verbose)
+            {
+                play_sfx_sound_at_location_with_minimum_volume(SFX_CRUNCHING_SOUND, mtmp->mx, mtmp->my, 0.25);
+                if (cansee(mtmp->mx, mtmp->my))
+                    pline("%s eats %s!", Monnam(mtmp),
+                        distant_name(otmp, doname));
+                else
+                    You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a crunching sound.");
+            }
+            mtmp->meating = otmp->owt / 2 + 1;
+            /* Heal up to the object's weight in hp */
+            if (mtmp->mhp < mtmp->mhpmax)
+            {
+                mtmp->mhp += objects[otmp->otyp].oc_weight;
+                if (mtmp->mhp > mtmp->mhpmax)
+                    mtmp->mhp = mtmp->mhpmax;
+            }
+            if (otmp == uball)
+            {
+                unpunish();
+                delobj(otmp);
+            }
+            else if (otmp == uchain)
+            {
+                unpunish(); /* frees uchain */
+            }
+            else
+            {
+                poly = polyfodder(otmp);
+                grow = mlevelgain(otmp);
+                heal = mhealup(otmp);
+                mstone = mstoning(otmp);
+                if (isstatue)
+                    (void)pre_break_statue(otmp);
+                delobj(otmp);
+                ptr = mtmp->data;
+                if (poly)
+                {
+                    if (newcham(mtmp, (struct permonst*)0, FALSE, FALSE))
+                        ptr = mtmp->data;
+                }
+                else if (grow)
+                {
+                    ptr = grow_up(mtmp, (struct monst*)0);
+                }
+                else if (mstone)
+                {
+                    if (poly_when_stoned(ptr))
+                    {
+                        mon_to_stone(mtmp);
+                        ptr = mtmp->data;
+                    }
+                    else if (!resists_ston(mtmp))
+                    {
+                        play_sfx_sound_at_location(SFX_PETRIFY, mtmp->mx, mtmp->my);
+                        if (canseemon(mtmp))
+                            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns to stone!", Monnam(mtmp));
+                        monstone(mtmp);
+                        ptr = (struct permonst*)0;
+                    }
+                }
+                else if (heal)
+                {
+                    mtmp->mhp = mtmp->mhpmax;
+                }
+                if (!ptr)
+                    return 2; /* it died */
+            }
+            /* Left behind a pile? */
+            if (!isrock && (isstatue || rnd(25) < 3))
+                (void)mksobj_at(ROCK, mtmp->mx, mtmp->my, TRUE, FALSE);
+            newsym(mtmp->mx, mtmp->my);
+            return 1;
         }
     }
     return 0;
@@ -4628,8 +4744,8 @@ struct monst *mon;
     }
 }
 
-static short *animal_list = 0; /* list of PM values for animal monsters */
-static int animal_list_count;
+STATIC_VAR short *animal_list = 0; /* list of PM values for animal monsters */
+STATIC_VAR int animal_list_count;
 
 void
 mon_animal_list(construct)
@@ -6004,6 +6120,12 @@ struct monst* mon;
             cnt++;
     }
     return cnt;
+}
+
+void
+reset_mon(VOID_ARGS)
+{
+    vamp_rise_msg = disintegested = 0;
 }
 
 /*mon.c*/

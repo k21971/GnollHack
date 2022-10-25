@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    extralev.c    $NHDT-Date: 1446975468 2015/11/08 09:37:48 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /*      Copyright 1988, 1989 by Ken Arromdee                      */
@@ -22,7 +22,7 @@ struct rogueroom {
 #define LEFT 4
 #define RIGHT 8
 
-static NEARDATA struct rogueroom r[3][3];
+STATIC_VAR NEARDATA struct rogueroom r[3][3];
 STATIC_DCL void FDECL(roguejoin, (int, int, int, int, int));
 STATIC_DCL void FDECL(roguecorr, (int, int, int));
 STATIC_DCL void FDECL(miniwalk, (int, int));
@@ -369,6 +369,12 @@ makerogueghost()
         ghostobj = mksobj_at(FAKE_AMULET_OF_YENDOR, x, y, TRUE, FALSE);
         ghostobj->known = TRUE;
     }
+}
+
+void
+reset_extralev(VOID_ARGS)
+{
+    memset((genericptr_t)&r, 0, sizeof(r));
 }
 
 /*extralev.c*/

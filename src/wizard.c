@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    wizard.c    $NHDT-Date: 1539804905 2018/10/17 19:35:05 $  $NHDT-Branch: keni-makedefsm $:$NHDT-Revision: 1.53 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -28,7 +28,7 @@ STATIC_DCL unsigned long FDECL(strategy, (struct monst *));
    only four lawful candidates, so lawful summoners tended to summon more
    (trying to get lawful or neutral but obtaining chaotic instead) than
    their chaotic counterparts */
-static NEARDATA const int nasties[] = {
+STATIC_VAR NEARDATA const int nasties[] = {
     /* neutral */
     PM_GARGANTUAN_COCKATRICE, PM_GIANT_COCKATRICE, PM_MINOTAUR,
     PM_OWLBEAR_PATRIARCH, PM_OWLBEAR_MATRIARCH, PM_PURPLE_WORM, 
@@ -50,7 +50,7 @@ static NEARDATA const int nasties[] = {
        they're summoners so would aggravate excessive summoning) */
 };
 
-static NEARDATA const unsigned wizapp[] = {
+STATIC_VAR NEARDATA const unsigned wizapp[] = {
     PM_HUMAN,      PM_WATER_DEMON,  PM_VAMPIRE,       PM_RED_DRAGON,
     PM_TROLL,      PM_UMBRAL_HULK,   PM_XORN,          PM_XAN,
     PM_COCKATRICE, PM_FLOATING_EYE, PM_GUARDIAN_NAGA, PM_TRAPPER,
@@ -663,7 +663,7 @@ struct monst *summoner;
             if (mtmp)
             {
                 /* delay first use of spell or breath attack */
-                mtmp->mspec_used = (3 + rnd(3)) / mon_spec_cooldown_divisor(mtmp);
+                mtmp->mspec_used = (3 + rnd(3));
                 mtmp->mmagespell_used = mtmp->mspec_used;
                 mtmp->mmageultimate_used = mtmp->mspec_used;
                 mtmp->mclericspell_used = mtmp->mspec_used;
@@ -744,7 +744,7 @@ struct monst* summoner;
         if (mtmp)
         {
             /* delay first use of spell or breath attack */
-            mtmp->mspec_used = (3 + rnd(3)) / mon_spec_cooldown_divisor(mtmp);
+            mtmp->mspec_used = (3 + rnd(3));
             mtmp->mmagespell_used = mtmp->mspec_used;
             mtmp->mmageintermediate_used = mtmp->mspec_used;
             mtmp->mmageultimate_used = mtmp->mspec_used;

@@ -44,6 +44,8 @@ namespace GnollHackClient.Pages.Game
             RefreshRatePicker.ItemsSource = list;
 
             SetInitialValues();
+
+            ClassicStatusBarSwitch_Toggled(null, new ToggledEventArgs(ClassicStatusBarSwitch.IsToggled));
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
@@ -147,6 +149,10 @@ namespace GnollHackClient.Pages.Game
             Preferences.Set("DeveloperMode", App.DeveloperMode);
 
             Preferences.Set("DefaultMapNoClipMode", !YesClipNormalSwitch.IsToggled);
+
+            App.SilentMode = SilentModeSwitch.IsToggled;
+            Preferences.Set("SilentMode", App.SilentMode);
+
             Preferences.Set("GeneralVolume", (float)GeneralVolumeSlider.Value);
             Preferences.Set("MusicVolume", (float)MusicVolumeSlider.Value);
             Preferences.Set("AmbientVolume", (float)AmbientVolumeSlider.Value);
@@ -154,7 +160,7 @@ namespace GnollHackClient.Pages.Game
             Preferences.Set("EffectsVolume", (float)EffectsVolumeSlider.Value);
             Preferences.Set("UIVolume", (float)UIVolumeSlider.Value);
 
-            if(_gamePage == null || !_gamePage.MuteSounds)
+            if(!App.IsMuted)
                 App.FmodService.AdjustVolumes((float)GeneralVolumeSlider.Value, (float)MusicVolumeSlider.Value, (float)AmbientVolumeSlider.Value, (float)DialogueVolumeSlider.Value, (float)EffectsVolumeSlider.Value, (float)UIVolumeSlider.Value);
 
             int res = GHConstants.DefaultMessageRows, tryres = 0;
@@ -190,7 +196,22 @@ namespace GnollHackClient.Pages.Game
             bool oldvalue = App.LoadBanks;
             App.LoadBanks = SoundBankSwitch.IsToggled;
             Preferences.Set("LoadSoundBanks", SoundBankSwitch.IsToggled);
-            if(oldvalue != App.LoadBanks)
+            if(!App.IsiOS)
+            {
+                bool oldCarousel = App.UsesCarousel;
+                App.UsesCarousel = CarouselSwitch.IsToggled;
+                Preferences.Set("UsesCarousel", CarouselSwitch.IsToggled);
+                if(oldCarousel != App.UsesCarousel)
+                {
+                    if (_mainPage != null)
+                        _mainPage.UpdateMainScreenBackgroundStyle();
+                    else if (_gamePage != null)
+                        _gamePage.MainPageBackgroundNeedsUpdate = true;
+                }
+            }
+            if (App.UsesCarousel && _mainPage != null)
+                _mainPage.PlayCarouselView();
+            if (oldvalue != App.LoadBanks)
             {
                 if (App.LoadBanks)
                 {
@@ -241,12 +262,13 @@ namespace GnollHackClient.Pages.Game
         private void SetInitialValues()
         {
             int cursor = 0, graphics = 0, maprefresh = (int)ClientUtils.GetDefaultMapFPS(), msgnum = 0, petrows = 0;
-            bool mem = false, fps = false, gpu = GHConstants.IsGPUDefault, bank = true, navbar = GHConstants.DefaultHideNavigation, statusbar = GHConstants.DefaultHideStatusBar;
+            bool mem = false, fps = false, gpu = GHConstants.IsGPUDefault, bank = true, carousel = false, navbar = GHConstants.DefaultHideNavigation, statusbar = GHConstants.DefaultHideStatusBar;
             bool devmode = GHConstants.DefaultDeveloperMode, hpbars = false, nhstatusbarclassic = GHConstants.IsDefaultStatusBarClassic, pets = true, orbs = true, orbmaxhp = false, orbmaxmana = false, mapgrid = false, playermark = false, monstertargeting = false, walkarrows = true;
-            bool forcemaxmsg = false, showexstatus = false, noclipmode = GHConstants.DefaultMapNoClipMode;
+            bool forcemaxmsg = false, showexstatus = false, noclipmode = GHConstants.DefaultMapNoClipMode, silentmode = false;
             //bool altnoclipmode = GHConstants.DefaultMapAlternateNoClipMode, zoomchangecenter = GHConstants.DefaultZoomChangeCenterMode;
             float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
 
+            silentmode = Preferences.Get("SilentMode", false);
             generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
             musicVolume = Preferences.Get("MusicVolume", GHConstants.DefaultMusicVolume);
             ambientVolume = Preferences.Get("AmbientVolume", GHConstants.DefaultAmbientVolume);
@@ -257,6 +279,7 @@ namespace GnollHackClient.Pages.Game
             statusbar = App.HideiOSStatusBar;
             devmode = App.DeveloperMode;
             bank = Preferences.Get("LoadSoundBanks", true);
+            carousel = Preferences.Get("UsesCarousel", App.IsiOS);
             noclipmode = Preferences.Get("DefaultMapNoClipMode", GHConstants.DefaultMapNoClipMode);
             if (_gamePage == null)
             {
@@ -333,6 +356,7 @@ namespace GnollHackClient.Pages.Game
             MonsterTargetingSwitch.IsToggled = monstertargeting;
             WalkArrowSwitch.IsToggled = walkarrows;
             YesClipNormalSwitch.IsToggled = !noclipmode;
+            SilentModeSwitch.IsToggled = silentmode;
             //YesClipAlternateSwitch.IsToggled = !altnoclipmode;
             //ZoomChangeCenterSwitch.IsToggled = zoomchangecenter;
             MemorySwitch.IsToggled = mem;
@@ -342,6 +366,9 @@ namespace GnollHackClient.Pages.Game
             StatusBarSwitch.IsToggled = statusbar;
             DeveloperSwitch.IsToggled = devmode;
             SoundBankSwitch.IsToggled = bank;
+            CarouselSwitch.IsToggled = carousel;
+            CarouselSwitch.IsEnabled = !App.IsiOS;
+            CarouselLabel.TextColor = !App.IsiOS ? Color.Black : Color.Gray;
             GeneralVolumeSlider.Value = (double)generalVolume;
             MusicVolumeSlider.Value = (double)musicVolume;
             AmbientVolumeSlider.Value = (double)ambientVolume;
@@ -374,7 +401,65 @@ namespace GnollHackClient.Pages.Game
             ForceMaxMessageSwitch.IsToggled = forcemaxmsg;
             ShowExtendedStatusBarSwitch.IsToggled = showexstatus;
 
-            _doChangeVolume = _gamePage == null ? true : !_gamePage.MuteSounds;
+            _doChangeVolume = !App.IsMuted;
+        }
+
+        private void ClassicStatusBarSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            if (ClassicStatusBarSwitch.IsToggled)
+            {
+                OrbSwitch.IsEnabled = true;
+                OrbsLabel.TextColor = Color.Black;
+                PetSwitch.IsEnabled = false;
+                PetsLabel.TextColor = Color.Gray;
+            }
+            else
+            {
+                OrbSwitch.IsEnabled = false;
+                OrbsLabel.TextColor = Color.Gray;
+                PetSwitch.IsEnabled = true;
+                PetsLabel.TextColor = Color.Black;
+            }
+            OrbSwitch_Toggled(sender, new ToggledEventArgs(OrbSwitch.IsToggled));
+            PetSwitch_Toggled(sender, new ToggledEventArgs(PetSwitch.IsToggled));
+        }
+
+        private void OrbSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            if (!ClassicStatusBarSwitch.IsToggled || OrbSwitch.IsToggled)
+            {
+                MaxHealthInOrbSwitch.IsEnabled = true;
+                MaxHealthInOrbLabel.TextColor = Color.Black;
+                MaxManaInOrbSwitch.IsEnabled = true;
+                MaxManaInOrbLabel.TextColor = Color.Black;
+            }
+            else
+            {
+                MaxHealthInOrbSwitch.IsEnabled = false;
+                MaxHealthInOrbLabel.TextColor = Color.Gray;
+                MaxManaInOrbSwitch.IsEnabled = false;
+                MaxManaInOrbLabel.TextColor = Color.Gray;
+            }
+        }
+
+        private void PetSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            if (!ClassicStatusBarSwitch.IsToggled && PetSwitch.IsToggled)
+            {
+                PetRowPicker.IsEnabled = true;
+                PetRowsLabel.TextColor = Color.Black;
+            }
+            else
+            {
+                PetRowPicker.IsEnabled = false;
+                PetRowsLabel.TextColor = Color.Gray;
+            }
+        }
+
+        private void SilentModeSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            App.SilentMode = SilentModeSwitch.IsToggled;
+            _doChangeVolume = !App.IsMuted;
         }
 
         private async void Button_Clicked(object sender, EventArgs e)
@@ -415,6 +500,5 @@ namespace GnollHackClient.Pages.Game
                 CloseGrid.Margin = ClientUtils.GetFooterMarginWithBorder(bkgView.BorderStyle, width, height);
             }
         }
-
     }
 }

@@ -257,6 +257,8 @@ namespace GnollHackClient.Unknown
         public static extern void LibSaveAndRestoreSavedGame();
         [DllImport(PlatformConstants.dll)]
         public static extern void LibTallyRealTime();
+        [DllImport(PlatformConstants.dll)]
+        public static extern int LibValidateSaveFile(string filename);
 
         private void LoadNativeLibrary(string libName)
         {
@@ -380,6 +382,18 @@ namespace GnollHackClient.Unknown
             }
         }
 
+        public void ClearBones()
+        {
+            string filesdir = GetGnollHackPath();
+            DirectoryInfo di = new DirectoryInfo(filesdir);
+            foreach (FileInfo file in di.GetFiles())
+            {
+                if(file.Name.Length > 4 && file.Name.Substring(0, 4) == "bon-")
+                {
+                    file.Delete();
+                }
+            }
+        }
 
         public void ResetDefaultsFile()
         {
@@ -869,6 +883,11 @@ namespace GnollHackClient.Unknown
         public void TallyRealTime()
         {
             LibTallyRealTime();
+        }
+
+        public bool ValidateSaveFile(string filename)
+        {
+            return LibValidateSaveFile(filename) != 0;
         }
 
         public int StartGnollHack(ClientGame clientGame)

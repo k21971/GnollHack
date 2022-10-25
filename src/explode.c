@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    explode.c    $NHDT-Date: 1545182146 2018/12/19 01:15:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright (C) 1990 by Ken Arromdee */
@@ -7,7 +7,7 @@
 #include "hack.h"
 
 /* Note: Arrays are column first, while the screen is row first */
-static const int explosion[3][3] = { { S_explode1, S_explode4, S_explode7 },
+STATIC_VAR const int explosion[3][3] = { { S_explode1, S_explode4, S_explode7 },
                                { S_explode2, S_explode5, S_explode8 },
                                { S_explode3, S_explode6, S_explode9 } };
 

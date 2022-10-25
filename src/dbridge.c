@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    dbridge.c    $NHDT-Date: 1503355815 2017/08/21 22:50:15 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.39 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet              */
@@ -307,7 +307,7 @@ struct entity {
 
 #define ENTITIES 2
 
-static NEARDATA struct entity occupants[ENTITIES];
+STATIC_VAR NEARDATA struct entity occupants[ENTITIES];
 
 STATIC_OVL
 struct entity *
@@ -1125,6 +1125,13 @@ boolean is_disintegrated;
         }
     }
     nokiller();
+}
+
+
+void
+reset_drawbridge(VOID_ARGS)
+{
+    memset((genericptr_t)&occupants, 0, sizeof(occupants));
 }
 
 /*dbridge.c*/

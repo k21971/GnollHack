@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    mhmap.c    $NHDT-Date: 1435002695 2015/06/22 19:51:35 $  $NHDT-Branch: master $:$NHDT-Revision: 1.56 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -5369,7 +5369,7 @@ static void dirtyAll(PNHMapWindow data)
 
 static void dirty(PNHMapWindow data, int x, int y, boolean usePrinted)
 {
-    if (program_state.freeing_dynamic_data == 1 || program_state.exiting > 0 || in_mklev || program_state.in_bones)
+    if (program_state.freeing_dynamic_data == 1 || program_state.exiting > 0 || reseting || restoring || in_mklev || program_state.in_bones)
         return;
 
     data->mapDirty[x][y] = TRUE;

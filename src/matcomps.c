@@ -1170,7 +1170,7 @@ struct materialcomponentlist matlists[] =
     },
 
     { SPE_SUMMON_DIREWOLF,
-        "Mandrake root",
+        "Bone and bat guano",
         STRANGE_OBJECT,
         1,
         {
@@ -2870,6 +2870,20 @@ struct materialcomponentlist matlists[] =
         {
             {
                 {CLOVE_OF_GARLIC, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT}, 
+                NO_MATCOMP_MONSTER_ALTERNATIVES, NO_DESC, 1, MATCOMP_NO_FLAGS
+            },
+            NO_MATCOMP,
+            NO_MATCOMP, NO_MATCOMP, NO_MATCOMP, NO_MATCOMP, NO_MATCOMP, NO_MATCOMP, NO_MATCOMP, NO_MATCOMP
+        }
+    },
+
+    { SPE_PROTECTION_FROM_CHARM,
+    "Mandrake root",
+    STRANGE_OBJECT,
+    3,
+        {
+            {
+                {MANDRAKE_ROOT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT},
                 NO_MATCOMP_MONSTER_ALTERNATIVES, NO_DESC, 1, MATCOMP_NO_FLAGS
             },
             NO_MATCOMP,

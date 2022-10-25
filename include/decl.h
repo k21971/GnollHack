@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0  decl.h  $NHDT-Date: 1547025154 2019/01/09 09:12:34 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.147 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -209,6 +209,7 @@ E NEARDATA struct sinfo {
 } program_state;
 
 E boolean restoring;
+E boolean reseting;
 E boolean ransacked;
 
 E const char quitchars[];
@@ -254,6 +255,7 @@ E NEARDATA struct kinfo {
 E NEARDATA struct obj* getobj_autoselect_obj;
 E NEARDATA const char getobj_comestibles[];
 E NEARDATA const char getobj_offerfodder[];
+E NEARDATA const char getobj_all_count[];
 E NEARDATA const char getobj_allobj[];
 E NEARDATA const char getobj_styluses[];
 E NEARDATA const char getobj_drop_types[];
@@ -280,12 +282,20 @@ E NEARDATA const char getobj_unmark_autostashs[];
 E long done_money;
 E NEARDATA char plname[PL_NSIZ];
 E NEARDATA char recovery_plname[PL_NSIZ];
+E NEARDATA boolean plname_from_error_savefile;
+E NEARDATA boolean plname_from_imported_savefile;
 E NEARDATA char dogname[];
 E NEARDATA char catname[];
 E NEARDATA char horsename[];
 E NEARDATA char ramname[];
 E NEARDATA char luggagename[];
 E NEARDATA char wolfname[];
+E short doggender;
+E short catgender;
+E short horsegender;
+E short ramgender;
+/* No luggagegender, because luggages are neuter */
+E short wolfgender;
 E char preferred_pet;
 
 E NEARDATA unsigned long n_game_recoveries;
@@ -601,6 +611,12 @@ E const char cmdnotavail[];
 E const char* const hofe_titles[3];
 
 E unsigned long file_end_marker;
+
+E char debug_buf_1[BUFSIZ];
+E char debug_buf_2[BUFSIZ];
+E char debug_buf_3[BUFSIZ];
+E char debug_buf_4[BUFSIZ];
+
 #undef E
 
 #endif /* DECL_H */

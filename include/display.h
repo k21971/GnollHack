@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    display.h    $NHDT-Date: 1546212620 2018/12/30 23:30:20 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.29 $ */
 /* Copyright (c) Dean Luick, with acknowledgements to Kevin Darcy */
@@ -46,9 +46,9 @@
 #define tp_sensemon(mon) \
     (/* The hero can always sense a monster IF:        */  \
      /* 1. the monster has a brain to sense            */  \
-     (!mindless(mon->data))                                \
+     (!mon_has_no_apparent_mind(mon))                      \
      /* AND     2a. hero is blind and telepathic       */  \
-      && ((Blind && (Blind_telepat || Unblind_telepat))                         \
+      && ((Blind && (Blind_telepat || Unblind_telepat))    \
           /* OR 2b. hero is using a telepathy inducing */  \
           /*        object and in range                */  \
           || (Unblind_telepat                              \

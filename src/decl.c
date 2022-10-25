@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    decl.c    $NHDT-Date: 1547025164 2019/01/09 09:12:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.141 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -55,6 +55,8 @@ NEARDATA long done_money = 0;
 const char *nomovemsg = 0;
 NEARDATA char plname[PL_NSIZ] = DUMMY; /* player name */
 NEARDATA char recovery_plname[PL_NSIZ] = DUMMY;  /* Set at program start to check for recoverable games before ask_name */
+NEARDATA boolean plname_from_error_savefile = FALSE;
+NEARDATA boolean plname_from_imported_savefile = FALSE;
 NEARDATA char pl_character[PL_CSIZ] = DUMMY;
 NEARDATA char pl_race = '\0';
 
@@ -289,8 +291,8 @@ NEARDATA struct obj* getobj_autoselect_obj = (struct obj*)0;
 
 /* getobj class definitions */
 NEARDATA const char getobj_comestibles[] = { FOOD_CLASS, REAGENT_CLASS, 0 };
-NEARDATA const char getobj_offerfodder[] = { FOOD_CLASS, AMULET_CLASS,
-                                                 0 };
+NEARDATA const char getobj_offerfodder[] = { FOOD_CLASS, AMULET_CLASS, 0 };
+NEARDATA const char getobj_all_count[] = { ALLOW_COUNT, ALL_CLASSES, 0 };
 
 /* Gold must come first for getobj(). */
 NEARDATA const char getobj_allobj[] = {
@@ -355,6 +357,8 @@ NEARDATA char ramname[PL_PSIZ] = DUMMY;
 NEARDATA char luggagename[PL_PSIZ] = DUMMY;
 NEARDATA char wolfname[PL_PSIZ] = DUMMY;
 char preferred_pet; /* '\0', 'c', 'd', 'n' (none) */
+short doggender, catgender, horsegender, ramgender, wolfgender; /* 0 = random, 1 = male, 2 = female */
+
 /* monsters that went down/up together with @ */
 NEARDATA struct monst *mydogs = (struct monst *) 0;
 /* monsters that are moving to another dungeon level */
@@ -498,7 +502,10 @@ NEARDATA const char* const hofe_titles[3] = { "the Hand of Elbereth",
                                             "the Envoy of Balance",
                                             "the Glory of Arioch" };
 
-
+NEARDATA char debug_buf_1[BUFSIZ] = "";
+NEARDATA char debug_buf_2[BUFSIZ] = "";
+NEARDATA char debug_buf_3[BUFSIZ] = "";
+NEARDATA char debug_buf_4[BUFSIZ] = "";
 
 /* dummy routine used to force linkage */
 void

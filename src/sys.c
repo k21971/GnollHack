@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    sys.c    $NHDT-Date: 1547118632 2019/01/10 11:10:32 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) Kenneth Lorber, Kensington, Maryland, 2008. */
@@ -18,8 +18,6 @@
 #endif
 
 struct sysopt sysopt;
-
-STATIC_DCL void NDECL(reset_global_variables);
 
 void
 sys_early_init()
@@ -155,12 +153,13 @@ int val;
 }
 
 
-STATIC_OVL void
+void
 reset_global_variables(VOID_ARGS)
 {
     wizard = discover = ModernMode = CasualMode = FALSE;
     save_initial_objects_values();
     save_initial_urolerace_values();
+    save_initial_artifact_values();
 #ifdef SYSFLAGS
     memset((genericptr_t)&sysflags, 0, sizeof(sysflags));
 #endif
@@ -214,35 +213,6 @@ reset_global_variables(VOID_ARGS)
     in_steed_dismounting = FALSE;
     has_strong_rngseed = FALSE;
     ubirthday = 0;
-    invent = (struct obj*)0;
-    uwep = (struct obj*)0;
-    uarm = (struct obj*)0;
-    uswapwep = (struct obj*)0;
-    uswapwep2 = (struct obj*)0;
-    uquiver = (struct obj*)0;       /* quiver */
-    uarmu = (struct obj*)0;     /* under-wear, so to speak */
-    uarmo = (struct obj*)0;     /* over-wear, so to speak */
-    uarmb = (struct obj*)0;     /* bracers */
-    uskin = (struct obj*)0; /* dragon armor, if a dragon */
-    uarmc = (struct obj*)0;
-    uarmh = (struct obj*)0;
-    uarms = (struct obj*)0;
-    uarmg = (struct obj*)0;
-    uarmf = (struct obj*)0;
-    uamul = (struct obj*)0;
-    umisc = (struct obj*)0;
-    umisc2 = (struct obj*)0;
-    umisc3 = (struct obj*)0;
-    umisc4 = (struct obj*)0;
-    umisc5 = (struct obj*)0;     /* miscellaneous */
-    uright = (struct obj*)0;
-    uleft = (struct obj*)0;
-    ublindf = (struct obj*)0;
-    uchain = (struct obj*)0;
-    uball = (struct obj*)0;
-    current_wand = 0;  /* wand currently zapped/applied */
-    thrownobj = 0;     /* object in flight due to throwing */
-    kickedobj = 0;     /* object in flight due to kicking */
     moves = 1L;
     monstermoves = 1L;
     wailmsg = 0L;
@@ -253,6 +223,11 @@ reset_global_variables(VOID_ARGS)
     *ramname = 0;
     *luggagename = 0;
     *wolfname = 0;
+    doggender = 0;
+    catgender = 0;
+    horsegender = 0;
+    ramgender = 0;
+    wolfgender = 0;
     preferred_pet = 0;
     domove_attempting = 0L;
     domove_succeeded = 0L;
@@ -261,6 +236,42 @@ reset_global_variables(VOID_ARGS)
     hearing_full_recalc = 0;
     *toplines = 0;
     upstairs_room = dnstairs_room = sstairs_room = 0;
+
+    reset_item_global_variables();
+}
+
+void
+reset_item_global_variables(VOID_ARGS)
+{
+    invent = (struct obj*)0;
+    uwep = (struct obj*)0;
+    uarm = (struct obj*)0;
+    uswapwep = (struct obj*)0;
+    uswapwep2 = (struct obj*)0;
+    uquiver = (struct obj*)0;
+    uarmu = (struct obj*)0;
+    uarmo = (struct obj*)0;
+    uarmb = (struct obj*)0;
+    uskin = (struct obj*)0;
+    uarmc = (struct obj*)0;
+    uarmh = (struct obj*)0;
+    uarms = (struct obj*)0;
+    uarmg = (struct obj*)0;
+    uarmf = (struct obj*)0;
+    uamul = (struct obj*)0;
+    umisc = (struct obj*)0;
+    umisc2 = (struct obj*)0;
+    umisc3 = (struct obj*)0;
+    umisc4 = (struct obj*)0;
+    umisc5 = (struct obj*)0;
+    uright = (struct obj*)0;
+    uleft = (struct obj*)0;
+    ublindf = (struct obj*)0;
+    uchain = (struct obj*)0;
+    uball = (struct obj*)0;
+    current_wand = 0;  /* wand currently zapped/applied */
+    thrownobj = 0;     /* object in flight due to throwing */
+    kickedobj = 0;     /* object in flight due to kicking */
 }
 
 /*sys.c*/

@@ -360,6 +360,26 @@ LibTallyRealTime()
     tally_realtime();
 }
 
+int
+LibValidateSaveFile(const char* filename)
+{
+    int fd;
+    int res = 0;
+    Strcpy(SAVEF, filename);
+#ifdef COMPRESS_EXTENSION
+    SAVEF[strlen(SAVEF) - strlen(COMPRESS_EXTENSION)] = '\0';
+#endif
+    nh_uncompress(SAVEF);
+    if ((fd = open_savefile()) >= 0) {
+        if (validate(fd, filename) == 0) {
+            res = 1;
+        }
+        (void)nhclose(fd);
+    }
+    nh_compress(SAVEF);
+    return res;
+}
+
 int GnollHackStart(cmdlineargs)
 char* cmdlineargs;
 {
@@ -369,7 +389,7 @@ char* cmdlineargs;
     Strcpy(cmdbuf, cmdlineargs);
     char parambufs[MAX_CMD_PARAMS][PL_NSIZ + 10] = { "" };
 
-	Strcpy(parambufs[0], "gnollhack");
+    Strcpy(parambufs[0], "gnollhack");
 
     int curparamcnt = 1;
     if (cmdlineargs)
@@ -411,7 +431,7 @@ char* cmdlineargs;
         params[i] = parambufs[i];
     }    
 
-	return GnollHackMain(curparamcnt, params);
+    return GnollHackMain(curparamcnt, params);
 }
 
 extern struct callback_procs lib_callbacks;

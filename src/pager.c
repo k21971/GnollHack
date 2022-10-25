@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    pager.c    $NHDT-Date: 1555627307 2019/04/18 22:41:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.151 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -304,7 +304,7 @@ int x, y;
     strcpy(tmpbuf, "");
     Sprintf(tmpbuf, "%s%s%s",
         (is_tame(mtmp) && accurate)
-        ? "tame "
+        ? (call_mon_tame(mtmp) ? "tame " : "allied ")
         : (is_peaceful(mtmp) && accurate)
         ? "peaceful "
         : "",
@@ -743,6 +743,8 @@ char *supplemental_name;
         dbase_str += 8;
     if (!strncmp(dbase_str, "tame ", 5))
         dbase_str += 5;
+    else if (!strncmp(dbase_str, "allied ", 7))
+        dbase_str += 7;
     else if (!strncmp(dbase_str, "peaceful ", 9))
         dbase_str += 9;
     if (!strncmp(dbase_str, "invisible ", 10))
@@ -1641,7 +1643,7 @@ boolean do_mons; /* True => monsters, False => objects */
     destroy_nhwindow(win);
 }
 
-static const char *suptext1[] = {
+STATIC_VAR const char *suptext1[] = {
     "%s is a member of a marauding horde of orcs",
     "rumored to have brutally attacked and plundered",
     "the ordinarily sheltered town that is located ",
@@ -1653,7 +1655,7 @@ static const char *suptext1[] = {
     (char *) 0,
 };
 
-static const char *suptext2[] = {
+STATIC_VAR const char *suptext2[] = {
     "\"%s\" is the common dungeon name of",
     "a nefarious orc who is known to acquire property",
     "from thieves and sell it off for profit.",
@@ -2221,7 +2223,7 @@ domenucontrols(VOID_ARGS)
 }
 
 /* data for dohelp() */
-static const struct {
+STATIC_VAR const struct {
     void NDECL((*f));
     const char *text;
 } help_menu_items[] = {

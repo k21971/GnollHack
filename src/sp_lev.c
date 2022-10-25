@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    sp_lev.c    $NHDT-Date: 1553787633 2019/03/28 15:40:33 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.111 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -236,23 +236,23 @@ extern struct engr *head_engr;
 extern int min_rx, max_rx, min_ry, max_ry; /* from mkmap.c */
 
 /* positions touched by level elements explicitly defined in the des-file */
-static char SpLev_Map[COLNO][ROWNO];
+STATIC_VAR char SpLev_Map[COLNO][ROWNO];
 
-static aligntyp ralign[3] = { AM_CHAOTIC, AM_NEUTRAL, AM_LAWFUL };
-static NEARDATA xchar xstart, ystart;
-static NEARDATA char xsize, ysize;
+STATIC_VAR aligntyp ralign[3] = { AM_CHAOTIC, AM_NEUTRAL, AM_LAWFUL };
+STATIC_VAR NEARDATA xchar xstart, ystart;
+STATIC_VAR NEARDATA char xsize, ysize;
 
 char *lev_message = 0;
 lev_region *lregions = 0;
 int num_lregions = 0;
 
-static boolean splev_init_present = FALSE;
-static boolean icedpools = FALSE;
-static int mines_prize_count = 0, soko_prize_count = 0; /* achievements */
+STATIC_VAR boolean splev_init_present = FALSE;
+STATIC_VAR boolean icedpools = FALSE;
+STATIC_VAR int mines_prize_count = 0, soko_prize_count = 0; /* achievements */
 
-static struct obj *container_obj[MAX_CONTAINMENT];
-static int container_idx = 0;
-static struct monst *invent_carrying_monster = NULL;
+STATIC_VAR struct obj *container_obj[MAX_CONTAINMENT];
+STATIC_VAR int container_idx = 0;
+STATIC_VAR struct monst *invent_carrying_monster = NULL;
 
 #define SPLEV_STACK_RESERVE 128
 
@@ -1776,6 +1776,9 @@ struct mkroom *croom;
             mtmp = christen_monst(mtmp, m->name.str);
             mtmp->u_know_mname = 1; /* On special levels you know all generated monsters -- maybe should be specified later */
         }
+
+        mtmp->mon_flags |= MON_FLAGS_SPLEVEL_RESIDENT; /* Created specifically for the special level; don't remove in bones if staying on the level */
+
         /*
          * This doesn't complain if an attempt is made to give a
          * non-mimic/non-shapechanger an appearance or to give a
@@ -1996,7 +1999,8 @@ struct mkroom *croom;
         }
 
         if (m->has_invent) {
-            discard_minvent(mtmp);
+            if(!m->keep_original_invent)
+                discard_minvent(mtmp);
             invent_carrying_monster = mtmp;
         }
     }
@@ -2014,6 +2018,7 @@ struct mkroom *croom;
     schar x, y;
     char c;
     boolean named; /* has a name been supplied in level description? */
+    Sprintf(debug_buf_2, "create_object, oclass=%d, id=%d", o->class, o->id);
 
     named = o->name.str ? TRUE : FALSE;
 
@@ -2206,7 +2211,7 @@ struct mkroom *croom;
         unsigned long mkflags = o->open ? MKOBJ_FLAGS_OPEN_COFFIN : 0UL;
         mkflags |= o->corpsenm > NON_PM ? MKOBJ_FLAGS_MONSTER_SPECIFIED : 0UL;
         
-        otmp = mksobj_at_with_flags(o->id, x, y, TRUE, !named, -1, 0, mkflags);
+        otmp = mksobj_at_with_flags(o->id, x, y, TRUE, !named, -1, 0L, 0L, mkflags);
     }
     else {
         /*
@@ -2330,7 +2335,7 @@ struct mkroom *croom;
         {
             if (objects[otmp->otyp].oc_subtyp == BOOKTYPE_NOVEL)
             {
-                const char* ntitle = noveltitle(&otmp->novelidx);
+                const char* ntitle = noveltitle(&otmp->novelidx, 0UL, 0UL);
                 if (ntitle)
                 {
                     otmp = oname(otmp, ntitle);
@@ -2338,7 +2343,7 @@ struct mkroom *croom;
             }
             else if (objects[otmp->otyp].oc_subtyp == BOOKTYPE_MANUAL)
             {
-                const char* mtitle = manualtitle(&otmp->manualidx);
+                const char* mtitle = manualtitle(&otmp->manualidx, 0UL, 0UL);
                 if (mtitle)
                 {
                     otmp = oname(otmp, mtitle);
@@ -3722,7 +3727,7 @@ struct sp_coder *coder;
     opvar_free(op);
 }
 
-static const monster emptymons; /* Initialized to zero automatically */
+STATIC_VAR const monster emptymons; /* Initialized to zero automatically */
 
 void
 spo_monster(coder)
@@ -3751,6 +3756,7 @@ struct sp_coder *coder;
     tmpmons.stunned = 0;
     tmpmons.confused = 0;
     tmpmons.waitforu = 0;
+    tmpmons.keep_original_invent = 0;
     tmpmons.protector = 0;
     tmpmons.seentraps = 0;
     tmpmons.has_invent = 0;
@@ -3804,6 +3810,10 @@ struct sp_coder *coder;
         case SP_M_V_WAITFORU:
             if (OV_typ(parm) == SPOVAR_INT)
                 tmpmons.waitforu = OV_i(parm);
+            break;
+        case SP_M_V_KEEP_ORIGINAL_INVENTORY:
+            if (OV_typ(parm) == SPOVAR_INT)
+                tmpmons.keep_original_invent = OV_i(parm);
             break;
         case SP_M_V_PROTECTOR:
             if (OV_typ(parm) == SPOVAR_INT)
@@ -3897,7 +3907,7 @@ struct sp_coder *coder;
 }
 
 
-static const object emptyobject; /* Initialized to zero automatically */
+STATIC_VAR const object emptyobject; /* Initialized to zero automatically */
 
 void
 spo_object(coder)
@@ -8314,6 +8324,31 @@ const char *name;
 
 give_up:
     return result;
+}
+
+void
+reset_splev(VOID_ARGS)
+{
+    selection_flood_check_func = 0;
+    floodfillchk_match_under_typ = 0;
+    xsize = ysize = 0;
+    xstart = ystart = 0;
+    memset((genericptr_t)&SpLev_Map, 0, sizeof(SpLev_Map));
+    ralign[0] = AM_CHAOTIC;
+    ralign[1] = AM_NEUTRAL;
+    ralign[2] = AM_LAWFUL;
+
+    lev_message = 0;
+    lregions = 0;
+    num_lregions = 0;
+
+    splev_init_present = FALSE;
+    icedpools = FALSE;
+    mines_prize_count = 0, soko_prize_count = 0; /* achievements */
+
+    memset((genericptr_t)&container_obj, 0, sizeof(container_obj));
+    container_idx = 0;
+    invent_carrying_monster = NULL;
 }
 
 

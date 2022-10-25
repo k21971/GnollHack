@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    monmove.c    $NHDT-Date: 1557094802 2019/05/05 22:20:02 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -180,10 +180,15 @@ struct monst* mon;
                         char itembuf[BUFSZ];
                         char someitembuf[BUFSZ];
                         struct obj* otmp;
-                        if (cnt == 1 && (otmp = get_first_sellable_item(mon)) != 0)
+                        if (cnt == 1 && !iflags.using_gui_sounds && (otmp = get_first_sellable_item(mon)) != 0)
                         {
-                            strcpy(itembuf, otmp->quan == 1 ? an(cxname(otmp)) : cxname(otmp));
+                            strcpy(itembuf, otmp->quan == 1 ? acxname(otmp) : cxname(otmp));
                             strcpy(someitembuf, itembuf);
+                        }
+                        else if (cnt == 1)
+                        {
+                            strcpy(itembuf, "item");
+                            strcpy(someitembuf, "an item");
                         }
                         else
                         {
@@ -197,18 +202,22 @@ struct monst* mon;
                         switch (mon->talkstate_item_trading)
                         {
                         case 0:
+                            play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_HOW_ARE_YOU_I_HAVE_AN_ITEM_FOR_SALE : MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_HOW_ARE_YOU_I_HAVE_SOME_ITEMS_FOR_SALE);
                             Sprintf(yellbuf, "Hello, adventurer! How are you? I have %s for sale.", someitembuf);
                             mon_yells(mon, yellbuf, "say", "politely", TRUE);
                             break;
                         case 1:
+                            play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_AGAIN_I_STILL_HAVE_AN_ITEM_FOR_SALE : MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_AGAIN_I_STILL_HAVE_SOME_ITEMS_FOR_SALE);
                             Sprintf(yellbuf, "Hello again, I still have %s for sale.", someitembuf);
                             mon_yells(mon, yellbuf, "say", "politely", TRUE);
                             break;
                         case 2:
-                            Sprintf(yellbuf, "How is your adventuring going? Would you still have interest in %s?", someitembuf);
+                            play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HOW_IS_YOUR_ADVENTURING_GOING_WOULD_YOU_PERHAPS_HAVE_NOW_INTEREST_IN_BUYING_AN_ITEM : MONSTER_ITEM_TRADING_LINE_TRADING_HOW_IS_YOUR_ADVENTURING_GOING_WOULD_YOU_PERHAPS_HAVE_NOW_INTEREST_IN_BUYING_SOME_ITEMS);
+                            Sprintf(yellbuf, "How is your adventuring going? Would you perhaps have now interest in buying %s?", someitembuf);
                             mon_yells(mon, yellbuf, "say", "inquisitively", TRUE);
                             break;
                         case 3:
+                            play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_THERE_AGAIN_ANY_INTEREST_IN_MY_ITEM : MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_THERE_AGAIN_ANY_INTEREST_IN_MY_ITEMS);
                             Sprintf(yellbuf, "Hello there again! Any interest in my %s?", itembuf);
                             mon_yells(mon, yellbuf, "say", "politely", TRUE);
                             break;
@@ -242,7 +251,7 @@ register struct monst *mtmp;
     int x, y;
 
     if (is_peaceful(mtmp) && in_town(u.ux + u.dx, u.uy + u.dy)
-        && !is_blinded(mtmp) && m_canseeu(mtmp) && !rn2(3)) {
+        && !m_cannotsenseu(mtmp) && m_canseeu(mtmp) && !rn2(3)) {
         if (picking_lock(&x, &y) && IS_DOOR(levl[x][y].typ)
             && (levl[x][y].doormask & D_LOCKED)) {
             if (couldsee(mtmp->mx, mtmp->my)) {
@@ -459,29 +468,45 @@ boolean digest_meal;
         }
     }
 
-
     /* Spec_used */
-    if (mon->mspec_used)
-        mon->mspec_used--;
+    /* Counters using energy regeneration */
+    int enregmult = mon_spec_cooldown_divisor(mon);
+    if (mon->mspec_used > enregmult)
+        mon->mspec_used -= enregmult;
+    else
+        mon->mspec_used = 0;
 
-    if (mon->mmagespell_used)
-        mon->mmagespell_used--;
+    if (mon->mmagespell_used > enregmult)
+        mon->mmagespell_used -= enregmult;
+    else
+        mon->mmagespell_used = 0;
 
-    if (mon->mmageintermediate_used)
-        mon->mmageintermediate_used--;
+    if (mon->mmageintermediate_used > enregmult)
+        mon->mmageintermediate_used -= enregmult;
+    else
+        mon->mmageintermediate_used = 0;
 
-    if (mon->mmageultimate_used)
-        mon->mmageultimate_used--;
+    if (mon->mmageultimate_used > enregmult)
+        mon->mmageultimate_used -= enregmult;
+    else
+        mon->mmageultimate_used = 0;
 
-    if (mon->mclericspell_used)
-        mon->mclericspell_used--;
+    if (mon->mclericspell_used > enregmult)
+        mon->mclericspell_used -= enregmult;
+    else
+        mon->mclericspell_used = 0;
 
-    if (mon->mclericintermediate_used)
-        mon->mclericintermediate_used--;
+    if (mon->mclericintermediate_used > enregmult)
+        mon->mclericintermediate_used -= enregmult;
+    else
+        mon->mclericintermediate_used = 0;
 
-    if (mon->mclericultimate_used)
-        mon->mclericultimate_used--;
+    if (mon->mclericultimate_used > enregmult)
+        mon->mclericultimate_used -= enregmult;
+    else
+        mon->mclericultimate_used = 0;
 
+    /* Counters not using energy regeneration */
     if (mon->mdemonsummon_used)
         mon->mdemonsummon_used--;
 
@@ -676,7 +701,7 @@ int *inrange, *nearby, *scared;
      * running into you by accident but possibly attacking the spot
      * where it guesses you are.
      */
-    if (is_blinded(mtmp) || (Invis && !has_see_invisible(mtmp))) {
+    if (m_cannotsenseu(mtmp)) {
         seescaryx = mtmp->mux;
         seescaryy = mtmp->muy;
     } else {
@@ -724,10 +749,8 @@ register struct monst *mtmp;
 
     mdat = mtmp->data;
 
-    if (mtmp->data == &mons[PM_VLAD_THE_IMPALER])
-        tmp = 0;
-
-    if (mtmp->mstrategy & STRAT_ARRIVE) {
+    if (mtmp->mstrategy & STRAT_ARRIVE) 
+    {
         int res = m_arrival(mtmp);
         if (res >= 0)
             return res;
@@ -818,7 +841,8 @@ register struct monst *mtmp;
     {
         if (use_defensive(mtmp) != 0)
             return 1;
-    } else if (find_misc(mtmp))
+    } 
+    else if (find_misc(mtmp))
     {
         if (use_misc(mtmp) != 0)
             return 1;
@@ -957,7 +981,7 @@ register struct monst *mtmp;
             && !(mtmp->mtrapped && !nearby && select_rwep(mtmp))) 
         {
             mtmp->weapon_strategy = NEED_HTH_WEAPON;
-            if (mon_wield_item(mtmp, FALSE) != 0)
+            if (mon_wield_item(mtmp, FALSE, u.ux, u.uy) != 0)
                 return 0;
         }
     }
@@ -1097,14 +1121,14 @@ struct monst* mtmp;
 }
 
 
-static NEARDATA const char practical[] = { WEAPON_CLASS, ARMOR_CLASS,
+STATIC_VAR NEARDATA const char practical[] = { WEAPON_CLASS, ARMOR_CLASS,
                                            GEM_CLASS, FOOD_CLASS, MISCELLANEOUS_CLASS, 0 };
-static NEARDATA const char magical[] = { AMULET_CLASS, POTION_CLASS,
+STATIC_VAR NEARDATA const char magical[] = { AMULET_CLASS, POTION_CLASS,
                                          SCROLL_CLASS, WAND_CLASS,
                                          RING_CLASS,   SPBOOK_CLASS, MISCELLANEOUS_CLASS, 0 };
-static NEARDATA const char indigestion[] = { BALL_CLASS, ROCK_CLASS, 0 };
-static NEARDATA const char boulder_class[] = { ROCK_CLASS, 0 };
-static NEARDATA const char gem_class[] = { GEM_CLASS, 0 };
+STATIC_VAR NEARDATA const char indigestion[] = { BALL_CLASS, ROCK_CLASS, 0 };
+STATIC_VAR NEARDATA const char boulder_class[] = { ROCK_CLASS, 0 };
+STATIC_VAR NEARDATA const char gem_class[] = { GEM_CLASS, 0 };
 
 boolean
 itsstuck(mtmp)
@@ -1187,7 +1211,7 @@ xchar nix,niy;
             if (!(mw_tmp = MON_WEP(mtmp)) || !is_pick(mw_tmp))
                 mtmp->weapon_strategy = NEED_PICK_AXE;
         }
-        if (mtmp->weapon_strategy >= NEED_PICK_AXE && mon_wield_item(mtmp, FALSE))
+        if (mtmp->weapon_strategy >= NEED_PICK_AXE && mon_wield_item(mtmp, FALSE, nix, niy))
             return TRUE;
     }
     return FALSE;
@@ -1390,9 +1414,8 @@ register int after;
                               && (levl[gx][gy].lit || !levl[omx][omy].lit)
                               && (dist2(omx, omy, gx, gy) <= 36));
 
-        if (is_blinded(mtmp)
-            || (should_see && Invis && !has_see_invisible(mtmp) && rn2(11))
-            || is_obj_mappear(&youmonst,STRANGE_OBJECT) || u.uundetected
+        if ((should_see && m_cannotsenseu(mtmp) && rn2(11))
+            || is_obj_mappear(&youmonst,STRANGE_OBJECT)
             || (is_obj_mappear(&youmonst,GOLD_PIECE) && !likes_gold(ptr))
             || (is_peaceful(mtmp) && !mtmp->isshk) /* allow shks to follow */
             || ((mtmp->mnum == PM_STALKER || ptr->mlet == S_BAT
@@ -2048,6 +2071,13 @@ register int after;
                     return 2; /* it died */
             }
 
+            /* Maybe a rock mole just ate some metal object */
+            if (lithovore(ptr))
+            {
+                if (meatrock(mtmp) == 2)
+                    return 2; /* it died */
+            }
+
             if (g_at(mtmp->mx, mtmp->my) && likegold)
                 mpickgold(mtmp);
 
@@ -2160,7 +2190,8 @@ register struct monst *mtmp;
     if (mx == u.ux && my == u.uy)
         goto found_you;
 
-    notseen = (is_blinded(mtmp) || (Invis && !has_see_invisible(mtmp)));
+    notseen = m_cannotsenseu(mtmp);
+
     /* add cases as required.  eg. Displacement ... */
     if (notseen || Underwater) {
         /* Xorns can smell quantities of valuable metal

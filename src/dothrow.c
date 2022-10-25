@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    dothrow.c    $NHDT-Date: 1556201496 2019/04/25 14:11:36 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -20,11 +20,11 @@ STATIC_DCL boolean FDECL(toss_up, (struct obj *, BOOLEAN_P));
 STATIC_DCL void FDECL(sho_obj_return_to_u, (struct obj * obj));
 STATIC_DCL boolean FDECL(mhurtle_step, (genericptr_t, int, int));
 
-static NEARDATA const char toss_objs[] = { ALLOW_COUNT, COIN_CLASS,
+STATIC_VAR NEARDATA const char toss_objs[] = { ALLOW_COUNT, COIN_CLASS,
                                            ALL_CLASSES, WEAPON_CLASS, 0 };
 /* different default choices when wielding a sling (gold must be included) */
-static NEARDATA const char bullets[] = { ALLOW_COUNT, COIN_CLASS, ALL_CLASSES,
-                                         GEM_CLASS, 0 };
+STATIC_VAR NEARDATA const char bullets[] = { ALLOW_COUNT, COIN_CLASS, ALL_CLASSES,
+                                         GEM_CLASS, WEAPON_CLASS, 0 };
 
 /* thrownobj (decl.c) tracks an object until it lands */
 
@@ -123,7 +123,8 @@ boolean firing;
                          : (obj->oclass == WEAPON_CLASS && !is_launcher(obj)))
         && !(Confusion || Stunned)) 
     {
-        multishot = get_multishot_stats(&youmonst, obj, uwep, TRUE, (double*)0);     
+        struct multishot_result msres = get_multishot_stats(&youmonst, obj, uwep, TRUE);     
+        multishot = msres.wielder_attacks * msres.weapon_attacks;
         if ((long) multishot > obj->quan)
             multishot = (int) obj->quan;
         if (shotlimit > 0 && multishot > shotlimit)
@@ -178,26 +179,26 @@ boolean firing;
     return 1;
 }
 
-int
-get_multishot_stats(magr, otmp, weapon, thrown, average_ptr)
+struct multishot_result
+get_multishot_stats(magr, otmp, weapon, thrown)
 struct monst* magr;
 struct obj* otmp;
 struct obj* weapon;
 boolean thrown;
-double* average_ptr;
 {
+    struct multishot_result res = { 1, 1, 1.0 };
     if (!magr)
-        return 1;
+        return res;
 
+    boolean isyou = magr == &youmonst;
     int multishot = 1;
-    if (average_ptr)
-        *average_ptr = 1.0;
-
+    int wieldermultishot = 1;
+    double average = 1.0;
     if (!otmp || otmp == uarmg)
     {
         int skilllevel = 0;
         /* martial arts */
-        if (magr == &youmonst)
+        if (isyou)
         {
             skilllevel = limited_skill_level(P_MARTIAL_ARTS, FALSE, TRUE);
         }
@@ -223,12 +224,14 @@ double* average_ptr;
         }
 
         if (rn2(100) < martial_arts_multishot_percentage_chance(skilllevel))
-            multishot++;
+            wieldermultishot++;
 
-        if (average_ptr)
-            *average_ptr = 1.0 + martial_arts_multishot_percentage_chance(skilllevel) / 100.0;
+        average = 1.0 + martial_arts_multishot_percentage_chance(skilllevel) / 100.0;
 
-        return multishot;
+        res.wielder_attacks = wieldermultishot;
+        res.average = average;
+
+        return res;
     }
 
     boolean isammo = is_ammo(otmp);
@@ -253,7 +256,7 @@ double* average_ptr;
     }
 
     /* Find skill level */
-    if (magr == &youmonst)
+    if (isyou)
     {
         skilllevel = P_SKILL_LEVEL(weapon_skill_type(otmpmulti));
     }
@@ -286,13 +289,11 @@ double* average_ptr;
         {
         case MULTISHOT_LAUNCHER_MULTISHOT_BOW:
             multishot = 1 + (skilllevel > P_BASIC ? (rn2(100) < (skilllevel - 2) * 25 ? 1 : 0) : 0);
-            if (average_ptr)
-                *average_ptr = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 2) * 0.25 : 0.0);
+            average = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 2) * 0.25 : 0.0);
             break; 
         case MULTISHOT_LAUNCHER_REPEATING_CROSSBOW:
             multishot = 2;
-            if (average_ptr)
-                *average_ptr = 2.0;
+            average = 2.0;
             break;
         case MULTISHOT_LAUNCHER_STAFF_SLING:
         {
@@ -300,8 +301,7 @@ double* average_ptr;
             boolean has_random = skilllevel == P_SKILLED ? TRUE : FALSE;
             int random = has_random ? rn2(2) : 0;
             multishot = fixed + random;
-            if (average_ptr)
-                *average_ptr = (double)fixed + (has_random ? 0.5 : 0.0);
+            average = (double)fixed + (has_random ? 0.5 : 0.0);
             break;
         }
         default:
@@ -316,18 +316,15 @@ double* average_ptr;
         {
         case MULTISHOT_THROWN_DART:
             multishot = 1 + (skilllevel > P_SKILLED ? (rn2(100) < (skilllevel - 3) * 25 ? 1 : 0) : 0);
-            if (average_ptr)
-                *average_ptr = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 3) * 0.25 : 0.0);
+            average = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 3) * 0.25 : 0.0);
             break;
         case MULTISHOT_THROWN_SHURIKEN:
             multishot = 1 + (skilllevel > P_BASIC ? (rn2(100) < (skilllevel - 2) * 25 ? 1 : 0) : 0);
-            if (average_ptr)
-                *average_ptr = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 2) * 0.25 : 0.0);
+            average = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 2) * 0.25 : 0.0);
             break;
         case MULTISHOT_THROWN_DAGGER:
             multishot = 1 + (skilllevel > P_EXPERT ? (rn2(100) < (skilllevel - 4) * 25 ? 1 : 0) : 0);
-            if (average_ptr)
-                *average_ptr = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 4) * 0.25 : 0.0);
+            average = 1.0 + (skilllevel > P_BASIC ? (skilllevel - 4) * 0.25 : 0.0);
             break;
         default:
             break;
@@ -344,8 +341,7 @@ double* average_ptr;
             boolean has_random = skilllevel == P_SKILLED ? 1 : 0;
             int random = has_random ? rn2(2) : 0;
             multishot = fixed + random;
-            if (average_ptr)
-                *average_ptr = (double)fixed + (has_random ? 0.5 : 0.0);
+            average = (double)fixed + (has_random ? 0.5 : 0.0);
             break;
         }
         case MULTISHOT_MELEE_TRIPLE_HEADED_FLAIL:
@@ -354,8 +350,7 @@ double* average_ptr;
             boolean has_random = skilllevel == P_SKILLED || skilllevel == P_MASTER ? 1 : 0;
             int random = has_random ? rn2(2) : 0;
             multishot = fixed + random;
-            if (average_ptr)
-                *average_ptr = (double)fixed + (has_random ? 0.5 : 0.0);
+            average = (double)fixed + (has_random ? 0.5 : 0.0);
             break;
         }
         default:
@@ -363,7 +358,33 @@ double* average_ptr;
         }
     }
 
-    return multishot;
+    /* Find two-handed weapon skill level */
+    if (otmp && otmp == uwep && two_handed_bonus_applies(otmp))
+    {
+        if (isyou)
+        {
+            skilllevel = P_SKILL_LEVEL(P_TWO_HANDED_WEAPON);
+        }
+        else
+        {
+            if (is_prince(magr->data))
+                skilllevel = P_SKILLED;
+            else if (is_lord(magr->data))
+                skilllevel = P_BASIC;
+            else
+                skilllevel = P_UNSKILLED;
+        }
+
+        if (rn2(100) < two_handed_weapon_multishot_percentage_chance(skilllevel))
+            wieldermultishot++;
+
+        average *= 1.0 + two_handed_weapon_multishot_percentage_chance(skilllevel) / 100.0;
+    }
+    res.wielder_attacks = wieldermultishot;
+    res.weapon_attacks = multishot;
+    res.average = average;
+
+    return res;
 }
 
 
@@ -424,7 +445,7 @@ dothrow()
 
 /* KMH -- Automatically fill quiver */
 /* Suggested by Jeffrey Bay <jbay@convex.hp.com> */
-static void
+STATIC_OVL void
 autoquiver()
 {
     struct obj *otmp, *oammo = 0, *omissile = 0, *omisc = 0, *altammo = 0;
@@ -1481,6 +1502,7 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
 
             if (wep_mask && !(obj->owornmask & wep_mask)) 
             {
+                Strcpy(debug_buf_4, "throwit");
                 setworn(obj, wep_mask);
             }
             thrownobj = (struct obj *) 0;
@@ -1916,7 +1938,7 @@ uchar* hitres_ptr;
                     break;
                 }
                 if(!context.hide_melee_range_warning)
-                    You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit with %s at melee range.", an(cxname(uwep)));
+                    You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit with %s at melee range.", acxname(uwep));
 
                 context.hide_melee_range_warning = TRUE;
         }
@@ -1924,7 +1946,7 @@ uchar* hitres_ptr;
         {
             tmp -= THROWN_WEAPON_TO_HIT_MELEE_PENALTY;
             if (!context.hide_melee_range_warning && !is_obj_normally_edible(obj))
-                You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit by throwing %s at melee range.", an(cxname(obj)));
+                You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit by throwing %s at melee range.", acxname(obj));
 
             context.hide_melee_range_warning = TRUE;
         }
@@ -2268,11 +2290,11 @@ register struct obj *obj;
     boolean is_gem = objects[obj->otyp].oc_material == MAT_GEMSTONE;
     int ret = 0;
     int luck_change = 0;
-    static NEARDATA const char nogood[] = " is not interested in your junk.";
-    static NEARDATA const char acceptgift[] = " accepts your gift.";
-    static NEARDATA const char maybeluck[] = " hesitatingly";
-    static NEARDATA const char noluck[] = " graciously";
-    static NEARDATA const char addluck[] = " gratefully";
+    STATIC_VAR NEARDATA const char nogood[] = " is not interested in your junk.";
+    STATIC_VAR NEARDATA const char acceptgift[] = " accepts your gift.";
+    STATIC_VAR NEARDATA const char maybeluck[] = " hesitatingly";
+    STATIC_VAR NEARDATA const char noluck[] = " graciously";
+    STATIC_VAR NEARDATA const char addluck[] = " gratefully";
 
     Strcpy(buf, Monnam(mon));
     mon->mpeaceful = 1;
@@ -2424,6 +2446,9 @@ xchar x, y;
     }
 }
 
+STATIC_VAR NEARDATA long lastmovetime = 0L;
+STATIC_VAR NEARDATA boolean peaceful_shk = FALSE;
+
 /*
  * Unconditionally break an object. Assumes all resistance checks
  * and break messages have been delivered prior to getting here.
@@ -2498,8 +2523,6 @@ boolean from_invent;
             struct monst *shkp = shop_keeper(*o_shop);
 
             if (shkp) { /* (implies *o_shop != '\0') */
-                static NEARDATA long lastmovetime = 0L;
-                static NEARDATA boolean peaceful_shk = FALSE;
                 /*  We want to base shk actions on her peacefulness
                     at start of this turn, so that "simultaneous"
                     multiple breakage isn't drastically worse than
@@ -2666,6 +2689,13 @@ struct obj *obj;
     stackobj(obj);
     newsym(bhitpos.x, bhitpos.y);
     return 1;
+}
+
+void
+reset_throw(VOID_ARGS)
+{
+    peaceful_shk = FALSE;
+    lastmovetime = 0;
 }
 
 /*dothrow.c*/

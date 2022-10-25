@@ -67,7 +67,7 @@ namespace GnollHackClient
             StartLocalGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
             StartLocalGameButton.TextColor = Color.Gray;
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
 
             var gamePage = new GamePage(this);
@@ -76,7 +76,7 @@ namespace GnollHackClient
             gamePage.EnableModernMode = !classicModeSwitch.IsToggled;
             //gamePage.Disappearing += (sender2, e2) =>
             //{
-            //    if (App.IsiOS)
+            //    if (App.UsesCarousel)
             //        carouselView.Play();
             //};
             await App.Current.MainPage.Navigation.PushModalAsync(gamePage);
@@ -143,7 +143,7 @@ namespace GnollHackClient
             }
             else if (!GameStarted)
             {
-                if ((App.IsAndroid && !videoView.IsVisible) || (App.IsiOS && !_mainScreenMusicStarted))
+                if ((!App.UsesCarousel && !videoView.IsVisible) || (App.UsesCarousel && !_mainScreenMusicStarted))
                     PlayMainScreenVideoAndMusic();
             }
 
@@ -151,7 +151,7 @@ namespace GnollHackClient
             UpperButtonGrid.IsEnabled = true;
             LogoGrid.IsEnabled = true;
 
-            if(App.ShowSpecialEffect && !App.SponsorButtonVisited)
+            if(App.ShowSpecialEffect && !App.SponsorButtonVisited && SponsorButton.IsVisible)
             {
                 SponsorButton.AbortAnimation("AnimationCounter");
                 _sponsorAnimation = new Animation(v => SponsorButton.AnimationCounter = (long)v, 1, 120);
@@ -265,12 +265,34 @@ namespace GnollHackClient
             string verid = "?";
             string path = ".";
             string fmodverstr = "?";
+            string skiaverstr = "?";
+            string skiasharpverstr = "?";
             try
             {
                 verstr = App.GnollHackService.GetVersionString();
                 verid = App.GnollHackService.GetVersionId();
                 path = App.GnollHackService.GetGnollHackPath();
                 fmodverstr = App.FmodService.GetVersionString();
+                skiaverstr = SkiaSharpVersion.Native.ToString();
+                Assembly skiaSharpAssem = typeof(SkiaSharpVersion).Assembly;
+                AssemblyName skiaSharpAssemName = skiaSharpAssem.GetName();
+                Version ver = skiaSharpAssemName.Version;
+                skiasharpverstr = ver.Major + "." + ver.Minor;
+                var attr = skiaSharpAssem
+                    .GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
+                    as AssemblyInformationalVersionAttribute[];
+                if (attr != null && attr.Length > 0)
+                {
+                    string fullverid = attr[0].InformationalVersion;
+                    if (!string.IsNullOrWhiteSpace(fullverid))
+                    {
+                        int dashpos = fullverid.IndexOf("-");
+                        if (dashpos >= 0)
+                            skiasharpverstr = fullverid.Substring(0, dashpos);
+                        else
+                            skiasharpverstr = fullverid;
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -280,6 +302,8 @@ namespace GnollHackClient
             App.GHVersionId = verid;
             App.GHPath = path;
             App.FMODVersionString = fmodverstr;
+            App.SkiaVersionString = skiaverstr;
+            App.SkiaSharpVersionString = skiasharpverstr;
 
             VersionLabel.Text = verid;
             GnollHackLabel.Text = "GnollHack";
@@ -330,6 +354,9 @@ namespace GnollHackClient
                 App.FmodService.AdjustVolumes(generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume);
                 if (App.LoadBanks)
                     App.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, 0.5f, 1.0f);
+
+                /* Check silent mode; this also mutes everything if need be */
+                App.SilentMode = Preferences.Get("SilentMode", false);
             }
             catch (Exception ex)
             {
@@ -419,13 +446,13 @@ namespace GnollHackClient
 
         public void PlayMainScreenVideoAndMusic()
         {
-            if (App.IsAndroid)
+            if (!App.UsesCarousel)
             {
                 videoView.IsVisible = true;
                 videoView.Play();
                 StillImage.IsVisible = false;
             }
-            else if (App.IsiOS)
+            else // if (App.IsiOS)
             {
                 carouselView.IsVisible = true;
                 carouselView.Play();
@@ -458,7 +485,7 @@ namespace GnollHackClient
             //Task[] tasklist1 = new Task[2] { t1, t2 };
             //Task.WaitAll(tasklist1);
 
-            if (App.IsAndroid)
+            if (!App.UsesCarousel)
             {
                 videoView.IsVisible = true;
                 await videoView.FadeTo(1, 250);
@@ -582,12 +609,12 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
             var resetPage = new ResetPage();
             resetPage.Disappearing += (sender2, e2) =>
             {
-                if (App.IsiOS)
+                if (App.UsesCarousel)
                     carouselView.Play();
                 UpperButtonGrid.IsEnabled = true;
             };
@@ -599,13 +626,13 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
             var settingsPage = new SettingsPage(null, this);
             settingsPage.Disappearing += (sender2, e2) =>
             {
-                if (App.IsiOS)
-                    carouselView.Play();
+                //if (App.UsesCarousel)
+                //    carouselView.Play();
                 UpperButtonGrid.IsEnabled = true;
             };
             await App.Current.MainPage.Navigation.PushModalAsync(settingsPage);
@@ -616,7 +643,7 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
             string fulltargetpath = Path.Combine(App.GHPath, "defaults.gnh");
             var editorPage = new EditorPage(fulltargetpath, "Default Options File");
@@ -624,7 +651,7 @@ namespace GnollHackClient
             if (!editorPage.ReadFile(out errormsg))
             {
                 ErrorLabel.Text = errormsg;
-                if (App.IsiOS)
+                if (App.UsesCarousel)
                     carouselView.Play();
                 UpperButtonGrid.IsEnabled = true;
             }
@@ -633,7 +660,7 @@ namespace GnollHackClient
                 ErrorLabel.Text = "";
                 editorPage.Disappearing += (sender2, e2) =>
                 {
-                    if (App.IsiOS)
+                    if (App.UsesCarousel)
                         carouselView.Play();
                     UpperButtonGrid.IsEnabled = true;
                 };
@@ -646,12 +673,12 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
             var creditsPage = new CreditsPage();
             creditsPage.Disappearing += (sender2, e2) =>
             {
-                if (App.IsiOS)
+                if (App.UsesCarousel)
                     carouselView.Play();
                 UpperButtonGrid.IsEnabled = true;
             };
@@ -661,7 +688,7 @@ namespace GnollHackClient
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
-            if (App.IsAndroid)
+            if (!App.UsesCarousel)
             {
                 StillImage.IsVisible = true;
                 videoView.Stop();
@@ -682,33 +709,57 @@ namespace GnollHackClient
             {
                 _currentPageWidth = width;
                 _currentPageHeight = height;
+                UpdateMainScreenBackgroundElement(true);
+            }
+        }
 
-                if (App.IsAndroid)
+        public void UpdateMainScreenBackgroundStyle()
+        {
+            /* Change the situation as it would have been from the start */
+            if (App.UsesCarousel)
+            {
+                videoView.Stop();
+                videoView.IsVisible = false;
+                StillImage.IsVisible = false;
+                carouselView.IsVisible = true;
+            }
+            else
+            {
+                carouselView.Stop();
+                carouselView.IsVisible = false;
+                StillImage.IsVisible = true;
+                UpdateMainScreenBackgroundElement(false);
+            }
+        }
+
+        public void UpdateMainScreenBackgroundElement(bool playAfterUpdate)
+        {
+            if (!App.UsesCarousel)
+            {
+                videoView.Stop();
+                videoView.Source = null;
+                if (_currentPageWidth > _currentPageHeight)
                 {
-                    videoView.Stop();
-                    videoView.Source = null;
-                    if (width > height)
-                    {
-                        if (Device.RuntimePlatform == Device.UWP)
-                            videoView.Source = new Uri($"ms-appx:///Assets/mainmenulandscape.mp4");
-                        else
-                            videoView.Source = new Uri($"ms-appx:///mainmenulandscape.mp4");
-                    }
+                    if (Device.RuntimePlatform == Device.UWP)
+                        videoView.Source = new Uri($"ms-appx:///Assets/mainmenulandscape.mp4");
                     else
-                    {
-                        if (Device.RuntimePlatform == Device.UWP)
-                            videoView.Source = new Uri($"ms-appx:///Assets/mainmenuportrait.mp4");
-                        else
-                            videoView.Source = new Uri($"ms-appx:///mainmenuportrait.mp4");
-                    }
-                    videoView.WidthRequest = width;
-                    videoView.HeightRequest = height;
-                    videoView.Play();
+                        videoView.Source = new Uri($"ms-appx:///mainmenulandscape.mp4");
                 }
                 else
                 {
-                    carouselView.InvalidateSurface();
+                    if (Device.RuntimePlatform == Device.UWP)
+                        videoView.Source = new Uri($"ms-appx:///Assets/mainmenuportrait.mp4");
+                    else
+                        videoView.Source = new Uri($"ms-appx:///mainmenuportrait.mp4");
                 }
+                videoView.WidthRequest = _currentPageWidth;
+                videoView.HeightRequest = _currentPageHeight;
+                if(playAfterUpdate)
+                    videoView.Play();
+            }
+            else
+            {
+                carouselView.InvalidateSurface();
             }
         }
 
@@ -716,7 +767,7 @@ namespace GnollHackClient
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
             string fulltargetpath = Path.Combine(App.GHPath, "xlogfile");
             if(File.Exists(fulltargetpath))
@@ -726,7 +777,7 @@ namespace GnollHackClient
                 if (!topScorePage.ReadFile(out errormsg))
                 {
                     ErrorLabel.Text = errormsg;
-                    if (App.IsiOS)
+                    if (App.UsesCarousel)
                         carouselView.Play();
                     UpperButtonGrid.IsEnabled = true;
                 }
@@ -735,7 +786,7 @@ namespace GnollHackClient
                     ErrorLabel.Text = "";
                     topScorePage.Disappearing += (sender2, e2) =>
                     {
-                        if (App.IsiOS)
+                        if (App.UsesCarousel)
                             carouselView.Play();
                         UpperButtonGrid.IsEnabled = true;
                     };
@@ -748,13 +799,18 @@ namespace GnollHackClient
                 var topScorePage = new TopScorePage();
                 topScorePage.Disappearing += (sender2, e2) =>
                 {
-                    if (App.IsiOS)
+                    if (App.UsesCarousel)
                         carouselView.Play();
                     UpperButtonGrid.IsEnabled = true;
                 };
                 await App.Current.MainPage.Navigation.PushModalAsync(topScorePage);
             }
             UpperButtonGrid.IsEnabled = true;
+        }
+
+        public void PlayCarouselView()
+        {
+            carouselView.Play();
         }
 
         private void GetFilesFromResources()
@@ -771,7 +827,8 @@ namespace GnollHackClient
                     {
                         FileInfo file = new FileInfo(sfile);
                         DateTime moddate = Preferences.Get("Verify_" + f.id + "_LastWriteTime", DateTime.MinValue);
-                        if (moddate != file.LastWriteTimeUtc || file.Length != f.length)
+                        string version = Preferences.Get("Verify_" + f.id + "_Version", "");
+                        if (version != f.version || moddate != file.LastWriteTimeUtc || file.Length != f.length)
                         {
                             File.Delete(sfile);
                             if (Preferences.ContainsKey("Verify_" + f.id + "_Version"))
@@ -1158,7 +1215,7 @@ namespace GnollHackClient
             SponsorButton.IsEnabled = false;
             Uri uri = new Uri(GHConstants.GnollHackSponsorPage);
             App.PlayButtonClickedSound();
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Stop();
             try
             {
@@ -1172,7 +1229,7 @@ namespace GnollHackClient
             {
                 await DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
             }
-            if (App.IsiOS)
+            if (App.UsesCarousel)
                 carouselView.Play();
             SponsorButton.IsEnabled = true;
         }

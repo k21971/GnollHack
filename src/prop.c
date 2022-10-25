@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-04-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0 prop.c */
 /* Copyright (c) Janne Gustafsson, 2021.                            */
@@ -382,7 +382,7 @@ const char* condition_names[NUM_BL_CONDITIONS] = {
 };
 
 const char* status_names[MAX_STATUS_MARKS] = {
-    "Pet",
+    "Tame",
     "Peaceful",
     "Detected",
     "Object pile",
@@ -433,5 +433,21 @@ int prop_index;
     return "";
 }
 
+const char*
+get_status_name(mtmp, status_index)
+struct monst* mtmp;
+int status_index;
+{
+    switch (status_index)
+    {
+    case STATUS_MARK_PET:
+        if (!call_mon_tame(mtmp))
+            return "Ally";
+        break;
+    default:
+        break;
+    }
+    return status_names[status_index];
+}
 
 /* prop.c */

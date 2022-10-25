@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    eat.c    $NHDT-Date: 1542765357 2018/11/21 01:55:57 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.197 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -20,7 +20,6 @@ STATIC_DCL struct obj *FDECL(touchfood, (struct obj *));
 STATIC_DCL void NDECL(do_reset_eat);
 STATIC_DCL void FDECL(done_eating, (BOOLEAN_P));
 STATIC_DCL void FDECL(corpse_pre_effect, (int, UCHAR_P));
-STATIC_DCL boolean FDECL(intrinsic_possible, (int, struct permonst *));
 STATIC_DCL void FDECL(givit, (int, struct permonst *));
 STATIC_DCL void FDECL(temporary_givit, (int, int));
 STATIC_DCL void FDECL(corpse_after_effect, (int, UCHAR_P));
@@ -88,6 +87,9 @@ register struct obj *obj;
         && (!rust_causing_and_ironvorous(youmonst.data) || is_rustprone(obj)))
         return TRUE;
 
+    if (lithovore(youmonst.data) && is_obj_stony(obj) && !((In_sokoban(&u.uz) && obj->otyp == BOULDER)))
+        return TRUE;
+
     /* Ghouls only eat non-veggy corpses or eggs (see dogfood()) */
     if (u.umonnum == PM_GHOUL)
         return (boolean)((obj->otyp == CORPSE
@@ -153,7 +155,7 @@ init_uhunger()
 }
 
 /* tin types [SPINACH_TIN = -1, overrides corpsenm, nut==600] */
-static const struct {
+STATIC_VAR const struct {
     const char *txt;                      /* description */
     int nut;                              /* nutrition */
     Bitfield(fodder, 1);                  /* stocked by health food shops */
@@ -176,7 +178,7 @@ static const struct {
                 { "", 0, 0, 0 } };
 #define TTSZ SIZE(tintxts)
 
-static char *eatmbuf = 0; /* set by corpse_after_effect() */
+STATIC_VAR char *eatmbuf = 0; /* set by corpse_after_effect() */
 
 /* called after mimicing is over */
 STATIC_PTR int
@@ -340,23 +342,57 @@ reset_eat()
     return;
 }
 
+unsigned
+mon_nutrition_size_multiplier(mtmp)
+struct monst* mtmp;
+{
+    unsigned nutr_size_mult = 1;
+    switch (mtmp->data->msize)
+    {
+    case MZ_TINY:
+        nutr_size_mult = 4;
+        break;
+    case MZ_SMALL:
+        nutr_size_mult = 2;
+        break;
+    default:
+    case MZ_MEDIUM:
+        nutr_size_mult = 1;
+        break;
+    case MZ_LARGE:
+        nutr_size_mult = 1;
+        break;
+    case MZ_HUGE:
+        nutr_size_mult = 1;
+        break;
+    case MZ_GIGANTIC:
+        nutr_size_mult = 1;
+        break;
+    }
+
+    return nutr_size_mult;
+}
+
 /* base nutrition of a food-class object */
 unsigned
-obj_nutrition(otmp)
-struct obj *otmp;
+obj_nutrition(otmp, mtmp)
+struct obj* otmp;
+struct monst* mtmp;
 {
-    if (!otmp || (otmp->otyp == CORPSE && otmp->corpsenm < LOW_PM))
+    if (!otmp || !mtmp || (otmp->otyp == CORPSE && otmp->corpsenm < LOW_PM))
         return 0;
 
+    boolean isyou = mtmp == &youmonst;
     unsigned nut = (otmp->otyp == CORPSE) ? mons[otmp->corpsenm].cnutrit
+        : (otmp->otyp == STATUE) ? ((otmp->owt * objects[ROCK].oc_nutrition) / (max(1, otmp->quan * objects[ROCK].oc_weight)))
                       : otmp->globby ? otmp->owt
-                         : (unsigned) objects[otmp->otyp].oc_nutrition;
+                         : objects[otmp->otyp].oc_nutrition;
 
     if (otmp->otyp == ELVEN_WAYBREAD) 
     {
-        if (maybe_polyd(is_elf(youmonst.data), Race_if(PM_ELF)))
+        if (isyou ? maybe_polyd(is_elf(mtmp->data), Race_if(PM_ELF)) : is_elf(mtmp->data))
             nut += nut / 4; /* 800 -> 1000 */
-        else if (maybe_polyd(is_orc(youmonst.data), Race_if(PM_ORC)))
+        else if (isyou ? maybe_polyd(is_orc(mtmp->data), Race_if(PM_ORC)) : is_orc(mtmp->data))
             nut -= nut / 4; /* 800 -> 600 */
         /* prevent polymorph making a partly eaten wafer
            become more nutritious than an untouched one */
@@ -366,12 +402,12 @@ struct obj *otmp;
     } 
     else if (otmp->otyp == CRAM_RATION) 
     {
-        if (maybe_polyd(is_dwarf(youmonst.data), Race_if(PM_DWARF)))
+        if (isyou ? maybe_polyd(is_dwarf(mtmp->data), Race_if(PM_DWARF)) : is_dwarf(mtmp->data))
             nut += nut / 6; /* 600 -> 700 */
     }
     else if (otmp->otyp == TRIPE_RATION) 
     {
-        if (maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)))
+        if (isyou ? maybe_polyd(is_gnoll(mtmp->data), Race_if(PM_GNOLL)) : is_gnoll(mtmp->data))
             nut += nut * 2; /* 200 -> 600 */
     }
     return nut;
@@ -391,7 +427,7 @@ struct obj *otmp;
 
     if (!otmp->oeaten) {
         costly_alteration(otmp, COST_BITE);
-        otmp->oeaten = obj_nutrition(otmp);
+        otmp->oeaten = obj_nutrition(otmp, &youmonst);
     }
 
     if (carried(otmp)) {
@@ -708,7 +744,7 @@ double *dmg_p; /* for dishing out extra damage in lieu of Int loss */
 
         if (adjresult >= 2)
         {
-            static NEARDATA const char brainlessness[] = "brainlessness";
+            STATIC_VAR NEARDATA const char brainlessness[] = "brainlessness";
 
             if (Lifesaved)
             {
@@ -781,13 +817,14 @@ double *dmg_p; /* for dishing out extra damage in lieu of Int loss */
     return result;
 }
 
+STATIC_VAR NEARDATA long ate_brains = 0L;
+
 /* eating a corpse or egg of one's own species is usually naughty */
 STATIC_OVL boolean
 maybe_cannibal(pm, allowmsg)
 int pm;
 boolean allowmsg;
 {
-    static NEARDATA long ate_brains = 0L;
     struct permonst *fptr = &mons[pm]; /* food type */
 
     /* when poly'd into a tentacled one, multiple tentacle hits in one
@@ -943,7 +980,7 @@ fix_petrification()
  */
 
 /* intrinsic_possible() returns TRUE iff a monster can give an intrinsic. */
-STATIC_OVL boolean
+boolean
 intrinsic_possible(type, ptr)
 int type;
 register struct permonst *ptr;
@@ -1218,6 +1255,76 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
     if (eatmbuf)
         (void) eatmdone();
 
+    if (pm < LOW_PM || pm >= NUM_MONSTERS)
+        return;
+
+    struct permonst* ptr = &mons[pm];
+    boolean donotcheckfurther = FALSE;
+    if (has_hallucinating_corpse(ptr))
+    {
+        pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "Oh wow!  Great stuff!");
+        play_sfx_sound(SFX_ACQUIRE_HALLUCINATION);
+        (void)make_hallucinated((HHallucination & TIMEOUT) + 200L, FALSE,
+            0L);
+        donotcheckfurther = TRUE;
+    }
+
+    if (has_stunning_corpse(ptr))
+    {
+        if (!Stunned)
+            play_sfx_sound(SFX_ACQUIRE_STUN);
+        make_stunned((HStun & TIMEOUT) + mons[pm].mlevel * 2 + 5 + rnd(20), FALSE);
+        standard_hint("Some corpses make you stunned. You can also check this out by using a wand of probing.", &u.uhint.ate_stunning_corpse);
+        donotcheckfurther = TRUE;
+    }
+
+    if (conveys_see_invisible(ptr))
+    {
+        if (!See_invisible)
+        {
+            //First temporary
+            set_itimeout(&HSee_invisible, (long)rn1(100, 50));
+        }
+        else
+        {
+            //Then permanent
+            HSee_invisible |= FROM_ACQUIRED;
+        }
+        refresh_u_tile_gui_info(FALSE);
+        set_mimic_blocking(); /* do special mimic handling */
+        see_monsters();       /* see invisible monsters */
+        newsym(u.ux, u.uy);   /* see yourself! */
+        donotcheckfurther = TRUE;
+    }
+
+    if (conveys_invisibility(ptr))
+    {
+        if (!Invis)
+        {
+            //First temporary
+            set_itimeout(&HInvis, (long)rn1(100, 50));
+            if (!Blind && !Blocks_Invisibility)
+                self_invis_message();
+        }
+        else
+        {
+            //Then permanent
+            if (!(HInvis & INTRINSIC))
+                You_feel("hidden!");
+            HInvis |= FROM_ACQUIRED;
+            HSee_invisible |= FROM_ACQUIRED;
+        }
+        refresh_u_tile_gui_info(FALSE);
+        newsym(u.ux, u.uy);
+        donotcheckfurther = TRUE;
+    }
+
+    if (donotcheckfurther)
+    {
+        flush_screen(1);
+        return;
+    }
+
     switch (pm) {
     case PM_NEWT:
         /* MRKR: "eye of newt" may give small magical energy boost */
@@ -1257,33 +1364,6 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
         make_blinded(0L, !u.ucreamed);
         context.botl = 1;
         check_intrinsics = TRUE; /* might also convey poison resistance */
-        break;
-    case PM_STALKER:
-        if (!Invis) {
-            set_itimeout(&HInvis, (long) rn1(100, 50));
-            refresh_u_tile_gui_info(TRUE);
-            if (!Blind && !Blocks_Invisibility)
-                self_invis_message();
-        } else {
-            if (!(HInvis & INTRINSIC))
-                You_feel("hidden!");
-            HInvis |= FROM_ACQUIRED;
-            HSee_invisible |= FROM_ACQUIRED;
-        }
-        newsym(u.ux, u.uy);
-        /*FALLTHRU*/
-    case PM_YELLOW_LIGHT:
-    case PM_HELL_BAT:
-    case PM_GIANT_BAT:
-        if (!Stunned)
-            play_sfx_sound(SFX_ACQUIRE_STUN);
-        make_stunned((HStun & TIMEOUT) + 30L, FALSE);
-        /*FALLTHRU*/
-    case PM_BAT:
-        if (!Stunned)
-            play_sfx_sound(SFX_ACQUIRE_STUN);
-        make_stunned((HStun & TIMEOUT) + 30L, FALSE);
-        standard_hint("Some corpses make you stunned. You can also check this out by using a wand of probing.", &u.uhint.ate_stunning_corpse);
         break;
     case PM_CHAOS_MIMIC:
         tmp += 10;
@@ -1383,7 +1463,6 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
         break;
     }
 
-    struct permonst* ptr = &mons[pm];
     /* Level gain has been moved here, 100% chance */
     if (conveys_level(ptr))
     {
@@ -1401,14 +1480,6 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
         boolean conveys_WIS = conveys_wisdom(ptr);
         boolean conveys_CHA = conveys_charisma(ptr);
         int i, count;
-
-        if (has_hallucinating_corpse(ptr))
-        {
-            pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "Oh wow!  Great stuff!");
-            play_sfx_sound(SFX_ACQUIRE_HALLUCINATION);
-            (void)make_hallucinated((HHallucination & TIMEOUT) + 200L, FALSE,
-                0L);
-        }
 
         /* Check the monster for all of the intrinsics.  If this
          * monster can give more than one, pick one to try to give
@@ -1560,6 +1631,7 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
         set_ulycn(catch_lycanthropy);
         retouch_equipment(2);
     }
+    flush_screen(1);
     return;
 }
 
@@ -1807,6 +1879,7 @@ const char *mesg;
         if (tintxts[r].greasy) 
         {
             /* Assume !Glib, because you can't open tins when Glib. */
+            play_sfx_sound(SFX_ACQUIRE_GLIB);
             incr_itimeout(&Glib, rnd(15));
             refresh_u_tile_gui_info(TRUE);
             pline_ex(ATR_NONE, CLR_MSG_WARNING, "Eating %s food made your %s very slippery.",
@@ -2656,7 +2729,17 @@ struct obj *otmp;
                 RIN_PROTECTION);
             //u.ublessed = bounded_increase(u.ublessed, otmp->enchantment,
             //                              RIN_PROTECTION);
+            find_ac();
             context.botl = 1;
+            break;
+        case RIN_FORTITUDE:
+            u.ubasehpmax += d(1, 4);
+            updatemaxhp();
+            break;
+        case RIN_THE_SERPENT_GOD:
+        case RIN_WIZARDRY:
+            u.ubaseenmax += d(1, 4);
+            updatemaxen();
             break;
         case RIN_FREE_ACTION:
             /* Give sleep resistance instead */
@@ -2709,6 +2792,23 @@ struct obj *otmp;
             break;
         }
     }
+}
+
+STATIC_OVL boolean
+eat_statue(obj)
+struct obj* obj;
+{
+    if (pre_break_statue(obj))
+    {
+        if (carried(obj))
+            useup(obj);
+        else
+            useupf(obj, 1L);
+        return TRUE;
+    }
+    else
+        return FALSE;
+
 }
 
 /* called after eating non-food */
@@ -2789,21 +2889,13 @@ eatspecial()
         unpunish();
     if (otmp == uchain)
         unpunish(); /* but no useup() */
+    else if (otmp->otyp == STATUE)
+        (void)eat_statue(otmp);
     else if (carried(otmp))
         useup(otmp);
     else
         useupf(otmp, 1L);
 }
-
-/* NOTE: the order of these words exactly corresponds to the
-   order of oc_material values #define'd in objclass.h. */
-static const char *foodwords[] = {
-    "meal",    "liquid",  "wax",       "food",  "meat",       "food",       "paper",
-    "cloth",   "silk",    "leather",   "wood",  "bone",       "scale",      "metal",
-    "metal",   "copper",  "silver",    "gold",  "platinum",   "orichalcum", "adamantium", "mithril",
-    "plastic", "glass",   "rich food", "stone", "alien food", "void food",  "magic food"
-};
-
 
 STATIC_OVL const char *
 foodword(otmp)
@@ -2820,7 +2912,7 @@ struct obj *otmp;
     if (otmp->oclass == GEM_CLASS && (objects[otmp->otyp].oc_material == MAT_GLASS || objects[otmp->otyp].oc_material == MAT_CRYSTAL)
         && otmp->dknown)
         makeknown(otmp->otyp);
-    return foodwords[objects[otmp->otyp].oc_material];
+    return material_definitions[objects[otmp->otyp].oc_material].foodword;
 }
 
 /* called after consuming (non-corpse) food */
@@ -3175,7 +3267,18 @@ struct obj *otmp;
             return 2;
     }
 
-    if (otmp->otyp == APPLE && otmp->cursed && !Sleep_resistance) 
+    if ((cadaver && mnum >= LOW_PM && has_stunning_corpse(&mons[mnum]) && !Stun_resistance))
+    {
+        /* stunning */
+        Sprintf(buf, "%s like %s might make you stunned!  %s", foodsmell,
+            it_or_they, eat_it_anyway);
+        if (yn_function_es(YN_STYLE_GENERAL, ATR_NONE, CLR_MSG_NEGATIVE, (const char*)0, buf, ynchars, 'n', yndescs, (const char*)0) == 'n')
+            return 1;
+        else
+            return 2;
+    }
+
+    if (otmp->otyp == APPLE && otmp->cursed && !Sleep_resistance)
     {
         /* causes sleep, for long enough to be dangerous */
         Sprintf(buf, "%s like %s might have been poisoned.  %s", foodsmell,
@@ -3688,7 +3791,7 @@ doeat()
     }
 
     /* re-calc the nutrition */
-    basenutrit = (int) obj_nutrition(otmp);
+    basenutrit = (int) obj_nutrition(otmp, & youmonst);
 
     if (!objects[otmp->otyp].oc_name_known && (objects[otmp->otyp].oc_flags3 & O3_EATING_IDENTIFIES) && !hadhallucination)
     {
@@ -3783,7 +3886,8 @@ bite()
 
     if (context.victual.nmod < 0) 
     {
-        lesshungry(-context.victual.nmod);
+        int amt = -context.victual.nmod * (int)mon_nutrition_size_multiplier(&youmonst);
+        lesshungry(amt);
         consume_oeaten(context.victual.piece,
                        context.victual.nmod); /* -= -nmod */
     } 
@@ -3995,14 +4099,15 @@ reset_faint()
         unmul("You revive.");
 }
 
-static unsigned save_hs;
-static boolean saved_hs = FALSE;
+STATIC_VAR unsigned save_hs;
+STATIC_VAR boolean saved_hs = FALSE;
 
 void
 reset_hunger_status(VOID_ARGS)
 {
     save_hs = 0;
     saved_hs = FALSE;
+    ate_brains = 0L;
 }
 
 /* compute and comment on your (new?) hunger status */
@@ -4335,7 +4440,7 @@ struct obj *obj;
     long uneaten_amt, full_amount;
 
     /* get full_amount first; obj_nutrition() might modify obj->oeaten */
-    full_amount = (long) obj_nutrition(obj);
+    full_amount = (long) obj_nutrition(obj, &youmonst);
     uneaten_amt = (long) obj->oeaten;
     if (uneaten_amt > full_amount) {
         impossible(
@@ -4475,5 +4580,6 @@ int threat;
     }
     return FALSE;
 }
+
 
 /*eat.c*/

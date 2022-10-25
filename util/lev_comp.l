@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0  lev_comp.l	$NHDT-Date: 1543371690 2018/11/28 02:21:30 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /*	Copyright (c) 1989 by Jean-Christophe Collet */
@@ -78,8 +78,7 @@ YY_MALLOC_DECL
 void FDECL(init_yyin, (FILE *));
 void FDECL(init_yyout, (FILE *));
 
-long NDECL(handle_varstring_check);
-long FDECL(corefunc_str_check, (char *, long));
+int NDECL(handle_varstring_check);
 
 extern void VDECL(lc_error, (const char *, ...));
 extern struct lc_vardefs *FDECL(vardef_defined,(struct lc_vardefs *,char *, int));
@@ -99,10 +98,10 @@ void FDECL(advancepos, (char *));
 extern YYSTYPE yylval;
 
 int nh_line_number = 1;
-int token_start_pos = 0;
+size_t token_start_pos = 0;
 char curr_token[512];
 static char map[4096];
-static int map_cnt = 0;
+static size_t map_cnt = 0;
 
 FILE *orig_yyin = NULL;
 
@@ -125,7 +124,7 @@ FILE *orig_yyin = NULL;
 		  return MAP_ID;
 		}
 <MAPC>[-|}{+xABCISHKPLWTF\\#.,: 0123456789]*\r?\n	{
-		  int len = yyleng;
+		  size_t len = yyleng < 0 ? 0 : (size_t)yyleng;
 		  savetoken(yytext);
 		  /* convert \r\n to \n */
 		  if (len >= 2 && yytext[len - 2] == '\r')
@@ -286,6 +285,7 @@ waitforu	ST_RET(WAITFORU_ID);
 protector	ST_RET(PROTECTOR_ID);
 maxhp		ST_RET(MAXHP_ID);
 level_adjustment  ST_RET(LEVEL_ADJUSTMENT_ID);
+keep_original_inventory	ST_RET(KEEP_ORIGINAL_INVENTORY_ID);
 switchable	ST_RET(SWITCHABLE_ID);
 secret_door	ST_RET(SECRET_DOOR_ID);
 uses_up_key	ST_RET(USES_UP_KEY_ID);
@@ -588,7 +588,7 @@ FILE *output_f;
     yyout = output_f;
 }
 
-long
+int
 handle_varstring_check()
 {
     struct lc_vardefs *vd;

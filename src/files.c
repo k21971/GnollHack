@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    files.c    $NHDT-Date: 1546144856 2018/12/30 04:40:56 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.249 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -66,7 +66,7 @@ const
 
 #ifdef PREFIXES_IN_USE
 #define FQN_NUMBUF 4
-static char fqn_filename_buffer[FQN_NUMBUF][FQN_MAX_FILENAME];
+STATIC_VAR char fqn_filename_buffer[FQN_NUMBUF][FQN_MAX_FILENAME];
 #endif
 
 #if !defined(MFLOPPY) && !defined(VMS) && !defined(WIN32)
@@ -128,14 +128,19 @@ struct level_ftrack {
 #endif /*HOLD_LOCKFILE_OPEN*/
 
 #define WIZKIT_MAX 128
-static char wizkit[WIZKIT_MAX];
+STATIC_VAR char wizkit[WIZKIT_MAX];
 STATIC_DCL FILE *NDECL(fopen_wizkit_file);
 STATIC_DCL void FDECL(wizkit_addinv, (struct obj *));
+#ifndef MICRO
+STATIC_DCL void FDECL(print_special_savefile_extension, (char*, const char*));
+STATIC_DCL void FDECL(print_error_savefile_extension, (char*));
+STATIC_DCL void FDECL(print_imported_savefile_extension, (char*));
+#endif
 
 #ifdef AMIGA
 extern char PATH[]; /* see sys/amiga/amidos.c */
 extern char bbs_id[];
-static int lockptr;
+STATIC_VAR int lockptr;
 #ifdef __SASC_60
 #include <proto/dos.h>
 #endif
@@ -145,7 +150,7 @@ extern void FDECL(amii_set_text_font, (char *, int));
 #endif
 
 #if defined(WIN32) || defined(MSDOS)
-static int lockptr;
+STATIC_VAR int lockptr;
 #ifdef MSDOS
 #define Delay(a) msleep(a)
 #endif
@@ -219,8 +224,8 @@ STATIC_DCL int FDECL(open_levelfile_exclusively, (const char *, int, int));
 
 #define INBUF_SIZ 4 * BUFSIZ
 
-static char config_section_chosen[INBUF_SIZ]; // = (char*)0;
-static char config_section_current[INBUF_SIZ]; // = (char*)0;
+STATIC_VAR char config_section_chosen[INBUF_SIZ]; // = (char*)0;
+STATIC_VAR char config_section_current[INBUF_SIZ]; // = (char*)0;
 
 /*
  * fname_encode()
@@ -281,6 +286,26 @@ int bufsz;
         sp++;
     }
     return callerbuf;
+}
+
+
+int is_imported_error_savefile_name(savefilename)
+char* savefilename;
+{
+    size_t dlen = strlen(savefilename);
+    char ebuf[BUFSZ] = "";
+    print_error_savefile_extension(ebuf);
+    print_imported_savefile_extension(ebuf);
+    size_t elen = strlen(ebuf);
+    if (dlen <= elen)
+        return FALSE;
+
+    size_t i;
+    for (i = 0; i < elen; i++)
+        if (savefilename[dlen - 1 - i] != ebuf[elen - 1 - i])
+            return FALSE;
+
+    return TRUE;
 }
 
 /*
@@ -970,6 +995,10 @@ boolean regularize_it;
 #endif /* WIN32 */
 #endif /* MICRO */
 #endif /* VMS   */
+    if (plname_from_error_savefile)
+        set_error_savefile();
+    if (plname_from_imported_savefile)
+        set_imported_savefile();
 }
 
 #ifdef INSURANCE
@@ -982,25 +1011,68 @@ int fd;
 #endif
 
 #ifndef MICRO
-/* change pre-existing savefile name to indicate an error savefile */
-void
-set_error_savefile()
+STATIC_OVL void
+print_special_savefile_extension(printbuf, ext)
+char* printbuf;
+const char* ext;
 {
 #ifdef VMS
     {
-        char *semi_colon = rindex(SAVEF, ';');
+        char* semi_colon = rindex(printbuf, ';');
 
         if (semi_colon)
             *semi_colon = '\0';
     }
-    Strcat(SAVEF, ".e;1");
+    Sprintf(eos(printbuf), ".%s;1", ext);
 #else
 #ifdef MAC
-    Strcat(SAVEF, "-e");
+    Sprintf(eos(printbuf), "-%s", ext);
 #else
-    Strcat(SAVEF, ".e");
+    Sprintf(eos(printbuf), ".%s", ext);
 #endif
 #endif
+}
+
+STATIC_OVL void
+print_error_savefile_extension(printbuf)
+char* printbuf;
+{
+    print_special_savefile_extension(printbuf, "e");
+//#ifdef VMS
+//    {
+//        char* semi_colon = rindex(printbuf, ';');
+//
+//        if (semi_colon)
+//            *semi_colon = '\0';
+//    }
+//    Strcat(printbuf, ".e;1");
+//#else
+//#ifdef MAC
+//    Strcat(printbuf, "-e");
+//#else
+//    Strcat(printbuf, ".e");
+//#endif
+//#endif
+}
+
+STATIC_OVL void
+print_imported_savefile_extension(printbuf)
+char* printbuf;
+{
+    print_special_savefile_extension(printbuf, "i");
+}
+
+/* change pre-existing savefile name to indicate an error savefile */
+void
+set_error_savefile(VOID_ARGS)
+{
+    print_error_savefile_extension(SAVEF);
+}
+
+void
+set_imported_savefile(VOID_ARGS)
+{
+    print_imported_savefile_extension(SAVEF);
 }
 #endif
 
@@ -1114,8 +1186,14 @@ int
 load_saved_game(load_type)
 int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after saving quietly
 {
+    reseting = TRUE;
     if (load_type > 0)
     {
+        /* Reset game state */
+        dmonsfree();
+        reset_gamestate_ex();
+        reset_item_global_variables();
+
         /* Functions that would have been run at start */
         create_gamestate_levelfile();
     }
@@ -1142,11 +1220,14 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
             mark_synch(); /* flush output */
         }
         if (!dorecover_saved_game(fd)) //This deletes the save file in normal modes
+        {
+            reseting = FALSE;
             return 0;
-
+        }
         if (!wizard && remember_wiz_mode)
             wizard = TRUE;
 
+        reseting = FALSE;
         if (load_type > 0)
             flush_screen(1);
 
@@ -1166,6 +1247,7 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
             mode_message();
         }
 
+        boolean savefilekept = FALSE;
         if (discover || wizard || CasualMode)
         {
             //Note that you can be in both Casual and wizard mode
@@ -1174,6 +1256,7 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
                 if(load_type == 0)
                     pline("Keeping the save file.");
 
+                savefilekept = TRUE;
                 nh_compress(fq_save);
             }
             else
@@ -1184,27 +1267,57 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
                 }
                 else
                 {
+                    savefilekept = TRUE;
                     nh_compress(fq_save);
                 }
             }
         }
 
+        reset_save_file_name(savefilekept);
         return 1;
     }
+    reseting = FALSE;
     return 0;
+}
+
+void
+reset_save_file_name(savefilekept)
+boolean savefilekept;
+{
+    if (plname_from_error_savefile || plname_from_imported_savefile)
+    {
+        if (plname_from_imported_savefile)
+        {
+            flags.non_scoring = TRUE;
+        }
+        char oldsavef[SAVESIZE];
+        Strcpy(oldsavef, SAVEF);
+        plname_from_error_savefile = FALSE;
+        plname_from_imported_savefile = FALSE;
+        set_savefile_name(TRUE);
+        if (savefilekept && strcmp(SAVEF, oldsavef))
+        {
+            (void)remove(SAVEF); //If it happens to exist
+            (void)rename(oldsavef, SAVEF);
+        }
+    }
 }
 
 
 #if defined(SELECTSAVED)
 struct save_game_data 
-newsavegamedata(playername, gamestats, is_running)
+newsavegamedata(playername, filename, gamestats, is_running, is_error_savefile, is_imported_savefile)
 char* playername;
+char* filename;
 struct save_game_stats gamestats;
-boolean is_running;
+boolean is_running, is_error_savefile, is_imported_savefile;
 {
     struct save_game_data svgd = { 0 };
     svgd.playername = playername;
+    Strcpy(svgd.filename, filename ? filename : "");
     svgd.is_running = is_running;
+    svgd.is_error_save_file = is_error_savefile;
+    svgd.is_imported_save_file = is_imported_savefile;
     svgd.gamestats = gamestats;
     return svgd;
 }
@@ -1216,6 +1329,7 @@ struct save_game_stats* stats_ptr;
 {
     int fd;
     char *result = 0;
+    boolean dodeletefile = FALSE;
 
     Strcpy(SAVEF, filename);
 #ifdef COMPRESS_EXTENSION
@@ -1229,10 +1343,31 @@ struct save_game_stats* stats_ptr;
             get_save_game_stats_from_file(fd, stats_ptr);
             result = dupstr(tplname);
         }
+        else
+        {
+            dodeletefile = TRUE;
+        }
         (void) nhclose(fd);
     }
     nh_compress(SAVEF);
 
+    //Delete mismatching save files, so they do not hang around for nothing
+    if (dodeletefile)
+    {
+        //Confirmation
+        struct special_view_info info = { 0 };
+        char txtbuf[BUFSZ * 4] = "";
+        info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION;
+        info.title = "Delete Invalid Save File";
+        Sprintf(txtbuf, "Save file \"%s\" is invalid. Delete it?", filename);
+        info.text = txtbuf;
+        int res = open_special_view(info);
+        if (res)
+        {
+            pline("Deleting an invalid save file \"%s\".", filename);
+            delete_savefile();
+        }
+    }
     return result;
 #if 0
 /* --------- obsolete - used to be ifndef STORE_PLNAME_IN_FILE ----*/
@@ -1264,12 +1399,68 @@ struct save_game_stats* stats_ptr;
 /* --------- end of obsolete code ----*/
 #endif /* 0 - WAS STORE_PLNAME_IN_FILE*/
 }
+
 #if defined(ANDROID) || defined(GNH_MOBILE)
+int is_error_savefile_name(savefilename)
+char* savefilename;
+{
+    size_t dlen = strlen(savefilename);
+    char ebuf[BUFSZ] = "";
+    print_error_savefile_extension(ebuf);
+    size_t elen = strlen(ebuf);
+    if (dlen <= elen)
+        return FALSE;
+
+    size_t i;
+    for (i = 0; i < elen; i++)
+        if (savefilename[dlen - 1 - i] != ebuf[elen - 1 - i])
+            return FALSE;
+
+    return TRUE;
+}
+
+int is_imported_savefile_name(savefilename)
+char* savefilename;
+{
+    size_t dlen = strlen(savefilename);
+    char ebuf[BUFSZ] = "";
+    print_imported_savefile_extension(ebuf);
+    size_t elen = strlen(ebuf);
+    if (dlen <= elen)
+        return FALSE;
+
+    size_t i;
+    for (i = 0; i < elen; i++)
+        if (savefilename[dlen - 1 - i] != ebuf[elen - 1 - i])
+            return FALSE;
+
+    return TRUE;
+}
+
 int filter_running(entry)
 const struct dirent* entry;
 {
     return *entry->d_name && entry->d_name[strlen(entry->d_name) - 1] == '0';
 }
+
+int filter_error(entry)
+const struct dirent* entry;
+{
+    return is_error_savefile_name((char *)entry->d_name);
+}
+
+int filter_imported(entry)
+const struct dirent* entry;
+{
+    return is_imported_savefile_name((char*)entry->d_name);
+}
+
+int filter_imported_error(entry)
+const struct dirent* entry;
+{
+    return is_imported_error_savefile_name((char*)entry->d_name);
+}
+
 char*
 plname_from_running(filename, stats_ptr)
 const char* filename;
@@ -1323,6 +1514,8 @@ get_saved_games()
     {
         char *foundfile;
         const char *fq_save;
+        char fq_save_ebuf[BUFSZ];
+        char fq_save_ibuf[BUFSZ];
 
         Strcpy(plname, "*");
         set_savefile_name(FALSE);
@@ -1330,26 +1523,78 @@ get_saved_games()
         Strcat(SAVEF, COMPRESS_EXTENSION);
 #endif
         fq_save = fqname(SAVEF, SAVEPREFIX, 0);
+        Strcpy(fq_save_ebuf, fq_save);
+        Strcpy(fq_save_ibuf, fq_save);
+#ifndef MICRO
+        print_error_savefile_extension(fq_save_ebuf);
+        print_imported_savefile_extension(fq_save_ibuf);
+#endif
 
         int n = 0;
+        int n2 = 0;
+        int n3 = 0;
         foundfile = foundfile_buffer();
         if (findfirst((char *) fq_save)) {
             do {
                 ++n;
             } while (findnext());
         }
-        if (n > 0) {
-            result = (struct save_game_data*) alloc(((size_t)n + 1) * sizeof(struct save_game_data)); /* at most */
-            (void) memset((genericptr_t) result, 0, ((size_t)n + 1) * sizeof(struct save_game_data));
-            if (findfirst((char *) fq_save)) {
-                j = n = 0;
-                do {
-                    char *r;
-                    r = plname_from_file(foundfile, &gamestats);
-                    if (r)
-                        result[j++] = newsavegamedata(r, gamestats, FALSE);
-                    ++n;
-                } while (findnext());
+#ifndef MICRO
+        if (findfirst((char*)fq_save_ebuf)) {
+            do {
+                ++n2;
+            } while (findnext());
+        }
+        if (findfirst((char*)fq_save_ibuf)) {
+            do {
+                ++n3;
+            } while (findnext());
+        }
+#endif
+        if (n > 0 || n2 > 0 || n3 > 0) {
+            result = (struct save_game_data*) alloc(((size_t)n + (size_t)n2 + (size_t)n3 + 1) * sizeof(struct save_game_data)); /* at most */
+            (void) memset((genericptr_t) result, 0, ((size_t)n + (size_t)n2 + (size_t)n3 + 1) * sizeof(struct save_game_data));
+            if (n > 0)
+            {
+                if (findfirst((char*)fq_save)) {
+                    j = n = 0;
+                    do {
+                        char* r;
+                        r = plname_from_file(foundfile, &gamestats);
+                        if (r)
+                            result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, FALSE, FALSE);
+                        ++n;
+                    } while (findnext());
+                }
+            }
+            if (n2 > 0)
+            {
+                if (findfirst((char*)fq_save_ebuf)) {
+                    n2 = 0;
+                    do {
+                        char* r;
+                        r = plname_from_file(foundfile, &gamestats);
+                        if (r)
+                            result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, TRUE, FALSE);
+                        ++n2;
+                    } while (findnext());
+                }
+            }
+            if (n3 > 0)
+            {
+                if (findfirst((char*)fq_save_ibuf)) {
+                    n3 = 0;
+                    do {
+                        char* r;
+                        r = plname_from_file(foundfile, &gamestats);
+                        if (r)
+                        {
+                            boolean isimportederror = is_imported_error_savefile_name(foundfile);
+                            result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, isimportederror, TRUE);
+                        }
+                        ++n3;
+                    } while (findnext());
+                }
             }
         }
     }
@@ -1385,7 +1630,7 @@ get_saved_games()
                         Sprintf(filename, "save/%d%s", uid, name);
                         r = plname_from_file(filename, &gamestats);
                         if (r)
-                            result[j++] = newsavegamedata(r, gamestats, FALSE);
+                            result[j++] = newsavegamedata(r, filename, gamestats, FALSE, FALSE, FALSE);
                     }
                 }
             }
@@ -1415,7 +1660,9 @@ get_saved_games()
                 r = plname_from_file(filename, &gamestats);
                 if (r)
                 {
-                    result[j++] = newsavegamedata(r, gamestats, FALSE);
+                    boolean isimportedfile = !!filter_imported(namelist[i]);
+                    boolean iserrorfile = filter_error(namelist[i]) || filter_imported_error(namelist[i]);
+                    result[j++] = newsavegamedata(r, filename, gamestats, FALSE, iserrorfile, isimportedfile);
                 }
             }
         }
@@ -1426,7 +1673,7 @@ get_saved_games()
                 char* r;
                 r = plname_from_running(namelist2[i]->d_name, &gamestats);
                 if (r)
-                    result[j++] = newsavegamedata(r, gamestats, TRUE);
+                    result[j++] = newsavegamedata(r, namelist2[i]->d_name, gamestats, TRUE, FALSE, FALSE);
             }
         }
     }
@@ -1839,10 +2086,10 @@ boolean uncomp;
 
 /* ----------  BEGIN FILE LOCKING HANDLING ----------- */
 
-static int nesting = 0;
+STATIC_VAR int nesting = 0;
 
 #if defined(NO_FILE_LINKS) || defined(USE_FCNTL) /* implies UNIX */
-static int lockfd; /* for lock_file() to pass to unlock_file() */
+STATIC_VAR int lockfd; /* for lock_file() to pass to unlock_file() */
 #endif
 #ifdef USE_FCNTL
 struct flock sflock; /* for unlocking, same as above */
@@ -3150,7 +3397,7 @@ struct _config_error_frame {
     struct _config_error_frame *next;
 };
 
-static struct _config_error_frame *config_error_data = 0;
+STATIC_VAR struct _config_error_frame *config_error_data = 0;
 
 void
 config_error_init(from_file, sourcename, secure)
@@ -3599,9 +3846,9 @@ extern struct symsetentry *symset_list;  /* options.c */
 extern struct symparse loadsyms[];       /* drawing.c */
 extern const char *known_handling[];     /* drawing.c */
 extern const char *known_restrictions[]; /* drawing.c */
-static int symset_count = 0;             /* for pick-list building only */
-static boolean chosen_symset_start = FALSE, chosen_symset_end = FALSE;
-static int symset_which_set = 0;
+STATIC_VAR int symset_count = 0;             /* for pick-list building only */
+STATIC_VAR boolean chosen_symset_start = FALSE, chosen_symset_end = FALSE;
+STATIC_VAR int symset_which_set = 0;
 
 STATIC_OVL
 FILE *
@@ -4404,11 +4651,11 @@ boolean wildcards;
 
 #define MAXPASSAGES SIZE(context.novel.pasg) /* 20 */
 
-static int FDECL(choose_passage, (int, unsigned));
+STATIC_DCL int FDECL(choose_passage, (int, unsigned));
 
 /* choose a random passage that hasn't been chosen yet; once all have
    been chosen, reset the tracking to make all passages available again */
-static int
+STATIC_OVL int
 choose_passage(passagecnt, oid)
 int passagecnt; /* total of available passages */
 unsigned oid; /* book.o_id, used to determine whether re-reading same book */

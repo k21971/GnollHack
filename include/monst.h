@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    monst.h    $NHDT-Date: 1550524559 2019/02/18 21:15:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -181,7 +181,7 @@ struct monst {
     Bitfield(isprotector, 1);                      /* attacks hostiles if itself is being peaceful */
     Bitfield(ispartymember, 1);                    /* a peaceful monster that has joined your party (e.g., does not give you the money or items back from its inventory) */
     /* 4 free bits to 32 bit integer */
-    /* The follow splits bitfields so they fit in one int both in 32 bit and 64 bit systems */
+    /* The following splits bitfields so they fit in one int both in 32 bit and 64 bit systems */
     uchar  talkstate_item_trading;                 /* 1 = has said introduction, 2 = has said non-repeatable secondary question, 3 = has said first repeatable confirmatory question,  4 = has said second repeatable confirmatory question */
     uchar  talkstate_special;                      /* Special index, e.g., for Aleax */
     short  general_special_index;                  /* Special general purpose index */
@@ -207,11 +207,13 @@ struct monst {
     /* 10 free bits to 32-bit integer */
 
     unsigned long mon_flags; /* General easy-to-add flags for monsters for things not covered by the above bitfields */
-#define MON_FLAGS_NONE              0x00000000
-#define MON_FLAGS_RWRAITH           0x00000001
-#define MON_FLAGS_CHAINED           0x00000002
-#define MON_FLAGS_CLONED_WIZ        0x00000004
-#define MON_FLAGS_SUMMONED_AT_ALTAR 0x00000008
+#define MON_FLAGS_NONE              0x00000000UL
+#define MON_FLAGS_RWRAITH           0x00000001UL
+#define MON_FLAGS_CHAINED           0x00000002UL
+#define MON_FLAGS_CLONED_WIZ        0x00000004UL
+#define MON_FLAGS_SUMMONED_AT_ALTAR 0x00000008UL
+#define MON_FLAGS_SPLEVEL_RESIDENT  0x00000010UL
+#define MON_FLAGS_YOUR_CHILD        0x00000020UL
 
     unsigned long mstrategy; /* for monsters with mflag3: current strategy */
 

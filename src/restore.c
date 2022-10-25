@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    restore.c    $NHDT-Date: 1555201698 2019/04/14 00:28:18 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -41,7 +41,7 @@ STATIC_OVL void FDECL(restore_msghistory, (int));
 STATIC_DCL void FDECL(reset_oattached_mids, (BOOLEAN_P));
 STATIC_DCL void FDECL(rest_levl, (int, BOOLEAN_P));
 
-static struct restore_procs {
+STATIC_VAR struct restore_procs {
     const char *name;
     int mread_flags;
     void NDECL((*restore_minit));
@@ -71,8 +71,8 @@ struct bucket {
 STATIC_DCL void NDECL(clear_id_mapping);
 STATIC_DCL void FDECL(add_id_mapping, (unsigned, unsigned));
 
-static int n_ids_mapped = 0;
-static struct bucket *id_map = 0;
+STATIC_VAR int n_ids_mapped = 0;
+STATIC_VAR struct bucket *id_map = 0;
 
 #ifdef AMII_GRAPHICS
 void FDECL(amii_setpens, (int)); /* use colors from save file */
@@ -82,8 +82,10 @@ extern int amii_numcolors;
 #include "display.h"
 
 boolean restoring = FALSE;
-static NEARDATA struct fruit *oldfruit;
-static NEARDATA long omoves;
+boolean reseting = FALSE;
+
+STATIC_VAR NEARDATA struct fruit *oldfruit;
+STATIC_VAR NEARDATA long omoves;
 
 #define Is_IceBox(o) ((o)->otyp == ICE_BOX ? TRUE : FALSE)
 
@@ -621,6 +623,7 @@ unsigned int *stuckid, *steedid;
     char timebuf[15];
     unsigned long uid;
     boolean defer_perm_invent;
+    Strcpy(debug_buf_4, "restgamestate");
 
     mread(fd, (genericptr_t) &uid, sizeof uid);
     if (SYSOPT_CHECK_SAVE_UID
@@ -918,6 +921,7 @@ register int fd;
     int rtmp;
     struct obj *otmp;
     struct save_game_stats dummy_stats = { 0 };
+    Strcpy(debug_buf_4, "dorecover_saved_game");
 
     restoring = TRUE;
     get_plname_from_file(fd, plname);
@@ -1702,11 +1706,11 @@ struct save_game_data* saved;
             char prefix[8] = "";
     #endif
 
-            Sprintf(namebuf, "%s", saved[k].playername);
+            Sprintf(namebuf, "%s%s%s%s", saved[k].playername, saved[k].is_running ? " [Crashed]" : "", saved[k].is_error_save_file ? " [Saved upon Error]" : "", saved[k].is_imported_save_file ? " [Imported]" : "");
             Sprintf(characterbuf, "%sLevel %d %s %s%s %s", prefix, saved[k].gamestats.ulevel, alignbuf, genderwithspacebuf, racebuf, rolebuf);
             Sprintf(adventuringbuf, "%sAdventuring %s%s%s", prefix, lvlbuf, dgnbuf, totallevelbuf);
             Sprintf(playingbuf, "%sPlaying at %s difficulty in %s mode for %ld turns", prefix, get_game_difficulty_text(saved[k].gamestats.game_difficulty),
-                get_game_mode_text_core(saved[k].gamestats.debug_mode, saved[k].gamestats.explore_mode, saved[k].gamestats.modern_mode, saved[k].gamestats.casual_mode, TRUE),
+                get_game_mode_text_core(saved[k].gamestats.debug_mode, saved[k].gamestats.explore_mode, saved[k].gamestats.modern_mode, saved[k].gamestats.casual_mode, saved[k].gamestats.non_scoring, TRUE),
                 saved[k].gamestats.umoves);
             char* timestr = ctime(&saved[k].gamestats.time_stamp);
             if (timestr && *timestr)
@@ -1764,6 +1768,8 @@ struct save_game_data* saved;
             if (ch > 0 && saved[ch - 1].playername > 0)
             {
                 Strcpy(plname, saved[ch - 1].playername);
+                plname_from_error_savefile = saved[ch - 1].is_error_save_file;
+                plname_from_imported_savefile = saved[ch - 1].is_imported_save_file;
                 if (style == 1)
                 {
                     shoulddelete = TRUE;
@@ -1994,11 +2000,11 @@ const char *suitename;
 #ifndef ZEROCOMP_BUFSIZ
 #define ZEROCOMP_BUFSIZ BUFSZ
 #endif
-static NEARDATA unsigned char inbuf[ZEROCOMP_BUFSIZ];
-static NEARDATA unsigned short inbufp = 0;
-static NEARDATA unsigned short inbufsz = 0;
-static NEARDATA short inrunlength = -1;
-static NEARDATA int mreadfd;
+STATIC_VAR NEARDATA unsigned char inbuf[ZEROCOMP_BUFSIZ];
+STATIC_VAR NEARDATA unsigned short inbufp = 0;
+STATIC_VAR NEARDATA unsigned short inbufsz = 0;
+STATIC_VAR NEARDATA short inrunlength = -1;
+STATIC_VAR NEARDATA int mreadfd;
 
 STATIC_OVL int
 zerocomp_mgetc()

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    save.c    $NHDT-Date: 1554591225 2019/04/06 22:53:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -17,7 +17,7 @@
 
 #ifdef MFLOPPY
 long bytes_counted;
-static int count_only;
+STATIC_VAR int count_only;
 #endif
 
 #ifdef MICRO
@@ -51,7 +51,7 @@ STATIC_DCL void FDECL(zerocomp_bwrite, (int, genericptr_t, size_t));
 STATIC_DCL void FDECL(zerocomp_bputc, (int));
 #endif
 
-static struct save_procs {
+STATIC_VAR struct save_procs {
     const char *name;
     void FDECL((*save_bufon), (int));
     void FDECL((*save_bufoff), (int));
@@ -74,7 +74,7 @@ static struct save_procs {
 #endif
 
 /* need to preserve these during save to avoid accessing freed memory */
-static unsigned ustuck_id = 0, usteed_id = 0;
+STATIC_VAR unsigned ustuck_id = 0, usteed_id = 0;
 
 int
 dosave()
@@ -275,7 +275,8 @@ boolean quietly;
     u.ustuck = (struct monst *) 0;
     u.usteed = (struct monst *) 0;
 
-    for (ltmp = (xchar) 1; ltmp <= maxledgerno(); ltmp++) {
+    xchar maxnoofledgers = maxledgerno();
+    for (ltmp = (xchar) 1; ltmp <= maxnoofledgers; ltmp++) {
         if (ltmp == ledger_no(&uz_save))
             continue;
         if (!(level_info[ltmp].flags & LFILE_EXISTS))
@@ -736,9 +737,9 @@ int fd;
     return;
 }
 
-static int bw_fd = -1;
-static FILE *bw_FILE = 0;
-static boolean buffering = FALSE;
+STATIC_VAR int bw_fd = -1;
+STATIC_VAR FILE *bw_FILE = 0;
+STATIC_VAR boolean buffering = FALSE;
 
 STATIC_OVL void
 def_bufon(fd)
@@ -849,11 +850,11 @@ int fd;
 #ifndef ZEROCOMP_BUFSIZ
 #define ZEROCOMP_BUFSIZ BUFSZ
 #endif
-static NEARDATA unsigned char outbuf[ZEROCOMP_BUFSIZ];
-static NEARDATA unsigned short outbufp = 0;
-static NEARDATA short outrunlength = -1;
-static NEARDATA int bwritefd;
-static NEARDATA boolean compressing = FALSE;
+STATIC_VAR NEARDATA unsigned char outbuf[ZEROCOMP_BUFSIZ];
+STATIC_VAR NEARDATA unsigned short outbufp = 0;
+STATIC_VAR NEARDATA short outrunlength = -1;
+STATIC_VAR NEARDATA int bwritefd;
+STATIC_VAR NEARDATA boolean compressing = FALSE;
 
 /*dbg()
 {
@@ -1388,6 +1389,7 @@ int fd;
     gamestats.explore_mode = discover;
     gamestats.modern_mode = ModernMode;
     gamestats.casual_mode = CasualMode;
+    gamestats.non_scoring = flags.non_scoring;
     gamestats.time_stamp = getnow();
     gamestats.num_recoveries = n_game_recoveries;
 

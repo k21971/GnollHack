@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    align.h    $NHDT-Date: 1432512779 2015/05/25 00:12:59 $  $NHDT-Branch: master $:$NHDT-Revision: 1.8 $ */
 /* Copyright (c) Mike Stephenson, Izchak Miller  1991.          */
@@ -37,8 +37,8 @@ typedef struct align { /* alignment & record */
 #define AM_SPLEV_NONCO 7
 
 #define Amask2align(x)                                          \
-    ((aligntyp)((!(x)) ? A_NONE : ((x) == AM_LAWFUL) ? A_LAWFUL \
-                                                     : ((int) x) - 2))
+    ((aligntyp)((!((x) & AM_MASK)) ? A_NONE : (((x) & AM_MASK) == AM_LAWFUL) ? A_LAWFUL \
+                                                     : ((int) ((x) & AM_MASK)) - 2))
 #define Align2amask(x) \
     (((x) == A_NONE) ? AM_NONE : ((x) == A_LAWFUL) ? AM_LAWFUL : (x) + 2)
 

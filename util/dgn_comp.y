@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0  dgn_comp.y	$NHDT-Date: 1432512785 2015/05/25 00:13:05 $  $NHDT-Branch: master $:$NHDT-Revision: 1.8 $ */
 /*	Copyright (c) 1989 by Jean-Christophe Collet */
@@ -159,7 +159,7 @@ desc		: DESCRIPTION ':' DESCRIPTOR
 			else
 			{
 			    tmpdungeon[n_dgns].has_tileset = 1;
-			    tmpdungeon[n_dgns].tileset = $<i>3 ;
+			    tmpdungeon[n_dgns].tileset = (uchar)$<i>3 ;
 			}
 		  }
 		;
@@ -431,8 +431,8 @@ acouple		: '(' INTEGER ',' INTEGER ')'
 			    yyerror("Abs range out of dlevel range - zeroing!");
 			    couple.base = couple.rand = 0;
 			} else {
-			    couple.base = $2;
-			    couple.rand = $4;
+			    couple.base = (short)$2;
+			    couple.rand = (short)$4;
 			}
 		  }
 		;
@@ -463,8 +463,8 @@ rcouple		: '(' INTEGER ',' INTEGER ')'
 			    yyerror("Rel base out of dlevel range - zeroing!");
 			    couple.base = couple.rand = 0;
 			} else {
-			    couple.base = $2;
-			    couple.rand = $4;
+			    couple.base = (short)$2;
+			    couple.rand = (short)$4;
 			}
 		  }
 		;

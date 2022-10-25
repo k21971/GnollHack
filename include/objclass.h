@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    objclass.h    $NHDT-Date: 1547255901 2019/01/12 01:18:21 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -77,6 +77,7 @@ struct material_definition {
     Bitfield(death_enchantable, 1);
     Bitfield(flimsy, 1);
     Bitfield(metallic, 1);
+    Bitfield(mineral, 1);
 
     Bitfield(gemstone, 1);
     Bitfield(organic, 1);
@@ -85,6 +86,8 @@ struct material_definition {
 
     Bitfield(fragile, 1);
     Bitfield(destroyed_in_lava, 1);
+
+    const char* foodword;
 };
 extern struct material_definition material_definitions[MAX_MATERIAL_TYPES]; /* in objnam.c */
 
@@ -343,6 +346,7 @@ enum enchantment_init_types {
     ENCHTYPE_TWO_HANDED_ELVEN_LAUNCHER,
     ENCHTYPE_SINGLE_HANDED_ELVEN_MELEE_WEAPON,
     ENCHTYPE_PROJECTILE_ALWAYS_START_0,
+    ENCHTYPE_GENERAL_WEAPON_ARMOR,
     MAX_ENCHTYPES
 };
 
@@ -402,6 +406,7 @@ struct objclass {
 #define melts_in_lava(otmp) (material_definitions[objects[(otmp)->otyp].oc_material].destroyed_in_lava != 0)
 #define is_metallic(otmp)  (material_definitions[objects[(otmp)->otyp].oc_material].metallic != 0) 
 #define is_fragile(otmp)  (material_definitions[objects[(otmp)->otyp].oc_material].fragile != 0) 
+#define is_obj_stony(otmp)  (material_definitions[objects[(otmp)->otyp].oc_material].mineral != 0) 
 
 /* primary damage: fire/rust/--- */
 /* is_flammable(otmp), is_rottable(otmp) in mkobj.c */
@@ -532,7 +537,9 @@ struct objclass {
 
 
 #define oc_spell_flags oc_aflags
-#define oc_spell_flags2 oc_aflags2
+#define oc_spell_effect_flags oc_aflags2
+#define oc_potion_effect_flags oc_aflags2
+#define oc_scroll_effect_flags oc_aflags2
 
 /* Spell flags for spells, scrolls, potions, spell-like tools, and wands */
 #define S1_NONE                                  0x00000000UL
@@ -563,6 +570,32 @@ struct objclass {
 #define S1_FLAGS_EFFECT_USES_SAVING_THROW_MASK        0x000FF000UL
 
 #define S2_NONE                                       0x00000000UL
+#define POTFLAGS_NONE                                 0x00000000UL
+#define POTFLAGS_CURSED_CURE_SICKNESS                 0x00000001UL
+#define POTFLAGS_UNCURSED_CURE_SICKNESS               0x00000002UL
+#define POTFLAGS_BLESSED_CURE_SICKNESS                0x00000004UL
+#define POTFLAGS_NONCURSED_CURE_SICKNESS              (POTFLAGS_UNCURSED_CURE_SICKNESS | POTFLAGS_BLESSED_CURE_SICKNESS)
+#define POTFLAGS_ALL_CURE_SICKNESS                    (POTFLAGS_CURSED_CURE_SICKNESS | POTFLAGS_UNCURSED_CURE_SICKNESS | POTFLAGS_BLESSED_CURE_SICKNESS)
+#define POTFLAGS_CURSED_CURE_BLINDNESS                0x00000008UL
+#define POTFLAGS_UNCURSED_CURE_BLINDNESS              0x00000010UL
+#define POTFLAGS_BLESSED_CURE_BLINDNESS               0x00000020UL
+#define POTFLAGS_NONCURSED_CURE_BLINDNESS             (POTFLAGS_UNCURSED_CURE_BLINDNESS | POTFLAGS_BLESSED_CURE_BLINDNESS)
+#define POTFLAGS_ALL_CURE_BLINDNESS                   (POTFLAGS_CURSED_CURE_BLINDNESS | POTFLAGS_UNCURSED_CURE_BLINDNESS | POTFLAGS_BLESSED_CURE_BLINDNESS)
+#define POTFLAGS_CURSED_CURE_HALLUCINATION            0x00000040UL
+#define POTFLAGS_UNCURSED_CURE_HALLUCINATION          0x00000080UL
+#define POTFLAGS_BLESSED_CURE_HALLUCINATION           0x00000100UL
+#define POTFLAGS_NONCURSED_CURE_HALLUCINATION         (POTFLAGS_UNCURSED_CURE_HALLUCINATION | POTFLAGS_BLESSED_CURE_HALLUCINATION)
+#define POTFLAGS_ALL_CURE_HALLUCINATION               (POTFLAGS_CURSED_CURE_HALLUCINATION | POTFLAGS_UNCURSED_CURE_HALLUCINATION | POTFLAGS_BLESSED_CURE_HALLUCINATION)
+#define POTFLAGS_CURSED_CURE_STUN                     0x00000200UL
+#define POTFLAGS_UNCURSED_CURE_STUN                   0x00000400UL
+#define POTFLAGS_BLESSED_CURE_STUN                    0x00000800UL
+#define POTFLAGS_NONCURSED_CURE_STUN                  (POTFLAGS_UNCURSED_CURE_STUN | POTFLAGS_BLESSED_CURE_STUN)
+#define POTFLAGS_ALL_CURE_STUN                        (POTFLAGS_CURSED_CURE_STUN | POTFLAGS_UNCURSED_CURE_STUN | POTFLAGS_BLESSED_CURE_STUN)
+#define POTFLAGS_CURSED_CURE_CONFUSION                0x00001000UL
+#define POTFLAGS_UNCURSED_CURE_CONFUSION              0x00002000UL
+#define POTFLAGS_BLESSED_CURE_CONFUSION               0x00004000UL
+#define POTFLAGS_NONCURSED_CURE_CONFUSION             (POTFLAGS_UNCURSED_CURE_CONFUSION | POTFLAGS_BLESSED_CURE_CONFUSION)
+#define POTFLAGS_ALL_CURE_CONFUSION                   (POTFLAGS_CURSED_CURE_CONFUSION | POTFLAGS_UNCURSED_CURE_CONFUSION | POTFLAGS_BLESSED_CURE_CONFUSION)
 
     short oc_hitbonus;                         /* weapons: "to hit" bonus */
     short oc_mc_adjustment;                    /* weapons: adjustment to any MC checks; spells and wands: MC adjustment */
@@ -836,17 +869,17 @@ struct objclass {
 
 
 /* Flags 2 */
-#define O2_NONE                    0x00000000UL
-#define O2_ELVEN_ITEM              0x00000001UL
-#define O2_DWARVEN_ITEM            0x00000002UL
-#define O2_ORCISH_ITEM             0x00000004UL
-#define O2_GNOLLISH_ITEM           0x00000008UL
-#define O2_DRAGON_ITEM             0x00000010UL
-#define O2_DEMON_ITEM              0x00000020UL
-#define O2_ANGELIC_ITEM            0x00000040UL
-#define O2_MODRON_ITEM             0x00000080UL
-#define O2_GNOMISH_ITEM            0x00000100UL
-    /* free bit */
+#define O2_NONE                   0x00000000UL
+#define O2_ELVEN_ITEM             0x00000001UL
+#define O2_DWARVEN_ITEM           0x00000002UL
+#define O2_ORCISH_ITEM            0x00000004UL
+#define O2_GNOLLISH_ITEM          0x00000008UL
+#define O2_DRAGON_ITEM            0x00000010UL
+#define O2_DEMON_ITEM             0x00000020UL
+#define O2_ANGELIC_ITEM           0x00000040UL
+#define O2_MODRON_ITEM            0x00000080UL
+#define O2_GNOMISH_ITEM           0x00000100UL
+#define O2_UNDEAD_ITEM            0x00000200UL
 
 #define O2_CONTAINER              0x00000400UL    
 #define O2_CONTAINER_BOX          0x00000800UL    
@@ -937,7 +970,7 @@ struct objclass {
 #define O4_GENERATED_CELESTIAL         0x00000800UL
 #define O4_GENERATED_PRIMORDIAL        0x00001000UL
 #define O4_GENERATED_INFERNAL          0x00002000UL
-#define O4_NEVER_GENERATED_WITH_EXCEPTIONALITY             0x00004000UL
+#define O4_NON_EXCEPTIONAL             0x00004000UL
 #define O4_DEALS_DAMAGE_TO_INAPPROPRIATE_CHARACTERS        0x00008000UL    /* deals damage when wielded like artifacts */
 #define O4_INAPPROPRIATE_CHARACTERS_CANT_HANDLE            0x00010000UL
 #define O4_NON_MYTHIC                                      0x00020000UL
@@ -971,10 +1004,18 @@ struct objclass {
 #define O5_EFFECT_IS_MANA              0x00000800UL /* (Potion) Effect data is mana */
 #define O5_EFFECT_IS_DAMAGE            0x00001000UL /* (Potion) Effect data is damage */
 #define O5_EFFECT_FOR_BLESSED_ONLY     0x00002000UL /* Effect data is for blessed potion only (monster detection, scroll of fire) */
-
+#define O5_EFFECT_FLAGS_ARE_HEALING    0x00004000UL /* aflags2 bits determine what ailments the effect cures */
+/* free bit */
 #define O5_LIGHT_SOURCE                0x00010000UL
 #define O5_BURNS_INFINITELY            0x00020000UL
 #define O5_NO_CATALOGUE                0x00040000UL
+#define O5_DOUBLE_EXCEPTIONALITY_CHANCE 0x00080000UL
+#define O5_HALF_EXCEPTIONALITY_CHANCE  0x00100000UL
+#define O5_CANNOT_BE_CELESTIAL         0x00200000UL
+#define O5_CANNOT_BE_PRIMORDIAL        0x00400000UL
+#define O5_CANNOT_BE_INFERNAL          0x00800000UL
+#define O5_MIXTURE_CLEARS              0x01000000UL
+
 
 #define O6_NONE                        0x00000000UL
 

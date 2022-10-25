@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    wield.c    $NHDT-Date: 1543492132 2018/11/29 11:48:52 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.58 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -106,6 +106,7 @@ register struct obj *obj;
 long mask;
 boolean verbose;
 {
+    Sprintf(debug_buf_3, "setuwepcore, hasobj=%d", obj != 0);
     struct obj* olduwep = (struct obj*)0;
     if (mask == W_WEP)
     {
@@ -333,6 +334,7 @@ void
 setuqwep(obj)
 register struct obj *obj;
 {
+    Sprintf(debug_buf_3, "setuqwep, hasobj=%d", obj != 0);
     setworncore(obj, W_QUIVER, TRUE);
     /* no extra handling needed; this used to include a call to
        update_inventory() but that's already performed by setworn() */
@@ -344,6 +346,7 @@ setuswapwep(obj, mask)
 register struct obj *obj;
 long mask;
 {
+    Sprintf(debug_buf_3, "setuswapwep, hasobj=%d", obj != 0);
     setworncore(obj, mask, TRUE);
     return;
 }
@@ -352,6 +355,7 @@ void
 setuqwepquietly(obj)
 register struct obj* obj;
 {
+    Sprintf(debug_buf_3, "setuqwepquietly, hasobj=%d", obj != 0);
     setworncore(obj, W_QUIVER, FALSE);
     /* no extra handling needed; this used to include a call to
        update_inventory() but that's already performed by setworn() */
@@ -363,25 +367,26 @@ setuswapwepquietly(obj, mask)
 register struct obj* obj;
 long mask;
 {
-    setworncore(obj, mask, FALSE); 
+    Sprintf(debug_buf_3, "setuswapwepquietly, hasobj=%d", obj != 0);
+    setworncore(obj, mask, FALSE);
     return;
 }
 
 
 /*** Commands to change particular slot(s) ***/
 
-static NEARDATA const char wield_objs[] = {
+STATIC_VAR NEARDATA const char wield_objs[] = {
     ALL_CLASSES, ALLOW_NONE, WEAPON_CLASS, TOOL_CLASS, 0
 };
-static NEARDATA const char ready_objs[] = {
+STATIC_VAR NEARDATA const char ready_objs[] = {
     ALLOW_COUNT, COIN_CLASS, ALL_CLASSES, ALLOW_NONE, WEAPON_CLASS, 0
 };
-static NEARDATA const char bullets[] = { /* (note: different from dothrow.c) */
+STATIC_VAR NEARDATA const char bullets[] = { /* (note: different from dothrow.c) */
     ALLOW_COUNT, COIN_CLASS, ALL_CLASSES, ALLOW_NONE,
     GEM_CLASS, WEAPON_CLASS, 0
 };
 
-static NEARDATA const char unwield_objs[] = { ALL_CLASSES, 0 };
+STATIC_VAR NEARDATA const char unwield_objs[] = { ALL_CLASSES, 0 };
 
 int
 dowield()
@@ -835,6 +840,7 @@ doswapweapon()
     register struct obj* oldwep2, * oldswap2;
     int result = 0;
     int result2 = 0;
+    Strcpy(debug_buf_4, "doswapweapon");
 
     /* May we attempt this? */
     multi = 0;
@@ -1569,19 +1575,19 @@ dotwoweapon()
     if (u.twoweap) 
     {
         play_ui_sound(UI_SOUND_STOP_TWO_WEAPON_COMBAT);
-        You("stop two-weapon fighting.");
+        You("stop two weapon fighting.");
         u.twoweap = 0;
     }
     else
     {
-        if (P_SKILL_LEVEL(P_TWO_WEAPON_COMBAT) == P_ISRESTRICTED)
+        if (P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT) == P_ISRESTRICTED)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("do not have the two-weapon combat skill.");
+            You("do not have the dual wielding skill.");
             return 0;
         }
         play_ui_sound(UI_SOUND_START_TWO_WEAPON_COMBAT);
-        You("begin two-weapon fighting.");
+        You("begin two weapon fighting.");
         u.twoweap = 1;
     }
 
@@ -1603,6 +1609,7 @@ dotwoweapon()
 void
 uwepgone()
 {
+    Strcpy(debug_buf_4, "uwepgone");
     if (uwep) {
         if ((artifact_light(uwep) || has_obj_mythic_magical_light(uwep) || obj_shines_magical_light(uwep)) && uwep->lamplit) {
             end_burn(uwep, FALSE);
@@ -1619,6 +1626,7 @@ uwepgone()
 void
 uwep2gone()
 {
+    Strcpy(debug_buf_4, "uwep2gone");
     if (uarms) {
         if ((artifact_light(uarms) || has_obj_mythic_magical_light(uarms) || obj_shines_magical_light(uarms)) && uarms->lamplit) {
             end_burn(uarms, FALSE);
@@ -1635,6 +1643,7 @@ uwep2gone()
 void
 uswapwepgone()
 {
+    Strcpy(debug_buf_4, "uswapwepgone");
     if (uswapwep) {
         setworn((struct obj *) 0, W_SWAPWEP);
         update_inventory();
@@ -1644,6 +1653,7 @@ uswapwepgone()
 void
 uswapwep2gone()
 {
+    Strcpy(debug_buf_4, "uswapwep2gone");
     if (uswapwep2) {
         setworn((struct obj*) 0, W_SWAPWEP2);
         update_inventory();
@@ -1654,6 +1664,7 @@ uswapwep2gone()
 void
 uqwepgone()
 {
+    Strcpy(debug_buf_4, "uqwepgone");
     if (uquiver) {
         setworn((struct obj *) 0, W_QUIVER);
         update_inventory();

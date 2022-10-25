@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mklev.c    $NHDT-Date: 1550800390 2019/02/22 01:53:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -40,8 +40,8 @@ STATIC_DCL void FDECL(mk_knox_portal, (XCHAR_P, XCHAR_P));
 #define create_vault() create_room(-1, -1, 2, 2, -1, -1, VAULT, TRUE, ROOM, 0, NON_PM)
 #define init_vault() vault_x = -1
 #define do_vault() (vault_x != -1)
-static xchar vault_x, vault_y;
-static boolean made_branch; /* used only during level creation */
+STATIC_VAR xchar vault_x, vault_y;
+STATIC_VAR boolean made_branch; /* used only during level creation */
 
 /* Args must be (const genericptr) so that qsort will always be happy. */
 
@@ -558,7 +558,7 @@ int *dy, *xx, *yy;
 }
 
 /* there should be one of these per trap, in the same order as trap.h */
-static NEARDATA const char *trap_engravings[TRAPNUM] = {
+STATIC_VAR NEARDATA const char *trap_engravings[TRAPNUM] = {
     (char *) 0,      (char *) 0,    (char *) 0,    (char *) 0, (char *) 0,
     (char *) 0,      (char *) 0,    (char *) 0,    (char *) 0, (char *) 0,
     (char *) 0,      (char *) 0,    (char *) 0,    (char *) 0,
@@ -1024,22 +1024,22 @@ makelevel()
             res = mkroom(COURT);
         if (!res && u_depth > 7 && !rn2(7))
             res = mkroom(LIBRARY);
-        if (!res && u_depth > 9 && u_depth < 20 && !rn2(6)
+        if (!res && u_depth > 8 && u_depth < 15 && !rn2(6)
             && !(mvitals[PM_KILLER_BEE].mvflags & MV_GONE))
             res = mkroom(BEEHIVE);
-        if (!res && u_depth > 10 && u_depth < 21 && !rn2(8) && antholemon())
+        if (!res && u_depth > 9 && u_depth < 16 && !rn2(8) && antholemon())
             res = mkroom(ANTHOLE);
         if (!res && u_depth > 11 && !rn2(6))
             res = mkroom(MORGUE);
-        if (!res && u_depth > 14 && !rn2(6)
+        if (!res && u_depth > 12 && !rn2(6)
             && !(mvitals[PM_SOLDIER].mvflags & MV_GONE))
             res = mkroom(BARRACKS);
-        if (!res && u_depth > 15 && !rn2(6))
+        if (!res && u_depth > 13 && !rn2(6))
             res = mkroom(SWAMP);
-        if (!res && u_depth > 16 && !rn2(8)
+        if (!res && u_depth > 14 && !rn2(8)
             && !(mvitals[PM_COCKATRICE].mvflags & MV_GONE))
             res = mkroom(COCKNEST);
-        if (!res && u_depth > 20 && !rn2(5))
+        if (!res && u_depth > 15 && !rn2(5))
             res = mkroom(DRAGONLAIR);
 
         if (u_depth >= 2 && u_depth < depth(&medusa_level) && !rn2(6))
@@ -1193,14 +1193,19 @@ makelevel()
 
                 if (context.game_difficulty < 0)
                 {
-                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                    long bits = 0L, bits2 = 0L;
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
                     if (otmp)
                     {
                         otmp->bknown = 1;
                         (void)add_to_container(stash, otmp);
+                        if(otmp->manualidx < 32)
+                            bits |= 1L << otmp->special_quality;
+                        else if (otmp->manualidx < 64)
+                            bits2 |= 1L << (otmp->special_quality - 32);
                     }
 
-                    otmp = mksobj(SPE_MANUAL, TRUE, FALSE, FALSE);
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, bits, bits2, MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS);
                     if (otmp)
                     {
                         otmp->bknown = 1;
@@ -1925,6 +1930,7 @@ coord *tm;
                 break;
             }
 
+            Strcpy(debug_buf_2, "mktrap");
             otmp = mkobj(poss_class, FALSE, FALSE);
             /* these items are always cursed, both for flavour (owned
                by a dead adventurer, bones-pile-style) and for balance
@@ -2219,7 +2225,7 @@ boolean match_player_alignment;
     levl[m.x][m.y].altarmask = Align2amask(al);
 }
 
-static void
+STATIC_OVL void
 mkgrave(croom)
 struct mkroom *croom;
 {

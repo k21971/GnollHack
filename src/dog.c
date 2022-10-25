@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    dog.c    $NHDT-Date: 1554580624 2019/04/06 19:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.85 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -69,14 +69,16 @@ pet_type()
         if (urole.petnum == PM_PONY && urace.monsternum == PM_DWARF)
             return PM_RAM;
         else
-            return  urole.petnum;
+            return urole.petnum;
     }
     else if (preferred_pet == 'c')
-        return  PM_KITTEN;
+        return PM_KITTEN;
     else if (preferred_pet == 'd')
-        return  PM_LITTLE_DOG;
+        return PM_LITTLE_DOG;
+    else if (preferred_pet == 'h')
+        return urace.monsternum == PM_DWARF ? PM_RAM : PM_PONY;
     else
-        return  rn2(2) ? PM_KITTEN : PM_LITTLE_DOG;
+        return rn2(2) ? PM_KITTEN : PM_LITTLE_DOG;
 }
 
 struct monst *
@@ -178,12 +180,12 @@ boolean quietly;
     /* must wield weapon immediately since pets will otherwise drop it */
     if (is_tame(mtmp) && attacktype(mtmp->data, AT_WEAP)) {
         mtmp->weapon_strategy = NEED_HTH_WEAPON;
-        (void) mon_wield_item(mtmp, FALSE);
+        (void) mon_wield_item(mtmp, FALSE, 0, 0);
     }
     return mtmp;
 }
 
-static int petname_used = 0;
+STATIC_VAR int petname_used = 0;
 
 struct monst *
 makedog()
@@ -193,23 +195,47 @@ makedog()
     const char *petname;
     const char* petname_female = "";
     int pettype;
+    short petgender;
+    boolean ismale = FALSE;
+    boolean isfemale = FALSE;
+    boolean isneuter = FALSE;
 
     if (preferred_pet == 'n')
         return ((struct monst *) 0);
 
     pettype = pet_type();
     if (pettype == PM_LITTLE_DOG)
+    {
         petname = dogname;
+        petgender = doggender;
+    }
     else if (pettype == PM_PONY)
+    {
         petname = horsename;
+        petgender = horsegender;
+    }
     else if (pettype == PM_RAM)
+    {
         petname = ramname;
+        petgender = ramgender;
+    }
     else if (pettype == PM_SMALL_LUGGAGE)
+    {
         petname = luggagename;
+        petgender = 0;
+        isneuter = TRUE;
+        /* luggages are always neuter */
+    }
     else if (pettype == PM_DIREWOLF_CUB)
+    {
         petname = wolfname;
+        petgender = wolfgender;
+    }
     else
+    {
         petname = catname;
+        petgender = catgender;
+    }
 
     /* default pet names */
     if (!*petname && pettype == PM_LITTLE_DOG)
@@ -227,18 +253,24 @@ makedog()
         else
         {
             if (Role_if(PM_CAVEMAN))
-                petname = "Slasher";        /* The Warrior */
+                petname = "Slasher";         /* The Warrior */
             if (Role_if(PM_SAMURAI))
-                petname = "Hachiko";        /* Shibuya Station */
+            {
+                petname = "Hachiko";         /* Shibuya Station */
+                ismale = TRUE;
+            }
             if (Role_if(PM_BARBARIAN))
-                petname = "Idefix";            /* Obelix */
+            {
+                petname = "Idefix";          /* Obelix */
+                ismale = TRUE;
+            }
             if (Role_if(PM_TOURIST))
             {
                 petname = "Pepe";            /* Tribute to a male Welsh springer spaniel -- JG */
-                petname_female = "Luna";    /* Tribute to a female Finnish Lapphund -- JG */
+                petname_female = "Luna";     /* Tribute to a female Finnish Lapphund -- JG */
             }
             if (Role_if(PM_RANGER))
-                petname = "Sirius";            /* Orion's dog */
+                petname = "Sirius";          /* Orion's dog */
         }
     }
     else if(!*petname && pettype == PM_DIREWOLF_CUB) 
@@ -246,19 +278,47 @@ makedog()
         if (Role_if(PM_VALKYRIE))
         {
             petname = "Ghost";                /* Game of Thrones */
-            petname_female = "Nymeria";        /* Game of Thrones */
+            petname_female = "Nymeria";       /* Game of Thrones */
         }
     }
 
-    mtmp = makemon(&mons[pettype], u.ux, u.uy, MM_EDOG | MM_NORMAL_HIT_DICE | MM_NO_MONSTER_INVENTORY);
+    if (petgender == 1 && !isfemale && !isneuter)
+        ismale = TRUE;
+    else if (petgender == 2 && !ismale && !isneuter)
+        isfemale = TRUE;
+
+    if (*petname == '+' || *petname == '_')
+    {
+        petname++;
+        if(!ismale && !isneuter)
+            isfemale = TRUE;
+    }
+    else if (*petname == '>')
+    {
+        petname++;
+        if (!isfemale && !isneuter)
+            ismale = TRUE;
+    }
+
+    unsigned long extrammflags = 0UL;
+    if (isfemale && !isneuter)
+    {
+        petname_female = petname;
+        extrammflags = MM_FEMALE;
+    }
+    else if (ismale && !isneuter)
+    {
+        extrammflags = MM_MALE;
+    }
+
+    mtmp = makemon(&mons[pettype], u.ux, u.uy, MM_EDOG | MM_NORMAL_HIT_DICE | MM_NO_MONSTER_INVENTORY | extrammflags);
 
     if (!mtmp)
         return ((struct monst *) 0); /* pets were genocided */
 
     if (pettype == PM_LITTLE_DOG && Role_if(PM_SAMURAI))
     {
-        mtmp->female = FALSE;
-        mtmp->isfaithful = 1; /* Hachiko is well-known for its faithfulness -- JG */
+        mtmp->isfaithful = 1; /* Hachiko is well-known for his faithfulness -- JG */
     }
 
     context.startingpet_mid = mtmp->m_id;
@@ -692,41 +752,60 @@ long nmv; /* number of moves */
         mtmp->meating -= imv;
 
     /* reduce spec_used */
-    if (imv > mtmp->mspec_used)
+    /* recover lost energy */
+    int repidest_enreg_dur = !has_rapidest_regeneration(mtmp) ? 0 : (mtmp->mprops[RAPIDEST_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[RAPIDEST_REGENERATION] & M_TIMEOUT) : imv;
+    int repider_enreg_dur = !has_rapider_regeneration(mtmp) ? 0 : (mtmp->mprops[RAPIDER_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[RAPIDER_REGENERATION] & M_TIMEOUT) : imv;
+    int repid_enreg_dur = !has_rapider_regeneration(mtmp) ? 0 : (mtmp->mprops[RAPID_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[RAPID_REGENERATION] & M_TIMEOUT) : imv;
+    int enreg_dur = !has_regeneration(mtmp) ? 0 : (mtmp->mprops[REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[REGENERATION] & M_TIMEOUT) : imv;
+    int eff_repidest_enreg_dur = max(0, repidest_enreg_dur);
+    int eff_repider_enreg_dur = max(0, repider_enreg_dur - repidest_enreg_dur);
+    int eff_repid_enreg_dur = max(0, repid_enreg_dur - repider_enreg_dur - repidest_enreg_dur);
+    int eff_enreg_dur = max(0, enreg_dur - repid_enreg_dur - repider_enreg_dur - repidest_enreg_dur);
+    int eff_normal_enreg_dur = max(0, imv - enreg_dur - repid_enreg_dur - repider_enreg_dur - repidest_enreg_dur);
+
+    int enrecovered = eff_normal_enreg_dur * 1;
+    enrecovered += (eff_repidest_enreg_dur ? eff_repidest_enreg_dur * 5 : 0);
+    enrecovered += (eff_repider_enreg_dur ? eff_repider_enreg_dur * 4 : 0);
+    enrecovered += (eff_repid_enreg_dur ? eff_repid_enreg_dur * 3 : 0);
+    enrecovered += (eff_enreg_dur ? eff_enreg_dur * 2 : 0);
+
+    /* Using enrecovered */
+    if (enrecovered > mtmp->mspec_used)
         mtmp->mspec_used = 0;
     else
-        mtmp->mspec_used -= imv;
+        mtmp->mspec_used -= enrecovered;
 
-    if (imv > mtmp->mmagespell_used)
+    if (enrecovered > mtmp->mmagespell_used)
         mtmp->mmagespell_used = 0;
     else
-        mtmp->mmagespell_used -= imv;
+        mtmp->mmagespell_used -= enrecovered;
 
-    if (imv > mtmp->mmageintermediate_used)
+    if (enrecovered > mtmp->mmageintermediate_used)
         mtmp->mmageintermediate_used = 0;
     else
-        mtmp->mmageintermediate_used -= imv;
+        mtmp->mmageintermediate_used -= enrecovered;
 
-    if (imv > mtmp->mmageultimate_used)
+    if (enrecovered > mtmp->mmageultimate_used)
         mtmp->mmageultimate_used = 0;
     else
-        mtmp->mmageultimate_used -= imv;
+        mtmp->mmageultimate_used -= enrecovered;
 
-    if (imv > mtmp->mclericspell_used)
+    if (enrecovered > mtmp->mclericspell_used)
         mtmp->mclericspell_used = 0;
     else
-        mtmp->mclericspell_used -= imv;
+        mtmp->mclericspell_used -= enrecovered;
 
-    if (imv > mtmp->mclericintermediate_used)
+    if (enrecovered > mtmp->mclericintermediate_used)
         mtmp->mclericintermediate_used = 0;
     else
-        mtmp->mclericintermediate_used -= imv;
+        mtmp->mclericintermediate_used -= enrecovered;
 
-    if (imv > mtmp->mclericultimate_used)
+    if (enrecovered > mtmp->mclericultimate_used)
         mtmp->mclericultimate_used = 0;
     else
-        mtmp->mclericultimate_used -= imv;
+        mtmp->mclericultimate_used -= enrecovered;
 
+    /* Using imv only */
     if (imv > mtmp->mdemonsummon_used)
         mtmp->mdemonsummon_used = 0;
     else
@@ -760,7 +839,7 @@ long nmv; /* number of moves */
     /* check to see if it would have died as a pet; if so, go wild instead
      * of dying the next time we call dog_move()
      */
-    if (mtmp->mtame && !mtmp->isminion && !is_non_eater(mtmp->data))
+    if (mtmp->mtame && has_edog(mtmp) && !mtmp->isminion && !is_non_eater(mtmp->data))
     {
         struct edog *edog = EDOG(mtmp);
 
@@ -781,12 +860,42 @@ long nmv; /* number of moves */
     }
 
     /* recover lost hit points */
-    if (!has_regeneration(mtmp))
-        imv /= 20;
-    if (mtmp->mhp + imv >= mtmp->mhpmax)
+    int divine_reg_dur = !has_divine_regeneration(mtmp) ? 0 : (mtmp->mprops[DIVINE_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[DIVINE_REGENERATION] & M_TIMEOUT) : imv;
+    int repidest_reg_dur = !has_rapidest_regeneration(mtmp) ? 0 : (mtmp->mprops[RAPIDEST_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[RAPIDEST_REGENERATION] & M_TIMEOUT) : imv;
+    int repider_reg_dur = !has_rapider_regeneration(mtmp) ? 0 : (mtmp->mprops[RAPIDER_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[RAPIDER_REGENERATION] & M_TIMEOUT) : imv;
+    int repid_reg_dur = !has_rapider_regeneration(mtmp) ? 0 : (mtmp->mprops[RAPID_REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[RAPID_REGENERATION] & M_TIMEOUT) : imv;
+    int reg_dur = !has_regeneration(mtmp) ? 0 : (mtmp->mprops[REGENERATION] & M_TIMEOUT) ? (mtmp->mprops[REGENERATION] & M_TIMEOUT) : imv;
+    int eff_divine_reg_dur = divine_reg_dur;
+    int eff_repidest_reg_dur = max(0, repidest_reg_dur - divine_reg_dur);
+    int eff_repider_reg_dur = max(0, repider_reg_dur - repidest_reg_dur - divine_reg_dur);
+    int eff_repid_reg_dur = max(0, repid_reg_dur - repider_reg_dur - repidest_reg_dur - divine_reg_dur);
+    int eff_reg_dur = max(0, reg_dur - repid_reg_dur - repider_reg_dur - repidest_reg_dur - divine_reg_dur);
+    int eff_normal_reg_dur = max(0, imv - reg_dur - repid_reg_dur - repider_reg_dur - repidest_reg_dur - divine_reg_dur);
+
+    int hprecovered = eff_normal_reg_dur / 20;
+    hprecovered += (eff_divine_reg_dur ? eff_divine_reg_dur * max(1, min(mtmp->mhpmax / 16, 10)) : 0);
+    hprecovered += (eff_repidest_reg_dur ? eff_repidest_reg_dur * max(1, min(mtmp->mhpmax / 8, 20)) : 0);
+    hprecovered += (eff_repider_reg_dur ? eff_repider_reg_dur * max(1, min(mtmp->mhpmax / 4, 40)) : 0);
+    hprecovered += (eff_repid_reg_dur ? eff_repid_reg_dur * max(1, min(mtmp->mhpmax / 2, 80)) : 0);
+    hprecovered += (eff_reg_dur ? eff_reg_dur * max(1, min(mtmp->mhpmax, 160)) : 0);
+
+    if (mtmp->mhp + hprecovered >= mtmp->mhpmax)
         mtmp->mhp = mtmp->mhpmax;
     else
-        mtmp->mhp += imv;
+        mtmp->mhp += hprecovered;
+
+    int i;
+    for (i = 1; i <= LAST_PROP; i++)
+    {
+        unsigned short tim = (mtmp->mprops[i] & M_TIMEOUT);
+        if (tim)
+        {
+            if (imv > tim)
+                mtmp->mprops[i] = (mtmp->mprops[i] & ~M_TIMEOUT) | 1;
+            else
+                mtmp->mprops[i] = (mtmp->mprops[i] & ~M_TIMEOUT) | tim;
+        }
+    }
 
     if (imv != 0 && iflags.wc2_statuslines > 3 && is_tame(mtmp))
         context.botl = 1;
@@ -972,6 +1081,7 @@ coord *cc;   /* optional destination coordinates */
     mtmp->mux = new_lev.dnum;
     mtmp->muy = new_lev.dlevel;
     mtmp->mx = mtmp->my = 0; /* this implies migration */
+    mtmp->mon_flags &= ~MON_FLAGS_SPLEVEL_RESIDENT; /* Not level's original resident anymore */
     if (mtmp == context.polearm.hitmon)
         context.polearm.hitmon = (struct monst *) 0;
 }
@@ -1061,6 +1171,7 @@ register struct obj *obj;
                  && mptr->mlet != S_FUNGUS)
                 || (has_acidic_corpse(fptr) && !(is_mon_immune_to_acid(mon) || mon_resists_acid_weakly(mon)))
                 || (has_poisonous_corpse(fptr) && !resists_poison(mon))
+                || (has_stunning_corpse(fptr) && !resists_stun(mon))
                 || (has_sickening_corpse(fptr) && !resists_sickness(mon))
                 || (has_mummy_rotted_corpse(fptr) && !resists_sickness(mon))
                 )
@@ -1068,6 +1179,8 @@ register struct obj *obj;
             /* turning into slime is preferable to starvation */
             else if (fptr == &mons[PM_GREEN_SLIME] && !slimeproof(mon->data))
                 return starving ? ACCFOOD : POISON;
+            else if (incorporeal_food(fptr))
+                return MANFOOD;
             else if (vegan(fptr))
                 return herbi ? CADAVER : MANFOOD;
             /* most humanoids will avoid cannibalism unless starving;
@@ -1121,6 +1234,8 @@ register struct obj *obj;
             return (is_rustprone(obj) && !obj->oerodeproof) ? DOGFOOD
                                                             : ACCFOOD;
         }
+        if (lithovore(mptr) && is_obj_stony(obj))
+            return (obj->speflags & SPEFLAGS_NO_PICKUP) || (In_sokoban(&u.uz) && obj->otyp == BOULDER) ? TABU : obj->cursed ? ACCFOOD : DOGFOOD;
         if (!obj->cursed
             && obj->oclass != BALL_CLASS
             && obj->oclass != CHAIN_CLASS)
@@ -1289,7 +1404,7 @@ boolean thrown;
     if (attacktype(mtmp->data, AT_WEAP))
     {
         mtmp->weapon_strategy = NEED_HTH_WEAPON;
-        (void) mon_wield_item(mtmp, FALSE);
+        (void) mon_wield_item(mtmp, FALSE, 0, 0);
     }
     return TRUE;
 }

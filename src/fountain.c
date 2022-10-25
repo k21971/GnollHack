@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    fountain.c    $NHDT-Date: 1544442711 2018/12/10 11:51:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright Scott R. Turner, srt@ucla, 10/27/86 */
@@ -969,6 +969,7 @@ register struct obj *obj;
 
         if (obj && is_weapon(obj) && is_poisonable(obj) && !obj->opoisoned)
         {
+            play_sfx_sound(SFX_POISON_COATING);
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The fountain forms a coating on %s.", the(xname(obj)));
             obj->opoisoned = TRUE;
             identified = TRUE;

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    version.c    $NHDT-Date: 1552353060 2019/03/12 01:11:00 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.52 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -223,7 +223,7 @@ extern const char regex_id[];
  * that of the substituted value since we don't do phrase-splitting/line-
  * wrapping when displaying it.
  */
-static const struct rt_opt {
+STATIC_VAR const struct rt_opt {
     const char *token, *value;
 } rt_opts[] = {
     { ":PATMATCH:", regex_id },
@@ -277,9 +277,9 @@ boolean complain;
 
     unsigned long versioncompat = 0UL;
 #ifdef VERSION_COMPATIBILITY
-    versioncompat = VERSION_NUMBER;
-#else
     versioncompat = VERSION_COMPATIBILITY;
+#else
+    versioncompat = VERSION_NUMBER;
 #endif
 
     if (

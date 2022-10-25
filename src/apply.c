@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    apply.c    $NHDT-Date: 1553363415 2019/03/23 17:50:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.272 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -48,7 +48,7 @@ STATIC_DCL boolean FDECL(find_poleable_mon, (coord *, int, int));
 void FDECL(amii_speaker, (struct obj *, char *, int));
 #endif
 
-static const char no_elbow_room[] =
+STATIC_VAR const char no_elbow_room[] =
     "don't have enough elbow-room to maneuver.";
 
 STATIC_OVL int
@@ -408,6 +408,7 @@ struct obj *obj;
         {
         case 2:
             old = Glib;
+            play_sfx_sound(SFX_ACQUIRE_GLIB);
             incr_itimeout(&Glib, rn1(10, 3));
             refresh_u_tile_gui_info(TRUE);
             Your("%s %s!", makeplural(body_part(HAND)),
@@ -624,7 +625,7 @@ int rx, ry, *resp;
     return FALSE; /* no corpse or statue */
 }
 
-static const char hollow_str[] = "a hollow sound.  This must be a secret %s!";
+STATIC_VAR const char hollow_str[] = "a hollow sound.  This must be a secret %s!";
 
 /* Strictly speaking it makes no sense for usage of a stethoscope to
    not take any time; however, unless it did, the stethoscope would be
@@ -770,7 +771,7 @@ register struct obj *obj;
     return res;
 }
 
-static const char whistle_str[] = "produce a %s whistling sound.";
+STATIC_VAR const char whistle_str[] = "produce a %s whistling sound.";
 
 STATIC_OVL void
 use_whistle(obj)
@@ -975,7 +976,7 @@ unleash_all()
  *  This ought to exclude various other things, such as lights and gas
  *  spore, is_whirly() critters, ethereal creatures, possibly others.
  */
-static boolean
+STATIC_OVL boolean
 leashable(mtmp)
 struct monst *mtmp;
 {
@@ -1263,7 +1264,7 @@ beautiful()
                : "ugly");
 }
 
-static const char look_str[] = "look %s.";
+STATIC_VAR const char look_str[] = "look %s.";
 
 STATIC_OVL int
 use_mirror(obj)
@@ -2039,7 +2040,7 @@ struct obj **optr;
     {
         boolean objsplitted = FALSE;
         struct obj* lightedcandle = (struct obj*)0;
-        char qbuf2[BUFSIZ];
+        char qbuf2[QBUFSZ];
         Sprintf(qbuf2, "%s only one?", obj->lamplit ? "Snuff out" : "Light");
 
         if (obj->quan > 1L && yn_query(qbuf2) == 'y') 
@@ -2174,7 +2175,7 @@ struct obj **optr;
     if (!is_obj_candelabrum(otmp))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot attach candles to %s.", an(cxname(otmp)));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot attach candles to %s.", acxname(otmp));
         return 1;
     }
 
@@ -2501,7 +2502,7 @@ struct obj **optr;
     *optr = obj;
 }
 
-static NEARDATA const char cuddly[] = { TOOL_CLASS, GEM_CLASS, 0 };
+STATIC_VAR NEARDATA const char cuddly[] = { TOOL_CLASS, GEM_CLASS, 0 };
 
 int
 dorub()
@@ -2706,7 +2707,7 @@ boolean showmsg;
     return TRUE;
 }
 
-static int jumping_is_magic;
+STATIC_VAR int jumping_is_magic;
 
 STATIC_OVL boolean
 get_valid_jump_position(x,y)
@@ -2753,7 +2754,7 @@ int magic; /* 0=Physical, otherwise skill level */
             if (spl_book[sp_no].sp_id == NO_SPELL)
                 break;
             else if (spl_book[sp_no].sp_id == SPE_JUMPING)
-                return spelleffects(sp_no, FALSE);
+                return spelleffects(sp_no, FALSE, &youmonst);
     }
 
     if (!magic && (nolimbs(youmonst.data) || slithy(youmonst.data))) 
@@ -3049,7 +3050,7 @@ struct obj *obj;
 
     if ((can = mksobj(TIN, FALSE, FALSE, FALSE)) != 0) 
     {
-        static const char you_buy_it[] = "You tin it, you bought it!";
+        STATIC_VAR const char you_buy_it[] = "You tin it, you bought it!";
 
         can->corpsenm = corpse->corpsenm;
         can->cursed = obj->cursed;
@@ -3534,7 +3535,7 @@ struct obj **optr;
     *optr = 0;
 }
 
-static NEARDATA const char lubricables[] = { ALL_CLASSES, ALLOW_NONE, 0 };
+STATIC_VAR NEARDATA const char lubricables[] = { ALL_CLASSES, ALLOW_NONE, 0 };
 
 STATIC_OVL void
 use_grease(obj)
@@ -3564,7 +3565,7 @@ struct obj *obj;
         otmp = getobj(lubricables, objects[obj->otyp].oc_name_known ? "grease" : "apply viscous fluid on", 0, "");
         if (!otmp)
             return;
-        if (inaccessible_equipment(otmp, objects[obj->otyp].oc_name_known ? "grease" : "apply viscous fluid on", FALSE))
+        if (inaccessible_equipment(otmp, objects[obj->otyp].oc_name_known ? "grease" : "apply viscous fluid on", FALSE, FALSE))
             return;
 
         consume_obj_charge(obj, TRUE);
@@ -3573,10 +3574,12 @@ struct obj *obj;
 
         if (otmp != &zeroobj)
         {
+            play_sfx_sound(SFX_GREASE_COATING);
             You("cover %s with a thick layer of grease.", yname(otmp));
             otmp->greased = 1;
             if (obj->cursed && !nohands(youmonst.data)) 
             {
+                play_sfx_sound(SFX_ACQUIRE_GLIB);
                 incr_itimeout(&Glib, rnd(15));
                 refresh_u_tile_gui_info(TRUE);
                 pline("Some of the grease gets all over your %s.",
@@ -3585,6 +3588,7 @@ struct obj *obj;
         }
         else
         {
+            play_sfx_sound(SFX_ACQUIRE_GLIB);
             incr_itimeout(&Glib, rnd(15));
             refresh_u_tile_gui_info(TRUE);
             You("coat your %s with grease.", makeplural(body_part(FINGER)));
@@ -3602,7 +3606,7 @@ struct obj *obj;
     update_inventory();
 }
 
-static NEARDATA const char wand_application_objects[] = { ALL_CLASSES, ALLOW_NONE, 0 };
+STATIC_VAR NEARDATA const char wand_application_objects[] = { ALL_CLASSES, ALLOW_NONE, 0 };
 
 STATIC_OVL int 
 use_wand_on_object(obj)
@@ -3639,7 +3643,7 @@ struct obj* obj;
             return 0;
         }
 
-        if (inaccessible_equipment(otmp, "use wand on", FALSE))
+        if (inaccessible_equipment(otmp, "use wand on", FALSE, FALSE))
             return 0;
 
         consume_obj_charge(obj, TRUE);
@@ -4179,7 +4183,7 @@ struct obj *tstone;
     return;
 }
 
-static struct trapinfo {
+STATIC_VAR struct trapinfo {
     struct obj *tobj;
     xchar tx, ty;
     int time_needed;
@@ -4678,7 +4682,7 @@ struct obj *obj;
     return 1;
 }
 
-static const char
+STATIC_VAR const char
     not_enough_room[] = "There's not enough room here to use that.",
     where_to_hit[] = "Where do you want to hit?",
     cant_see_spot[] = "won't hit anything if you can't see that spot.",
@@ -4730,8 +4734,8 @@ int min_range, max_range;
     return TRUE;
 }
 
-static int polearm_range_min = -1;
-static int polearm_range_max = -1;
+STATIC_VAR int polearm_range_min = -1;
+STATIC_VAR int polearm_range_max = -1;
 
 STATIC_OVL boolean
 get_valid_polearm_position(x, y)
@@ -5487,7 +5491,7 @@ char class;
     Strcat(cl, tmp);
 }
 
-static const char tools[] = { TOOL_CLASS, WEAPON_CLASS, WAND_CLASS, 0 };
+STATIC_VAR const char tools[] = { TOOL_CLASS, WEAPON_CLASS, WAND_CLASS, 0 };
 
 /* augment tools[] if various items are carried */
 void
@@ -6022,7 +6026,7 @@ int arrowtype, quan; //ObjID and quantity
 {
     struct obj* otmp;
     otmp = mksobj(arrowtype, FALSE, FALSE, FALSE);
-    if (otmp && otmp != &zeroobj) 
+    if (otmp) 
     {
         otmp->quan = quan;
         otmp->owt = weight(otmp);
@@ -6067,6 +6071,7 @@ int arrowtype, quan; //ObjID and quantity
             }
         }
 
+        play_sfx_sound(SFX_ITEM_APPEARS);
         You("pull %s out of %s.", doname(otmp), yname(bag));
         makeknown(bag->otyp);
         bag->cooldownleft = objects[bag->otyp].oc_item_cooldown;

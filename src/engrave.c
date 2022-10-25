@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
 
 /* GnollHack 4.0    engrave.c    $NHDT-Date: 1456304550 2016/02/24 09:02:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.61 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -35,7 +35,7 @@ char *outbuf;
 }
 
 /* Partial rubouts for engraving characters. -3. */
-static const struct {
+STATIC_VAR const struct {
     char wipefrom;
     const char *wipeto;
 } rubouts[] = { { 'A', "^" },
@@ -461,7 +461,7 @@ freehand()
             || (!bimanual(uwep) && (!uarms || !uarms->cursed)));
 }
 
-static NEARDATA const char styluses[] = { ALL_CLASSES, ALLOW_NONE,
+STATIC_VAR NEARDATA const char styluses[] = { ALL_CLASSES, ALLOW_NONE,
                                           TOOL_CLASS,  WEAPON_CLASS,
                                           WAND_CLASS,  GEM_CLASS,
                                           RING_CLASS,  0 };
@@ -1492,7 +1492,7 @@ boolean in_mklev_var;
     return;
 }
 
-static const char blind_writing[][21] = {
+STATIC_VAR const char blind_writing[][21] = {
     {0x44, 0x66, 0x6d, 0x69, 0x62, 0x65, 0x22, 0x45, 0x7b, 0x71,
      0x65, 0x6d, 0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
     {0x51, 0x67, 0x60, 0x7a, 0x7f, 0x21, 0x40, 0x71, 0x6b, 0x71,

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    lev_main.c    $NHDT-Date: 1543371692 2018/11/28 02:21:32 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -152,7 +152,7 @@ void FDECL(vardef_used, (struct lc_vardefs *, char *));
 void FDECL(check_vardef_type, (struct lc_vardefs *, char *, long));
 struct lc_vardefs *FDECL(add_vardef_type,
                          (struct lc_vardefs *, char *, long));
-int FDECL(reverse_jmp_opcode, (int));
+int FDECL(reverse_jmp_opcode, (long));
 struct opvar *FDECL(opvar_clone, (struct opvar *));
 void FDECL(start_level_def, (sp_lev **, char *));
 
@@ -372,7 +372,7 @@ const char *s;
     char *e = ((char *) s + strlen(s) - 1);
 
     (void) fprintf(stderr, "%s: line %d, pos %d: %s", fname, nh_line_number,
-                   token_start_pos - (int) strlen(curr_token), s);
+                   (int)token_start_pos - (int) strlen(curr_token), s);
     if (*e != '.' && *e != '!')
         (void) fprintf(stderr, " at \"%s\"", curr_token);
     (void) fprintf(stderr, "\n");
@@ -1068,7 +1068,7 @@ long vartype;
 
 int
 reverse_jmp_opcode(opcode)
-int opcode;
+long opcode;
 {
     switch (opcode) {
     case SPO_JE:
@@ -1085,7 +1085,7 @@ int opcode;
         return SPO_JL;
     default:
         lc_error("Cannot reverse comparison jmp opcode %ld.",
-                 VA_PASS1((long) opcode));
+                 VA_PASS1(opcode));
         return SPO_NULL;
     }
 }

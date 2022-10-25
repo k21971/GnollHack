@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    mondata.h    $NHDT-Date: 1550524558 2019/02/18 21:15:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.37 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -135,7 +135,6 @@
 /* no corpse (ie, blank scrolls) if killed by fire */
 #define completelyburns(ptr) (((ptr)->mflags3 & M3_BURNS_COMPLETELY) != 0)
 
-
 #define is_brave(ptr) (((ptr)->mflags4 & M4_BRAVE) != 0L)
 #define is_fearless(ptr) (((ptr)->mflags4 & M4_FEARLESS) != 0L)
 #define has_bloodlust(ptr) (((ptr)->mflags4 & M4_BLOODLUST) != 0L)
@@ -196,6 +195,7 @@
 #define has_monster_type_nontinnable_corpse(ptr) (((ptr)->mflags6 & M6_NON_TINNABLE) != 0)
 #define has_monster_type_nonedible_corpse(ptr) (((ptr)->mflags6 & M6_NON_EDIBLE) != 0)
 #define revives_upon_meddling(ptr) (((ptr)->mflags6 & M6_REVIVES_UPON_MEDDLING) != 0)
+#define lithovore(ptr) (((ptr)->mflags6 & M6_LITHOVORE) != 0L)
 
 #define is_archaeologist(ptr) (((ptr)->mflags7 & M7_ARCHAEOLOGIST) != 0L)
 #define is_barbarian(ptr) (((ptr)->mflags7 & M7_BARBARIAN) != 0L)
@@ -219,8 +219,9 @@
     ((ptr) == &mons[PM_GREEN_SLIME] || flaming(ptr) || is_incorporeal(ptr))
 
 #define is_non_eater(ptr) \
-    ((is_not_living(ptr) || is_angel(ptr) || is_demon(ptr) || has_mflag_is_non_eater(ptr) || (!carnivorous(ptr) && !herbivorous(ptr) && !metallivorous(ptr))) && !is_corpse_eater(ptr))
+    ((is_not_living(ptr) || is_angel(ptr) || is_demon(ptr) || has_mflag_is_non_eater(ptr) || (!carnivorous(ptr) && !herbivorous(ptr) && !metallivorous(ptr) && !lithovore(ptr))) && !is_corpse_eater(ptr))
 
+#define mon_is_literate(m) (is_speaking_monster((m)->data) && !mindless((m)->data) && haseyes((m)->data))
 
 /* Resistances and properties */
 #define has_innate(ptr, bit) \
@@ -269,6 +270,15 @@
 #define has_brain_protection(mon) \
     has_property(mon, BRAIN_PROTECTION)
 
+#define has_unchanging(mon) \
+    has_property(mon, UNCHANGING)
+
+/* mind shielding */
+#define has_mind_shielding(mon) \
+    has_property(mon, MIND_SHIELDING)
+
+#define mon_has_no_apparent_mind(mon) \
+    (has_mind_shielding(mon) || mindless((mon)->data))
 
 /* slow, stoning, and sliming */
 #define has_slowed(mon) \
@@ -382,6 +392,9 @@
 #define is_stunned(mon) \
     (has_stunned(mon))
 
+#define has_stun_resistance(mon) \
+    has_property(mon, STUN_RESISTANCE)
+
 #define has_confused(mon) \
     has_property(mon, CONFUSION)
 
@@ -404,7 +417,6 @@
 
 #define is_deaf(mon) \
     (has_property(mon, DEAF))
-
 
 /* hallucination */
 #define has_hallucination(mon) \
@@ -457,7 +469,7 @@
     has_property(mon, UNDEAD_CONTROL)
 
 #define is_charmed(mon) \
-    ((has_charmed(mon) && !has_charm_resistance(mon) && !is_undead((mon)->data) && !is_vampshifter(mon) && !mindless((mon)->data)) \
+    ((has_charmed(mon) && !has_charm_resistance(mon) && !is_undead((mon)->data) && !is_vampshifter(mon) && !mon_has_no_apparent_mind(mon)) \
      || (has_undead_control(mon) && (is_undead((mon)->data) || is_vampshifter(mon))) \
     )
 
@@ -477,7 +489,7 @@
     (has_innate_or_property(mon, FEAR_RESISTANCE))
 
 #define is_fearful(mon) \
-    (has_fearful(mon) && !has_fear_resistance(mon) && !is_undead((mon)->data) && !mindless((mon)->data) && !is_vampshifter(mon))
+    (has_fearful(mon) && !has_fear_resistance(mon) && !is_undead((mon)->data) && !mon_has_no_apparent_mind(mon) && !is_vampshifter(mon))
 
 #define is_fleeing(mon) \
     (is_fearful(mon) || (mon)->mflee)
@@ -603,9 +615,6 @@
 
 #define has_crazed(mon) \
     has_property(mon, CRAZED)
-
-#define has_mind_shielding(mon) \
-    has_property(mon, MIND_SHIELDING)
 
 #define is_crazed(mon) \
     (has_crazed(mon) && !has_mind_shielding(mon))
@@ -743,9 +752,9 @@
 #define resists_magic(mon) \
     (has_innate((mon)->data, MR_MAGIC) || has_property(mon, ANTIMAGIC))
 #define resists_charm(mon) \
-    (has_innate((mon)->data, MR_CHARM) || has_property(mon, CHARM_RESISTANCE) || is_undead((mon)->data) || mindless((mon)->data))
+    (has_innate((mon)->data, MR_CHARM) || has_property(mon, CHARM_RESISTANCE) || is_undead((mon)->data) || mon_has_no_apparent_mind(mon))
 #define resists_fear(mon) \
-    (has_innate((mon)->data, MR_FEAR) || has_property(mon, FEAR_RESISTANCE) || is_undead((mon)->data) || mindless((mon)->data) || is_vampshifter(mon))
+    (has_innate((mon)->data, MR_FEAR) || has_property(mon, FEAR_RESISTANCE) || is_undead((mon)->data) || mon_has_no_apparent_mind(mon) || is_vampshifter(mon))
 #define is_reflecting(mon) \
     (has_innate((mon)->data, MR_REFLECTING) || has_property(mon, REFLECTING))
 #define resists_drain(mon) \
@@ -792,6 +801,10 @@
     (((ptr)->mconveys & MC_CHARISMA) != 0)
 #define conveys_level(ptr) \
     (((ptr)->mconveys & MC_LEVEL_GAIN) != 0)
+#define conveys_invisibility(ptr) \
+    (((ptr)->mconveys & MC_INVISIBILITY) != 0)
+#define conveys_see_invisible(ptr) \
+    (((ptr)->mconveys & MC_SEE_INVISIBLE) != 0)
 
 
 #define has_see_invisible(mon) \
@@ -800,11 +813,8 @@
     (has_innate_regeneration((mon)->data) || has_property(mon, REGENERATION))
 #define has_energy_regeneration(mon) \
     (has_innate_energy_regeneration((mon)->data) || has_property(mon, ENERGY_REGENERATION))
-#define has_half_spec_cooldown(mon) has_energy_regeneration(mon)
-#define has_one_third_spec_cooldown(mon) \
-    (has_property(mon, RAPID_ENERGY_REGENERATION) || has_property(mon, RAPIDER_ENERGY_REGENERATION) || has_property(mon, RAPIDEST_ENERGY_REGENERATION))
 #define mon_spec_cooldown_divisor(mon) \
-    (has_one_third_spec_cooldown(mon) ? 3 : has_half_spec_cooldown(mon) ? 2 : 1)
+    (has_property(mon, RAPIDEST_ENERGY_REGENERATION) ? 5 : has_property(mon, RAPIDER_ENERGY_REGENERATION) ? 4 : has_property(mon, RAPID_ENERGY_REGENERATION) ? 3 : has_energy_regeneration(mon) ? 2 : 1)
 #define has_teleportation(mon) \
     (has_innate_teleportation((mon)->data) || has_property(mon, TELEPORT))
 #define has_teleport_control(mon) \
@@ -813,7 +823,10 @@
     (has_innate_blind_telepathy((mon)->data) || has_property(mon, BLIND_TELEPATHY))
 #define has_telepathy(mon) \
     (has_innate_telepathy((mon)->data) || has_property(mon, TELEPAT))
+#define has_detect_monsters(mon) \
+    (has_property(mon, DETECT_MONSTERS))
 
+#define has_stunning_corpse(ptr) (((ptr)->mconveys & MC_STUNNING_CORPSE) != 0L)
 #define has_acidic_corpse(ptr) (((ptr)->mconveys & MC_ACIDIC_CORPSE) != 0L)
 #define has_poisonous_corpse(ptr) (((ptr)->mconveys & MC_POISONOUS_CORPSE) != 0L)
 #define has_hallucinating_corpse(ptr) (((ptr)->mconveys & MC_HALLUCINATING_CORPSE) != 0L)
@@ -860,8 +873,10 @@
 /* Used for conduct with corpses, tins, and digestion attacks */
 /* G_NOCORPSE monsters might still be swallowed as a purple worm */
 /* Maybe someday this could be in mflags... */
+#define incorporeal_food(ptr) is_incorporeal(ptr)
+
 #define vegan(ptr)                                                 \
-    (is_vegan_food(ptr) || is_incorporeal(ptr))
+    (is_vegan_food(ptr) || incorporeal_food(ptr))
 
 #define vegetarian(ptr) \
     (vegan(ptr) || is_vegetarian_food(ptr))
@@ -870,6 +885,7 @@
 #define nonrotting_corpse(mnum) nonrotting_corpse_ptr(&mons[mnum])
 #define has_pitwalk(ptr) (((ptr)->mflags4 & M4_PITWALK) != 0)
 #define can_speak_language(ptr) ((ptr)->msound >= MS_LAUGH || (ptr)->msound == MS_ORC || is_speaking_monster(ptr))
+#define call_mon_tame(mon) ((is_animal((mon)->data) || !humanoid((mon)->data)) && !mindless((mon)->data) && !is_speaking_monster((mon)->data) && is_living((mon)->data) && !is_demon((mon)->data))
 
 /* Overall resistances */
 #define resists_drli(mon) resists_drain(mon)

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    spell.c    $NHDT-Date: 1546565814 2019/01/04 01:36:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.88 $ */
 /*      Copyright (c) M. Stephenson 1988                          */
@@ -67,7 +67,7 @@ STATIC_DCL int FDECL(count_matcomp_alternatives, (struct materialcomponent*));
 STATIC_DCL struct extended_create_window_info FDECL(extended_create_window_info_from_spell, (int, BOOLEAN_P));
 
 /* since the spellbook itself doesn't blow up, don't say just "explodes" */
-static const char explodes[] = "radiates explosive energy";
+STATIC_VAR const char explodes[] = "radiates explosive energy";
 
 NEARDATA const char* spl_sortchoices[NUM_SPELL_SORTBY] = {
     "no sorting, by casting letter",
@@ -801,7 +801,7 @@ register struct obj *spellbook;
         if (objects[booktype].oc_subtyp == BOOKTYPE_NOVEL) 
         {
             /* Obtain current Terry Pratchett book title */
-            const char *tribtitle = noveltitle(&spellbook->novelidx);
+            const char *tribtitle = noveltitle(&spellbook->novelidx, 0UL, 0UL);
 
             if (read_tribute("books", tribtitle, 0, (char *) 0, 0,
                              spellbook->o_id))
@@ -1086,7 +1086,7 @@ int spell_list_type;
     if (spellid(0) == NO_SPELL) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("don't know any spells right now.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know any spells right now.");
         return FALSE;
     }
 
@@ -1297,7 +1297,7 @@ int* spell_no;
 
 
 
-static int docast_spell_no = -1;
+STATIC_VAR int docast_spell_no = -1;
 
 /* the 'Z' command -- cast a spell */
 int
@@ -1305,13 +1305,13 @@ docast()
 {
     if (in_doagain && docast_spell_no > -1)
     {
-        return spelleffects(docast_spell_no, FALSE);
+        return spelleffects(docast_spell_no, FALSE, &youmonst);
     }
     else
     {
         docast_spell_no = -1;
         if (getspell(&docast_spell_no, 0))
-            return spelleffects(docast_spell_no, FALSE);
+            return spelleffects(docast_spell_no, FALSE, &youmonst);
     }
     docast_spell_no = -1;
     return 0;
@@ -2174,9 +2174,10 @@ int spell;
 }
 
 int
-spelleffects(spell, atme)
+spelleffects(spell, atme, targetmonst)
 int spell;
 boolean atme;
+struct monst* targetmonst;
 {
     double damage = 0;
     int chance, n; // , intell;
@@ -2732,7 +2733,7 @@ boolean atme;
             play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
             u_wait_until_action();
         }
-        (void) seffects(pseudo, &effect_happened);
+        (void) seffects(pseudo, &effect_happened, targetmonst);
         break;
 
     /* these are all duplicates of potion effects */
@@ -2803,6 +2804,7 @@ boolean atme;
     case SPE_PROTECTION_FROM_LIGHTNING:
     case SPE_PROTECTION_FROM_ACID:
     case SPE_PROTECTION_FROM_POISON:
+    case SPE_PROTECTION_FROM_CHARM:
     case SPE_PROTECTION_FROM_LIFE_DRAINING:
     case SPE_PROTECTION_FROM_DEATH_MAGIC:
     case SPE_PROTECTION_FROM_DISINTEGRATION:
@@ -2863,7 +2865,7 @@ boolean atme;
             "enchant");
 
         otmp = getobj(enchant_objects, buf, 0, "");
-        if (!otmp || inaccessible_equipment(otmp, buf, FALSE))
+        if (!otmp || inaccessible_equipment(otmp, buf, FALSE, FALSE))
         {
             return 0;
         }
@@ -3260,7 +3262,7 @@ int otyp;
 }
 #endif
 
-static struct tport_hideaway {
+STATIC_VAR struct tport_hideaway {
     struct spell savespell;
     int tport_indx;
 } save_tport;
@@ -4850,7 +4852,7 @@ struct obj *obj;
 
 
 /* Mixing starts here*/
-static int domix_spell_no = -1;
+STATIC_VAR int domix_spell_no = -1;
 /* the 'X' command, two-weapon moved to M(x) */
 int
 domix()

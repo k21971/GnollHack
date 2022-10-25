@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    dig.c    $NHDT-Date: 1547421446 2019/01/13 23:17:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -7,7 +7,7 @@
 
 #include "hack.h"
 
-static NEARDATA boolean did_dig_msg;
+STATIC_VAR NEARDATA boolean did_dig_msg;
 
 STATIC_DCL boolean NDECL(rm_waslit);
 STATIC_DCL void FDECL(mkcavepos,
@@ -618,7 +618,7 @@ dig(VOID_ARGS)
     } 
     else 
     { /* not enough effort has been spent yet */
-        static const char *const d_target[6] = { "",        "rock", "statue",
+        STATIC_VAR const char *const d_target[6] = { "",        "rock", "statue",
                                                  "boulder", "door", "tree" };
         int dig_target = dig_typ(wep, dpx, dpy);
 
@@ -1146,7 +1146,7 @@ coord *cc;
                 pline(Hallucination ? "I want my mummy!"
                     : "You've disturbed a tomb!");
             }
-            otmp = mksobj_at_with_flags(SARCOPHAGUS, dig_x, dig_y, FALSE, FALSE, 0, 0, MKOBJ_FLAGS_OPEN_COFFIN);
+            otmp = mksobj_at_with_flags(SARCOPHAGUS, dig_x, dig_y, FALSE, FALSE, 0, 0L, 0L, MKOBJ_FLAGS_OPEN_COFFIN);
             if (otmp)
             {
                 boolean dealloc = FALSE;
@@ -1474,21 +1474,21 @@ struct obj *obj;
         }
         else 
         {
-            static const char *const d_action[6] = { "swinging", 
+            STATIC_VAR const char *const d_action[6] = { "swinging", 
                                                      "digging",
                                                      "chipping the statue",
                                                      "hitting the boulder",
                                                      "chopping at the door",
                                                      "cutting the tree" };
 
-            static const char* const d_action_saw[6] = { "positioning the saw",
+            STATIC_VAR const char* const d_action_saw[6] = { "positioning the saw",
                                          "cutting",
                                          "cutting the statue",
                                          "cutting the boulder",
                                          "cutting at the door",
                                          "cutting the tree" };
 
-            static const int /*enum object_occupation_types*/ d_action_soundset[6] = { OCCUPATION_SWINGING,
+            STATIC_VAR const int /*enum object_occupation_types*/ d_action_soundset[6] = { OCCUPATION_SWINGING,
                                          OCCUPATION_DIGGING_ROCK,
                                          OCCUPATION_DIGGING_ROCK,
                                          OCCUPATION_DIGGING_ROCK,
@@ -1793,7 +1793,12 @@ register struct monst *mtmp;
     {
         /* KMH -- Okay on arboreal levels (room walls are still stone) */
         if (flags.verbose && !rn2(5))
-            You_hear("crashing rock.");
+        {
+            context.global_minimum_volume = 0.15f;
+            play_simple_location_sound(mtmp->mx, mtmp->my, LOCATION_SOUND_TYPE_BREAK);
+            context.global_minimum_volume = 0.0f;
+            You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "crashing rock.");
+        }
         if (*in_rooms(mtmp->mx, mtmp->my, SHOPBASE))
             add_damage(mtmp->mx, mtmp->my, 0L);
 
@@ -1903,23 +1908,23 @@ boolean unexpected;
 
     if (unexpected) {
         if (!Hallucination)
-            You_feel("an unexpected draft.");
+            You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "an unexpected draft.");
         else
             /* U.S. classification system uses 1-A for eligible to serve
                and 4-F for ineligible due to physical or mental defect;
                some intermediate values exist but are rarely seen */
-            You_feel("like you are %s.",
+            You_feel_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "like you are %s.",
                      (ACURR(A_STR) < 6 || ACURR(A_DEX) < 6
                       || ACURR(A_CON) < 6 || ACURR(A_CHA) < 6
                       || ACURR(A_INT) < 6 || ACURR(A_WIS) < 6) ? "4-F"
                                                                : "1-A");
     } else {
         if (!Hallucination) {
-            You_feel("a draft.");
+            You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "a draft.");
         } else {
             /* "marching" is deliberately ambiguous; it might mean drills
                 after entering military service or mean engaging in protests */
-            static const char *draft_reaction[] = {
+            STATIC_VAR const char *draft_reaction[] = {
                 "enlisting", "marching", "protesting", "fleeing",
             };
             int dridx;
@@ -1929,7 +1934,7 @@ boolean unexpected;
             if (u.ualign.record < STRIDENT)
                 /* L: +(0..2), N: +(-1..1), C: +(-2..0); all: 0..3 */
                 dridx += rn1(3, sgn(u.ualign.type) - 1);
-            You_feel("like %s.", draft_reaction[dridx]);
+            You_feel_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "like %s.", draft_reaction[dridx]);
         }
     }
 }
@@ -3373,5 +3378,9 @@ int x, y;
     }
 }
 
-
+void
+reset_dig(VOID_ARGS)
+{
+    did_dig_msg = 0;
+}
 /*dig.c*/

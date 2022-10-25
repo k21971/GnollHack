@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    u_init.c    $NHDT-Date: 1539510426 2018/10/14 09:47:06 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -31,11 +31,16 @@ STATIC_DCL struct obj* FDECL(mk_obj_in_container_known, (struct obj*, int));
 #define UNDEF_SPE '\177'
 #define UNDEF_BLESS 2
 
+STATIC_VAR NEARDATA short nocreate = STRANGE_OBJECT;
+STATIC_VAR NEARDATA short nocreate2 = STRANGE_OBJECT;
+STATIC_VAR NEARDATA short nocreate3 = STRANGE_OBJECT;
+STATIC_VAR NEARDATA short nocreate4 = STRANGE_OBJECT;
+
 /*
  *      Initial inventory for the various roles.
  */
 
-static const struct trobj Archaeologist[] = {
+STATIC_VAR const struct trobj Archaeologist[] = {
     /* if adventure has a name...  idea from tan@uvm-gen */
     { BULLWHIP, 3, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { LEATHER_JACKET, 2, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -52,7 +57,7 @@ static const struct trobj Archaeologist[] = {
     { BACKPACK, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Barbarian[] = {
+STATIC_VAR const struct trobj Barbarian[] = {
     { TWO_HANDED_SWORD, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { AXE, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { RING_MAIL, 0, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -60,7 +65,7 @@ static const struct trobj Barbarian[] = {
     { FOOD_RATION, 0, FOOD_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj BarbarianAlternative[] = {
+STATIC_VAR const struct trobj BarbarianAlternative[] = {
     { BATTLE_AXE, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { SHORT_SWORD, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { RING_MAIL, 0, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -68,7 +73,7 @@ static const struct trobj BarbarianAlternative[] = {
     { FOOD_RATION, 0, FOOD_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Cave_man[] = {
+STATIC_VAR const struct trobj Cave_man[] = {
     { CLUB, 3, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { SLING, 1, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { FLINT, 0, GEM_CLASS, 10, 10, UNDEF_BLESS, 0, 0 },
@@ -80,7 +85,7 @@ static const struct trobj Cave_man[] = {
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
-static const struct trobj Healer[] = {
+STATIC_VAR const struct trobj Healer[] = {
     { SCALPEL, 3, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { LEATHER_GLOVES, 3, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { MEDIEVAL_ROBE, 1, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -108,7 +113,7 @@ static const struct trobj Healer[] = {
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
-static const struct trobj Knight[] = {
+STATIC_VAR const struct trobj Knight[] = {
     { LONG_SWORD, 1, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { LANCE, 1, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { PLATE_MAIL, 0, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -118,7 +123,7 @@ static const struct trobj Knight[] = {
     { LEATHER_BAG, 0, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Monk[] = {
+STATIC_VAR const struct trobj Monk[] = {
     { LEATHER_GLOVES, 1, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { SIMPLE_GOWN, 1, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { POT_HEALING, 0, POTION_CLASS, 3, 0, UNDEF_BLESS, 0, 0 },
@@ -135,7 +140,7 @@ static const struct trobj Monk[] = {
     { ORIENTAL_SILK_SACK, 0, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Priest[] = {
+STATIC_VAR const struct trobj Priest[] = {
     { BANDED_MAIL, 0, ARMOR_CLASS, 1, 0, 1, 0, 0 },
     { CLERICAL_GOWN, 0, ARMOR_CLASS, 1, 0, 1, 0, 0 },
     { HOLY_SYMBOL, 0, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 }, //Blessed holy symbol is even more powerful
@@ -150,7 +155,7 @@ static const struct trobj Priest[] = {
     { LEATHER_BAG, 0, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Ranger[] = {
+STATIC_VAR const struct trobj Ranger[] = {
     { DAGGER, 1, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { SHORT_BOW, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { ARROW, 1, WEAPON_CLASS, 15, 10, UNDEF_BLESS, 0, 0 },
@@ -161,7 +166,7 @@ static const struct trobj Ranger[] = {
     { CRAM_RATION, 0, FOOD_CLASS, 4, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Rogue[] = {
+STATIC_VAR const struct trobj Rogue[] = {
     { SHORT_SWORD, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { DAGGER, 0, WEAPON_CLASS, 5, 5, 0, 0, 0 }, /* quan is variable */
     { HAND_CROSSBOW, 1, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -173,7 +178,7 @@ static const struct trobj Rogue[] = {
     { BAG_OF_TREASURE_HAULING, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Samurai[] = {
+STATIC_VAR const struct trobj Samurai[] = {
     { KATANA, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { SHORT_SWORD, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 }, /* wakizashi */
     { YUMI, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -183,7 +188,7 @@ static const struct trobj Samurai[] = {
     { FOOD_RATION, 0, FOOD_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Tourist[] = {
+STATIC_VAR const struct trobj Tourist[] = {
     { DART, 3, WEAPON_CLASS, 20, 20, UNDEF_BLESS, 0, 0 }, /* quan is variable */
     { GOLF_CLUB, 3, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { POT_EXTRA_HEALING, 0, POTION_CLASS, 2, 0, UNDEF_BLESS, 0, 0 },
@@ -198,26 +203,26 @@ static const struct trobj Tourist[] = {
     { UNDEF_TYP, UNDEF_SPE, FOOD_CLASS, 10, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj TouristMale[] = {
+STATIC_VAR const struct trobj TouristMale[] = {
     { LEATHER_BAG, 0, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { EXPENSIVE_WATCH, 0, MISCELLANEOUS_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj TouristFemale[] = {
+STATIC_VAR const struct trobj TouristFemale[] = {
     { EXPENSIVE_HANDBAG, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
     { GOLDEN_EARRINGS, 0, MISCELLANEOUS_CLASS, 1, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Valkyrie[] = {
+STATIC_VAR const struct trobj Valkyrie[] = {
     { LONG_SWORD, 1, WEAPON_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { DAGGER, 0, WEAPON_CLASS, 1, 0, UNDEF_BLESS, COLD_ENCHANTMENT, 0 },
     { FOOD_RATION, 0, FOOD_CLASS, 1,0, 0, 0, 0 },
     { SACK, 0, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj Wizard[] = 
+STATIC_VAR const struct trobj Wizard[] = 
 {
-    { QUARTERSTAFF, 1, WEAPON_CLASS, 1, 1, 0, 0 },
+    { QUARTERSTAFF, 1, WEAPON_CLASS, 1, 0, 1, 0, 0 },
     { CLOAK_OF_MAGIC_RESISTANCE, 0, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { WIZARD_S_ROBE, 1, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { BAG_OF_WIZARDRY, 0, TOOL_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -230,7 +235,7 @@ static const struct trobj Wizard[] =
     { UNDEF_TYP, UNDEF_SPE, SPBOOK_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
-static const struct trobj WizardAlternate[] = 
+STATIC_VAR const struct trobj WizardAlternate[] = 
 {
     { STAFF_OF_FIRE, 1, WEAPON_CLASS, 1, 0, 1, 0, 0 },
     { LEATHER_CLOAK, 0, ARMOR_CLASS, 1, 0, UNDEF_BLESS, 0, 0 },
@@ -250,83 +255,78 @@ static const struct trobj WizardAlternate[] =
  *      Optional extra inventory items.
  */
 
-static const struct trobj Tinopener[] = { { TIN_OPENER, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Tinopener[] = { { TIN_OPENER, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Magicmarker[] = { { MAGIC_MARKER, UNDEF_SPE, TOOL_CLASS,
-                                        1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Magicmarker[] = { { MAGIC_MARKER, UNDEF_SPE, TOOL_CLASS, 1, 0, 0, 0, 0 },
                                       { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Lamp[] = { { OIL_LAMP, 1, TOOL_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Lamp[] = { { OIL_LAMP, 1, TOOL_CLASS, 1, 0, 0, 0, 0 },
                                { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Blindfold[] = { { BLINDFOLD, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Blindfold[] = { { BLINDFOLD, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Xtra_food[] = { { UNDEF_TYP, UNDEF_SPE, FOOD_CLASS, 2, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Xtra_food[] = { { UNDEF_TYP, UNDEF_SPE, FOOD_CLASS, 2, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Leash[] = { { LEASH, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Leash[] = { { LEASH, 0, TOOL_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Wishing[] = { { WAN_WISHING, 3, WAND_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Wishing[] = { { WAN_WISHING, 3, WAND_CLASS, 1, 0, 0, 0, 0 },
                                   { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj OreDetection[] = { { WAN_ORE_DETECTION, UNDEF_SPE, WAND_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj OreDetection[] = { { WAN_ORE_DETECTION, UNDEF_SPE, WAND_CLASS, 1, 0, 0, 0, 0 },
                                   { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj Money[] = { { GOLD_PIECE, 0, COIN_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj Money[] = { { GOLD_PIECE, 0, COIN_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
 
-static const struct trobj DeathQuarrel[] = { { BONE_QUARREL, 0, WEAPON_CLASS,
-                                        1, 0, 0, DEATH_ENCHANTMENT, 0 },
+STATIC_VAR const struct trobj DeathQuarrel[] = { { BONE_QUARREL, 0, WEAPON_CLASS, 1, 0, 0, DEATH_ENCHANTMENT, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj LightningArrow[] = { { ARROW, 0, WEAPON_CLASS,
-                                        2, 0, 0, LIGHTNING_ENCHANTMENT, 0 },
+STATIC_VAR const struct trobj LightningArrow[] = { { ARROW, 0, WEAPON_CLASS, 2, 0, 0, LIGHTNING_ENCHANTMENT, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj LightningElvenArrow[] = { { ELVEN_ARROW, 0, WEAPON_CLASS,
-                                        2, 0, 0, LIGHTNING_ENCHANTMENT, 0 },
+STATIC_VAR const struct trobj LightningElvenArrow[] = { { ELVEN_ARROW, 0, WEAPON_CLASS, 2, 0, 0, LIGHTNING_ENCHANTMENT, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj LightningOrcishArrow[] = { { ORCISH_ARROW, 0, WEAPON_CLASS,
-                                        2, 0, 0, LIGHTNING_ENCHANTMENT, 0 },
+STATIC_VAR const struct trobj LightningOrcishArrow[] = { { ORCISH_ARROW, 0, WEAPON_CLASS, 2, 0, 0, LIGHTNING_ENCHANTMENT, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
 
-static const struct trobj PriestSilverMace[] = { { SILVER_MACE, 2, WEAPON_CLASS, 1,0,  1, 0, 0 },
+STATIC_VAR const struct trobj PriestSilverMace[] = { { SILVER_MACE, 2, WEAPON_CLASS, 1, 0, 1, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestNormalMace[] = { { MACE, 3, WEAPON_CLASS, 1, 0, 1, 0, 0 },
+STATIC_VAR const struct trobj PriestNormalMace[] = { { MACE, 3, WEAPON_CLASS, 1, 0, 1, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestLawfulSummonSpell[] = { { SPE_CELESTIAL_DOVE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj PriestLawfulSummonSpell[] = { { SPE_CELESTIAL_DOVE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestNeutralSummonSpell[] = { { SPE_STICK_TO_SNAKE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj PriestNeutralSummonSpell[] = { { SPE_STICK_TO_SNAKE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestChaoticSummonSpell[] = { { SPE_RAISE_MINOR_ZOMBIE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj PriestChaoticSummonSpell[] = { { SPE_RAISE_MINOR_ZOMBIE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj KnightSmallShield[] = { { SMALL_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj KnightSmallShield[] = { { SMALL_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj KnightSpikedSilverShield[] = { { SPIKED_SILVER_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj KnightSpikedSilverShield[] = { { SPIKED_SILVER_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestSmallShield[] = { { SMALL_SHIELD, 1, ARMOR_CLASS, 1, 0, 1, 0, 0 },
+STATIC_VAR const struct trobj PriestSmallShield[] = { { SMALL_SHIELD, 1, ARMOR_CLASS, 1, 0, 1, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestSpikedSilverShield[] = { { SPIKED_SILVER_SHIELD, 0, ARMOR_CLASS, 1, 0, 1, 0, 0 },
+STATIC_VAR const struct trobj PriestSpikedSilverShield[] = { { SPIKED_SILVER_SHIELD, 0, ARMOR_CLASS, 1, 0, 1, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj ValkyrieSpikedShield[] = { { SPIKED_SHIELD, 3, ARMOR_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj ValkyrieSpikedShield[] = { { SPIKED_SHIELD, 3, ARMOR_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj ValkyrieSpikedSilverShield[] = { { SPIKED_SILVER_SHIELD, 3, ARMOR_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj ValkyrieSpikedSilverShield[] = { { SPIKED_SILVER_SHIELD, 3, ARMOR_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj KnightLeatherGloves[] = { { LEATHER_GLOVES, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj KnightLeatherGloves[] = { { LEATHER_GLOVES, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj KnightSilverGauntlets[] = { { SILVER_GAUNTLETS, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj KnightSilverGauntlets[] = { { SILVER_GAUNTLETS, 0, ARMOR_CLASS, 1, 0, 0, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj PriestSilverGauntlets[] = { { SILVER_GAUNTLETS, 0, ARMOR_CLASS, 1, 0, 1, 0, 0 },
+STATIC_VAR const struct trobj PriestSilverGauntlets[] = { { SILVER_GAUNTLETS, 0, ARMOR_CLASS, 1, 0, 1, 0, 0 },
                                 { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj ScrollOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj ScrollOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 1, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj TwoScrollsOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 2, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj TwoScrollsOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 2, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj ThreeScrollsOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 3, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj ThreeScrollsOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 3, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj FourScrollsOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 4, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj FourScrollsOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 4, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj WandOfProbing[] = { { WAN_PROBING, 0, WAND_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj WandOfProbing[] = { { WAN_PROBING, 0, WAND_CLASS, 1, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const struct trobj ScrollOfRemoveCurse[] = { { SCR_REMOVE_CURSE, 0, SCROLL_CLASS, 1, 0, 0, 0, 0 },
+STATIC_VAR const struct trobj ScrollOfRemoveCurse[] = { { SCR_REMOVE_CURSE, 0, SCROLL_CLASS, 1, 0, 0, 0, 0 },
                                     { 0, 0, 0, 0, 0, 0, 0, 0 } };
 
 /* race-based substitutions for initial inventory;
    the weaker cloak for elven rangers is intentional--they shoot better */
-static const struct inv_sub {
+STATIC_VAR const struct inv_sub {
     short race_pm, item_otyp, subs_otyp;
 } inv_subs[] = {
     { PM_ELF, DAGGER, ELVEN_DAGGER },
@@ -399,7 +399,7 @@ static const struct inv_sub {
     { NON_PM, STRANGE_OBJECT, STRANGE_OBJECT }
 };
 
-static const struct def_skill Skill_A_Max[] = {
+STATIC_VAR const struct def_skill Skill_A_Max[] = {
     { P_DAGGER, P_MASTER },
     { P_DIGGING, P_GRAND_MASTER },
     { P_SWORD, P_MASTER },
@@ -415,7 +415,7 @@ static const struct def_skill Skill_A_Max[] = {
     { P_DIVINATION_SPELL, P_MASTER },
     { P_TRANSMUTATION_SPELL, P_MASTER },
     { P_NECROMANCY_SPELL, P_MASTER },
-    { P_TWO_WEAPON_COMBAT, P_MASTER },
+    { P_DUAL_WEAPON_COMBAT, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
     { P_DODGE, P_EXPERT },
     { P_WAND, P_MASTER },
@@ -423,7 +423,7 @@ static const struct def_skill Skill_A_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_A_Init[] = {
+STATIC_VAR const struct def_skill Skill_A_Init[] = {
     { P_WHIP, P_BASIC },
     { P_CROSSBOW, P_BASIC },
     { P_DIVINATION_SPELL, P_BASIC },
@@ -431,7 +431,7 @@ static const struct def_skill Skill_A_Init[] = {
 };
 
 
-static const struct def_skill Skill_B_Max[] = {
+STATIC_VAR const struct def_skill Skill_B_Max[] = {
     { P_DAGGER, P_MASTER },
     { P_AXE, P_GRAND_MASTER },
     { P_DIGGING, P_EXPERT },
@@ -441,24 +441,26 @@ static const struct def_skill Skill_B_Max[] = {
     { P_QUARTERSTAFF, P_EXPERT },
     { P_THRUSTING_WEAPON, P_EXPERT },
     { P_BOW, P_EXPERT },
+    { P_SLING, P_EXPERT },
     { P_CROSSBOW, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_RIDING, P_MASTER },
-    { P_TWO_WEAPON_COMBAT, P_EXPERT },
+    { P_DUAL_WEAPON_COMBAT, P_MASTER },
+    { P_TWO_HANDED_WEAPON, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
     { P_DODGE, P_MASTER },
     { P_SHIELD, P_EXPERT },
     { P_DISARM_TRAP, P_SKILLED },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_B_Init[] = {
+STATIC_VAR const struct def_skill Skill_B_Init[] = {
     { P_AXE, P_BASIC },
     { P_SWORD, P_BASIC },
     { P_BARE_HANDED_COMBAT, P_BASIC },
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_C_Max[] = {
+STATIC_VAR const struct def_skill Skill_C_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_AXE, P_EXPERT },
     { P_DIGGING, P_MASTER },
@@ -472,6 +474,7 @@ static const struct def_skill Skill_C_Max[] = {
     { P_THROWN_WEAPON, P_MASTER },
     { P_NATURE_SPELL, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
+    { P_TWO_HANDED_WEAPON, P_GRAND_MASTER },
     { P_DODGE, P_MASTER },
     { P_SHIELD, P_EXPERT },
     { P_WAND, P_EXPERT },
@@ -479,7 +482,7 @@ static const struct def_skill Skill_C_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_C_Init[] = {
+STATIC_VAR const struct def_skill Skill_C_Init[] = {
     { P_BLUDGEONING_WEAPON, P_SKILLED },
     { P_QUARTERSTAFF, P_BASIC },
     { P_THRUSTING_WEAPON, P_BASIC },
@@ -491,7 +494,7 @@ static const struct def_skill Skill_C_Init[] = {
 };
 
 
-static const struct def_skill Skill_H_Max[] = {
+STATIC_VAR const struct def_skill Skill_H_Max[] = {
     { P_DAGGER, P_GRAND_MASTER },
     { P_SWORD, P_SKILLED },
     { P_BLUDGEONING_WEAPON, P_SKILLED },
@@ -508,7 +511,7 @@ static const struct def_skill Skill_H_Max[] = {
     { P_DISARM_TRAP, P_SKILLED },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_H_Init[] = {
+STATIC_VAR const struct def_skill Skill_H_Init[] = {
     { P_DAGGER, P_SKILLED },
     { P_QUARTERSTAFF, P_BASIC },
     { P_HEALING_SPELL, P_SKILLED },
@@ -520,7 +523,7 @@ static const struct def_skill Skill_H_Init[] = {
 };
 
 
-static const struct def_skill Skill_K_Max[] = {
+STATIC_VAR const struct def_skill Skill_K_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_AXE, P_MASTER },
     { P_SWORD, P_GRAND_MASTER },
@@ -536,7 +539,8 @@ static const struct def_skill Skill_K_Max[] = {
     { P_CELESTIAL_SPELL, P_SKILLED },
     { P_ABJURATION_SPELL, P_SKILLED },
     { P_RIDING, P_GRAND_MASTER },
-    { P_TWO_WEAPON_COMBAT, P_GRAND_MASTER },
+    { P_DUAL_WEAPON_COMBAT, P_GRAND_MASTER },
+    { P_TWO_HANDED_WEAPON, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_EXPERT },
     { P_DODGE, P_MASTER },
     { P_SHIELD, P_GRAND_MASTER },
@@ -545,7 +549,7 @@ static const struct def_skill Skill_K_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_K_Init[] = {
+STATIC_VAR const struct def_skill Skill_K_Init[] = {
     { P_SWORD, P_BASIC },
     { P_THRUSTING_WEAPON, P_BASIC },
     { P_SHIELD, P_BASIC },
@@ -554,7 +558,7 @@ static const struct def_skill Skill_K_Init[] = {
 };
 
 
-static const struct def_skill Skill_Monk_Max[] = {
+STATIC_VAR const struct def_skill Skill_Monk_Max[] = {
     { P_QUARTERSTAFF, P_EXPERT },
     { P_SLING, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
@@ -570,7 +574,7 @@ static const struct def_skill Skill_Monk_Max[] = {
     { P_DISARM_TRAP, P_BASIC },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_Monk_Init[] = {
+STATIC_VAR const struct def_skill Skill_Monk_Init[] = {
     { P_BARE_HANDED_COMBAT, P_EXPERT },
     { P_MARTIAL_ARTS, P_UNSKILLED },
     { P_ABJURATION_SPELL, P_BASIC },
@@ -579,7 +583,7 @@ static const struct def_skill Skill_Monk_Init[] = {
 };
 
 
-static const struct def_skill Skill_P_Max_Chaotic[] = {
+STATIC_VAR const struct def_skill Skill_P_Max_Chaotic[] = {
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
     { P_QUARTERSTAFF, P_EXPERT },
@@ -597,7 +601,7 @@ static const struct def_skill Skill_P_Max_Chaotic[] = {
     { P_WAND, P_SKILLED },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_P_Max_Neutral[] = {
+STATIC_VAR const struct def_skill Skill_P_Max_Neutral[] = {
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
     { P_QUARTERSTAFF, P_EXPERT },
@@ -615,7 +619,7 @@ static const struct def_skill Skill_P_Max_Neutral[] = {
     { P_WAND, P_SKILLED },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_P_Max_Lawful[] = {
+STATIC_VAR const struct def_skill Skill_P_Max_Lawful[] = {
     { P_BLUDGEONING_WEAPON, P_EXPERT },
     { P_FLAIL, P_EXPERT },
     { P_QUARTERSTAFF, P_EXPERT },
@@ -634,21 +638,21 @@ static const struct def_skill Skill_P_Max_Lawful[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_P_Init_Chaotic[] = {
+STATIC_VAR const struct def_skill Skill_P_Init_Chaotic[] = {
     { P_BLUDGEONING_WEAPON, P_BASIC },
     { P_CLERIC_SPELL, P_BASIC },
     { P_NECROMANCY_SPELL, P_BASIC },
     { P_HEALING_SPELL, P_BASIC },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_P_Init_Neutral[] = {
+STATIC_VAR const struct def_skill Skill_P_Init_Neutral[] = {
     { P_BLUDGEONING_WEAPON, P_BASIC },
     { P_CLERIC_SPELL, P_BASIC },
     { P_NATURE_SPELL, P_BASIC },
     { P_HEALING_SPELL, P_BASIC },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_P_Init_Lawful[] = {
+STATIC_VAR const struct def_skill Skill_P_Init_Lawful[] = {
     { P_BLUDGEONING_WEAPON, P_BASIC },
     { P_CLERIC_SPELL, P_BASIC },
     { P_CELESTIAL_SPELL, P_BASIC },
@@ -656,7 +660,7 @@ static const struct def_skill Skill_P_Init_Lawful[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_Rogue_Max[] = {
+STATIC_VAR const struct def_skill Skill_Rogue_Max[] = {
     { P_DAGGER, P_GRAND_MASTER },
     { P_SWORD, P_MASTER },
     { P_BLUDGEONING_WEAPON, P_EXPERT },
@@ -669,7 +673,7 @@ static const struct def_skill Skill_Rogue_Max[] = {
     { P_MOVEMENT_SPELL, P_SKILLED },
     { P_TRANSMUTATION_SPELL, P_SKILLED },
     { P_RIDING, P_SKILLED },
-    { P_TWO_WEAPON_COMBAT, P_MASTER },
+    { P_DUAL_WEAPON_COMBAT, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_MASTER },
     { P_DODGE, P_GRAND_MASTER },
     { P_SHIELD, P_SKILLED },
@@ -677,7 +681,7 @@ static const struct def_skill Skill_Rogue_Max[] = {
     { P_DISARM_TRAP, P_GRAND_MASTER },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_Rogue_Init[] = {
+STATIC_VAR const struct def_skill Skill_Rogue_Init[] = {
     { P_DAGGER, P_BASIC },
     { P_SWORD, P_BASIC },
     { P_CROSSBOW, P_BASIC },
@@ -686,7 +690,7 @@ static const struct def_skill Skill_Rogue_Init[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_Ranger_Max[] = {
+STATIC_VAR const struct def_skill Skill_Ranger_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_AXE, P_EXPERT },
     { P_DIGGING, P_BASIC },
@@ -709,7 +713,7 @@ static const struct def_skill Skill_Ranger_Max[] = {
     { P_DISARM_TRAP, P_MASTER },
     { P_NONE, 0 }
 };
-static const struct def_skill Skill_Ranger_Init[] = {
+STATIC_VAR const struct def_skill Skill_Ranger_Init[] = {
     { P_DAGGER, P_BASIC },
     { P_THRUSTING_WEAPON, P_BASIC },
     { P_BOW, P_BASIC },
@@ -719,7 +723,7 @@ static const struct def_skill Skill_Ranger_Init[] = {
 };
 
 
-static const struct def_skill Skill_S_Max[] = {
+STATIC_VAR const struct def_skill Skill_S_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_SWORD, P_GRAND_MASTER },
     { P_FLAIL, P_GRAND_MASTER },
@@ -730,7 +734,8 @@ static const struct def_skill Skill_S_Max[] = {
     { P_CROSSBOW, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_RIDING, P_EXPERT },
-    { P_TWO_WEAPON_COMBAT, P_GRAND_MASTER },
+    { P_DUAL_WEAPON_COMBAT, P_GRAND_MASTER },
+    { P_TWO_HANDED_WEAPON, P_GRAND_MASTER },
     { P_BARE_HANDED_COMBAT, P_GRAND_MASTER },
     { P_MARTIAL_ARTS, P_SKILLED },
     { P_DODGE, P_MASTER },
@@ -740,7 +745,7 @@ static const struct def_skill Skill_S_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_S_Init[] = {
+STATIC_VAR const struct def_skill Skill_S_Init[] = {
     { P_SWORD, P_BASIC },
     { P_THROWN_WEAPON, P_BASIC },
     { P_QUARTERSTAFF, P_BASIC },
@@ -749,7 +754,7 @@ static const struct def_skill Skill_S_Init[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_T_Max[] = {
+STATIC_VAR const struct def_skill Skill_T_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_AXE, P_EXPERT },
     { P_DIGGING, P_EXPERT },
@@ -774,7 +779,8 @@ static const struct def_skill Skill_T_Max[] = {
     { P_MOVEMENT_SPELL, P_GRAND_MASTER },
     { P_TRANSMUTATION_SPELL, P_EXPERT },
     { P_RIDING, P_EXPERT },
-    { P_TWO_WEAPON_COMBAT, P_EXPERT },
+    { P_DUAL_WEAPON_COMBAT, P_EXPERT },
+    { P_TWO_HANDED_WEAPON, P_EXPERT },
     { P_BARE_HANDED_COMBAT, P_EXPERT },
     { P_DODGE, P_EXPERT },
     { P_SHIELD, P_EXPERT },
@@ -783,13 +789,13 @@ static const struct def_skill Skill_T_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_T_Init[] = {
+STATIC_VAR const struct def_skill Skill_T_Init[] = {
     { P_THROWN_WEAPON, P_BASIC },
     { P_NONE, 0 }
 };
 
 
-static const struct def_skill Skill_V_Max[] = {
+STATIC_VAR const struct def_skill Skill_V_Max[] = {
     { P_DAGGER, P_GRAND_MASTER },
     { P_AXE, P_GRAND_MASTER },
     { P_SWORD, P_GRAND_MASTER },
@@ -800,7 +806,8 @@ static const struct def_skill Skill_V_Max[] = {
     { P_CROSSBOW, P_EXPERT },
     { P_THROWN_WEAPON, P_EXPERT },
     { P_RIDING, P_EXPERT },
-    { P_TWO_WEAPON_COMBAT, P_GRAND_MASTER },
+    { P_DUAL_WEAPON_COMBAT, P_GRAND_MASTER },
+    { P_TWO_HANDED_WEAPON, P_MASTER },
     { P_BARE_HANDED_COMBAT, P_GRAND_MASTER },
     { P_DODGE, P_MASTER },
     { P_SHIELD, P_GRAND_MASTER },
@@ -809,18 +816,18 @@ static const struct def_skill Skill_V_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_V_Init[] = {
+STATIC_VAR const struct def_skill Skill_V_Init[] = {
     { P_DAGGER, P_BASIC },
     { P_AXE, P_BASIC },
     { P_SWORD, P_BASIC },
     { P_BLUDGEONING_WEAPON, P_BASIC },
     { P_BARE_HANDED_COMBAT, P_BASIC },
-    { P_TWO_WEAPON_COMBAT, P_BASIC },
+    { P_DUAL_WEAPON_COMBAT, P_BASIC },
     { P_SHIELD, P_BASIC },
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_W_Max[] = {
+STATIC_VAR const struct def_skill Skill_W_Max[] = {
     { P_DAGGER, P_EXPERT },
     { P_SWORD, P_BASIC },
     { P_QUARTERSTAFF, P_EXPERT },
@@ -840,7 +847,7 @@ static const struct def_skill Skill_W_Max[] = {
     { P_NONE, 0 }
 };
 
-static const struct def_skill Skill_W_Init[] = {
+STATIC_VAR const struct def_skill Skill_W_Init[] = {
     { P_ARCANE_SPELL, P_BASIC },
     { P_ENCHANTMENT_SPELL, P_BASIC },
     { P_TRANSMUTATION_SPELL, P_BASIC },
@@ -937,7 +944,12 @@ u_init()
     u.uhp_fraction = 0;
     u.mh_fraction = 0;
     u.uen_fraction = 0;
-    
+
+    nocreate = STRANGE_OBJECT;
+    nocreate2 = STRANGE_OBJECT;
+    nocreate3 = STRANGE_OBJECT;
+    nocreate4 = STRANGE_OBJECT;
+
     adjabil(0, 1);
     u.ulevel = u.ulevelmax = 1;
 
@@ -1431,6 +1443,7 @@ void
 add_school_specific_spellbooks(VOID_ARGS)
 {
     int skill;
+    Strcpy(debug_buf_2, "add_school_specific_spellbooks");
     for (skill = P_FIRST_SPELL; skill <= P_LAST_SPELL; skill++)
     {
         if (P_SKILL_LEVEL(skill) >= P_BASIC)
@@ -1554,6 +1567,8 @@ register const struct trobj * trop;
     struct obj *obj;
     int otyp;
     long quan;
+    Strcpy(debug_buf_2, "ini_inv");
+    Strcpy(debug_buf_4, "ini_inv");
 
     while (trop->trclass) 
     {
@@ -1567,10 +1582,6 @@ register const struct trobj * trop;
             }
             else
             { /* UNDEF_TYP */
-                static NEARDATA short nocreate = STRANGE_OBJECT;
-                static NEARDATA short nocreate2 = STRANGE_OBJECT;
-                static NEARDATA short nocreate3 = STRANGE_OBJECT;
-                static NEARDATA short nocreate4 = STRANGE_OBJECT;
                 /*
                  * For random objects, do not create certain overly powerful
                  * items: wand of wishing, ring of levitation, or the
@@ -2071,7 +2082,7 @@ mk_obj_in_container_known(container, itemtype)
 struct obj* container;
 int itemtype;
 {
-    struct obj* otmp = add_to_container(container, mksobj(itemtype, FALSE, FALSE, TRUE));
+    struct obj* otmp = mksobj(itemtype, FALSE, FALSE, TRUE);
     if (otmp)
     {
         otmp->bknown = 1;
@@ -2083,6 +2094,7 @@ int itemtype;
             else
                 otmp->speflags &= ~SPEFLAGS_ALTERNATIVE_APPEARANCE;
         }
+        add_to_container(container, otmp);
     }
 
     return otmp;

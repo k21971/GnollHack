@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
 
 /* GnollHack 4.0    do_name.c    $NHDT-Date: 1555627306 2019/04/18 22:41:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -24,6 +24,7 @@ STATIC_DCL void FDECL(print_catalogue, (winid, struct obj*, int, unsigned long))
 STATIC_DCL void FDECL(print_artifact_catalogue, (winid, struct obj*));
 STATIC_DCL int FDECL(CFDECLSPEC citemsortcmp, (const void*, const void*));
 STATIC_DCL int FDECL(CFDECLSPEC artilistsortcmp, (const void*, const void*));
+STATIC_DCL const char* FDECL(gettitle, (short*, const char* const*, int, int, unsigned long, unsigned long));
 
 extern const char what_is_an_unknown_object[]; /* from pager.c */
 
@@ -43,8 +44,8 @@ nextmbuf()
 /* function for getpos() to highlight desired map locations.
  * parameter value 0 = initialize, 1 = highlight, 2 = done
  */
-static void FDECL((*getpos_hilitefunc), (int)) = (void FDECL((*), (int))) 0;
-static boolean FDECL((*getpos_getvalid), (int, int)) =
+STATIC_DCL void FDECL((*getpos_hilitefunc), (int)) = (void FDECL((*), (int))) 0;
+STATIC_DCL boolean FDECL((*getpos_getvalid), (int, int)) =
                                            (boolean FDECL((*), (int, int))) 0;
 
 void
@@ -56,7 +57,7 @@ boolean FDECL((*gp_getvalidf), (int, int));
     getpos_getvalid = gp_getvalidf;
 }
 
-static const char *const gloc_descr[NUM_GLOCS][4] = {
+STATIC_VAR const char *const gloc_descr[NUM_GLOCS][4] = {
     { "any monsters", "monster", "next/previous monster", "monsters" },
     { "any items", "item", "next/previous object", "objects" },
     { "any doors", "door", "next/previous door or doorway", "doors or doorways" },
@@ -68,7 +69,7 @@ static const char *const gloc_descr[NUM_GLOCS][4] = {
       "valid locations" }
 };
 
-static const char *const gloc_filtertxt[NUM_GFILTER] = {
+STATIC_VAR const char *const gloc_filtertxt[NUM_GFILTER] = {
     "",
     " in view",
     " in this area"
@@ -250,13 +251,13 @@ const void *b;
      && generic_glyph_to_cmap(levl[(x)][(y)].hero_memory_layers.glyph) == S_unexplored  \
      && !levl[(x)][(y)].seenv)
 
-static struct opvar *gloc_filter_map = (struct opvar *) 0;
+STATIC_VAR struct opvar *gloc_filter_map = (struct opvar *) 0;
 
 #define GLOC_SAME_AREA(x,y)                                     \
     (isok((x), (y))                                             \
      && (selection_getpoint((x),(y), gloc_filter_map)))
 
-static int gloc_filter_floodfill_match_glyph;
+STATIC_VAR int gloc_filter_floodfill_match_glyph;
 
 int
 gloc_filter_classify_glyph(glyph)
@@ -1424,7 +1425,7 @@ do_mname()
         if (!alreadynamed(mtmp, monnambuf, buf))
             pline("%s will not accept the name %s.", upstart(monnambuf), buf);
     }
-    else if((!has_mname(mtmp) || (is_tame(mtmp) && !is_charmed(mtmp))) && is_animal(mtmp->data) && is_peaceful(mtmp))
+    else if(((!has_mname(mtmp) || (is_tame(mtmp) && !is_charmed(mtmp))) && is_animal(mtmp->data) && is_peaceful(mtmp)) || (mtmp->mon_flags & MON_FLAGS_YOUR_CHILD))
     {
         /* Peaceful animals who do not have names and tame animals can be named, others do not accept your naming */
         (void)christen_monst(mtmp, buf);
@@ -1600,7 +1601,7 @@ const char* name;
     return obj;
 }
 
-static NEARDATA const char callable[] = {
+STATIC_VAR NEARDATA const char callable[] = {
     SCROLL_CLASS, POTION_CLASS, WAND_CLASS,  RING_CLASS, AMULET_CLASS, FOOD_CLASS,
     GEM_CLASS, SPBOOK_CLASS, ARMOR_CLASS, TOOL_CLASS, MISCELLANEOUS_CLASS, WEAPON_CLASS, 0
 };
@@ -1929,7 +1930,7 @@ namefloorobj()
     }
 }
 
-static const char *const ghostnames[] = {
+STATIC_VAR const char *const ghostnames[] = {
     /* these names should have length < PL_NSIZ */
     /* Capitalize the names for aesthetics -dgk */
     "Adri",    "Andries",       "Andreas",     "Bert",    "David",  "Dirk",
@@ -2447,7 +2448,7 @@ roguename()
                   : "Glenn Wichman";
 }
 
-static NEARDATA const char *const hcolors[] = {
+STATIC_VAR NEARDATA const char *const hcolors[] = {
     "ultraviolet", "infrared", "bluish-orange", "reddish-green", "dark white",
     "light black", "sky blue-pink", "salty", "sweet", "sour", "bitter",
     "striped", "spiral", "swirly", "plaid", "checkered", "argyle", "paisley",
@@ -2477,7 +2478,7 @@ rndcolor()
                                            : c_obj_colors[k];
 }
 
-static NEARDATA const char *const hliquids[] = {
+STATIC_VAR NEARDATA const char *const hliquids[] = {
     "yoghurt", "oobleck", "clotted blood", "diluted water", "purified water",
     "instant coffee", "tea", "herbal infusion", "liquid rainbow",
     "creamy foam", "mulled wine", "bouillon", "nectar", "grog", "flubber",
@@ -2497,7 +2498,7 @@ const char *liquidpref;
 
 /* Aliases for road-runner nemesis
  */
-static const char *const coynames[] = {
+STATIC_VAR const char *const coynames[] = {
     "Carnivorous Vulgaris", "Road-Runnerus Digestus", "Eatibus Anythingus",
     "Famishus-Famishus", "Eatibus Almost Anythingus", "Eatius Birdius",
     "Famishius Fantasticus", "Eternalii Famishiis", "Famishus Vulgarus",
@@ -3798,7 +3799,7 @@ const char *gang, *other;
 }
 
 /* make sure "The Colour of Magic" remains the first entry in here */
-static const char *const sir_Terry_novels[] = {
+STATIC_VAR const char *const sir_Terry_novels[] = {
     "The Colour of Magic", "The Light Fantastic", "Equal Rites", "Mort",
     "Sourcery", "Wyrd Sisters", "Pyramids", "Guards! Guards!", "Eric",
     "Moving Pictures", "Reaper Man", "Witches Abroad", "Small Gods",
@@ -3812,25 +3813,93 @@ static const char *const sir_Terry_novels[] = {
     "Raising Steam", "The Shepherd's Crown"
 };
 
-const char *
-noveltitle(novidx)
-short* novidx;
+STATIC_OVL
+const char*
+gettitle(titleidx, titlearray, arraysize, numrandomized, excludedtitles, excludedtitles2)
+short* titleidx;
+const char* const* titlearray;
+int arraysize;
+int numrandomized; /* Only this first elements are included in randomization */
+unsigned long excludedtitles, excludedtitles2; /* Requires a 64-bit long to work for more than 32 novels */
 {
-    short j, k = (short)SIZE(sir_Terry_novels);
-
-    j = (short)rn2((int)k);
-    if (novidx) {
-        if (*novidx == -1)
-            *novidx = j;
-        else if (*novidx >= 0 && *novidx < k)
-            j = *novidx;
+    short num = (short)min(arraysize, numrandomized); /* num is the titles randomized before exclusions */
+    short j, k = num; /* k is the titles randomized after exclusions */
+    if (excludedtitles)
+    {
+        int i;
+        for (i = 0; i < 32 && i < num; i++)
+        {
+            unsigned long bit = 1UL << i;
+            if (excludedtitles & bit)
+            {
+                k--;
+            }
+        }
     }
-    return sir_Terry_novels[j];
+    if (excludedtitles2)
+    {
+        int i;
+        for (i = 32; i < 64 && i < num; i++)
+        {
+            unsigned long bit = 1UL << (i - 32);
+            if (excludedtitles2 & bit)
+            {
+                k--;
+            }
+        }
+    }
+
+    if (k < 1)
+        j = 0;
+    else
+    {
+        short roll = (short)rn2((int)k);
+        if (excludedtitles || excludedtitles2)
+        {
+            for (j = 0; j < num; j++)
+            {
+                unsigned long bit = 0UL;
+                if (j < 32)
+                {
+                    bit = 1UL << j;
+                    if (excludedtitles & bit)
+                        continue;
+                }
+                else if (j < 64)
+                {
+                    bit = 1UL << (j - 32);
+                    if (excludedtitles2 & bit)
+                        continue;
+                }
+                if (!roll)
+                    break;
+                roll--;
+            }
+        }
+        else
+            j = roll;
+    }
+
+    if (titleidx)  /* Randomized or non-randomized if titleidx != 0 */
+    {
+        if (*titleidx == -1)
+            *titleidx = j; /* Randomized, set titleidx to the randomized index */
+        else if (*titleidx >= 0 && *titleidx < arraysize)
+            j = *titleidx;  /* Set to value determined by titleidx */
+    }
+    return titlearray[j];
+}
+
+const char *
+noveltitle(novidx, excludedtitles, excludedtitles2)
+short* novidx;
+unsigned long excludedtitles, excludedtitles2;
+{
+    return gettitle(novidx, sir_Terry_novels, SIZE(sir_Terry_novels), SIZE(sir_Terry_novels), excludedtitles, excludedtitles2);
 }
 
 
-
-static const char* const manual_names[MAX_MANUAL_TYPES] = {
+STATIC_VAR const char* const manual_names[MAX_MANUAL_TYPES] = {
     /* Manuals */
     "Wands 101", "Armor 101", "Weapons 101", "Gray Stones 101",
     "Basics of Kicking", "Basics of Enchantment", "Basics of Eating and Drinking", "Introduction to Dangerous Monsters",
@@ -3843,25 +3912,17 @@ static const char* const manual_names[MAX_MANUAL_TYPES] = {
     "Secrets of Scare Monster", "Gurathul's Guide to Ascension", "Master Class in Wands", "Infernal Inhabitants of Gehennom",
     "Advanced Reading in Known Monsters", "Manual of the Planes",
     /* Catalogues */
-    "Catalogue of Weapons", "Catalogue of Armors", "Catalogue of Rings", "Catalogue of Potions", "Catalogue of Scrolls", "Catalogue of Wands",
+    "Catalogue of Weapons", "Catalogue of Armor", "Catalogue of Rings", "Catalogue of Potions", "Catalogue of Scrolls", "Catalogue of Wands",
     "Catalogue of Miscellaneous Magic Items", "Catalogue of Tools", "Catalogue of Magic Spells", "Catalogue of Clerical Spells",
     "Catalogue of Comestibles", "Catalogue of Gems and Stones", "Catalogue of Artifacts",
 };
 
 const char*
-manualtitle(mnlidx)
+manualtitle(mnlidx, excludedtitles, excludedtitles2)
 short* mnlidx;
+unsigned long excludedtitles, excludedtitles2;
 {
-    short j, k = NUM_RANDOM_MANUALS; /* Number of randomly generated manuals */ //SIZE(manual_names);
-
-    j = (short)rn2((int)k);
-    if (mnlidx) {
-        if (*mnlidx == -1)
-            *mnlidx = j;
-        else if (*mnlidx >= 0 && *mnlidx < SIZE(manual_names))
-            j = *mnlidx;
-    }
-    return manual_names[j];
+    return gettitle(mnlidx, manual_names, SIZE(manual_names), NUM_RANDOM_MANUALS, excludedtitles, excludedtitles2);
 }
 
 /* qsort comparison routine */
@@ -3907,7 +3968,7 @@ const void* q;
     return namediff;
 }
 
-static short sorted_citems[NUM_OBJECTS];
+STATIC_VAR short sorted_citems[NUM_OBJECTS];
 
 #define CATALOGUE_MAGICAL 1
 #define CATALOGUE_CLERICAL 2
@@ -4505,6 +4566,12 @@ short* idx;
         return manual_names[*idx];
 
     return (const char*)0;
+}
+
+void
+reset_doname(VOID_ARGS)
+{
+    via_naming = 0;
 }
 
 /*do_name.c*/
