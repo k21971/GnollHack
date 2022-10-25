@@ -80,7 +80,7 @@ ENTRYMAX=2000
 #PERS_IS_UID=1
 
 # Maximum number of score file entries to use for random statue names
-#MAX_STATUENAME_RANK=10
+MAX_STATUENAME_RANK=50
 
 # Show debugging information originating from these source files.
 # Use '*' for all, or list source files separated by spaces.
