@@ -44,6 +44,7 @@ dat/options
 dat/quest.dat
 dat/dungeon.pdf
 include/date.h
+include/lev_comp.h
 include/onames.h
 include/pm.h
 include/animoff.h
