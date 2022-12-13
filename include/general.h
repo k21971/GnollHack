@@ -337,6 +337,20 @@ enum special_level_naming_types {
     MAX_SPECIAL_LEVEL_NAMING_TYPES
 };
 
+enum simple_doodad_tile_types
+{
+    DOODAD_STALAGMITE = 0,
+    MAX_SIMPLE_DOODAD_TILES
+};
+
+enum rotatable_doodad_tile_types
+{
+    DOODAD_COBWEB_NORMAL = 0,
+    DOODAD_COBWEB_CORNER,
+    MAX_ROTATABLE_DOODAD_TILES
+};
+#define NUM_DOODAD_ROTATIONS 4
+
 enum hit_tile_types
 {
     HIT_GENERAL = 0,
