@@ -15,7 +15,7 @@ COMPILEREVISION?=1
 PREFIX=/opt/nethack/chroot
 
 # this is the dir where NetHack is inside the chroot
-HACKDIR=/gnollhack-4.1.0.34
+HACKDIR=/gnollhack-4.1.0.35
 INSTDIR=$(PREFIX)$(HACKDIR)
 # DGL does not use the shell script launcher
 SHELLDIR=/tmp
@@ -36,6 +36,8 @@ CFLAGS+=-DCURSES_GRAPHICS
 CFLAGS+=-DPANICLOG_FMT2
 CFLAGS+=-DFCMASK=0644
 CFLAGS+=-DTTY_TILES_ESCCODES
+CFLAGS+=-DEDIT_GETLIN
+CFLAGS+=-DSCORE_ON_BOTL
 CFLAGS+=-DDUMPLOG
 
 LINK=$(CC)
