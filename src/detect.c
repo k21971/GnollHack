@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    detect.c    $NHDT-Date: 1544437284 2018/12/10 10:21:24 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.91 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -192,12 +192,12 @@ unsigned material;
     register struct obj *otmp;
     struct obj *temp;
 
-    if (objects[obj->otyp].oc_material == material)
+    if (obj->material == material)
         return obj;
 
     if (Has_contents(obj)) {
         for (otmp = obj->cobj; otmp; otmp = otmp->nobj)
-            if (objects[otmp->otyp].oc_material == material)
+            if (otmp->material == material)
                 return otmp;
             else if (Has_contents(otmp)
                      && (temp = o_material(otmp, material)) != 0)

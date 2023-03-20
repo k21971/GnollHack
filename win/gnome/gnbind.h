@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	gnbind.h	$NHDT-Date: 1432512806 2015/05/25 00:13:26 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright (C) 1998 by Erik Andersen <andersee@debian.org> */
@@ -55,6 +55,7 @@ void gnome_destroy_nhwindow(winid wid);
 void gnome_curs(winid wid, int x, int y);
 void gnome_putstr(winid wid, int attr, const char *text);
 void gnome_putstr_ex(winid wid, int attr, const char* text, int app, int color);
+void gnome_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app);
 void gnome_display_file(const char *filename, BOOLEAN_P must_exist);
 void gnome_start_menu_ex(winid wid, int style);
 void gnome_add_menu(winid wid, int glyph, const ANY_P *identifier,

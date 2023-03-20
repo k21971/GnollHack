@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mhmsg.h    $NHDT-Date: 1432512811 2015/05/25 00:13:31 $  $NHDT-Branch: master $:$NHDT-Revision: 1.15 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -40,6 +40,8 @@ typedef struct mswin_nhmsg_putstr {
     const char *text;
     int append;
     int color;
+    const char* attrs;
+    const char* colors;
 } MSNHMsgPutstr, *PMSNHMsgPutstr;
 
 typedef struct mswin_nhmsg_print_glyph {
@@ -61,6 +63,7 @@ typedef struct mswin_nhmsg_add_menu {
     CHAR_P accelerator;
     CHAR_P group_accel;
     int attr;
+    int color;
     const char *str;
     BOOLEAN_P presel;
 } MSNHMsgAddMenu, *PMSNHMsgAddMenu;
@@ -75,9 +78,14 @@ typedef struct mswin_nhmsg_end_menu_ex {
     const char *subtitle;
 } MSNHMsgEndMenu, *PMSNHMsgEndMenu;
 
+
+#define TEXT_BUFFER_SIZE 4096
+
 typedef struct mswin_nhmsg_get_text {
     size_t max_size;
-    char buffer[];
+    char buffer[TEXT_BUFFER_SIZE];
+    char attrs[TEXT_BUFFER_SIZE];
+    char colors[TEXT_BUFFER_SIZE];
 } MSNHMsgGetText, *PMSNHMsgGetText;
 
 typedef struct mswin_nhmsg_update_status {

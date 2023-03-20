@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    do.c    $NHDT-Date: 1548978604 2019/01/31 23:50:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.189 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -49,7 +49,7 @@ int
 docharacterstatistics()
 {
     int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
-    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     winid datawin = WIN_ERR;
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon_with_flags(&youmonst, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
@@ -240,7 +240,7 @@ docharacterstatistics()
 
 
     /* Current intrinsics */
-    Sprintf(buf, "Intrinsic and extrinsic abilities:");
+    Sprintf(buf, "Intrinsic and known extrinsic abilities:");
     putstr(datawin, ATR_HEADING, buf);
 
     int intrinsic_count = 0;
@@ -248,6 +248,7 @@ docharacterstatistics()
     {
         struct obj* obj = 0;
         long innate_intrinsic = u.uprops[i].intrinsic & (INTRINSIC | FROM_FORM);
+        long temporary_intrinsic = u.uprops[i].intrinsic & TIMEOUT;
         long extrinsic = u.uprops[i].extrinsic;
         boolean o_stats_known = FALSE;
         if (extrinsic)
@@ -256,7 +257,7 @@ docharacterstatistics()
             if (obj)
                 o_stats_known = object_stats_known(obj);
         }
-        if (innate_intrinsic || o_stats_known)
+        if (innate_intrinsic || o_stats_known || temporary_intrinsic)
         {
             intrinsic_count++;
 
@@ -298,6 +299,14 @@ docharacterstatistics()
                     Sprintf(eos(dbuf3), ", ");
 
                 Sprintf(eos(dbuf3), "%s", cxname(obj));
+            }
+            
+            if (temporary_intrinsic)
+            {
+                if (strcmp(dbuf3, ""))
+                    Sprintf(eos(dbuf3), ", ");
+
+                Sprintf(eos(dbuf3), "temporary effect");
             }
 
             if (strcmp(dbuf3, ""))
@@ -742,7 +751,7 @@ register struct obj* obj;
 
     winid datawin = WIN_ERR;
     int glyph = obj_to_glyph(obj, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, obj->ox, obj->oy, data_to_replacement_info(glyph, LAYER_OBJECT, obj, (struct monst*)0, 0UL));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, obj->ox, obj->oy, data_to_replacement_info(glyph, LAYER_OBJECT, obj, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_DESCRIPTION_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_obj(obj));
 
@@ -926,7 +935,7 @@ register struct obj* obj;
         if(obj->oartifact)
             Sprintf(buf2, "%ld gold", artilist[obj->oartifact].cost);
         else
-            Sprintf(buf2, "%ld gold", objects[otyp].oc_cost);
+            Sprintf(buf2, "%ld gold", get_object_base_value(obj));
 
         Sprintf(buf, "Base value:             %s", buf2);        
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -1071,13 +1080,14 @@ register struct obj* obj;
     /* Material */
     if (stats_known || objects[otyp].oc_name_known)
     {
-        Strcpy(buf2, material_definitions[objects[otyp].oc_material].name);
+        Strcpy(buf2, material_definitions[obj->material].name);
         *buf2 = highc(*buf2);
         Sprintf(buf, "Material:               %s", buf2);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
-    if (objects[otyp].oc_name_known && obj->oartifact == 0 && !objects[otyp].oc_unique && (objects[otyp].oc_class == SPBOOK_CLASS || objects[obj->otyp].oc_class == SCROLL_CLASS))
+    if (objects[otyp].oc_name_known && obj->oartifact == 0 && !objects[otyp].oc_unique && (objects[otyp].oc_class == SPBOOK_CLASS || objects[obj->otyp].oc_class == SCROLL_CLASS)
+        && otyp != SCR_BLANK_PAPER && otyp != SPE_BLANK_PAPER && otyp != SCR_SUPREME_DIABOLISM)
     {
         int ink = ink_cost(obj);
         Sprintf(buf, "Base write cost:        %d charge%s", ink, plur(ink));        
@@ -1185,6 +1195,14 @@ register struct obj* obj;
                         putstr(datawin, ATR_INDENT_AT_COLON, buf);
                     }
                 }
+                if (material_definitions[obj->material].digging_speed_bonus != 0)
+                {
+                    if (is_pick(obj) || is_axe(obj) || is_saw(obj))
+                    {
+                        Sprintf(buf, "Material bonus:         %d%% %s speed", material_definitions[obj->material].digging_speed_bonus, is_axe(obj) ? "chopping" : is_saw(obj) ? "cutting" : "digging");
+                        putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    }
+                }
             }
         }
 
@@ -1275,31 +1293,34 @@ register struct obj* obj;
         boolean doubledamagetopermittedtargets = FALSE;
 
         /* Damage - Small */
-        if((objects[otyp].oc_wsdice > 0 && objects[otyp].oc_wsdam > 0) || objects[otyp].oc_wsdmgplus != 0)
+        short wsdice = get_obj_wsdice(obj);
+        short wsdam = get_obj_wsdam(obj);
+        short wsdmgplus = get_obj_wsdmgplus(obj);
+        if((wsdice > 0 && wsdam > 0) || wsdmgplus != 0)
         {
             printmaindmgtype = TRUE;
             Sprintf(buf, "Base damage - Small:    ");
 
-            if (objects[otyp].oc_wsdice > 0 && objects[otyp].oc_wsdam > 0)
+            if (wsdice > 0 && wsdam > 0)
             {
                 maindiceprinted = TRUE;
-                Sprintf(plusbuf, "%dd%d", objects[otyp].oc_wsdice * exceptionality_multiplier, objects[otyp].oc_wsdam);
+                Sprintf(plusbuf, "%dd%d", wsdice * exceptionality_multiplier, wsdam);
                 Strcat(buf, plusbuf);
             }
 
-            if (objects[otyp].oc_wsdmgplus != 0)
+            if (wsdmgplus != 0)
             {
-                if (maindiceprinted && objects[otyp].oc_wsdmgplus > 0)
+                if (maindiceprinted && wsdmgplus > 0)
                 {
                     Sprintf(plusbuf, "+");
                     Strcat(buf, plusbuf);
                 }
-                Sprintf(plusbuf, "%d", objects[otyp].oc_wsdmgplus * exceptionality_multiplier);
+                Sprintf(plusbuf, "%d", wsdmgplus * exceptionality_multiplier);
                 Strcat(buf, plusbuf);
             }
 
             char endbuf[BUFSZ] = "";
-            double avgdmg = (double)exceptionality_multiplier * ((double)objects[otyp].oc_wsdice * (double)(1 + objects[otyp].oc_wsdam) / 2.0 + (double)objects[otyp].oc_wsdmgplus);
+            double avgdmg = (double)exceptionality_multiplier * ((double)wsdice * (double)(1 + wsdam) / 2.0 + (double)wsdmgplus);
             if (*endbuf)
                 Strcat(endbuf, ", ");
             Sprintf(eos(endbuf), "avg %.1f", avgdmg);
@@ -1339,32 +1360,35 @@ register struct obj* obj;
 
 
         /* Damage - Large */
-        if((objects[otyp].oc_wldice > 0 && objects[otyp].oc_wldam > 0) || objects[otyp].oc_wldmgplus != 0)
+        short wldice = get_obj_wldice(obj);
+        short wldam = get_obj_wldam(obj);
+        short wldmgplus = get_obj_wldmgplus(obj);
+        if((wldice > 0 && wldam > 0) || wldmgplus != 0)
         {
             printmaindmgtype = TRUE;
             maindiceprinted = FALSE;
             Sprintf(buf, "Base damage - Large:    ");
 
-            if (objects[otyp].oc_wldice > 0 && objects[otyp].oc_wldam > 0)
+            if (wldice > 0 && wldam > 0)
             {
                 maindiceprinted = TRUE;
-                Sprintf(plusbuf, "%dd%d", objects[otyp].oc_wldice * exceptionality_multiplier, objects[otyp].oc_wldam);
+                Sprintf(plusbuf, "%dd%d", wldice * exceptionality_multiplier, wldam);
                 Strcat(buf, plusbuf);
             }
 
-            if (objects[otyp].oc_wldmgplus != 0)
+            if (wldmgplus != 0)
             {
-                if (maindiceprinted && objects[otyp].oc_wldmgplus > 0)
+                if (maindiceprinted && wldmgplus > 0)
                 {
                     Sprintf(plusbuf, "+");
                     Strcat(buf, plusbuf);
                 }
-                Sprintf(plusbuf, "%d", objects[otyp].oc_wldmgplus * exceptionality_multiplier);
+                Sprintf(plusbuf, "%d", wldmgplus * exceptionality_multiplier);
                 Strcat(buf, plusbuf);
             }
 
             char endbuf[BUFSZ] = "";
-            double avgdmg = (double)exceptionality_multiplier * ((double)objects[otyp].oc_wldice * (double)(1 + objects[otyp].oc_wldam) / 2.0 + (double)objects[otyp].oc_wldmgplus);
+            double avgdmg = (double)exceptionality_multiplier * ((double)wldice * (double)(1 + wldam) / 2.0 + (double)wldmgplus);
             if (*endbuf)
                 Strcat(endbuf, ", ");
             Sprintf(eos(endbuf), "avg %.1f", avgdmg);
@@ -1402,8 +1426,8 @@ register struct obj* obj;
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
 
-        double base_avg_dmg = 0.5 * ((double)objects[otyp].oc_wsdice * (double)exceptionality_multiplier * (1.0 + (double)objects[otyp].oc_wsdam) / 2.0 + (double)objects[otyp].oc_wsdmgplus * (double)exceptionality_multiplier
-            + objects[otyp].oc_wldice * (double)exceptionality_multiplier * (1.0 + (double)objects[otyp].oc_wldam) / 2.0 + (double)objects[otyp].oc_wldmgplus * (double)exceptionality_multiplier);
+        double base_avg_dmg = 0.5 * ((double)wsdice * (double)exceptionality_multiplier * (1.0 + (double)wsdam) / 2.0 + (double)wsdmgplus * (double)exceptionality_multiplier
+            + wldice * (double)exceptionality_multiplier * (1.0 + (double)wldam) / 2.0 + (double)wldmgplus * (double)exceptionality_multiplier);
         wep_avg_dmg += base_avg_dmg;
         wep_multipliable_avg_dmg += base_avg_dmg;
         if (doubledamagetopermittedtargets)
@@ -1547,7 +1571,7 @@ register struct obj* obj;
         }
 
         /* Damage - Silver*/
-        if (objects[otyp].oc_material == MAT_SILVER)
+        if (obj->material == MAT_SILVER)
         {
             Sprintf(buf, "Silver bonus damage:    ");
             maindiceprinted = TRUE;
@@ -1674,25 +1698,21 @@ register struct obj* obj;
 
     if (affectsac)
     {
-        long shownacbonus = -objects[otyp].oc_armor_class;
+        int shownacbonus = -get_object_base_ac(obj);
         if (flags.baseacasbonus)
         {
-            Sprintf(buf, "Base armor class bonus: %s%ld", shownacbonus >= 0 ? "+" : "", shownacbonus);
+            Sprintf(buf, "Base armor class bonus: %s%d", shownacbonus >= 0 ? "+" : "", shownacbonus);
         }
         else
         {
-            Sprintf(buf, "Base armor class:       %ld", 10L + shownacbonus);
+            Sprintf(buf, "Base armor class:       %d", 10 + shownacbonus);
         }
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
     if(affectsmc)
     {
-        int mc = (int)objects[otyp].oc_magic_cancellation;
-        //if (objects[otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC)
-        //    mc+= obj->enchantment;
-
-        /* magic cancellation */
+        int mc = get_object_base_mc(obj);
         Sprintf(buf2, "%s%d", mc >= 0 ? "+" : "", mc);
         Sprintf(buf, "Magic cancellation:     %s", buf2);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -1734,7 +1754,7 @@ register struct obj* obj;
                         Sprintf(plusbuf, "+");
                         Strcat(buf, plusbuf);
                     }
-                    Sprintf(plusbuf, "%d", objects[otyp].oc_wsdmgplus);
+                    Sprintf(plusbuf, "%d", objects[otyp].oc_spell_dmg_plus);
                     Strcat(buf, plusbuf);
                 }
 
@@ -2142,13 +2162,12 @@ register struct obj* obj;
             }
         }
 
+        long splpenalty = get_object_spell_casting_penalty(obj);
         if (objects[otyp].oc_class != SPBOOK_CLASS && objects[otyp].oc_class != WAND_CLASS &&
-            (objects[otyp].oc_class == ARMOR_CLASS || (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || objects[otyp].oc_spell_casting_penalty != 0))
+            (objects[otyp].oc_class == ARMOR_CLASS || (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || splpenalty != 0))
         {
-            long splcaster = has_obj_mythic_spellcasting(obj) ? 0L : objects[otyp].oc_spell_casting_penalty;
-
-            Sprintf(buf2, "%s%ld%%", splcaster <= 0 ? "+" : "", -splcaster * ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER);
-            if (splcaster < 0)
+            Sprintf(buf2, "%s%ld%%", splpenalty <= 0 ? "+" : "", -splpenalty * ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER);
+            if (splpenalty < 0)
                 Sprintf(buf, "Spell casting bonus:    %s (somatic spells only)", buf2);
             else
                 Sprintf(buf, "Spell casting penalty:  %s (somatic spells only)", buf2);
@@ -2296,7 +2315,7 @@ register struct obj* obj;
 
             if (obj->oclass == ARMOR_CLASS || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)))
             {
-                penalty = min(greatest_erosion(obj), (int)objects[otyp].oc_armor_class);
+                penalty = min(greatest_erosion(obj), get_object_base_ac(obj));
                 Sprintf(eos(penaltybuf), "(+%d penalty to AC)", penalty);
             }
         }
@@ -2413,6 +2432,10 @@ register struct obj* obj;
         if (objects[otyp].oc_oprop > 0
             || objects[otyp].oc_oprop2 > 0
             || objects[otyp].oc_oprop3 > 0
+            || (obj->material != objects[otyp].oc_material 
+                && ((is_armor(obj) && (material_definitions[obj->material].power_armor[objects[otyp].oc_armor_category] != NO_POWER || material_definitions[obj->material].power2_armor[objects[otyp].oc_armor_category] != NO_POWER))
+                    || (is_weapon(obj) && (material_definitions[obj->material].power_weapon != NO_POWER || material_definitions[obj->material].power2_weapon != NO_POWER)))
+               )
             || objects[otyp].oc_mana_bonus > 0
             || objects[otyp].oc_hp_bonus > 0
             || objects[otyp].oc_bonus_attributes > 0
@@ -2428,10 +2451,18 @@ register struct obj* obj;
 
             int powercnt = 0;
             int j;
-            for (j = 1; j <= 6; j++)
+            for (j = -3; j <= 6; j++)
             {
                 int prop = 0;
-                if (j == 1)
+                if (j == -3)
+                    prop = obj->material != objects[otyp].oc_material && is_weapon(obj) ? material_definitions[obj->material].power_weapon : NO_POWER;
+                else if (j == -2)
+                    prop = obj->material != objects[otyp].oc_material && is_weapon(obj) ? material_definitions[obj->material].power2_weapon : NO_POWER;
+                else if (j == -1)
+                    prop = obj->material != objects[otyp].oc_material && is_armor(obj) ? material_definitions[obj->material].power_armor[objects[otyp].oc_armor_category] : NO_POWER;
+                else if (j == 0)
+                    prop = obj->material != objects[otyp].oc_material && is_armor(obj) ? material_definitions[obj->material].power2_armor[objects[otyp].oc_armor_category] : NO_POWER;
+                else if (j == 1)
                     prop = objects[otyp].oc_oprop;
                 else if (j == 2)
                     prop = objects[otyp].oc_oprop2;
@@ -2445,7 +2476,11 @@ register struct obj* obj;
                     prop = (int)objects[otyp].oc_bonus_attributes;
 
                 char pwbuf[BUFSZ] = "";
-                if (j == 1)
+                if (j <= 0)
+                {
+                    Sprintf(eos(pwbuf), " when %s", is_wieldable_weapon(obj) ? "wielded" : "worn");
+                }
+                else if (j == 1)
                 {
                     if (objects[otyp].oc_pflags & P1_POWER_1_APPLIES_WHEN_CARRIED)
                         Sprintf(eos(pwbuf), " when carried");
@@ -3204,10 +3239,12 @@ register struct obj* obj;
     boolean show_corpse_hint = FALSE;
     if(stats_known)
     {
+        unsigned long ocflags = get_obj_oc_flags(obj);
+        unsigned long ocflags5 = get_obj_oc_flags5(obj);
         /* Item properties */
-        if (objects[otyp].oc_flags & ~(O1_THROWN_WEAPON_ONLY | O1_MELEE_AND_THROWN_WEAPON
+        if (ocflags & ~(O1_THROWN_WEAPON_ONLY | O1_MELEE_AND_THROWN_WEAPON
             | O1_SPELLTOOL | O1_NON_SPELL_SPELLBOOK | O1_EDIBLE_NONFOOD) 
-            || (objects[otyp].oc_flags5 & (O5_MBAG_DESTROYING_ITEM | O5_CANCELLATION_NO_EXPLOSION_BUT_DRAIN))
+            || (ocflags5 & (O5_MBAG_DESTROYING_ITEM | O5_CANCELLATION_NO_EXPLOSION_BUT_DRAIN))
             || otyp_shines_magical_light(otyp)
             || is_otyp_special_praying_item(otyp) || otyp_consumes_nutrition_every_20_rounds(otyp)
             || is_death_enchantable(obj) //|| is_otyp_elemental_enchantable(otyp) 
@@ -3219,97 +3256,97 @@ register struct obj* obj;
             putstr(datawin, ATR_HEADING, buf);
 
             /* Flags here */
-            if (objects[otyp].oc_flags & O1_BECOMES_CURSED_WHEN_PICKED_UP_AND_DROPPED)
+            if (ocflags & O1_BECOMES_CURSED_WHEN_PICKED_UP_AND_DROPPED)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Becomes cursed when picked up", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_BECOMES_CURSED_WHEN_WORN)
+            if (ocflags & O1_BECOMES_CURSED_WHEN_WORN)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Becomes cursed when worn", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED)
+            if (ocflags & O1_CANNOT_BE_DROPPED_IF_CURSED)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Undroppable when cursed", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_COLD_RESISTANT)
+            if (ocflags & O1_COLD_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Cold resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_CORROSION_RESISTANT)
+            if (ocflags & O1_CORROSION_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Corrosion resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_DISINTEGRATION_RESISTANT)
+            if (ocflags & O1_DISINTEGRATION_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Disintegration resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_FIRE_RESISTANT)
+            if (ocflags & O1_FIRE_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Fire resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_INDESTRUCTIBLE)
+            if (ocflags & O1_INDESTRUCTIBLE)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Indestructible", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_LIGHTNING_RESISTANT)
+            if (ocflags & O1_LIGHTNING_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Lightning resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_NOT_CURSEABLE)
+            if (ocflags & O1_NOT_CURSEABLE)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Cannot be cursed", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_POLYMORPH_RESISTANT)
+            if (ocflags & O1_POLYMORPH_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Polymorph resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_RUST_RESISTANT)
+            if (ocflags & O1_RUST_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Rust-proof", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_ROT_RESISTANT)
+            if (ocflags & O1_ROT_RESISTANT)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Rot-resistant", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)
+            if (ocflags & O1_IS_ARMOR_WHEN_WIELDED)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Is armor when wielded", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags & O1_IS_WEAPON_WHEN_WIELDED)
+            if (ocflags & O1_IS_WEAPON_WHEN_WIELDED)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Is weapon when wielded", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags5 & O5_IS_WEAPON_WHEN_WORN)
+            if (ocflags5 & O5_IS_WEAPON_WHEN_WORN)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Is weapon when worn", powercnt);
@@ -3339,13 +3376,13 @@ register struct obj* obj;
                 Sprintf(buf, " %2d - Death-magically enchantable", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags5 & O5_MBAG_DESTROYING_ITEM)
+            if (ocflags5 & O5_MBAG_DESTROYING_ITEM)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Destroys magic bags if put in", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH, buf);
             }
-            if (objects[otyp].oc_flags5 & O5_CANCELLATION_NO_EXPLOSION_BUT_DRAIN)
+            if (ocflags5 & O5_CANCELLATION_NO_EXPLOSION_BUT_DRAIN)
             {
                 powercnt++;
                 Sprintf(buf, " %2d - Strips magic bag destroying items of charges; does not explode", powercnt);
@@ -4017,7 +4054,7 @@ register struct obj* obj;
                 else if (applicable_launcher)
                 {
                     roll_to_hit += weapon_to_hit_value(applicable_launcher, &youmonst, &youmonst, 2);
-                    roll_to_hit += weapon_skill_hit_bonus(applicable_launcher, P_NONE, FALSE, FALSE, TRUE, 0);
+                    roll_to_hit += weapon_skill_hit_bonus(applicable_launcher, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
 
                     if ((Race_if(PM_ELF) || Role_if(PM_SAMURAI))
                         && (!Upolyd || your_race(youmonst.data))
@@ -4043,7 +4080,7 @@ register struct obj* obj;
                 if (throwing_weapon(obj)) /* meant to be thrown */
                     roll_to_hit += 2;
 
-                roll_to_hit += weapon_skill_hit_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0);
+                roll_to_hit += weapon_skill_hit_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
             }
         }
         else
@@ -4081,7 +4118,7 @@ register struct obj* obj;
 
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
 
-        double skill_dmg_bonus = (double)weapon_skill_dmg_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0);
+        double skill_dmg_bonus = (double)weapon_skill_dmg_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
         wep_avg_dmg += skill_dmg_bonus;
         wep_multipliable_avg_dmg += skill_dmg_bonus;
         if (wep_avg_dmg < 0)
@@ -4200,7 +4237,7 @@ register struct monst* mon;
 
     winid datawin = WIN_ERR;
     int glyph = any_mon_to_glyph(mon, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL, 0UL, MAT_NONE, 0));
 
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_DESCRIPTION_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon_with_flags(mon, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
 
@@ -5114,7 +5151,11 @@ const char *word;
                   obj->corpsenm ? " any of" : "", is_graystone(obj) ? "the stone" : "the item", plur(obj->quan));
         }
         obj->corpsenm = 0; /* reset */
-        obj->bknown = 1;
+        if (!obj->bknown)
+        {
+            obj->bknown = TRUE;
+            update_inventory();
+        }
         return FALSE;
     }
     if (obj->otyp == LEASH && obj->leashmon != 0) {
@@ -5373,6 +5414,7 @@ struct obj *obj;
             if (!context.mon_moving && !program_state.gameover)
                 costly_alteration(obj, COST_DEGRD);
             obj->otyp = WORM_TOOTH;
+            obj->material = objects[obj->otyp].oc_material;
             obj->oerodeproof = 0;
         }
         break;
@@ -5991,6 +6033,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     char whynot[BUFSZ];
     char *annotation;
     boolean play_arrival_teleport_effect = !!(u.utotype & 0x0100);
+    d_level fromlevel = u.uz;
 
     if(at_location & 2)
         context.reviving = TRUE;
@@ -6236,16 +6279,19 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         register struct trap *ttrap;
 
         for (ttrap = ftrap; ttrap; ttrap = ttrap->ntrap)
-            if (ttrap->ttyp == MAGIC_PORTAL)
+            if (ttrap->ttyp == MAGIC_PORTAL && ttrap->dst.dlevel == fromlevel.dlevel && ttrap->dst.dnum == fromlevel.dnum)
                 break;
 
         if (!ttrap)
         {
-            panic("goto_level: no corresponding portal!");
-            return;
+            impossible("goto_level: no corresponding portal!");
+            u_on_rndspot((up ? 1 : 0) | (was_in_W_tower ? 2 : 0));
         }
-        seetrap(ttrap);
-        u_on_newpos(ttrap->tx, ttrap->ty);
+        else
+        {
+            seetrap(ttrap);
+            u_on_newpos(ttrap->tx, ttrap->ty);
+        }
     } 
     else if ((portal == 2 || portal == 3) && !In_endgame(&u.uz))
     {
@@ -6480,10 +6526,9 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         else
             pline_ex(ATR_NONE, CLR_MSG_WARNING, "It is hot here.  You smell smoke...");
 
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.enter_gehennom)
             context.botl = 1;
-#endif
+
         if (!u.uachieve.enter_gehennom)
             achievement_gained("Entered Gehennom");
         u.uachieve.enter_gehennom = 1;
@@ -7069,13 +7114,13 @@ long timeout UNUSED;
         long when;
         int action;
 
-        if (is_rider(mptr) && rn2(99)) { /* Rider usually tries again */
+        if (is_rider_or_tarrasque(mptr) && rn2(99)) { /* Rider usually tries again */
             action = REVIVE_MON;
             for (when = 3L; when < 67L; when++)
                 if (!rn2(3))
                     break;
         } else { /* rot this corpse away */
-            You_feel("%sless hassled.", is_rider(mptr) ? "much " : "");
+            You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless hassled.", is_rider_or_tarrasque(mptr) ? "much " : "");
             action = ROT_CORPSE;
             when = 250L - (monstermoves - body->age);
             if (when < 1L)
@@ -7322,7 +7367,13 @@ xchar x, y;
     levl[x][y].subtyp = 0;
     levl[x][y].vartyp = 0;
     levl[x][y].floor_doodad = 0;
-    levl[x][y].feature_doodad = 0;
+    levl[x][y].carpet_typ = 0;
+    levl[x][y].carpet_piece = 0;
+    levl[x][y].carpet_flags = 0;
+    levl[x][y].decoration_typ = 0;
+    levl[x][y].decoration_subtyp = 0;
+    levl[x][y].decoration_dir = 0;
+    levl[x][y].decoration_flags = 0;
     levl[x][y].key_otyp = 0;
     levl[x][y].special_quality = 0;
     levl[x][y].floortyp = 0;
@@ -7333,9 +7384,36 @@ xchar x, y;
 }
 
 void
-full_location_transform(x, y, type, subtype, vartype, location_flags, feature_doodad, floor_doodad, floortype, floorsubtype, floorvartype, facing_right, horizontal, key_otyp, special_quality, donewsym)
+delete_decoration(x, y)
 xchar x, y;
-int type, subtype, vartype, feature_doodad, floor_doodad, floortype, floorsubtype, floorvartype;
+{
+    if (levl[x][y].decoration_typ)
+    {
+        if (levl[x][y].lamplit)
+        {
+            if (!in_mklev)
+                del_light_source(LS_LOCATION, xy_to_any(x, y));
+            levl[x][y].lamplit = 0;
+        }
+        if (levl[x][y].makingsound)
+        {
+            if (!in_mklev)
+                del_sound_source(SOUNDSOURCE_LOCATION, xy_to_any(x, y));
+            levl[x][y].makingsound = 0;
+        }
+        levl[x][y].decoration_typ = 0;
+        levl[x][y].decoration_subtyp = 0;
+        levl[x][y].decoration_dir = 0;
+        levl[x][y].decoration_flags = 0;
+    }
+}
+
+void
+full_location_transform(x, y, type, subtype, vartype, location_flags, carpet_typ, carpet_piece, carpet_flags, decoration_typ, decoration_subtyp, decoration_dir, decoration_flags, floor_doodad, floortype, floorsubtype, floorvartype, facing_right, horizontal, key_otyp, special_quality, donewsym)
+xchar x, y;
+int type, subtype, vartype, floor_doodad, floortype, floorsubtype, floorvartype;
+schar carpet_typ, carpet_piece, decoration_typ, decoration_subtyp, decoration_dir;
+uchar carpet_flags, decoration_flags;
 unsigned short location_flags;
 boolean facing_right, horizontal, donewsym;
 short key_otyp, special_quality;
@@ -7346,7 +7424,13 @@ short key_otyp, special_quality;
     levl[x][y].vartyp = vartype;
     levl[x][y].flags = location_flags;
     levl[x][y].floor_doodad = floor_doodad;
-    levl[x][y].feature_doodad = feature_doodad;
+    levl[x][y].carpet_typ = carpet_typ;
+    levl[x][y].carpet_piece = carpet_piece;
+    levl[x][y].carpet_flags = carpet_flags;
+    levl[x][y].decoration_typ = decoration_typ;
+    levl[x][y].decoration_subtyp = decoration_subtyp;
+    levl[x][y].decoration_dir = decoration_dir;
+    levl[x][y].decoration_flags = decoration_flags;
     levl[x][y].floortyp = floortype;
     levl[x][y].floorsubtyp = floorsubtype;
     levl[x][y].floorvartyp = floorvartype;
@@ -7368,9 +7452,11 @@ short key_otyp, special_quality;
 }
 
 void
-full_initial_location_transform(x, y, type, location_flags, feature_doodad, floor_doodad, floortype, facing_right, horizontal, key_otyp, special_quality, donewsym)
+full_initial_location_transform(x, y, type, location_flags, carpet_typ, carpet_piece, carpet_flags, decoration_typ, decoration_subtyp, decoration_dir, decoration_flags, floor_doodad, floortype, facing_right, horizontal, key_otyp, special_quality, donewsym)
 xchar x, y;
-int type, feature_doodad, floor_doodad, floortype;
+int type, floor_doodad, floortype;
+schar carpet_typ, carpet_piece, decoration_typ, decoration_subtyp, decoration_dir;
+uchar carpet_flags, decoration_flags;
 unsigned short location_flags;
 boolean facing_right, horizontal, donewsym;
 short key_otyp, special_quality;
@@ -7381,7 +7467,7 @@ short key_otyp, special_quality;
         floortype = 0;
     int floorsubtype = floortype == 0 ? 0 : get_initial_location_subtype(floortype);
     int floorvartype = floortype == 0 ? 0 : get_initial_location_vartype(floortype, floorsubtype);
-    full_location_transform(x, y, type, subtype, vartype, location_flags, feature_doodad, floor_doodad, floortype, floorsubtype, floorvartype, facing_right, horizontal, key_otyp, special_quality, donewsym);
+    full_location_transform(x, y, type, subtype, vartype, location_flags, carpet_typ, carpet_piece, carpet_flags, decoration_typ, decoration_subtyp, decoration_dir, decoration_flags, floor_doodad, floortype, floorsubtype, floorvartype, facing_right, horizontal, key_otyp, special_quality, donewsym);
     initialize_location(&levl[x][y]);
 }
 
@@ -7392,7 +7478,7 @@ int type, subtype, vartype, floor_doodad, floortype, floorsubtype, floorvartype;
 unsigned short location_flags;
 boolean donewsym;
 {
-    full_location_transform(x, y, type, subtype, vartype, location_flags, 0, floor_doodad, floortype, floorsubtype, floorvartype, FALSE, FALSE, 0, 0, donewsym);
+    full_location_transform(x, y, type, subtype, vartype, location_flags, 0, 0, 0, 0, 0, 0, 0, floor_doodad, floortype, floorsubtype, floorvartype, FALSE, FALSE, 0, 0, donewsym);
     initialize_location(&levl[x][y]);
 }
 
@@ -7403,7 +7489,7 @@ int type, floor_doodad, floortype;
 unsigned short location_flags;
 boolean donewsym;
 {
-    full_initial_location_transform(x, y, type, location_flags, 0, floor_doodad, floortype, FALSE, FALSE, 0, 0, donewsym);
+    full_initial_location_transform(x, y, type, location_flags, 0, 0, 0, 0, 0, 0, 0, floor_doodad, floortype, FALSE, FALSE, 0, 0, donewsym);
     initialize_location(&levl[x][y]);
 }
 
@@ -7469,7 +7555,7 @@ boolean donewsym;
         return;
 
     int vartype = get_initial_location_vartype(type, subtype);
-    full_location_transform(x, y, type, subtype, vartype, location_flags, 0, 0, 0, 0, 0, FALSE, FALSE, 0, 0, donewsym);
+    full_location_transform(x, y, type, subtype, vartype, location_flags, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, FALSE, FALSE, 0, 0, donewsym);
 }
 
 void
@@ -7649,10 +7735,11 @@ const char* hint_text;
 {
     if (hint_text)
     {
-        char hintbuf[BUFSZ];
-        Sprintf(hintbuf, "HINT - %s", hint_text);
+        //char hintbuf[BUFSZ];
+        //Sprintf(hintbuf, "HINT - %s", hint_text);
         play_sfx_sound(SFX_HINT);
-        pline_ex1(ATR_NONE, CLR_MSG_HINT, hintbuf);
+        //pline_ex1(ATR_NONE, CLR_MSG_HINT, hintbuf);
+        custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "HINT", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "%s", hint_text);
     }
 }
 
@@ -7978,6 +8065,9 @@ heal_ailments_upon_revival(VOID_ARGS)
     make_sick(0L, (char*)0, FALSE, 0);
     make_food_poisoned(0L, (char*)0, FALSE, 0);
     make_hallucinated(0L, FALSE, 0L);
+    u.ubasehpdrain = u.ubaseendrain = u.basemhdrain = 0;
+    updatemaxhp();
+    updatemaxen();
 }
 
 /*do.c*/

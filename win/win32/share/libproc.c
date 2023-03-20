@@ -23,7 +23,7 @@ struct window_procs lib_procs = {
     lib_init_nhwindows, lib_player_selection, lib_askname,
     lib_get_nh_event, lib_exit_nhwindows, lib_suspend_nhwindows,
     lib_resume_nhwindows, lib_create_nhwindow_ex, lib_clear_nhwindow,
-    lib_display_nhwindow, lib_destroy_nhwindow, lib_curs, lib_putstr_ex,
+    lib_display_nhwindow, lib_destroy_nhwindow, lib_curs, lib_putstr_ex, lib_putstr_ex2,
     genl_putmixed_ex, lib_display_file, lib_start_menu_ex, lib_add_menu, lib_add_extended_menu,
     lib_end_menu_ex, lib_select_menu,
     genl_message_menu, /* no need for X-specific handling */
@@ -255,12 +255,21 @@ void lib_curs(winid wid, int x, int y)
 }
 
 /* text is supposed to be in CP437; if text is UTF8 encoding, call callback_putstr_ex directly */
-void lib_putstr_ex(winid wid, int attr, const char* text, int param, int color)
+void lib_putstr_ex(winid wid, int attr, const char* text, int append, int color)
 {
     char buf[BUFSIZ];
     if (text)
         write_text2buf_utf8(buf, BUFSIZ, text);
-    lib_callbacks.callback_putstr_ex(wid, attr, text ? buf : 0, param, color);
+    lib_callbacks.callback_putstr_ex(wid, attr, text ? buf : 0, append, color);
+}
+
+void lib_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int append)
+{
+    char buf[BUFSIZ];
+    if (text)
+        write_text2buf_utf8(buf, BUFSIZ, text);
+    //lib_callbacks.callback_putstr_ex(wid, attrs ? attrs[0] : attr, text ? buf : 0, append, colors ? colors[0] : color);
+    lib_callbacks.callback_putstr_ex2(wid, text ? buf : 0, attrs, colors, attr, color, append);
 }
 
 void lib_display_file(const char* filename, BOOLEAN_P must_exist)
@@ -427,6 +436,9 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
 
     lib_callbacks.callback_print_glyph(wid, x, y, layers.glyph, layers.bkglyph, symbol, ocolor, special, &layers);
 
+    if (program_state.in_bones)
+        return;
+
     /* Now send all object data */
     /* Note: print_glyph clears all object data */
     boolean showing_detection = !!(layers.layer_flags & LFLAGS_SHOWING_DETECTION);
@@ -461,7 +473,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
                     mimic_obj.oy = y;
                     mimic_obj.glyph = obj_to_glyph(&mimic_obj, newsym_rn2);
                     mimic_obj.gui_glyph = maybe_get_replaced_glyph(mimic_obj.glyph, x, y, data_to_replacement_info(mimic_obj.glyph,
-                        is_obj_drawn_in_front(&mimic_obj) ? LAYER_COVER_OBJECT : LAYER_OBJECT, &mimic_obj, (struct monst*)0, 0UL));
+                        is_obj_drawn_in_front(&mimic_obj) ? LAYER_COVER_OBJECT : LAYER_OBJECT, &mimic_obj, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
                 }
             }
             if (has_obj_mimic)
@@ -602,13 +614,13 @@ int lib_doprev_message(void)
 
 char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char* question, const char* choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
 {
-    char buf[BUFSIZ] = "", tbuf[BUFSIZ] = "", ibuf[BUFSIZ] = "";
+    char buf[UTF8QBUFSZ] = "", tbuf[UTF8QBUFSZ] = "", ibuf[UTF8IBUFSZ] = "";
     if(question)
-        write_text2buf_utf8(buf, BUFSIZ, question);
+        write_text2buf_utf8(buf, UTF8QBUFSZ, question);
     if (title)
-        write_text2buf_utf8(tbuf, BUFSIZ, title);
+        write_text2buf_utf8(tbuf, UTF8QBUFSZ, title);
     if (introline)
-        write_text2buf_utf8(ibuf, BUFSIZ, introline);
+        write_text2buf_utf8(ibuf, UTF8IBUFSZ, introline);
     char defs[2] = { 0,0 };
     defs[0] = def;
     int res = lib_callbacks.callback_yn_function_ex(style, attr, color, glyph, title ? tbuf : 0, question ? buf : 0, choices, defs, resp_desc, introline ? ibuf : 0, ynflags);
@@ -617,27 +629,29 @@ char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* t
 
 void lib_getlin_ex(int style, int attr, int color, const char* question, char* input, const char* placeholder, const char* linesuffix, const char* introline)
 {
-    char buf[BUFSIZ] = "";
-    char phbuf[BUFSIZ] = "";
-    char dvbuf[BUFSIZ] = "";
-    char ibuf[BUFSIZ] = "";
+    char buf[UTF8QBUFSZ] = "";
+    char phbuf[UTF8BUFSZ] = "";
+    char dvbuf[UTF8BUFSZ] = "";
+    char ibuf[UTF8IBUFSZ] = "";
 
     if (question)
-        write_text2buf_utf8(buf, BUFSIZ, question);
+        write_text2buf_utf8(buf, UTF8QBUFSZ, question);
     if (placeholder)
-        write_text2buf_utf8(phbuf, BUFSIZ, placeholder);
+        write_text2buf_utf8(phbuf, UTF8BUFSZ, placeholder);
     if (linesuffix)
-        write_text2buf_utf8(dvbuf, BUFSIZ, linesuffix);
+        write_text2buf_utf8(dvbuf, UTF8BUFSZ, linesuffix);
     if (introline)
-        write_text2buf_utf8(ibuf, BUFSIZ, introline);
+        write_text2buf_utf8(ibuf, UTF8IBUFSZ, introline);
 
     char* res = lib_callbacks.callback_getlin_ex(style, attr, color, buf, placeholder ? phbuf : 0, linesuffix ? dvbuf : 0, introline ? ibuf : 0);
     if (res && input)
     {
-        char msgbuf[BUFSZ] = "";
-        strcpy(msgbuf, res);
-        convertUTF8toCP437(msgbuf, BUFSZ);
-        strcpy(input, msgbuf);
+        char msgbuf[UTF8BUFSZ] = "";
+        strncpy(msgbuf, res, UTF8BUFSZ - 1);
+        msgbuf[UTF8BUFSZ - 1] = '\0';
+        convertUTF8toCP437(msgbuf, UTF8BUFSZ);
+        strncpy(input, msgbuf, BUFSZ - 1);
+        input[BUFSZ - 1] = '\0';
     }
 }
 
@@ -735,21 +749,31 @@ void lib_preference_update(const char* pref)
     }
 }
 
-char* lib_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
+char* lib_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
 {
-    char* res = lib_callbacks.callback_getmsghistory(attr_ptr, color_ptr, (int)init);
-    static char buf[BUFSIZ] = "";
+    static char buf[BUFSIZ * 2] = "";
+    static char attrs[BUFSIZ * 2] = "";
+    static char colors[BUFSIZ * 2] = "";
+    char* res = lib_callbacks.callback_getmsghistory(attrs, colors, (int)init);
     if (res)
     {
-        strncpy(buf, res, BUFSIZ - 1);
-        buf[BUFSIZ - 1] = '\0';
+        strncpy(buf, res, BUFSIZ * 2 - 1);
+        buf[BUFSIZ * 2 - 1] = '\0';
+        if (attrs_ptr)
+        {
+            *attrs_ptr = attrs;
+        }
+        if (colors_ptr)
+        {
+            *colors_ptr = colors;
+        }
     }
     return res ? buf : 0;
 }
 
-void lib_putmsghistory_ex(const char* msg, int attr, int color, BOOLEAN_P is_restoring)
+void lib_putmsghistory_ex(const char* msg, const char* attrs, const char* colors, BOOLEAN_P is_restoring)
 {
-    lib_callbacks.callback_putmsghistory(msg, attr, color, is_restoring);
+    lib_callbacks.callback_putmsghistory(msg, attrs, colors, is_restoring);
 }
 
 
@@ -767,10 +791,10 @@ static const char* cond_names[NUM_BL_CONDITIONS] = {
     "Deaf", "Stun", "Conf", "Hallu", "Lev", "Fly", "Ride", "Slow", "Paral", "Fear", "Sleep", "Cancl", "Silent", "Grab", "Rot", "Lyca"
 };
 
-void lib_status_init(void)
+void lib_status_init(int reassessment)
 {
-    lib_callbacks.callback_status_init();
-    genl_status_init();
+    lib_callbacks.callback_status_init(reassessment);
+    genl_status_init(reassessment);
 
 }
 
@@ -826,7 +850,7 @@ void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
         return;
 
     mi_ptr->glyph = any_mon_to_glyph(mtmp, rn2_on_display_rng);
-    mi_ptr->gui_glyph = maybe_get_replaced_glyph(mi_ptr->glyph, mtmp->mx, mtmp->my, data_to_replacement_info(mi_ptr->glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL));
+    mi_ptr->gui_glyph = maybe_get_replaced_glyph(mi_ptr->glyph, mtmp->mx, mtmp->my, data_to_replacement_info(mi_ptr->glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
 
     char tempbuf[BUFSIZ] = "";
     if (mtmp->mextra && UMNAME(mtmp))
@@ -921,7 +945,7 @@ int get_condition_attr(int cond_mask)
     return attr;
 }
 
-void print_conditions(const char** names)
+void lib_print_conditions(const char** names)
 {
     int i;
     for (i = 0; i < NUM_BL_CONDITIONS; i++) {
@@ -1003,7 +1027,7 @@ void print_status_field(int idx, boolean first_field)
 
     if (idx == BL_CONDITION)
     {
-        print_conditions(cond_names);
+        lib_print_conditions(cond_names);
     }
     else
     {
@@ -1041,31 +1065,12 @@ void lib_status_flush(void)
     enum statusfields idx;
     register int i, j;
 
-    static const int fieldorder1[] = { BL_TITLE, BL_STR, BL_DX,    BL_CO,    BL_IN,
-                             BL_WI,    BL_CH, BL_GOLD,  /*BL_ALIGN,*/ BL_FLUSH, };
-    static const int fieldorder2[] = { BL_MODE, BL_LEVELDESC, BL_HP,   BL_HPMAX,
-                                 BL_ENE,       BL_ENEMAX,    BL_AC,  BL_MC_LVL, BL_MC_PCT,    BL_MOVE, BL_UWEP, BL_UWEP2,  BL_XP,
-                                 BL_EXP,       BL_HD,        BL_TIME, BL_SCORE, BL_FLUSH };
-    static const int fieldorder2_2statuslines[] = { BL_MODE, BL_LEVELDESC, BL_HP,   BL_HPMAX,
-                                 BL_ENE,       BL_ENEMAX,    BL_AC,    BL_MC_LVL, BL_MC_PCT,    BL_MOVE, BL_UWEP, BL_UWEP2,   BL_XP,
-                                 BL_EXP,       BL_HD,        BL_TIME,  BL_2WEP,   BL_SKILL,     BL_HUNGER, BL_CAP,  BL_CONDITION, BL_FLUSH };
-    static const int fieldorder3[] = { BL_2WEP, BL_SKILL,     BL_HUNGER,
-                                 BL_CAP,       BL_CONDITION, BL_FLUSH };
-    static const int fieldorder4[] = { BL_PARTYSTATS, BL_FLUSH };
-    static const int fieldorder5[] = { BL_PARTYSTATS2, BL_FLUSH };
-    static const int fieldorder6[] = { BL_PARTYSTATS3, BL_FLUSH };
-    static const int fieldorder7[] = { BL_PARTYSTATS4, BL_FLUSH };
-    static const int fieldorder8[] = { BL_PARTYSTATS5, BL_FLUSH };
-
-    static const int* fieldorders_2statuslines[MAX_STATUS_LINES + 1] = { fieldorder1, fieldorder2_2statuslines, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
-    static const int* fieldorders[MAX_STATUS_LINES + 1] = { fieldorder1, fieldorder2, fieldorder3, fieldorder4, fieldorder5, fieldorder6, fieldorder7, fieldorder8, NULL };
-
-    const int** fieldorder = iflags.wc2_statuslines == 2 ? fieldorders_2statuslines : fieldorders;
+    const enum statusfields** fieldorder = iflags.wc2_statuslines < 3 ? fieldorders_2statuslines : flags.fullstatuslineorder ? fieldorders_alt : fieldorders;
 
     for (j = 0; fieldorder[j] != NULL && j < iflags.wc2_statuslines; j++)
     {
         curs(WIN_STATUS, 1, j);
-        for (i = 0; (idx = fieldorder[j][i]) != BL_FLUSH; i++)
+        for (i = 0; i < MAX_STATUS_LINE_ITEMS && (idx = fieldorder[j][i]) != BL_FLUSH; i++)
             print_status_field(idx, i == 0);
     }
 

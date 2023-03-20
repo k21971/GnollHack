@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    do_name.c    $NHDT-Date: 1555627306 2019/04/18 22:41:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1815,7 +1815,10 @@ const char* introline;
 #ifdef EDIT_GETLIN
     /* if there's an existing name, make it be the default answer */
     if (*str1)
-        Strcpy(buf, *str1);
+    {
+        strncpy(buf, *str1, BUFSZ - 1);
+        buf[BUFSZ - 1] = '\0';
+    }
 #endif
 #ifdef ANDROID
     if (1) /* was showlog but that was always TRUE */
@@ -1843,6 +1846,7 @@ const char* introline;
             undiscover_object(obj->otyp);
         }
     } else {
+        buf[PL_PSIZ - 1] = '\0'; /* Truncate to 62 chars */
         *str1 = dupstr(buf);
         discover_object(obj->otyp, FALSE, TRUE); /* possibly add to disco[] */
     }

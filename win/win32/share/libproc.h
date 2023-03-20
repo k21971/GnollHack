@@ -21,6 +21,7 @@ void lib_display_nhwindow(winid wid, BOOLEAN_P block);
 void lib_destroy_nhwindow(winid wid);
 void lib_curs(winid wid, int x, int y);
 void lib_putstr_ex(winid wid, int attr, const char* text, int app, int color);
+void lib_putstr_ex2(winid wid,const char* text, const char* attrs, const char* colors, int attr, int color, int append);
 void lib_display_file(const char* filename, BOOLEAN_P must_exist);
 void lib_start_menu_ex(winid wid, int style);
 void lib_add_menu(winid wid, int glyph, const ANY_P* identifier,
@@ -57,10 +58,10 @@ void lib_start_screen(void);
 void lib_end_screen(void);
 void lib_outrip(winid wid, int how, time_t when);
 void lib_preference_update(const char* pref);
-char* lib_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init);
-void lib_putmsghistory_ex(const char* msg, int attr, int color, BOOLEAN_P restoring);
+char* lib_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init);
+void lib_putmsghistory_ex(const char* msg, const char* attrs, const char* colors, BOOLEAN_P restoring);
 
-void lib_status_init(void);
+void lib_status_init(int);
 void lib_status_finish(void);
 void lib_status_enablefield(int fieldidx, const char* nm, const char* fmt, BOOLEAN_P enable);
 void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, unsigned long* colormasks);

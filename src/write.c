@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    write.c    $NHDT-Date: 1450261366 2015/12/16 10:22:46 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.17 $ */
 /* GnollHack may be freely redistributed.  See license for details. */
@@ -55,6 +55,7 @@ register struct obj *otmp;
     case SCR_CHARGING:
         return 24;
     case SCR_GENOCIDE:
+    case SCR_SUPREME_DIABOLISM:
         return 30;
     case SCR_BLANK_PAPER:
     default:
@@ -227,6 +228,10 @@ found:
         play_sfx_sound(SFX_GENERAL_DO_NOT_KNOW_HOW);
         pline_ex(ATR_NONE, CLR_MSG_FAIL, "No mere dungeon adventurer could write that.");
         return 1;
+    } else if (i == SCR_SUPREME_DIABOLISM) {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot write that with mere ink.");
+        return 1;
     } else if (by_descr && paper->oclass == SPBOOK_CLASS
                && !objects[i].oc_name_known) {
         /* can't write unknown spellbooks by description */
@@ -332,7 +337,7 @@ found:
     }
     /* can write scrolls when blind, but requires luck too;
        attempts to write books when blind are caught above */
-    if (Blind && rnl(3)) {
+    if ((Blind && rnl(3)) || (Tottering && rn2(7))) {
         /* writing while blind usually fails regardless of
            whether the target scroll is known; even if we
            have passed the write-an-unknown scroll test

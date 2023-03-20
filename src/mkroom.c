@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mkroom.c    $NHDT-Date: 1446887530 2015/11/07 09:12:10 $  $NHDT-Branch: master $:$NHDT-Revision: 1.24 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -18,6 +18,45 @@
  */
 
 #include "hack.h"
+
+NEARDATA struct room_definition room_definitions[NUM_ROOM_TYPES] =
+{
+    { "ordinary room" , FALSE, 0 },
+    { "" , FALSE, 0 },
+    { "court", TRUE, CMAP_OPULENT },
+    { "swamp", TRUE, CMAP_UNDEAD },
+    { "vault", TRUE, CMAP_REINFORCED },
+    { "beehive", TRUE, CMAP_NEST },
+    { "dragon lair", TRUE, CMAP_NEST },
+    { "library", TRUE, CMAP_CITYSCAPE },
+    { "garden", TRUE, CMAP_GARDEN },
+    { "morgue", TRUE, CMAP_UNDEAD },
+    { "barracks", TRUE, CMAP_REINFORCED },
+    { "armory", TRUE, CMAP_REINFORCED },
+    { "zoo", TRUE, CMAP_NEST },
+    { "Delphi", TRUE, CMAP_GARDEN },
+    { "temple", TRUE, CMAP_TEMPLE },
+    { "leprechaun hall", TRUE, CMAP_CITYSCAPE },
+    { "cockatrice nest", TRUE, CMAP_NEST },
+    { "anthole", TRUE, CMAP_GNOMISH_MINES },
+    { "smithy", TRUE, CMAP_REINFORCED },
+    { "residence", TRUE, CMAP_CITYSCAPE },
+    { "deserted shop", TRUE, CMAP_CITYSCAPE },
+    { "general store", TRUE, CMAP_CITYSCAPE },
+    { "armor shop", TRUE, CMAP_CITYSCAPE },
+    { "scroll shop", TRUE, CMAP_CITYSCAPE },
+    { "potion shop", TRUE, CMAP_CITYSCAPE },
+    { "weapon shop", TRUE, CMAP_CITYSCAPE },
+    { "food shop", TRUE, CMAP_CITYSCAPE },
+    { "ring shop", TRUE, CMAP_CITYSCAPE },
+    { "wand shop", TRUE, CMAP_CITYSCAPE },
+    { "tool shop", TRUE, CMAP_CITYSCAPE },
+    { "book shop", TRUE, CMAP_CITYSCAPE },
+    { "reagent shop", TRUE, CMAP_CITYSCAPE },
+    { "modron shop", TRUE, CMAP_MODRON },
+    { "fodder shop", TRUE, CMAP_CITYSCAPE },
+    { "candle shop", TRUE, CMAP_CITYSCAPE },
+};
 
 STATIC_DCL boolean FDECL(isbig, (struct mkroom *));
 STATIC_DCL struct mkroom *FDECL(pick_room, (BOOLEAN_P));
@@ -252,8 +291,27 @@ gottype:
             if(isok(x, y))
             {
                 levl[x][y].floor_doodad = 0;
-                levl[x][y].feature_doodad = 0;
+                delete_decoration(x, y);
             }
+
+    /* Set room tileset */
+    set_room_tileset(sroom);
+
+    /* Add a painting */
+    schar lowx = sroom->lx;
+    schar hix = sroom->hx;
+    schar lowy = sroom->ly;
+    int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+    if (lowx + 1 < hix && !rn2(2))
+    {
+        if (IS_WALL(levl[lowx + roll2 + 1][lowy - 1].typ))
+        {
+            levl[lowx + roll2 + 1][lowy - 1].decoration_typ = DECORATION_PAINTING;
+            levl[lowx + roll2 + 1][lowy - 1].decoration_subtyp = rn2(MAX_PAINTINGS);
+            levl[lowx + roll2 + 1][lowy - 1].decoration_dir = 0;
+            levl[lowx + roll2 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+        }
+    }
 
     /* set room bits before stocking the shop */
 #ifdef SPECIALIZATION
@@ -349,6 +407,19 @@ mkdesertedshop()
 
     /* Change back to get the right message */
     sroom->rtype = DESERTEDSHOP;
+
+    /* Remove doodads */
+    for (x = sroom->lx - 1; x <= sroom->hx + 1; x++)
+        for (y = sroom->ly - 1; y <= sroom->hy + 1; y++)
+            if (isok(x, y))
+            {
+                levl[x][y].floor_doodad = 0;
+                delete_decoration(x, y);
+            }
+
+    /* Set room tileset */
+    set_room_tileset(sroom);
+
     return 1;
 }
 
@@ -395,8 +466,11 @@ int type;
                 if (isok(x, y))
                 {
                     levl[x][y].floor_doodad = 0;
-                    levl[x][y].feature_doodad = 0;
+                    delete_decoration(x, y);
                 }
+
+        /* Set room tileset */
+        set_room_tileset(sroom);
 
         /* Change floor for some randomly generated zoo rooms */
         int floorsubtype = 0;
@@ -432,6 +506,78 @@ int type;
                     }
 
         }
+
+        int lowx = sroom->lx;
+        int hix = sroom->hx;
+        int lowy = sroom->ly;
+        switch (sroom->rtype)
+        {
+        case BARRACKS:
+        case ARMORY:
+        case COURT:
+            if (lowx + 1 < hix)
+            {
+                int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                schar bannertype = (schar)rn2(sroom->rtype == COURT ? BANNER_RED_OLD + 1 : MAX_BANNERS);
+                if (IS_WALL(levl[lowx + roll + 1][lowy - 1].typ))
+                {
+                    levl[lowx + roll + 1][lowy - 1].decoration_typ = DECORATION_BANNER;
+                    levl[lowx + roll + 1][lowy - 1].decoration_subtyp = bannertype;
+                    levl[lowx + roll + 1][lowy - 1].decoration_dir = 0;
+                    levl[lowx + roll + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                }
+                if ((hix - lowx > 5 && rn2(3)) || (hix - lowx >= 2 && !rn2(3)))
+                {
+                    int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll2 + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_typ = DECORATION_BANNER;
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_subtyp = bannertype;
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+
+                }
+                if ((hix - lowx > 5 && !rn2(3)))
+                {
+                    int roll3 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll3 + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll3 + 1][lowy - 1].decoration_typ = DECORATION_BANNER;
+                        levl[lowx + roll3 + 1][lowy - 1].decoration_subtyp = bannertype;
+                        levl[lowx + roll3 + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll3 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+                }
+                if (lowx + 1 < hix && !rn2(2))
+                {
+                    int roll4 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll4 + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll4 + 1][lowy - 1].decoration_typ = DECORATION_SHIELD_WITH_SWORDS;
+                        levl[lowx + roll4 + 1][lowy - 1].decoration_subtyp = 0;
+                        levl[lowx + roll4 + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll4 + 1][lowy - 1].decoration_flags = (rn2(6) ? DECORATION_FLAGS_ITEM_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM2_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM3_IN_HOLDER : 0UL);
+                    }
+                }
+                if (lowx + 1 < hix && sroom->rtype == COURT && !rn2(2))
+                {
+                    int roll5 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll5 + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll5 + 1][lowy - 1].decoration_typ = DECORATION_KNIGHT_NICHE;
+                        levl[lowx + roll5 + 1][lowy - 1].decoration_subtyp = 0;
+                        levl[lowx + roll5 + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll5 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+                }
+            }
+            break;
+        default:
+            break;
+        }
+        /* Decorations */
+
         return 1;
     }
     return 0;
@@ -482,14 +628,16 @@ struct mkroom *sroom;
     int box_count = 0;
     int box_threshold = 5;
     boolean make_special_item = FALSE;
+    int x, y;
 
     sh = sroom->fdoor;
     switch (type)
     {
+    case ANTHOLE:
     case MORGUE:
         /* Change floor to ground, more sensible for graveyards */
-        for (int x = sroom->lx; x <= sroom->hx; x++)
-            for (int y = sroom->ly; y <= sroom->hy; y++)
+        for (x = sroom->lx; x <= sroom->hx; x++)
+            for (y = sroom->ly; y <= sroom->hy; y++)
                 if (!sroom->irregular || (sroom->irregular && levl[x][y].roomno == rmno))
                 {
                     if (levl[x][y].typ == ROOM)
@@ -973,11 +1121,6 @@ place_main_monst_here:
         break;
     case MORGUE:
         level.flags.has_morgue = 1;
-        if (!level.flags.has_tileset && u.uz.dnum == main_dungeon_dnum && !Is_special(&u.uz))
-        {
-            level.flags.tileset = CMAP_UNDEAD_STYLE;
-            level.flags.has_tileset = 1;
-        }
         break;
     case SWAMP:
         level.flags.has_swamp = 1;
@@ -991,6 +1134,61 @@ place_main_monst_here:
         break;
     }
 
+    /* Shields */
+    switch (type)
+    {
+    case ZOO:
+    case BARRACKS:
+    case COURT:
+    case ARMORY:
+    {
+        int roll1 = sroom->hx - sroom->lx - 1 <= 1 ? 0 : rn2(sroom->hx - sroom->lx - 1);
+        int roll2 = sroom->hx - sroom->lx - 1 <= 1 ? 0 : rn2(sroom->hx - sroom->lx - 1);
+        if (sroom->lx + 1 < sroom->hx)
+        {
+            if (IS_WALL(levl[sroom->lx + roll2 + 1][sroom->ly - 1].typ) && rn2(3))
+            {
+                levl[sroom->lx + roll2 + 1][sroom->ly - 1].decoration_typ = rn2(2) ? DECORATION_KNIGHT_NICHE : DECORATION_GARGOYLE_NICHE;
+                levl[sroom->lx + roll2 + 1][sroom->ly - 1].decoration_subtyp = 0;
+                levl[sroom->lx + roll2 + 1][sroom->ly - 1].decoration_dir = 0;
+                levl[sroom->lx + roll2 + 1][sroom->ly - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM2_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER;
+            }
+            if (IS_WALL(levl[sroom->lx + roll1 + 1][sroom->ly - 1].typ) && rn2(3))
+            {
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_typ = DECORATION_SHIELD_WITH_SWORDS;
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_subtyp = 0;
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_dir = 0;
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM2_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER;
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    /* Paintings */
+    switch (type)
+    {
+    case LIBRARY:
+    case COURT:
+    {
+        int roll1 = sroom->hx - sroom->lx - 1 <= 1 ? 0 : rn2(sroom->hx - sroom->lx - 1);
+        if (sroom->lx + 1 < sroom->hx)
+        {
+            if (IS_WALL(levl[sroom->lx + roll1 + 1][sroom->ly - 1].typ) && rn2(3))
+            {
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_typ = DECORATION_PAINTING;
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_subtyp = rn2(MAX_PAINTINGS);
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_dir = 0;
+                levl[sroom->lx + roll1 + 1][sroom->ly - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 /* make a swarm of undead around mm */
@@ -1216,13 +1414,6 @@ mkswamp() /* Michiel Huisjes & Fred de Wilde */
 
         level.flags.has_swamp = 1;
         swampnumber++;
-
-        //Change the tileset of the dungeon level
-        if (!level.flags.has_tileset && u.uz.dnum == main_dungeon_dnum && !Is_special(&u.uz))
-        {
-            level.flags.tileset = CMAP_UNDEAD_STYLE;
-            level.flags.has_tileset = 1;
-        }
     }
     return swampnumber;
 }
@@ -1252,17 +1443,6 @@ mkgarden()
     int statue_base_type = levdiff >= 16 && rn2(2) ? PM_WINGED_GARGOYLE :
         levdiff >= 13 && rn2(3) ? PM_ROCK_TROLL : levdiff >= 7 && rn2(9) ? PM_GARGOYLE : PM_GNOME;
     sroom->rtype = GARDEN;
-    for (sx = sroom->lx - 1; sx <= sroom->hx + 1; sx++)
-    {
-        for (sy = sroom->ly - 1; sy <= sroom->hy + 1; sy++)
-        {
-            if (isok(sx, sy))
-            {
-                levl[sx][sy].use_special_tileset = TRUE;
-                levl[sx][sy].special_tileset = CMAP_GARDEN;
-            }
-        }
-    }
 
     /* Remove doodads */
     for (sx = sroom->lx - 1; sx <= sroom->hx + 1; sx++)
@@ -1270,9 +1450,11 @@ mkgarden()
             if (isok(sx, sy))
             {
                 levl[sx][sy].floor_doodad = 0;
-                levl[sx][sy].feature_doodad = 0;
+                delete_decoration(sx, sy);
             }
 
+    /* Set room tileset */
+    set_room_tileset(sroom);
 
     for (sx = sroom->lx; sx <= sroom->hx; sx++)
     {
@@ -1746,9 +1928,11 @@ mktemple()
             if (isok(x, y))
             {
                 levl[x][y].floor_doodad = 0;
-                levl[x][y].feature_doodad = 0;
+                delete_decoration(x, y);
             }
 
+    /* Set room tileset */
+    set_room_tileset(sroom);
 
      /* Altar */
     shrine_spot = shrine_pos((int) ((sroom - rooms) + ROOMOFFSET));
@@ -1784,6 +1968,45 @@ mktemple()
                         begin_burn(otmp, FALSE);
                 }
             }
+        }
+    }
+
+    /* Priest statue */
+    int lowx = sroom->lx;
+    int hix = sroom->hx;
+    int lowy = sroom->ly;
+    int hiy = sroom->hy;
+    int roll1 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+    if (lowx + 1 < hix && rn2(5))
+    {
+        if (IS_WALL(levl[lowx + roll1 + 1][lowy - 1].typ))
+        {
+            levl[lowx + roll1 + 1][lowy - 1].decoration_typ = DECORATION_PRIEST_NICHE;
+            levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
+            levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
+            levl[lowx + roll1 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+        }
+    }
+    int roll2 = hiy - lowy - 1 <= 1 ? 0 : rn2(hiy - lowy - 1);
+    if (lowy + 1 < hiy && rn2(5))
+    {
+        if (IS_WALL(levl[lowx - 1][lowy + roll2 + 1].typ))
+        {
+            levl[lowx - 1][lowy + roll2 + 1].decoration_typ = DECORATION_PRIEST_NICHE;
+            levl[lowx - 1][lowy + roll2 + 1].decoration_subtyp = 0;
+            levl[lowx - 1][lowy + roll2 + 1].decoration_dir = 1;
+            levl[lowx - 1][lowy + roll2 + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+        }
+    }
+    int roll3 = hiy - lowy - 1 <= 1 ? 0 : rn2(hiy - lowy - 1);
+    if (lowy + 1 < hiy && rn2(5))
+    {
+        if (IS_WALL(levl[hix + 1][lowy + roll3 + 1].typ))
+        {
+            levl[hix + 1][lowy + roll3 + 1].decoration_typ = DECORATION_PRIEST_NICHE;
+            levl[hix + 1][lowy + roll3 + 1].decoration_subtyp = 0;
+            levl[hix + 1][lowy + roll3 + 1].decoration_dir = 2;
+            levl[hix + 1][lowy + roll3 + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
         }
     }
 
@@ -1842,8 +2065,27 @@ mksmithy()
             if (isok(x, y))
             {
                 levl[x][y].floor_doodad = 0;
-                levl[x][y].feature_doodad = 0;
+                delete_decoration(x, y);
             }
+
+    /* Set room tileset */
+    set_room_tileset(sroom);
+
+    /* Add a fireplace */
+    schar lowx = sroom->lx;
+    schar hix = sroom->hx;
+    schar lowy = sroom->ly;
+    int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+    if (lowx + 1 < hix && !rn2(2))
+    {
+        if (IS_WALL(levl[lowx + roll2 + 1][lowy - 1].typ))
+        {
+            levl[lowx + roll2 + 1][lowy - 1].decoration_typ = DECORATION_FIREPLACE;
+            levl[lowx + roll2 + 1][lowy - 1].decoration_subtyp = 0;
+            levl[lowx + roll2 + 1][lowy - 1].decoration_dir = 0;
+            levl[lowx + roll2 + 1][lowy - 1].decoration_flags = 0;
+        }
+    }
 
     return 1;
 }
@@ -1966,11 +2208,57 @@ int npctyp;
             if (isok(x, y))
             {
                 levl[x][y].floor_doodad = 0;
-                levl[x][y].feature_doodad = 0;
+                delete_decoration(x, y);
+                if (room_definitions[sroom->rtype].has_special_tileset || npc_subtype_definitions[npctype].has_special_tileset)
+                {
+                    levl[x][y].use_special_tileset = 1;
+                    levl[x][y].special_tileset = npc_subtype_definitions[npctype].has_special_tileset ? npc_subtype_definitions[npctype].special_tileset : room_definitions[sroom->rtype].special_tileset;
+                }
             }
+
+    if (npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_MAY_HAVE_PAINTINGS)
+    {
+        /* Add a painting */
+        schar lowx = sroom->lx;
+        schar hix = sroom->hx;
+        schar lowy = sroom->ly;
+        //schar hiy = sroom->hy;
+        int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+        if (lowx + 1 < hix && ((npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_ALWAYS_HAS_PAINTING) || !rn2(2)))
+        {
+            if (IS_WALL(levl[lowx + roll2 + 1][lowy - 1].typ))
+            {
+                levl[lowx + roll2 + 1][lowy - 1].decoration_typ = DECORATION_PAINTING;
+                levl[lowx + roll2 + 1][lowy - 1].decoration_subtyp = rn2(MAX_PAINTINGS);
+                levl[lowx + roll2 + 1][lowy - 1].decoration_dir = 0;
+                levl[lowx + roll2 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+            }
+        }
+    }
 
 
     return 1;
+}
+
+void
+set_room_tileset(sroom)
+struct mkroom* sroom;
+{
+    if (!sroom)
+        return;
+
+    if (room_definitions[sroom->rtype].has_special_tileset)
+    {
+        int x, y;
+        for (x = sroom->lx - 1; x <= sroom->hx + 1; x++)
+            for (y = sroom->ly - 1; y <= sroom->hy + 1; y++)
+                if (isok(x, y))
+                {
+                    levl[x][y].use_special_tileset = 1;
+                    levl[x][y].special_tileset = room_definitions[sroom->rtype].special_tileset;
+                }
+
+    }
 }
 
 boolean

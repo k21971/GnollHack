@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    trap.c    $NHDT-Date: 1545259936 2018/12/19 22:52:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.313 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -121,7 +121,7 @@ struct monst *victim;
         case 0:
             item = hitting_u ? uarmh : which_armor(victim, W_ARMH);
             if (item) {
-                mat_idx = objects[item->otyp].oc_material;
+                mat_idx = item->material;
                 Sprintf(buf, "%s %s", material_definitions[mat_idx].name,
                         helm_simple_name(item));
             }
@@ -564,7 +564,7 @@ fall_through(td)
 boolean td; /* td == TRUE : trap door or hole */
 {
     d_level dtmp;
-    char msgbuf[BUFSZ];
+    char msgbuf[BUFSZ] = "";
     const char *dont_fall = 0;
     int newlevel, bottom;
 
@@ -1021,7 +1021,7 @@ t_missile(otyp, trap)
 int otyp;
 struct trap *trap;
 {
-    struct obj *otmp = mksobj(otyp, TRUE, FALSE, FALSE);
+    struct obj *otmp = mksobj_with_flags(otyp, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
 
     otmp->quan = 1L;
     otmp->owt = weight(otmp);
@@ -1786,7 +1786,8 @@ unsigned short trflags;
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are caught in a magical explosion!");
             losehp(adjust_damage(rnd(10), (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_NONE), "magical explosion", KILLED_BY_AN);
             Your("body absorbs some of the magical energy!");
-            u.uen = (u.ubaseenmax += 2);
+            u.ubaseenmax += 2;
+            u.uen = u.ubaseenmax;
             updatemaxen();
             special_effect_wait_until_end(0);
             break;
@@ -4678,6 +4679,7 @@ boolean force;
         }
 
         obj->otyp = SPE_BLANK_PAPER;
+        obj->material = objects[obj->otyp].oc_material;
         obj->dknown = 0;
         if (carried(obj))
             update_inventory();

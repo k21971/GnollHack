@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	winX.c	$NHDT-Date: 1552441031 2019/03/13 01:37:11 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.73 $ */
 /* Copyright (c) Dean Luick, 1992                                 */
@@ -113,7 +113,7 @@ struct window_procs X11_procs = {
     X11_player_selection, X11_askname, X11_get_nh_event, X11_exit_nhwindows,
     X11_suspend_nhwindows, X11_resume_nhwindows, X11_create_nhwindow_ex,
     X11_clear_nhwindow, X11_display_nhwindow, X11_destroy_nhwindow, X11_curs,
-    X11_putstr_ex, genl_putmixed_ex, X11_display_file, X11_start_menu_ex, X11_add_menu, X11_add_extended_menu,
+    X11_putstr_ex, X11_putstr_ex2, genl_putmixed_ex, X11_display_file, X11_start_menu_ex, X11_add_menu, X11_add_extended_menu,
     X11_end_menu_ex, X11_select_menu,
     genl_message_menu, /* no need for X-specific handling */
     X11_update_inventory, X11_mark_synch, X11_wait_synch,
@@ -197,14 +197,14 @@ boolean is_restoring;
 }
 
 char*
-X11_getmsghistory_ex(attr_ptr, color_ptr, init)
-int* attr_ptr, color_ptr;
+X11_getmsghistory_ex(attrs_ptr, colors_ptr, init)
+char** attrs_ptr, **colors_ptr;
 boolean init;
 {
-    if (attr_ptr)
-        *attr_ptr = ATR_NONE;
-    if (color_ptr)
-        *color_ptr = NO_COLOR;
+    if (attrs_ptr)
+        *attrs_ptr = (char*)0;
+    if (colors_ptr)
+        *colors_ptr = (char*)0;
 
     if (WIN_MESSAGE != WIN_ERR) {
         static struct line_element *curr = (struct line_element *) 0;
@@ -988,6 +988,15 @@ const char *str;
     default:
         impossible("putstr: unknown window type [%d] \"%s\"", wp->type, str);
     }
+}
+
+void
+X11_putstr_ex2(window, str, attrs, colors, attr, color, app)
+winid window;
+int attr, color, app;
+const char* str, *attrs, *colors;
+{
+    X11_putstr_ex(window, attrs ? attrs[0] : attr, str, app, colors ? colors[0] : color);
 }
 
 /* We do event processing as a callback, so this is a null routine. */

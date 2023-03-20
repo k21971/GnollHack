@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	mswproc.c	$NHDT-Date: 1433806606 2015/06/08 23:36:46 $  $NHDT-Branch: master $:$NHDT-Revision: 1.60 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -55,7 +55,7 @@ struct window_procs mswin_procs = {
     mswin_player_selection, mswin_askname, mswin_get_nh_event,
     mswin_exit_nhwindows, mswin_suspend_nhwindows, mswin_resume_nhwindows,
     mswin_create_nhwindow_ex, mswin_clear_nhwindow, mswin_display_nhwindow,
-    mswin_destroy_nhwindow, mswin_curs, mswin_putstr_ex, genl_putmixed_ex,
+    mswin_destroy_nhwindow, mswin_curs, mswin_putstr_ex, mswin_putstr_ex2, genl_putmixed_ex,
     mswin_display_file, mswin_start_menu_ex, mswin_add_menu, mswin_add_extended_menu, mswin_end_menu_ex,
     mswin_select_menu,
     genl_message_menu, /* no need for X-specific handling */
@@ -960,6 +960,12 @@ mswin_putstr_ex(winid wid, int attr, const char *text, int app, int color)
     }
 }
 
+void
+mswin_putstr_ex2(winid wid, const char* text, const char* text, const char* text, int attr, int color, int app)
+{
+    mswin_putstr_ex(wid, attrs ? attrs[0] : attr, text, app, colors ? colors[0] : color);
+}
+
 /* Display the file named str.  Complain about missing files
                    iff complain is TRUE.
 */
@@ -1496,7 +1502,7 @@ void
 mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline)
 {
     logDebug("mswin_getlin(%s, %p)\n", question, input);
-    char promptbuf[BUFSZ] = "";
+    char promptbuf[PBUFSZ] = "";
     //Do not show introline
     //if (introline && *introline)
     //    Sprintf(promptbuf, "%s", introline);
@@ -1511,7 +1517,7 @@ mswin_getlin_ex(int style, int attr, int color, const char *question, char *inpu
     if (linesuffix)
         Sprintf(eos(promptbuf), " %s", linesuffix);
     if (mswin_getlin_window(style, attr, color, promptbuf, input, BUFSZ) == IDCANCEL) {
-        strcpy(input, "\033");
+        Strcpy(input, "\033");
     }
 }
 

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	winproto.h	$NHDT-Date: 1433806597 2015/06/08 23:36:37 $  $NHDT-Branch: master $:$NHDT-Revision: 1.9 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993. */
@@ -20,6 +20,7 @@ char *dirname(char *str);
 
 /* winstr.c */
 void amii_putstr_ex(winid window, int attr, const char *str, int app, int color);
+void amii_putstr_ex2(winid window, const char* str, const char* attrs, const char* colors, int attr, int color, int app);
 void outmore(struct amii_WinDesc *cw);
 void outsubstr(struct amii_WinDesc *cw, char *str, int len, int fudge);
 void amii_putsym(winid st, int i, int y, CHAR_P c);

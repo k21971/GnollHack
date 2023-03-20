@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    sounds.c    $NHDT-Date: 1542765362 2018/11/21 01:56:02 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.81 $ */
 /*      Copyright (c) 1989 Janet Walz, Mike Threepoint */
@@ -166,7 +166,7 @@ STATIC_DCL int FDECL(blessed_recharge_item_func, (struct monst*, struct obj*));
 STATIC_DCL int FDECL(repair_armor_func, (struct monst*));
 STATIC_DCL int FDECL(repair_weapon_func, (struct monst*));
 STATIC_DCL int FDECL(refill_lantern_func, (struct monst*));
-STATIC_DCL int FDECL(forge_special_func, (struct monst*, int, int, int, int, int, BOOLEAN_P));
+STATIC_DCL int FDECL(forge_special_func, (struct monst*, int, int, int, int, int, UCHAR_P, BOOLEAN_P));
 STATIC_DCL int FDECL(forge_cubic_gate_func, (struct monst*));
 STATIC_DCL int FDECL(forge_artificial_wings_func, (struct monst*));
 STATIC_DCL int FDECL(forge_dragon_scale_mail_func, (struct monst*));
@@ -194,6 +194,7 @@ STATIC_DCL boolean FDECL(maybe_spellbook, (struct obj*));
 STATIC_DCL boolean FDECL(maybe_dragon_scales, (struct obj*));
 STATIC_DCL boolean FDECL(maybe_otyp, (struct obj*));
 STATIC_VAR int otyp_for_maybe_otyp = 0;
+STATIC_VAR boolean stop_chat = FALSE;
 
 extern const struct shclass shtypes[]; /* defined in shknam.c */
 
@@ -1245,7 +1246,7 @@ boolean dopopup, fromchatmenu;
          * night */
         boolean isnight = night();
         boolean kindred = (Upolyd && (u.umonnum == PM_VAMPIRE || u.umonnum == PM_VAMPIRE_MAGE
-                                      || u.umonnum == PM_VAMPIRE_LORD));
+                                      || u.umonnum == PM_VAMPIRE_LORD || u.umonnum == PM_VAMPIRE_KING));
         boolean nightchild =
             (Upolyd && (u.umonnum == PM_WOLF || u.umonnum == PM_WINTER_WOLF
                         || u.umonnum == PM_WINTER_WOLF_CUB));
@@ -1260,26 +1261,34 @@ boolean dopopup, fromchatmenu;
                         isnight ? "evening" : "day",
                         isnight ? "!" : ".  Why do we not rest?");
                 verbl_msg = verbuf;
+                chat_line = isnight ? 4 : 5;
             } else {
                 Sprintf(verbuf, "%s%s",
-                        nightchild ? "Child of the night, " : "",
+                        nightchild && !iflags.using_gui_sounds ? "Child of the night, " : "", /* Voice lines not currently available in */
                         midnight()
                          ? "I can stand this craving no longer!"
                          : isnight
                           ? "I beg you, help me satisfy this growing craving!"
                           : "I find myself growing a little weary.");
                 verbl_msg = verbuf;
+                chat_line = midnight() ? 6 : isnight ? 7 : 8;
             }
         } else if (is_peaceful(mtmp)) {
             if (kindred && isnight) {
                 Sprintf(verbuf, "Good feeding %s!",
                         flags.female ? "sister" : "brother");
                 verbl_msg = verbuf;
+                chat_line = flags.female ? 9 : 10;
             } else if (nightchild && isnight) {
                 Sprintf(verbuf, "How nice to hear you, child of the night!");
                 verbl_msg = verbuf;
-            } else
+                chat_line = 12;
+            }
+            else
+            {
                 verbl_msg = "I only drink... potions.";
+                chat_line = 13;
+            }
         } else {
             int vampindex;
             static const char *const vampmsg[] = {
@@ -1289,8 +1298,11 @@ boolean dopopup, fromchatmenu;
                 /* other famous vampire quotes can follow here if desired */
             };
             if (kindred)
+            {
                 verbl_msg =
                     "This is my hunting ground that you dare to prowl!";
+                chat_line = 14;
+            }
             else if (youmonst.data == &mons[PM_SILVER_DRAGON] || youmonst.data == &mons[PM_ANCIENT_SILVER_DRAGON]
                      || youmonst.data == &mons[PM_SILVER_DRAGON_HATCHLING]) {
                 /* Silver dragons are silver in color, not made of silver */
@@ -1299,18 +1311,25 @@ boolean dopopup, fromchatmenu;
                             ? "Fool"
                             : "Young fool");
                 verbl_msg = verbuf;
+                chat_line = youmonst.data == &mons[PM_SILVER_DRAGON] || youmonst.data == &mons[PM_ANCIENT_SILVER_DRAGON] ? 16 : 17;
             } else {
                 vampindex = rn2(SIZE(vampmsg));
                 if (vampindex == 0) {
                     Sprintf(verbuf, vampmsg[vampindex], body_part(BLOOD));
                     verbl_msg = verbuf;
+                    chat_line = 18;
                 } else if (vampindex == 1) {
                     Sprintf(verbuf, vampmsg[vampindex],
                             Upolyd ? an(pm_monster_name(&mons[u.umonnum], flags.female))
                                    : an(racenoun));
                     verbl_msg = verbuf;
-                } else
+                    chat_line = 19;
+                }
+                else
+                {
                     verbl_msg = vampmsg[vampindex];
+                    chat_line = 18 + vampindex;
+                }
             }
         }
     } break;
@@ -1780,7 +1799,7 @@ bark_here:
         break;
     case MS_BRIBE:
         if (is_peaceful(mtmp) && !is_tame(mtmp)) {
-            (void) demon_talk(mtmp);
+            (void) demon_talk(mtmp, &stop_chat);
             break;
         }
         if (is_gnoll(mtmp->data))
@@ -1878,17 +1897,25 @@ bark_here:
         {
             if ((tribtitle = noveltitle(&book->novelidx, 0UL, 0UL)) != 0)
             {
-                Sprintf(verbuf, "Ah, so you have a copy of /%s/.", tribtitle);
-                /* no Death featured in these two, so exclude them */
-                if (strcmpi(tribtitle, "Snuff")
-                    && strcmpi(tribtitle, "The Wee Free Men"))
+                if (iflags.using_gui_sounds)
+                {
+                    Strcpy(verbuf, "Ah, so you have a copy of a Discworld novel.");
                     Strcat(verbuf, "  I may have been misquoted there.");
+                }
+                else
+                {
+                    Sprintf(verbuf, "Ah, so you have a copy of /%s/.", tribtitle);
+                    /* no Death featured in these two, so exclude them */
+                    if (strcmpi(tribtitle, "Snuff")
+                        && strcmpi(tribtitle, "The Wee Free Men"))
+                        Strcat(verbuf, "  I may have been misquoted there.");
+                }
                 verbl_msg = verbuf;
                 chat_line = 2;
             }
             context.tribute.Deathnotice = 1;
         } 
-        else if (ms_Death && rn2(3) && Death_quote(verbuf, sizeof verbuf)) 
+        else if (ms_Death && !iflags.using_gui_sounds && rn2(3) && Death_quote(verbuf, sizeof verbuf)) 
         {
             verbl_msg = verbuf;
             /* end of tribute addition */
@@ -1897,12 +1924,12 @@ bark_here:
         else if (ms_Death && !rn2(10)) 
         {
             pline_msg = "is busy reading a copy of Sandman #8.";
-            chat_line = 1;
+            chat_line = -1;
         }
         else
         {
             verbl_msg = "Who do you think you are, War?";
-            chat_line = 0;
+            chat_line = 3;
         }
         break;
     } /* case MS_RIDER */
@@ -2089,7 +2116,7 @@ const char* nomoodstr;
         There("is no one here to talk to.");
         return 0;
     }
-    else if (!is_peaceful(mtmp) && !is_quantum_mechanic(mtmp->data)) 
+    else if (!is_peaceful(mtmp) && !is_quantum_mechanic(mtmp->data) && !is_rider(mtmp->data))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         pline("%s is in no mood for %s.", noittame_Monnam(mtmp), nomoodstr);
@@ -2120,6 +2147,7 @@ dochat()
     int tx, ty;
     struct obj *otmp;
     boolean elbereth_was_known = (boolean)u.uevent.elbereth_known;
+    boolean target_is_steed = FALSE;
 
     if (!getdir("Talk to whom? (in what direction)")) 
     {
@@ -2127,7 +2155,7 @@ dochat()
         return 0;
     }
 
-    if (u.dx == 0 && u.dy == 0)
+    if (u.dx == 0 && u.dy == 0 && u.dz == 0)
     {
         struct special_view_info info = { 0 };
         info.viewtype = SPECIAL_VIEW_CHAT_MESSAGE;
@@ -2144,25 +2172,24 @@ dochat()
         return 0;
     }
 
-    if (u.usteed && u.dz > 0)
+    if (u.usteed && u.dx == 0 && u.dy == 0 && u.dz > 0)
     {
         if (!mon_can_move(u.usteed)) 
         {
             play_sfx_sound(SFX_MONSTER_DOES_NOT_NOTICE);
             pline("%s seems not to notice you.", noittame_Monnam(u.usteed));
             return 1;
-        } else
-            return domonnoise(u.usteed, FALSE, TRUE);
+        }
+        else
+            target_is_steed = TRUE; // return domonnoise(u.usteed, FALSE, TRUE);
     }
-
-    if (u.dz)
+    else if (u.dz)
     {
         play_sfx_sound(SFX_GENERAL_THAT_DID_NOTHING);
         pline("They won't hear you %s there.", u.dz < 0 ? "up" : "down");
         return 0;
     }
-
-    if (u.dx == 0 && u.dy == 0) 
+    else if (u.dx == 0 && u.dy == 0) 
     {
         /* Note: Used above for chat message --JG */
 
@@ -2189,7 +2216,7 @@ dochat()
     if (!isok(tx, ty))
         return 0;
 
-    mtmp = m_at(tx, ty);
+    mtmp = target_is_steed ? u.usteed : m_at(tx, ty);
 
     if ((!mtmp || mtmp->mundetected)
         && (otmp = vobj_at(tx, ty)) != 0 && otmp->otyp == STATUE)
@@ -2262,7 +2289,6 @@ dochat()
         return 0;
     }
 
-
     /* Finally, generate the actual chat menu */
     struct permonst* ptr = mtmp->data;
     int msound = ptr->msound;
@@ -2300,6 +2326,7 @@ dochat()
     int i = '\0';
     int result = 0;
     boolean stopsdialogue = FALSE;
+    stop_chat = FALSE;
     do
     {
         i = '\0';
@@ -2331,7 +2358,7 @@ dochat()
 
         chatnum++;
 
-        if (is_speaking_monster(mtmp->data) && (is_peaceful(mtmp) || is_quantum_mechanic(mtmp->data)))
+        if (is_speaking_monster(mtmp->data) && (is_peaceful(mtmp) || is_quantum_mechanic(mtmp->data) || is_rider(mtmp->data)))
         {
             /* Who are you? */
             strcpy(available_chat_list[chatnum].name, "\"Who are you?\"");
@@ -3686,7 +3713,7 @@ dochat()
                 chatnum++;
 
                 char sbuf[BUFSIZ];
-                Sprintf(sbuf, "Sell nuggets of ore to %s", noittame_mon_nam(mtmp));
+                Sprintf(sbuf, "Sell nuggets of armor ore to %s", noittame_mon_nam(mtmp));
                 strcpy(available_chat_list[chatnum].name, sbuf);
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_sell_ore;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
@@ -4208,7 +4235,7 @@ dochat()
         }
         if (!is_peaceful(mtmp))
             stopsdialogue = TRUE;
-    } while (i > 0 && !stopsdialogue);
+    } while (i > 0 && !stopsdialogue && !stop_chat);
     
 end_of_chat_here:
     if (!elbereth_was_known && u.uevent.elbereth_known)
@@ -4549,13 +4576,24 @@ struct monst* mtmp;
     else if (is_mname_proper_name(mtmp->data))
     {
         char titlebuf[BUFSZ];
-        strcpy(titlebuf, "");
-        if (mtmp->data->mtitle && strcmp(mtmp->data->mtitle, ""))
+        Strcpy(titlebuf, "");
+        if (!is_rider(mtmp->data) && mtmp->data->mtitle && strcmp(mtmp->data->mtitle, ""))
             Sprintf(titlebuf, ", %s", mtmp->data->mtitle);
 
         play_monster_switchable_who_sound(mtmp, MONSTER_WHO_SOUND_ANSWER_WHO_ARE_YOU, MONSTER_STANDARD_DIALOGUE_LINE_ANSWER_WHO_ARE_YOU);
+
         Sprintf(ansbuf, "I am %s%s.", mon_monster_name(mtmp), titlebuf);
-        popup_talk_line(mtmp, ansbuf);
+        if (mtmp->mnum == PM_DEATH)
+        {
+            (void)ucase(ansbuf);
+            popup_talk_line_ex(mtmp, ansbuf, ATR_NONE, CLR_MSG_GOD, TRUE, FALSE);
+        }
+        else
+        {
+            popup_talk_line(mtmp, ansbuf);
+        }
+
+
     }
     else if (has_mname(mtmp))
     {
@@ -4628,6 +4666,7 @@ struct monst* mtmp;
         : (mtmp->ispriest && has_epri(mtmp) && EPRI(mtmp)->shralign == A_NONE) || (mtmp->isminion && has_emin(mtmp) && EMIN(mtmp)->min_align == A_NONE) || is_demon(mtmp->data) ? -1
         : mtmp->ispriest || mtmp->isminion ? 1 : 0;
     int truth = min(is_peaceful(mtmp), truth_core);
+    boolean is_death = mtmp->mnum == PM_DEATH;
 
     (void)getrumor(truth, rumorbuf, TRUE);
     if (*rumorbuf)
@@ -4638,7 +4677,13 @@ struct monst* mtmp;
         play_voice_monster_advice(mtmp, FALSE);
         pline("%s answers:", noittame_Monnam(mtmp));
         Sprintf(ansbuf, "Unfortunately, I don't have any %s advice for you.", mtmp->told_rumor ? "further" : "useful");
-        popup_talk_line(mtmp, ansbuf);
+        if (is_death)
+        {
+            (void)ucase(ansbuf);
+            popup_talk_line_ex(mtmp, ansbuf, ATR_NONE, CLR_MSG_GOD, TRUE, FALSE);
+        }
+        else
+            popup_talk_line(mtmp, ansbuf);
         mtmp->rumorsleft = 0;
     }
     else
@@ -4649,16 +4694,32 @@ struct monst* mtmp;
             Sprintf(ansbuf, "Let me think. Maybe keep this in mind%s", iflags.using_gui_sounds || Deaf ? "." : ":");
         else
             Sprintf(ansbuf, "Yes, here's a piece of advice for you%s", iflags.using_gui_sounds || Deaf ? "." : ":");
-        popup_talk_line(mtmp, ansbuf);
+        
+        if (is_death)
+        {
+            (void)ucase(ansbuf);
+            popup_talk_line_ex(mtmp, ansbuf, ATR_NONE, CLR_MSG_GOD, TRUE, FALSE);
+        }
+        else
+            popup_talk_line(mtmp, ansbuf);
 
         /* Tell a rumor */
+        boolean isspeaking = TRUE;
         if (iflags.using_gui_sounds || Deaf)
         {
+            isspeaking = FALSE;
             pline("(%s hands a note over to you.)  It reads:", noittame_Monnam(mtmp));
             u.uconduct.literate++;
         }
-        verbalize("%s", rumorbuf);
-        display_popup_text(rumorbuf, "Advice", POPUP_TEXT_ADVICE, ATR_NONE, NO_COLOR, NO_GLYPH, POPUP_FLAGS_ADD_QUOTES);
+        if (is_death && isspeaking)
+        {
+            (void)ucase(rumorbuf);
+            popup_talk_line_ex(mtmp, rumorbuf, ATR_NONE, CLR_MSG_GOD, TRUE, FALSE);
+        }
+        else
+            verbalize("%s", rumorbuf);
+
+        display_popup_text(rumorbuf, "Advice", POPUP_TEXT_ADVICE, ATR_NONE, is_death ? CLR_MSG_GOD : NO_COLOR, NO_GLYPH, POPUP_FLAGS_ADD_QUOTES);
 
         mtmp->told_rumor = TRUE;
     }
@@ -5225,10 +5286,34 @@ struct monst* mtmp;
                             pline_ex1_popup(ATR_NONE, NO_COLOR, pbuf, "Item Given", TRUE);
                         }
 
+                        boolean abort_pickup = FALSE;
                         if (*u.ushops || otmp->unpaid)
+                        {
                             check_shop_obj(otmp, mtmp->mx, mtmp->my, FALSE);
-
-                        (void)mpickobj(mtmp, otmp);
+                            if (costly_spot(mtmp->mx, mtmp->my))
+                            {
+                                struct monst* shkp = shop_keeper(inside_shop(mtmp->mx, mtmp->my));
+                                if (shkp)
+                                {
+                                    play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_DROP_THAT_NOW);
+                                    pline("%s shouts:", Monnam(shkp));
+                                    verbalize("Drop that, now!");
+                                    if (iflags.using_gui_sounds)
+                                        delay_output_milliseconds(1200);
+                                    play_monster_unhappy_sound(mtmp, MONSTER_UNHAPPY_SOUND_WHIMPER);
+                                    if (iflags.using_gui_sounds)
+                                        delay_output_milliseconds(200);
+                                    play_object_floor_sound(otmp, OBJECT_SOUND_TYPE_DROP, FALSE);
+                                    pline("%s drops %s.", Monnam(mtmp), the(cxname(otmp)));
+                                    place_object(otmp, mtmp->mx, mtmp->my);
+                                    abort_pickup = TRUE;
+                                }
+                            }
+                        }
+                        if (abort_pickup)
+                            break;
+                        else
+                            (void)mpickobj(mtmp, otmp);
                     }
                 }
             }
@@ -5308,7 +5393,7 @@ struct monst* mtmp;
             int tasty = dogfood(mtmp, otmp);
             boolean foodmakesfriendly = (!is_tame(mtmp) && befriend_with_obj(mtmp->data, otmp) && tasty <= ACCFOOD);
             boolean takesfood = (!is_tame(mtmp) && tasty <= (carnivorous(mtmp->data) ? MANFOOD : ACCFOOD));
-            boolean willeat = ((is_tame(mtmp) && (tasty < (objects[otmp->otyp].oc_material == MAT_VEGGY ? APPORT : MANFOOD))) || foodmakesfriendly || takesfood);
+            boolean willeat = ((is_tame(mtmp) && (tasty < (otmp->material == MAT_VEGGY ? APPORT : MANFOOD))) || foodmakesfriendly || takesfood);
 
             if (cnt < otmp->quan)
             {
@@ -6175,7 +6260,7 @@ struct monst* mtmp;
     static const char def_srt_order[MAX_OBJECT_CLASSES] = {
     COIN_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
     SCROLL_CLASS, SPBOOK_CLASS, GEM_CLASS, FOOD_CLASS, REAGENT_CLASS, TOOL_CLASS,
-    WEAPON_CLASS, ARMOR_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
+    WEAPON_CLASS, ARMOR_CLASS, ART_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
     };
 
     const char* classorder = flags.sortpack ? flags.inv_order : def_srt_order;
@@ -6223,7 +6308,7 @@ struct monst* mtmp;
 //                char accel = def_oc_syms[(int)otmp->oclass].sym;
 
                 int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-                int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL));
+                int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
                 add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, & any, obj_to_extended_menu_info(otmp), 
                     0, 0, ATR_NONE, 
                     itembuf, MENU_UNSELECTED);
@@ -6355,6 +6440,7 @@ struct monst* mtmp;
                     You("%s", qbuf);
 
                     money2mon(mtmp, item_cost);
+                    umoney = money_cnt(invent);
                     if(itemized)
                         bot();
 
@@ -6426,7 +6512,7 @@ struct monst* mtmp;
 
 
     static const char def_srt_order[MAX_OBJECT_CLASSES] = {
-    COIN_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
+    COIN_CLASS, AMULET_CLASS, ART_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
     SCROLL_CLASS, SPBOOK_CLASS, GEM_CLASS, FOOD_CLASS, REAGENT_CLASS, TOOL_CLASS,
     WEAPON_CLASS, ARMOR_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
     };
@@ -7848,27 +7934,27 @@ struct monst* mtmp;
     switch (i)
     {
     case 1:
-        cost = max(1L, (long)((double)(objects[IRON_SLING_BULLET].oc_cost) * 3 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        cost = max(1L, (long)((double)(objects[SLING_BULLET].oc_cost) * 3 * service_cost_charisma_adjustment(ACURR(A_CHA))));
         return general_service_query_with_extra(mtmp, forge_iron_sling_bullets_func, "forge 10 iron sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "2 nuggets of iron ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_IRON_SLING_BULLETS);
         break;
     case 2:
-        cost = max(1L, (long)((double)(objects[IRON_SLING_BULLET].oc_cost) * 12 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        cost = max(1L, (long)((double)(objects[SLING_BULLET].oc_cost) * 12 * service_cost_charisma_adjustment(ACURR(A_CHA))));
         return general_service_query_with_extra(mtmp, forge_ex_iron_sling_bullets_func, "forge 10 exceptional iron sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "3 nuggets of iron ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_EXCEPTIONAL_IRON_SLING_BULLETS);
         break;
     case 3:
-        cost = max(1L, (long)((double)(objects[IRON_SLING_BULLET].oc_cost) * 48 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        cost = max(1L, (long)((double)(objects[SLING_BULLET].oc_cost) * 48 * service_cost_charisma_adjustment(ACURR(A_CHA))));
         return general_service_query_with_extra(mtmp, forge_el_iron_sling_bullets_func, "forge 10 elite iron sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "4 nuggets of iron ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_ELITE_IRON_SLING_BULLETS);
         break;
     case 4:
-        cost = max(1L, (long)((double)(objects[SILVER_SLING_BULLET].oc_cost) * 3 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        cost = max(1L, (long)(((double)objects[SLING_BULLET].oc_cost * material_definitions[MAT_SILVER].cost_multiplier) * 3 * service_cost_charisma_adjustment(ACURR(A_CHA))));
         return general_service_query_with_extra(mtmp, forge_silver_sling_bullets_func, "forge 10 silver sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "2 nuggets of silver ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_SILVER_SLING_BULLETS);
         break;
     case 5:
-        cost = max(1L, (long)((double)(objects[SILVER_SLING_BULLET].oc_cost) * 12 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        cost = max(1L, (long)(((double)objects[SLING_BULLET].oc_cost * material_definitions[MAT_SILVER].cost_multiplier) * 12 * service_cost_charisma_adjustment(ACURR(A_CHA))));
         return general_service_query_with_extra(mtmp, forge_ex_silver_sling_bullets_func, "forge 10 exceptional silver sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "3 nuggets of silver ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_EXCEPTIONAL_SILVER_SLING_BULLETS);
         break;
     case 6:
-        cost = max(1L, (long)((double)(objects[SILVER_SLING_BULLET].oc_cost) * 48 * service_cost_charisma_adjustment(ACURR(A_CHA))));
+        cost = max(1L, (long)(((double)objects[SLING_BULLET].oc_cost * material_definitions[MAT_SILVER].cost_multiplier) * 48 * service_cost_charisma_adjustment(ACURR(A_CHA))));
         return general_service_query_with_extra(mtmp, forge_el_silver_sling_bullets_func, "forge 10 elite silver sling-bullets", cost, "forging any sling-bullets", QUERY_STYLE_COMPONENTS, "4 nuggets of silver ore", NPC_LINE_WOULD_YOU_LIKE_TO_FORGE_10_ELITE_SILVER_SLING_BULLETS);
         break;
     default:
@@ -10076,7 +10162,7 @@ int special_dialogue_sound_id;
     if (!otmp)
         return 0;
 
-    long service_cost = !item_cost_at_base ? service_base_cost : max(minimum_cost, (service_base_cost * objects[otmp->otyp].oc_cost) / max(1L, item_cost_at_base));
+    long service_cost = !item_cost_at_base ? service_base_cost : max(minimum_cost, (service_base_cost * get_object_base_value(otmp)) / max(1L, item_cost_at_base));
     char ingbuf[BUFSZ] = "";
     Strcpy(ingbuf, service_verb_ing);
     *ingbuf = highc(*ingbuf);
@@ -10331,14 +10417,14 @@ STATIC_OVL int
 forge_cubic_gate_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, DILITHIUM_CRYSTAL, 1, CUBIC_GATE, 0, 0, TRUE);
+    return forge_special_func(mtmp, DILITHIUM_CRYSTAL, 1, CUBIC_GATE, 0, 0, MAT_NONE,TRUE);
 }
 
 STATIC_OVL int
 forge_artificial_wings_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, FEATHER, 12, WINGS_OF_FLYING, 0, 0, FALSE);
+    return forge_special_func(mtmp, FEATHER, 12, WINGS_OF_FLYING, 0, 0, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
@@ -10393,112 +10479,113 @@ STATIC_OVL int
 forge_orichalcum_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_ORICHALCUM_ORE, 4, ORICHALCUM_FULL_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_ORICHALCUM_ORE, 4, FULL_PLATE_MAIL, 0, 0, MAT_ORICHALCUM, FALSE);
 }
 
 STATIC_OVL int
 forge_crystal_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, DILITHIUM_CRYSTAL, 2, CRYSTAL_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, DILITHIUM_CRYSTAL, 2, PLATE_MAIL, 0, 0, MAT_HARD_CRYSTAL, FALSE);
 }
 
 STATIC_OVL int
 forge_shield_of_reflection_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 8, SHIELD_OF_REFLECTION, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 8, SHIELD_OF_REFLECTION, 0, 0, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_adamantium_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_ADAMANTIUM_ORE, 4, ADAMANTIUM_FULL_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_ADAMANTIUM_ORE, 4, FULL_PLATE_MAIL, 0, 0, MAT_ADAMANTIUM, FALSE);
 }
 
 STATIC_OVL int
 forge_mithril_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_MITHRIL_ORE, 4, MITHRIL_FULL_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_MITHRIL_ORE, 4, FULL_PLATE_MAIL, 0, 0, MAT_MITHRIL, FALSE);
 }
 
 STATIC_OVL int
 forge_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 4, PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 4, PLATE_MAIL, 0, 0, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_bronze_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_COPPER_ORE, 4, BRONZE_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_COPPER_ORE, 4, PLATE_MAIL, 0, 0, MAT_BRONZE, FALSE);
 }
 
 STATIC_OVL int
 forge_field_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 6, FIELD_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 6, FIELD_PLATE_MAIL, 0, 0, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_full_plate_mail_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 8, FULL_PLATE_MAIL, 0, 0, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 8, FULL_PLATE_MAIL, 0, 0, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_iron_sling_bullets_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 2, IRON_SLING_BULLET, 10, EXCEPTIONALITY_NORMAL, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 2, SLING_BULLET, 10, EXCEPTIONALITY_NORMAL, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_ex_iron_sling_bullets_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 3, IRON_SLING_BULLET, 10, EXCEPTIONALITY_EXCEPTIONAL, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 3, SLING_BULLET, 10, EXCEPTIONALITY_EXCEPTIONAL, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_el_iron_sling_bullets_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 4, IRON_SLING_BULLET, 10, EXCEPTIONALITY_ELITE, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_IRON_ORE, 4, SLING_BULLET, 10, EXCEPTIONALITY_ELITE, MAT_NONE, FALSE);
 }
 
 STATIC_OVL int
 forge_silver_sling_bullets_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 2, SILVER_SLING_BULLET, 10, EXCEPTIONALITY_NORMAL, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 2, SLING_BULLET, 10, EXCEPTIONALITY_NORMAL, MAT_SILVER, FALSE);
 }
 
 STATIC_OVL int
 forge_ex_silver_sling_bullets_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 3, SILVER_SLING_BULLET, 10, EXCEPTIONALITY_EXCEPTIONAL, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 3, SLING_BULLET, 10, EXCEPTIONALITY_EXCEPTIONAL, MAT_SILVER, FALSE);
 }
 
 STATIC_OVL int
 forge_el_silver_sling_bullets_func(mtmp)
 struct monst* mtmp;
 {
-    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 4, SILVER_SLING_BULLET, 10, EXCEPTIONALITY_ELITE, FALSE);
+    return forge_special_func(mtmp, NUGGET_OF_SILVER_ORE, 4, SLING_BULLET, 10, EXCEPTIONALITY_ELITE, MAT_SILVER, FALSE);
 }
 
 
 STATIC_OVL int
-forge_special_func(mtmp, forge_source_otyp, forge_source_quan, forge_dest_otyp, quan, exceptionality, initialize)
+forge_special_func(mtmp, forge_source_otyp, forge_source_quan, forge_dest_otyp, quan, exceptionality, material, initialize)
 struct monst* mtmp;
 int forge_source_otyp, forge_source_quan, forge_dest_otyp, quan, exceptionality;
+uchar material;
 boolean initialize;
 {
     char talkbuf[BUFSZ];
@@ -10581,7 +10668,7 @@ boolean initialize;
         otmp = 0;
     }
 
-    struct obj* craftedobj = mksobj(forge_dest_otyp, initialize, FALSE, 3);
+    struct obj* craftedobj = mksobj_with_flags(forge_dest_otyp, initialize, FALSE, 3, (struct monst*)0, material, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
     if (craftedobj)
     {
         if (quan > 0)
@@ -10688,7 +10775,7 @@ int* spell_otyps;
         any.a_int = i;
         char let = 'a' + spell_count;
         int glyph = obj_to_glyph(&pseudo, rn2_on_display_rng);
-        int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, &pseudo, (struct monst*)0, 0UL));
+        int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, &pseudo, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
         add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
             let, 0, ATR_NONE,

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursmisc.h */
@@ -6,6 +6,7 @@
 /* GnollHack may be freely redistributed.  See license for details. */
 
 #include "general.h"
+#include "curses.h"
 
 #ifndef CURSMISC_H
 # define CURSMISC_H
@@ -29,7 +30,7 @@ void curses_posthousekeeping(void);
 void curses_view_file(const char *filename, boolean must_exist);
 void curses_rtrim(char *str);
 int curses_get_count(int first_digit);
-int curses_convert_attr(int attr);
+attr_t curses_convert_attr(int attr);
 int curses_read_attrs(const char *attrs);
 char *curses_fmt_attrs(char *);
 int curses_convert_keys(int key);

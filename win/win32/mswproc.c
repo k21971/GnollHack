@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mswproc.c    $NHDT-Date: 1545705822 2018/12/25 02:43:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.130 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -31,7 +31,7 @@
 #include "mhfont.h"
 #include "resource.h"
 
-#define LLEN 128
+#define LLEN UTF8BUFSZ /* 128 */
 
 #define NHTRACE_LOG "nhtrace.log"
 
@@ -101,7 +101,7 @@ struct window_procs mswin_procs = {
     mswin_init_nhwindows, mswin_player_selection, mswin_askname,
     mswin_get_nh_event, mswin_exit_nhwindows, mswin_suspend_nhwindows,
     mswin_resume_nhwindows, mswin_create_nhwindow_ex, mswin_clear_nhwindow,
-    mswin_display_nhwindow, mswin_destroy_nhwindow, mswin_curs, mswin_putstr_ex,
+    mswin_display_nhwindow, mswin_destroy_nhwindow, mswin_curs, mswin_putstr_ex, mswin_putstr_ex2,
     genl_putmixed_ex, mswin_display_file, mswin_start_menu_ex, mswin_add_menu, mswin_add_extended_menu,
     mswin_end_menu_ex, mswin_select_menu,
     genl_message_menu, /* no need for X-specific handling */
@@ -1177,6 +1177,47 @@ mswin_putstr_ex(winid wid, int attr, const char *text, int app, int color)
     }
 }
 
+void
+mswin_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app)
+{
+    //mswin_putstr_ex(wid, attrs ? attrs[0] : ATR_NONE, text, app, colors ? colors[0]: NO_COLOR);
+    if ((wid >= 0) && (wid < MAXWINDOWS)) {
+        if (GetNHApp()->windowlist[wid].win == NULL
+            && GetNHApp()->windowlist[wid].type == NHW_MENU) {
+            GetNHApp()->windowlist[wid].win =
+                mswin_init_menu_window(MENU_TYPE_TEXT);
+            GetNHApp()->windowlist[wid].dead = 0;
+        }
+
+        if (GetNHApp()->windowlist[wid].win != NULL) {
+            MSNHMsgPutstr data;
+            ZeroMemory(&data, sizeof(data));
+            data.attr = attr;
+            data.text = text;
+            data.append = app;
+            data.color = color;
+            data.attrs = attrs;
+            data.colors = colors;
+            SendMessage(GetNHApp()->windowlist[wid].win, WM_MSNH_COMMAND,
+                (WPARAM)MSNH_MSG_PUTSTR, (LPARAM)&data);
+        }
+        /* yield a bit so it gets done immediately */
+        mswin_get_nh_event();
+    }
+    else {
+        // build text to display later in message box
+        char* tempchar_ptr = (char*)
+            realloc(GetNHApp()->saved_text,
+                strlen(text) + strlen(GetNHApp()->saved_text) + 1);
+        if (!tempchar_ptr)
+            return;
+        else
+            GetNHApp()->saved_text = tempchar_ptr;
+
+        strcat(GetNHApp()->saved_text, text);
+    }
+}
+
 /* Display the file named str.  Complain about missing files
                    iff complain is TRUE.
 */
@@ -1285,6 +1326,7 @@ mswin_add_extended_menu(winid wid, int glyph, const ANY_P *identifier, struct ex
              presel);
 
     struct obj* otmp = info.object;
+    int color = info.color;
 
     if ((wid >= 0) && (wid < MAXWINDOWS)
         && (GetNHApp()->windowlist[wid].win != NULL)) {
@@ -1296,6 +1338,7 @@ mswin_add_extended_menu(winid wid, int glyph, const ANY_P *identifier, struct ex
         data.accelerator = accelerator;
         data.group_accel = group_accel;
         data.attr = attr;
+        data.color = color;
         data.str = str;
         data.presel = presel;
 
@@ -1309,7 +1352,7 @@ mswin_add_menu(winid wid, int glyph, const ANY_P* identifier,
     CHAR_P accelerator, CHAR_P group_accel, int attr,
     const char* str, BOOLEAN_P presel)
 {
-    mswin_add_extended_menu(wid, glyph, identifier, zeroextendedmenuinfo,
+    mswin_add_extended_menu(wid, glyph, identifier, nilextendedmenuinfo,
         accelerator, group_accel, attr,
         str, presel);
 }
@@ -1839,7 +1882,7 @@ void
 mswin_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline)
 {
     logDebug("mswin_getlin(%s, %p)\n", question, input);
-    char promptbuf[BUFSZ] = "";
+    char promptbuf[PBUFSZ] = "";
     //Do not show introline
     if (question)
         Sprintf(promptbuf, "%s", question);
@@ -2285,21 +2328,21 @@ mswin_preference_update(const char *pref)
 
 }
 
-#define TEXT_BUFFER_SIZE 4096
 char *
-mswin_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
+mswin_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
 {
-    if (attr_ptr)
-        *attr_ptr = ATR_NONE;
-    if (color_ptr)
-        *color_ptr = NO_COLOR;
+    if (attrs_ptr)
+        *attrs_ptr = (char*)0;
+    if (colors_ptr)
+        *colors_ptr = (char*)0;
 
     static PMSNHMsgGetText text = 0;
     static char *next_message = 0;
+    static char* next_message_attrs = 0;
+    static char* next_message_colors = 0;
 
     if (init) {
-        text = (PMSNHMsgGetText) malloc(sizeof(MSNHMsgGetText)
-                                        + TEXT_BUFFER_SIZE);
+        text = (PMSNHMsgGetText) malloc(sizeof(MSNHMsgGetText));
 
         if (!text)
             return (char*)0;
@@ -2309,31 +2352,56 @@ mswin_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
             - 1; /* make sure we always have 0 at the end of the buffer */
 
         ZeroMemory(text->buffer, TEXT_BUFFER_SIZE);
+        FillMemory(text->attrs, ATR_NONE, TEXT_BUFFER_SIZE);
+        FillMemory(text->colors, NO_COLOR, TEXT_BUFFER_SIZE);
         SendMessage(mswin_hwnd_from_winid(WIN_MESSAGE), WM_MSNH_COMMAND,
                     (WPARAM) MSNH_MSG_GETTEXT, (LPARAM) text);
 
         next_message = text->buffer;
+        next_message_attrs = text->attrs;
+        next_message_colors = text->colors;
     }
 
-    if (!(next_message && next_message[0])) {
+    if (!(next_message && next_message[0])) 
+    {
         free(text);
         next_message = 0;
+        next_message_attrs = 0;
+        next_message_colors = 0;
+        *attrs_ptr = (char*)0;
+        *colors_ptr = (char*)0;
         return (char *) 0;
-    } else {
+    } 
+    else
+    {
         char *retval = next_message;
+        *attrs_ptr = next_message_attrs;
+        *colors_ptr = next_message_colors;
+
         char *p;
         next_message = p = strchr(next_message, '\n');
         if (next_message)
+        {
             next_message++;
+            next_message_attrs += next_message - retval;
+            next_message_colors += next_message - retval;
+        }
+        else
+        {
+            next_message_attrs = 0;
+            next_message_colors = 0;
+        }
+
         if (p)
             while (p >= retval && isspace((uchar) *p))
                 *p-- = (char) 0; /* delete trailing whitespace */
+
         return retval;
     }
 }
 
 void
-mswin_putmsghistory_ex(const char *msg, int attr, int color, BOOLEAN_P restoring)
+mswin_putmsghistory_ex(const char *msg, const char* attrs, const char* colors, BOOLEAN_P restoring)
 {
     BOOL save_sound_opt;
 
@@ -2345,7 +2413,7 @@ mswin_putmsghistory_ex(const char *msg, int attr, int color, BOOLEAN_P restoring
     save_sound_opt = GetNHApp()->bNoSounds;
     GetNHApp()->bNoSounds =
         TRUE; /* disable sounds while restoring message history */
-    mswin_putstr_ex(WIN_MESSAGE, attr, msg, 0, color);
+    mswin_putstr_ex2(WIN_MESSAGE, msg, attrs, colors, ATR_NONE, NO_COLOR, 0);
     clear_nhwindow(WIN_MESSAGE); /* it is in fact end-of-turn indication so
                                     each message will print on the new line */
     GetNHApp()->bNoSounds = save_sound_opt; /* restore sounds option */
@@ -3235,7 +3303,7 @@ status_init()   -- core calls this to notify the window port that a status
                    the necessary initialization in here, allocate memory, etc.
 */
 void
-mswin_status_init(void)
+mswin_status_init(int reassessment)
 {
     logDebug("mswin_status_init()\n");
 
@@ -3271,6 +3339,10 @@ mswin_status_init(void)
         _status_hilites[i].over = BL_HILITE_NONE;
 #endif /* STATUS_HILITES */
     }
+
+    if (reassessment)
+        return;
+
     /* Use a window for the genl version; backward port compatibility */
     WIN_STATUS = create_nhwindow(NHW_STATUS);
     display_nhwindow(WIN_STATUS, FALSE);
@@ -3290,10 +3362,13 @@ mswin_statuslines_init(void)
         mswin_status_strings* status_strings = &line->status_strings;
         status_strings->count = 0;
 
-        int fc = iflags.wc2_statuslines == 2 ? fieldcounts_2statuslines[lineIndex] : fieldcounts[lineIndex];
-        for (int i = 0; i < fc; i++) 
+        const enum statusfields* line_field_order = iflags.wc2_statuslines == 2 ? fieldorders_2statuslines[lineIndex] : flags.fullstatuslineorder ? fieldorders_alt[lineIndex] : fieldorders[lineIndex];
+        if (line_field_order == NULL)
+            break;
+
+        for (int i = 0; i < MAX_STATUS_LINE_ITEMS && line_field_order[i] != BL_FLUSH; i++)
         {
-            int field_index = iflags.wc2_statuslines == 2 ? fieldorders_2statuslines[lineIndex][i] : fieldorders[lineIndex][i];
+            int field_index = line_field_order[i];
             nhassert(field_index <= SIZE(_status_fields));
 
             nhassert(status_fields->count <= SIZE(status_fields->status_fields));

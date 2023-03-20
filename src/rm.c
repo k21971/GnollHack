@@ -4,7 +4,7 @@
 
 #include "hack.h"
 
-NEARDATA struct location_type_definition location_type_definitions[MAX_TYPE] = {
+NEARDATA const struct location_type_definition location_type_definitions[MAX_TYPE] = {
     {"STONE",           S_stone,    CORR,   MAT_MINERAL, LOCATION_SOUNDSET_STONE},
     {"VWALL",           S_vwall,    CORR,   MAT_MINERAL, LOCATION_SOUNDSET_STONE},
     {"HWALL",           S_hwall,    CORR,   MAT_MINERAL, LOCATION_SOUNDSET_STONE},
@@ -49,25 +49,25 @@ NEARDATA struct location_type_definition location_type_definitions[MAX_TYPE] = {
     {"UNDEFINED_LOCATION",S_unexplored,0,   MAT_NONE,    LOCATION_SOUNDSET_NONE}
 };
 
-struct location_subtype_definition corridor_subtype_definitions[MAX_CORRIDOR_SUBTYPES] =
+const struct location_subtype_definition corridor_subtype_definitions[MAX_CORRIDOR_SUBTYPES] =
 {
     { "normal corridor", CORRIDOR_SUBTYPE_NORMAL_VARIATIONS, 0 },
 };
 
-struct location_subtype_definition grass_subtype_definitions[MAX_GRASS_SUBTYPES] =
+const struct location_subtype_definition grass_subtype_definitions[MAX_GRASS_SUBTYPES] =
 {
     { "normal grass", GRASS_SUBTYPE_NORMAL_VARIATIONS, 0 },
     { "swampy grass", GRASS_SUBTYPE_SWAMPY_VARIATIONS, GRASS_SUBTYPE_NORMAL_VARIATIONS },
 };
 
-struct location_subtype_definition ground_subtype_definitions[MAX_GROUND_SUBTYPES] =
+const struct location_subtype_definition ground_subtype_definitions[MAX_GROUND_SUBTYPES] =
 {
     { "normal ground", GROUND_SUBTYPE_NORMAL_VARIATIONS, 0 },
     { "swampy ground", GROUND_SUBTYPE_SWAMPY_VARIATIONS, GROUND_SUBTYPE_NORMAL_VARIATIONS },
     { "desert sand",   GROUND_SUBTYPE_DESERT_SAND_VARIATIONS, GROUND_SUBTYPE_NORMAL_VARIATIONS + GROUND_SUBTYPE_SWAMPY_VARIATIONS },
 };
 
-struct location_subtype_definition floor_subtype_definitions[MAX_FLOOR_SUBTYPES] =
+const struct location_subtype_definition floor_subtype_definitions[MAX_FLOOR_SUBTYPES] =
 {
     { "normal floor", FLOOR_SUBTYPE_NORMAL_VARIATIONS, 0 },
     { "marble floor", FLOOR_SUBTYPE_MARBLE_VARIATIONS, FLOOR_SUBTYPE_NORMAL_VARIATIONS },
@@ -75,17 +75,17 @@ struct location_subtype_definition floor_subtype_definitions[MAX_FLOOR_SUBTYPES]
     { "cobblestone", FLOOR_SUBTYPE_COBBLESTONE_VARIATIONS, FLOOR_SUBTYPE_PARQUET_VARIATIONS + FLOOR_SUBTYPE_MARBLE_VARIATIONS + FLOOR_SUBTYPE_NORMAL_VARIATIONS },
 };
 
-struct location_subtype_definition stone_subtype_definitions[MAX_STONE_SUBTYPES] =
+const struct location_subtype_definition stone_subtype_definitions[MAX_STONE_SUBTYPES] =
 {
     { "normal stone", STONE_SUBTYPE_NORMAL_VARIATIONS, 0 },
 };
 
-struct location_subtype_definition wall_subtype_definitions[MAX_WALL_SUBTYPES] =
+const struct location_subtype_definition wall_subtype_definitions[MAX_WALL_SUBTYPES] =
 {
     { "normal wall", WALL_SUBTYPE_NORMAL_VARIATIONS, 0 }, /* Must be aligned with stone normal subtypes */
 };
 
-struct location_subtype_definition altar_subtype_definitions[MAX_ALTAR_SUBTYPES] =
+const struct location_subtype_definition altar_subtype_definitions[MAX_ALTAR_SUBTYPES] =
 {
     { "normal altar", ALTAR_SUBTYPE_NORMAL_VARIATIONS, 0 },
     { "high altar", ALTAR_SUBTYPE_HIGH_VARIATIONS, ALTAR_SUBTYPE_NORMAL_VARIATIONS },
@@ -93,7 +93,7 @@ struct location_subtype_definition altar_subtype_definitions[MAX_ALTAR_SUBTYPES]
 };
 
 
-struct door_subtype_definition door_subtype_definitions[MAX_DOOR_SUBTYPES] =
+const struct door_subtype_definition door_subtype_definitions[MAX_DOOR_SUBTYPES] =
 {
     {"wooden door",          "door", MAT_WOOD, LOCATION_SOUNDSET_DOOR, DSTFLAGS_BLOCKS_VISION_AND_SOUND | DSTFLAGS_BLOCKS_PROJECTILES | DSTFLAGS_BROKEN_BY_STRONG_MONSTERS | DSTFLAGS_BROKEN_BY_DIGGING | DSTFLAGS_BROKEN_BY_KICKING | DSTFLAGS_BROKEN_BY_STRIKING | DSTFLAGS_BROKEN_BY_BEING_BOOBY_TRAPPED },
     {"windowed wooden door", "door", MAT_WOOD, LOCATION_SOUNDSET_DOOR, DSTFLAGS_BROKEN_BY_STRONG_MONSTERS | DSTFLAGS_BROKEN_BY_DIGGING | DSTFLAGS_BROKEN_BY_KICKING | DSTFLAGS_BROKEN_BY_STRIKING | DSTFLAGS_BROKEN_BY_BEING_BOOBY_TRAPPED },
@@ -109,7 +109,7 @@ struct door_subtype_definition door_subtype_definitions[MAX_DOOR_SUBTYPES] =
     {"black gate",           "gate", MAT_METAL, LOCATION_SOUNDSET_DOOR, DSTFLAGS_BLOCKS_VISION_AND_SOUND},
 };
 
-struct tree_subtype_definition tree_subtype_definitions[MAX_TREE_SUBTYPES] =
+const struct tree_subtype_definition tree_subtype_definitions[MAX_TREE_SUBTYPES] =
 {
     {"tree",          "tree",  
         TREE_SUBTYPE_NORMAL_VARIATIONS, 0,  
@@ -209,6 +209,203 @@ struct tree_subtype_definition tree_subtype_definitions[MAX_TREE_SUBTYPES] =
         EUCALYPTUS_LEAF, 1, 4, 0, 50, 1, 2, 0,  -1, -1,
         TREE_FLAGS_MAY_HAVE_KILLER_BEES,
     },
+};
+
+NEARDATA const struct decoration_type_definition decoration_type_definitions[MAX_DECORATIONS] = {
+    {
+        (char*)0, (char*)0, (char*)0, 
+        {0, 0, 0, 0},
+        0, STRANGE_OBJECT, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_NONE 
+    },
+    {
+        "cobweb", "cobweb", "cobweb", 
+        {DOODAD_COBWEB_NORMAL, DOODAD_COBWEB_NORMAL, DOODAD_COBWEB_NORMAL, DOODAD_COBWEB_NORMAL},
+        2, STRANGE_OBJECT,  NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_NONE, 
+        DECORATION_TYPE_FLAGS_MIRRORABLE
+    },
+    {
+        "cobweb", "cobweb", "cobweb", 
+        {DOODAD_COBWEB_CORNER_ELONGATED, DOODAD_COBWEB_CORNER_ELONGATED, DOODAD_COBWEB_CORNER_ELONGATED, DOODAD_COBWEB_CORNER_ELONGATED},
+        5, STRANGE_OBJECT, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_MIRRORABLE | DECORATION_TYPE_FLAGS_CORNERS
+    },
+    {
+        "torch", "torch holder", "torch", 
+        {DOODAD_TORCH_HOLDER, DOODAD_TORCH_HOLDER_LEFT, DOODAD_TORCH_HOLDER_RIGHT, DOODAD_TORCH_HOLDER_BOTTOM},
+        1, TORCH, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_BRAZIER,
+        DECORATION_TYPE_FLAGS_LOOTABLE | DECORATION_TYPE_FLAGS_LIGHTABLE | DECORATION_TYPE_FLAGS_ALL_SIDES
+    },
+    {
+        "lantern", "lantern holder", "brass lantern", 
+        {DOODAD_LANTERN_HOLDER, DOODAD_LANTERN_HOLDER_LEFT, DOODAD_LANTERN_HOLDER_RIGHT, DOODAD_LANTERN_HOLDER_BOTTOM},
+        1, BRASS_LANTERN, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_BRAZIER,
+        DECORATION_TYPE_FLAGS_LOOTABLE | DECORATION_TYPE_FLAGS_LIGHTABLE | DECORATION_TYPE_FLAGS_ALL_SIDES
+    },
+    {
+        "fireplace", "fireplace", "fireplace",
+        {DOODAD_FIREPLACE, DOODAD_FIREPLACE_LEFT, DOODAD_FIREPLACE_RIGHT, DOODAD_FIREPLACE},
+        1, STRANGE_OBJECT, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_BRAZIER,
+        DECORATION_TYPE_FLAGS_LIGHTABLE | DECORATION_TYPE_FLAGS_ALL_SIDES 
+    },
+    {
+        "painting", "painting hanger", "painting",
+        {DOODAD_PAINTING_HOLDER, DOODAD_PAINTING_HOLDER, DOODAD_PAINTING_HOLDER, DOODAD_PAINTING_HOLDER},
+        1, PAINTING, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_LOOTABLE | DECORATION_TYPE_FLAGS_PAINTING_DESCR | DECORATION_TYPE_FLAGS_NO_SUBTYP_OFFSET | DECORATION_TYPE_FLAGS_SUBTYP_IS_OBJ_SPECIAL_QUALITY | DECORATION_TYPE_FLAGS_WOODY_FILLED_COLOR
+    },
+    {
+        "gargoyle statue niche", "statue niche", "statue of a gargoyle in a niche",
+        {DOODAD_GARGOYLE_STATUE_NICHE, DOODAD_GARGOYLE_STATUE_NICHE_LEFT, DOODAD_GARGOYLE_STATUE_NICHE_RIGHT, DOODAD_GARGOYLE_STATUE_NICHE},
+        1, STATUE, PM_GARGOYLE, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, CLR_WHITE,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_LOOTABLE
+    },
+    {
+        "knight statue niche", "statue niche", "statue of a knight in a niche",
+        {DOODAD_KNIGHT_STATUE_NICHE, DOODAD_KNIGHT_STATUE_NICHE_LEFT, DOODAD_KNIGHT_STATUE_NICHE_RIGHT, DOODAD_KNIGHT_STATUE_NICHE},
+        1, STATUE, PM_KNIGHT, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, CLR_WHITE,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_LOOTABLE 
+    },
+    {
+        "shield with swords", "equipment holder", "shield", 
+        {DOODAD_EQUIPMENT_HOLDER, DOODAD_EQUIPMENT_HOLDER_LEFT, DOODAD_EQUIPMENT_HOLDER_RIGHT, DOODAD_EQUIPMENT_HOLDER},
+        1, LARGE_SHIELD, NON_PM, LONG_SWORD, LONG_SWORD,
+        NO_COLOR, CLR_CYAN,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_LOOTABLE | DECORATION_TYPE_FLAGS_ADD_OTHER_ITEM_DESCRIPTIONS
+    },
+    {
+        "banner", "banner pole", "banner",
+        {DOODAD_BANNER_HOLDER, DOODAD_BANNER_HOLDER_LEFT, DOODAD_BANNER_HOLDER_RIGHT, DOODAD_BANNER_HOLDER_BOTTOM},
+        1, BANNER, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_LOOTABLE | DECORATION_TYPE_FLAGS_BANNER_DESCR | DECORATION_TYPE_FLAGS_NO_SUBTYP_OFFSET | DECORATION_TYPE_FLAGS_SUBTYP_IS_OBJ_SPECIAL_QUALITY
+    },
+    {
+        "priest statue niche", "statue niche", "statue of a priest in a niche",
+        {DOODAD_PRIEST_STATUE_NICHE, DOODAD_PRIEST_STATUE_NICHE_LEFT, DOODAD_PRIEST_STATUE_NICHE_RIGHT, DOODAD_PRIEST_STATUE_NICHE},
+        1, STATUE, PM_PRIEST, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, CLR_WHITE,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_LOOTABLE
+    },
+    {
+        "wall sculpture", "wall sculpture", "wall sculpture",
+        {DOODAD_WALL_SCULPTURE, DOODAD_WALL_SCULPTURE, DOODAD_WALL_SCULPTURE, DOODAD_WALL_SCULPTURE},
+        1, STRANGE_OBJECT, NON_PM, STRANGE_OBJECT, STRANGE_OBJECT,
+        NO_COLOR, NO_COLOR,
+        LOCATION_SOUNDSET_NONE,
+        DECORATION_TYPE_FLAGS_WALL_SCULPTURE_DESCR | DECORATION_TYPE_FLAGS_NO_SUBTYP_OFFSET
+    },
+};
+
+NEARDATA struct banner_definition banner_definitions[MAX_BANNERS] = {
+    { "red banner", "red banner", 25L },
+    { "old red banner", "old red banner", 25L },
+    { "purple banner", "purple banner", 25L },
+    { "old purple banner", "old purple banner", 25L },
+};
+
+NEARDATA struct wall_sculpture_definition wall_sculpture_definitions[MAX_WALL_SCULPTURES] = {
+    { "modron spherical wall sculpture", "alien spherical sculpture" },
+    { "modron triangular wall sculpture", "alien triangular sculpture" },
+};
+
+
+NEARDATA struct painting_definition painting_definitions[MAX_PAINTINGS] = {
+    { "Portrait of Male Aristocrat", "a male aristocrat", "Otumn", (char*)0, (char*)0, 25L },
+    { "Portrait of Male Aristocrat", "a male aristocrat", "Otumn", (char*)0, (char*)0, 50L },
+    { "Portrait of Female Aristocrat", "a female aristocrat", "Otumn", (char*)0, (char*)0, 100L },
+    { "Portrait of Elucid Priestess", "a priestess", "Otumn", (char*)0, (char*)0, 150L },
+    { "Portrait of Serious Dispater", "Dispater, Archduke of Gehennom", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Smiling Dispater", "Dispater, Archduke of Gehennom", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Wizard of Yendor in Blue", "Wizard of Yendor", "Diedi", (char*)0, (char*)0, 250L },
+    { "Portrait of Wizard of Yendor in Red", "Wizard of Yendor", "Diedi", (char*)0, (char*)0, 250L },
+    { "Portrait of Vlad the Impaler", "Vlad the Impaler", "Diedi", (char*)0, (char*)0, 250L },
+    { "Portrait of Vampire Lord", "a vampire lord", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Vampire Lady", "a vampire lady", "Diedi", (char*)0, (char*)0, 200L },
+};
+
+NEARDATA const struct carpet_type_definition carpet_type_definitions[MAX_CARPETS] = {
+    {
+        (char*)0, (char*)0,
+        0, CARPET_TILE_INDEXATION_TYPE_NORMAL, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "carpet-horizantal-red", "red carpet",
+        DOODAD_CARPET_RED_HORIZONTAL_TLCORN + GLYPH_SIMPLE_DOODAD_OFF, 
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "carpet-purple-vertical", "purple carpet",
+        DOODAD_CARPET_PURPLE_VERTICAL_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "carpet-brown-animal-skin", "brown hide",
+        DOODAD_CARPET_BROWN_ANIMAL_HIDE_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 3, 3,
+        CARPET_TYPE_FLAGS_FIXED_SIZE
+    },
+    {
+        "carpet-crimson", "red carpet",
+        DOODAD_CARPET_CRIMSON_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "modron-spherical-plaque", "alien plaque",
+        DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_3X2_CARPET, 3, 2,
+        CARPET_TYPE_FLAGS_FIXED_SIZE
+    },
+    {
+        "carpet-yellow", "yellow carpet",
+        DOODAD_CARPET_YELLOW_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+};
+
+NEARDATA const struct decoration_lit_color_definition decoration_lit_colors[CLR_MAX] = {
+    { CLR_GRAY, CLR_WHITE, CLR_BROWN },           /* CLR_BLACK */
+    { CLR_BLACK, CLR_ORANGE, CLR_BROWN },         /* CLR_RED */
+    { CLR_BLACK, CLR_BRIGHT_GREEN, CLR_BROWN },   /* CLR_GREEN */
+    { CLR_BLACK,  CLR_ORANGE, CLR_RED },          /* CLR_BROWN */
+    { CLR_BLACK, CLR_BRIGHT_BLUE, CLR_BROWN },    /* CLR_BLUE */
+    { CLR_BLACK, CLR_BRIGHT_MAGENTA, CLR_BROWN },   /* CLR_MAGENTA */
+    { CLR_BLACK, CLR_BRIGHT_CYAN, CLR_BROWN },     /* CLR_CYAN */
+    { CLR_BLACK, CLR_WHITE, CLR_BROWN },          /* CLR_GRAY */
+    { NO_COLOR, NO_COLOR, NO_COLOR },            /* NO_COLOR */
+    { CLR_RED, CLR_WHITE, CLR_BROWN },            /* CLR_ORANGE */
+    { CLR_GREEN, CLR_WHITE, CLR_BROWN },          /* CLR_BRIGHT_GREEN */
+    { CLR_BROWN, CLR_WHITE, CLR_BROWN },          /* CLR_YELLOW */
+    { CLR_BLUE, CLR_WHITE, CLR_BROWN },           /* CLR_BRIGHT_BLUE */
+    { CLR_MAGENTA, CLR_WHITE, CLR_BROWN },        /* CLR_BRIGHT_MAGENTA */
+    { CLR_CYAN, CLR_WHITE, CLR_BROWN },           /* CLR_BRIGHT_CYAN */
+    { CLR_GRAY, CLR_YELLOW, CLR_BROWN },          /* CLR_WHITE */
 };
 
 /* force linkage */
@@ -323,7 +520,7 @@ int
 get_initial_location_vartype(typ, subtyp)
 int typ, subtyp;
 {
-    struct location_subtype_definition* sub_def = 0;
+    const struct location_subtype_definition* sub_def = 0;
     int num_subs = 0;
 
     if (typ == CORR)

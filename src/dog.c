@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    dog.c    $NHDT-Date: 1554580624 2019/04/06 19:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.85 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1223,7 +1223,7 @@ register struct obj *obj;
         if (obj->otyp == AMULET_OF_STRANGULATION
             || obj->otyp == RIN_SLOW_DIGESTION)
             return TABU;
-        if (mon_hates_silver(mon) && objects[obj->otyp].oc_material == MAT_SILVER)
+        if (mon_hates_silver(mon) && obj->material == MAT_SILVER)
             return TABU;
         if (slurps_items(mptr) && is_slurpable(obj))
             return ACCFOOD;
@@ -1242,6 +1242,7 @@ register struct obj *obj;
             return APPORT;
         /*FALLTHRU*/
     case ROCK_CLASS:
+    case ART_CLASS:
         return UNDEF;
     }
 }

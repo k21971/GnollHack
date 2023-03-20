@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    exper.c    $NHDT-Date: 1553296396 2019/03/22 23:13:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.32 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -104,7 +104,7 @@ int
 enmaxadjustment()
 {
     int baseen = u.ubaseenmax;
-    int baseadj = ((int)(max(0, max(ACURR(A_INT), ACURR(A_WIS)) - 1) * (u.ulevel + 3)) / 6);
+    int baseadj = ((int)(max(0, max(ACURR(A_INT), ACURR(A_WIS)) - 1) * (u.ulevel + 3)) / 6) + u.ubaseendrain;
     int adj = baseadj;
     int otyp = 0;
     struct obj* uitem;
@@ -135,9 +135,9 @@ enmaxadjustment()
             }
         }
         
-        if (has_obj_mythic_mana_gain_25(uitem) && worn)
+        if (has_obj_mythic_mana_gain(uitem) && worn)
         {
-            adj += 1 * (25 * (baseen + baseadj)) / 100;
+            adj += 1 * (MYTHIC_MANA_GAIN_PERCENTAGE * (baseen + baseadj)) / 100;
         }
     }
 
@@ -279,10 +279,8 @@ register int exper, gamescore;
     /* newrexp will always differ from oldrexp unless they're LONG_MAX */
     if (newscore != oldscore) {
         u.u_gamescore = newscore;
-#ifdef SCORE_ON_BOTL
         if (flags.showscore)
             context.botl = TRUE;
-#endif
     }
     if (u.u_gamescore >= (Role_if(PM_WIZARD) ? 1000 : 2000))
         flags.beginner = 0;

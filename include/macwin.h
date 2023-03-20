@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	macwin.h	$NHDT-Date: 1447755970 2015/11/17 10:26:10 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -227,6 +227,7 @@ E void FDECL(mac_display_nhwindow, (winid, BOOLEAN_P));
 E void FDECL(mac_destroy_nhwindow, (winid));
 E void FDECL(mac_curs, (winid, int, int));
 E void FDECL(mac_putstr_ex, (winid, int, const char *, int, int));
+E void FDECL(mac_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 #define mac_putstr(x, y, z) mac_putstr_ex(x, y, z, 0, 0)
 E void FDECL(mac_start_menu_ex, (winid, int));
 E void FDECL(mac_add_menu, (winid, int, const anything *, CHAR_P, CHAR_P, int,

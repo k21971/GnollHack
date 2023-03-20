@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    lock.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.84 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -905,7 +905,7 @@ doforce()
             else
                 You("start bashing it with %s.", yname(uwep));
             xlock.box = otmp;
-            xlock.chance = objects[uwep->otyp].oc_wldam * 2;
+            xlock.chance = get_obj_wldam(uwep) * 2;
             xlock.picktyp = picktyp;
             xlock.magic_key = FALSE;
             xlock.usedtime = 0;
@@ -1647,7 +1647,7 @@ int x, y;
 
     play_simple_object_sound_at_location(otmp, x, y, OBJECT_SOUND_TYPE_BREAK);
     if (otmp->oclass == POTION_CLASS) {
-        char dcbuf[BUFSZ] = "";
+        char dcbuf[IBUFSZ] = "";
         Sprintf(dcbuf, "You %s %s shatter!", Blind ? "hear" : "see", an(bottlename()));
         pline1(dcbuf);
         if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data))
@@ -1660,7 +1660,7 @@ int x, y;
     Blinded = 1;
     thing = singular(otmp, xname);
     Blinded = save_Blinded;
-    switch (objects[otmp->otyp].oc_material) {
+    switch (otmp->material) {
     case MAT_PAPER:
         disposition = "is torn to shreds";
         break;

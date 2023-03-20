@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    artifact.c    $NHDT-Date: 1553363416 2019/03/23 17:50:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -25,7 +25,7 @@ STATIC_VAR boolean touch_blasted; /* for retouch_object() */
 const char* artifact_invoke_names[NUM_ARTINVOKES] = {
     "taming", "healing", "mana replenishment", "untrapping", "charging",
     "level teleportation", "portal creation", "enlightenment", "arrow creation", "arrow of Diana", "death ray", "blessing of contents", "wishing",
-    "summon demon", "summon elder air elemental", "recharge itself", "activates the artifact", "time stop"
+    "summon demon", "summon elder air elemental", "recharge itself", "activates the artifact", "time stop", "bolt of cold, lightning or fire"
 };
 
 #define get_artifact(o) \
@@ -257,7 +257,7 @@ uchar mkflags; /* for monks */
 
         /* make an appropriate object if necessary, then christen it */
         if (by_align || !otmp)
-            otmp = mksobj((int) a->otyp, TRUE, FALSE, FALSE);
+            otmp = mksobj_with_flags((int) a->otyp, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0UL, 0UL, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
 
         if (otmp) 
         {
@@ -267,6 +267,10 @@ uchar mkflags; /* for monks */
             otmp->exceptionality = artilist[otmp->oartifact].exceptionality;
             otmp->mythic_prefix = artilist[otmp->oartifact].mythic_prefix;
             otmp->mythic_suffix = artilist[otmp->oartifact].mythic_suffix;
+            if(artilist[otmp->oartifact].material)
+                otmp->material = artilist[otmp->oartifact].material;
+            else
+                otmp->material = objects[otmp->otyp].oc_material; /* Only the base material will do */
         }
     } 
     else 
@@ -347,6 +351,10 @@ boolean mod;
                     otmp->exceptionality = artilist[otmp->oartifact].exceptionality;
                     otmp->mythic_prefix = artilist[otmp->oartifact].mythic_prefix;
                     otmp->mythic_suffix = artilist[otmp->oartifact].mythic_suffix;
+                    if (artilist[otmp->oartifact].material)
+                        otmp->material = artilist[otmp->oartifact].material;
+                    else
+                        otmp->material = objects[otmp->otyp].oc_material; /* Only the base material will do */
 
                     if (artilist[otmp->oartifact].aflags & AF_FAMOUS)
                         otmp->nknown = TRUE;
@@ -600,7 +608,7 @@ struct obj *obj;
     const struct artifact *arti;
 
     /* any silver object is effective */
-    if (objects[obj->otyp].oc_material == MAT_SILVER)
+    if (obj->material == MAT_SILVER)
         return TRUE;
 
     /* any blessed object is effective */
@@ -831,7 +839,7 @@ struct monst *mon;
             if(badclass || badalign)
                 dmg += d((Antimagic_or_resistance ? 2 : 4), (self_willed ? 10 : 4));
             /* add half (maybe quarter) of the usual silver damage bonus */
-            if (objects[obj->otyp].oc_material == MAT_SILVER && Hate_silver)
+            if (obj->material == MAT_SILVER && Hate_silver)
                 dmg += rnd(10);
             damage = adjust_damage(dmg, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE);
 
@@ -1271,9 +1279,7 @@ char *hittee;              /* target's name: "you" or mon_nam(mdef) */
                 if (youmonst.data != old_uasmon)
                     *dmgptr = 0; /* rehumanized, so no more damage */
                 if (u.uenmax > 0) {
-                    u.ubaseenmax--;
-                    if (u.uen > 0)
-                        u.uen--;
+                    u.ubaseendrain--;
                     updatemaxen();
                     context.botl = TRUE;
                     You("lose magical energy!");
@@ -1282,8 +1288,13 @@ char *hittee;              /* target's name: "you" or mon_nam(mdef) */
                 if (mdef->data == &mons[PM_CLAY_GOLEM])
                     mdef->mhp = 1; /* cancelled clay golems will die */
                 if (youattack && attacktype(mdef->data, AT_MAGC)) {
-                    u.ubaseenmax++;
-                    u.uen++;
+                    if (u.ubaseendrain < 0)
+                        u.ubaseendrain++;
+                    else
+                    {
+                        u.ubaseenmax++;
+                        u.uen++;
+                    }
                     updatemaxen();
                     context.botl = TRUE;
                     You("absorb magical energy!");
@@ -1721,7 +1732,7 @@ int dieroll; /* needed for Magicbane and vorpal blades */
                 }
 
                 *dmgptr += (double)drain + mhpadj;
-                mdef->mbasehpmax -= drain;
+                mdef->mbasehpdrain -= drain;
                 mdef->m_lev -= levelloss;
                 update_mon_maxhp(mdef);
                 drain /= 2;
@@ -1920,7 +1931,7 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                         if (!does_regenerate_bodyparts(mdef->data))
                         {
                             /* Max HP does not go down if the creature can regenerate the lost body part */
-                            mdef->mbasehpmax -= damagedone;
+                            mdef->mbasehpdrain -= damagedone;
                             mdef->mhpmax -= damagedone;
                             if (mdef->mhpmax < 1)
                                 mdef->mhpmax = 1, lethaldamage = TRUE;
@@ -1981,7 +1992,7 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                             if (!does_regenerate_bodyparts(youmonst.data))
                             {
                                 /* Max HP does not go down if the creature can regenerate the lost body part */
-                                u.ubasehpmax -= damagedone;
+                                u.ubasehpdrain -= damagedone;
                                 u.uhpmax -= damagedone;
                                 if (u.uhpmax < 1)
                                     u.uhpmax = 1, lethaldamage = TRUE;
@@ -2007,7 +2018,7 @@ short* adtyp_ptr; /* return value is the type of damage caused */
         }
         else if ((objects[otmp->otyp].oc_aflags & A1_SVB_MASK) == A1_SHARPNESS || has_obj_mythic_sharpness(otmp))
         {
-            if (has_obj_mythic_sharpness(otmp) ||
+            if ((has_obj_mythic_sharpness(otmp) && rn2(100) < SHARPNESS_PERCENTAGE_CHANCE) ||
                 (
                     ((objects[otmp->otyp].oc_aflags & A1_VORPAL_LIKE_DISRESPECTS_TARGETS) || eligible_for_extra_damage(otmp, mdef, magr))
                     && ((objects[otmp->otyp].oc_aflags & A1_VORPAL_LIKE_DISRESPECTS_CHARACTERS) || !inappropriate_monster_character_type(magr, otmp))
@@ -2228,7 +2239,7 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                             int drain = monbasehp_per_lvl(mdef);
                             int drain2 = (int)monhpadj_per_lvl(mdef);
                             totaldamagedone += drain + drain2;
-                            mdef->mbasehpmax -= drain;
+                            mdef->mbasehpdrain -= drain;
                             mdef->mhpmax -= (drain + drain2);
                             if (mdef->mhpmax < 1)
                                 mdef->mhpmax = 1, lethaldamage = TRUE;
@@ -2791,10 +2802,11 @@ struct obj *obj;
             }
             break;
         }
+        case ARTINVOKE_RUBY_ROD:
         case ARTINVOKE_WAND_OF_DEATH:
         {
             struct obj pseudo = zeroobj;
-            pseudo.otyp = WAN_DEATH;
+            pseudo.otyp = oart->inv_prop == ARTINVOKE_WAND_OF_DEATH ? WAN_DEATH : obj->special_quality == 0 ? WAN_COLD : obj->special_quality == 1 ? WAN_LIGHTNING : WAN_FIRE;
             pseudo.quan = 1L; /* do not let useup get it */
             double damage = 0;
 
@@ -3257,11 +3269,11 @@ arti_cost(otmp)
 struct obj *otmp;
 {
     if (!otmp->oartifact)
-        return objects[otmp->otyp].oc_cost;
+        return get_object_base_value(otmp);
     else if (artilist[(int) otmp->oartifact].cost)
         return artilist[(int) otmp->oartifact].cost;
     else
-        return (20L * (objects[otmp->otyp].oc_cost + 75L));
+        return (20L * (get_object_base_value(otmp) + 75L));
 }
 
 struct abil2adtyp_tag {
@@ -3690,7 +3702,7 @@ boolean loseit;    /* whether to drop it if hero can longer touch it */
     if (touch_artifact(obj, &youmonst)) {
         char buf[BUFSZ];
         double damage = 0;
-        boolean ag = (objects[obj->otyp].oc_material == MAT_SILVER && Hate_silver),
+        boolean ag = (obj->material == MAT_SILVER && Hate_silver),
             bane = bane_applies(get_artifact(obj), &youmonst),
             inappr_character = ((objects[obj->otyp].oc_flags4 & O4_INAPPROPRIATE_CHARACTERS_CANT_HANDLE) != 0 && inappropriate_monster_character_type(&youmonst, obj)),
             inappr_exceptionality = inappropriate_exceptionality(&youmonst, obj);

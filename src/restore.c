@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    restore.c    $NHDT-Date: 1555201698 2019/04/14 00:28:18 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1357,8 +1357,10 @@ STATIC_OVL void
 restore_msghistory(fd)
 register int fd;
 {
-    int msgsize, msgcount = 0, attr, color;
+    int msgsize, msgcount = 0;
     char msg[BUFSZ];
+    char attrs[BUFSZ];
+    char colors[BUFSZ];
 
     while (1) {
         mread(fd, (genericptr_t) &msgsize, sizeof(msgsize));
@@ -1371,9 +1373,11 @@ register int fd;
         }
         mread(fd, (genericptr_t) msg, msgsize);
         msg[msgsize] = '\0';
-        mread(fd, (genericptr_t) &attr, sizeof(attr));
-        mread(fd, (genericptr_t) &color, sizeof(color));
-        putmsghistory_ex(msg, attr, color, TRUE);
+        mread(fd, (genericptr_t) attrs, msgsize);
+        attrs[msgsize] = '\0';
+        mread(fd, (genericptr_t) colors, msgsize);
+        colors[msgsize] = '\0';
+        putmsghistory_ex(msg, attrs, colors, TRUE);
         ++msgcount;
     }
     if (msgcount)
@@ -1729,7 +1733,7 @@ struct save_game_data* saved;
             int glyph = saved[k].gamestats.glyph;
             int gui_glyph = saved[k].gamestats.gui_glyph;
             any.a_int = k + 1;
-            struct extended_menu_info menuinfo = { 0 };
+            struct extended_menu_info menuinfo = nilextendedmenuinfo;
             menuinfo.color = style == 1 ? CLR_RED : NO_COLOR;
 
             add_extended_menu(tmpwin, iflags.using_gui_tiles ? gui_glyph : glyph, &any, menuinfo, 0, 0, ATR_HEADING | ATR_BOLD, namebuf,

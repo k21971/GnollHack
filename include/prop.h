@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    prop.h    $NHDT-Date: 1547514641 2019/01/15 01:10:41 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -188,7 +188,9 @@ enum prop_types {
     HALF_SLOW_DIGESTION = 165,
     SLIME_RESISTANCE = 166,
     LAUGHING          = 167,
-    MAX_PROPS         = 168
+    TOTTERING         = 168,
+    MARTIAL_PROWESS   = 169,
+    MAX_PROPS         = 170
 };
 #define LAST_PROP (MAX_PROPS - 1)
 

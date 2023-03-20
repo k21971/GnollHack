@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    quest.c    $NHDT-Date: 1505170343 2017/09/11 22:52:23 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.21 $ */
 /*      Copyright 1991, M. Stephenson             */
@@ -560,7 +560,7 @@ achievement_gained(achievement_name)
 const char* achievement_name;
 {
     play_sfx_sound(SFX_ACHIEVEMENT);
-    pline_ex(ATR_NONE, CLR_MSG_HINT, "ACHIEVEMENT - %s", achievement_name);
+    custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "ACHIEVEMENT", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0U, "%s", achievement_name);
 }
 
 /*quest.c*/

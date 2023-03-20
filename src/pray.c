@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    pray.c    $NHDT-Date: 1549074257 2019/02/02 02:24:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.110 $ */
 /* Copyright (c) Benson I. Margulies, Mike Stephenson, Steve Linhart, 1989. */
@@ -453,6 +453,7 @@ int trouble;
            boosted to be more than that */
         play_sfx_sound(SFX_FULL_HEALING);
         You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "much better.");
+        u.ubasehpdrain = u.basemhdrain = 0;
         if (Upolyd) {
             u.basemhmax += rnd(5);
             if (u.basemhmax <= 5)
@@ -919,9 +920,9 @@ gcrownu()
 #define ok_wep(o) ((o) && ((o)->oclass == WEAPON_CLASS || is_weptool(o)))
 
     HSee_invisible |= FROM_ACQUIRED;
-    HFire_immunity |= FROM_ACQUIRED;
-    HCold_immunity |= FROM_ACQUIRED;
-    HShock_immunity |= FROM_ACQUIRED;
+    HFire_resistance |= FROM_ACQUIRED;
+    HCold_resistance |= FROM_ACQUIRED;
+    HShock_resistance |= FROM_ACQUIRED;
     HDeath_resistance |= FROM_ACQUIRED;
     HLycanthropy_resistance |= FROM_ACQUIRED;
     HSleep_resistance |= FROM_ACQUIRED;
@@ -1397,11 +1398,12 @@ gcrownu()
                     discover_artifact(ART_KATANA_OF_MASAMUNE);
                 }
             }
-            else if (obj && objects[obj->otyp].oc_subtyp == WEP_LONG_SWORD && objects[obj->otyp].oc_cost < 2000L && !obj->oartifact)
+            else if (obj && objects[obj->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj) < 2000L && !obj->oartifact)
             {
                 if (!Blind)
                     Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "sword shines brightly for a moment.");
                 obj->otyp = LONG_SWORD;
+                obj->material = objects[obj->otyp].oc_material;
                 obj = oname(obj, artiname(ART_EXCALIBUR));
                 if (obj && obj->oartifact == ART_EXCALIBUR)
                 {
@@ -1410,11 +1412,12 @@ gcrownu()
                 }
             }
             /* acquire Excalibur's skill regardless of weapon or gift */
-            else if (obj2 && objects[obj2->otyp].oc_subtyp == WEP_LONG_SWORD && objects[obj2->otyp].oc_cost < 2000L && !obj2->oartifact)
+            else if (obj2 && objects[obj2->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj2) < 2000L && !obj2->oartifact)
             {
                 if (!Blind)
                     Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "sword shines brightly for a moment.");
                 obj2->otyp = LONG_SWORD;
+                obj2->material = objects[obj2->otyp].oc_material;
                 obj2 = oname(obj2, artiname(ART_EXCALIBUR));
                 if (obj2 && obj2->oartifact == ART_EXCALIBUR)
                 {
@@ -2271,7 +2274,7 @@ dosacrifice()
                 exercise(A_WIS, FALSE);
             }
 
-            if (highaltar && (altaralign != A_CHAOTIC || u.ualign.type != A_CHAOTIC))
+            if (highaltar && (altaralign != A_CHAOTIC || u.ualign.type != A_CHAOTIC) && !molochaltar)
             {
                 goto desecrate_high_altar;
             } 
@@ -2285,7 +2288,7 @@ dosacrifice()
             } 
             else 
             {
-                struct monst *dmon;
+                struct monst *dmon = 0;
                 const char *demonless_msg;
 
                 /* Human sacrifice on a chaotic or Moloch altar */
@@ -2309,7 +2312,17 @@ dosacrifice()
                     demonless_msg = "blood coagulates";
                 }
 
-                if ((pm = dlord(altaralign)) != NON_PM && (dmon = makemon(&mons[pm], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END)) != 0)
+                if(Inhell)
+                    dmon = makemon(&mons[PM_DEMOGORGON], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+
+                if (!dmon)
+                {
+                    pm = dlord(altaralign);
+                    if(pm)
+                        dmon = makemon(&mons[pm], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+                }
+
+                if (dmon)
                 {
                     if(context.dlords_summoned_via_altar < 255)
                         context.dlords_summoned_via_altar++;
@@ -2501,10 +2514,9 @@ dosacrifice()
             else
             { /* super big win */
                 adjalign(10);
-#ifdef SHOW_SCORE_ON_BOTL
                 if (flags.showscore && !u.uachieve.ascended)
                     context.botl = 1;
-#endif
+
                 u.uachieve.ascended = 1;
 
                 play_sfx_sound(SFX_INVISIBLE_CHOIR_SINGS);
@@ -2615,8 +2627,7 @@ dosacrifice()
                 if (u.ualignbase[A_CURRENT] == u.ualignbase[A_ORIGINAL]
                     && altaralign != A_NONE) 
                 {
-                    You_ex(ATR_NONE, CLR_MSG_WARNING, "have a strong feeling that %s is angry...",
-                        u_gname());
+                    You_ex(ATR_NONE, CLR_MSG_WARNING, "have a strong feeling that %s is angry...", u_gname());
                     consume_offering(otmp);
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s accepts your allegiance.", a_gname());
                     play_sfx_sound(SFX_ALTAR_ANGRY_ACCEPTS_SACRIFICE);
@@ -2831,11 +2842,11 @@ dosacrifice()
                     {
                         struct obj* otmp2 = (struct obj*)0;
                         if (objects[otmp->otyp].oc_skill == P_BOW)
-                            otmp2 = mksobj(SILVER_ARROW, FALSE, FALSE, FALSE);
+                            otmp2 = mksobj_with_flags(ARROW, FALSE, FALSE, FALSE, (struct monst*)0, MAT_SILVER, 0L, 0L, 0UL);
                         else if(objects[otmp->otyp].oc_skill == P_CROSSBOW)
-                            otmp2 = mksobj(SILVER_CROSSBOW_BOLT, FALSE, FALSE, FALSE);
+                            otmp2 = mksobj_with_flags(CROSSBOW_BOLT, FALSE, FALSE, FALSE, (struct monst*)0, MAT_SILVER, 0L, 0L, 0UL);
                         else if (objects[otmp->otyp].oc_skill == P_SLING)
-                            otmp2 = mksobj(SILVER_SLING_BULLET, FALSE, FALSE, FALSE);
+                            otmp2 = mksobj_with_flags(SLING_BULLET, FALSE, FALSE, FALSE, (struct monst*)0, MAT_SILVER, 0L, 0L, 0UL);
 
                         if (otmp2)
                         {

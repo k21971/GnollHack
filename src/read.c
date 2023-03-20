@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    read.c    $NHDT-Date: 1546465285 2019/01/02 21:41:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1296,13 +1296,15 @@ STATIC_OVL void
 forget_single_object(obj_id)
 int obj_id;
 {
+    boolean was_known = objects[obj_id].oc_name_known;
     objects[obj_id].oc_name_known = 0;
     objects[obj_id].oc_pre_discovered = 0; /* a discovery when relearned */
     if (objects[obj_id].oc_uname) {
         free((genericptr_t) objects[obj_id].oc_uname);
         objects[obj_id].oc_uname = 0;
     }
-    undiscover_object(obj_id); /* after clearing oc_name_known */
+    if(was_known)
+        undiscover_object(obj_id); /* after clearing oc_name_known */
 
     /* clear & free object names from matching inventory items too? */
 }
@@ -1832,18 +1834,39 @@ struct monst* targetmonst;
         s = scursed ? -otmp->enchantment : otmp->enchantment;
         if (s > max_ench && rn2(max(1, s)))
         {
-            play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
-            otmp->in_use = TRUE;
-            Sprintf(effbuf, "%s violently %s%s%s for a while, then %s.", Yname2(otmp),
-                otense(otmp, Blind ? "vibrate" : "glow"),
-                (!Blind && !same_color) ? " " : "",
-                (Blind || same_color) ? "" : hcolor(scursed ? NH_BLACK
-                    : NH_SILVER),
-                otense(otmp, "evaporate"));
-            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, effbuf, "Evaporation", is_serviced_spell);
-            remove_worn_item(otmp, FALSE);
-            useup(otmp);
-            break;
+            if (((otmp->speflags & SPEFLAGS_GIVEN_OUT_BLUE_SMOKE) == 0 || rn2(3)) && (otmp->material == MAT_ORICHALCUM || obj_resists(otmp, 0, 75)))
+            {
+                play_special_effect_at(SPECIAL_EFFECT_PUFF_OF_SMOKE, u.ux, u.uy, 0, FALSE);
+                play_sfx_sound(SFX_VANISHES_IN_PUFF_OF_SMOKE);
+                special_effect_wait_until_action(0);
+                Sprintf(effbuf, "%s violently %s%s%s for a while, then suddenly %s out a puff of%s smoke.", Yname2(otmp),
+                    otense(otmp, Blind ? "vibrate" : "glow"),
+                    (!Blind && !same_color) ? " " : "",
+                    (Blind || same_color) ? "" : hcolor(scursed ? NH_BLACK
+                        : NH_SILVER),
+                    otense(otmp, "give"), Blind ? "" : " blue");
+                pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, effbuf, Blind ? "Puff of Smoke" : "Puff of Blue Smoke", is_serviced_spell);
+                otmp->enchantment = 0;
+                otmp->speflags |= SPEFLAGS_GIVEN_OUT_BLUE_SMOKE;
+                update_inventory();
+                special_effect_wait_until_end(0);
+                break;
+            }
+            else
+            {
+                play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
+                otmp->in_use = TRUE;
+                Sprintf(effbuf, "%s violently %s%s%s for a while, then %s.", Yname2(otmp),
+                    otense(otmp, Blind ? "vibrate" : "glow"),
+                    (!Blind && !same_color) ? " " : "",
+                    (Blind || same_color) ? "" : hcolor(scursed ? NH_BLACK
+                        : NH_SILVER),
+                    otense(otmp, "evaporate"));
+                pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, effbuf, "Evaporation", is_serviced_spell);
+                remove_worn_item(otmp, FALSE);
+                useup(otmp);
+                break;
+            }
         }
 
         s = scursed ? -1
@@ -2120,6 +2143,20 @@ struct monst* targetmonst;
          * monsters are not visible
          */
         break;
+    case SCR_SUPREME_DIABOLISM:
+    {
+        You_ex1(ATR_NONE, NO_COLOR, "recite the words of the ancient pact, demanding its hellish signatory to come forth.");
+
+        struct monst* mon = makemon(&mons[PM_ASMODEUS], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+        if(!mon)
+            mon = makemon(&mons[PM_GERYON], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+
+        if (mon && canspotmon(mon))
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s appears in a puff of smoke!", Monnam(mon));
+        else
+            pline_ex1(ATR_NONE, NO_COLOR, "However, nothing much seems to happen.");
+        break;
+    }
     case SPE_PROTECT_WEAPON:
     case SCR_PROTECT_WEAPON:
     case SPE_ENCHANT_WEAPON:
@@ -2326,8 +2363,9 @@ struct monst* targetmonst;
             {
                 u.dx = cc.x - u.ux;
                 update_u_facing(TRUE);
+                //play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
                 update_u_action(ACTION_TILE_CAST_NODIR);
-                play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
+                play_sfx_sound_at_location(SFX_GENERIC_CAST_EFFECT, u.ux, u.uy);
                 u_wait_until_action();
                 u.dx = 0;
             }
@@ -3158,8 +3196,9 @@ struct monst* targetmonst;
         {
             u.dx = cc.x - u.ux;
             update_u_facing(TRUE);
+            //play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
             update_u_action(ACTION_TILE_CAST_NODIR);
-            play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
+            play_sfx_sound_at_location(SFX_GENERIC_CAST_EFFECT, u.ux, u.uy);
             u_wait_until_action();
             u.dx = 0;
         }
@@ -3203,8 +3242,9 @@ struct monst* targetmonst;
         {
             u.dx = cc.x - u.ux;
             update_u_facing(TRUE);
+            //play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
             update_u_action(ACTION_TILE_CAST_NODIR);
-            play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
+            play_sfx_sound_at_location(SFX_GENERIC_CAST_EFFECT, u.ux, u.uy);
             u_wait_until_action();
             u.dx = 0;
         }
@@ -4248,7 +4288,7 @@ struct _create_particular_data *d;
                 genderflag = MM_FEMALE;
         }
 
-        mtmp = makemon(whichpm, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | genderflag);
+        mtmp = makemon2(whichpm, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | genderflag, MM2_MAYBE_ALLOW_EXTINCT);
 
         if (!mtmp)
         {

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    worm.c    $NHDT-Date: 1543892216 2018/12/04 02:56:56 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -408,6 +408,7 @@ boolean cuttier; /* hit is by wielded blade or axe or by thrown axe */
        Note: m_lev is always at least 3 in order to get this far. */
     worm->m_lev = max((unsigned) worm->m_lev - 2, 3);
     new_worm->m_lev = worm->m_lev;
+    new_worm->mbasehpdrain = worm->mbasehpdrain;
 
     /* Calculate the lower-level mhp; use <N>d8 for long worms.
        Can't use newmonhp() here because it would reset m_lev. */

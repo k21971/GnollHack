@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    steed.c    $NHDT-Date: 1545441042 2018/12/22 01:10:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.62 $ */
 /* Copyright (c) Kevin Hugo, 1998-1999. */
@@ -415,13 +415,42 @@ struct monst *mtmp; /* The animal */
             play_player_ouch_sound(MONSTER_OUCH_SOUND_OUCH);
         }
 
-        Sprintf(buf, "slipped while mounting %s",
+        if (!rn2(2) || ((Upolyd ? u.mh : u.uhp) <= 3))
+        {
+            if (has_head(youmonst.data))
+            {
+                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "hit your %s.", body_part(HEAD));
+                if (!Stun_resistance)
+                    make_stunned(rnd(3) + 1, TRUE);
+            }
+            else
+            {
+                nomul(-rnd(3));
+            }
+        }
+        else
+        {
+            if (has_head(youmonst.data))
+            {
+                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "hit your %s badly.", body_part(HEAD));
+                if(!Stun_resistance)
+                    make_stunned(rnd(5) + 1, TRUE);
+            }
+            else
+            {
+                nomul(-rnd(5));
+            }
+
+            Sprintf(buf, "slipped while mounting %s",
                 /* "a saddled mumak" or "a saddled pony called Dobbin" */
-                x_monnam(mtmp, ARTICLE_A, (char *) 0,
-                         SUPPRESS_IT | SUPPRESS_INVISIBLE
-                             | SUPPRESS_HALLUCINATION,
-                         TRUE));
-        losehp(adjust_damage(rnd(8) + 1, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE), buf, NO_KILLER_PREFIX);
+                x_monnam(mtmp, ARTICLE_A, (char*)0,
+                    SUPPRESS_IT | SUPPRESS_INVISIBLE
+                    | SUPPRESS_HALLUCINATION,
+                    TRUE));
+
+            int dmg = context.game_difficulty <= 0 ? rnd(3) : rnd(8) + 1;
+            losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE), buf, NO_KILLER_PREFIX);
+        }
         return (FALSE);
     }
 
@@ -462,7 +491,7 @@ exercise_steed()
         return;
 
     /* It takes many turns of riding to exercise skill */
-    if (++u.urideturns >= 100) {
+    if (++u.urideturns >= RIDING_TURNS_TO_EXERCISE_SKILL) {
         u.urideturns = 0;
         use_skill(P_RIDING, 1);
     }

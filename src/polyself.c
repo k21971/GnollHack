@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    polyself.c    $NHDT-Date: 1556497911 2019/04/29 00:31:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.132 $ */
 /*      Copyright (C) 1987, 1988, 1989 by Ken Arromdee */
@@ -105,46 +105,14 @@ set_uasmon()
     PROPSET(MAGIC_MISSILE_RESISTANCE, mon_resists_magic_missile_weakly(&youmonst));
     PROPSET(ACID_RESISTANCE, mon_resists_acid_weakly(&youmonst));
 
-    /* Strong resistances cannot be innate */
-
-#if 0
-    {
-        /* resists_drli() takes wielded weapon into account; suppress it */
-        struct obj *save_uwep = uwep;
-
-        uwep = 0;
-        PROPSET(DRAIN_RESISTANCE, resists_drli(&youmonst));
-        uwep = save_uwep;
-    }
-    /* is_magic_resistant() takes wielded, worn, and carried equipment into
-       into account; cheat and duplicate its monster-specific part */
-    PROPSET(ANTIMAGIC, (dmgtype(mdat, AD_MAGM)
-                        || mdat == &mons[PM_GRAY_DRAGON_HATCHLING]
-                        || dmgtype(mdat, AD_RBRE)));
-//    PROPSET(STUNNED, (mdat == &mons[PM_STALKER] || is_bat(mdat))); /* Not sure what this was about --JG */
-    PROPSET(SEE_INVISIBLE, has_innate_see_invisible(mdat));
-    PROPSET(BLIND_TELEPATHY, has_innate_blind_telepathy(mdat));
-    PROPSET(TELEPAT, has_innate_telepathy(mdat));
-    /* note that Infravision uses mons[race] rather than usual mons[role] */
-    PROPSET(INVISIBILITY, has_innate_invisibility(mdat));
-    PROPSET(TELEPORT, has_innate_teleportation(mdat));
-    PROPSET(TELEPORT_CONTROL, has_innate_teleport_control(mdat));
-    /* floating eye is the only 'floater'; it is also flagged as a 'flyer';
-       suppress flying for it so that enlightenment doesn't confusingly
-       show latent flight capability always blocked by levitation */
-    PROPSET(LEVITATION_CONTROL, has_innate_levitation_control(mdat));
-    /* [don't touch MAGICAL_BREATHING here; both Amphibious and Breathless
-       key off of it but include different monster forms...] */
-    PROPSET(REGENERATION, has_innate_regeneration(mdat));
-    PROPSET(REFLECTING, is_reflecting(&youmonst));
-#endif
-    PROPSET(SICK_RESISTANCE, (mdat->mlet == S_FUNGUS || mdat == &mons[PM_GHOUL]));
+    PROPSET(SICK_RESISTANCE, (mdat->mlet == S_FUNGUS));
     PROPSET(HALLUC_RES, dmgtype(mdat, AD_HALU));
     PROPSET(INFRAVISION, infravision(Upolyd ? mdat : &mons[urace.monsternum]));
     PROPSET(LEVITATION, is_floater(mdat));
     PROPSET(FLYING, (is_flyer(mdat)));
     PROPSET(SWIMMING, is_swimmer(mdat));
     PROPSET(PASSES_WALLS, passes_walls(mdat));
+
 #undef PROPSET
 
     float_vs_flight(); /* maybe toggle (BFlying & I_SPECIAL) */
@@ -723,8 +691,7 @@ made_change:
         if (new_light == 1)
             ++new_light; /* otherwise it's undetectable */
         if (new_light)
-            new_light_source(u.ux, u.uy, new_light, LS_MONSTER,
-                             monst_to_any(&youmonst));
+            new_light_source(u.ux, u.uy, new_light, LS_MONSTER, monst_to_any(&youmonst), 0);
     }
     new_ambient = mon_ambient_sound(youmonst.data);
     if (old_ambient != new_ambient)
@@ -2627,6 +2594,7 @@ polysense()
     case PM_VAMPIRE:
     case PM_VAMPIRE_MAGE:
     case PM_VAMPIRE_LORD:
+    case PM_VAMPIRE_KING:
         context.warntype.polyd = M2_HUMAN | M2_ELF;
         HWarn_of_mon |= FROM_RACE;
         return;

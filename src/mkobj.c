@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mkobj.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.142 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,6 +22,8 @@ STATIC_DCL void FDECL(insane_object, (struct obj *, const char *,
                                       const char *, struct monst *));
 STATIC_DCL void FDECL(check_contained, (struct obj *, const char *));
 STATIC_DCL void FDECL(sanity_check_worn, (struct obj *));
+STATIC_DCL uchar FDECL(get_otyp_initial_material, (int));
+STATIC_DCL unsigned long FDECL(mkobj_ownerflags, (struct monst*));
 
 struct icp {
     int iprob;   /* probability of an item type */
@@ -213,10 +215,12 @@ struct obj *otmp;
 }
 
 struct obj *
-mkobj_at_with_flags(let, x, y, artif, mkflags)
+mkobj_at_with_flags(let, x, y, artif, material, param1, param2, mkflags)
 char let;
 int x, y;
 boolean artif;
+uchar material;
+long param1, param2;
 unsigned long mkflags;
 {
     if (!isok(x, y))
@@ -224,7 +228,7 @@ unsigned long mkflags;
 
     struct obj *otmp;
 
-    otmp = mkobj_with_flags(let, artif, FALSE, (struct monst*)0, mkflags);
+    otmp = mkobj_with_flags(let, artif, FALSE, (struct monst*)0, material, param1, param2, mkflags);
     if (otmp)
     {
         place_object(otmp, x, y);
@@ -243,7 +247,7 @@ char let;
 int x, y;
 boolean artif;
 {
-    return mkobj_at_with_flags(let, x, y, artif, 0UL);
+    return mkobj_at_with_flags(let, x, y, artif, MAT_NONE, 0L, 0L, 0UL);
 }
 
 struct obj *
@@ -251,13 +255,15 @@ mksobj_at(otyp, x, y, init, artif)
 int otyp, x, y;
 boolean init, artif;
 {
-    return mksobj_at_with_flags(otyp, x, y, init, artif, 0, 0L, 0L, 0UL);
+    return mksobj_at_with_flags(otyp, x, y, init, artif, 0, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
 }
 
 struct obj*
-mksobj_at_with_flags(otyp, x, y, init, artif, mkobj_type, param, param2, mkflags)
+mksobj_at_with_flags(otyp, x, y, init, artif, mkobj_type, mowner, material, param, param2, mkflags)
 int otyp, x, y, mkobj_type;
 boolean init, artif;
+struct monst* mowner;
+uchar material;
 long param, param2;
 unsigned long mkflags;
 {
@@ -266,7 +272,7 @@ unsigned long mkflags;
 
     struct obj* otmp;
 
-    otmp = mksobj_with_flags(otyp, init, artif, mkobj_type, param, param2, mkflags);
+    otmp = mksobj_with_flags(otyp, init, artif, mkobj_type, mowner, material, param, param2, mkflags);
     if (otmp)
     {
         place_object(otmp, x, y);
@@ -305,15 +311,17 @@ char oclass;
 boolean artif;
 int mkobj_type;
 {
-    return mkobj_with_flags(oclass, artif, mkobj_type, (struct monst*)0, 0UL);
+    return mkobj_with_flags(oclass, artif, mkobj_type, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
 }
 
 struct obj *
-mkobj_with_flags(oclass, artif, mkobj_type, mowner, mkflags)
+mkobj_with_flags(oclass, artif, mkobj_type, mowner, material, param1, param2, mkflags)
 char oclass;
 boolean artif;
 int mkobj_type;
 struct monst* mowner;
+uchar material;
+long param1, param2;
 unsigned long mkflags;
 {
     int tprob;
@@ -342,7 +350,7 @@ unsigned long mkflags;
         else
             break;
     }
-    return mksobj_with_flags(i, TRUE, artif, mkobj_type, 0L, 0L, mkflags);
+    return mksobj_with_flags(i, TRUE, artif, mkobj_type, mowner, material, param1, param2, mkflags);
 }
 
 int
@@ -614,7 +622,7 @@ struct obj *box;
             if (!rn2(4))
             {
                 /* A random catalogue */
-                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, FIRST_CATALOGUE + rn2(NUM_CATALOGUES), 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, FIRST_CATALOGUE + rn2(NUM_CATALOGUES), 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
             }
             else if (rn2(3))
                 otmp = mkobj(SCROLL_CLASS, FALSE, TRUE);
@@ -674,6 +682,7 @@ struct obj *box;
                 while (is_rock(otmp))
                 {
                     otmp->otyp = rnd_class(DILITHIUM_CRYSTAL, JINXSTONE);
+                    otmp->material = objects[otmp->otyp].oc_material;
                     if (otmp->quan > 2L)
                         otmp->quan = 1L;
                     otmp->owt = weight(otmp);
@@ -684,6 +693,7 @@ struct obj *box;
                 if (Is_mbag(otmp)) 
                 {
                     otmp->otyp = SACK;
+                    otmp->material = objects[otmp->otyp].oc_material;
                     otmp->enchantment = 0;
                     otmp->special_quality = 0;
                     otmp->charges = 0;
@@ -691,8 +701,13 @@ struct obj *box;
                     otmp->owt = weight(otmp);
                 } 
                 else
+                {
                     while (otmp->otyp == WAN_CANCELLATION || otmp->otyp == WAN_DISJUNCTION)
+                    {
                         otmp->otyp = rnd_class(WAN_LIGHT, WAN_LIGHTNING);
+                        otmp->material = objects[otmp->otyp].oc_material;
+                    }
+                }
             }
         }
         (void) add_to_container(box, otmp);
@@ -1045,7 +1060,7 @@ register struct obj *otmp;
     copy_oextra(dummy, otmp);
     if (has_omid(dummy))
         free_omid(dummy); /* only one association with m_id*/
-    if (is_candle(dummy))
+    if (is_candle(dummy) || is_torch(dummy))
         dummy->lamplit = 0;
     dummy->makingsound = 0;
     dummy->owornmask = 0L; /* dummy object is not worn */
@@ -1339,6 +1354,27 @@ int alter_type;
     }
 }
 
+STATIC_OVL
+unsigned long mkobj_ownerflags(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return 0UL;
+
+    aligntyp alignment = mon_aligntyp(mtmp);
+    unsigned long mkflags = 0UL;
+    if (alignment == A_NONE || is_mercenary(mtmp->data) || mtmp->isgd)
+        mkflags |= MKOBJ_FLAGS_OWNER_IS_NONALIGNED;
+    else if (alignment == A_LAWFUL)
+        mkflags |= MKOBJ_FLAGS_OWNER_IS_LAWFUL;
+    else if (alignment == A_NEUTRAL)
+        mkflags |= MKOBJ_FLAGS_OWNER_IS_NEUTRAL;
+    else if (alignment == A_CHAOTIC)
+        mkflags |= MKOBJ_FLAGS_OWNER_IS_CHAOTIC;
+
+    return mkflags;
+}
+
 /* These are the classes where dknown is zero by default! */
 STATIC_VAR const char dknowns[] = { WAND_CLASS,   RING_CLASS, POTION_CLASS, ARMOR_CLASS, MISCELLANEOUS_CLASS, REAGENT_CLASS,
                                 SCROLL_CLASS, GEM_CLASS,  SPBOOK_CLASS,
@@ -1353,15 +1389,29 @@ boolean init;
 boolean artif;
 int mkobj_type;
 {
-    return mksobj_with_flags(otyp, init, artif, mkobj_type, 0L, 0L, 0UL);
+    return mksobj_with_flags(otyp, init, artif, mkobj_type, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
+}
+
+struct obj*
+mksobj_ex(otyp, init, artif, mkobj_type, mowner, material)
+int otyp;
+boolean init;
+boolean artif;
+int mkobj_type;
+struct monst* mowner;
+uchar material;
+{
+    return mksobj_with_flags(otyp, init, artif, mkobj_type, mowner, material, 0L, 0L, 0UL);
 }
 
 struct obj *
-mksobj_with_flags(otyp, init, artif, mkobj_type, param, param2, mkflags)
+mksobj_with_flags(otyp, init, artif, mkobj_type, mowner, material, param, param2, mkflags)
 int otyp;
 boolean init;
 boolean artif;
 int mkobj_type; /* 0 = floor, 1 = box, 2 = wishing, -1 = special level preset item */
+struct monst* mowner;
+uchar material;
 long param, param2;
 unsigned long mkflags;
 {
@@ -1370,11 +1420,18 @@ unsigned long mkflags;
     char let = objects[otyp].oc_class;
     boolean forcemythic = (mkflags & MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY) != 0;
     boolean forcelegendary = (mkflags & MKOBJ_FLAGS_FORCE_LEGENDARY) != 0;
+    boolean forcebasematerial = (mkflags & MKOBJ_FLAGS_FORCE_BASE_MATERIAL) != 0 || mkobj_type == 2;
+    boolean param_is_spquality = (mkflags & MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY) != 0;
+    boolean param_is_mnum = (mkflags & MKOBJ_FLAGS_PARAM_IS_MNUM) != 0;
     unsigned long excludedtitles = 0UL, excludedtitles2 = 0UL;
     if (mkflags & MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS)
     {
         excludedtitles = (unsigned long)param;
         excludedtitles2 = (unsigned long)param2;
+    }
+    if (mowner)
+    {
+        mkflags |= mkobj_ownerflags(mowner);
     }
 
     otmp = newobj();
@@ -1400,6 +1457,7 @@ unsigned long mkflags;
     otmp->tknown = 0;
     otmp->cknown = (objects[otmp->otyp].oc_flags4 & O4_CONTAINER_CONTENTS_VISIBLE) ? 1 : 0;
     otmp->corpsenm = NON_PM;
+    otmp->material = material > 0 ? material : forcebasematerial ? objects[otyp].oc_material : get_otyp_initial_material(otyp);
     otmp->elemental_enchantment = 0;
     otmp->exceptionality = 0;
     otmp->mythic_prefix = 0;
@@ -1423,21 +1481,33 @@ unsigned long mkflags;
     if (mkobj_type == 0 && (In_mines(&u.uz) || leveldiff < 10))
     {
         if (otyp == FROST_HORN || otyp == FIRE_HORN)
+        {
             otmp->otyp = !rn2(3) ? HORN_OF_CHAOS : !rn2(2) ? BRASS_HORN : TOOLED_HORN;
+            otmp->material = objects[otmp->otyp].oc_material;
+        }
         else if (otmp->otyp == WAN_COLD || otmp->otyp == WAN_FIRE || otmp->otyp == WAN_LIGHTNING)
+        {
             otmp->otyp = !rn2(3) ? WAN_STRIKING : !rn2(2) ? WAN_DIGGING : WAN_SPEED_MONSTER;
+            otmp->material = objects[otmp->otyp].oc_material;
+        }
     }
     
     if (mkobj_type == 0 && !Inhell) /* No instadeath wands on floor ever, except in Gehennom */
     {
         if (otmp->otyp == WAN_DEATH || otmp->otyp == WAN_DISINTEGRATION || otmp->otyp == WAN_PETRIFICATION)
+        {
             otmp->otyp = !rn2(2) ? WAN_LIGHTNING : WAN_FIRE;
+            otmp->material = objects[otmp->otyp].oc_material;
+        }
     }
 
     if (mkobj_type >= 0 && mkobj_type < 2 && (depth(&u.uz) == 1 || depth(&u.uz) == 2 || leveldiff < 5))
     {
         if (otmp->otyp == WAN_WISHING)
+        {
             otmp->otyp = WAN_POLYMORPH;
+            otmp->material = objects[otmp->otyp].oc_material;
+        }
     }
 
     /* Initialize */
@@ -1604,6 +1674,13 @@ unsigned long mkflags;
                 otmp->quan = 1L + (long) (rn2(2) ? rn2(7) : 0);
                 blessorcurse(otmp, 5);
                 break;
+            case TORCH:
+                otmp->special_quality = 1;
+                otmp->age = torch_starting_burn_time(otmp);
+                otmp->lamplit = 0;
+                otmp->quan = 1L;
+                blessorcurse(otmp, 5);
+                break;
             case LARGE_FIVE_BRANCHED_CANDELABRUM:
                 otmp->special_quality = !rn2(3) ? 0 : !rn2(2) ? objects[otmp->otyp].oc_special_quality : rnd(objects[otmp->otyp].oc_special_quality);
                 otmp->lamplit = 0;
@@ -1652,6 +1729,11 @@ unsigned long mkflags;
                     {
                         if (!rn2(2))
                             cnm = NON_PM;
+                        else if (Inhell && !context.amonket_generated && rn2(100) < leveldiff * 2 - 23)
+                        {
+                            context.amonket_generated = TRUE;
+                            cnm = PM_AMONKET;
+                        }
                         else
                         {
                             boolean low_level = ((leveldiff + u.ulevel) / 2 < mons[PM_LICH].difficulty);
@@ -1898,7 +1980,7 @@ unsigned long mkflags;
             switch (otmp->otyp) {
             case STATUE:
                 /* possibly overridden by mkcorpstat() */
-                otmp->corpsenm = rndmonnum();
+                otmp->corpsenm = param_is_mnum && param >= LOW_PM ? (int)param : rndmonnum();
 
                 if(!rn2(2))
                     otmp->speflags |= SPEFLAGS_FACING_RIGHT;
@@ -1917,6 +1999,18 @@ unsigned long mkflags;
                     (void) add_to_container(otmp, mkobj(SPBOOK_CLASS, FALSE, TRUE));
             }
             break;
+        case ART_CLASS:
+            switch (otmp->otyp) {
+            case PAINTING:
+                otmp->special_quality = rn2(MAX_PAINTINGS);
+                break;
+            case BANNER:
+                otmp->special_quality = rn2(MAX_BANNERS);
+                break;
+            default:
+                break;
+            }
+            break;
         case COIN_CLASS:
             break; /* do nothing */
         default:
@@ -1925,6 +2019,11 @@ unsigned long mkflags;
             return (struct obj *) 0;
         }
     }
+
+    /* Special quality */
+    if(param_is_spquality)
+        otmp->special_quality = (short)param;
+
 
     /* Default to current tile set, and override later, if necessary */
     if ((objects[otmp->otyp].oc_flags5 & O5_TILE_IS_TILESET_DEPENDENT) != 0)
@@ -1980,7 +2079,7 @@ unsigned long mkflags;
             if (In_endgame(&u.uz))
             {
                 if (doublechance || !rn2(halfchance ? 4 : 2))
-                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
+                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && otmp->material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
                 else if (!rn2(halfchance ? 4 : 2))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
                 else if (halfchance ? rn2(2) : doublechance ? rn2(8) : rn2(4))
@@ -1989,7 +2088,7 @@ unsigned long mkflags;
             else if (Inhell)
             {
                 if (!rn2(halfchance ? 20 : doublechance ? 5 : 10))
-                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
+                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && otmp->material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
                 else if (!rn2(halfchance ? 8 : doublechance ? 2 : 4))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
                 else if (halfchance ? !rn2(4) : doublechance ? rn2(4) : !rn2(2))
@@ -1998,7 +2097,7 @@ unsigned long mkflags;
             else if (leveldiff >= 16)
             {
                 if (!rn2(halfchance ? 400 : doublechance ? 100 : 200))
-                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && objects[otmp->otyp].oc_material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
+                    otmp->exceptionality = ownerimpliedexcep ? ownerimpliedexcep : (!rn2(3) && otmp->material != MAT_SILVER ? EXCEPTIONALITY_INFERNAL : !rn2(2) ? EXCEPTIONALITY_PRIMORDIAL : EXCEPTIONALITY_CELESTIAL);
                 else if (!rn2(halfchance ? 20 : doublechance ? 5 : 10))
                     otmp->exceptionality = EXCEPTIONALITY_ELITE;
                 else if (!rn2(halfchance ? 8 : doublechance ? 2 : 4))
@@ -2029,7 +2128,7 @@ unsigned long mkflags;
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
         else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGELIC_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
-        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || objects[otmp->otyp].oc_material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
     }
 
@@ -2223,6 +2322,9 @@ int charge_init_index;
     case CHARGED_1D6_6:
         charge = rnd(6) + 6;
         break;
+    case CHARGED_1D6_9:
+        charge = rnd(6) + 9;
+        break;
     case CHARGED_2D6_8:
         charge = d(2, 6) + 8;
         break;
@@ -2336,6 +2438,9 @@ int charge_init_index;
     case CHARGED_1D6_6:
         charge = 12;
         break;
+    case CHARGED_1D6_9:
+        charge = 15;
+        break;
     case CHARGED_2D6_8:
         charge = 20;
         break;
@@ -2429,6 +2534,9 @@ struct obj* otmp;
         return 0;
 
     int max_spe = get_max_enchantment(objects[otmp->otyp].oc_enchantable);
+
+    /* Material */
+    max_spe = (max_spe * material_definitions[otmp->material].added_enchantability_multiplier) / (max(1, material_definitions[otmp->material].added_enchantability_divisor));
 
     /* Extra modifications */
     if (has_obj_mythic_added_enchantability(otmp))
@@ -2802,6 +2910,7 @@ struct obj *body;
     long corpse_age = 0; /* age of corpse          */
     int rot_adjust= 0;
     short action = -1;
+    short revivals = has_omonst(body) ? OMONST(body)->mrevived : 0;
 
 #define TAINT_AGE (50L)        /* age when corpses go bad */
 #define TROLL_REVIVE_CHANCE 37 /* 1/37 chance for 50 turns ~ 75% chance */
@@ -2851,16 +2960,21 @@ struct obj *body;
         else if (body->corpsenm == PM_PHOENIX && !body->norevive)
         {
             /*
-             * Phoenixes always revive.  They have a 1/4 chance per turn
-             * of reviving after 20 turns.  Always revive by 500.
+             * Phoenixes always revive on the Elemental Planes and the first time everywhere.
+             * On the second and subsequent times, they have 80% or lower chance in Gehennom and 
+             * and on Primaterial Plane 95% or lower chance. However, after 4 revivals in Gehennom and 20 otherwise, they have just
+             * 50% chance of riving. If they do revive, they have a 1/33 chance per turn of 
+             * reviving after 25 turns. They always revive by 500.
              */
-            action = REVIVE_MON;
-            for (when = 25L; when < 500L; when++)
-                if (!rn2(PHOENIX_REVIVE_CHANCE))
-                    break;
-
+            if (In_endgame(&u.uz) || !revivals ? TRUE : revivals >= (Inhell ? 4 : 20) ? rn2(2) : Inhell ? rn2(5 - (revivals - 1)) : rn2(20 - (revivals - 1) * 5))
+            {
+                action = REVIVE_MON;
+                for (when = 25L; when < 500L; when++)
+                    if (!rn2(PHOENIX_REVIVE_CHANCE))
+                        break;
+            }
         }
-        else if (mons[body->corpsenm].mlet == S_TROLL && !body->norevive) 
+        else if (mons[body->corpsenm].mlet == S_TROLL)
         {
             long age;
             for (age = 2; age <= TAINT_AGE; age++)
@@ -3143,11 +3257,30 @@ register struct obj *otmp;
  *         of the code messes with a contained object and doesn't update the
  *         container's weight.
  */
+unsigned int
+get_item_base_weight(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return 0U;
+
+    unsigned int tmp = objects[obj->otyp].oc_weight;
+    double matmult = 1.0;
+    if (obj->material != objects[obj->otyp].oc_material)
+    {
+        double curmult = material_definitions[obj->material].weight_multiplier > 0 ? material_definitions[obj->material].weight_multiplier : 1.0;
+        double basemult = material_definitions[objects[obj->otyp].oc_material].weight_multiplier > 0 ? material_definitions[objects[obj->otyp].oc_material].weight_multiplier : 1.0;
+        matmult = curmult / basemult;
+    }
+    tmp = (unsigned int)max(0.0, ((double)tmp * matmult));
+    return tmp;
+}
+
 int
 weight(obj)
 register struct obj *obj;
 {
-    int wt = (int) objects[obj->otyp].oc_weight;
+    int wt = (int)get_item_base_weight(obj);
 
     if (has_obj_mythic_lightness(obj))
         wt /= 8;
@@ -3193,12 +3326,12 @@ register struct obj *obj;
                 && (contents->oclass == COIN_CLASS || contents->oclass == GEM_CLASS
                     || contents->oclass == RING_CLASS || contents->oclass == AMULET_CLASS
                     || contents->oclass == MISCELLANEOUS_CLASS
-                    || objects[contents->otyp].oc_material == MAT_SILVER
-                    || objects[contents->otyp].oc_material == MAT_GOLD
-                    || objects[contents->otyp].oc_material == MAT_PLATINUM
-                    || objects[contents->otyp].oc_material == MAT_MITHRIL
-                    || objects[contents->otyp].oc_material == MAT_ADAMANTIUM
-                    || objects[contents->otyp].oc_material == MAT_GEMSTONE
+                    || contents->material == MAT_SILVER
+                    || contents->material == MAT_GOLD
+                    || contents->material == MAT_PLATINUM
+                    || contents->material == MAT_MITHRIL
+                    || contents->material == MAT_ADAMANTIUM
+                    || contents->material == MAT_GEMSTONE
                     ))
                 cwt += obj->cursed ? (weight(contents) * 2) : obj->blessed ? ((weight(contents) + 63) / 64)
                 : ((weight(contents) + 31) / 32);
@@ -3499,17 +3632,16 @@ boolean
 is_flammable(otmp)
 register struct obj *otmp;
 {
-    int otyp = otmp->otyp;
-    int omat = objects[otyp].oc_material;
+    int omat = otmp->material;
 
-    /* Candles can be burned, but they're not flammable in the sense that
+    /* Candles and torches can be burned, but they're not flammable in the sense that
      * they can't get fire damage and it makes no sense for them to be
      * fireproofed.
      */
-    if (is_candle(otmp))
+    if (is_candle(otmp) || is_torch(otmp))
         return FALSE;
 
-    if ((objects[otyp].oc_flags & O1_FIRE_RESISTANT) != 0)
+    if ((get_obj_oc_flags(otmp) & O1_FIRE_RESISTANT) != 0)
         return FALSE;
 
     return (boolean)material_definitions[omat].flammable; // ((omat <= MAT_WOOD && omat != MAT_LIQUID) || omat == MAT_PLASTIC);
@@ -3519,12 +3651,10 @@ boolean
 is_rottable(otmp)
 register struct obj *otmp;
 {
-    int otyp = otmp->otyp;
-
-    if (objects[otyp].oc_flags & O1_ROT_RESISTANT)
+    if (get_obj_oc_flags(otmp) & O1_ROT_RESISTANT)
         return FALSE;
 
-    return (boolean)material_definitions[objects[otyp].oc_material].rottable;// <= MAT_WOOD && objects[otyp].oc_material != MAT_LIQUID);
+    return (boolean)material_definitions[otmp->material].rottable;// <= MAT_WOOD && objects[otyp].oc_material != MAT_LIQUID);
 }
 
 /*
@@ -4108,7 +4238,10 @@ boolean tipping; /* caller emptying entire contents; affects shop handling */
         {
             obj = mkobj(FOOD_CLASS, FALSE, FALSE);
             if (obj->otyp == FOOD_RATION && !rn2(7))
+            {
                 obj->otyp = LUMP_OF_ROYAL_JELLY;
+                obj->material = objects[obj->otyp].oc_material;
+            }
             what = "Some food";
         }
         ++objcount;
@@ -4830,6 +4963,136 @@ struct obj *otmp2;
     {
         You_hear("a faint sloshing sound.");
     }
+}
+
+STATIC_OVL
+uchar get_otyp_initial_material(otyp)
+int otyp;
+{
+    uchar mat = objects[otyp].oc_material;
+    xchar levdiff = level_difficulty();
+    int simple_rare_one_in_chance = levdiff < 10 ? 20 : levdiff < 20 ? 15 : levdiff < 30 ? 10 : 5;
+    int silver_rare_one_in_chance = Inhell ? 200 : levdiff < 10 ? 20 : levdiff < 20 ? 15 : levdiff < 30 ? 10 : 5;
+    int special_bronze_rare_one_in_chance = levdiff < 10 ? 10 : levdiff < 20 ? 15 : levdiff < 30 ? 20 : 25;
+    int mithril_rare_one_in_chance = levdiff < 10 ? 25 : levdiff < 20 ? 20 : levdiff < 30 ? 15 : 10;
+    int adamantium_rare_one_in_chance = levdiff < 10 ? 30 : levdiff < 20 ? 25 : levdiff < 30 ? 20 : 15;
+    int crystal_long_sword_one_in_chance = levdiff < 10 ? 800 : levdiff < 20 ? 200 : levdiff < 30 ? 100 : 50;
+    int silver_long_sword_one_in_chance = Inhell ? 200 : levdiff < 10 ? 100 : levdiff < 20 ? 50 : levdiff < 30 ? 30 : 20;
+    int bronze_plate_mail_one_in_chance = levdiff < 10 ? 4 : levdiff < 20 ? 8 : levdiff < 30 ? 16 : 32;
+    int crystal_plate_mail_one_in_chance = levdiff < 5 ? 150 : levdiff < 10 ? 75 : levdiff < 20 ? 50 : levdiff < 30 ? 25 : 10;
+    int orichalcum_plate_mail_one_in_chance = levdiff < 5 ? 300 : levdiff < 10 ? 125 : levdiff < 20 ? 75 : levdiff < 30 ? 30 : 15;
+    int mithril_plate_mail_one_in_chance = levdiff < 5 ? 175 : levdiff < 10 ? 100 : levdiff < 20 ? 50 : levdiff < 30 ? 25 : 10;
+
+    switch (objects[otyp].oc_material_init_type)
+    {
+    case MATINIT_MAYBE_SILVER:
+        if(!rn2(silver_rare_one_in_chance))
+            mat = MAT_SILVER;
+        break;
+    case MATINIT_MAYBE_SILVER_OR_BONE:
+        if (!rn2(silver_rare_one_in_chance))
+            mat = MAT_SILVER;
+        else if (!rn2(20))
+            mat = MAT_BONE;
+        break;
+    case MATINIT_LONG_SWORD:
+        if (!rn2(crystal_long_sword_one_in_chance))
+            mat = MAT_HARD_CRYSTAL;
+        else if (!rn2(silver_long_sword_one_in_chance))
+            mat = MAT_SILVER;
+        break;
+    case MATINIT_PLATE_MAIL:
+        if (!rn2(bronze_plate_mail_one_in_chance))
+            mat = MAT_BRONZE;
+        else if (!rn2(crystal_plate_mail_one_in_chance))
+            mat = MAT_HARD_CRYSTAL;
+        else if (!rn2(orichalcum_plate_mail_one_in_chance))
+            mat = MAT_ORICHALCUM;
+        else if (!rn2(mithril_plate_mail_one_in_chance))
+            mat = MAT_MITHRIL;
+        else if (!rn2(mithril_plate_mail_one_in_chance))
+            mat = MAT_ADAMANTIUM;
+        break;
+    case MATINIT_SLING_BULLET:
+        if (!rn2(silver_rare_one_in_chance))
+            mat = MAT_SILVER;
+        else if (!rn2(2))
+            mat = MAT_LEAD;
+        break;
+    case MATINIT_DWARVISH_METAL_ITEM:
+        if (!rn2(simple_rare_one_in_chance))
+            mat = MAT_MITHRIL;
+        else if (!rn2(simple_rare_one_in_chance))
+            mat = MAT_GEMSTONE;
+        else if (!rn2(3))
+            mat = MAT_STEEL;
+        break;
+    case MATINIT_MAYBE_ADAMANTIUM_MITHRIL_OR_SILVER:
+        if (!rn2(adamantium_rare_one_in_chance))
+            mat = MAT_ADAMANTIUM;
+        else if (!rn2(mithril_rare_one_in_chance))
+            mat = MAT_MITHRIL;
+        else if (!rn2(silver_rare_one_in_chance))
+            mat = MAT_SILVER;
+        break;
+    case MATINIT_MAYBE_STEEL_MITHRIL_OR_SILVER:
+        if (!rn2(mithril_rare_one_in_chance))
+            mat = MAT_MITHRIL;
+        else if (!rn2(silver_rare_one_in_chance))
+            mat = MAT_SILVER;
+        else if (!rn2(3))
+            mat = MAT_STEEL;
+        break;
+    case MATINIT_CHAIN_MAIL:
+        if (!rn2(orichalcum_plate_mail_one_in_chance) && levdiff >= 10)
+            mat = MAT_ORICHALCUM;
+        else if (!rn2(mithril_plate_mail_one_in_chance) && levdiff >= 6)
+            mat = MAT_MITHRIL;
+        else if (!rn2(mithril_plate_mail_one_in_chance) && levdiff >= 8)
+            mat = MAT_ADAMANTIUM;
+        break;
+    case MATINIT_MAYBE_BONE:
+        if (!rn2(4))
+            mat = MAT_BONE;
+        break;
+    case MATINIT_MAYBE_ADAMANTIUM_OR_MITHRIL:
+        if (!rn2(adamantium_rare_one_in_chance))
+            mat = MAT_ADAMANTIUM;
+        else if (!rn2(mithril_rare_one_in_chance))
+            mat = MAT_MITHRIL;
+        break;
+    case MATINIT_MAYBE_ADAMANTIUM_MITHRIL_OR_BRONZE:
+        if (!rn2(adamantium_rare_one_in_chance))
+            mat = MAT_ADAMANTIUM;
+        else if (!rn2(mithril_rare_one_in_chance))
+            mat = MAT_MITHRIL;
+        else if (!rn2(special_bronze_rare_one_in_chance))
+            mat = MAT_BRONZE;
+        break;
+    case MATINIT_MAYBE_ADAMANTIUM_MITHRIL_SILVER_OR_BONE:
+        if (!rn2(adamantium_rare_one_in_chance))
+            mat = MAT_ADAMANTIUM;
+        else if (!rn2(mithril_rare_one_in_chance))
+            mat = MAT_MITHRIL;
+        else if (!rn2(silver_rare_one_in_chance))
+            mat = MAT_SILVER;
+        else if (Inhell ? !rn2(3) : levdiff > 20 ? !rn2(10) : !rn2(20))
+            mat = MAT_BONE;
+        break;
+    case MATINIT_MAYBE_SPECIAL_BONE:
+        if (Inhell ? !rn2(3) : levdiff > 20 ? !rn2(10) : !rn2(20))
+            mat = MAT_BONE;
+        break;
+    case MATINIT_MAYBE_DRAGON_HIDE:
+        if (!rn2(simple_rare_one_in_chance))
+            mat = MAT_DRAGON_HIDE;
+        break;
+    case MATINIT_NORMAL:
+    default:
+        break;
+    }
+
+    return mat;
 }
 
 /*mkobj.c*/

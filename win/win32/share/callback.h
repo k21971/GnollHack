@@ -49,6 +49,7 @@ typedef void(__callconv* VoidIntIntIntCallback)(int, int, int);
 typedef void(__callconv* VoidIntBooleanCallback)(int, UCHAR_P);
 typedef void(__callconv* VoidIntIntConstCharCallback)(int, int, const char*);
 typedef void(__callconv* PutStrExColorCallback)(int, int, const char*, int, int);
+typedef void(__callconv* PutStrEx2ColorCallback)(int, const char*, const char*, const char*, int, int, int);
 typedef void(__callconv* VoidConstCharIntCallback)(const char*, int);
 typedef void(__callconv* VoidConstCharBooleanCallback)(const char*, BOOLEAN_P);
 typedef int(__callconv* IntVoidCallback)();
@@ -76,6 +77,7 @@ typedef VoidIntBooleanCallback DisplayWindowCallback;
 typedef VoidIntCallback DestroyWindowCallback;
 typedef VoidIntIntIntCallback CursCallback;
 typedef PutStrExColorCallback PutStrExCallback;
+typedef PutStrEx2ColorCallback PutStrEx2Callback;
 typedef PutStrExColorCallback PutMixedCallback;
 typedef VoidConstCharBooleanCallback DisplayFileCallback;
 typedef void(__callconv* StartMenuCallback)(int, int);
@@ -112,9 +114,9 @@ typedef VoidVoidCallback StartScreenCallback;
 typedef VoidVoidCallback EndScreenCallback;
 typedef void(__callconv* OutRipCallback)(int, char*, int, char*, char*);
 typedef VoidConstCharCallback PreferenceUpdateCallback;
-typedef char* (__callconv* GetMsgHistoryCallback)(int*, int*, BOOLEAN_P);
-typedef void(__callconv* PutMsgHistoryCallback)(const char* , int, int, BOOLEAN_P);
-typedef VoidVoidCallback StatusInitCallback;
+typedef char* (__callconv* GetMsgHistoryCallback)(char*, char*, BOOLEAN_P);
+typedef void(__callconv* PutMsgHistoryCallback)(const char*, const char*, const char*, BOOLEAN_P);
+typedef VoidIntCallback StatusInitCallback;
 typedef VoidVoidCallback StatusFinishCallback;
 typedef VoidIntConstCharPtrConstCharPtrBooleanCallback StatusEnableFieldCallback;
 typedef void(__callconv* StatusUpdateCallback)(int, char*, long, int, int, int, short*);
@@ -148,8 +150,6 @@ typedef void(__callconv* ExitHackCallback)(int);
 
 typedef char*(__callconv* GetCwdCallback)();
 typedef int (__callconv* MessageBoxCallback)(char*, char*, unsigned int);
-typedef VoidIntCallback OutRipBeginCallback;
-typedef VoidIntCallback OutRipEndCallback;
 typedef void(__callconv* FreeMemoryCallback)(long long**);
 typedef void (__callconv* ReportPlayerNameCallback)(char*);
 typedef void (__callconv* ReportPlayTimeCallback)(long, long);
@@ -170,6 +170,7 @@ struct callback_procs {
     DestroyWindowCallback callback_destroy_nhwindow;
     CursCallback callback_curs;
     PutStrExCallback callback_putstr_ex;
+    PutStrEx2Callback callback_putstr_ex2;
     PutMixedCallback callback_putmixed_ex;
     DisplayFileCallback callback_display_file;
     StartMenuCallback callback_start_menu_ex;
@@ -246,9 +247,6 @@ struct callback_procs {
 
     GetCwdCallback callback_getcwd;
     MessageBoxCallback callback_messagebox;
-    //OutRipBeginCallback callback_outrip_begin;
-    //OutRipEndCallback callback_outrip_end;
-
     FreeMemoryCallback callback_free_memory;
     ReportPlayerNameCallback callback_report_player_name;
     ReportPlayTimeCallback callback_report_play_time;

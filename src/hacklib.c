@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    hacklib.c    $NHDT-Date: 1552639487 2019/03/15 08:44:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.67 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1120,11 +1120,11 @@ long realtime;
 
     char hourbuf[BUFSZ] = "", minutebuf[BUFSZ] = "";
     if (hours > 0)
-        Sprintf(hourbuf, "%ld hour%s ", hours, plur(hours));
+        Sprintf(hourbuf, "%ld hour%s", hours, plur(hours));
     if (minutes > 0)
-        Sprintf(minutebuf, "%s%ld minute%s ", *hourbuf ? ", " : "", minutes, plur(minutes));
+        Sprintf(minutebuf, "%s%ld minute%s", *hourbuf ? ", " : "", minutes, plur(minutes));
 
-    Sprintf(buf, "%s%s%s%ld second%s", hourbuf, minutebuf, *hourbuf || *minutebuf ? "and " : "", seconds, plur(seconds));
+    Sprintf(buf, "%s%s%s%ld second%s", hourbuf, minutebuf, *hourbuf || *minutebuf ? " and " : "", seconds, plur(seconds));
 }
 
 time_t
@@ -1410,14 +1410,14 @@ size_t bufsize;
         return;
 
     char* bp, *wp;
-    char copybuf[BUFSIZ] = "";
+    char copybuf[BUFSZ] = "";
     wp = copybuf;
     uchar uc, uc2, uc3, uc4;
     unsigned long unicode = 0, byte2bits, byte1bits, byte3bits, byte4bits;
     char cp437char = 0;
     //boolean was_unicode = FALSE;
 
-    for (bp = buf; *bp && bp < bp + bufsize && wp < copybuf + sizeof(copybuf); bp++)
+    for (bp = buf; *bp && bp < buf + bufsize && wp < copybuf + sizeof(copybuf); bp++)
     {
         uc = (uchar)(*bp);
         if (uc >= 0x80)
@@ -1524,7 +1524,7 @@ size_t bufsize;
     else
         copybuf[sizeof(copybuf) - 1] = '\0';
 
-    strcpy(buf, copybuf);
+    Strcpy(buf, copybuf);
 }
 
 char

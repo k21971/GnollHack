@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mondata.c    $NHDT-Date: 1550525093 2019/02/18 21:24:53 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.72 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1412,6 +1412,7 @@ STATIC_VAR const short grownups[][2] = {
     { PM_DEMILICH, PM_MASTER_LICH },
     { PM_MASTER_LICH, PM_ARCH_LICH },
     { PM_VAMPIRE, PM_VAMPIRE_LORD },
+    { PM_VAMPIRE_LORD, PM_VAMPIRE_KING },
     { PM_BAT, PM_GIANT_BAT },
     { PM_GRAY_DRAGON_HATCHLING, PM_GRAY_DRAGON },
     { PM_SILVER_DRAGON_HATCHLING, PM_SILVER_DRAGON },
@@ -1677,7 +1678,7 @@ struct obj* obj;
 
     if (is_hell_hound(ptr) && (obj)->oclass == FOOD_CLASS && (obj)->cursed)
     {
-        if (!(objects[(obj)->otyp].oc_material == MAT_VEGGY
+        if (!(obj->material == MAT_VEGGY
             || ((obj)->otyp == CORPSE && (obj)->corpsenm >= LOW_PM && vegetarian(&mons[(obj)->corpsenm]))))
             return TRUE;
     }
@@ -1686,7 +1687,7 @@ struct obj* obj;
     {
         if ((ptr)->mlet == S_UNICORN)
         {
-            if (objects[(obj)->otyp].oc_material == MAT_VEGGY
+            if (obj->material == MAT_VEGGY
                 || ((obj)->otyp == CORPSE && (obj)->corpsenm >= LOW_PM && vegetarian(&mons[(obj)->corpsenm])))
                 return TRUE;
         }

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	winX.h	$NHDT-Date: 1457079196 2016/03/04 08:13:16 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) Dean Luick, 1992                                 */
@@ -400,8 +400,8 @@ E void FDECL(hilight_value, (Widget));
 E void FDECL(swap_fg_bg, (Widget));
 
 /* external declarations */
-E char *FDECL(X11_getmsghistory, (int*, int*, BOOLEAN_P));
-E void FDECL(X11_putmsghistory, (const char *, int, int, BOOLEAN_P));
+E char *FDECL(X11_getmsghistory, (char**, char**, BOOLEAN_P));
+E void FDECL(X11_putmsghistory, (const char *, const char *, const char *, BOOLEAN_P));
 E void FDECL(X11_init_nhwindows, (int *, char **));
 E void NDECL(X11_player_selection);
 E void NDECL(X11_askname);
@@ -415,6 +415,7 @@ E void FDECL(X11_display_nhwindow, (winid, BOOLEAN_P));
 E void FDECL(X11_destroy_nhwindow, (winid));
 E void FDECL(X11_curs, (winid, int, int));
 E void FDECL(X11_putstr_ex, (winid, int, const char *, int, int));
+E void FDECL(X11_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 #define X11_putstr(x, y, z) X11_putstr_ex(x, y, z, 0 , 0)
 E void FDECL(X11_display_file, (const char *, BOOLEAN_P));
 E void FDECL(X11_start_menu_ex, (winid, int));
@@ -445,7 +446,7 @@ E void FDECL(X11_number_pad, (int));
 E void NDECL(X11_delay_output);
 E void FDECL(X11_delay_output_milliseconds, (int));
 E void FDECL(X11_delay_output_intervals, (int));
-E void NDECL(X11_status_init);
+E void FDECL(X11_status_init, (int));
 E void NDECL(X11_status_finish);
 E void FDECL(X11_status_enablefield, (int, const char *, const char *, BOOLEAN_P));
 E void FDECL(X11_status_update, (int, genericptr_t, int, int, int, unsigned long *));

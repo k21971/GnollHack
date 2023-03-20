@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mkmap.c    $NHDT-Date: 1432512767 2015/05/25 00:12:47 $  $NHDT-Branch: master $:$NHDT-Revision: 1.16 $ */
 /* Copyright (c) J. C. Collet, M. Stephenson and D. Cohrs, 1992   */
@@ -364,7 +364,7 @@ lev_init* init_lev;
                 if (n_loc_filled > 3) 
                 {
                     add_room(min_rx, min_ry, max_rx, max_ry, FALSE, OROOM,
-                             TRUE, 0, 0, NON_PM);
+                             TRUE, 0, 0, NON_PM, -1, FALSE);
                     rooms[nroom - 1].irregular = TRUE;
                     if (nroom >= (MAXNROFROOMS * 2))
                         goto joinm;

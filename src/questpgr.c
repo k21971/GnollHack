@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    questpgr.c    $NHDT-Date: 1505172128 2017/09/11 23:22:08 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.38 $ */
 /*      Copyright 1991, M. Stephenson                             */
@@ -19,6 +19,8 @@
 
 /* from sp_lev.c, for deliver_splev_message() */
 extern char *lev_message;
+extern int lev_message_color;
+extern int lev_message_attr;
 
 STATIC_DCL void NDECL(dump_qtlist);
 STATIC_DCL void FDECL(Fread, (genericptr_t, long, long, dlb *));
@@ -598,7 +600,7 @@ struct qtmsg *qt_msg;
 int attr, color, how;
 {
     long size;
-    char in_line[BUFSZ], out_line[BUFSZ];
+    char in_line[BUFSZ], out_line[BUFSZ], attrs[BUFSZ], colors[BUFSZ];
     boolean qtdump = (how == NHW_MAP);
     winid datawin = create_nhwindow_ex(qtdump ? NHW_TEXT : how, GHWINDOW_STYLE_PAGER_GENERAL, NO_GLYPH, zerocreatewindowinfo);
 
@@ -640,7 +642,13 @@ int attr, color, how;
 #endif
     }
     if (*out_line)
-        putmsghistory_ex(out_line, attr, color, FALSE);
+    {
+        size_t len = strlen(out_line);
+        memset(attrs, attr, len);
+        memset(colors, color, len);
+        attrs[len] = colors[len] = 0;
+        putmsghistory_ex(out_line, attrs, colors, FALSE);
+    }
 }
 
 boolean
@@ -789,7 +797,7 @@ deliver_splev_message()
             /* convert_line() expects encrypted input */
             (void) xcrypt(in_line, in_line);
             convert_line(in_line, out_line);
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s", out_line);
+            pline_ex(lev_message_attr, lev_message_color, "%s", out_line);
 
             if ((nl = index(str, '\n')) == 0)
                 break; /* done if no newline */
@@ -797,6 +805,8 @@ deliver_splev_message()
 
         free((genericptr_t) lev_message);
         lev_message = 0;
+        lev_message_color = NO_COLOR;
+        lev_message_attr = ATR_NONE;
     }
 }
 

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0  botl.h  $NHDT-Date: 1554591222 2019/04/06 22:53:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.24 $ */
 /* Copyright (c) Michael Allison, 2003                            */
@@ -41,7 +41,7 @@ enum statusfields {
     BL_TITLE = 0,
     BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_ALIGN,
     BL_SCORE, BL_CAP, BL_ENE, BL_ENEMAX, 
-    BL_XP, BL_2WEP, BL_SKILL, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_HD, BL_TIME, BL_HUNGER, BL_HP,
+    BL_XP, BL_2WEP, BL_SKILL, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_HD, BL_TIME, BL_REALTIME, BL_HUNGER, BL_HP,
     BL_HPMAX, BL_MODE, BL_LEVELDESC, BL_EXP, BL_CONDITION,
     BL_PARTYSTATS, BL_PARTYSTATS2, BL_PARTYSTATS3, BL_PARTYSTATS4, BL_PARTYSTATS5,
     MAXBLSTATS
@@ -146,6 +146,14 @@ enum hlattribs { HL_UNDEF   = 0x00,
                  HL_DIM     = 0x20 };
 /* #endif STATUS_HILITES */
 
-extern const char *status_fieldnames[]; /* in botl.c */
+/* Maximum number of status lines */
+#define MAX_STATUS_LINES 8
+#define MAX_STATUS_LINE_ITEMS 24
+
+/* in botl.c */
+extern const char *status_fieldnames[MAX_STATUS_LINE_ITEMS];
+extern const enum statusfields* fieldorders_2statuslines[MAX_STATUS_LINES + 1];
+extern const enum statusfields* fieldorders[MAX_STATUS_LINES + 1];
+extern const enum statusfields* fieldorders_alt[MAX_STATUS_LINES + 1];
 
 #endif /* BOTL_H */

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    objnam.c    $NHDT-Date: 1551138256 2019/02/25 23:44:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.235 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -6,51 +6,6 @@
 /* GnollHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
-
-/* NOTE: the order of these exactly corresponds to the
-   order of oc_material values #define'd in objclass.h. */
-struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
-    {"mysterious",  PHASE_VOID,     HIT_SURFACE_NONE,       FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "meal" },
-    {"liquid",      PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, TRUE,       "liquid" },
-    {"oil",         PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "wax" },
-    {"wax",         PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "food" },
-    {"vegetable",   PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_GRASS,    TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,       "meat" },
-    {"flesh",       PHASE_SOLID,    HIT_SURFACE_FLESH,      FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,       "food" },
-    {"organic",     PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "food" },
-    {"paper",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "paper" },
-    {"cloth",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "cloth" },
-    {"silk",        PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "silk" },
-    {"leather",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "leather" },
-    {"wooden",      PHASE_SOLID,    HIT_SURFACE_WOOD,       FLOOR_SURFACE_WOOD,     TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "wood" },
-    {"bone",        PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "bone" },
-    {"chitin",      PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,       "chitin" },
-    {"tooth",       PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,       "ivory" },
-    {"dragonhide",  PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE,      "scale" },
-    {"iron",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, TRUE,  TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
-    {"metal",       PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
-    {"copper",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "copper" },
-    {"silver",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "silver" },
-    {"gold",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "gold" },
-    {"platinum",    PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
-    {"orichalcum",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
-    {"adamantium",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
-    {"mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "metal" },
-    {"plastic",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,       "plastic"  },
-    {"glass",       PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE,       "glass"  },
-    {"crystal",     PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE,       "crystal"  },
-    {"hard crystal",PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE,      "crystal" },
-    {"gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE,      "gemstone" },
-    {"stone",       PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "rock"},
-    {"modronite",   PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,       "alien food" },
-    {"planar rift", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "nothingness" },
-    {"force field", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "force field" },
-    {"air",         PHASE_GAS,      HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "air" },
-    {"fire",        PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "flames" },
-    {"energy",      PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "energy" },
-    {"incorporeal", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "incorporeal foodstuff" },
-    {"ice",         PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,       "ice"  },
-    {"soil",        PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_GROUND,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE,      "soil" },
-};
 
 const char* multishot_style_names[MAX_MULTISHOT_TYPES] = {
     "None",
@@ -96,7 +51,7 @@ const char* misc_type_worn_texts[MAX_MISC_TYPES] = {
 
 const char* tool_type_names[MAX_TOOL_TYPES] = {
     "tool", "box", "chest", "bag", "pick-axe", "shovel", "long club-headed weapon", "hook", "horn", "candelabrum", "bell",
-    "candle", "lamp", "lantern", "whistle", "flute", "harp", "drum", "saw", "jar", "can", "grail"
+    "candle", "lamp", "lantern", "whistle", "flute", "harp", "drum", "saw", "jar", "can", "grail", "torch"
 };
 
 const char* book_type_names[MAX_BOOK_TYPES] = {
@@ -107,8 +62,6 @@ const char* critical_strike_special_percentage_names[MAX_CRITICAL_STRIKE_SPECIAL
     "100% less 5% per hit die"
 };
 
-/* "an uncursed greased partly eaten guardian naga hatchling [corpse]" */
-#define PREFIX 80 /* (56) */
 #define SCHAR_LIM 127
 #define NUMOBUF 12
 
@@ -125,6 +78,7 @@ STATIC_DCL boolean FDECL(singplur_lookup, (char *, char *, BOOLEAN_P,
 STATIC_DCL char *FDECL(singplur_compound, (char *));
 STATIC_DCL char *FDECL(xname_flags, (struct obj *, unsigned));
 STATIC_DCL boolean FDECL(badman, (const char *, BOOLEAN_P));
+STATIC_DCL boolean FDECL(material_wish_success, (int, int));
 
 struct Jitem {
     int item;
@@ -158,8 +112,8 @@ register const char *pref;
 {
     register int i = (int) strlen(pref);
 
-    if (i > PREFIX) {
-        impossible("PREFIX too short (for %d).", i);
+    if (i > PREFIXBUFSZ) {
+        impossible("PREFIXBUFSZ too short (for %d).", i);
         return s;
     }
     s -= i;
@@ -168,7 +122,7 @@ register const char *pref;
 }
 
 /* manage a pool of BUFSZ buffers, so callers don't have to */
-STATIC_VAR char NEARDATA obufs[NUMOBUF][BUFSZ];
+STATIC_VAR char NEARDATA obufs[NUMOBUF][OBUFSZ];
 STATIC_VAR int obufidx = 0;
 
 char *
@@ -185,7 +139,7 @@ char *bufp;
 {
     /* caller may not know whether bufp is the most recently allocated
        buffer; if it isn't, do nothing; note that because of the somewhat
-       obscure PREFIX handling for object name formatting by xname(),
+       obscure PREFIXBUFSZ handling for object name formatting by xname(),
        the pointer our caller has and is passing to us might be into the
        middle of an obuf rather than the address returned by nextobuf() */
     if (bufp >= obufs[obufidx]
@@ -411,7 +365,7 @@ int *highest_fid; /* optional output; only valid if 'fname' isn't found */
         releaseobuf(altfname);
     }
     if (!f && !exact) {
-        char fnamebuf[BUFSZ], *p;
+        char fnamebuf[OBUFSZ], *p;
         size_t fname_k = strlen(fname); /* length of assumed plural fname */
 
         tentativef = 0;
@@ -496,7 +450,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     if (!obj)
     {
         buf = nextobuf();
-        strcpy(buf, empty_string);
+        Strcpy(buf, empty_string);
         return buf;
     }
 
@@ -518,7 +472,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     boolean known, dknown, bknown, nknown, aknown, mknown, tknown;
     boolean makeThelower = FALSE;
 
-    buf = nextobuf() + PREFIX; /* leave room for "17 -3 " */
+    buf = nextobuf() + PREFIXBUFSZ; /* leave room for "17 -3 " */
 
     if (Role_if(PM_SAMURAI) && Japanese_item_name(typ))
         actualn = Japanese_item_name(typ);
@@ -526,6 +480,75 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
        needs to come after possibly overriding 'actualn' */
     if (!dn)
         dn = actualn;
+
+    char actualn_fullbuf[OBUFSZ] = "";
+    char dn_fullbuf[OBUFSZ] = "";
+
+    char actualn_startbuf[OBUFSZ] = "";
+    char dn_startbuf[OBUFSZ] = "";
+    if (objects[obj->otyp].oc_flags5 & (O5_MATERIAL_NAME_2ND_WORD_AN | O5_MATERIAL_NAME_3RD_WORD_AN | O5_MATERIAL_NAME_4TH_WORD_AN))
+    {
+        int spacecnt = (objects[obj->otyp].oc_flags5 & O5_MATERIAL_NAME_4TH_WORD_AN) == O5_MATERIAL_NAME_4TH_WORD_AN ? 3 : (objects[obj->otyp].oc_flags5 & O5_MATERIAL_NAME_3RD_WORD_AN) == O5_MATERIAL_NAME_3RD_WORD_AN ? 2 : 1;
+        const char* p = actualn;
+        boolean doabort = FALSE;
+        int i;
+        for (i = 0; i < spacecnt; i++)
+        {
+            if (!p || !*p)
+            {
+                doabort = TRUE;
+                break;
+            }
+            p = index(p, ' ');
+            if (p)
+                p++;
+        }
+        if (!doabort && p && *p)
+        {
+            int len = (int)(p - actualn);
+            if (len > 0 && (int)strlen(actualn) > len)
+            {
+                strncpy(actualn_startbuf, actualn, (size_t)len);
+                actualn_startbuf[len + 1] = '\0';
+                actualn += len;
+            }
+        }
+    }
+    if ( (!artifact_description_exists && (((OBJ_DESCR_FLAGS(obj->otyp) & OD_MATERIAL_NAME_WORD_BY_AN) != 0 && (objects[obj->otyp].oc_flags5 & (O5_MATERIAL_NAME_2ND_WORD_AN | O5_MATERIAL_NAME_3RD_WORD_AN | O5_MATERIAL_NAME_4TH_WORD_AN)) != 0)
+            || (OBJ_DESCR_FLAGS(obj->otyp) & (OD_MATERIAL_NAME_2ND_WORD_DN | OD_MATERIAL_NAME_3RD_WORD_DN | OD_MATERIAL_NAME_4TH_WORD_DN)) != 0)
+         )
+        || (artifact_description_exists && (artilist[obj->oartifact].aflags2 & (AF2_MATERIAL_NAME_2ND_WORD_DN | AF2_MATERIAL_NAME_3RD_WORD_DN | AF2_MATERIAL_NAME_4TH_WORD_DN)) != 0))
+    {
+        int spacecnt = artifact_description_exists ? ((artilist[obj->oartifact].aflags2 & AF2_MATERIAL_NAME_4TH_WORD_DN) == AF2_MATERIAL_NAME_4TH_WORD_DN ? 3 : (artilist[obj->oartifact].aflags2 & AF2_MATERIAL_NAME_3RD_WORD_DN) == AF2_MATERIAL_NAME_3RD_WORD_DN ? 2 : 1)
+            : ((OBJ_DESCR_FLAGS(obj->otyp) & OD_MATERIAL_NAME_WORD_BY_AN) != 0 ?
+            ((objects[obj->otyp].oc_flags5 & O5_MATERIAL_NAME_4TH_WORD_AN) == O5_MATERIAL_NAME_4TH_WORD_AN ? 3 : (objects[obj->otyp].oc_flags5 & O5_MATERIAL_NAME_3RD_WORD_AN) == O5_MATERIAL_NAME_3RD_WORD_AN ? 2 : 1) : 
+            (OBJ_DESCR_FLAGS(obj->otyp) & OD_MATERIAL_NAME_4TH_WORD_DN) == OD_MATERIAL_NAME_4TH_WORD_DN ? 3 : (OBJ_DESCR_FLAGS(obj->otyp) & OD_MATERIAL_NAME_3RD_WORD_DN) == OD_MATERIAL_NAME_3RD_WORD_DN ? 2 : 1);
+        
+        const char* p = dn;
+        boolean doabort = FALSE;
+        int i;
+        for (i = 0; i < spacecnt; i++)
+        {
+            if (!p || !*p)
+            {
+                doabort = TRUE;
+                break;
+            }
+            p = index(p, ' ');
+            if (p)
+                p++;
+        }
+        if (!doabort && p && *p)
+        {
+            int len = (int)(p - dn);
+            if (len > 0 && (int)strlen(dn) > len)
+            {
+                strncpy(dn_startbuf, dn, (size_t)len);
+                dn_startbuf[len + 1] = '\0';
+                dn += len;
+            }
+        }
+    }
 
     buf[0] = '\0';
     /*
@@ -564,14 +587,23 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
 
     if (dknown)
     {
-        if (obj->elemental_enchantment == COLD_ENCHANTMENT)
+        switch (obj->elemental_enchantment)
+        {
+        case COLD_ENCHANTMENT:
             Strcat(buf, "freezing ");
-        else if (obj->elemental_enchantment == FIRE_ENCHANTMENT)
+            break;
+        case FIRE_ENCHANTMENT:
             Strcat(buf, "flaming ");
-        else if (obj->elemental_enchantment == LIGHTNING_ENCHANTMENT)
+            break;
+        case LIGHTNING_ENCHANTMENT:
             Strcat(buf, "electrified ");
-        else if (obj->elemental_enchantment == DEATH_ENCHANTMENT)
+            break;
+        case DEATH_ENCHANTMENT:
             Strcat(buf, "death-magical ");
+            break;
+        default:
+            break;
+        }
     }
 
     if (obj->oclass == ARMOR_CLASS && (is_boots(obj) || is_gloves(obj) || is_bracers(obj)))
@@ -607,17 +639,49 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
 
     if (dknown)
     {
-        if (obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL)
+        switch (obj->exceptionality)
+        {
+        case EXCEPTIONALITY_EXCEPTIONAL:
             Strcat(buf, "exceptional ");
-        else if (obj->exceptionality == EXCEPTIONALITY_ELITE)
+            break;
+        case EXCEPTIONALITY_ELITE:
             Strcat(buf, "elite ");
-        else if (obj->exceptionality == EXCEPTIONALITY_CELESTIAL)
+            break;
+        case EXCEPTIONALITY_CELESTIAL:
             Strcat(buf, "celestial ");
-        else if (obj->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+            break;
+        case EXCEPTIONALITY_PRIMORDIAL:
             Strcat(buf, "primordial ");
-        else if (obj->exceptionality == EXCEPTIONALITY_INFERNAL)
+            break;
+        case EXCEPTIONALITY_INFERNAL:
             Strcat(buf, "infernal ");
+            break;
+        default:
+            break;
+        }
     }
+
+    Strcpy(actualn_fullbuf, actualn_startbuf);
+    Strcpy(dn_fullbuf, dn_startbuf);
+
+    if (dknown)
+    {
+        if ((nn && (objects[obj->otyp].oc_flags5 & O5_SHOW_BASE_MATERIAL_NAME) != 0) || 
+            (!nn && (artifact_description_exists ? (artilist[obj->oartifact].aflags2 & AF2_SHOW_BASE_MATERIAL_NAME) != 0 : (OBJ_DESCR_FLAGS(obj->otyp) & OD_SHOW_BASE_MATERIAL_NAME) != 0 && (OBJ_DESCR_FLAGS(obj->otyp) & OD_NO_MATERIAL_NAME) == 0))
+            || (obj->material != objects[obj->otyp].oc_material && ((nn && (objects[obj->otyp].oc_flags5 & O5_NO_MATERIAL_NAME) == 0) 
+                || (!nn && (artifact_description_exists ? (artilist[obj->oartifact].aflags2 & AF2_NO_MATERIAL_NAME) == 0 : (OBJ_DESCR_FLAGS(obj->otyp) & OD_NO_MATERIAL_NAME) == 0)))
+               )
+           )
+        {
+            Strcat(actualn_fullbuf, material_definitions[obj->material].object_prefix);
+            Strcat(actualn_fullbuf, " ");
+            Strcat(dn_fullbuf, material_definitions[obj->material].object_prefix);
+            Strcat(dn_fullbuf, " ");
+        }
+    }
+
+    Strcat(actualn_fullbuf, actualn);
+    Strcat(dn_fullbuf, dn);
 
     switch (obj->oclass) {
     case AMULET_CLASS:
@@ -625,13 +689,13 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             Strcat(buf, "amulet");
         else if (typ == AMULET_OF_YENDOR || typ == FAKE_AMULET_OF_YENDOR)
             /* each must be identified individually */
-            Strcat(buf, known ? actualn : dn);
+            Strcat(buf, known ? actualn_fullbuf : dn_fullbuf);
         else if (nn)
-            Strcat(buf, actualn);
+            Strcat(buf, actualn_fullbuf);
         else if (un)
             Sprintf(eos(buf), "amulet called %s", un);
         else
-            Sprintf(eos(buf), "%s amulet", dn);
+            Sprintf(eos(buf), "%s amulet", dn_fullbuf);
         break;
     case WEAPON_CLASS:
     case VENOM_CLASS:
@@ -654,26 +718,26 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             else if (obj->oclass == GEM_CLASS)
                 Strcpy(buf, rock);
             else
-                Strcat(buf, dn);
+                Strcat(buf, dn_fullbuf);
         }
         else if (nn)
         {
-            Strcat(buf, actualn);
+            Strcat(buf, actualn_fullbuf);
             if (isgem && GemStone(typ))
                 Strcat(buf, " stone");
         }
         else if (un)
         {
-            Strcat(buf, isgem ? rock : dn);
+            Strcat(buf, isgem ? rock : dn_fullbuf);
             Strcat(buf, " called ");
             Strcat(buf, un);
         }
         else
         {
             if (isgem)
-                Sprintf(buf, "%s %s", dn, rock);
+                Sprintf(buf, "%s %s", dn_fullbuf, rock);
             else
-                Strcat(buf, dn);
+                Strcat(buf, dn_fullbuf);
         }
 
         if (typ == FIGURINE && omndx != NON_PM) {
@@ -692,7 +756,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     case ARMOR_CLASS:
         /* depends on order of the dragon scales objects -- Special case, ignores the modifiers above */
         if (typ >= GRAY_DRAGON_SCALES && typ <= YELLOW_DRAGON_SCALES) {
-            Sprintf(buf, "set of %s", actualn);
+            Sprintf(buf, "set of %s", actualn_fullbuf);
             break;
         }
 
@@ -709,13 +773,13 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         if (!dknown)
             Strcat(buf, armor_class_simple_name(obj));
         else if (nn) {
-            Strcat(buf, actualn);
+            Strcat(buf, actualn_fullbuf);
         } else if (un) {
-            Strcat(buf, dn);
+            Strcat(buf, dn_fullbuf);
             Strcat(buf, " called ");
             Strcat(buf, un);
         } else
-            Strcat(buf, dn);
+            Strcat(buf, dn_fullbuf);
         break;
     case FOOD_CLASS:
         if (typ == SLIME_MOLD) {
@@ -745,30 +809,65 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                           : (obj->owt > GLOB_MEDIUM_MAXIMUM_WEIGHT)
                              ? "large "
                              : "",
-                    actualn);
+                    actualn_fullbuf);
             break;
         }
 
         if (!dknown)
             Strcat(buf, food_type_names[objects[obj->otyp].oc_subtyp]);
         else if (nn)
-            Strcat(buf, actualn);
+            Strcat(buf, actualn_fullbuf);
         else if (un) {
-            Strcat(buf, dn);
+            Strcat(buf, dn_fullbuf);
             Strcat(buf, " called ");
             Strcat(buf, un);
         }
         else
-            Strcat(buf, dn);
+            Strcat(buf, dn_fullbuf);
 
 
-        //Strcpy(buf, actualn);
+        //Strcpy(buf, actualn_fullbuf);
         if (typ == TIN && known)
             tin_details(obj, omndx, buf);
         break;
     case COIN_CLASS:
     case CHAIN_CLASS:
-        Strcpy(buf, actualn);
+        Strcpy(buf, actualn_fullbuf);
+        break;
+    case ART_CLASS:
+        Strcpy(buf, actualn_fullbuf);
+        if (dknown)
+        {
+            switch (obj->otyp)
+            {
+            case PAINTING:
+                if (obj->special_quality >= 0 && obj->special_quality < MAX_PAINTINGS)
+                {
+                    if (painting_definitions[obj->special_quality].description)
+                    {
+                        Strcat(buf, " of ");
+                        Strcat(buf, painting_definitions[obj->special_quality].description);
+                    }
+                    if (painting_definitions[obj->special_quality].artist)
+                    {
+                        Strcat(buf, " by ");
+                        Strcat(buf, painting_definitions[obj->special_quality].artist);
+                    }
+                }
+                break;
+            case BANNER:
+                if (obj->special_quality >= 0 && obj->special_quality < MAX_BANNERS)
+                {
+                    if (banner_definitions[obj->special_quality].description)
+                    {
+                        Strcpy(buf, banner_definitions[obj->special_quality].description);
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
         break;
     case ROCK_CLASS:
         if (typ == STATUE && omndx != NON_PM) 
@@ -792,7 +891,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                     (Role_if(PM_ARCHAEOLOGIST) && (obj->speflags & SPEFLAGS_STATUE_HISTORIC))
                        ? "historic "
                        : "",
-                    actualn,
+                    actualn_fullbuf,
                     is_mname_proper_name(&mons[omndx])
                        ? ""
                        : the_unique_pm(&mons[omndx])
@@ -801,7 +900,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                     monbuf);
         }
         else
-            Strcpy(buf, actualn);
+            Strcpy(buf, actualn_fullbuf);
 
         break;
     case BALL_CLASS:
@@ -821,13 +920,13 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                     && (obj->blessed || obj->cursed)) {
                     Strcat(buf, obj->blessed ? "holy " : "unholy ");
                 }
-                Strcat(buf, actualn);
+                Strcat(buf, actualn_fullbuf);
             } else {
                 Strcat(buf, " called ");
                 Strcat(buf, un);
             }
         } else {
-            Strcat(buf, dn);
+            Strcat(buf, dn_fullbuf);
             Strcat(buf, " potion");
         }
         break;
@@ -837,15 +936,15 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             break;
         if (nn) {
             Strcat(buf, " of ");
-            Strcat(buf, actualn);
+            Strcat(buf, actualn_fullbuf);
         } else if (un) {
             Strcat(buf, " called ");
             Strcat(buf, un);
         } else if (ocl->oc_magic) {
             Strcat(buf, " labeled ");
-            Strcat(buf, dn);
+            Strcat(buf, dn_fullbuf);
         } else {
-            Strcpy(buf, dn);
+            Strcpy(buf, dn_fullbuf);
             Strcat(buf, " scroll");
         }
         break;
@@ -853,22 +952,22 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         if (!dknown)
             Strcpy(buf, "wand");
         else if (nn)
-            Sprintf(buf, "wand of %s", actualn);
+            Sprintf(buf, "wand of %s", actualn_fullbuf);
         else if (un)
             Sprintf(buf, "wand called %s", un);
         else
-            Sprintf(buf, "%s wand", dn);
+            Sprintf(buf, "%s wand", dn_fullbuf);
         break;
     case SPBOOK_CLASS:
         if (objects[typ].oc_subtyp == BOOKTYPE_NOVEL || objects[typ].oc_subtyp == BOOKTYPE_MANUAL) { /* 3.6 tribute */
             if (!dknown)
                 Strcpy(buf, "book");
             else if (nn)
-                Strcpy(buf, actualn);
+                Strcpy(buf, actualn_fullbuf);
             else if (un)
                 Sprintf(buf, "%s called %s", book_type_names[objects[typ].oc_subtyp], un);
             else
-                Sprintf(buf, "%s book", dn);
+                Sprintf(buf, "%s book", dn_fullbuf);
             break;
             /* end of tribute */
         } else if (!dknown) {
@@ -876,21 +975,21 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         } else if (nn) {
             if (!(objects[typ].oc_flags5 & O5_FULL_NAME)) // typ != SPE_BOOK_OF_THE_DEAD && typ != SPE_BOOK_OF_MODRON)
                 Sprintf(buf, "%s of ", book_type_names[objects[typ].oc_subtyp]);
-            Strcat(buf, actualn);
+            Strcat(buf, actualn_fullbuf);
         } else if (un) {
             Sprintf(buf, "%s called %s", book_type_names[objects[typ].oc_subtyp], un);
         } else
-            Sprintf(buf, "%s %s", dn, book_type_names[objects[typ].oc_subtyp]);
+            Sprintf(buf, "%s %s", dn_fullbuf, book_type_names[objects[typ].oc_subtyp]);
         break;
     case RING_CLASS:
         if (!dknown)
             Strcpy(buf, "ring");
         else if (nn)
-            Sprintf(buf, "ring of %s", actualn);
+            Sprintf(buf, "ring of %s", actualn_fullbuf);
         else if (un)
             Sprintf(buf, "ring called %s", un);
         else
-            Sprintf(buf, "%s ring", dn);
+            Sprintf(buf, "%s ring", dn_fullbuf);
         break;
     default:
         Sprintf(buf, "glorkum %d %d %d %d", obj->oclass, typ, obj->enchantment, obj->charges);
@@ -904,12 +1003,12 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     }
 
     if (obj->otyp == T_SHIRT && program_state.gameover) {
-        char tmpbuf[BUFSZ];
+        char tmpbuf[OBUFSZ];
 
         Sprintf(eos(buf), " with text \"%s\"", tshirt_text(obj, tmpbuf));
     }
 
-    char anamebuf[BUFSZ] = "";
+    char anamebuf[OBUFSZ] = "";
     if (has_oname(obj) && nknown && dknown) {
         if(obj->oclass == SPBOOK_CLASS)
             Strcat(buf, " entitled ");
@@ -917,7 +1016,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             Strcat(buf, " named ");
         makeThelower = TRUE;
     nameit:
-        strcpy(anamebuf, ONAME(obj));
+        Strcpy(anamebuf, ONAME(obj));
         if (makeThelower && !strncmpi(anamebuf, "The ", 4))
             *anamebuf = lowc(*anamebuf);
         Strcat(buf, anamebuf);
@@ -983,6 +1082,7 @@ struct obj *obj;
        are required in order for xname() to yield a sensible result */
     bareobj = zeroobj;
     bareobj.otyp = otyp;
+    bareobj.material = obj->material;
     bareobj.oartifact = obj->oartifact;
     bareobj.oclass = obj->oclass;
     bareobj.dknown = obj->dknown;
@@ -1012,7 +1112,7 @@ char *
 mshot_xname(obj)
 struct obj *obj;
 {
-    char tmpbuf[BUFSZ];
+    char tmpbuf[OBUFSZ];
     char *onm = xname(obj);
 
     if (m_shot.n > 1 && m_shot.o == obj->otyp) {
@@ -1172,8 +1272,8 @@ unsigned doname_flags;
             lit_in_front = (doname_flags & DONAME_LIT_IN_FRONT) != 0;
     boolean known, dknown, cknown, bknown, lknown, tknown;
     int omndx = obj->corpsenm, isenchanted = 0;
-    char prefix[PREFIX];
-    char tmpbuf[PREFIX + 1]; /* for when we have to add something at
+    char prefix[PREFIXBUFSZ];
+    char tmpbuf[PREFIXBUFSZ + 1]; /* for when we have to add something at
                                 the start of prefix instead of the
                                 end (Strcat is used on the end) */
     register char *bp = xname(obj);
@@ -1362,7 +1462,7 @@ unsigned doname_flags;
                 Strcat(bp, " (being worn)");
             else
             {
-                char replacetxt[BUFSZ] = "";
+                char replacetxt[OBUFSZ] = "";
                 strcpy(replacetxt, misc_type_worn_texts[objects[obj->otyp].oc_subtyp]);
 
                 /* special replacement for some types */
@@ -1539,12 +1639,12 @@ weapon_here:
                         !obj->lamplit ? " attached" : ", lit");
             break;
         } 
-        else if (obj->otyp == OIL_LAMP || obj->otyp == MAGIC_LAMP
-                   || obj->otyp == BRASS_LANTERN || is_candle(obj)) 
+        else if (is_lamp(obj) || is_candle(obj) || is_torch(obj))
         {
             if ((is_candle(obj) && obj->otyp != MAGIC_CANDLE
                 && obj->age < candle_maximum_burn_time(obj))
                 || (obj->otyp == MAGIC_CANDLE && obj->special_quality < 2)
+                || (is_torch(obj) && obj->age < torch_maximum_burn_time(obj))
                 )
                 Strcat(prefix, "partly used ");
             if (obj->lamplit)
@@ -1800,7 +1900,7 @@ weapon_here:
     /* Mark if glowing when detected something */
     if (obj->detectioncount > 0)
     {
-        char colorbuf[BUFSZ] = "red";
+        char colorbuf[OBUFSZ] = "red";
         if (obj->oartifact)
             strcpy(colorbuf, glow_color(obj->oartifact));
 
@@ -1841,9 +1941,9 @@ weapon_here:
 
     if ((wizard && iflags.wizweight) || weightfirst) 
     {
-        char weightbuf[BUFSZ];
+        char weightbuf[OBUFSZ];
         printweight(weightbuf, objweight_oz, TRUE, TRUE);
-        char buf[BUFSZ];
+        char buf[OBUFSZ];
         Sprintf(buf, "%s - %s", weightbuf, bp);
         Strcpy(bp, buf);
 
@@ -1851,9 +1951,9 @@ weapon_here:
     
     if (weightlast)
     {
-        char weightbuf[BUFSZ];
+        char weightbuf[OBUFSZ];
         printweight(weightbuf, objweight_oz, FALSE, FALSE);
-        char buf[BUFSZ];
+        char buf[OBUFSZ];
         Sprintf(buf, "%s (%s)", bp, weightbuf);
         Strcpy(bp, buf);
     }
@@ -2177,7 +2277,7 @@ unsigned kxnflags;
     if (!obj)
     {
         buf = nextobuf();
-        strcpy(buf, empty_string);
+        Strcpy(buf, empty_string);
         return buf;
     }
 
@@ -2484,7 +2584,7 @@ aobjnam(otmp, verb)
 struct obj *otmp;
 const char *verb;
 {
-    char prefix[PREFIX];
+    char prefix[PREFIXBUFSZ];
     char *bp = cxname(otmp);
 
     if (otmp->quan != 1L) {
@@ -2511,7 +2611,7 @@ const char *verb;
     if (!carried(obj) || !obj_is_pname(obj)
         || any_quest_artifact(obj)) {
         char *outbuf = shk_your(nextobuf(), obj);
-        size_t space_left = BUFSZ - 1 - strlen(outbuf);
+        size_t space_left = OBUFSZ - 1 - strlen(outbuf);
 
         s = strncat(outbuf, s, space_left);
     }
@@ -2569,7 +2669,7 @@ struct obj *obj;
         || any_quest_artifact(obj)) 
     {
         char *outbuf = shk_your(nextobuf(), obj);
-        size_t space_left = BUFSZ - 1 - strlen(outbuf);
+        size_t space_left = OBUFSZ - 1 - strlen(outbuf);
 
         s = strncat(outbuf, s, space_left);
     }
@@ -2577,7 +2677,7 @@ struct obj *obj;
     {
         if (strncmpi(s, "the ", 4))
         {
-            char tempbuf[BUFSZ];
+            char tempbuf[OBUFSZ];
             strcpy(tempbuf, s);
             Sprintf(s, "the %s", tempbuf);
         }
@@ -2607,7 +2707,7 @@ struct obj *obj;
 {
     char *outbuf = nextobuf();
     char *s = shk_your(outbuf, obj); /* assert( s == outbuf ); */
-    size_t space_left = BUFSZ - 1 - strlen(s);
+    size_t space_left = OBUFSZ - 1 - strlen(s);
 
     char* min_name = minimal_xname(obj);
 
@@ -2865,7 +2965,7 @@ STATIC_VAR const struct sing_plur one_off[] = {
 
 STATIC_VAR const char *const as_is[] = {
     /* makesingular() leaves these plural due to how they're used */
-    "boots",   "shoes",     "gloves",    "lenses", "goggles", "glasses", "eye glasses", "scales",
+    "boots",   "shoes",     "slippers",  "sandals", "gloves", "lenses", "goggles", "glasses", "eye glasses", "eyeglasses", "scales",
     "eyes",    "gauntlets", "iron bars", "bracers", "wings", "earrings",
     "pants",   "trousers",  "trunks",
     /* both singular and plural are spelled the same */
@@ -3343,7 +3443,7 @@ boolean retry_inverted; /* optional extra "of" handling */
 {
     STATIC_VAR NEARDATA const char detect_SP[] = "detect ",
                                SP_detection[] = " detection";
-    char *p, buf[BUFSZ];
+    char *p, buf[OBUFSZ];
 
     /* ignore spaces & hyphens and upper/lower case when comparing */
     if (fuzzymatch(u_str, o_str, " -", TRUE))
@@ -3441,13 +3541,13 @@ STATIC_OVL NEARDATA const struct o_range o_ranges[] = {
     { "horn", TOOL_CLASS, BRASS_HORN, HORN_OF_PLENTY },
     { "shield", ARMOR_CLASS, SMALL_SHIELD, SHIELD_OF_REFLECTION },
     { "hat", ARMOR_CLASS, FEDORA, DUNCE_CAP },
-    { "helm", ARMOR_CLASS, ELVEN_LEATHER_HELM, HELM_OF_TELEPATHY },
+    { "helm", ARMOR_CLASS, ELVEN_HELM, HELM_OF_TELEPATHY },
     { "crown", ARMOR_CLASS, ROYAL_CROWN, CROWN_OF_RULERSHIP },
     { "conical hat", ARMOR_CLASS, CORNUTHAUM, GNOMISH_FELT_HAT },
     { "gloves", ARMOR_CLASS, LEATHER_GLOVES, GAUNTLETS_OF_DEXTERITY },
-    { "gauntlets", ARMOR_CLASS, LEATHER_GLOVES, GAUNTLETS_OF_DEXTERITY },
+    //{ "gauntlets", ARMOR_CLASS, LEATHER_GLOVES, GAUNTLETS_OF_DEXTERITY },
     { "boots", ARMOR_CLASS, LOW_BOOTS, LEVITATION_BOOTS },
-    { "shoes", ARMOR_CLASS, LOW_BOOTS, IRON_SHOES },
+    //{ "shoes", ARMOR_CLASS, LOW_BOOTS, IRON_SHOES },
     { "cloak", ARMOR_CLASS, ELVEN_CLOAK, CLOAK_OF_DISPLACEMENT },
     { "shirt", ARMOR_CLASS, HAWAIIAN_SHIRT, T_SHIRT },
     { "robe", ARMOR_CLASS, MEDIEVAL_ROBE, MUMMY_WRAPPING },
@@ -3460,7 +3560,9 @@ STATIC_OVL NEARDATA const struct o_range o_ranges[] = {
     { "reagent", REAGENT_CLASS, THREAD_OF_SPIDER_SILK, FEATHER },
     { "miscellaneous item", MISCELLANEOUS_CLASS, BROOCH_OF_SHIELDING, WINGS_OF_FLYING },
     { "belt", MISCELLANEOUS_CLASS, LEATHER_BELT, BELT_OF_STORM_GIANT_STRENGTH },
+    { "brooch", MISCELLANEOUS_CLASS, BROOCH_OF_SHIELDING, BROOCH_OF_HAPLESSNESS },
     { "nose ring", MISCELLANEOUS_CLASS, NOSE_RING_OF_BULL_STRENGTH, NOSE_RING_OF_CEREBRAL_SAFEGUARDING },
+    { "headband", MISCELLANEOUS_CLASS, HEADBAND_OF_INTELLECT, HEADBAND_OF_CRANIAL_TIGHTNESS },
     { "ioun stone", MISCELLANEOUS_CLASS, IOUN_STONE_OF_PROTECTION, IOUN_STONE_OF_SUSTENANCE },
     { "eyeglasses", MISCELLANEOUS_CLASS, LENSES, SUNGLASSES },
     { "goggles", MISCELLANEOUS_CLASS, GOGGLES_OF_NIGHT, GOGGLES_OF_EYE_PROTECTION },
@@ -3532,18 +3634,10 @@ STATIC_VAR const struct alt_spellings {
     { "potion of full mana", POT_FULL_ENERGY },
     { "stone", STONE_PEBBLE },
     { "clay", CLAY_PEBBLE },
-    { "lead sling bullet", LEADEN_SLING_BULLET },
-    { "lead sling-bullet", LEADEN_SLING_BULLET },
-    { "leaden sling bullet", LEADEN_SLING_BULLET },
-    { "iron sling bullet", IRON_SLING_BULLET },
-    { "silver sling bullet", SILVER_SLING_BULLET },
-    { "sling-bullet", LEADEN_SLING_BULLET },
-    { "sling bullet", LEADEN_SLING_BULLET },
-    { "sling bullet", LEADEN_SLING_BULLET },
+    { "sling-bullet", SLING_BULLET },
+    { "sling bullet", SLING_BULLET },
     { "quarrel", CROSSBOW_BOLT },
-    { "bone crossbow bolt", BONE_QUARREL },
     { "gnollish crossbow bolt", GNOLLISH_QUARREL },
-    { "silver quarrel", SILVER_CROSSBOW_BOLT },
     { "camera", EXPENSIVE_CAMERA },
     { "tee shirt", T_SHIRT },
     { "can", TIN },
@@ -3724,12 +3818,12 @@ boolean is_wiz_wish;
     int blessed, uncursed, iscursed, ispoisoned, isgreased;
     int eroded, eroded2, erodeproof, locked, unlocked, broken, open;
     int halfeaten, mntmp, contents;
-    int islit, unlabeled, ishistoric, isdiluted, trapped, elemental_enchantment, exceptionality, mythic_prefix, mythic_suffix, key_special_quality, key_otyp, is_switchable;
+    int islit, unlabeled, ishistoric, isdiluted, trapped, elemental_enchantment, material, exceptionality, mythic_prefix, mythic_suffix, key_special_quality, key_otyp, is_switchable;
     int tmp, tinv, tvariety;
     int wetness, gsize = 0;
     struct fruit *f;
     int ftype = context.current_fruit;
-    char fruitbuf[BUFSZ], globbuf[BUFSZ];
+    char fruitbuf[OBUFSZ], globbuf[OBUFSZ];
     /* Fruits may not mess up the ability to wish for real objects (since
      * you can leave a fruit in a bones file and it will be added to
      * another person's game), so they must be checked for last, after
@@ -3751,7 +3845,7 @@ boolean is_wiz_wish;
     boolean wiz_wishing = (wizard && is_wiz_wish);
 
     cnt = enchantment = charges = chargesfound = spesgn = typ = 0;
-    very = rechrg = blessed = uncursed = iscursed = ispoisoned = elemental_enchantment = exceptionality = mythic_prefix = mythic_suffix =
+    very = rechrg = blessed = uncursed = iscursed = ispoisoned = elemental_enchantment = material = exceptionality = mythic_prefix = mythic_suffix =
         isgreased = eroded = eroded2 = erodeproof = halfeaten =
         islit = unlabeled = ishistoric = isdiluted = trapped =
         locked = unlocked = open = broken = key_special_quality = key_otyp = is_switchable = 0;
@@ -4216,7 +4310,7 @@ boolean is_wiz_wish;
             && !strstri(bp, "gauntlets ") && !strstri(bp, "belt ") && !strstri(bp, "girdle ")
             && !strstri(bp, "boots ") && !strstri(bp, "ring ")
             && !strstri(bp, "potion ") && !strstri(bp, "scroll ")
-            && !strstri(bp, "potions ") && !strstri(bp, "scrolls ")
+            && !strstri(bp, "potions ") && !strstri(bp, "scrolls ") && !strstri(bp, "ruby rod ") && !strstri(bp, "triple-headed flail ")
             && !strstri(bp, "finger ")) {
             if ((p = strstri(bp, "tin of ")) != 0) {
                 if (!strcmpi(p + 7, "spinach")) {
@@ -4239,6 +4333,9 @@ boolean is_wiz_wish;
         && strncmpi(bp, "wizard lock", 11) /* not the "wizard" monster! */
         && strncmpi(bp, "wizard's robe", 13) /* not the "wizard" monster! */
         && strncmpi(bp, "bat guano", 9) /* not the "bat" monster! */
+        && strncmpi(bp, "ruby rod of asmodeus", 20) /* not the "Asmodeus" monster! */
+        && strncmpi(bp, "wand of orcus", 13) /* not the "Orcus" monster! */
+        && strncmpi(bp, "triple-headed flail of yeenaghu", 31) /* not the "Yeenaghu" monster! */
         && strncmpi(bp, "ninja-to", 8)     /* not the "ninja" rank */
         && strncmpi(bp, "master key", 10)  /* not the "master" rank */
         && strncmpi(bp, "death cap", 9)  /* not the "death" monster */
@@ -4455,7 +4552,7 @@ boolean is_wiz_wish;
         }
     }
 
- retry:
+retry:
     /* "grey stone" check must be before general "stone" */
     for (i = 0; i < SIZE(o_ranges); i++)
         if (!strcmpi(bp, o_ranges[i].name)) {
@@ -4493,7 +4590,7 @@ boolean is_wiz_wish;
             else
                 typ = 0; /* somebody changed objects[]? punt */
         } else { /* try to construct canonical form */
-            char tbuf[BUFSZ];
+            char tbuf[OBUFSZ];
 
             Strcpy(tbuf, "worthless piece of ");
             Strcat(tbuf, g); /* assume it starts with the color */
@@ -4710,7 +4807,7 @@ boolean is_wiz_wish;
             int floorsubtype = IS_FLOOR(lev->typ) ? lev->subtyp : get_initial_location_subtype(ROOM);
             int floorvartype = IS_FLOOR(lev->typ) ? lev->vartyp : get_initial_location_vartype(ROOM, floorsubtype);
 
-            full_location_transform(x, y, FOUNTAIN, lsubtype, lvartype, lflags, 0, 0, floortype, floorsubtype, floorvartype, FALSE, lhorizontal, 0, 0, FALSE);
+            full_location_transform(x, y, FOUNTAIN, lsubtype, lvartype, lflags, 0, 0, 0, 0, 0, 0, 0, 0, floortype, floorsubtype, floorvartype, FALSE, lhorizontal, 0, 0, FALSE);
 
             int ftyp = lev->subtyp; // (lev->fountainmask & FOUNTAIN_TYPE_MASK);
             pline("A %s.", ftyp == FOUNTAIN_MAGIC && lev->blessedftn ? "enchanted fountain" : fountain_type_text(ftyp));
@@ -4834,8 +4931,6 @@ boolean is_wiz_wish;
             return (struct obj*)&zeroobj;
         }
 
-
-
         if (!BSTRCMPI(bp, p - 4, "bars")) {
             create_simple_location(x, y, IRONBARS, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].vartyp : levl[x][y].floorvartyp, FALSE);
             pline("Iron bars.");
@@ -4851,6 +4946,59 @@ boolean is_wiz_wish;
         } else if (!strncmpi(bp, "hammer", 6)) {
             typ = rnd_otyp_by_wpnskill(P_BLUDGEONING_WEAPON);
             goto typfnd;
+        }
+    }
+
+    if (!material)
+    {
+        int m;
+        /* Check for materials */
+        for (m = MAT_NONE + 1; m < MAX_MATERIAL_TYPES; m++)
+        {
+            if (material_definitions[m].wishable)
+            {
+                size_t mlen = strlen(material_definitions[m].object_prefix);
+                size_t mlena = material_definitions[m].adjective ? strlen(material_definitions[m].adjective) : 0;
+
+                char startbuf[OBUFSZ] = "";
+                char originalbuf[OBUFSZ] = "";
+                Strcpy(originalbuf, bp);
+                size_t bplen = strlen(originalbuf);
+                char* mbp = originalbuf;
+                char* spacep = 0;
+                /* Check up to 4 words for a material word */
+                int w;
+                for (w = 0; w < 4; w++)
+                {
+                    if (!mbp || !*mbp)
+                        break;
+
+                    if ((!strncmpi(mbp, material_definitions[m].object_prefix, mlen) && bplen >= mlen + 1 && *(mbp + mlen) == ' ')
+                        || (material_definitions[m].adjective && !strncmpi(mbp, material_definitions[m].adjective, mlena) && bplen >= mlena + 1 && *(mbp + mlena) == ' '))
+                    {
+                        mbp += mlen + 1;
+                        Sprintf(bp, "%s%s", startbuf, mbp);
+                        material = m;
+                        goto retry;
+                    }
+                    spacep = index(mbp, ' ');
+                    if (spacep)
+                    {
+                        spacep++;
+                        int len = (int)(spacep - originalbuf);
+                        if (len > 0 && (int)bplen > len)
+                        {
+                            strncpy(startbuf, mbp, (size_t)len);
+                            startbuf[len + 1] = '\0';
+                            mbp += len;
+                        }
+                        else
+                            break;
+                    }
+                    else
+                        break;
+                }
+            }
         }
     }
 
@@ -4913,11 +5061,10 @@ boolean is_wiz_wish;
     if (open && typ > 0 && Is_otyp_container_with_lid(typ))
         mkflags |= MKOBJ_FLAGS_OPEN_COFFIN;
 
-    otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, 2, 0L, 0L, mkflags) : mkobj(oclass, FALSE, 2);
+    otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, 2, (struct monst*)0, MAT_NONE, 0L, 0L, mkflags) : mkobj(oclass, FALSE, 2);
     typ = otmp->otyp, oclass = otmp->oclass; /* what we actually got */
 
-    if (islit && (typ == OIL_LAMP || typ == MAGIC_LAMP || typ == BRASS_LANTERN
-                  || is_candle(otmp) || is_obj_candelabrum(otmp) || typ == POT_OIL)) 
+    if (islit && (is_lamp(otmp) || is_candle(otmp) || is_torch(otmp) || is_obj_candelabrum(otmp) || typ == POT_OIL))
     {
         place_object(otmp, u.ux, u.uy); /* make it viable light source */
         begin_burn(otmp, FALSE);
@@ -5097,9 +5244,19 @@ boolean is_wiz_wish;
         case SCALE_MAIL:
             /* Dragon mail - depends on the order of objects & dragons. */
             if (mntmp >= PM_GRAY_DRAGON && mntmp <= PM_YELLOW_DRAGON)
+            {
                 otmp->otyp = GRAY_DRAGON_SCALE_MAIL + mntmp - PM_GRAY_DRAGON;
+                otmp->material = objects[otmp->otyp].oc_material;
+            }
             break;
         }
+    }
+
+    /* set material */
+    if (material > 0)
+    {
+        if (material_wish_success(typ, material))
+            otmp->material = material;
     }
 
     /* set eroded and erodeproof */
@@ -5186,7 +5343,7 @@ boolean is_wiz_wish;
                 otmp->exceptionality = EXCEPTIONALITY_ELITE;
             else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGELIC_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
                 otmp->exceptionality = EXCEPTIONALITY_ELITE;
-            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || objects[otmp->otyp].oc_material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
                 otmp->exceptionality = EXCEPTIONALITY_ELITE;
         }
     }
@@ -5677,7 +5834,7 @@ int *otyp_ptr, *sq_ptr;
     int i;
     for (i = 0; key_special_descriptions[i].otyp > STRANGE_OBJECT; i++)
     {
-        char buf[BUFSZ];
+        char buf[OBUFSZ];
         size_t ln = 0;
         strcpy(buf, key_special_descriptions[i].description);
         Strcat(buf, " ");
@@ -5756,6 +5913,31 @@ boolean normally_without_lock;
         else
             Sprintf(lbuf, " with %s lock", an(ldesc));
     }
+}
+
+STATIC_OVL
+boolean material_wish_success(otyp, material)
+int otyp, material;
+{
+    if (otyp <= STRANGE_OBJECT || otyp >= NUM_OBJECTS)
+        return FALSE;
+
+    if (material == objects[otyp].oc_material)
+        return TRUE; /* base material always works */
+
+    int mit = objects[otyp].oc_material_init_type;
+    if (mit <= MATINIT_NORMAL || mit >= MAX_MATINIT_TYPES)
+        return FALSE;
+
+    int i;
+    for (i = 0; i < MAX_WISHING_MATERIALS && material_wishing_definitions[mit].material[i] > 0; i++)
+    {
+        if (material == material_wishing_definitions[mit].material[i])
+        {
+            return wizard || (rn2(100) < material_wishing_definitions[mit].probability[i]);
+        }
+    }
+    return FALSE;
 }
 
 /*objnam.c*/

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    apply.c    $NHDT-Date: 1553363415 2019/03/23 17:50:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.272 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1100,8 +1100,12 @@ struct obj *obj;
         {
             play_sfx_sound(SFX_GENERAL_WELDED);
             pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "leash would not come off!");
-            obj->bknown = 1;
-        } 
+            if (!obj->bknown)
+            {
+                obj->bknown = TRUE;
+                update_inventory();
+            }
+        }
         else
         {
             mtmp->mleashed = 0;
@@ -2271,6 +2275,87 @@ struct obj *otmp;
     return FALSE;
 }
 
+int
+use_torch(optr)
+struct obj** optr;
+{
+    register struct obj* obj = *optr;
+
+    if (u.uswallow)
+    {
+        play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, no_elbow_room);
+        return 1;
+    }
+
+    boolean objsplitted = FALSE;
+    struct obj* lightedcandle = (struct obj*)0;
+
+    if (obj->quan > 1L)
+    {
+        objsplitted = TRUE;
+        if (!carried(obj))
+        {
+            (void)splitobj(obj, obj->quan - 1);
+            lightedcandle = obj;
+        }
+        else
+            lightedcandle = splitobj(obj, 1);
+        debugpline0("split object,");
+    }
+    else
+        lightedcandle = obj;
+
+    if (lightedcandle)
+    {
+        use_lamp(lightedcandle);
+    }
+
+    if (lightedcandle && carried(lightedcandle) && objsplitted)
+    {
+        freeinv(lightedcandle);
+        if (inv_cnt(FALSE) >= 52)
+        {
+            pline("Oops! %s from your %s.", Tobjnam(lightedcandle, "slip"), body_part(HAND));
+            sellobj_state(SELL_DONTSELL);
+            dropy(lightedcandle);
+            sellobj_state(SELL_NORMAL);
+        }
+        else
+        {
+            lightedcandle->nomerge = 1; /* used to prevent merge */
+            lightedcandle = addinv(lightedcandle);
+            lightedcandle->nomerge = 0;
+        }
+    }
+
+    update_inventory();
+    return 1;
+}
+
+/* call in drop, throw, and put in box, etc. */
+boolean
+snuff_torch(otmp)
+struct obj* otmp;
+{
+    boolean istorch = is_torch(otmp);
+
+    if (istorch && otmp->lamplit)
+    {
+        char buf[BUFSZ];
+        xchar x, y;
+        boolean many = otmp->quan > 1L;
+
+        (void)get_obj_location(otmp, &x, &y, 0);
+        if (otmp->where == OBJ_MINVENT ? cansee(x, y) : !Blind)
+            pline("%storch%s flame%s extinguished.", Shk_Your(buf, otmp),
+                (many ? "es'" : "'s"), (many ? "s are" : " is"));
+        end_burn(otmp, TRUE);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 /* called when lit lamp is hit by water or put into a container or
    you've been swallowed by a monster; obj might be in transit while
    being thrown or dropped so don't assume that its location is valid */
@@ -2280,17 +2365,26 @@ struct obj *obj;
 {
     xchar x, y;
 
-    if (obj->lamplit) {
-        if (obj->otyp == OIL_LAMP || obj->otyp == MAGIC_LAMP
-            || obj->otyp == BRASS_LANTERN || obj->otyp == POT_OIL) {
+    if (obj->lamplit) 
+    {
+        if (is_lamp(obj) || obj->otyp == POT_OIL) 
+        {
             (void) get_obj_location(obj, &x, &y, 0);
             if (obj->where == OBJ_MINVENT ? cansee(x, y) : !Blind)
                 pline("%s %s out!", Yname2(obj), otense(obj, "go"));
             end_burn(obj, TRUE);
             return TRUE;
         }
-        if (snuff_candle(obj))
-            return TRUE;
+        else if (is_torch(obj))
+        {
+            if (snuff_torch(obj))
+                return TRUE;
+        }
+        else
+        {
+            if (snuff_candle(obj))
+                return TRUE;
+        }
     }
     return FALSE;
 }
@@ -2315,8 +2409,7 @@ struct obj *obj;
             return FALSE;
         if (is_obj_candelabrum(obj) && obj->cursed)
             return FALSE;
-        if ((obj->otyp == OIL_LAMP || obj->otyp == MAGIC_LAMP
-             || obj->otyp == BRASS_LANTERN) && obj->cursed && !rn2(2))
+        if (is_lamp(obj) && obj->cursed && !rn2(2))
             return FALSE;
         if (obj->where == OBJ_MINVENT ? cansee(x, y) : !Blind)
             pline("%s %s light!", Yname2(obj), otense(obj, "catch"));
@@ -2358,8 +2451,7 @@ struct obj *obj;
     if (obj->lamplit) 
     {
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY2);
-        if (obj->otyp == OIL_LAMP || obj->otyp == MAGIC_LAMP
-            || obj->otyp == BRASS_LANTERN)
+        if (is_lamp(obj))
         {
             pline("%slamp is now off.", Shk_Your(buf, obj));
         }
@@ -2374,13 +2466,13 @@ struct obj *obj;
     if (Underwater)
     {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        pline_ex(ATR_NONE, CLR_MSG_FAIL, !is_candle(obj) ? "This is not a diving lamp"
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, !is_candle_or_torch(obj) ? "This is not a diving lamp"
                               : "Sorry, fire and water don't mix.");
         return;
     }
 
     /* magic lamps with an enchantment == 0 (wished for) cannot be lit */
-    if ((!is_candle(obj) && obj->age == 0)
+    if ((!is_candle_or_torch(obj) && obj->age == 0)
         || (obj->otyp == MAGIC_LAMP && obj->special_quality  == 0))
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
@@ -2400,8 +2492,7 @@ struct obj *obj;
     else
     {
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY);
-        if (obj->otyp == OIL_LAMP || obj->otyp == MAGIC_LAMP
-            || obj->otyp == BRASS_LANTERN) 
+        if (is_lamp(obj))
         {
             check_unpaid(obj);
             pline("%slamp is now on.", Shk_Your(buf, obj));
@@ -3759,7 +3850,7 @@ struct obj* obj;
                     (void)erode_obj(otmp, xname(otmp), ERODE_BURN,
                         EF_GREASE | EF_VERBOSE);
                 }
-                else if (is_candle(otmp))
+                else if (is_candle_or_torch(otmp))
                 {
                     wandknown = TRUE;
                     if (!otmp->lamplit)
@@ -4062,7 +4153,7 @@ struct obj *tstone;
         return;
     }
 
-    if (tstone->otyp == TOUCHSTONE && tstone->cursed
+    if (tstone->otyp == TOUCHSTONE && (tstone->cursed || tstone->charges <= 0)
         && obj->oclass == GEM_CLASS && !is_graystone(obj)
         && !obj_resists(obj, 80, 100)) 
     {
@@ -4097,24 +4188,24 @@ struct obj *tstone;
     {
     case GEM_CLASS: /* these have class-specific handling below */
     case RING_CLASS:
-        if (tstone->otyp != TOUCHSTONE) 
+        if (tstone->otyp != TOUCHSTONE || tstone->charges <= 0)
         {
             do_scratch = TRUE;
         } 
-        else if (obj->oclass == GEM_CLASS
-                   && (tstone->blessed
-                       || (!tstone->cursed /*&& (Role_if(PM_ARCHAEOLOGIST)
-                                               || Race_if(PM_GNOME))*/ ))) {
+        else if (obj->oclass == GEM_CLASS) /* Touchstone */
+        {
+            tstone->charges--;
             makeknown(TOUCHSTONE);
             makeknown(obj->otyp);
             prinv((char *) 0, obj, 0L);
             play_sfx_sound(SFX_IDENTIFY_SUCCESS);
+            update_inventory();
             return;
         } 
         else
         {
             /* either a ring or the touchstone was not effective */
-            if (objects[obj->otyp].oc_material == MAT_GLASS || objects[obj->otyp].oc_material == MAT_CRYSTAL)
+            if (obj->material == MAT_GLASS || obj->material == MAT_CRYSTAL)
             {
                 do_scratch = TRUE;
                 break;
@@ -4124,8 +4215,9 @@ struct obj *tstone;
         break; /* gem or ring */
 
     default:
-        switch (objects[obj->otyp].oc_material) 
+        switch (obj->material)
         {
+        case MAT_COTTON:
         case MAT_CLOTH:
             pline("%s a little more polished now.", Tobjnam(tstone, "look"));
             return;
@@ -4135,20 +4227,6 @@ struct obj *tstone;
             else
                 pline("%s a little wetter now.", Tobjnam(tstone, "are"));
             return;
-        case MAT_WAX:
-            streak_color = "waxy";
-            break; /* okay even if not touchstone */
-        case MAT_WOOD:
-            streak_color = "wooden";
-            break; /* okay even if not touchstone */
-        case MAT_GOLD:
-            do_scratch = TRUE; /* scratching and streaks */
-            streak_color = "golden";
-            break;
-        case MAT_SILVER:
-            do_scratch = TRUE; /* scratching and streaks */
-            streak_color = "silvery";
-            break;
         default:
             /* Objects passing the is_flimsy() test will not
                scratch a stone.  They will leave streaks on
@@ -4156,7 +4234,10 @@ struct obj *tstone;
             if (is_flimsy(obj))
                 streak_color = c_obj_colors[objects[obj->otyp].oc_color];
             else
-                do_scratch = (tstone->otyp != TOUCHSTONE);
+            {
+                do_scratch = material_definitions[obj->material].scratchable;
+                streak_color = material_definitions[obj->material].streakword;
+            }
             break;
         }
         break; /* default oclass */
@@ -5709,13 +5790,13 @@ doapply()
             (void)bagotricks(obj, FALSE, (int*)0);
             break;
         case POUCH_OF_ENDLESS_BOLTS:
-            (void)endlessarrows(obj, obj->blessed && !rn2(4) ? SILVER_CROSSBOW_BOLT : CROSSBOW_BOLT, rnd(10) + 10);
+            (void)endlessarrows(obj, CROSSBOW_BOLT, rnd(10) + 10);
             break;
         case BAG_OF_INFINITE_SLING_BULLETS:
-            (void)endlessarrows(obj, obj->blessed && !rn2(4) ? SILVER_SLING_BULLET : ((obj->blessed || !rn2(2)) && !obj->cursed ? IRON_SLING_BULLET : LEADEN_SLING_BULLET), rnd(10) + 10);
+            (void)endlessarrows(obj, SLING_BULLET, rnd(10) + 10);
             break;
         case QUIVER_OF_INFINITE_ARROWS:
-            (void)endlessarrows(obj, obj->blessed && !rn2(4) ? SILVER_ARROW : ARROW, rnd(10) + 10);
+            (void)endlessarrows(obj, ARROW, rnd(10) + 10);
             break;
         case CAN_OF_GREASE:
             use_grease(obj);
@@ -5766,6 +5847,7 @@ doapply()
                         obj->bknown = 1;
                     }
                     unbless(obj);
+                    update_inventory();
                 }
             }
             else
@@ -5794,6 +5876,9 @@ doapply()
         case TALLOW_CANDLE:
         case MAGIC_CANDLE:
             res = use_candle(&obj);
+            break;
+        case TORCH:
+            res = use_torch(&obj);
             break;
         case OIL_LAMP:
         case MAGIC_LAMP:
@@ -5865,6 +5950,31 @@ doapply()
         case CUBIC_GATE:
             res = use_cubic_gate(obj);
             break;
+        case DIABOLICAL_SCEPTRE:
+        {
+            obj->special_quality++;
+            if (obj->special_quality > 2)
+                obj->special_quality = 0;
+
+            const char* glowcolor = "gray";
+            switch (obj->special_quality)
+            {
+            case 0:
+                glowcolor = "blue";
+                break;
+            case 1:
+                glowcolor = "white";
+                break;
+            case 2:
+                glowcolor = "red";
+                break;
+            default:
+                break;
+            }
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The head of %s rotates.", yname(obj));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s.", Tobjnam(obj, "glow"), glowcolor);
+            break;
+        }
         default:
             /* Pole-type-weapons can strike at a distance */
             if (is_appliable_pole_type_weapon(obj))
@@ -5951,7 +6061,7 @@ boolean useonlyautostashes;
             xchar x = 0, y = 0;
             get_obj_location(otmp, &x, &y, CONTAINED_TOO | BURIED_TOO);
             int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL));
+            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
             add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
                 applied_invlet,

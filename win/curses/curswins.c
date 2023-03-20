@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-13 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 curswins.c */
@@ -481,17 +481,29 @@ curses_get_window_orientation(winid wid)
    and text attributes */
 
 void
-curses_puts(winid wid, int attr, const char *text)
+curses_puts(winid wid, int attr, const char* text)
+{
+    curses_puts_ex(wid, attr, NO_COLOR, text);
+}
+
+void
+curses_puts_ex(winid wid, int attr, int color, const char *text)
+{
+    curses_puts_ex2(wid, text, (char*)0, (char*)0, attr, color);
+}
+
+void
+curses_puts_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color)
 {
     anything Id;
-    WINDOW *win = NULL;
+    WINDOW* win = NULL;
 
     if (is_main_window(wid)) {
         win = curses_get_nhwin(wid);
     }
 
     if (wid == MESSAGE_WIN) {
-        curses_message_win_puts(text, FALSE);
+        curses_message_win_puts_ex(text, attrs, colors, attr, color, FALSE);
         return;
     }
 
@@ -505,13 +517,14 @@ curses_puts(winid wid, int attr, const char *text)
     if (curses_is_menu(wid) || curses_is_text(wid)) {
         if (!curses_menu_exists(wid)) {
             impossible(
-                     "curses_puts: Attempted write to nonexistant window %d!",
-                       wid);
+                "curses_puts: Attempted write to nonexistant window %d!",
+                wid);
             return;
         }
         Id = zeroany;
-        curses_add_nhmenu_item(wid, NO_GLYPH, &Id, 0, 0, attr, text, FALSE);
-    } else {
+        curses_add_nhmenu_item(wid, NO_GLYPH, &Id, 0, 0, attr, color, text, attrs, colors, FALSE);
+    }
+    else {
         waddstr(win, text);
         wnoutrefresh(win);
     }

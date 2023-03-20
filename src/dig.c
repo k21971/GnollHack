@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    dig.c    $NHDT-Date: 1547421446 2019/01/13 23:17:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -360,7 +360,7 @@ dig(VOID_ARGS)
     }
 
     context.digging.effort +=
-        10 + rn2(5) + u_strdex_to_hit_bonus() + wep->enchantment + exceptionality_digging_speed_bonus(wep) - greatest_erosion(wep) + u.ubasedaminc + u.udaminc;
+        10 + rn2(5) + u_strdex_to_hit_bonus() + wep->enchantment + material_definitions[wep->material].digging_speed_bonus + exceptionality_digging_speed_bonus(wep) - greatest_erosion(wep) + u.ubasedaminc + u.udaminc;
     
     int speed_bonus = digging_skill_speed_bonus(P_SKILL_LEVEL(objects[wep->otyp].oc_skill));
     context.digging.effort = max(1, (context.digging.effort * (100 + speed_bonus)) / 100);
@@ -761,7 +761,13 @@ int ttyp;
 
     /* Remove doodads */
     levl[x][y].floor_doodad = 0;
-    levl[x][y].feature_doodad = 0;
+    levl[x][y].carpet_typ = 0;
+    levl[x][y].carpet_piece = 0;
+    levl[x][y].carpet_flags = 0;
+    levl[x][y].decoration_typ = 0;
+    levl[x][y].decoration_subtyp = 0;
+    levl[x][y].decoration_dir = 0;
+    levl[x][y].decoration_flags = 0;
 
     if (ttyp == PIT) {
         if (madeby_u) {
@@ -1146,7 +1152,7 @@ coord *cc;
                 pline(Hallucination ? "I want my mummy!"
                     : "You've disturbed a tomb!");
             }
-            otmp = mksobj_at_with_flags(SARCOPHAGUS, dig_x, dig_y, FALSE, FALSE, 0, 0L, 0L, MKOBJ_FLAGS_OPEN_COFFIN);
+            otmp = mksobj_at_with_flags(SARCOPHAGUS, dig_x, dig_y, FALSE, FALSE, 0, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_OPEN_COFFIN);
             if (otmp)
             {
                 boolean dealloc = FALSE;

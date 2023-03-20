@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursdial.h */
@@ -16,8 +16,8 @@ int curses_character_input_dialog(int attr UNUSED, int color UNUSED, const char 
 int curses_ext_cmd(void);
 void curses_create_nhmenu(winid wid);
 void curses_add_nhmenu_item(winid wid, int glyph, const ANY_P *identifier,
-                            CHAR_P accelerator, CHAR_P group_accel, int attr,
-                            const char *str, BOOLEAN_P presel);
+                            CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
+                            const char *str, const char* attrs, const char* colors, BOOLEAN_P presel);
 void curs_menu_set_bottom_heavy(winid);
 void curses_finalize_nhmenu(winid wid, const char *prompt, const char *subtitle);
 int curses_display_nhmenu(winid wid, int how, MENU_ITEM_P **_selected);

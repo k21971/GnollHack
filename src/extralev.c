@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    extralev.c    $NHDT-Date: 1446975468 2015/11/08 09:37:48 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /*      Copyright 1988, 1989 by Ken Arromdee                      */
@@ -274,7 +274,7 @@ makeroguerooms()
                  * encountered below level 10, use !rn2(7).
                  */
                 add_room(lowx, lowy, hix, hiy, (boolean) !rn2(7), OROOM,
-                         FALSE, ROOM, 0, NON_PM);
+                         FALSE, ROOM, 0, NON_PM, -1, 0);
             }
         }
 

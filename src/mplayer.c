@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mplayer.c    $NHDT-Date: 1550524564 2019/02/18 21:16:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.26 $ */
 /*      Copyright (c) Izchak Miller, 1992.                        */
@@ -166,7 +166,7 @@ register boolean special;
         cloak  = !rn2(8) ? STRANGE_OBJECT
                          : rnd_class(OILSKIN_CLOAK, CLOAK_OF_DISPLACEMENT);
         helm   = !rn2(8) ? STRANGE_OBJECT
-                         : rnd_class(ELVEN_LEATHER_HELM, HELM_OF_TELEPATHY);
+                         : rnd_class(ELVEN_HELM, HELM_OF_TELEPATHY);
         shield = !rn2(8) ? STRANGE_OBJECT
                          : rnd_class(ELVEN_SHIELD, SHIELD_OF_REFLECTION);
 

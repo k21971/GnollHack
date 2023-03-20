@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    objclass.h    $NHDT-Date: 1547255901 2019/01/12 01:18:21 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -61,35 +61,6 @@ enum multishot_types {
     MAX_MULTISHOT_TYPES
 };
 extern const char* multishot_style_names[MAX_MULTISHOT_TYPES]; /* in objnam.c */
-
-
-struct material_definition {
-    const char* name;
-    enum material_phase phase;
-    enum hit_surface_types hit_surface_mapping;
-    enum floor_surface_types floor_surface_mapping;
-    Bitfield(flammable, 1);
-    Bitfield(rustprone, 1);
-    Bitfield(corrodeable, 1);
-    Bitfield(rottable, 1);
-
-    Bitfield(melts_in_fire, 1);        /* Solids melt, liquids boil */
-    Bitfield(death_enchantable, 1);
-    Bitfield(flimsy, 1);
-    Bitfield(metallic, 1);
-    Bitfield(mineral, 1);
-
-    Bitfield(gemstone, 1);
-    Bitfield(organic, 1);
-    Bitfield(edible, 1);
-    Bitfield(slurpable, 1);
-
-    Bitfield(fragile, 1);
-    Bitfield(destroyed_in_lava, 1);
-
-    const char* foodword;
-};
-extern struct material_definition material_definitions[MAX_MATERIAL_TYPES]; /* in objnam.c */
 
 enum obj_armor_types {
     ARM_SUIT    = 0,
@@ -238,6 +209,7 @@ enum obj_tool_types {
     TOOLTYPE_JAR = 19,
     TOOLTYPE_CAN = 20,
     TOOLTYPE_GRAIL = 21,
+    TOOLTYPE_TORCH = 22,
     MAX_TOOL_TYPES
 };
 extern const char* tool_type_names[MAX_TOOL_TYPES]; /* in objnam.c */
@@ -287,7 +259,8 @@ enum charged_init_types {
     CHARGED_UNICORN_HORN = 29,
     CHARGED_1D4_4 = 30,
     CHARGED_1D20_20 = 31,
-    CHARGED_1D4_1 = 32
+    CHARGED_1D4_1 = 32,
+    CHARGED_1D6_9 = 33,
 };
 
 enum recharging_types {
@@ -350,6 +323,92 @@ enum enchantment_init_types {
     MAX_ENCHTYPES
 };
 
+enum material_init_types {
+    MATINIT_NORMAL = 0,
+    MATINIT_MAYBE_SILVER,
+    MATINIT_MAYBE_SILVER_OR_BONE,
+    MATINIT_LONG_SWORD,
+    MATINIT_PLATE_MAIL,
+    MATINIT_SLING_BULLET,
+    MATINIT_DWARVISH_METAL_ITEM,
+    MATINIT_MAYBE_ADAMANTIUM_MITHRIL_OR_SILVER,
+    MATINIT_CHAIN_MAIL,
+    MATINIT_MAYBE_BONE,
+    MATINIT_MAYBE_ADAMANTIUM_OR_MITHRIL,
+    MATINIT_MAYBE_ADAMANTIUM_MITHRIL_OR_BRONZE,
+    MATINIT_MAYBE_ADAMANTIUM_MITHRIL_SILVER_OR_BONE,
+    MATINIT_MAYBE_SPECIAL_BONE,
+    MATINIT_MAYBE_STEEL_MITHRIL_OR_SILVER,
+    MATINIT_MAYBE_DRAGON_HIDE,
+    MAX_MATINIT_TYPES
+};
+
+struct material_definition {
+    const char* name; /* noun */
+    const char* object_prefix;
+    const char* adjective;
+    enum material_phase phase;
+    enum hit_surface_types hit_surface_mapping;
+    enum floor_surface_types floor_surface_mapping;
+    Bitfield(flammable, 1);
+    Bitfield(rustprone, 1);
+    Bitfield(corrodeable, 1);
+    Bitfield(rottable, 1);
+
+    Bitfield(melts_in_fire, 1);        /* Solids melt, liquids boil */
+    Bitfield(death_enchantable, 1);
+    Bitfield(flimsy, 1);
+    Bitfield(metallic, 1);
+    Bitfield(mineral, 1);
+
+    Bitfield(gemstone, 1);
+    Bitfield(organic, 1);
+    Bitfield(edible, 1);
+    Bitfield(slurpable, 1);
+
+    Bitfield(fragile, 1);
+    Bitfield(destroyed_in_lava, 1);
+    Bitfield(wishable, 1);
+    Bitfield(scratchable, 1);
+
+    const char* foodword;
+    const char* streakword;
+
+    uchar color;
+    schar acbonus_armor[MAX_ARMOR_TYPES];
+    schar mcbonus_armor[MAX_ARMOR_TYPES];
+    schar spell_casting_penalty_armor[MAX_ARMOR_TYPES];
+    double weight_multiplier;
+    double cost_multiplier;
+    double cost_addition;
+    short power_armor[MAX_ARMOR_TYPES];
+    short power2_armor[MAX_ARMOR_TYPES];
+    short sdice_adjustment;
+    short sdam_adjustment;
+    short splus_adjustment;
+    short ldice_adjustment;
+    short ldam_adjustment;
+    short lplus_adjustment;
+    short power_weapon;
+    short power2_weapon;
+    short added_enchantability_multiplier;
+    short added_enchantability_divisor;
+    short digging_speed_bonus;
+    unsigned long extra_oflags1;
+    unsigned long extra_oflags2;
+    unsigned long extra_oflags3;
+    unsigned long extra_oflags4;
+    unsigned long extra_oflags5;
+    unsigned long extra_oflags6;
+};
+extern struct material_definition material_definitions[MAX_MATERIAL_TYPES]; /* in o_init.c */
+
+#define MAX_WISHING_MATERIALS 10
+struct material_wishing_definition {
+    uchar material[MAX_WISHING_MATERIALS];
+    schar probability[MAX_WISHING_MATERIALS];
+};
+extern struct material_wishing_definition material_wishing_definitions[MAX_MATINIT_TYPES]; /* in o_init.c */
 
 struct objclass {
     short oc_name_idx;              /* index of actual name */
@@ -399,22 +458,23 @@ struct objclass {
 #define WHACK 0
     /* 4 free bits */
 
+    uchar oc_material_init_type;
     uchar oc_material; /* one of obj_material_types */
 
-#define is_organic(otmp) (material_definitions[objects[(otmp)->otyp].oc_material].organic != 0) //(objects[otmp->otyp].oc_material <= MAT_WOOD)
-#define is_slurpable(otmp) (material_definitions[objects[(otmp)->otyp].oc_material].slurpable != 0)
-#define melts_in_lava(otmp) (material_definitions[objects[(otmp)->otyp].oc_material].destroyed_in_lava != 0)
-#define is_metallic(otmp)  (material_definitions[objects[(otmp)->otyp].oc_material].metallic != 0) 
-#define is_fragile(otmp)  (material_definitions[objects[(otmp)->otyp].oc_material].fragile != 0) 
-#define is_obj_stony(otmp)  (material_definitions[objects[(otmp)->otyp].oc_material].mineral != 0) 
+#define is_organic(otmp) (material_definitions[(otmp)->material].organic != 0) //(objects[otmp->otyp].oc_material <= MAT_WOOD)
+#define is_slurpable(otmp) (material_definitions[(otmp)->material].slurpable != 0)
+#define melts_in_lava(otmp) (material_definitions[(otmp)->material].destroyed_in_lava != 0)
+#define is_metallic(otmp)  (material_definitions[(otmp)->material].metallic != 0) 
+#define is_fragile(otmp)  (material_definitions[(otmp)->material].fragile != 0) 
+#define is_obj_stony(otmp)  (material_definitions[(otmp)->material].mineral != 0) 
 
 /* primary damage: fire/rust/--- */
 /* is_flammable(otmp), is_rottable(otmp) in mkobj.c */
-#define is_rustprone(otmp) ((material_definitions[objects[(otmp)->otyp].oc_material].rustprone != 0) && !(objects[(otmp)->otyp].oc_flags & O1_RUST_RESISTANT))
+#define is_rustprone(otmp) ((material_definitions[(otmp)->material].rustprone != 0) && !(get_obj_oc_flags(otmp) & O1_RUST_RESISTANT))
 
 /* secondary damage: rot/acid/acid */
 #define is_corrodeable(otmp)                   \
-    ((material_definitions[objects[(otmp)->otyp].oc_material].corrodeable != 0) && !(objects[(otmp)->otyp].oc_flags & O1_CORROSION_RESISTANT))
+    ((material_definitions[(otmp)->material].corrodeable != 0) && !(get_obj_oc_flags(otmp) & O1_CORROSION_RESISTANT))
 
 #define is_damageable(otmp)                                        \
     (is_rustprone(otmp) || is_flammable(otmp) || is_rottable(otmp) \
@@ -642,7 +702,7 @@ struct objclass {
 #define FIXED_IS_MAXIMUM        0x00020000
 #define IGNORE_ENCHANTMENT      0x00040000
 
-#define BONUS_TO_ALLSTATS BONUS_TO_STR | BONUS_TO_DEX | BONUS_TO_CON | BONUS_TO_INT | BONUS_TO_WIS | BONUS_TO_CHA
+#define BONUS_TO_ALLSTATS (BONUS_TO_STR | BONUS_TO_DEX | BONUS_TO_CON | BONUS_TO_INT | BONUS_TO_WIS | BONUS_TO_CHA)
 
 
 /* weapons */
@@ -1015,7 +1075,13 @@ struct objclass {
 #define O5_CANNOT_BE_PRIMORDIAL        0x00400000UL
 #define O5_CANNOT_BE_INFERNAL          0x00800000UL
 #define O5_MIXTURE_CLEARS              0x01000000UL
-
+#define O5_TORCH                       0x02000000UL
+#define O5_LAMP                        0x04000000UL
+#define O5_SHOW_BASE_MATERIAL_NAME     0x08000000UL
+#define O5_MATERIAL_NAME_2ND_WORD_AN   0x10000000UL
+#define O5_MATERIAL_NAME_3RD_WORD_AN   0x20000000UL
+#define O5_MATERIAL_NAME_4TH_WORD_AN   (O5_MATERIAL_NAME_2ND_WORD_AN | O5_MATERIAL_NAME_3RD_WORD_AN)
+#define O5_NO_MATERIAL_NAME            0x40000000UL
 
 #define O6_NONE                        0x00000000UL
 
@@ -1083,6 +1149,15 @@ struct class_sym {
     const char *explain;
 };
 
+#define OD_NONE                        0x00000000UL
+#define OD_MATERIAL_NAME_WORD_BY_AN    0x00000001UL
+#define OD_MATERIAL_NAME_2ND_WORD_DN   0x00000002UL
+#define OD_MATERIAL_NAME_3RD_WORD_DN   0x00000004UL
+#define OD_MATERIAL_NAME_4TH_WORD_DN   (OD_MATERIAL_NAME_2ND_WORD_DN | OD_MATERIAL_NAME_3RD_WORD_DN)
+#define OD_SHOW_BASE_MATERIAL_NAME     0x00000008UL
+#define OD_MISSILE_REPLACEMENTS        0x00000010UL
+#define OD_NO_MATERIAL_NAME            0x00000020UL
+
 struct objdescr {
     const char *oc_name;                /* actual name */
     const char *oc_descr;               /* description when name unknown */
@@ -1090,6 +1165,7 @@ struct objdescr {
     const char* oc_content_description; /* unknown description of contents (spellbooks, jars) */
     const char* oc_item_description;    /* description of the item */
     int oc_tile_floor_height;           /* (scaled) height of the item tile in pixels when it appears on the floor */
+    unsigned long oc_descr_flags;
     short stand_animation;
     short enlargement;
     short replacement;
@@ -1123,8 +1199,9 @@ enum obj_class_types {
     VENOM_CLASS  = 17,
     REAGENT_CLASS = 18,
     MISCELLANEOUS_CLASS = 19,
+    ART_CLASS = 20,
 
-    MAX_OBJECT_CLASSES  = 20
+    MAX_OBJECT_CLASSES  = 21
 };
 
 
@@ -1164,6 +1241,7 @@ extern uchar oc_syms[MAX_OBJECT_CLASSES];      /* current class symbols */
 #define VENOM_SYM '.'
 #define REAGENT_SYM '9'
 #define MISCELLANEOUS_SYM '8'
+#define ART_SYM '7'
 #define GOLD_SYM_ALTERNATE '\''
 
 struct fruit {
@@ -1184,6 +1262,7 @@ struct fruit {
 
 #define OBJ_TILE_HEIGHT(otyp) (obj_descr[objects[(otyp)].oc_descr_idx].oc_tile_floor_height)
 #define OBJ_STAND_ANIMATION(otyp) (obj_descr[objects[(otyp)].oc_descr_idx].stand_animation)
+#define OBJ_DESCR_FLAGS(otyp) (obj_descr[objects[(otyp)].oc_descr_idx].oc_descr_flags)
 
 #define has_spell_otyp_per_level_bonus(otyp) \
     ((objects[otyp].oc_spell_flags & S1_LDMG_IS_PER_LEVEL_DMG_INCREASE) != 0 && objects[otyp].oc_spell_per_level_step > 0)

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mkroom.h    $NHDT-Date: 1432512780 2015/05/25 00:13:00 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -25,7 +25,9 @@ struct mkroom {
     boolean irregular;    /* true if room is non-rectangular */
     struct mkroom *sbrooms[MAX_SUBROOMS]; /* Subrooms pointers */
     struct monst *resident; /* priest/shopkeeper/guard for this room */
-    int resident_mtype;   /* Specific monster type for the resident, if any */
+    short resident_mtype;   /* Specific monster type for the resident, if any */
+    short room_decoration_type;
+    unsigned short room_flags;
 };
 
 struct shclass {
@@ -93,8 +95,17 @@ enum roomtype_types {
     REAGENTSHOP,
     MODRONSHOP,
     FODDERSHOP, /* health food store */
-    CANDLESHOP
+    CANDLESHOP,
+    NUM_ROOM_TYPES
 };
+
+struct room_definition {
+    const char* name;
+    boolean has_special_tileset;
+    uchar special_tileset;
+};
+
+extern NEARDATA struct room_definition room_definitions[NUM_ROOM_TYPES];
 
 #define MAXRTYPE (CANDLESHOP) /* maximum valid room type */
 #define UNIQUESHOP (CANDLESHOP) /* shops here & above not randomly gen'd. */

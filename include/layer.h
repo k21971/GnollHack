@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /*
  * Layers. Copyright (c) Janne Gustafsson, 2020
@@ -13,6 +13,7 @@
 enum layer_types
 {
     LAYER_FLOOR = 0,
+    LAYER_CARPET,
     LAYER_FLOOR_DOODAD,   /* Doodads underneath features and traps */
     LAYER_FEATURE,
     LAYER_TRAP,
@@ -36,7 +37,7 @@ enum layer_types
 
 
 #define MAXLEASHED 2
-#define NUM_BUFF_BIT_ULONGS 7 // 1 + (MAX_PROPS - 1) / 32
+#define NUM_BUFF_BIT_ULONGS 8 // 1 + (MAX_PROPS - 1) / 32
 
 struct layer_info {
     int glyph; /* For ascii compatibility */
@@ -55,9 +56,10 @@ struct layer_info {
     short damage_displayed;
     short hit_tile;
 
-    short special_monster_layer_height;
-    xchar monster_origin_x;
-    xchar monster_origin_y;
+    schar special_feature_doodad_layer_height;
+    schar special_monster_layer_height;
+    schar monster_origin_x;
+    schar monster_origin_y;
     int monster_hp;
     int monster_maxhp;
     int rider_glyph;
@@ -72,6 +74,8 @@ struct layer_info {
     short object_height;
 
     uchar missile_poisoned;
+    uchar missile_material;
+    short missile_special_quality;
     uchar missile_elemental_enchantment;
     uchar missile_exceptionality;
     uchar missile_mythic_prefix;
@@ -113,12 +117,14 @@ struct simple_layer_info {
 #define LFLAGS_M_WORM_TAIL              0x00001000UL
 #define LFLAGS_M_WORM_SEEN              0x00002000UL
 #define LFLAGS_M_KILLED                 0x00004000UL
+/* free bit */
 #define LFLAGS_M_MASK                   0x0000FFFFUL
 
 /* These are flags for showing extra stuff in graphical interfaces */
 #define LFLAGS_O_PILE                   0x00010000UL
 #define LFLAGS_O_IN_PIT                 0x00020000UL
 #define LFLAGS_O_CHAIN                  0x00040000UL
+/* free bit */
 #define LFLAGS_O_MASK                   0x000F0000UL
 
 #define LFLAGS_ZAP_LEADING_EDGE         0x00100000UL /* First (leading) tile in a zap */
@@ -127,16 +133,19 @@ struct simple_layer_info {
 
 /* Traps */
 #define LFLAGS_T_TRAPPED                0x00400000UL
-/* free bit */
+
+/* Cmap */
+#define LFLAGS_C_DECORATION             0x00800000UL
+#define LFLAGS_C_CARPET                 0x01000000UL
 
 /* Important general flags */
-#define LFLAGS_SHOWING_MEMORY           0x01000000UL /* also implies that you cannot see the location (and hence showing memory) */
-#define LFLAGS_SHOWING_DETECTION        0x02000000UL /* Do not darken */
-#define LFLAGS_ASCENSION_RADIANCE       0x04000000UL /* Lighten up */
-#define LFLAGS_CAN_SEE                  0x08000000UL /* cansee(x, y) is true (if not, then darken etc.) */
-#define LFLAGS_UXUY                     0x10000000UL /* x == u.ux && y == u.uy is true */
-#define LFLAGS_APPEARS_UNLIT            0x20000000UL
-#define LFLAGS_NO_WALL_END_AUTODRAW     0x40000000UL /* NO_WALL_END_AUTODRAW(x, y) is true */
+#define LFLAGS_SHOWING_MEMORY           0x02000000UL /* also implies that you cannot see the location (and hence showing memory) */
+#define LFLAGS_SHOWING_DETECTION        0x04000000UL /* Do not darken */
+#define LFLAGS_ASCENSION_RADIANCE       0x08000000UL /* Lighten up */
+#define LFLAGS_CAN_SEE                  0x10000000UL /* cansee(x, y) is true (if not, then darken etc.) */
+#define LFLAGS_UXUY                     0x20000000UL /* x == u.ux && y == u.uy is true */
+#define LFLAGS_APPEARS_UNLIT            0x40000000UL
+#define LFLAGS_NO_WALL_END_AUTODRAW     0x80000000UL /* NO_WALL_END_AUTODRAW(x, y) is true */
 
 #define LMFLAGS_WORM_HEAD               0x00000001UL
 #define LMFLAGS_WORM_TAILEND            0x00000002UL
@@ -156,6 +165,7 @@ struct simple_layer_info {
 #define MISSILE_FLAGS_ERODEPROOF    0x00000010UL
 #define MISSILE_FLAGS_POISONABLE    0x00000020UL
 #define MISSILE_FLAGS_TETHERED      0x00000040UL /* Missile is tethered */
+#define MISSILE_FLAGS_LIT           0x00000080UL
 
 
 struct monst_info {

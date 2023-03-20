@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mhmenu.c    $NHDT-Date: 1432512811 2015/05/25 00:13:31 $  $NHDT-Branch: master $:$NHDT-Revision: 1.48 $ */
 /* Copyright (c) Alex Kompel, 2002                                */
@@ -35,6 +35,7 @@ typedef struct mswin_menu_item {
     CHAR_P accelerator;
     CHAR_P group_accel;
     int attr;
+    int color;
     char str[NHMENU_STR_SIZE];
     BOOLEAN_P presel;
     int count;
@@ -670,6 +671,7 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         data->menu.items[new_item].accelerator = msg_data->accelerator;
         data->menu.items[new_item].group_accel = msg_data->group_accel;
         data->menu.items[new_item].attr = msg_data->attr;
+        data->menu.items[new_item].color = msg_data->color;
 
         char msgbuf[NHMENU_STR_SIZE] = "";
         write_CP437_to_buf_unicode(msgbuf, NHMENU_STR_SIZE, msg_data->str);
@@ -1096,8 +1098,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
     int column;
     int spacing = 0, BoldAverageCharWidth = 0, BoldOverhang = 0;
 
-    int color = NO_COLOR, attr;
-    boolean menucolr = FALSE;
+    int color, attr;
     double monitorScale = win10_monitor_scale(hWnd);
 
     UNREFERENCED_PARAMETER(wParam);
@@ -1111,6 +1112,8 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
     data = (PNHMenuWindow) GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
     item = &data->menu.items[lpdis->itemID];
+    color = item->color;
+    attr = item->attr;
 
     for(int i = 0; i < GetNHApp()->mapTileSheets; i++)
         tileDC[i] = CreateCompatibleDC(lpdis->hDC);
@@ -1123,7 +1126,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
     BoldAverageCharWidth = tm.tmAveCharWidth;
     BoldOverhang = tm.tmOverhang;
 
-    cached_font* font = mswin_get_font(NHW_MENU, item->attr, lpdis->hDC, FALSE);
+    cached_font* font = mswin_get_font(NHW_MENU, attr, lpdis->hDC, FALSE);
     normalFont = SelectObject(lpdis->hDC, font->hFont);
     NewBg = menu_bg_brush ? menu_bg_color : (COLORREF) GetSysColor(DEFAULT_COLOR_BG_MENU);
     OldBg = SetBkColor(lpdis->hDC, NewBg);
@@ -1198,13 +1201,17 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
             buf[0] = item->accelerator;
             buf[1] = '\x0';
 
-            if (iflags.use_menu_color
-                && (menucolr = get_menu_coloring(item->str, &color, &attr))) {
-                cached_font * menu_font = mswin_get_font(NHW_MENU, attr, lpdis->hDC, FALSE);
-                SelectObject(lpdis->hDC, menu_font->hFont);
-                if (color != NO_COLOR)
-                    SetTextColor(lpdis->hDC, nhcolor_to_RGB(color));
+            if (iflags.use_menu_color) {
+                (void)get_menu_coloring(item->str, &color, &attr);
             }
+
+            if (attr != ATR_NONE)
+            {
+                cached_font* menu_font = mswin_get_font(NHW_MENU, attr, lpdis->hDC, FALSE);
+                SelectObject(lpdis->hDC, menu_font->hFont);
+            }
+            if (color != NO_COLOR)
+                SetTextColor(lpdis->hDC, nhcolor_to_RGB(color));
 
             SetRect(&drawRect, x, lpdis->rcItem.top, lpdis->rcItem.right,
                     lpdis->rcItem.bottom);
@@ -1235,7 +1242,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
             enum autodraw_types autodraw = AUTODRAW_NONE;
             ntile = glyph2tile[glyph];
             ntile = maybe_get_replaced_tile(ntile, -1, -1,
-                data_to_replacement_info(signed_glyph, -1, item->object_data.otyp > STRANGE_OBJECT ? &item->object_data : (struct obj*)0, (struct monst*)0, 0UL),
+                data_to_replacement_info(signed_glyph, -1, item->object_data.otyp > STRANGE_OBJECT ? &item->object_data : (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0),
                 &autodraw);
             //int tile_animation_idx = get_tile_animation_index_from_glyph(glyph);
             //ntile = maybe_get_animated_tile(ntile, tile_animation_idx, ANIMATION_PLAY_TYPE_ALWAYS, data->intervalCounter, &frame_idx, &main_tile_idx, &item->is_animated, &autodraw);
@@ -2430,7 +2437,7 @@ onListChar(HWND hWnd, HWND hwndList, WORD ch)
     accelerator:
     default:
         if (strchr(data->menu.gacc, ch)
-            && !((ch == '0' || ch == '9' || ch == '8' || ch == GOLD_SYM || ch == GOLD_SYM_ALTERNATE) && data->menu.counting)) 
+            && !((ch == '0' || ch == '9' || ch == '8' || ch == '7' || ch == GOLD_SYM || ch == GOLD_SYM_ALTERNATE) && data->menu.counting))
         {
             /* matched a group accelerator */
             if (data->how == PICK_ANY || data->how == PICK_ONE) 

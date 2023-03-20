@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	winstat.c	$NHDT-Date: 1543447325 2018/11/28 23:22:05 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) Dean Luick, 1992				  */
@@ -62,8 +62,9 @@
 #define F_EXP      16
 #define F_ALIGN    17
 #define F_TIME     18
-#define F_SCORE    19
-#define F_MODE     20
+#define F_REALTIME 19
+#define F_SCORE    20
+#define F_MODE     21
 
 /* status conditions grouped by columns; tty orders these differently */
 #define F_STONE    20
@@ -114,7 +115,7 @@ static enum statusfields X11_fieldorder[X11_NUM_STATUS_LINES][X11_NUM_STATUS_FIE
       BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH,
       BL_FLUSH, BL_FLUSH },
     { BL_MODE, BL_LEVELDESC, BL_GOLD, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,
-      BL_AC, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_HUNGER,
+      BL_AC, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_HUNGER,
       BL_CAP, BL_CONDITION, BL_FLUSH }
 };
 
@@ -176,7 +177,8 @@ unsigned long *bmarray;
 }
 
 void
-X11_status_init()
+X11_status_init(reassessment)
+int reassessment;
 {
 #ifdef STATUS_HILITES
     int i;
@@ -187,7 +189,7 @@ X11_status_init()
     hpbar_percent = 0, hpbar_color = NO_COLOR;
 #endif /* STATUS_HILITES */
     /* let genl_status_init do most of the initialization */
-    genl_status_init();
+    genl_status_init(reassessment);
 }
 
 void
@@ -551,6 +553,7 @@ unsigned long *colormasks UNUSED;
         { BL_UWEP2, F_UWEP2 },
         /*{ BL_HD, F_ },*/
         { BL_TIME, F_TIME },
+        { BL_REALTIME, F_REALTIME },
         { BL_HUNGER, F_HUNGER },
         { BL_HP, F_HP },
         { BL_HPMAX, F_MAXHP },
@@ -1176,8 +1179,6 @@ long new_value;
         /* special case: score can be enabled & disabled */
         else if (attr_rec == &shown_stats[F_SCORE]) {
             static boolean flagscore = TRUE;
-#ifdef SCORE_ON_BOTL
-
             if (flags.showscore && !flagscore) {
                 set_name(attr_rec->w, shown_stats[F_SCORE].name);
                 force_update = TRUE;
@@ -1189,14 +1190,6 @@ long new_value;
             }
             if (!flagscore)
                 return;
-#else
-            if (flagscore) {
-                set_name(attr_rec->w, "");
-                set_value(attr_rec->w, "");
-                flagscore = FALSE;
-            }
-            return;
-#endif
         }
 
         /* special case: when polymorphed, show "HD", disable exp */
@@ -1420,11 +1413,7 @@ int i;
             val = flags.time ? (long) moves : 0L;
             break;
         case F_SCORE:
-#ifdef SCORE_ON_BOTL
             val = flags.showscore ? botl_score() : 0L;
-#else
-            val = 0L;
-#endif
             break;
         default: {
             /*

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    options.c    $NHDT-Date: 1554591224 2019/04/06 22:53:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.363 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -165,6 +165,7 @@ static struct Bool_Opt {
 #endif
     { "force_hint", &flags.force_hint, FALSE, SET_IN_GAME },
     { "fullscreen", &iflags.wc2_fullscreen, FALSE, SET_IN_FILE }, /*WC2*/
+    { "fullstatuslineorder", &flags.fullstatuslineorder, TRUE, SET_IN_GAME },
     { "goldX", &iflags.goldX, FALSE, SET_IN_GAME },
     { "guicolor", &iflags.wc2_guicolor, TRUE, SET_IN_GAME}, /*WC2*/
     { "help", &flags.help, TRUE, SET_IN_GAME },
@@ -194,7 +195,7 @@ static struct Bool_Opt {
     { "mail", (boolean *) 0, TRUE, SET_IN_FILE },
 #endif
     { "mention_walls", &iflags.mention_walls, FALSE, SET_IN_GAME },
-#ifdef ANDROID
+#if defined(ANDROID) || defined(GNH_MOBILE)
     { "menucolors", &iflags.use_menu_color, TRUE, SET_IN_GAME },
 #else
     { "menucolors", &iflags.use_menu_color, FALSE, SET_IN_GAME },
@@ -251,15 +252,13 @@ static struct Bool_Opt {
     { "search_box_traps", &flags.search_box_traps, TRUE, SET_IN_GAME },
     { "selectsaved", &iflags.wc2_selectsaved, TRUE, DISP_IN_GAME }, /*WC*/
     { "self_click_action", &flags.self_click_action, TRUE, SET_IN_GAME },
-    { "showexp", &flags.showexp, FALSE, SET_IN_GAME },
+    { "showexp", &flags.showexp, TRUE, SET_IN_GAME },
     { "showmove", &flags.showmove, TRUE, SET_IN_GAME },
     { "showrace", &flags.showrace, FALSE, SET_IN_GAME },
-#ifdef SCORE_ON_BOTL
-    { "showscore", &flags.showscore, FALSE, SET_IN_GAME },
-#else
-    { "showscore", (boolean *) 0, FALSE, SET_IN_FILE },
-#endif
+    { "showrealtime", &flags.showrealtime, TRUE, SET_IN_GAME },
+    { "showscore", &flags.showscore, TRUE, SET_IN_GAME },
     { "show_buff_timer", &flags.show_buff_timer, FALSE, SET_IN_GAME },
+    { "show_decorations", &flags.show_decorations, TRUE, SET_IN_GAME },
     { "show_grid", &flags.show_grid, FALSE, SET_IN_GAME },
     { "show_tile_mon_hp_bar", &flags.show_tile_mon_hp_bar, FALSE, SET_IN_GAME },
     { "show_tile_pet_hp_bar", &flags.show_tile_pet_hp_bar, FALSE, SET_IN_GAME },
@@ -595,7 +594,7 @@ extern char ttycolors[CLR_MAX]; /* in sys/msdos/video.c */
 static char def_inv_order[MAX_OBJECT_CLASSES] = {
     COIN_CLASS, AMULET_CLASS, WEAPON_CLASS, ARMOR_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, 
     FOOD_CLASS, SCROLL_CLASS, SPBOOK_CLASS, POTION_CLASS, WAND_CLASS,
-    TOOL_CLASS, REAGENT_CLASS, GEM_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
+    TOOL_CLASS, REAGENT_CLASS, GEM_CLASS, ART_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
 };
 
 /*
@@ -5051,9 +5050,8 @@ boolean tinitial, tfrom_file;
                 return retval;
 
             if (boolopt[i].addr == &flags.time
-#ifdef SCORE_ON_BOTL
                 || boolopt[i].addr == &flags.showscore
-#endif
+                || boolopt[i].addr == &flags.showrealtime
                 || boolopt[i].addr == &flags.showexp
                 || boolopt[i].addr == &flags.showmove
                 || boolopt[i].addr == &flags.show_weapon_style
@@ -5062,7 +5060,13 @@ boolean tinitial, tfrom_file;
                 status_reassess();
                 context.botl = TRUE;
             }
-            else if (boolopt[i].addr == &flags.invlet_constant) 
+            else if(boolopt[i].addr == &flags.fullstatuslineorder)
+            {
+                (*windowprocs.win_status_init)(1);
+                status_reassess();
+                context.botl = TRUE;
+            }
+            else if (boolopt[i].addr == &flags.invlet_constant)
             {
                 if (flags.invlet_constant) 
                 {
@@ -5076,7 +5080,7 @@ boolean tinitial, tfrom_file;
                     need_redraw = TRUE;
                     need_issue_gui_command = TRUE;
             }
-            else if (boolopt[i].addr == &flags.classic_statue_symbol || boolopt[i].addr == &flags.classic_colors)
+            else if (boolopt[i].addr == &flags.classic_statue_symbol || boolopt[i].addr == &flags.classic_colors || boolopt[i].addr == &flags.show_decorations)
             {
                 need_redraw = TRUE;
             }
@@ -5720,6 +5724,7 @@ doset() /* changing options via menu by Per Liboriussen */
 
     if (need_status_initialize)
     {
+        (*windowprocs.win_status_init)(1);
         status_reassess();
         need_redraw = TRUE;
     }
@@ -6999,7 +7004,8 @@ char *buf;
     {
         if (wc2_supported(optname))
         { 
-            Sprintf(buf, "%d", (iflags.wc2_statuslines < 3) ? 2 : (iflags.wc2_statuslines > 7) ? 8 : iflags.wc2_statuslines);
+            boolean auto_on = wc2_supported("autostatuslines") && iflags.wc2_autostatuslines;
+            Sprintf(buf, "%d%s", (iflags.wc2_statuslines < 3) ? 2 : (iflags.wc2_statuslines > 7) ? 8 : iflags.wc2_statuslines, auto_on ? ", auto" : "");
         }
         /* else default to "unknown" */
     } 
@@ -7172,9 +7178,12 @@ int
 dotogglepickup()
 {
     char buf[BUFSZ], ocl[MAX_OBJECT_CLASSES + 1];
+    int color = NO_COLOR;
 
     flags.pickup = !flags.pickup;
-    if (flags.pickup) {
+    if (flags.pickup) 
+    {
+        color = CLR_GREEN;
         oc_to_str(flags.pickup_types, ocl);
         Sprintf(buf, "ON, for %s objects%s", ocl[0] ? ocl : "all",
                 (iflags.autopickup_exceptions[AP_LEAVE]
@@ -7183,10 +7192,13 @@ dotogglepickup()
                            ? ", with one exception"
                            : ", with some exceptions")
                     : "");
-    } else {
+    } 
+    else 
+    {
+        color = CLR_RED;
         Strcpy(buf, "OFF");
     }
-    pline("Autopickup: %s.", buf);
+    custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "Autopickup: ", ATR_NONE, NO_COLOR, "", ATR_NONE, color, 0UL, "%s.", buf);
     return 0;
 }
 
@@ -7263,6 +7275,29 @@ struct autopickup_exception *whichape;
             ape = ape->next;
         }
     }
+}
+
+int
+dotoggledecorations()
+{
+    char buf[BUFSZ];
+    int color = NO_COLOR;
+
+    flags.show_decorations = !flags.show_decorations;
+    if (flags.show_decorations) 
+    {
+        Strcpy(buf, "ON");
+        color = CLR_GREEN;
+    }
+    else 
+    {
+        Strcpy(buf, "OFF");
+        color = CLR_RED;
+    }
+    custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "Displaying decorations: ", ATR_NONE, NO_COLOR, "", ATR_NONE, color, 0UL, "%s.", buf);
+    (void)doredraw();
+
+    return 0;
 }
 
 STATIC_OVL int

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    dothrow.c    $NHDT-Date: 1556201496 2019/04/25 14:11:36 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -200,7 +200,7 @@ boolean thrown;
         /* martial arts */
         if (isyou)
         {
-            skilllevel = limited_skill_level(P_MARTIAL_ARTS, FALSE, TRUE);
+            skilllevel = adjusted_limited_skill_level(P_MARTIAL_ARTS, FALSE, TRUE);
         }
         else
         {
@@ -465,7 +465,7 @@ autoquiver()
                    || (otmp->otyp == FLINT
                        && objects[otmp->otyp].oc_name_known)
                    || (otmp->oclass == GEM_CLASS
-                       && (objects[otmp->otyp].oc_material == MAT_GLASS || objects[otmp->otyp].oc_material == MAT_CRYSTAL)
+                       && (otmp->material == MAT_GLASS || otmp->material == MAT_CRYSTAL)
                        && objects[otmp->otyp].oc_name_known))
         {
             if (uslinging())
@@ -1365,13 +1365,13 @@ struct obj *obj;
         tmp_at(DISP_FLASH, obj_to_missile_glyph(obj, get_missile_index(u.dx, u.dy), rn2_on_display_rng));
         while (isok(x,y) && (x != u.ux || y != u.uy)) {
             tmp_at(x, y);
-            if (obj && ((is_poisonable(obj) && obj->opoisoned) || obj->elemental_enchantment || obj->exceptionality || obj->mythic_prefix || obj->mythic_suffix || obj->oeroded || obj->oeroded2))
+            if (obj && ((is_poisonable(obj) && obj->opoisoned) || obj->material != objects[obj->otyp].oc_material || obj->elemental_enchantment || obj->exceptionality || obj->mythic_prefix || obj->mythic_suffix || obj->oeroded || obj->oeroded2))
             {
-                show_missile_info(x, y, obj->opoisoned, obj->elemental_enchantment, obj->exceptionality, obj->mythic_prefix, obj->mythic_suffix, obj->oeroded, obj->oeroded2, get_missile_flags(obj, FALSE), get_obj_height(obj), 0, 0);
+                show_missile_info(x, y, obj->opoisoned, obj->material, obj->special_quality, obj->elemental_enchantment, obj->exceptionality, obj->mythic_prefix, obj->mythic_suffix, obj->oeroded, obj->oeroded2, get_missile_flags(obj, FALSE), get_obj_height(obj), 0, 0);
                 flush_screen(1);
             }
             adjusted_delay_output();
-            show_missile_info(x, y, 0, 0, 0, 0, 0, 0, 0, 0UL, 0, 0, 0); /* Clear missile info out */
+            show_missile_info(x, y, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0UL, 0, 0, 0); /* Clear missile info out */
             x -= u.dx;
             y -= u.dy;
         }
@@ -1393,7 +1393,7 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
     boolean isinstakill = FALSE;
 
     notonhead = FALSE; /* reset potentially stale value */
-    if ((obj->cursed || obj->greased) && (u.dx || u.dy) && !rn2(7))
+    if ((obj->cursed || obj->greased || Tottering) && (u.dx || u.dy) && (Tottering ? rn2(7) : !rn2(7)))
     {
         boolean slipok = TRUE;
 
@@ -1622,7 +1622,7 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
         {
 //            if (rn2(100)) {
                 if (tethered_weapon)
-                    tmp_at_with_obj(DISP_END, BACKTRACK, obj);
+                    tmp_at_with_obj(DISP_END, BACKTRACK, obj, get_missile_flags(obj, TRUE), obj ? obj->material : MAT_NONE, obj ? obj->special_quality : 0);
                 else
                     sho_obj_return_to_u(obj); /* display its flight */
 
@@ -2054,7 +2054,7 @@ uchar* hitres_ptr;
             else if (uwep)
             {
                 tmp += weapon_to_hit_value(uwep, mon, &youmonst, 2);    //tmp += uwep->enchantment - greatest_erosion(uwep);
-                nonpolytmp += weapon_skill_hit_bonus(uwep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0); //Players get skill bonuses
+                nonpolytmp += weapon_skill_hit_bonus(uwep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0, TRUE); //Players get skill bonuses
 //                if (uwep->oartifact)
 //                    tmp += spec_abon(uwep, mon);
                 /*
@@ -2082,7 +2082,7 @@ uchar* hitres_ptr;
                 tmp -= 2;
             /* we know we're dealing with a weapon or weptool handled
                by WEAPON_SKILLS once ammo objects have been excluded */
-            nonpolytmp += weapon_skill_hit_bonus(obj, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0);
+            nonpolytmp += weapon_skill_hit_bonus(obj, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
         }
 
         /* If poly'd, give maximum of player hit chance and polymorph form hit dice, otherwise use normal player chance */
@@ -2286,7 +2286,7 @@ register struct obj *obj;
 {
     char buf[BUFSZ];
     boolean is_buddy = sgn(mon->data->maligntyp) == sgn(u.ualign.type);
-    boolean is_gem = objects[obj->otyp].oc_material == MAT_GEMSTONE;
+    boolean is_gem = obj->material == MAT_GEMSTONE;
     int ret = 0;
     int luck_change = 0;
     STATIC_VAR NEARDATA const char nogood[] = " is not interested in your junk.";
@@ -2473,7 +2473,7 @@ boolean from_invent;
             explode_oil(obj, x, y);
         } else if (distu(x, y) <= 2) {
             if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data)) {
-                char dcbuf[BUFSZ] = "";
+                char dcbuf[IBUFSZ] = "";
                 if (obj->otyp != POT_WATER) {
                     if (!has_innate_breathless(youmonst.data)) {
                         /* [what about "familiar odor" when known?] */
@@ -2585,7 +2585,6 @@ boolean in_view;
         if (!is_fragile(obj))
             impossible("breaking odd object?");
         /*FALLTHRU*/
-    case CRYSTAL_PLATE_MAIL:
     case LENSES:
     case SUNGLASSES:
     case MIRROR:

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    bones.c    $NHDT-Date: 1557092711 2019/05/05 21:45:11 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.75 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985,1993. */
@@ -91,6 +91,7 @@ boolean restore;
                         if (artilist[otmp->oartifact].maskotyp && objects[artilist[otmp->oartifact].maskotyp].oc_prob > 0 && !(objects[artilist[otmp->oartifact].maskotyp].oc_flags3 & O3_NO_GENERATION))
                         {
                             otmp->otyp = artilist[otmp->oartifact].maskotyp;
+                            otmp->material = objects[otmp->otyp].oc_material;
                         }
                         else
                         {
@@ -98,6 +99,7 @@ boolean restore;
                             otmp->otyp = random_objectid_from_class(otmp->oclass, (struct monst*)0, MKOBJ_FLAGS_ALSO_RARE);
                             otmp->elemental_enchantment = 0;
                             otmp->exceptionality = 0;
+                            otmp->material = objects[otmp->otyp].oc_material;
                             otmp->mythic_prefix = 0;
                             otmp->mythic_suffix = 0;
                             otmp->charges = 0;
@@ -200,6 +202,7 @@ boolean restore;
             } else if (otmp->otyp == AMULET_OF_YENDOR) {
                 /* no longer the real Amulet */
                 otmp->otyp = FAKE_AMULET_OF_YENDOR;
+                otmp->material = objects[otmp->otyp].oc_material;
                 curse(otmp);
             } else if (otmp->otyp == CANDELABRUM_OF_INVOCATION) {
                 if (otmp->lamplit)
@@ -209,6 +212,7 @@ boolean restore;
                 if (otmp->special_quality > 0)
                     otmp->quan = (long) otmp->special_quality;
                 otmp->special_quality = 0;
+                otmp->material = objects[otmp->otyp].oc_material;
                 otmp->owt = weight(otmp);
                 curse(otmp);
             } else if (otmp->otyp == BELL_OF_OPENING) {
@@ -522,6 +526,7 @@ make_bones:
     if (mtmp) {
         mtmp->m_lev = (u.ulevel ? u.ulevel : 1);
         mtmp->mbasehpmax = u.ubasehpmax;
+        mtmp->mbasehpdrain = 0; /* Undead are cured on hp drain */
         update_mon_maxhp(mtmp);
         mtmp->mhp = mtmp->mhpmax;
         mtmp->female = flags.female;

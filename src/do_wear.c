@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    do_wear.c    $NHDT-Date: 1551138255 2019/02/25 23:44:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.108 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1411,6 +1411,18 @@ dotakeoff()
         if (context.takeoff.command == TAKEOFF_WEAR_CMD_TAKEOFF && context.takeoff.mask && context.takeoff.mask == otmp->owornmask)
             return doddoremarm();
 
+        if (!(otmp->owornmask & (W_ARMOR | W_ACCESSORY))) {
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            You_ex1(ATR_NONE, CLR_MSG_FAIL, "are not wearing that.");
+            return 0;
+        }
+        else if (otmp == uskin)
+        {
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            You_cant_ex1(ATR_NONE, CLR_MSG_FAIL, "take that off; it's embedded.");
+            return 0;
+        }
+
         if (is_armor_covered(otmp))
         {
             char what[BUFSZ] = "", why[BUFSZ], qbuf[BUFSZ * 2], tbuf[BUFSZ];
@@ -1467,7 +1479,11 @@ register struct obj *otmp;
 
         play_sfx_sound(SFX_GENERAL_WELDED);
         You_ex(ATR_NONE, CLR_MSG_WARNING, "can't.  %s cursed.", use_plural ? "They are" : "It is");
-        otmp->bknown = TRUE;
+        if (!otmp->bknown)
+        {
+            otmp->bknown = TRUE;
+            update_inventory();
+        }
         return 1;
     }
     return 0;
@@ -2319,7 +2335,11 @@ boolean in_takeoff_wear;
             if (uarmg && uarmg->cursed) 
             {
                 res = !uarmg->bknown;
-                uarmg->bknown = 1;
+                if (!uarmg->bknown)
+                {
+                    uarmg->bknown = TRUE;
+                    update_inventory();
+                }
                 play_sfx_sound(SFX_GENERAL_CANNOT);
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "cannot remove your gloves to put on the ring.");
                 return res; /* uses move iff we learned gloves are cursed */
@@ -2703,18 +2723,13 @@ find_ac()
     /* Monk protection */
     uac -= get_role_AC_bonus();
 
-    /* [The magic binary numbers 127 and -128 should be replaced with the
-     * mystic decimal numbers 99 and -99 which require no explanation to
-     * the uninitiated and would cap the width of a status line value at
-     * one less character.]
-     */
-    if (uac < -128)
-        uac = -128; /* u.uac is an schar */
-    else if (uac > 127)
-        uac = 127; /* for completeness */
+    if (uac < -9999)
+        uac = -9999; /* u.uac is a short */
+    else if (uac > 9999)
+        uac = 9999; /* for completeness */
 
     if (uac != u.uac) {
-        u.uac = uac;
+        u.uac = (short)uac;
         context.botl = 1;
     }
 }
@@ -2923,7 +2938,11 @@ register struct obj *otmp;
         if (why) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
             You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot %s to remove the ring.", buf);
-            why->bknown = TRUE;
+            if (!why->bknown)
+            {
+                why->bknown = TRUE;
+                update_inventory();
+            }
             return 0;
         }
     }
@@ -2933,7 +2952,11 @@ register struct obj *otmp;
             play_sfx_sound(SFX_GENERAL_CANNOT);
             You_ex(ATR_NONE, CLR_MSG_WARNING, "are unable to take off your %s while wielding that %s.",
                 c_gloves, is_sword(uwep) ? c_sword : c_weapon);
-            uwep->bknown = TRUE;
+            if (!uwep->bknown)
+            {
+                uwep->bknown = TRUE;
+                update_inventory();
+            }
             return 0;
         } else if (Glib) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
@@ -2978,7 +3001,11 @@ register struct obj *otmp;
         if (why) {
             play_sfx_sound(SFX_GENERAL_CANNOT);
             You_ex(ATR_NONE, CLR_MSG_WARNING, "cannot %s to take off %s.", buf, the(xname(otmp)));
-            why->bknown = TRUE;
+            if (!why->bknown)
+            {
+                why->bknown = TRUE;
+                update_inventory();
+            }
             return 0;
         }
     }

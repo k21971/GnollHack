@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    windows.c    $NHDT-Date: 1526933747 2018/05/21 20:15:47 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.48 $ */
 /* Copyright (c) D. Cohrs, 1993. */
@@ -90,6 +90,7 @@ STATIC_DCL void FDECL(dump_add_extended_menu, (winid, int, const ANY_P*, struct 
 STATIC_DCL void FDECL(dump_end_menu_ex, (winid, const char *, const char*));
 STATIC_DCL int FDECL(dump_select_menu, (winid, int, MENU_ITEM_P **));
 STATIC_DCL void FDECL(dump_putstr_ex, (winid, int, const char *, int, int));
+STATIC_DCL void FDECL(dump_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 #endif /* DUMPLOG */
 
 #ifdef HANGUPHANDLING
@@ -660,14 +661,14 @@ const char *pref UNUSED;
 }
 
 char *
-genl_getmsghistory_ex(attr_ptr, color_ptr, init)
-int* attr_ptr, * color_ptr;
+genl_getmsghistory_ex(attrs_ptr, colors_ptr, init)
+char** attrs_ptr, **colors_ptr;
 boolean init UNUSED;
 {
-    if (attr_ptr)
-        *attr_ptr = ATR_NONE;
-    if (color_ptr)
-        *color_ptr = NO_COLOR;
+    if (attrs_ptr)
+        *attrs_ptr = (char*)0;
+    if (colors_ptr)
+        *colors_ptr = (char*)0;
 
     /* window ports can provide
        their own getmsghistory() routine to
@@ -684,9 +685,9 @@ boolean init UNUSED;
 }
 
 void
-genl_putmsghistory_ex(msg, attr, color, is_restoring)
+genl_putmsghistory_ex(msg, attrs, colors, is_restoring)
 const char *msg;
-int attr, color;
+const char* attrs, *colors;
 boolean is_restoring;
 {
     /* window ports can provide
@@ -711,7 +712,7 @@ boolean is_restoring;
        previous session's messages upon restore, but it does put the quest
        message summary lines there by treating them as ordinary messages */
     if (!is_restoring)
-        pline_ex(attr, color, "%s", msg);
+        pline_ex(attrs[0], colors[0], "%s", msg);
     return;
 }
 
@@ -736,6 +737,7 @@ STATIC_DCL void FDECL(hup_add_extended_menu, (winid, int, const anything*, struc
     int, const char*, BOOLEAN_P));
 STATIC_DCL void FDECL(hup_end_menu_ex, (winid, const char *, const char*));
 STATIC_DCL void FDECL(hup_putstr_ex, (winid, int, const char *, int, int));
+STATIC_DCL void FDECL(hup_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 STATIC_DCL void FDECL(hup_print_glyph, (winid, XCHAR_P, XCHAR_P, struct layer_info));
 STATIC_DCL void FDECL(hup_issue_gui_command, (int));
 STATIC_DCL void FDECL(hup_outrip, (winid, int, time_t));
@@ -770,7 +772,7 @@ STATIC_VAR struct window_procs hup_procs = {
     hup_void_ndecl,                                    /* resume_nhwindows */
     hup_create_nhwindow_ex, hup_void_fdecl_winid,         /* clear_nhwindow */
     hup_display_nhwindow, hup_void_fdecl_winid,        /* destroy_nhwindow */
-    hup_curs, hup_putstr_ex, hup_putstr_ex,            /* putmixed */
+    hup_curs, hup_putstr_ex, hup_putstr_ex2, hup_putstr_ex,            /* putmixed */
     hup_display_file, hup_start_menu_ex,               /* start_menu */
     hup_add_menu, hup_add_extended_menu, hup_end_menu_ex, hup_select_menu, genl_message_menu,
     hup_void_ndecl,                                    /* update_inventory */
@@ -806,7 +808,7 @@ STATIC_VAR struct window_procs hup_procs = {
     hup_void_ndecl,                                   /* end_screen */
     hup_outrip, genl_preference_update, genl_getmsghistory_ex,
     genl_putmsghistory_ex,
-    hup_void_ndecl,                                   /* status_init */
+    hup_void_fdecl_int,                               /* status_init */
     hup_void_ndecl,                                   /* status_finish */
     genl_status_enablefield, hup_status_update,
     genl_can_suspend_no,
@@ -818,7 +820,7 @@ STATIC_VAR void FDECL((*previnterface_exit_nhwindows), (const char *)) = 0;
 void
 nhwindows_hangup()
 {
-    char *FDECL((*previnterface_getmsghistory_ex), (int*, int*, BOOLEAN_P)) = 0;
+    char *FDECL((*previnterface_getmsghistory_ex), (char**, char**, BOOLEAN_P)) = 0;
 
 #ifdef ALTMETA
     /* command processor shouldn't look for 2nd char after seeing ESC */
@@ -985,6 +987,16 @@ const char *text UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
+hup_putstr_ex2(window, text, attrs, colors, attr, color, app)
+winid window UNUSED;
+int attr UNUSED, color UNUSED, app UNUSED;
+const char* text UNUSED, *attrs UNUSED, *colors UNUSED;
+{
+    return;
+}
+
+/*ARGSUSED*/
+STATIC_OVL void
 hup_print_glyph(window, x, y, layers)
 winid window UNUSED;
 xchar x UNUSED, y UNUSED;
@@ -1143,8 +1155,12 @@ boolean status_activefields[MAXBLSTATS];
 //NEARDATA winid WIN_STATUS;
 
 void
-genl_status_init()
+genl_status_init(reassessment)
+int reassessment;
 {
+    if (reassessment)
+        return;
+
     int i;
 
     for (i = 0; i < MAXBLSTATS; ++i) {
@@ -1198,16 +1214,16 @@ unsigned long *colormasks UNUSED;
     enum statusfields idx1, idx2, *fieldlist;
     char *nb, *text = (char *) ptr;
 
-    static enum statusfields gsu_fieldorder[][22] = {
+    static enum statusfields gsu_fieldorder[][23] = {
         /* line one */
         { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, //BL_ALIGN,
           BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH,
-          BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH   },
+          BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH },
         /* line two, default order */
         { BL_MODE, BL_LEVELDESC, // BL_GOLD,
           BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
           BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD,
-          BL_TIME,
+          BL_TIME, BL_REALTIME,
           BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
           BL_FLUSH },
         /* move time to the end */
@@ -1215,17 +1231,17 @@ unsigned long *colormasks UNUSED;
           BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
           BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD,
           BL_2WEP, BL_SKILL,BL_HUNGER, BL_CAP, BL_CONDITION,
-          BL_TIME, BL_FLUSH },
+          BL_TIME, BL_REALTIME, BL_FLUSH },
         /* move experience and time to the end */
         { BL_MODE, BL_LEVELDESC, // BL_GOLD,
           BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
           BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
-          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_FLUSH },
+          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_FLUSH },
         /* move level description plus gold and experience and time to end */
         { BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
           BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
           BL_MODE, BL_LEVELDESC, //BL_GOLD,
-          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_FLUSH },
+          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_FLUSH },
     };
 
     /* in case interface is using genl_status_update() but has not
@@ -1337,6 +1353,7 @@ unsigned long *colormasks UNUSED;
                 case BL_MOVE:
                 case BL_UWEP:
                 case BL_TIME:
+                case BL_REALTIME:
                     Strcpy(nb = eos(nb), " ");
                     break;
                 case BL_MODE:
@@ -1570,6 +1587,16 @@ const char *str;
         fprintf(dumplog_file, "%s\n", buf);
 }
 
+/*ARGSUSED*/
+STATIC_OVL void
+dump_putstr_ex2(win, str, attrs, colors, attr, color, app)
+winid win;
+int attr, color, app;
+const char* str, *attrs, *colors;
+{
+    dump_putstr_ex(win, attrs ? attrs[0] : attr, str, app, colors ? colors[0] : color);
+}
+
 #ifdef DUMPLOG
 /*ARGSUSED*/
 void
@@ -1730,6 +1757,7 @@ boolean onoff_flag;
             windowprocs.win_end_menu_ex = dump_end_menu_ex;
             windowprocs.win_select_menu = dump_select_menu;
             windowprocs.win_putstr_ex = dump_putstr_ex;
+            windowprocs.win_putstr_ex2 = dump_putstr_ex2;
         } else {
             windowprocs = dumplog_windowprocs_backup;
         }

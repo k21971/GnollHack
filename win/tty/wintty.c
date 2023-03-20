@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    wintty.c    $NHDT-Date: 1557088734 2019/05/05 20:38:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.203 $ */
 /* Copyright (c) David Cohrs, 1991                                */
@@ -105,7 +105,7 @@ struct window_procs tty_procs = {
     tty_init_nhwindows, tty_player_selection, tty_askname, tty_get_nh_event,
     tty_exit_nhwindows, tty_suspend_nhwindows, tty_resume_nhwindows,
     tty_create_nhwindow_ex, tty_clear_nhwindow, tty_display_nhwindow,
-    tty_destroy_nhwindow, tty_curs, tty_putstr_ex, genl_putmixed_ex,
+    tty_destroy_nhwindow, tty_curs, tty_putstr_ex, tty_putstr_ex2, genl_putmixed_ex,
     tty_display_file, tty_start_menu_ex, tty_add_menu, tty_add_extended_menu, tty_end_menu_ex,
     tty_select_menu, tty_message_menu, tty_update_inventory, tty_mark_synch,
     tty_wait_synch,
@@ -374,12 +374,12 @@ int sig_unused UNUSED;
                 ttyDisplay->toplin = i;
                 flush_screen(1);
                 if (i) {
-                    addtopl(toplines);
+                    addtopl(toplines, ATR_NONE, NO_COLOR);
                 } else
                     for (i = WIN_INVEN; i < MAXWIN; i++)
                         if (wins[i] && wins[i]->active) {
                             /* cop-out */
-                            addtopl("Press Return to continue: ");
+                            addtopl("Press Return to continue: ", ATR_NONE, NO_COLOR);
                             break;
                         }
                 (void) fflush(stdout);
@@ -407,7 +407,7 @@ new_status_window()
     /* frees some status tracking data */
     genl_status_finish();
     /* creates status window and allocates tracking data */
-    tty_status_init();
+    tty_status_init(0);
     tty_clear_nhwindow(WIN_STATUS); /* does some init, sets context.botlx */
 #ifdef STATUS_HILITES
     status_initialize(REASSESS_ONLY);
@@ -1584,13 +1584,19 @@ struct extended_create_window_info info UNUSED;
 
     if (newwin->maxrow) {
         newwin->data = (char **) alloc(((size_t)newwin->maxrow * sizeof (char *)));
+        newwin->datattrs = (char**)alloc(((size_t)newwin->maxrow * sizeof(char*)));
+        newwin->datcolors = (char**) alloc(((size_t)newwin->maxrow * sizeof(char*)));
         newwin->datlen = (short *) alloc(((size_t)newwin->maxrow * sizeof (short)));
         for (i = 0; i < newwin->maxrow; i++) {
             if (newwin->maxcol) { /* WIN_STATUS */
                 newwin->data[i] = (char *) alloc((size_t)newwin->maxcol);
+                newwin->datattrs[i] = (char*)alloc((size_t)newwin->maxcol);
+                newwin->datcolors[i] = (char*) alloc((size_t)newwin->maxcol);
                 newwin->datlen[i] = (short) newwin->maxcol;
             } else {
                 newwin->data[i] = (char *) 0;
+                newwin->datattrs[i] = (char*)0;
+                newwin->datcolors[i] = (char*)0;
                 newwin->datlen[i] = 0;
             }
         }
@@ -1598,6 +1604,8 @@ struct extended_create_window_info info UNUSED;
             newwin->maxrow = 0;
     } else {
         newwin->data = (char **) 0;
+        newwin->datattrs = (char**)0;
+        newwin->datcolors = (char **) 0;
         newwin->datlen = (short *) 0;
     }
 
@@ -2013,7 +2021,10 @@ struct WinDesc *cw;
 
                     if (!iflags.use_menu_color
                         || !get_menu_coloring(curr->str, &color, &attr))
+                    {
                         attr = curr->attr;
+                        color = curr->color;
+                    }
 
                     /* which character to start attribute highlighting;
                        whole line for headers and such, after the selector
@@ -2119,6 +2130,7 @@ struct WinDesc *cw;
 
         switch (morc) {
         case '0':
+        case '7':
         case '8':
         case '9':
             /* special case: '0' is also the default ball class */
@@ -2132,7 +2144,6 @@ struct WinDesc *cw;
         case '4':
         case '5':
         case '6':
-        case '7':
             count = (count * 10L) + (long) (morc - '0');
             /*
              * It is debatable whether we should allow 0 to
@@ -2308,26 +2319,31 @@ process_text_window(window, cw)
 winid window;
 struct WinDesc *cw;
 {
-    int i, n, attr;
+    int i, n, /* attr, */ ccolor = NO_COLOR, cattr = ATR_NONE;
     boolean linestart;
-    register char *cp;
+    register char *cp,*ccp,*cap;
 
     issue_gui_command(GUI_CMD_START_FLUSH);
 
-    for (n = 0, i = 0; i < cw->maxrow; i++) {
+    for (n = 0, i = 0; i < cw->maxrow; i++) 
+    {
         HUPSKIP();
-        if (!cw->offx && (n + cw->offy == ttyDisplay->rows - 1)) {
+        if (!cw->offx && (n + cw->offy == ttyDisplay->rows - 1)) 
+        {
             tty_curs(window, 1, n);
             cl_end();
             dmore(cw, quitchars);
-            if (morc == '\033') {
+            if (morc == '\033') 
+            {
                 cw->flags |= WIN_CANCELLED;
                 break;
             }
-            if (cw->offy) {
+            if (cw->offy) 
+            {
                 tty_curs(window, 1, 0);
                 cl_eos();
-            } else
+            }
+            else
                 clear_screen();
             n = 0;
         }
@@ -2338,38 +2354,72 @@ struct WinDesc *cw;
         if (cw->offx)
             cl_end();
 #endif
-        if (cw->data[i]) {
-            attr = cw->data[i][0] - 1;
-            if (cw->offx) {
+        if (cw->data[i]) 
+        {
+            //attr = cw->data[i][0] - 1;
+            if (cw->offx) 
+            {
                 (void) doputchar(' ', TRUE);
                 ++ttyDisplay->curx;
             }
-            term_start_attr(attr);
-            for (cp = &cw->data[i][1], linestart = TRUE;
+            //term_start_attr(attr);
+            for (cp = &cw->data[i][1], ccp = &cw->datcolors[i][0], cap = &cw->datattrs[i][0], linestart = TRUE;
 #ifndef WIN32CON
                  *cp && (int) ++ttyDisplay->curx < (int) ttyDisplay->cols;
-                 cp++
+                 cp++, ccp++, cap++
 #else
                  *cp && (int) ttyDisplay->curx < (int) ttyDisplay->cols;
-                 cp++, ttyDisplay->curx++
+                 cp++, ccp++, cap++, ttyDisplay->curx++
 #endif
-                 ) {
+                 ) 
+            {
                 /* message recall for msg_window:full/combination/reverse
                    might have output from '/' in it (see redotoplin()) */
-                if (linestart && (*cp & 0x80) != 0) {
+                if (linestart && (*cp & 0x80) != 0) 
+                {
                     g_putch((int)*cp, TRUE);
                     end_glyphout();
                     linestart = FALSE;
-                } else {
+                }
+                else 
+                {
+                    if (ccolor != *ccp)
+                    {
+                        if(ccolor != NO_COLOR)
+                            term_end_color();
+                        ccolor = *ccp;
+                        if (ccolor != NO_COLOR)
+                            term_start_color(ccolor);
+                    }
+                    if (cattr != *cap)
+                    {
+                        if (cattr != ATR_NONE)
+                            term_end_attr(cattr);
+                        cattr = *cap;
+                        if (cattr != ATR_NONE)
+                            term_start_attr(cattr);
+                    }
                     (void) doputchar((nhsym)((unsigned char)(*cp)), TRUE);
                 }
             }
-            term_end_attr(attr);
+            if (ccolor != NO_COLOR)
+            {
+                term_end_color();
+                ccolor = NO_COLOR;
+            }
+            if (cattr != ATR_NONE)
+            {
+                term_end_attr(cattr);
+                cattr = ATR_NONE;
+            }
+            //term_end_attr(attr);
         }
     }
-    if (i == cw->maxrow) {
+    if (i == cw->maxrow) 
+    {
 #ifdef H2344_BROKEN
-        if (cw->type == NHW_TEXT) {
+        if (cw->type == NHW_TEXT) 
+        {
             tty_curs(BASE_WINDOW, 1, (int) ttyDisplay->cury + 1);
             cl_eos();
         }
@@ -2735,7 +2785,18 @@ void
 tty_putstr_ex(window, attr, str, app, color)
 winid window;
 int attr, app, color;
-const char *str;
+const char* str;
+{
+    if (!str)
+        return;
+    tty_putstr_ex2(window, str, (char*)0, (char*)0, attr, color, app);
+}
+
+void
+tty_putstr_ex2(window, str, attrs, colors, attr, color, app)
+winid window;
+int attr, color, app;
+const char *str, *attrs, *colors;
 {
     register struct WinDesc *cw = 0;
     register char *ob;
@@ -2764,13 +2825,15 @@ const char *str;
 
     print_vt_code2(AVTC_SELECT_WINDOW, window);
 
+    int used_attr = attrs ? attrs[0] : attr;
+
     switch (cw->type) {
     case NHW_MESSAGE: {
         int suppress_history = (attr & ATR_NOHISTORY);
 
         /* in case we ever support display attributes for topline
            messages, clear flag mask leaving only display attr */
-        /*attr &= ~(ATR_URGENT | ATR_NOHISTORY);*/
+        /*attr &= ~(ATR_LINE_MSG_MASK);*/
 
         /* really do this later */
 #if defined(USER_SOUNDS) && defined(WIN32CON)
@@ -2779,12 +2842,12 @@ const char *str;
         if (!suppress_history) {
             /* normal output; add to current top line if room, else flush
                whatever is there to history and then write this */
-            update_topl(str);
+            update_topl2(str, attrs, colors, attr, color);
         } else {
             /* put anything already on top line into history */
             remember_topl();
             /* write to top line without remembering what we're writing */
-            show_topl(str);
+            show_topl2(str, attrs, colors, attr, color);
         }
         break;
     }
@@ -2823,7 +2886,7 @@ const char *str;
 #endif /* STATUS_HILITES */
     case NHW_MAP:
         tty_curs(window, cw->curx + 1, cw->cury);
-        term_start_attr(attr);
+        term_start_attr(used_attr);
         while (*str && (int) ttyDisplay->curx < (int) ttyDisplay->cols - 1) {
             (void) doputchar((nhsym)*str, TRUE);
             str++;
@@ -2831,11 +2894,11 @@ const char *str;
         }
         cw->curx = 0;
         cw->cury++;
-        term_end_attr(attr);
+        term_end_attr(used_attr);
         break;
     case NHW_BASE:
         tty_curs(window, cw->curx + 1, cw->cury);
-        term_start_attr(attr);
+        term_start_attr(used_attr);
         while (*str) {
             if ((int) ttyDisplay->curx >= (int) ttyDisplay->cols - 1) {
                 cw->curx = 0;
@@ -2848,7 +2911,7 @@ const char *str;
         }
         cw->curx = 0;
         cw->cury++;
-        term_end_attr(attr);
+        term_end_attr(used_attr);
         break;
     case NHW_MENU:
     case NHW_TEXT:
@@ -2863,33 +2926,76 @@ const char *str;
             cw->maxcol = ttyDisplay->cols; /* force full-screen mode */
             tty_display_nhwindow(window, TRUE);
             for (i = 0; i < cw->maxrow; i++)
+            {
                 if (cw->data[i]) {
-                    free((genericptr_t) cw->data[i]);
+                    free((genericptr_t)cw->data[i]);
                     cw->data[i] = 0;
                 }
+                if (cw->datcolors[i]) {
+                    free((genericptr_t)cw->datcolors[i]);
+                    cw->datcolors[i] = 0;
+                }
+                if (cw->datattrs[i]) {
+                    free((genericptr_t)cw->datattrs[i]);
+                    cw->datattrs[i] = 0;
+                }
+            }
             cw->maxrow = cw->cury = 0;
         }
         /* always grows one at a time, but alloc 12 at a time */
         if (cw->cury >= cw->rows) {
-            char **tmp;
+            char **tmp, ** tmp2, ** tmp3;
 
             cw->rows += 12;
             tmp = (char **) alloc(sizeof(char *) * (size_t)cw->rows);
+            tmp2 = (char**) alloc(sizeof(char *) * (size_t)cw->rows);
+            tmp3 = (char**) alloc(sizeof(char *) * (size_t)cw->rows);
             for (i = 0; i < cw->maxrow; i++)
+            {
                 tmp[i] = cw->data[i];
+                tmp2[i] = cw->datcolors[i];
+                tmp3[i] = cw->datattrs[i];
+            }
             if (cw->data)
                 free((genericptr_t) cw->data);
+            if (cw->datcolors)
+                free((genericptr_t)cw->datcolors);
+            if (cw->datattrs)
+                free((genericptr_t)cw->datattrs);
             cw->data = tmp;
+            cw->datcolors = tmp2;
+            cw->datattrs = tmp3;
 
             for (i = cw->maxrow; i < cw->rows; i++)
+            {
                 cw->data[i] = 0;
+                cw->datcolors[i] = 0;
+                cw->datattrs[i] = 0;
+            }
         }
         if (cw->data[cw->cury])
             free((genericptr_t) cw->data[cw->cury]);
+        if (cw->datattrs[cw->cury])
+            free((genericptr_t)cw->datattrs[cw->cury]);
+        if (cw->datcolors[cw->cury])
+            free((genericptr_t)cw->datcolors[cw->cury]);
         n0 = (long) strlen(str) + 1L;
         ob = cw->data[cw->cury] = (char *) alloc((size_t)n0 + 1);
-        *ob++ = (char) (attr + 1); /* avoid nuls, for convenience */
+        cw->datattrs[cw->cury] = (char*)alloc((size_t)n0 + 1);
+        cw->datcolors[cw->cury] = (char*)alloc((size_t)n0 + 1);
+        *ob++ = (char) (used_attr + 1); /* avoid nuls, for convenience */
         Strcpy(ob, str);
+        size_t len = strlen(ob);
+        if(attrs)
+            memcpy(cw->datattrs[cw->cury], attrs, len);
+        else
+            memset(cw->datattrs[cw->cury], attr, len);
+        if (colors)
+            memcpy(cw->datcolors[cw->cury], colors, len);
+        else
+            memset(cw->datcolors[cw->cury], color, len);
+        cw->datattrs[cw->cury][len] = 0;
+        cw->datcolors[cw->cury][len] = 0;
 
         if (n0 > cw->maxcol)
             cw->maxcol = n0;
@@ -2901,7 +3007,7 @@ const char *str;
                 i--;
             if (i) {
                 cw->data[cw->cury - 1][++i] = '\0';
-                tty_putstr_ex(window, attr, &str[i], app, color);
+                tty_putstr_ex2(window, &str[i], attrs ? &attrs[i] : attrs, colors ? &colors[i] : colors, attr, color, app);
             }
         }
         break;
@@ -2950,7 +3056,7 @@ boolean complain;
 #else /* DEF_PAGER */
     {
         dlb *f;
-        char buf[BUFSZ];
+        char buf[UTF8BUFSZ];
         char *cr;
 
         tty_clear_nhwindow(WIN_MESSAGE);
@@ -2979,7 +3085,7 @@ boolean complain;
                 if ((int) wins[datawin]->offy + 12 > (int) ttyDisplay->rows)
                     wins[datawin]->offy = 0;
             }
-            while (dlb_fgets(buf, BUFSZ, f)) {
+            while (dlb_fgets(buf, sizeof(buf), f)) {
                 if ((cr = index(buf, '\n')) != 0)
                     *cr = 0;
 #ifdef MSDOS
@@ -3030,22 +3136,40 @@ int attr;                   /* attribute for string (like tty_putstr()) */
 const char *str;            /* menu string */
 boolean preselected;        /* item is marked as selected */
 {
-    register struct WinDesc *cw = 0;
-    tty_menu_item *item;
-    const char *newstr;
+    struct extended_menu_info info = nilextendedmenuinfo;
+    tty_add_extended_menu(window, glyph, identifier, info, ch, gch, attr, str, preselected);
+}
+
+void
+tty_add_extended_menu(window, glyph, identifier, info, ch, gch, attr, str, preselected)
+winid window;               /* window to use, must be of type NHW_MENU */
+int glyph UNUSED;           /* glyph to display with item (not used) */
+const anything* identifier; /* what to return if selected */
+struct extended_menu_info info;
+char ch;                    /* keyboard accelerator (0 = pick our own) */
+char gch;                   /* group accelerator (0 = no group) */
+int attr;                   /* attribute for string (like tty_putstr()) */
+const char* str;            /* menu string */
+boolean preselected;        /* item is marked as selected */
+{
+    register struct WinDesc* cw = 0;
+    tty_menu_item* item;
+    const char* newstr;
     char buf[4 + BUFSZ];
 
     HUPSKIP();
-    if (str == (const char *) 0)
+    if (str == (const char*)0)
         return;
 
     if (window == WIN_ERR
-        || (cw = wins[window]) == (struct WinDesc *) 0
+        || (cw = wins[window]) == (struct WinDesc*)0
         || cw->type != NHW_MENU)
     {
         panic(winpanicstr, window);
         return;
     }
+
+    int color = info.color;
 
     cw->nitems++;
     if (identifier->a_void) {
@@ -3057,38 +3181,25 @@ boolean preselected;        /* item is marked as selected */
             len = BUFSZ - 1;
         }
         Sprintf(buf, "%c - ", ch ? ch : '?');
-        (void) strncpy(buf + 4, str, len);
+        (void)strncpy(buf + 4, str, len);
         buf[4 + len] = '\0';
         newstr = buf;
-    } else
+    }
+    else
         newstr = str;
 
-    item = (tty_menu_item *) alloc(sizeof(tty_menu_item));
+    item = (tty_menu_item*)alloc(sizeof(tty_menu_item));
     item->identifier = *identifier;
     item->count = -1L;
     item->selected = preselected;
     item->selector = ch;
     item->gselector = gch;
     item->attr = attr;
+    item->color = color;
     item->str = dupstr(newstr ? newstr : "");
 
     item->next = cw->mlist;
     cw->mlist = item;
-}
-
-void
-tty_add_extended_menu(window, glyph, identifier, info, ch, gch, attr, str, preselected)
-winid window;               /* window to use, must be of type NHW_MENU */
-int glyph UNUSED;           /* glyph to display with item (not used) */
-const anything* identifier; /* what to return if selected */
-struct extended_menu_info info UNUSED;
-char ch;                    /* keyboard accelerator (0 = pick our own) */
-char gch;                   /* group accelerator (0 = no group) */
-int attr;                   /* attribute for string (like tty_putstr()) */
-const char* str;            /* menu string */
-boolean preselected;        /* item is marked as selected */
-{
-    tty_add_menu(window, glyph, identifier, ch, gch, attr, str, preselected);
 }
 
 /* Invert the given list, can handle NULL as an input. */
@@ -3331,7 +3442,7 @@ tty_wait_synch()
         tty_display_nhwindow(WIN_MAP, FALSE);
         if (ttyDisplay->inmore) 
         {
-            addtopl("--More--");
+            addtopl("--More--", ATR_NONE, NO_COLOR);
             (void) fflush(stdout);
         } 
         else if (ttyDisplay->inread > (program_state.gameover ? 1 : 0)) 
@@ -3660,7 +3771,7 @@ struct layer_info layers;
         reverse_on = TRUE;
     }
 
-    if (!reverse_on && (special & MG_PEACEFUL) && flags.underline_peaceful)
+    if (!reverse_on && ((special & MG_PEACEFUL) && flags.underline_peaceful))
     {
         term_start_attr(ATR_ULINE);
         underline_on = TRUE;
@@ -3971,147 +4082,7 @@ static const char *encvals[3][6] = {
     { "", "Burden",   "Stress",   "Strain",   "Overtax",   "Overload"   },
     { "", "Brd",      "Strs",     "Strn",     "Ovtx",      "Ovld"       }
 };
-#define blPAD BL_FLUSH
-#define MAX_PER_ROW 22
-
-/* 2 or 3 status lines */
-static const enum statusfields
-    twolineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD,  //BL_ALIGN,
-      BL_FLUSH, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, 
-      BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_2WEP, BL_SKILL, BL_HUNGER,
-      BL_CAP, BL_CONDITION, BL_FLUSH },
-    /* third row of array isn't used for twolineorder */
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-},
-    /* Align moved from 1 to 2, Leveldesc+Time+Condition moved from 2 to 3 */
-    threelineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH, 
-      BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, BL_ALIGN, 
-      BL_AC,  BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_SCORE, BL_FLUSH,
-      blPAD, blPAD, blPAD, blPAD },
-    { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, blPAD, blPAD, blPAD, 
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-},
-fourlineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH,
-      BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, BL_ALIGN, 
-      BL_AC,  BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_SCORE, BL_FLUSH,
-      blPAD, blPAD, blPAD, blPAD },
-    { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-},
-fivelineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH,
-      BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, BL_ALIGN, 
-      BL_AC,  BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_SCORE, BL_FLUSH,
-      blPAD, blPAD, blPAD, blPAD },
-    { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS2, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-},
-sixlineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH,
-      BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, BL_ALIGN, 
-      BL_AC,  BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_SCORE, BL_FLUSH,
-      blPAD, blPAD, blPAD, blPAD },
-    { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD , blPAD, blPAD, blPAD },
-    { BL_PARTYSTATS, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS2, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS3, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-},
-sevenlineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH,
-      BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, BL_ALIGN, 
-      BL_AC,  BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_SCORE, BL_FLUSH,
-      blPAD, blPAD, blPAD, blPAD },
-    { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS2, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS3, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_PARTYSTATS4, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD  },
-    { BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-    },
-eightlineorder[MAX_STATUS_LINES][MAX_PER_ROW] = {
-    { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH,
-      BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX,  //BL_GOLD, BL_ALIGN, 
-      BL_AC,  BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD,  BL_TIME, BL_SCORE, BL_FLUSH,
-      blPAD, blPAD, blPAD, blPAD },
-    { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_PARTYSTATS, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_PARTYSTATS2, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_PARTYSTATS3, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_PARTYSTATS4, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD },
-    { BL_PARTYSTATS5, BL_FLUSH, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD,
-      blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD, blPAD }
-};
-static const enum statusfields (*fieldorder)[MAX_PER_ROW];
+static const enum statusfields** fieldorder;
 
 static int finalx[MAX_STATUS_LINES][2];    /* [rows][NOW or BEFORE] */
 static boolean windowdata_init = FALSE;
@@ -4145,32 +4116,33 @@ static int do_field_opt =
  *      -- call genl_status_init() to initialize the general data.
  */
 void
-tty_status_init()
+tty_status_init(reassessment)
+int reassessment;
 {
 #ifdef STATUS_HILITES
-    int i, num_rows;
+    int i;
 
-    num_rows = (iflags.wc2_statuslines < 3) ? 2 : (iflags.wc2_statuslines >= MAX_STATUS_LINES) ? MAX_STATUS_LINES : iflags.wc2_statuslines;
-    fieldorder = (num_rows >= MAX_STATUS_LINES) ? eightlineorder : (num_rows == 7) ? sevenlineorder :
-        (num_rows == 6 ) ? sixlineorder : (num_rows == 5) ? fivelineorder : (num_rows == 4) ? fourlineorder :
-        (num_rows != 3) ? twolineorder : threelineorder;
+    fieldorder = iflags.wc2_statuslines < 3 ? fieldorders_2statuslines : flags.fullstatuslineorder ? fieldorders_alt : fieldorders;
 
-    for (i = 0; i < MAXBLSTATS; ++i) {
-        tty_status[NOW][i].idx = BL_FLUSH;
-        tty_status[NOW][i].color = NO_COLOR; /* no color */
-        tty_status[NOW][i].attr = ATR_NONE;
-        tty_status[NOW][i].x = tty_status[NOW][i].y = 0;
-        tty_status[NOW][i].valid  = FALSE;
-        tty_status[NOW][i].dirty  = FALSE;
-        tty_status[NOW][i].redraw = FALSE;
-        tty_status[BEFORE][i] = tty_status[NOW][i];
+    if (!reassessment)
+    {
+        for (i = 0; i < MAXBLSTATS; ++i) {
+            tty_status[NOW][i].idx = BL_FLUSH;
+            tty_status[NOW][i].color = NO_COLOR; /* no color */
+            tty_status[NOW][i].attr = ATR_NONE;
+            tty_status[NOW][i].x = tty_status[NOW][i].y = 0;
+            tty_status[NOW][i].valid = FALSE;
+            tty_status[NOW][i].dirty = FALSE;
+            tty_status[NOW][i].redraw = FALSE;
+            tty_status[BEFORE][i] = tty_status[NOW][i];
+        }
+        tty_condition_bits = 0L;
+        hpbar_percent = 0, hpbar_color = NO_COLOR;
     }
-    tty_condition_bits = 0L;
-    hpbar_percent = 0, hpbar_color = NO_COLOR;
 #endif /* STATUS_HILITES */
 
     /* let genl_status_init do most of the initialization */
-    genl_status_init();
+    genl_status_init(reassessment);
 }
 
 void
@@ -4292,14 +4264,14 @@ unsigned long *colormasks;
         /* should be checking for first enabled field here rather than
            just first field, but 'fieldorder' doesn't start any rows
            with fields which can be disabled so [any_row][0] suffices */
-        if (*fmt == ' ' && (fldidx == fieldorder[0][0]
-                            || fldidx == fieldorder[1][0]
-                            || fldidx == fieldorder[2][0]
-                            || fldidx == fieldorder[3][0]
-                            || fldidx == fieldorder[4][0]
-                            || fldidx == fieldorder[5][0]
-                            || fldidx == fieldorder[6][0]
-                            || fldidx == fieldorder[7][0]
+        if (*fmt == ' ' && ((fieldorder[0] != NULL && fldidx == fieldorder[0][0])
+                            || (fieldorder[1] != NULL && fldidx == fieldorder[1][0])
+                            || (fieldorder[2] != NULL && fldidx == fieldorder[2][0])
+                            || (fieldorder[3] != NULL && fldidx == fieldorder[3][0])
+                            || (fieldorder[4] != NULL && fldidx == fieldorder[4][0])
+                            || (fieldorder[5] != NULL && fldidx == fieldorder[5][0])
+                            || (fieldorder[6] != NULL && fldidx == fieldorder[6][0])
+                            || (fieldorder[7] != NULL && fldidx == fieldorder[7][0])
             ))
             ++fmt; /* skip leading space for first field on line */
         Sprintf(status_vals[fldidx], fmt, text);
@@ -4453,11 +4425,11 @@ int sz[MAX_STATUS_LINES];
 
     num_rows = (iflags.wc2_statuslines < 3) ? 2 : (iflags.wc2_statuslines >= MAX_STATUS_LINES) ? MAX_STATUS_LINES : iflags.wc2_statuslines;
 
-    for (row = 0; row < num_rows; ++row) {
+    for (row = 0; row < num_rows && fieldorder[row] != NULL; ++row) {
         sz[row] = 0;
         col = 1;
         update_right = FALSE;
-        for (i = 0; (idx = fieldorder[row][i]) != BL_FLUSH; ++i) {
+        for (i = 0; i < MAX_STATUS_LINE_ITEMS && (idx = fieldorder[row][i]) != BL_FLUSH; ++i) {
             if (!status_activefields[idx])
                 continue;
             if (!tty_status[NOW][idx].valid)
@@ -4764,13 +4736,13 @@ render_status(VOID_ARGS)
 
     num_rows = (iflags.wc2_statuslines < 3) ? 2 : (iflags.wc2_statuslines >= MAX_STATUS_LINES) ? MAX_STATUS_LINES : iflags.wc2_statuslines;
 
-    for (row = 0; row < num_rows; ++row) {
+    for (row = 0; row < num_rows && fieldorder[row] != NULL; ++row) {
         HUPSKIP();
         y = row;
         tty_curs(WIN_STATUS, 1, y);
         int removedspaces = 0;
         int x_start;
-        for (i = 0; (idx = fieldorder[row][i]) != BL_FLUSH; ++i) {
+        for (i = 0; i < MAX_STATUS_LINE_ITEMS && (idx = fieldorder[row][i]) != BL_FLUSH; ++i) {
             if (!status_activefields[idx])
                 continue;
             x = x_start = tty_status[NOW][idx].x - removedspaces;

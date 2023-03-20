@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    end.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.170 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -810,6 +810,8 @@ time_t when; /* date+time at end of game */
     dump_map();
     putstr(0, 0, do_statusline1());
     putstr(0, 0, do_statusline2());
+    if(iflags.wc2_statuslines > 2)
+        putstr(0, 0, do_statusline3());
     putstr(0, 0, "");
 
     dump_plines();
@@ -2879,6 +2881,18 @@ get_current_game_score()
         + u.uachieve.entered_astral_plane + u.uachieve.entered_elemental_planes
         );
 
+    /* Monk gets special score from easy achievements */
+
+    long Rogue_Loot_Score = 0L;
+    if (Role_if(PM_ROGUE))
+    {
+        long lootvalue = 0L;
+        lootvalue += money_cnt(invent);
+        lootvalue += hidden_gold(); /* accumulate gold from containers */
+        lootvalue += carried_gem_value();
+        Rogue_Loot_Score = lootvalue;
+    }
+
     long Tourist_Selfie_Score = 0L;
     if (Role_if(PM_TOURIST))
     {
@@ -2887,7 +2901,7 @@ get_current_game_score()
         {
             if (mvitals[i].mvflags & MV_SELFIE_TAKEN)
             {
-                Tourist_Selfie_Score += 50L * (mons[i].difficulty + 1);
+                Tourist_Selfie_Score += 100L * (mons[i].difficulty + 1);
             }
         }
     }
@@ -2901,8 +2915,8 @@ get_current_game_score()
         + 30 * (u.uconduct.literate == 0)
         + 2 * (u.uconduct.polypiles == 0)
         + 2 * (u.uconduct.polyselfs == 0)
-        + 30 * (u.uconduct.unvegan == 0)
-        + 10 * (u.uconduct.unvegetarian == 0)
+        + 25 * (u.uconduct.unvegan == 0)
+        + 15 * (u.uconduct.unvegetarian == 0)
         + 15 * (u.uconduct.weaphit == 0)
         + 2 * (u.uconduct.wisharti == 0)
         + 10 * (u.uconduct.wishes == 0)
@@ -2911,7 +2925,8 @@ get_current_game_score()
         + 10 * (ngenocided == 0)
         );
 
-    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 5000L + Small_Achievements_Score * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L + Tourist_Selfie_Score;
+    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 5000L + Small_Achievements_Score * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L 
+        + Rogue_Loot_Score + Tourist_Selfie_Score;
 
     double Turn_Count_Multiplier = sqrt(50000.0) / sqrt((double)max(1L, moves));
     double Ascension_Multiplier = u.uachieve.ascended ? min(16.0, max(2.0, 4.0 * Turn_Count_Multiplier)) : 1.0;

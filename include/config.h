@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    config.h    $NHDT-Date: 1447728911 2015/11/17 02:55:11 $  $NHDT-Branch: master $:$NHDT-Revision: 1.91 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -560,11 +560,6 @@ typedef unsigned char uchar;
 
 /* #define DEBUG_MIGRATING_MONS */  /* add a wizard-mode command to help debug
                                        migrating monsters */
-
-/* SCORE_ON_BOTL is neither experimental nor inadequately tested,
-   but doesn't seem to fit in any other section... */
-/* #define SCORE_ON_BOTL */         /* enable the 'showscore' option to
-                                       show estimated score on status line */
 
 /* FREE_ALL_MEMORY is neither experimental nor inadequately tested,
    but it isn't necessary for successful operation of the program */

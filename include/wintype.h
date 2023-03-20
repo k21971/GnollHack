@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0  wintype.h       $NHDT-Date: 1549327486 2019/02/05 00:44:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.19 $ */
 /* Copyright (c) David Cohrs, 1991                                */
@@ -103,6 +103,8 @@ typedef struct mi {
 #define ATR_ULINE           0x0004
 #define ATR_BLINK           0x0005
 #define ATR_INVERSE         0x0007
+#define ATR_ATTR_MASK       0x000F
+
 /* not a display attribute but passed to putstr() as an attribute;
    can be masked with one regular display attribute */
 #define ATR_URGENT          0x0010
@@ -127,6 +129,7 @@ typedef struct mi {
 #define ATR_INACTIVE        0x00040000
 #define ATR_HALF_SIZE       0x00080000
 #define ATR_ALT_COLORS      0x00100000
+#define ATR_LINE_MSG_MASK   0xFFFFFFF0
 
 /* nh_poskey() modifier types */
 #define CLICK_1 1

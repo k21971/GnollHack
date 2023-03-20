@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    shk.c    $NHDT-Date: 1555201699 2019/04/14 00:28:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.159 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2172,7 +2172,7 @@ unsigned oid;
     int res = 0, otyp = obj->otyp;
 
     if (!(obj->dknown && objects[otyp].oc_name_known)
-        && (obj->oclass != GEM_CLASS || (objects[otyp].oc_material != MAT_GLASS && objects[otyp].oc_material != MAT_CRYSTAL))) {
+        && (obj->oclass != GEM_CLASS || (obj->material != MAT_GLASS && obj->material != MAT_CRYSTAL))) {
         res = ((oid % 4) == 0); /* id%4 ==0 -> +1, ==1..3 -> 0 */
     }
     return res;
@@ -2202,7 +2202,7 @@ register struct monst *shkp; /* if angry, impose a surcharge */
         || (!obj->oartifact && !objects[obj->otyp].oc_name_known) || (obj->oartifact && !obj->nknown))
     {
         if (obj->oclass == GEM_CLASS
-            && objects[obj->otyp].oc_material == MAT_GLASS) 
+            && obj->material == MAT_GLASS)
         {
             int i;
             /* get a value that's 'random' from game to game, but the
@@ -2345,8 +2345,9 @@ boolean unpaid_only;
             if (saleable(shkp, otmp) && !otmp->unpaid
                 && otmp->oclass != BALL_CLASS
                 && !(otmp->oclass == FOOD_CLASS && otmp->oeaten)
-                && !(is_candle(otmp)
-                     && otmp->age < 30L * objects[otmp->otyp].oc_cost))
+                && !(is_candle(otmp) && otmp->age < candle_starting_burn_time(otmp))
+                && !(is_torch(otmp) && otmp->age < torch_starting_burn_time(otmp))
+                )
                 price += set_cost(otmp, shkp);
         } else {
             /* no_charge is only set for floor items (including
@@ -2499,10 +2500,10 @@ register struct monst * mtmp;
     if (!obj->dknown || !objects[obj->otyp].oc_name_known) {
         if (obj->oclass == GEM_CLASS) {
             /* different shop keepers give different prices */
-            if (objects[obj->otyp].oc_material == MAT_GEMSTONE
-                || objects[obj->otyp].oc_material == MAT_HARD_CRYSTAL
-                || objects[obj->otyp].oc_material == MAT_CRYSTAL
-                || objects[obj->otyp].oc_material == MAT_GLASS) {
+            if (obj->material == MAT_GEMSTONE
+                || obj->material == MAT_HARD_CRYSTAL
+                || obj->material == MAT_CRYSTAL
+                || obj->material == MAT_GLASS) {
                 tmp = (obj->otyp % (6 - mtmp->m_id % 3));
                 tmp = (tmp + 3) * obj->quan;
             }
@@ -3418,8 +3419,9 @@ xchar x, y;
     if ((!saleitem && !(container && cltmp > 0L)) || eshkp->billct == BILLSZ
         || obj->oclass == BALL_CLASS || obj->oclass == CHAIN_CLASS
         || offer == 0L || (obj->oclass == FOOD_CLASS && obj->oeaten)
-        || (is_candle(obj)
-            && obj->age < 30L * objects[obj->otyp].oc_cost)) 
+        || (is_candle(obj) && obj->age < candle_starting_burn_time(obj))
+        || (is_torch(obj) && obj->age < torch_starting_burn_time(obj))
+        )
     {
         play_sfx_sound(SFX_SEEMS_UNINTERESTED);
 
@@ -3646,12 +3648,51 @@ int mode; /* 0: deliver count 1: paged */
     return 0;
 }
 
+long
+get_object_base_value(obj)
+struct obj* obj; 
+{
+    if (!obj)
+        return 0L;
+
+    long tmp = objects[obj->otyp].oc_cost;
+    if (obj->otyp == PAINTING)
+    {
+        if (obj->special_quality >= 0 && obj->special_quality < MAX_PAINTINGS)
+        {
+            tmp = painting_definitions[obj->special_quality].cost;
+        }
+    }
+    else if (obj->otyp == BANNER)
+    {
+        if (obj->special_quality >= 0 && obj->special_quality < MAX_BANNERS)
+        {
+            tmp = banner_definitions[obj->special_quality].cost;
+        }
+    }
+    else
+    {
+        double matmult = 1.0;
+        double matadd = 0.0;
+        if (obj->material != objects[obj->otyp].oc_material)
+        {
+            double curmult = material_definitions[obj->material].cost_multiplier > 0 ? material_definitions[obj->material].cost_multiplier : 1.0;
+            double basemult = material_definitions[objects[obj->otyp].oc_material].cost_multiplier > 0 ? material_definitions[objects[obj->otyp].oc_material].cost_multiplier : 1.0;
+            matmult = curmult / basemult;
+            matadd += material_definitions[obj->material].cost_addition - material_definitions[objects[obj->otyp].oc_material].cost_addition;
+        }
+        tmp = max(0L, (long)((double)tmp * matmult + matadd));
+    }
+
+    return tmp;
+}
+
 STATIC_OVL long
 getprice(obj, shk_buying)
 register struct obj *obj;
 boolean shk_buying;
 {
-    register long tmp = objects[obj->otyp].oc_cost;
+    register long tmp = get_object_base_value(obj);
 
     if (obj->oartifact)
     {
@@ -3728,8 +3769,9 @@ boolean shk_buying;
             tmp += 10L * (long) obj->enchantment;
         break;
     case TOOL_CLASS:
-        if (is_candle(obj)
-            && obj->age < 30L * objects[obj->otyp].oc_cost)
+        if (is_candle(obj) && obj->age < candle_starting_burn_time(obj))
+            tmp /= 2L;
+        else if (is_torch(obj) && obj->age < torch_starting_burn_time(obj))
             tmp /= 2L;
         break;
     }

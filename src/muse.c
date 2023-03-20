@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    muse.c    $NHDT-Date: 1547025167 2019/01/09 09:12:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /*      Copyright (C) 1990 by Ken Arromdee                         */
@@ -226,6 +226,9 @@ boolean self;
     {
     case ARTINVOKE_WAND_OF_DEATH:
         powertxt = " a death ray from";
+        break;
+    case ARTINVOKE_RUBY_ROD:
+        powertxt = otmp->special_quality == 0 ? " a cone of cold from" : otmp->special_quality == 1 ? " a lightning bolt from" : " a bolt of fire from";
         break;
     default:
         break;
@@ -1350,6 +1353,7 @@ try_again:
 #define MUSE_WAN_DISINTEGRATION 18
 #define MUSE_WAN_PETRIFICATION 19
 #define MUSE_WAN_ORCUS 20
+#define MUSE_RUBY_ROD 21
 
 /* Select an offensive item/action for a monster.  Returns TRUE iff one is
  * found.
@@ -1417,6 +1421,31 @@ struct monst *mtmp;
             {
                 m.offensive = obj;
                 m.has_offense = MUSE_WAN_ORCUS;
+            }
+            nomore(MUSE_RUBY_ROD);
+            if (obj->oartifact == ART_RUBY_ROD_OF_ASMODEUS && obj->repowerleft == 0)
+            {
+                if (!cold_resistant_skip
+                    && lined_up(mtmp, TRUE, AD_COLD, TRUE, M_RAY_RANGE))
+                {
+                    obj->special_quality = 0;
+                        m.offensive = obj;
+                        m.has_offense = MUSE_RUBY_ROD;
+                }
+                else if (!shock_resistant_skip
+                    && lined_up(mtmp, TRUE, AD_ELEC, TRUE, M_RAY_RANGE))
+                {
+                    obj->special_quality = 1;
+                    m.offensive = obj;
+                    m.has_offense = MUSE_RUBY_ROD;
+                }
+                else if (!fire_resistant_skip
+                    && lined_up(mtmp, TRUE, AD_FIRE, TRUE, M_RAY_RANGE))
+                {
+                    obj->special_quality = 2;
+                    m.offensive = obj;
+                    m.has_offense = MUSE_RUBY_ROD;
+                }
             }
             nomore(MUSE_WAN_DISINTEGRATION);
             if (obj->otyp == WAN_DISINTEGRATION && obj->charges > 0 && !is_cancelled(mtmp) && !disintegration_resistant_skip && ((!uarm && !uarms && !level_skip_powerful_wand) || ((uarm || uarms) && !level_skip_normal_wand))
@@ -1808,13 +1837,17 @@ struct monst *mtmp;
         m_using = FALSE;
         return (DEADMONSTER(mtmp)) ? 1 : 2;
     case MUSE_WAN_ORCUS:
+    case MUSE_RUBY_ROD:
         if (!otmp)
             return 2;
 
         minvokemsg(mtmp, otmp, FALSE);
         if (otmp->oartifact > 0 && artilist[otmp->oartifact].repower_time > 0) /* Override below if effect failed */
             otmp->repowerleft = artilist[otmp->oartifact].repower_time;
-        otmp->charges--;
+
+        if (artilist[otmp->oartifact].aflags & AF_INVOKE_EXPENDS_CHARGE)
+            otmp->charges--;
+
         if (oseen && otmp->oartifact)
         {
             makeknown(otmp->otyp);
@@ -1822,10 +1855,10 @@ struct monst *mtmp;
         }
         m_using = TRUE;
 
-        raytype = -40 - objects[WAN_DEATH].oc_dir_subtype; //-40...-48;
         struct obj pseudo = { 0 };
-        pseudo.otyp = WAN_DEATH;
+        pseudo.otyp = m.has_offense == MUSE_WAN_ORCUS ? WAN_DEATH : otmp->special_quality == 0 ? WAN_COLD : otmp->special_quality == 1 ? WAN_LIGHTNING : WAN_FIRE;
         pseudo.quan = 1L;
+        raytype = -40 - objects[pseudo.otyp].oc_dir_subtype; //-40...-48;
         buzz(raytype, &pseudo, mtmp, 0, 0, 0, mtmp->mx, mtmp->my,
             sgn(mtmp->mux - mtmp->mx), sgn(mtmp->muy - mtmp->my));
         m_using = FALSE;
@@ -2818,7 +2851,7 @@ struct monst *mtmp;
                 pline_The("whip slips free."); /* not `The_whip' */
                 return 1;
             } else if (where_to == 3 && mon_hates_silver(mtmp)
-                       && objects[obj->otyp].oc_material == MAT_SILVER) {
+                       && obj->material == MAT_SILVER) {
                 /* this monster won't want to catch a silver
                    weapon; drop it at hero's feet instead */
                 where_to = 2;

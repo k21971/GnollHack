@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    global.h    $NHDT-Date: 1557254325 2019/05/07 18:38:45 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.71 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -308,6 +308,8 @@ extern char *FDECL(nhdupstr, (const char *, const char *, int));
 extern long *FDECL(alloc, (size_t));  /* alloc.c */
 extern char *FDECL(dupstr, (const char *)); /* ditto */
 #endif
+extern char* FDECL(setstr, (const char*, CHAR_P)); /* ditto */
+extern char* FDECL(cpystr, (const char*, const char*)); /* ditto */
 
 /* Used for consistency checks of various data files; declare it here so
    that utility programs which include config.h but not hack.h can see it. */
@@ -355,15 +357,23 @@ struct savefile_info {
 #define MAX_SUBROOMS 24 /* max # of subrooms in a given room */
 #define DOORMAX 120     /* max number of doors per level */
 
-#define BUFSZ 256  /* for getlin buffers */
-#define QBUFSZ 256 /* for building question text */
-#define TBUFSZ 300 /* toplines[] buffer max msg: 3 81char names */
-/* plus longest prefix plus a few extra words */
-
 #define PL_NSIZ 32 /* name of player, ghost, shopkeeper */
 #define PL_CSIZ 32 /* sizeof pl_character */
 #define PL_FSIZ 32 /* fruit name */
 #define PL_PSIZ 63 /* player-given names for pets, other monsters, objects */
+
+#define BUFSZ 256  /* for getlin buffers */
+#define QBUFSZ 256 /* for building question text */
+#define IBUFSZ (BUFSZ * 3)  /* for getlin introline buffers */
+#define PBUFSZ (IBUFSZ + QBUFSZ + BUFSZ)  /* for getlin combined introline + question (+ extras) buffers */
+#define TBUFSZ 300 /* toplines[] buffer max msg: 3 81char names */
+#define PREFIXBUFSZ 128 /* for object prefix buffer; "an uncursed greased partly eaten guardian naga hatchling [corpse]" and "an uncursed +10 erodeproof greased poisoned death-magical witch-king's primordial adamantium [long sword]" */
+#define OBUFSZ (BUFSZ + PL_FSIZ + PL_PSIZ * 2 + PREFIXBUFSZ)  /* for object name buffers */
+#define UTF8BUFSZ (BUFSZ * 4)  /* for getlin buffers in UTF8 */
+#define UTF8QBUFSZ (QBUFSZ * 4)  /* for building question text in UTF8 */
+#define UTF8IBUFSZ (IBUFSZ * 4)  /* for getlin introline buffers in UTF8 */
+
+/* plus longest prefix plus a few extra words */
 
 #define MAXDUNGEON 16 /* current maximum number of dungeons */
 #define MAXLEVEL 32   /* max number of levels in one dungeon */

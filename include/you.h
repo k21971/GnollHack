@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    you.h    $NHDT-Date: 1547514642 2019/01/15 01:10:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.35 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -518,7 +518,7 @@ struct you {
     int umonster;               /* hero's "real" monster num */
     int umonnum;                /* current monster number */
 
-    int mh, mhmax, basemhmax, mtimedone;   /* for polymorph-self */
+    int mh, mhmax, basemhmax, basemhdrain, mtimedone;   /* for polymorph-self */
     struct attribs macurr,      /* for monster attribs */
                    mamin,       /* for monster attribs */
                    mamax;       /* for monster attribs */
@@ -577,10 +577,10 @@ struct you {
     schar uspellcastingbonus_all;
     schar uexperiencebonus;
     schar uarcherybonus;
-    schar uac;                 /* current armor class */
+    short uac;                 /* current armor class */
     schar umc;                 /* current magic cancellation */
-    int uhp, uhpmax, ubasehpmax;         /* hit points, aka health */
-    int uen, uenmax, ubaseenmax;         /* magical energy - M. Stephenson */
+    int uhp, uhpmax, ubasehpmax, ubasehpdrain;         /* hit points, aka health */
+    int uen, uenmax, ubaseenmax, ubaseendrain;         /* magical energy - M. Stephenson */
     xchar uhpinc[MAXULEV],   /* increases to uhpmax for each level gain */
           ueninc[MAXULEV];   /* increases to uenmax for each level gain */
     int uhp_fraction, uen_fraction, mh_fraction;

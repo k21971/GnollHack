@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0 prop.c */
 /* Copyright (c) Janne Gustafsson, 2021.                            */
@@ -180,6 +180,8 @@ const struct propname propertynames[] = {
     { HALF_SLOW_DIGESTION, "digesting half slower than normal", "half slower digestion" },
     { SLIME_RESISTANCE, "resistant to green slime", "slime resistance" },
     { LAUGHING, "laughing uncontrollably", "uncontrollable laughter" },
+    { TOTTERING, "shaking and tottering", "shaking and tottering" },
+    { MARTIAL_PROWESS, "imbued with martial prowess", "martial prowess" },
     {  0, 0 },
 };
 
@@ -298,7 +300,7 @@ NEARDATA struct prop_info property_definitions[MAX_PROPS] =
     { "fear-resistance",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* FEAR_RESISTANCE = 110 */
     { "sleeping",                     0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE},  /* SLEEPING = 111 */
     { "summon-forbidden",             0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE},  /* SUMMON_FORBIDDEN = 112 */
-    { "silenced",                     0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* SILENCED = 113 */
+    { "silenced",                     1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* SILENCED = 113 */
     { "levitation-control",           1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* LEVITATION_CONTROL = 114 */
     { "fire-vulnerability",           0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* FIRE_VULNERABILITY = 115 */
     { "cold-vulnerability",           0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* COLD_VULNERABILITY = 116 */
@@ -353,6 +355,8 @@ NEARDATA struct prop_info property_definitions[MAX_PROPS] =
     { "half-slow-digestion",          1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* HALF_SLOW_DIGESTION = 165 */
     { "sliming-resistance",           0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE },  /* SLIME_RESISTANCE = 166 */
     { "laughing",                     0, 0, 1,  0, 20,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE},  /* LAUGHING = 167 */
+    { "tottering",                    0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* TOTTERING = 168 */
+    { "martial-prowess",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* MARTIAL_PROWESS = 169 */
 };
 
 const char* condition_names[NUM_BL_CONDITIONS] = {

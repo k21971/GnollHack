@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0  lev_comp.y	$NHDT-Date: 1543371691 2018/11/28 02:21:31 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.22 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -191,7 +191,7 @@ extern char curr_token[512];
 %token	<i> CHAR INTEGER BOOLEAN PERCENT SPERCENT
 %token	<i> MINUS_INTEGER PLUS_INTEGER
 %token	<i> MAZE_GRID_ID SOLID_FILL_ID MINES_ID ROGUELEV_ID
-%token	<i> MESSAGE_ID MAZE_ID LEVEL_ID LEV_INIT_ID TILESET_ID GEOMETRY_ID NOMAP_ID BOUNDARY_TYPE_ID SPECIAL_TILESET_ID
+%token	<i> MESSAGE_ID MESSAGE_TYPE MAZE_ID LEVEL_ID LEV_INIT_ID TILESET_ID GEOMETRY_ID NOMAP_ID BOUNDARY_TYPE_ID SPECIAL_TILESET_ID TILESET_PARAM_ID DECOTYP_ID
 %token	<i> OBJECT_ID COBJECT_ID MONSTER_ID TRAP_ID DOOR_ID DRAWBRIDGE_ID MONSTER_GENERATION_ID
 %token	<i> object_ID monster_ID terrain_ID
 %token	<i> MAZEWALK_ID WALLIFY_ID REGION_ID SPECIAL_REGION_ID SPECIAL_LEVREGION_ID SPECIAL_REGION_TYPE NAMING_ID NAMING_TYPE FILLING IRREGULAR JOINED
@@ -202,10 +202,11 @@ extern char curr_token[512];
 %token	<i> DIRECTION RANDOM_TYPE RANDOM_TYPE_BRACKET A_REGISTER
 %token	<i> ALIGNMENT LEFT_OR_RIGHT CENTER TOP_OR_BOT ALTAR_TYPE ALTAR_SUBTYPE UP_OR_DOWN ACTIVE_OR_INACTIVE
 %token	<i> MODRON_PORTAL_TYPE NPC_TYPE FOUNTAIN_TYPE SPECIAL_OBJECT_TYPE CMAP_TYPE FLOOR_SUBTYPE FLOOR_SUBTYPE_ID FLOOR_ID FLOOR_TYPE FLOOR_TYPE_ID
+%token	<i> DECORATION_ID DECORATION_TYPE DECORATION_DIR DECORATION_ITEM_STATE PAINTING_TYPE BANNER_TYPE WALL_SCULPTURE_TYPE
 %token	<i> ELEMENTAL_ENCHANTMENT_TYPE EXCEPTIONALITY_TYPE EXCEPTIONALITY_ID ELEMENTAL_ENCHANTMENT_ID ENCHANTMENT_ID SECRET_DOOR_ID USES_UP_KEY_ID
-%token	<i> MYTHIC_PREFIX_TYPE MYTHIC_SUFFIX_TYPE MYTHIC_PREFIX_ID MYTHIC_SUFFIX_ID
+%token	<i> MYTHIC_PREFIX_TYPE MYTHIC_SUFFIX_TYPE MYTHIC_PREFIX_ID MYTHIC_SUFFIX_ID MATERIAL_ID MATERIAL_TYPE
 %token	<i> CHARGES_ID SPECIAL_QUALITY_ID SPEFLAGS_ID
-%token	<i> SUBROOM_ID NAME_ID FLAGS_ID FLAG_TYPE MON_ATTITUDE MON_ALERTNESS SUBTYPE_ID NON_PASSDOOR_ID
+%token	<i> SUBROOM_ID NAME_ID FLAGS_ID FLAG_TYPE MON_ATTITUDE MON_ALERTNESS SUBTYPE_ID NON_PASSDOOR_ID CARPET_ID CARPET_PIECE_ID CARPET_TYPE
 %token	<i> MON_APPEARANCE ROOMDOOR_ID IF_ID ELSE_ID
 %token	<i> TERRAIN_ID HORIZ_OR_VERT REPLACE_TERRAIN_ID LOCATION_SUBTYPE_ID DOOR_SUBTYPE BRAZIER_SUBTYPE SIGNPOST_SUBTYPE TREE_SUBTYPE FOREST_ID FOREST_TYPE INITIALIZE_TYPE
 %token	<i> EXIT_ID SHUFFLE_ID MANUAL_TYPE_ID MANUAL_TYPE
@@ -256,7 +257,7 @@ extern char curr_token[512];
 %type	<i> object_infos object_info monster_infos monster_info
 %type	<i> levstatements stmt_block region_detail_end
 %type	<i> engraving_type flag_list roomregionflag roomregionflags
-%type	<i> optroomregionflags floorsubtype optfloorsubtype floortype optfloortype optmontype
+%type	<i> optroomregionflags floorsubtype optfloorsubtype floortype optfloortype optmontype opttileset optdecotyp
 %type	<i> humidity_flags
 %type	<i> comparestmt encodecoord encoderegion mapchar
 %type	<i> seen_trap_mask
@@ -509,8 +510,11 @@ levstatement 	: message
 		| boundary_type_detail
 		| forest_detail
 		| subtype_detail
+		| carpet_detail
+		| carpet_piece_detail
 		| monster_generation_detail
 		| floor_detail
+		| decoration_detail
 		| altar_detail
 		| anvil_detail
 		| npc_detail
@@ -1251,9 +1255,12 @@ if_ending	: stmt_block
 
 message		: MESSAGE_ID ':' string_expr
 		  {
-		      add_opvars(splev, "o", VA_PASS1(SPO_MESSAGE));
+		      add_opvars(splev, "io", VA_PASS2(NO_COLOR, SPO_MESSAGE));
 		  }
-		;
+		| MESSAGE_ID ':' string_expr ',' MESSAGE_TYPE
+		  {
+		      add_opvars(splev, "io", VA_PASS2((int)$5, SPO_MESSAGE));
+		  }		;
 
 random_corridors: RAND_CORRIDOR_ID
 		  {
@@ -1307,18 +1314,20 @@ room_begin      : room_type opt_percent ',' light_state
                   }
                 ;
 
-subroom_def	: SUBROOM_ID ':' room_begin ',' subroom_pos ',' room_size optroomregionflags optfloortype optfloorsubtype optmontype
+subroom_def	: SUBROOM_ID ':' room_begin ',' subroom_pos ',' room_size optroomregionflags optfloortype optfloorsubtype opttileset optdecotyp optmontype
 		  {
 		      long rflags = $8;
 		      long flmt = (long)$<i>9;
 		      long flt = (long)$<i>10;
+		      long tlset = (long)$<i>11;
+		      long decotyp = (long)$<i>12;
 
 		      if (rflags == -1) rflags = (1 << 0);
 		      //if (flmt == -1) flmt = ROOM;
 		      //if (flt == -1) flt = 0;
 
-		      add_opvars(splev, "iiiiiiiiio",
-				 VA_PASS10(flt, flmt, rflags, ERR, ERR,
+		      add_opvars(splev, "iiiiiiiiiiio",
+				 VA_PASS12(decotyp, tlset, flt, flmt, rflags, ERR, ERR,
 					  $5.x, $5.y, $7.width, $7.height,
 					  SPO_SUBROOM));
 		      break_stmt_start();
@@ -1330,18 +1339,20 @@ subroom_def	: SUBROOM_ID ':' room_begin ',' subroom_pos ',' room_size optroomreg
 		  }
 		;
 
-room_def	: ROOM_ID ':' room_begin ',' room_pos ',' room_align ',' room_size optroomregionflags optfloortype optfloorsubtype optmontype
+room_def	: ROOM_ID ':' room_begin ',' room_pos ',' room_align ',' room_size optroomregionflags optfloortype optfloorsubtype opttileset optdecotyp optmontype
 		  {
 		      long rflags = $10;
 		      long flmt = (long)$<i>11;
 		      long flt = (long)$<i>12;
+		      long tlset = (long)$<i>13;
+		      long decotyp = (long)$<i>14;
 
 		      if (rflags == -1) rflags = (1 << 0);
 		      //if (flmt == -1) flmt = ROOM;
 		      //if (flt == -1) flt = 0;
 
-		      add_opvars(splev, "iiiiiiiiio",
-				 VA_PASS10(flt, flmt, rflags,
+		      add_opvars(splev, "iiiiiiiiiiio",
+				 VA_PASS12(decotyp, tlset, flt, flmt, rflags,
 					  $7.x, $7.y, $5.x, $5.y,
 					  $9.width, $9.height, SPO_ROOM));
 		      break_stmt_start();
@@ -1633,6 +1644,11 @@ monster_info	: string_expr
 		      add_opvars(splev, "ii", VA_PASS2(1, SP_M_V_REVIVED));
 		      $$ = 0x00000100;
 		  }
+		| REVIVED_ID ':' integer_or_var
+		  {
+		      add_opvars(splev, "i", VA_PASS1(SP_M_V_REVIVED));
+		      $$ = 0x00000100;
+		  }
 		| AVENGE_ID
 		  {
 		      add_opvars(splev, "ii", VA_PASS2(1, SP_M_V_AVENGE));
@@ -1866,73 +1882,78 @@ object_info	: CURSE_TYPE
 		| EXCEPTIONALITY_ID ':' EXCEPTIONALITY_TYPE
 		  {
 		      add_opvars(splev, "ii", VA_PASS2((int)$<i>3, SP_O_V_EXCEPTIONALITY));
-		      $$ = 0x10000;
+		      $$ = 0x00010000;
 		  }
 		| ENCHANTMENT_ID ':' integer_or_var
 		  {
 		      add_opvars(splev, "i", VA_PASS1(SP_O_V_ENCHANTMENT));
-		      $$ = 0x20000;
+		      $$ = 0x00020000;
 		  }
 		| CHARGES_ID ':' integer_or_var
 		  {
 		      add_opvars(splev, "i", VA_PASS1(SP_O_V_CHARGES));
-		      $$ = 0x40000;
+		      $$ = 0x00040000;
 		  }
 		| SPECIAL_QUALITY_ID ':' integer_or_var
 		  {
 		      add_opvars(splev, "i", VA_PASS1(SP_O_V_SPECIAL_QUALITY));
-		      $$ = 0x80000;
+		      $$ = 0x00080000;
 		  }
 		| MANUAL_TYPE_ID ':' MANUAL_TYPE
 		  {
 		      add_opvars(splev, "ii", VA_PASS2((int)$<i>3, SP_O_V_SPECIAL_QUALITY));
-		      $$ = 0x80000;
+		      $$ = 0x00080000;
 		  }
 		| SPEFLAGS_ID ':' integer_or_var
 		  {
 		      add_opvars(splev, "i", VA_PASS1(SP_O_V_SPEFLAGS));
-		      $$ = 0x100000;
+		      $$ = 0x00100000;
 		  }
 		| KEYTYPE_ID ':' object_or_var
 		  {
 		      add_opvars(splev, "i", VA_PASS1(SP_O_V_KEY_TYPE));
-		      $$ = 0x200000;
+		      $$ = 0x00200000;
 		  }
 		| INDESTRUCTIBLE_ID
 		  {
 		      add_opvars(splev, "ii", VA_PASS2(1, SP_O_V_INDESTRUCTIBLE));
-		      $$ = 0x400000;
+		      $$ = 0x00400000;
 		  }
 		| USES_UP_KEY_ID
 		  {
 		      add_opvars(splev, "ii", VA_PASS2(1, SP_O_V_USES_UP_KEY));
-		      $$ = 0x800000;
+		      $$ = 0x00800000;
 		  }
 		| NO_PICKUP_ID
 		  {
 		      add_opvars(splev, "ii", VA_PASS2(1, SP_O_V_NO_PICKUP));
-		      $$ = 0x1000000;
+		      $$ = 0x01000000;
 		  }
         | MYTHIC_TYPE
 		  {
 		      add_opvars(splev, "ii",
 				 VA_PASS2((int) $1, SP_O_V_MYTHIC_TYPE));
-		      $$ = 0x2000000;
+		      $$ = 0x02000000;
 		  }		
 	    | MYTHIC_PREFIX_ID ':' MYTHIC_PREFIX_TYPE
 		  {
 		      add_opvars(splev, "ii", VA_PASS2((int)$<i>3, SP_O_V_MYTHIC_PREFIX));
-		      $$ = 0x4000000;
+		      $$ = 0x04000000;
 		  }
 		| MYTHIC_SUFFIX_ID ':' MYTHIC_SUFFIX_TYPE
 		  {
 		      add_opvars(splev, "ii", VA_PASS2((int)$<i>3, SP_O_V_MYTHIC_SUFFIX));
-		      $$ = 0x8000000;
+		      $$ = 0x08000000;
 		  }
 		| AGE_ID ':' integer_or_var
 		  {
 		      add_opvars(splev, "i", VA_PASS1(SP_O_V_AGE));
 		      $$ = 0x10000000;
+		  }
+		| MATERIAL_ID ':' MATERIAL_TYPE
+		  {
+		      add_opvars(splev, "ii", VA_PASS2((int)$<i>3, SP_O_V_MATERIAL));
+		      $$ = 0x20000000;
 		  }
 		;
 
@@ -2275,13 +2296,15 @@ special_tileset_detail : SPECIAL_TILESET_ID ':' ter_selection ',' CMAP_TYPE
 		  }
 		;
 
-region_detail	: REGION_ID ':' region_or_var ',' light_state ',' room_type optroomregionflags optfloortype optfloorsubtype optmontype
+region_detail	: REGION_ID ':' region_or_var ',' light_state ',' room_type optroomregionflags optfloortype optfloorsubtype opttileset optdecotyp optmontype
 		  {
 		      long irr;
 		      long rt = $7;
 		      long rflags = $8;
 		      long flmt = (long)$<i>9;
 		      long flt = (long)$<i>10;
+		      long tlset = (long)$<i>11;
+		      long decotyp = (long)$<i>12;
 
 		      if (rflags == -1) rflags = (1 << 0);
 		      //if (flmt == -1) flmt = 0;
@@ -2289,8 +2312,8 @@ region_detail	: REGION_ID ':' region_or_var ',' light_state ',' room_type optroo
 
 		      if (!(rflags & 1)) rt += MAXRTYPE+1;
 		      irr = ((rflags & 2) != 0);
-		      add_opvars(splev, "iiiiio",
-				 VA_PASS6((long)$5, rt, rflags, flmt, flt, SPO_REGION));
+		      add_opvars(splev, "iiiiiiio",
+				 VA_PASS8((long)$5, rt, rflags, flmt, flt, tlset, decotyp, SPO_REGION));
 		      $<i>$ = (irr || (rflags & 1) || rt != OROOM);
 		      break_stmt_start();
 		  }
@@ -2347,6 +2370,32 @@ anvil_detail : ANVIL_ID ':' coord_or_var
 		  }
 		;
 
+decoration_detail : DECORATION_ID ':' coord_or_var ',' DECORATION_TYPE ',' INTEGER ',' DECORATION_DIR ',' DECORATION_ITEM_STATE
+		  {
+		      add_opvars(splev, "iiiiio", VA_PASS6(1, (int)$11, (int)$9, (int)$7, (int)$5, SPO_DECORATION));
+		  }
+		| DECORATION_ID ':' coord_or_var ',' DECORATION_TYPE ',' INTEGER ',' DECORATION_DIR ',' DECORATION_ITEM_STATE ',' light_state
+		  {
+		      add_opvars(splev, "iiiiio", VA_PASS6((int)$13, (int)$11, (int)$9, (int)$7, (int)$5, SPO_DECORATION));
+		  }
+		| DECORATION_ID ':' coord_or_var ',' DECORATION_TYPE ',' PAINTING_TYPE ',' DECORATION_DIR
+		  {
+		      add_opvars(splev, "iiiiio", VA_PASS6(0, 1, (int)$9, (int)$7, (int)$5, SPO_DECORATION));
+		  }
+		| DECORATION_ID ':' coord_or_var ',' DECORATION_TYPE ',' BANNER_TYPE ',' DECORATION_DIR
+		  {
+		      add_opvars(splev, "iiiiio", VA_PASS6(0, 1, (int)$9, (int)$7, (int)$5, SPO_DECORATION));
+		  }
+		| DECORATION_ID ':' coord_or_var ',' DECORATION_TYPE ',' WALL_SCULPTURE_TYPE ',' DECORATION_DIR
+		  {
+		      add_opvars(splev, "iiiiio", VA_PASS6(0, 1, (int)$9, (int)$7, (int)$5, SPO_DECORATION));
+		  }
+		| DECORATION_ID ':' coord_or_var ',' DECORATION_TYPE ',' DECORATION_DIR
+		  {
+		      add_opvars(splev, "iiiiio", VA_PASS6(1, 1, (int)$7, 0, (int)$5, SPO_DECORATION));
+		  }
+		;
+
 floor_detail : FLOOR_ID ':' ter_selection ',' FLOOR_TYPE ',' FLOOR_SUBTYPE
 		  {
 		      add_opvars(splev, "iio", VA_PASS3((int)$7, (int)$5, SPO_FLOOR));
@@ -2361,6 +2410,22 @@ subtype_detail : SUBTYPE_ID ':' ter_selection ',' INTEGER
 		  {
 		      add_opvars(splev, "iio", VA_PASS3((int)$7, (int)$5, SPO_SUBTYPE));
 		  }
+		;
+
+carpet_detail : CARPET_ID ':' region_or_var ',' CARPET_TYPE
+		  {
+		      add_opvars(splev, "io", VA_PASS2($<i>5, SPO_CARPET));
+		  }
+		;
+
+carpet_piece_detail : CARPET_PIECE_ID ':' ter_selection ',' CARPET_TYPE ',' INTEGER ',' INTEGER
+		  {
+		      add_opvars(splev, "iiio", VA_PASS4((int)$9, (int)$7, (int)$5, SPO_CARPET_PIECE));
+		  }
+        | CARPET_PIECE_ID ':' ter_selection ',' CARPET_TYPE ',' INTEGER
+		  {
+		      add_opvars(splev, "iiio", VA_PASS4(0, (int)$7, (int)$5, SPO_CARPET_PIECE));
+		  }		
 		;
 
 npc_detail : NPC_ID ':' NPC_TYPE ',' coord_or_var
@@ -2559,6 +2624,25 @@ optmontype : /* empty */
 		  }
 		;
 
+opttileset : /* empty */
+		  {
+			$<i>$ = -1;
+		  }
+		| TILESET_PARAM_ID ':' CMAP_TYPE
+		  {
+			$<i>$ = $<i>3;
+		  }
+		;
+
+optdecotyp : /* empty */
+		  {
+			$<i>$ = -1;
+		  }
+		| DECOTYP_ID ':' INTEGER
+		  {
+			$<i>$ = $<i>3;
+		  }
+		;
 
 door_state	: DOOR_STATE
 		| RANDOM_TYPE

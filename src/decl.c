@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    decl.c    $NHDT-Date: 1547025164 2019/01/09 09:12:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.141 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -274,7 +274,7 @@ NEARDATA const anything zeroany;
 
 NEARDATA const struct layer_info zerolayerinfo = DUMMY;
 NEARDATA const struct replacement_info zeroreplacementinfo = DUMMY;
-NEARDATA const struct extended_menu_info zeroextendedmenuinfo = DUMMY;
+NEARDATA const struct extended_menu_info nilextendedmenuinfo = { 0, 0, 0, NO_COLOR, 0, 0, 0, 0, 0UL };
 NEARDATA const struct extended_create_window_info zerocreatewindowinfo = DUMMY;
 NEARDATA const struct d_level zerodlevel = DUMMY;
 
@@ -298,7 +298,7 @@ NEARDATA const char getobj_all_count[] = { ALLOW_COUNT, ALL_CLASSES, 0 };
 NEARDATA const char getobj_allobj[] = {
     COIN_CLASS,   WEAPON_CLASS, ARMOR_CLASS,  POTION_CLASS,
     SCROLL_CLASS, WAND_CLASS,   RING_CLASS,   AMULET_CLASS, MISCELLANEOUS_CLASS,
-    FOOD_CLASS,   REAGENT_CLASS,  TOOL_CLASS,   GEM_CLASS,
+    FOOD_CLASS,   REAGENT_CLASS,  TOOL_CLASS,   GEM_CLASS,   ART_CLASS,
     ROCK_CLASS,      BALL_CLASS,   CHAIN_CLASS,  SPBOOK_CLASS, 0
 };
 
@@ -420,6 +420,9 @@ NEARDATA winid WIN_STATUS = WIN_ERR;
 NEARDATA winid WIN_MAP = WIN_ERR, WIN_INVEN = WIN_ERR, WIN_HERE = WIN_ERR;
 
 char toplines[TBUFSZ];
+char toplinecolors[TBUFSZ];
+char toplineattrs[TBUFSZ];
+
 /* Windowing stuff that's really tty oriented, but present for all ports */
 struct tc_gbl_data tc_gbl_data = { 0, 0, 0, 0 }; /* AS,AE, LI,CO */
 

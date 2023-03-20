@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0  decl.h  $NHDT-Date: 1547025154 2019/01/09 09:12:34 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.147 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -385,7 +385,7 @@ E NEARDATA const anything zeroany;   /* init'd and defined in decl.c */
 
 E NEARDATA const struct layer_info zerolayerinfo;
 E NEARDATA const struct replacement_info zeroreplacementinfo;
-E NEARDATA const struct extended_menu_info zeroextendedmenuinfo;
+E NEARDATA const struct extended_menu_info nilextendedmenuinfo;
 E NEARDATA const struct extended_create_window_info zerocreatewindowinfo;
 
 E NEARDATA const struct d_level zerodlevel;
@@ -496,11 +496,15 @@ E NEARDATA winid WIN_MAP, WIN_INVEN, WIN_HERE;
 #define Your_ex1(a, b, cstr) Your_ex(a, b, "%s", cstr)
 #define You_ex1(a, b, cstr) You_ex(a, b, "%s", cstr)
 #define You_hear_ex1(a, b, cstr) You_hear_ex(a, b, "%s", cstr)
+#define You_cant_ex1(a, b, cstr) You_cant_ex(a, b, "%s", cstr)
 #define verbalize_ex1(a, b, cstr) verbalize_ex(a, b, "%s", cstr)
 
 #define pline_ex1_popup(a, b, cstr, title, dopop) pline_ex1(a, b, cstr); if (dopop) display_popup_text(cstr, title, POPUP_TEXT_GENERAL, a, b, NO_GLYPH, 0)
 
-E char toplines[];
+E char toplines[TBUFSZ];
+E char toplineattrs[TBUFSZ];
+E char toplinecolors[TBUFSZ];
+
 #ifndef TCAP_H
 E struct tc_gbl_data {   /* also declared in tcap.h */
     char *tc_AS, *tc_AE; /* graphics start and end (tty font swapping) */

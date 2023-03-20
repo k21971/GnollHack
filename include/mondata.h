@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mondata.h    $NHDT-Date: 1550524558 2019/02/18 21:15:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.37 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -262,6 +262,8 @@
 #define has_innate_energy_regeneration(ptr) \
     has_innate2(ptr, MR2_ENERGY_REGENERATION)
 
+#define has_innate_sick_resistance(ptr) \
+    has_innate(ptr, MR_SICK)
 
 /* fixed ability */
 #define has_fixed_ability(mon) \
@@ -843,6 +845,8 @@
 #define is_rider(ptr)                                      \
     ((ptr) == &mons[PM_DEATH] || (ptr) == &mons[PM_FAMINE] \
      || (ptr) == &mons[PM_PESTILENCE])
+#define is_rider_or_tarrasque(ptr)                                      \
+    ((ptr) == &mons[PM_TARRASQUE] || is_rider(ptr))
 #define is_placeholder(ptr)                             \
     ((ptr) == &mons[PM_ORC] || (ptr) == &mons[PM_GIANT] \
      || (ptr) == &mons[PM_ELF] || (ptr) == &mons[PM_HUMAN])
@@ -885,7 +889,7 @@
 #define nonrotting_corpse(mnum) nonrotting_corpse_ptr(&mons[mnum])
 #define has_pitwalk(ptr) (((ptr)->mflags4 & M4_PITWALK) != 0)
 #define can_speak_language(ptr) ((ptr)->msound >= MS_LAUGH || (ptr)->msound == MS_ORC || is_speaking_monster(ptr))
-#define call_mon_tame(mon) ((is_animal((mon)->data) || !humanoid((mon)->data)) && !mindless((mon)->data) && !is_speaking_monster((mon)->data) && is_living((mon)->data) && !is_demon((mon)->data))
+#define call_mon_tame(mon)  (is_domestic((mon)->data) || ((is_animal((mon)->data) || !humanoid((mon)->data)) && !mindless((mon)->data) && !is_speaking_monster((mon)->data) && is_living((mon)->data) && !is_demon((mon)->data)))
 
 /* Overall resistances */
 #define resists_drli(mon) resists_drain(mon)

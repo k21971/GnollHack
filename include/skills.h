@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    skills.h    $NHDT-Date: 1547255911 2019/01/12 01:18:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.15 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
@@ -105,6 +105,7 @@ enum skill_levels {
 
 #define is_magic_skill(skill) ((skill) >= P_ARCANE_SPELL && (skill) <= P_NECROMANCY_SPELL)
 #define practice_needed_to_advance_for_normal_skill(level) ((level) * (level) * 20)
+#define RIDING_TURNS_TO_EXERCISE_SKILL 50
 
 /* The hero's skill in various weapons. */
 struct skills {
@@ -121,8 +122,7 @@ struct skills {
 
 #define P_SKILL_LIMIT 60 /* Max number of skill advancements */
 
-/* These roles qualify for a martial arts bonus */
-#define martial_bonus() (P_SKILL_LEVEL(P_MARTIAL_ARTS) >= P_BASIC) // (Role_if(PM_SAMURAI) || Role_if(PM_MONK))
+#define martial_bonus() (adjusted_skill_level(P_MARTIAL_ARTS) >= P_BASIC)
 
 
 /* Initial skill matrix structure; used in u_init.c and weapon.c */

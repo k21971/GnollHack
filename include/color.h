@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    color.h    $NHDT-Date: 1432512776 2015/05/25 00:12:56 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Steve Linhart, Eric Raymond, 1989. */
@@ -52,6 +52,21 @@
 #define HI_MINERAL CLR_GRAY
 #define DRAGON_SILVER CLR_BRIGHT_CYAN
 #define HI_ZAP CLR_BRIGHT_BLUE
+
+#define HI_MINES CLR_BROWN
+#define HI_GEHENNOM CLR_ORANGE
+#define HI_UNDEAD CLR_BLACK
+#define HI_SOKOBAN CLR_BLUE
+#define HI_ELEMENTAL_PLANES CLR_GRAY /* HI_MINERAL */
+#define HI_ASTRAL CLR_BRIGHT_MAGENTA
+#define HI_GARDEN CLR_GREEN
+#define HI_MODRON CLR_WHITE /* color of modronite */
+#define HI_SHOP CLR_BROWN /* HI_WOOD */
+#define HI_REINFORCED CLR_CYAN /* HI_METAL */
+#define HI_NEST CLR_YELLOW
+#define HI_TOWER CLR_BRIGHT_BLUE /* HI_ZAP */
+#define HI_OPULENT CLR_MAGENTA /* could be also CLR_MAGENTA but best choice seems to depend on the color scheme */
+#define HI_TEMPLE CLR_WHITE
 
 #define CLR_MSG_POSITIVE      CLR_GREEN
 #define CLR_MSG_NEGATIVE      CLR_RED

@@ -37,7 +37,7 @@
 #include "callback.h"
 #include "dllhack.h"
 
-#define LLEN 128
+#define LLEN UTF8BUFSZ /* 128 */
 
 #define NHTRACE_LOG "nhtrace.log"
 
@@ -73,7 +73,7 @@ struct window_procs dll_procs = {
     WC2_PREFERRED_SCREEN_SCALE, dll_init_nhwindows, dll_player_selection, dll_askname,
     dll_get_nh_event, dll_exit_nhwindows, dll_suspend_nhwindows,
     dll_resume_nhwindows, dll_create_nhwindow_ex, dll_clear_nhwindow,
-    dll_display_nhwindow, dll_destroy_nhwindow, dll_curs, dll_putstr_ex,
+    dll_display_nhwindow, dll_destroy_nhwindow, dll_curs, dll_putstr_ex, dll_putstr_ex2,
     genl_putmixed_ex, dll_display_file, dll_start_menu_ex, dll_add_menu, dll_add_extended_menu,
     dll_end_menu_ex, dll_select_menu,
     genl_message_menu, /* no need for X-specific handling */
@@ -1072,6 +1072,12 @@ dll_putstr_ex(winid wid, int attr, const char *text, int app, int color)
 #endif
 }
 
+void
+dll_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app)
+{
+    dll_callbacks.callback_putstr_ex2((int)wid, text, attrs, colors, attr, color, app);
+}
+
 /* Display the file named str.  Complain about missing files
                    iff complain is TRUE.
 */
@@ -1201,7 +1207,7 @@ dll_add_menu(winid wid, int glyph, const ANY_P* identifier,
     CHAR_P accelerator, CHAR_P group_accel, int attr,
     const char* str, BOOLEAN_P presel)
 {
-    dll_add_extended_menu(wid, glyph, identifier, zeroextendedmenuinfo,
+    dll_add_extended_menu(wid, glyph, identifier, nilextendedmenuinfo,
         accelerator, group_accel, attr,
         str, presel);
 }
@@ -1776,7 +1782,10 @@ dll_getlin_ex(int style, int attr, int color, const char *question, char *input,
     dll_logDebug("dll_getlin(%s, %p)\n", question, input);
     char* res = dll_callbacks.callback_getlin_ex(style, attr, color, question, placeholder, linesuffix, introline);
     if (res && input)
-        strcpy(input, res);
+    {
+        strncpy(input, res, BUFSZ - 1);
+        input[BUFSZ - 1] = '\0';
+    }
 
 #if 0
     if (!iflags.wc_popup_dialog) {
@@ -2188,14 +2197,13 @@ dll_preference_update(const char *pref)
     dll_callbacks.callback_preference_update(pref);
 }
 
-#define TEXT_BUFFER_SIZE 4096
 char *
-dll_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
+dll_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
 {
-    if (attr_ptr)
-        *attr_ptr = ATR_NONE;
-    if (color_ptr)
-        *color_ptr = NO_COLOR;
+    if (attrs_ptr)
+        *attrs_ptr = (char*)0;
+    if (colors_ptr)
+        *colors_ptr = (char*)0;
 
     return (char*)0; // dll_callbacks.callback_getmsghistory(init);
 
@@ -2240,9 +2248,9 @@ dll_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
 }
 
 void
-dll_putmsghistory_ex(const char *msg, int attr, int color, BOOLEAN_P restoring)
+dll_putmsghistory_ex(const char *msg, const char* attrs, const char* colors, BOOLEAN_P restoring)
 {
-    dll_callbacks.callback_putmsghistory(msg, attr, color, restoring);
+    dll_callbacks.callback_putmsghistory(msg, attrs, colors, restoring);
 #if 0
     BOOL save_sound_opt;
 
@@ -2412,73 +2420,11 @@ status_init()   -- core calls this to notify the window port that a status
                    the necessary initialization in here, allocate memory, etc.
 */
 void
-dll_status_init(void)
+dll_status_init(int reassessment)
 {
     dll_logDebug("dll_status_init()\n");
-    dll_callbacks.callback_status_init();
+    dll_callbacks.callback_status_init(reassessment);
 
-#if 0
-    for (int i = 0; i < SIZE(_status_fields); i++) {
-        dll_status_field * status_field = &_status_fields[i];
-        status_field->field_index = i;
-        status_field->enabled = FALSE;
-    }
-
-    for (int i = 0; i < SIZE(_condition_fields); i++) {
-        dll_condition_field * condition_field = &_condition_fields[i];
-        nhassert(condition_field->mask == (1 << i));
-        condition_field->bit_position = i;
-    }
-
-    for (int i = 0; i < SIZE(_status_strings); i++) {
-        dll_status_string * status_string = &_status_strings[i];
-        status_string->str = NULL;
-    }
-
-    for (int i = 0; i < SIZE(_condition_strings); i++) {
-        dll_status_string * status_string = &_condition_strings[i];
-        status_string->str = NULL;
-    }
-
-    for (int lineIndex = 0; lineIndex < SIZE(_status_lines.lines); lineIndex++) {
-        dll_status_line * line = &_status_lines.lines[lineIndex];
-
-        dll_status_fields * status_fields = &line->status_fields;
-        status_fields->count = 0;
-
-        dll_status_strings * status_strings = &line->status_strings;
-        status_strings->count = 0;
-
-        for (int i = 0; i < iflags.wc2_statuslines == 2 ? fieldcounts_2statuslines[lineIndex] : fieldcounts[lineIndex]; i++) {
-            int field_index = iflags.wc2_statuslines == 2 ? fieldorders_2statuslines[lineIndex][i] : fieldorders[lineIndex][i];
-            nhassert(field_index <= SIZE(_status_fields));
-
-            nhassert(status_fields->count <= SIZE(status_fields->status_fields));
-            status_fields->status_fields[status_fields->count++] = &_status_fields[field_index];
-
-            nhassert(status_strings->count <= SIZE(status_strings->status_strings));
-            status_strings->status_strings[status_strings->count++] =
-                &_status_strings[field_index];
-
-            if (field_index == BL_CONDITION) {
-                for (int j = 0; j < BL_MASK_BITS; j++) {
-                    nhassert(status_strings->count <= SIZE(status_strings->status_strings));
-                    status_strings->status_strings[status_strings->count++] =
-                        &_condition_strings[j];
-                }
-            }
-        }
-    }
-
-    for (int i = 0; i < MAXBLSTATS; ++i) {
-#ifdef STATUS_HILITES
-        _status_hilites[i].thresholdtype = 0;
-        _status_hilites[i].behavior = BL_TH_NONE;
-        _status_hilites[i].under = BL_HILITE_NONE;
-        _status_hilites[i].over = BL_HILITE_NONE;
-#endif /* STATUS_HILITES */
-    }
-#endif
     /* Use a window for the genl version; backward port compatibility */
     WIN_STATUS = create_nhwindow(NHW_STATUS);
     display_nhwindow(WIN_STATUS, FALSE);

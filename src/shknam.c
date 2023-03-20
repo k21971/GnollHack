@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    shknam.c    $NHDT-Date: 1454485432 2016/02/03 07:43:52 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.41 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -397,7 +397,7 @@ const struct shclass shtypes[] = {
         D_SHOP,
         { { 60, REAGENT_CLASS },
           { 30, GEM_CLASS },
-          { 1, -BONE_DAGGER },
+          { 1, -DAGGER },
           { 2, -HOLY_SYMBOL },
           { 3, -ORACULAR_TOADSTOOL },
           { 2, -PANTHER_CAP },
@@ -451,13 +451,13 @@ const struct shclass shtypes[] = {
       0,
       D_SHOP,
       { { 30, -WAX_CANDLE },
-        { 45, -TALLOW_CANDLE },
+        { 42, -TALLOW_CANDLE },
         { 5, -BRASS_LANTERN },
         { 9, -OIL_LAMP },
         { 3, -MAGIC_LAMP },
         { 5, -POT_OIL },
         { 3, -MAGIC_CANDLE },
-        { 0, 0 },
+        { 3, -TORCH },
         { 0, 0 },
         { 0, 0 } },
           shklight },
@@ -502,20 +502,23 @@ int otyp; /* used iff obj is null */
 {
     int corpsenm;
     char oclass;
+    int material;
 
     if (obj) {
         /* actual object; will check tin content and corpse species */
         otyp = (int) obj->otyp;
         oclass = obj->oclass;
         corpsenm = obj->corpsenm;
+        material = obj->material;
     } else {
         /* just a type; caller will have to handle tins and corpses */
         oclass = objects[otyp].oc_class;
         corpsenm = PM_LICHEN; /* veggy standin */
+        material = objects[otyp].oc_material;
     }
 
     if (oclass == FOOD_CLASS) {
-        if (objects[otyp].oc_material == MAT_VEGGY || otyp == EGG)
+        if (material == MAT_VEGGY || otyp == EGG)
             return TRUE;
         if (otyp == TIN && corpsenm == NON_PM) /* implies obj is non-null */
             return (boolean) (obj->special_quality == 1); /* 0 = empty, 1 = spinach */
@@ -653,7 +656,7 @@ boolean deserted;
         else if (atype < 0)
             (void) mksobj_at(-atype, sx, sy, TRUE, TRUE);
         else
-            (void) mkobj_at_with_flags(atype, sx, sy, TRUE, MKOBJ_FLAGS_SHOP_ITEM);
+            (void) mkobj_at_with_flags(atype, sx, sy, TRUE, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_SHOP_ITEM);
     }
 }
 
@@ -989,7 +992,7 @@ boolean deserted;
         else if (inside_shop(sx, sy - 1))
             n++;
         Sprintf(buf, "Closed for inventory");
-        if (isok(m, n) && IS_FLOOR(levl[m][n].typ))
+        if (isok(m, n))
         {
             create_simple_location(m, n, SIGNPOST, 0, 0, 0, 0, levl[m][n].typ, levl[m][n].subtyp, levl[m][n].vartyp, FALSE);
             make_engr_at(m, n, buf, 0L, ENGR_SIGNPOST, ENGR_FLAGS_NONE);

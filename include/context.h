@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    context.h    $NHDT-Date: 1455907260 2016/02/19 18:41:00 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.30 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -250,9 +250,9 @@ struct context_info
     boolean starting_prayer_timeout_expired;
     uchar dlords_summoned_via_altar;
     boolean skip_botl;
+    boolean amonket_generated;
 
     /* Emergency reserved booleans to make non-save-game-breaking changes */
-    boolean reserved_bool2;
     boolean reserved_bool3;
     boolean reserved_bool4;
 

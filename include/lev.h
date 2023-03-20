@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    lev.h    $NHDT-Date: 1432512781 2015/05/25 00:13:01 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -52,6 +52,7 @@ typedef struct lightsource_t {
     struct lightsource_t*next;
     xchar x, y;  /* source's position */
     short range; /* source's current range */
+    short sidedness;
     short flags;
     short type;  /* type of light source */
     anything id; /* source's identifier */

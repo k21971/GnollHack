@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    obj.h    $NHDT-Date: 1508827590 2017/10/24 06:46:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.60 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -90,6 +90,7 @@ struct obj {
 #define SPEFLAGS_AUTOSTASH                     0x04000000UL
 #define SPEFLAGS_EMPTY_NOTICED                 0x08000000UL
 #define SPEFLAGS_BEING_BROKEN                  0x10000000UL
+#define SPEFLAGS_GIVEN_OUT_BLUE_SMOKE          0x20000000UL
 
     char oclass;    /* object class */
     char invlet;    /* designation in inventory */
@@ -98,18 +99,7 @@ struct obj {
     uchar mythic_suffix;  /* magical quality for a weapon or armor giving additional powers */
     uchar exceptionality; /* exceptional, elite, etc. weapon, multiplies base damage */
     uchar elemental_enchantment; /* cold, fire, lightning, or deathly */
-
-#define COLD_ENCHANTMENT 1
-#define FIRE_ENCHANTMENT 2
-#define LIGHTNING_ENCHANTMENT 3
-#define DEATH_ENCHANTMENT 4
-
-#define ELEMENTAL_ENCHANTMENT_QUANTITY_NORMAL 3 /* How many stackable items are enchanted. Also 1/quan is wear-off chance for non-stackable items */
-#define ELEMENTAL_ENCHANTMENT_QUANTITY_BUC_VARIATION 2 
-#define DEATH_ENCHANTMENT_QUANTITY_NORMAL 1 /* How many stackable items are enchanted. Also 1/quan is wear-off chance for non-stackable items */
-#define DEATH_ENCHANTMENT_QUANTITY_BUC_VARIATION 1 
-#define ELEMENTAL_ENCHANTMENT_BAG_WEAR_OFF_ONE_PER_CHANCE 3
-
+    uchar material; /* specific material of this object */
     char recharged; /* number of times it's been recharged */
 #define RECHARGE_LIMIT 100
 
@@ -196,6 +186,21 @@ struct obj {
     struct oextra *oextra; /* pointer to oextra struct */
 };
 
+enum elemental_enchantments {
+    NO_ELEMENATAL_ENCHANTMENT = 0,
+    COLD_ENCHANTMENT,
+    FIRE_ENCHANTMENT,
+    LIGHTNING_ENCHANTMENT,
+    DEATH_ENCHANTMENT,
+    MAX_ELEMENTAL_ENCHANTMENTS
+};
+
+#define ELEMENTAL_ENCHANTMENT_QUANTITY_NORMAL 3 /* How many stackable items are enchanted. Also 1/quan is wear-off chance for non-stackable items */
+#define ELEMENTAL_ENCHANTMENT_QUANTITY_BUC_VARIATION 2 
+#define DEATH_ENCHANTMENT_QUANTITY_NORMAL 1 /* How many stackable items are enchanted. Also 1/quan is wear-off chance for non-stackable items */
+#define DEATH_ENCHANTMENT_QUANTITY_BUC_VARIATION 1 
+#define ELEMENTAL_ENCHANTMENT_BAG_WEAR_OFF_ONE_PER_CHANCE 3
+
 #define newobj() (struct obj *) alloc(sizeof(struct obj))
 
 /* property blocking */
@@ -243,7 +248,7 @@ struct obj {
 #define is_obj_invokable(otmp) is_otyp_invokable((otmp)->otyp)
 
 #define is_otyp_indestructible(otyp) ((objects[(otyp)].oc_flags & O1_INDESTRUCTIBLE) != 0)
-#define is_obj_indestructible(o) (is_otyp_indestructible((o)->otyp) || ((o)->speflags & SPEFLAGS_INDESTRUCTIBLE) != 0 \
+#define is_obj_indestructible(o) ((get_obj_oc_flags(o) & O1_INDESTRUCTIBLE) != 0 || ((o)->speflags & SPEFLAGS_INDESTRUCTIBLE) != 0 \
                                   || ((o)->oartifact > 0 && (artilist[(o)->oartifact].aflags2 & AF2_INDESTRUCTIBLE) != 0))
 
 #define is_otyp_no_pickup(otyp) ((objects[(otyp)].oc_flags3 & O3_NO_PICKUP) != 0)
@@ -314,7 +319,7 @@ struct obj {
     (objects[(otmp)->otyp].oc_multigen_type > MULTIGEN_SINGLE)
 
 #define is_poisonable(otmp) \
-    ((is_weapon(otmp) && !is_launcher(otmp) && objects[(otmp)->otyp].oc_dir > WHACK) || objects[(otmp)->otyp].oc_flags3 & O3_POISONABLE)
+    ((is_weapon(otmp) && !is_launcher(otmp) && objects[(otmp)->otyp].oc_dir > WHACK) || (get_obj_oc_flags3(otmp) & O3_POISONABLE) != 0)
 
 #define is_obj_tethered_weapon(o, wmask)  \
     ((objects[(o)->otyp].oc_flags4 & O4_TETHERED_WEAPON) != 0 && ((wmask) & W_WIELDED_WEAPON) != 0)
@@ -330,27 +335,30 @@ struct obj {
 #define is_obj_enchantable(o) is_otyp_enchantable((o)->otyp) 
 
 #define is_otyp_elemental_enchantable(otyp)     \
-    (objects[(otyp)].oc_flags3 & O3_ELEMENTAL_ENCHANTABLE)
+    ((objects[(otyp)].oc_flags3 & O3_ELEMENTAL_ENCHANTABLE) != 0)
 
 /* Unusual definition to account for weapons appropriately */
-#define is_elemental_enchantable(o)     ((is_weapon(o) && !is_launcher(o)) || is_otyp_elemental_enchantable((o)->otyp))
+#define is_elemental_enchantable(o)     ((is_weapon(o) && !is_launcher(o)) || (get_obj_oc_flags3(o) & O3_ELEMENTAL_ENCHANTABLE) != 0)
 
 #define is_otyp_material_death_enchantable(otyp)     \
     (material_definitions[objects[otyp].oc_material].death_enchantable != 0)
 
-#define is_death_enchantable(o)  (is_elemental_enchantable(o) && is_otyp_material_death_enchantable((o)->otyp))
+#define is_obj_material_death_enchantable(o)     \
+    (material_definitions[(o)->material].death_enchantable != 0)
+
+#define is_death_enchantable(o)  (is_elemental_enchantable(o) && is_obj_material_death_enchantable(o))
 
 #define is_otyp_specially_exceptional(otyp)     \
-    ((objects[(otyp)].oc_flags4 & O4_CAN_HAVE_EXCEPTIONALITY))
+    ((objects[(otyp)].oc_flags4 & O4_CAN_HAVE_EXCEPTIONALITY) != 0)
 
 #define is_otyp_non_exceptional(otyp)     \
-    ((objects[(otyp)].oc_flags4 & O4_NON_EXCEPTIONAL))
+    ((objects[(otyp)].oc_flags4 & O4_NON_EXCEPTIONAL) != 0)
 
 /* Unusual definition to account for weapons appropriately */
 #define can_have_exceptionality(o)     ((is_weapon(o) || is_otyp_specially_exceptional((o)->otyp)) && !is_otyp_non_exceptional((o)->otyp))
 #define nonexceptionality_armor(o)     (is_armor(o) && !can_have_exceptionality(o))
 
-#define otyp_allows_specially_dipping_into(otyp) (objects[(otyp)].oc_flags4 & O4_ALLOWS_DIPPING_INTO)
+#define otyp_allows_specially_dipping_into(otyp) ((objects[(otyp)].oc_flags4 & O4_ALLOWS_DIPPING_INTO) != 0)
 #define otyp_allows_object_to_be_dipped_into_it(otyp) (objects[(otyp)].oc_class == POTION_CLASS || otyp_allows_specially_dipping_into(otyp))
 #define obj_allows_object_to_be_dipped_into_it(o) otyp_allows_object_to_be_dipped_into_it((o)->otyp)
 #define otyp_expends_charges_when_dipped_into(otyp) (otyp_allows_specially_dipping_into(otyp) && objects[otyp].oc_charged > CHARGED_NOT_CHARGED)
@@ -358,34 +366,34 @@ struct obj {
     (otyp_allows_object_to_be_dipped_into_it((o)->otyp) && (!otyp_expends_charges_when_dipped_into((o)->otyp) || (o)->charges > 0))
 
 #define is_cursed_magic_item(otmp)                                            \
-    (objects[(otmp)->otyp].oc_flags2 & O2_CURSED_MAGIC_ITEM)
+    ((objects[(otmp)->otyp].oc_flags2 & O2_CURSED_MAGIC_ITEM) != 0)
 
 #define is_obj_generated_cursed(otmp)                                            \
-    (objects[(otmp)->otyp].oc_flags2 & O2_GENERATED_CURSED)
+    ((objects[(otmp)->otyp].oc_flags2 & O2_GENERATED_CURSED) != 0)
 
 #define is_obj_generated_blessed(otmp)                                            \
-    (objects[(otmp)->otyp].oc_flags2 & O2_GENERATED_BLESSED)
+    ((objects[(otmp)->otyp].oc_flags2 & O2_GENERATED_BLESSED) != 0)
 
 #define oresist_disintegration(otmp)                                       \
-    (objects[(otmp)->otyp].oc_flags & O1_DISINTEGRATION_RESISTANT || is_obj_indestructible(otmp) \
+    ((get_obj_oc_flags(otmp) & O1_DISINTEGRATION_RESISTANT) != 0 || is_obj_indestructible(otmp) \
      || ((otmp)->otyp == CORPSE && pm_resists_disint(&mons[(otmp)->corpsenm])) \
      || obj_resists(otmp, 2, 50) \
      || is_quest_artifact(otmp) )
 
 #define oresist_fire(otmp)                                       \
-    (objects[(otmp)->otyp].oc_flags & O1_FIRE_RESISTANT || is_obj_indestructible(otmp) \
+    ((get_obj_oc_flags(otmp) & O1_FIRE_RESISTANT) != 0 || is_obj_indestructible(otmp) \
      || ((otmp)->otyp == CORPSE && pm_resists_fire(&mons[(otmp)->corpsenm])) \
      || obj_resists(otmp, 0, 0) \
      || is_quest_artifact(otmp) )
 
 #define oresist_cold(otmp)                                       \
-    (objects[(otmp)->otyp].oc_flags & O1_COLD_RESISTANT || is_obj_indestructible(otmp) \
+    ((get_obj_oc_flags(otmp) & O1_COLD_RESISTANT) != 0 || is_obj_indestructible(otmp) \
      || ((otmp)->otyp == CORPSE && pm_resists_cold(&mons[(otmp)->corpsenm])) \
      || obj_resists(otmp, 0, 0) \
      || is_quest_artifact(otmp) )
 
 #define oresist_elec(otmp)                                       \
-    (objects[(otmp)->otyp].oc_flags & O1_LIGHTNING_RESISTANT || is_obj_indestructible(otmp) \
+    ((get_obj_oc_flags(otmp) & O1_LIGHTNING_RESISTANT) != 0 || is_obj_indestructible(otmp) \
      || ((otmp)->otyp == CORPSE && pm_resists_elec(&mons[(otmp)->corpsenm])) \
      || obj_resists(otmp, 0, 0) \
      || is_quest_artifact(otmp) )
@@ -465,9 +473,9 @@ struct obj {
 
 /* dragon gear */
 #define is_dragon_scales(obj) \
-    (is_dragon_obj(obj) && (objects[(obj)->otyp].oc_flags2 & O2_MONSTER_SCALES))
+    (is_dragon_obj(obj) && (objects[(obj)->otyp].oc_flags2 & O2_MONSTER_SCALES) != 0)
 #define is_dragon_mail(obj)  \
-    (is_dragon_obj(obj) && (objects[(obj)->otyp].oc_flags2 & O2_MONSTER_SCALE_MAIL))
+    (is_dragon_obj(obj) && (objects[(obj)->otyp].oc_flags2 & O2_MONSTER_SCALE_MAIL) != 0)
 #define is_dragon_scale_armor(obj) \
     (is_dragon_scales(obj) || is_dragon_mail(obj))
 #define Dragon_scales_to_pm(obj) \
@@ -476,87 +484,97 @@ struct obj {
     &mons[PM_GRAY_DRAGON + (obj)->otyp - GRAY_DRAGON_SCALE_MAIL]
 #define Dragon_to_scales(pm) (GRAY_DRAGON_SCALES + (pm - mons))
 
-#define is_dragon_armor(obj) \
-    (obj->oclass == ARMOR_CLASS && is_dragon_obj(obj))
-#define is_dragon_obj(obj) ((objects[(obj)->otyp].oc_flags2 & O2_DRAGON_ITEM) != 0)
+#define is_dragon_obj(o) ((get_obj_oc_flags2(o) & O2_DRAGON_ITEM) != 0)
+#define is_dragon_armor(o) \
+    ((o)->oclass == ARMOR_CLASS && is_dragon_obj(o))
 
 /* Elven gear */
-#define is_elven_weapon(otmp)                                             \
-    ((otmp)->oclass == WEAPON_CLASS && is_elven_obj(otmp))
-#define is_elven_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_ELVEN_ITEM) != 0)
+#define is_elven_obj(o) ((get_obj_oc_flags2(o) & O2_ELVEN_ITEM) != 0)
+#define is_elven_weapon(o)                                             \
+    ((o)->oclass == WEAPON_CLASS && is_elven_obj(o))
 
 /* Orcish gear */
-#define is_orcish_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_ORCISH_ITEM) != 0)
+#define is_orcish_obj(o) ((get_obj_oc_flags2(o) & O2_ORCISH_ITEM) != 0)
 
 /* Dwarvish gear */
-#define is_dwarvish_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_DWARVEN_ITEM) != 0)
+#define is_dwarvish_obj(o) ((get_obj_oc_flags2(o) & O2_DWARVEN_ITEM) != 0)
 
 /* Gnomish gear */
-#define is_gnomish_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_GNOMISH_ITEM) != 0)
+#define is_gnomish_obj(o) ((get_obj_oc_flags2(o) & O2_GNOMISH_ITEM) != 0)
 
 /* Gnollish gear */
-#define is_gnollish_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_GNOLLISH_ITEM) != 0)
+#define is_gnollish_obj(o) ((get_obj_oc_flags2(o) & O2_GNOLLISH_ITEM) != 0)
 
 /* Modron gear */
-#define is_modron_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_MODRON_ITEM) != 0)
+#define is_modron_obj(o) ((get_obj_oc_flags2(o) & O2_MODRON_ITEM) != 0)
 
 /* Demon gear */
-#define is_demon_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_DEMON_ITEM) != 0 || (otmp)->exceptionality == EXCEPTIONALITY_INFERNAL)
+#define is_demon_obj(o) ((get_obj_oc_flags2(o) & O2_DEMON_ITEM) != 0 || (o)->exceptionality == EXCEPTIONALITY_INFERNAL)
 
 /* Angel gear */
-#define is_angel_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_ANGEL_ITEM) != 0 || (otmp)->exceptionality == EXCEPTIONALITY_CELESTIAL)
+#define is_angel_obj(o) ((get_obj_oc_flags2(o) & O2_ANGEL_ITEM) != 0 || (o)->exceptionality == EXCEPTIONALITY_CELESTIAL)
 
 /* Demon gear */
-#define is_undead_obj(otmp) ((objects[(otmp)->otyp].oc_flags2 & O2_UNDEAD_ITEM) != 0)
+#define is_undead_obj(o) ((get_obj_oc_flags2(o) & O2_UNDEAD_ITEM) != 0)
 
 /* Light sources */
 #define is_otyp_candle(otyp) \
     ((objects[(otyp)].oc_flags2 & O2_CANDLE) != 0)
-#define is_candle(otmp) \
-    is_otyp_candle((otmp)->otyp)
+#define is_candle(o) \
+    is_otyp_candle((o)->otyp)
+#define is_otyp_torch(otyp) \
+    ((objects[(otyp)].oc_flags5 & O5_TORCH) != 0)
+#define is_torch(o) \
+    is_otyp_torch((o)->otyp)
+#define is_candle_or_torch(o) \
+    (is_candle(o) || is_torch(o))
 #define is_otyp_candelabrum(otyp) \
     ((objects[(otyp)].oc_flags4 & O4_CANDELABRUM) != 0)
-#define is_obj_candelabrum(otmp) \
-    is_otyp_candelabrum((otmp)->otyp)
+#define is_obj_candelabrum(o) \
+    is_otyp_candelabrum((o)->otyp)
+#define is_otyp_lamp(otyp) \
+    ((objects[(otyp)].oc_flags5 & O5_LAMP) != 0)
+#define is_lamp(o) \
+    is_otyp_lamp((o)->otyp)
 #define otyp_shines_magical_light(otyp)                                             \
     ((objects[(otyp)].oc_flags2 & O2_SHINES_MAGICAL_LIGHT) != 0)
-#define obj_shines_magical_light(otmp)     \
-    otyp_shines_magical_light((otmp)->otyp)
+#define obj_shines_magical_light(o)     \
+    otyp_shines_magical_light((o)->otyp)
 #define is_otyp_special_praying_item(otyp)                                             \
     ((objects[(otyp)].oc_flags2 & O2_SPECIAL_PRAYING_ITEM) != 0)
-#define is_obj_special_praying_item(otmp)     \
-    is_otyp_special_praying_item((otmp)->otyp)
+#define is_obj_special_praying_item(o)     \
+    is_otyp_special_praying_item((o)->otyp)
 
 /* Wand-like tools */
-#define is_spelltool(otmp) \
-    ((objects[(otmp)->otyp].oc_flags & O1_SPELLTOOL) != 0)
+#define is_spelltool(o) \
+    ((objects[(o)->otyp].oc_flags & O1_SPELLTOOL) != 0)
 
 /* Other tools */
-#define is_saw(otmp)                                              \
-    ((otmp)->oclass == TOOL_CLASS \
-     && objects[(otmp)->otyp].oc_subtyp == TOOLTYPE_SAW)
+#define is_saw(o)                                              \
+    ((o)->oclass == TOOL_CLASS \
+     && objects[(o)->otyp].oc_subtyp == TOOLTYPE_SAW)
 
 #define MAX_OIL_IN_FLASK 400 /* maximum amount of oil in a potion of oil */
 
 /* MAGIC_LAMP intentionally excluded below */
 /* age field of this is relative age rather than absolute */
-#define age_is_relative(otmp)                                       \
-    ((objects[(otmp)->otyp].oc_flags3 & O3_RELATIVE_AGE) != 0)
+#define age_is_relative(o)                                       \
+    ((objects[(o)->otyp].oc_flags3 & O3_RELATIVE_AGE) != 0)
 
 /* object can be ignited */
 #define is_otyp_ignitable(otyp)                                             \
     ((objects[(otyp)].oc_flags3 & O3_IGNITABLE) != 0)
 
-#define is_obj_ignitable(otmp)                                             \
-    (is_otyp_ignitable((otmp)->otyp))
+#define is_obj_ignitable(o)                                             \
+    (is_otyp_ignitable((o)->otyp))
 
 /* object can be refilled with oil */
-#define is_refillable_with_oil(otmp)                                             \
-    ((objects[(otmp)->otyp].oc_flags3 & O3_REFILLABLE_WITH_OIL) != 0)
+#define is_refillable_with_oil(o)                                             \
+    ((objects[(o)->otyp].oc_flags3 & O3_REFILLABLE_WITH_OIL) != 0)
 
 /* things that can be read */
-#define is_readable(otmp)                                                    \
-    ((objects[(otmp)->otyp].oc_flags3 & O3_READABLE) || ((otmp)->oartifact && artilist[(otmp)->oartifact].aflags & AF_READABLE))
+#define is_readable(o)                                                    \
+    ((objects[(o)->otyp].oc_flags3 & O3_READABLE) != 0 || ((o)->oartifact && artilist[(o)->oartifact].aflags & AF_READABLE))
 
 /* special stones */
 #define is_otyp_rock(otyp)                                 \
@@ -585,8 +603,8 @@ struct obj {
 
 /* misc helpers, simple enough to be macros */
 #define is_flimsy(otmp)                           \
-    (objects[(otmp)->otyp].oc_material <= MAT_LEATHER \
-     || (objects[(otmp)->otyp].oc_flags2 & O2_FLIMSY))
+    ((otmp)->material <= MAT_LEATHER \
+     || (get_obj_oc_flags2(otmp) & O2_FLIMSY) != 0)
 #define is_plural(o) \
     ((o)->quan != 1L                                                    \
      /* "the Eyes of the Overworld" are plural, but                     \
@@ -636,7 +654,7 @@ struct obj {
     ((objects[otyp].oc_flags4 & O4_MISSILE_TILE) != 0)
 
 #define is_otyp_drawn_in_front(otyp, tx, ty) \
-     ((objects[(otyp)].oc_flags4 & O4_DRAWN_IN_FRONT) && (tx) == u.ux && (ty) == u.uy)
+     ((objects[(otyp)].oc_flags4 & O4_DRAWN_IN_FRONT) != 0 && (tx) == u.ux && (ty) == u.uy)
 
 #define is_obj_drawn_in_front(obj) \
     (is_otyp_drawn_in_front((obj)->otyp, (obj)->ox, (obj)->oy))
@@ -832,8 +850,8 @@ enum mythic_power_types {
 
 enum mythic_prefix_power_types {
     MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN = 0,
-    MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN_25,
-    MYTHIC_PREFIX_POWER_INDEX_HP_GAIN_25,
+    MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN,
+    MYTHIC_PREFIX_POWER_INDEX_HP_GAIN,
     MYTHIC_PREFIX_POWER_INDEX_LIFE_DRAINING,
     MYTHIC_PREFIX_POWER_INDEX_SHINES_LIGHT,
     MYTHIC_PREFIX_POWER_INDEX_ARMOR_DEATH_RESISTANCE,
@@ -851,8 +869,8 @@ enum mythic_prefix_power_types {
 
 #define MYTHIC_PREFIX_POWER_NONE                    0x00000000UL
 #define MYTHIC_PREFIX_POWER_LEVEL_DRAIN             (1UL << MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN)
-#define MYTHIC_PREFIX_POWER_MANA_GAIN_25            (1UL << MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN_25)
-#define MYTHIC_PREFIX_POWER_HP_GAIN_25              (1UL << MYTHIC_PREFIX_POWER_INDEX_HP_GAIN_25)
+#define MYTHIC_PREFIX_POWER_MANA_GAIN               (1UL << MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN)
+#define MYTHIC_PREFIX_POWER_HP_GAIN                 (1UL << MYTHIC_PREFIX_POWER_INDEX_HP_GAIN)
 #define MYTHIC_PREFIX_POWER_LIFE_DRAINING           (1UL << MYTHIC_PREFIX_POWER_INDEX_LIFE_DRAINING)
 #define MYTHIC_PREFIX_POWER_SHINES_LIGHT            (1UL << MYTHIC_PREFIX_POWER_INDEX_SHINES_LIGHT)
 #define MYTHIC_PREFIX_POWER_ARMOR_DEATH_RESISTANCE  (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_DEATH_RESISTANCE)
@@ -941,7 +959,7 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
     ((objects[otyp].oc_flags4 & O4_NON_MYTHIC) != 0 || objects[otyp].oc_magic) /* Inherently (already special) magical items cannot be made mythical, this is just for normal boring objects */
 
 #define can_obj_have_mythic(o) \
-    (!otyp_non_mythic((o)->otyp) && (is_weapon(o) || is_armor(o)))
+    (!((get_obj_oc_flags4(o) & O4_NON_MYTHIC) != 0 || objects[(o)->otyp].oc_magic) && (is_weapon(o) || is_armor(o)))
 
 #define mythic_power_applies_to_obj(o, pwrflags) \
     (!(!is_weapon(o) && ((pwrflags) & MYTHIC_POWER_FLAG_WEAPON_ONLY) != 0) && \
@@ -958,17 +976,24 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
 #define has_obj_mythic_suffix_power(o, pwrindex) \
     ((mythic_suffix_qualities[(o)->mythic_suffix].mythic_powers & (1UL << (pwrindex))) != 0 && mythic_power_applies_to_obj(o, mythic_suffix_powers[(pwrindex)].power_flags))
 
+#define MYTHIC_WOUNDING_DICE 1
+#define MYTHIC_WOUNDING_DIESIZE 4
+#define MYTHIC_LIFE_DRAINING_DICE 2
+#define MYTHIC_LIFE_DRAINING_DIESIZE 6
+#define MYTHIC_HP_GAIN_PERCENTAGE 25
+#define MYTHIC_MANA_GAIN_PERCENTAGE 25
+
 #define has_obj_mythic_lightness(o)             has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_LIGHTNESS)
 #define has_obj_mythic_spellcasting(o)          (has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_SORCERY) || has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_SORCERY))
 #define has_obj_mythic_level_drain(o)           has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN)
-#define has_obj_mythic_mana_gain_25(o)          has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN_25)
-#define has_obj_mythic_hp_gain_25(o)            has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_HP_GAIN_25)
+#define has_obj_mythic_mana_gain(o)             has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN)
+#define has_obj_mythic_hp_gain(o)               has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_HP_GAIN)
 #define has_obj_mythic_wounding(o)              has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_WOUNDING)
-#define mythic_wounding_amount(o)               (d(1, 4) + (o)->enchantment)
+#define mythic_wounding_amount(o)               (d(MYTHIC_WOUNDING_DICE, MYTHIC_WOUNDING_DIESIZE) + (o)->enchantment)
 #define has_obj_mythic_defense(o)               has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_DEFENSE)
 #define has_obj_mythic_sharpness(o)             has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_SHARPNESS)
 #define has_obj_mythic_life_draining(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_LIFE_DRAINING)
-#define mythic_life_draining_amount(o)          (d(2, 6) + (o)->enchantment) 
+#define mythic_life_draining_amount(o)          (d(MYTHIC_LIFE_DRAINING_DICE, MYTHIC_LIFE_DRAINING_DIESIZE) + (o)->enchantment) 
 #define has_obj_mythic_magical_light(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_SHINES_LIGHT)
 #define has_obj_mythic_reach(o)                 has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_REACH)
 #define has_obj_mythic_luck(o)                  has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_LUCK)
@@ -979,7 +1004,7 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
 #define has_obj_mythic_great_strength(o)        has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_STRENGTH)
 
 #define is_obj_uncurseable(o) \
-    ((objects[(o)->otyp].oc_flags& O1_NOT_CURSEABLE) || has_obj_mythic_uncurseable(o))
+    ((get_obj_oc_flags(o) & O1_NOT_CURSEABLE) != 0 || has_obj_mythic_uncurseable(o))
 
 #define is_obj_light_source(o) \
    ((objects[(o)->otyp].oc_flags5 & O5_LIGHT_SOURCE) != 0 || artifact_light(o) || obj_shines_magical_light(o) || has_obj_mythic_magical_light(o))
@@ -988,6 +1013,8 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
 #define candle_maximum_burn_time(o) candle_starting_burn_time(o)
 #define candlelabrum_starting_burn_time(o) MAX_BURN_IN_CANDELABRUM
 #define candlelabrum_maximum_burn_time(o) candlelabrum_starting_burn_time(o)
+#define torch_starting_burn_time(o) (500)
+#define torch_maximum_burn_time(o) torch_starting_burn_time(o)
 #define lamp_starting_burn_time(o) ((long)rn1(500, 1000))
 #define lamp_maximum_burn_time(o) MAX_OIL_IN_LAMP
 #define potion_starting_burn_time(o) MAX_OIL_IN_FLASK
@@ -1048,7 +1075,6 @@ enum manual_types
 #define FIRST_CATALOGUE MANUAL_CATALOGUE_OF_WEAPONS
 #define LAST_CATALOGUE MANUAL_CATALOGUE_OF_ARTIFACTS
 #define NUM_CATALOGUES (LAST_CATALOGUE - FIRST_CATALOGUE + 1)
-
 
 /* Flags for get_obj_location(). */
 #define CONTAINED_TOO 0x1

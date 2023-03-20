@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    wizard.c    $NHDT-Date: 1539804905 2018/10/17 19:35:05 $  $NHDT-Branch: keni-makedefsm $:$NHDT-Revision: 1.53 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -37,7 +37,7 @@ STATIC_VAR NEARDATA const int nasties[] = {
     PM_SILVER_GOLEM, PM_SKELETON_KING, PM_GREEN_SLIME,
     /* chaotic */
     PM_ANCIENT_BLACK_DRAGON, PM_ANCIENT_RED_DRAGON,
-    PM_BLACK_DRAGON, PM_RED_DRAGON, PM_VAMPIRE_LORD, PM_VAMPIRE_MAGE, PM_KING_WRAITH,
+    PM_BLACK_DRAGON, PM_RED_DRAGON, PM_VAMPIRE_LORD, PM_VAMPIRE_KING, PM_VAMPIRE_MAGE, PM_KING_WRAITH,
     PM_ELDER_TENTACLED_ONE, PM_DISENCHANTER, PM_WINGED_GARGOYLE, PM_FLIND_LORD,
     PM_STORM_GIANT, PM_WAR_TROLL, PM_ELDER_DRACOLICH, PM_DRACOLICH,
     PM_OGRE_KING, PM_DEATH_FLAYER, PM_GAZER, PM_ELDER_GAZER, PM_DEATH_GAZER,
@@ -739,7 +739,9 @@ struct monst* summoner;
     context.makemon_spef_idx = 0;
     for (i = 1; i <= summon_num; i++)
     {
-        mtmp = makemon_limited((struct permonst*) 0, bypos.x, bypos.y, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, 0, max(1, ml - 1), 0);
+        mtmp = makemon_limited((struct permonst*) 0, bypos.x, bypos.y, 
+            MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, 0UL, 
+            0, max(1, ml - 1), 0, 0);
 
         if (mtmp)
         {
@@ -829,7 +831,7 @@ resurrect()
                 !strcmp(verb, "kill") ? WIZARD_OF_YENDOR_LINE_SO_THOU_THOUGHT_THOU_COULDST_KILL_ME : 
                 !strcmp(verb, "elude") ? WIZARD_OF_YENDOR_LINE_SO_THOU_THOUGHT_THOU_COULDST_ELUDE_ME : 
                 WIZARD_OF_YENDOR_LINE_NONE);
-            verbalize("So thou thought thou couldst %s me, fool.", verb);
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, "So thou thought thou couldst %s me, fool.", verb);
             if(canseemon(mtmp))
                talkeff(mtmp->mx, mtmp->my);
 
@@ -918,7 +920,7 @@ register struct monst *mtmp;
         {
             int iroll = rn2(SIZE(random_insult));
             play_voice_wizard_of_yendor_cuss(mtmp, 11, iroll);
-            verbalize("Relinquish the amulet, %s!",
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Relinquish the amulet, %s!",
                 random_insult[rn2(SIZE(random_insult))]);
         }
         else if (u.uhp < 5 && !rn2(2)) /* Panic */
@@ -926,7 +928,7 @@ register struct monst *mtmp;
             int proll = rn2(2);
             int iroll = rn2(SIZE(random_insult));
             play_voice_wizard_of_yendor_cuss(mtmp, proll + 12, iroll);
-            verbalize(proll ? "Even now thy life force ebbs, %s!"
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, proll ? "Even now thy life force ebbs, %s!"
                 : "Savor thy breath, %s, it be thy last!",
                 random_insult[iroll]);
         }
@@ -934,14 +936,14 @@ register struct monst *mtmp;
         {
             int proll = rn2(2);
             play_voice_wizard_of_yendor_simple_line(mtmp, proll ? WIZARD_OF_YENDOR_LINE_I_SHALL_RETURN : WIZARD_OF_YENDOR_LINE_ILL_BE_BACK);
-            verbalize(proll ? "I shall return." : "I'll be back.");
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, proll ? "I shall return." : "I'll be back.");
         }
         else
         {
             int mroll = rn2(SIZE(random_malediction));
             int iroll = rn2(SIZE(random_insult));
             play_voice_wizard_of_yendor_cuss(mtmp, mroll, iroll);
-            verbalize("%s %s!",
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, "%s %s!",
                 random_malediction[mroll],
                 random_insult[iroll]);
         }

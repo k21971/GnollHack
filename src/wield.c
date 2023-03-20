@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    wield.c    $NHDT-Date: 1543492132 2018/11/29 11:48:52 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.58 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -307,15 +307,7 @@ long mask;
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s to shine %s!", Tobjnam(wep, "begin"),
                       arti_light_description(wep));
         }
-#if 0
-        /* we'll get back to this someday, but it's not balanced yet */
-        if (Race_if(PM_ELF) && !wep->oartifact
-            && objects[wep->otyp].oc_material == MAT_IRON) {
-            /* Elves are averse to wielding cold iron */
-            You("have an uneasy feeling about wielding cold iron.");
-            change_luck(-1);
-        }
-#endif
+
         if (wep && wep->unpaid)
         {
             struct monst *this_shkp;
@@ -1749,6 +1741,7 @@ boolean dopopup;
              multiple ? "fuse, and become" : "is");
         pline_ex1_popup(ATR_NONE, CLR_MSG_POSITIVE, buf, enchwepknown ? "Enchant Weapon" : "Sharpening Magic", dopopup);
         weapon->otyp = CRYSKNIFE;
+        weapon->material = objects[weapon->otyp].oc_material;
         weapon->oerodeproof = 0;
 
         if (multiple)
@@ -1787,6 +1780,7 @@ boolean dopopup;
         pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, enchwepknown ? "Enchant Weapon" : "Dulling Magic", dopopup);
         costly_alteration(weapon, COST_DEGRD); /* DECHNT? other? */
         weapon->otyp = WORM_TOOTH;
+        weapon->material = objects[weapon->otyp].oc_material;
         weapon->oerodeproof = 0;
 
         if (multiple) 
@@ -1825,14 +1819,32 @@ boolean dopopup;
     /* there is a (soft) upper and lower limit to weapon->enchantment */
     if (((weapon->enchantment > max_ench * ench_limit_multiplier && amount >= 0) || (weapon->enchantment < -max_ench * ench_limit_multiplier && amount < 0)) && rn2(3))
     {
-        play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
-        if (!Blind)
-            Sprintf(buf, "%s %s for a while and then %s.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "evaporate"));
+        if (((weapon->speflags & SPEFLAGS_GIVEN_OUT_BLUE_SMOKE) == 0 || rn2(3)) && (weapon->material == MAT_ORICHALCUM || obj_resists(weapon, 0, 75)))
+        {
+            play_special_effect_at(SPECIAL_EFFECT_PUFF_OF_SMOKE, u.ux, u.uy, 0, FALSE);
+            play_sfx_sound(SFX_VANISHES_IN_PUFF_OF_SMOKE);
+            special_effect_wait_until_action(0);
+            if (!Blind)
+                Sprintf(buf, "%s %s for a while, and then suddenly %s out a puff of blue smoke.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "give"));
+            else
+                Sprintf(buf, "%s for a while, and then suddenly %s out a puff of smoke.", Yobjnam2(weapon, "violently vibrate"), otense(weapon, "give"));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, Blind ? "Puff of Smoke" : "Puff of Blue Smoke", dopopup);
+            otmp->enchantment = 0;
+            otmp->speflags |= SPEFLAGS_GIVEN_OUT_BLUE_SMOKE;
+            update_inventory();
+            special_effect_wait_until_end(0);
+        }
         else
-            Sprintf(buf, "%s.", Yobjnam2(weapon, "evaporate"));
-        pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, "Evaporation", dopopup);
+        {
+            play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
+            if (!Blind)
+                Sprintf(buf, "%s %s for a while and then %s.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "evaporate"));
+            else
+                Sprintf(buf, "%s.", Yobjnam2(weapon, "evaporate"));
+            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, "Evaporation", dopopup);
 
-        useupall(weapon); /* let all of them disappear */
+            useupall(weapon); /* let all of them disappear */
+        }
         return 1;
     }
 
@@ -1902,8 +1914,14 @@ welded(obj, mon)
 register struct obj *obj;
 register struct monst* mon;
 {
-    if (obj && mon && (obj == uwep || obj == uarms) && will_weld(obj, mon)) {
-        obj->bknown = TRUE;
+    if (obj && mon && (obj == uwep || obj == uarms) && will_weld(obj, mon)) 
+    {
+        if (!obj->bknown)
+        {
+            obj->bknown = TRUE;
+            if (obj->where == OBJ_INVENT)
+                update_inventory();
+        }
         return 1;
     }
     return 0;

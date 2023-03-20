@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mklev.c    $NHDT-Date: 1550800390 2019/02/22 01:53:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -30,14 +30,14 @@ STATIC_DCL void FDECL(dosdoor, (XCHAR_P, XCHAR_P, struct mkroom *, int, UCHAR_P)
 STATIC_DCL void FDECL(join, (int, int, BOOLEAN_P));
 STATIC_DCL void FDECL(do_room_or_subroom, (struct mkroom *, int, int,
                                            int, int, BOOLEAN_P,
-                                           SCHAR_P, BOOLEAN_P, int, int, int, BOOLEAN_P));
+                                           SCHAR_P, BOOLEAN_P, int, int, int, int, SHORT_P, BOOLEAN_P));
 STATIC_DCL void NDECL(makerooms);
 STATIC_DCL void FDECL(finddpos, (coord *, XCHAR_P, XCHAR_P,
                                  XCHAR_P, XCHAR_P));
 STATIC_DCL void FDECL(mkinvpos, (XCHAR_P, XCHAR_P, int));
 STATIC_DCL void FDECL(mk_knox_portal, (XCHAR_P, XCHAR_P));
 
-#define create_vault() create_room(-1, -1, 2, 2, -1, -1, VAULT, TRUE, ROOM, 0, NON_PM)
+#define create_vault() create_room(-1, -1, 2, 2, -1, -1, VAULT, TRUE, ROOM, 0, NON_PM, -1, 0)
 #define init_vault() vault_x = -1
 #define do_vault() (vault_x != -1)
 STATIC_VAR xchar vault_x, vault_y;
@@ -110,7 +110,7 @@ sort_rooms()
 }
 
 STATIC_OVL void
-do_room_or_subroom(croom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype, is_room)
+do_room_or_subroom(croom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype, tileset, decotyp, is_room)
 register struct mkroom *croom;
 int lowx, lowy;
 register int hix, hiy;
@@ -118,7 +118,8 @@ boolean lit;
 schar rtype;
 boolean special;
 boolean is_room;
-int floortyp, floorsubtyp, mtype;
+short decotyp;
+int floortyp, floorsubtyp, mtype, tileset;
 {
     register int x, y;
     struct rm *lev;
@@ -161,6 +162,8 @@ int floortyp, floorsubtyp, mtype;
     croom->fdoor = doorindex;
     croom->irregular = FALSE;
     croom->resident_mtype = mtype;
+    croom->room_decoration_type = decotyp;
+    croom->room_flags = 0;
 
     croom->nsubrooms = 0;
     croom->sbrooms[0] = (struct mkroom *) 0;
@@ -175,6 +178,11 @@ int floortyp, floorsubtyp, mtype;
                 levl[x][y].special_quality = 0;
                 /* Retain floortype from stone */
                 levl[x][y].horizontal = 1; /* For open/secret doors. */
+                if (tileset >= 0)
+                {
+                    levl[x][y].use_special_tileset = 1;
+                    levl[x][y].special_tileset = (uchar)tileset;
+                }
             }
 
         for (x = lowx - 1; x <= hix + 1; x += (hix - lowx + 2))
@@ -186,6 +194,11 @@ int floortyp, floorsubtyp, mtype;
                 levl[x][y].special_quality = 0;
                 /* Retain floortype from stone */
                 levl[x][y].horizontal = 0; /* For open/secret doors. */
+                if (tileset >= 0)
+                {
+                    levl[x][y].use_special_tileset = 1;
+                    levl[x][y].special_tileset = (uchar)tileset;
+                }
             }
 
         if (IS_FLOOR(floortyp))
@@ -200,6 +213,11 @@ int floortyp, floorsubtyp, mtype;
                     lev->vartyp = get_initial_location_vartype(lev->typ, lev->subtyp);
                     lev->special_quality = 0;
                     lev->floortyp = lev->floorsubtyp = lev->floorvartyp = 0;
+                    if (tileset >= 0)
+                    {
+                        lev->use_special_tileset = 1;
+                        lev->special_tileset = (uchar)tileset;
+                    }
                     lev++;
                 }
             }
@@ -222,27 +240,317 @@ int floortyp, floorsubtyp, mtype;
             levl[lowx - 1][hiy + 1].vartyp = levl[lowx - 1][hiy + 1].vartyp; /* Retain the vartyp setting from stone */
             levl[hix + 1][hiy + 1].vartyp = levl[hix + 1][hiy + 1].vartyp; /* Retain the vartyp setting from stone */
 
-#if 1
-            if (level.flags.tileset == CMAP_NORMAL || level.flags.tileset == CMAP_UNDEAD_STYLE)
+            if (tileset >= 0)
             {
-                if (IS_WALL(levl[lowx][lowy - 1].typ) && !levl[lowx][lowy - 1].use_special_tileset && !rn2(5))
-                    levl[lowx][lowy - 1].feature_doodad = 0 + (DOODAD_COBWEB_CORNER_SMALL_DECORATED + rn2(DOODAD_COBWEB_CORNER_LARGE - DOODAD_COBWEB_CORNER_SMALL_DECORATED + 1)) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
-                if (IS_WALL(levl[hix][lowy - 1].typ) && !levl[hix][lowy - 1].use_special_tileset && !rn2(5))
-                    levl[hix][lowy - 1].feature_doodad = 1 + (DOODAD_COBWEB_CORNER_SMALL_DECORATED + rn2(DOODAD_COBWEB_CORNER_LARGE - DOODAD_COBWEB_CORNER_SMALL_DECORATED + 1)) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
-
-                if (lowx + 1 < hix && !rn2(7))
-                {
-                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
-                    if (IS_WALL(levl[lowx + roll + 1][lowy - 1].typ) && !levl[lowx + roll + 1][lowy - 1].use_special_tileset)
-                        levl[lowx + roll + 1][lowy - 1].feature_doodad = rn2(2) + (DOODAD_COBWEB_NORMAL) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
-                }
+                levl[lowx - 1][lowy - 1].use_special_tileset = 1;
+                levl[hix + 1][lowy - 1].use_special_tileset = 1;
+                levl[lowx - 1][hiy + 1].use_special_tileset = 1;
+                levl[hix + 1][hiy + 1].use_special_tileset = 1;
+                levl[lowx - 1][lowy - 1].special_tileset = (uchar)tileset;
+                levl[hix + 1][lowy - 1].special_tileset = (uchar)tileset;
+                levl[lowx - 1][hiy + 1].special_tileset = (uchar)tileset;
+                levl[hix + 1][hiy + 1].special_tileset = (uchar)tileset;
             }
-#endif
-
         }
         else 
         { /* a subroom */
             wallification(lowx - 1, lowy - 1, hix + 1, hiy + 1);
+        }
+
+        /* Decorations */
+        if (!Is_really_rogue_level(&u.uz))
+        {
+            switch (decotyp)
+            {
+            case 1:
+            {
+                int lvl_depth = max(0, depth(&u.uz));
+                int webmod = lvl_depth > 10 ? -2 : lvl_depth > 5 ? -1 : 0;
+                boolean made_fireplace = FALSE;
+                if (IS_WALL(levl[lowx][lowy - 1].typ) && !rn2(5 + webmod))
+                {
+                    levl[lowx][lowy - 1].decoration_typ = DECORATION_COBWEB_CORNER; // 0 + (DOODAD_COBWEB_CORNER_SMALL_DECORATED + rn2(DOODAD_COBWEB_CORNER_LARGE - DOODAD_COBWEB_CORNER_SMALL_DECORATED + 1)) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
+                    levl[lowx][lowy - 1].decoration_subtyp = decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes > 1 ? rn2(decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes) : 0;
+                    levl[lowx][lowy - 1].decoration_dir = 0;
+                }
+                if (IS_WALL(levl[hix][lowy - 1].typ) && !rn2(5 + webmod))
+                {
+                    levl[hix][lowy - 1].decoration_typ = DECORATION_COBWEB_CORNER; // 1 + (DOODAD_COBWEB_CORNER_SMALL_DECORATED + rn2(DOODAD_COBWEB_CORNER_LARGE - DOODAD_COBWEB_CORNER_SMALL_DECORATED + 1)) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
+                    levl[hix][lowy - 1].decoration_subtyp = decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes > 1 ? rn2(decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes) : 0;
+                    levl[hix][lowy - 1].decoration_dir = 1;
+                    levl[hix][lowy - 1].decoration_flags = 0;
+                }
+
+                if (lowx + 1 < hix && !rn2(7 + webmod))
+                {
+                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll + 1][lowy - 1].decoration_typ = DECORATION_COBWEB;
+                        levl[lowx + roll + 1][lowy - 1].decoration_subtyp = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_dir = rn2(2);
+                        levl[lowx + roll + 1][lowy - 1].decoration_flags = 0;
+                    }
+                }
+
+                schar bannertype = (schar)rn2(MAX_BANNERS);
+                boolean has_banners = FALSE;
+                if (lowx + 1 < hix && !rn2(15))
+                {
+                    has_banners = TRUE;
+                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll + 1][lowy - 1].decoration_typ = DECORATION_BANNER;
+                        levl[lowx + roll + 1][lowy - 1].decoration_subtyp = bannertype;
+                        levl[lowx + roll + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+                    if ((hix - lowx > 5 && rn2(3)) || (hix - lowx >= 2 && !rn2(3)))
+                    {
+                        int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                        if (IS_WALL(levl[lowx + roll2 + 1][lowy - 1].typ))
+                        {
+                            levl[lowx + roll2 + 1][lowy - 1].decoration_typ = DECORATION_BANNER;
+                            levl[lowx + roll2 + 1][lowy - 1].decoration_subtyp = bannertype;
+                            levl[lowx + roll2 + 1][lowy - 1].decoration_dir = 0;
+                            levl[lowx + roll2 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+
+                    }
+                    if ((hix - lowx > 5 && !rn2(3)))
+                    {
+                        int roll3 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                        if (IS_WALL(levl[lowx + roll3 + 1][lowy - 1].typ))
+                        {
+                            levl[lowx + roll3 + 1][lowy - 1].decoration_typ = DECORATION_BANNER;
+                            levl[lowx + roll3 + 1][lowy - 1].decoration_subtyp = bannertype;
+                            levl[lowx + roll3 + 1][lowy - 1].decoration_dir = 0;
+                            levl[lowx + roll3 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                    }
+                }
+
+                if (lowx + 1 < hix && ((has_banners && !rn2(2)) || !rn2(15)))
+                {
+                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll + 1][hiy + 1].typ))
+                    {
+                        levl[lowx + roll + 1][hiy + 1].decoration_typ = DECORATION_BANNER;
+                        levl[lowx + roll + 1][hiy + 1].decoration_subtyp = bannertype;
+                        levl[lowx + roll + 1][hiy + 1].decoration_dir = 3;
+                        levl[lowx + roll + 1][hiy + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+                    if ((hix - lowx > 5 && rn2(3)) || (hix - lowx >= 2 && !rn2(3)))
+                    {
+                        int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                        if (IS_WALL(levl[lowx + roll2 + 1][hiy + 1].typ))
+                        {
+                            levl[lowx + roll2 + 1][hiy + 1].decoration_typ = DECORATION_BANNER;
+                            levl[lowx + roll2 + 1][hiy + 1].decoration_subtyp = bannertype;
+                            levl[lowx + roll2 + 1][hiy + 1].decoration_dir = 3;
+                            levl[lowx + roll2 + 1][hiy + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+
+                    }
+                    if ((hix - lowx > 5 && !rn2(3)))
+                    {
+                        int roll3 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                        if (IS_WALL(levl[lowx + roll3 + 1][hiy + 1].typ))
+                        {
+                            levl[lowx + roll3 + 1][hiy + 1].decoration_typ = DECORATION_BANNER;
+                            levl[lowx + roll3 + 1][hiy + 1].decoration_subtyp = bannertype;
+                            levl[lowx + roll3 + 1][hiy + 1].decoration_dir = 3;
+                            levl[lowx + roll3 + 1][hiy + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                    }
+                }
+
+
+                int modron_one_in_chance = 50 - depth(&u.uz);
+                if (lowx + 1 < hix && !rn2(max(3, modron_one_in_chance)))
+                {
+                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll + 1][lowy - 1].decoration_typ = DECORATION_WALL_SCULPTURE;
+                        levl[lowx + roll + 1][lowy - 1].decoration_subtyp = rn2(MAX_WALL_SCULPTURES);
+                        levl[lowx + roll + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_flags = 0;
+                    }
+                }
+
+                if (lowx + 1 < hix && !rn2(15))
+                {
+                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll + 1][lowy - 1].typ))
+                    {
+                        levl[lowx + roll + 1][lowy - 1].decoration_typ = DECORATION_SHIELD_WITH_SWORDS;
+                        levl[lowx + roll + 1][lowy - 1].decoration_subtyp = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_flags = (rn2(6) ? DECORATION_FLAGS_ITEM_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM2_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM3_IN_HOLDER : 0UL);
+                    }
+                }
+
+                int roll1 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                if (lowx + 1 < hix && !rn2(3))
+                {
+                    if (IS_WALL(levl[lowx + roll1 + 1][lowy - 1].typ))
+                    {
+                        if (!rn2(4))
+                        {
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_typ = !rn2(2) ? DECORATION_GARGOYLE_NICHE : DECORATION_KNIGHT_NICHE;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                        else if (!rn2(3))
+                        {
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_typ = DECORATION_FIREPLACE;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_flags = 0;
+                            made_fireplace = TRUE;
+                        }
+                        else
+                        {
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_typ = !rn2(10) ? DECORATION_LANTERN : DECORATION_TORCH;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                    }
+                }
+                if (lowx + 1 < hix && !rn2(lvl_depth / 3 + 3))
+                {
+                    int roll = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                    if (IS_WALL(levl[lowx + roll + 1][hiy + 1].typ))
+                    {
+                        levl[lowx + roll + 1][hiy + 1].decoration_typ = !rn2(10) ? DECORATION_LANTERN : DECORATION_TORCH;
+                        levl[lowx + roll + 1][hiy + 1].decoration_subtyp = 0;
+                        levl[lowx + roll + 1][hiy + 1].decoration_dir = 3;
+                        levl[lowx + roll + 1][hiy + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+                }
+                if (lowy + 1 < hiy && !rn2(3))
+                {
+                    int roll = hiy - lowy - 1 <= 1 ? 0 : rn2(hiy - lowy - 1);
+                    if (IS_WALL(levl[lowx - 1][lowy + roll + 1].typ))
+                    {
+                        if (!rn2(3))
+                        {
+                            levl[lowx - 1][lowy + roll + 1].decoration_typ = !rn2(2) ? DECORATION_GARGOYLE_NICHE : DECORATION_KNIGHT_NICHE;
+                            levl[lowx - 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
+                            levl[lowx - 1][lowy + roll + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                        else if (!rn2(4))
+                        {
+                            levl[lowx - 1][lowy + roll + 1].decoration_typ = DECORATION_BANNER;
+                            levl[lowx - 1][lowy + roll + 1].decoration_subtyp = bannertype;
+                            levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
+                            levl[lowx - 1][lowy + roll + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                        else if (!rn2(7))
+                        {
+                            levl[lowx - 1][lowy + roll + 1].decoration_typ = DECORATION_SHIELD_WITH_SWORDS;
+                            levl[lowx - 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
+                            levl[lowx - 1][lowy + roll + 1].decoration_flags = (rn2(6) ? DECORATION_FLAGS_ITEM_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM2_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM3_IN_HOLDER : 0UL);
+                        }
+                        else if (!made_fireplace && !rn2(6))
+                        {
+                            levl[lowx - 1][lowy + roll + 1].decoration_typ = DECORATION_FIREPLACE;
+                            levl[lowx - 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
+                            levl[lowx - 1][lowy + roll + 1].decoration_flags = 0;
+                            made_fireplace = TRUE;
+                        }
+                        else
+                        {
+                            levl[lowx - 1][lowy + roll + 1].decoration_typ = !rn2(10) ? DECORATION_LANTERN : DECORATION_TORCH;
+                            levl[lowx - 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
+                            levl[lowx - 1][lowy + roll + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                    }
+                }
+                if (lowy + 1 < hiy && !rn2(3))
+                {
+                    int roll = hiy - lowy - 1 <= 1 ? 0 : rn2(hiy - lowy - 1);
+                    if (IS_WALL(levl[hix + 1][lowy + roll + 1].typ))
+                    {
+                        if (!rn2(3))
+                        {
+                            levl[hix + 1][lowy + roll + 1].decoration_typ = !rn2(2) ? DECORATION_GARGOYLE_NICHE : DECORATION_KNIGHT_NICHE;
+                            levl[hix + 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
+                            levl[hix + 1][lowy + roll + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                        else if (!rn2(4))
+                        {
+                            levl[hix + 1][lowy + roll + 1].decoration_typ = DECORATION_BANNER;
+                            levl[hix + 1][lowy + roll + 1].decoration_subtyp = bannertype;
+                            levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
+                            levl[hix + 1][lowy + roll + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                        else if (!rn2(7))
+                        {
+                            levl[hix + 1][lowy + roll + 1].decoration_typ = DECORATION_SHIELD_WITH_SWORDS;
+                            levl[hix + 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
+                            levl[hix + 1][lowy + roll + 1].decoration_flags = (rn2(6) ? DECORATION_FLAGS_ITEM_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM2_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM3_IN_HOLDER : 0UL);
+                        }
+                        else if (!made_fireplace && !rn2(6))
+                        {
+                            levl[hix + 1][lowy + roll + 1].decoration_typ = DECORATION_FIREPLACE;
+                            levl[hix + 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
+                            levl[hix + 1][lowy + roll + 1].decoration_flags = 0;
+                            made_fireplace = TRUE;
+                        }
+                        else
+                        {
+                            levl[hix + 1][lowy + roll + 1].decoration_typ = !rn2(10) ? DECORATION_LANTERN : DECORATION_TORCH;
+                            levl[hix + 1][lowy + roll + 1].decoration_subtyp = 0;
+                            levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
+                            levl[hix + 1][lowy + roll + 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                        }
+                    }
+                }
+                break;
+            }
+            case 2:
+            {
+                int roll1 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+                int roll2 = hix - lowx - 1 <= 1 ? 0 : rn2(hix - lowx - 1);
+
+                if (IS_WALL(levl[lowx + roll1 + 1][lowy - 1].typ))
+                {
+                    if (!rn2(3))
+                    {
+                        levl[lowx + roll1 + 1][lowy - 1].decoration_typ = DECORATION_FIREPLACE;
+                        levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
+                        levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll1 + 1][lowy - 1].decoration_flags = 0;
+                    }
+                }
+                if (IS_WALL(levl[lowx + roll2 + 1][lowy - 1].typ))
+                {
+                    if (!rn2(4))
+                    {
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_typ = DECORATION_PAINTING;
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_subtyp = rn2(MAX_PAINTINGS);
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll2 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+            }
+            
         }
     }
     else
@@ -268,6 +576,11 @@ int floortyp, floorsubtyp, mtype;
                         lev->floorsubtyp = floorsubtyp;
                         lev->floorvartyp = get_initial_location_vartype(lev->floortyp, lev->floorsubtyp);
                     }
+                    if (tileset >= 0)
+                    {
+                        lev->use_special_tileset = 1;
+                        lev->special_tileset = (uchar)tileset;
+                    }
                     lev++;
                 }
             }
@@ -276,17 +589,18 @@ int floortyp, floorsubtyp, mtype;
 }
 
 void
-add_room(lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype)
+add_room(lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype, tileset, decotyp)
 int lowx, lowy, hix, hiy;
 boolean lit;
 schar rtype;
 boolean special;
-int floortyp, floorsubtyp, mtype;
+short decotyp;
+int floortyp, floorsubtyp, mtype, tileset;
 {
     register struct mkroom *croom;
 
     croom = &rooms[nroom];
-    do_room_or_subroom(croom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype,
+    do_room_or_subroom(croom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype, tileset, decotyp,
                        (boolean) TRUE);
     croom++;
     croom->hx = -1;
@@ -294,18 +608,19 @@ int floortyp, floorsubtyp, mtype;
 }
 
 void
-add_subroom(proom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype)
+add_subroom(proom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype, tileset, decotyp)
 struct mkroom *proom;
 int lowx, lowy, hix, hiy;
 boolean lit;
 schar rtype;
 boolean special;
-int floortyp, floorsubtyp, mtype;
+short decotyp;
+int floortyp, floorsubtyp, mtype, tileset;
 {
     register struct mkroom *croom;
 
     croom = &subrooms[nsubroom];
-    do_room_or_subroom(croom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype,
+    do_room_or_subroom(croom, lowx, lowy, hix, hiy, lit, rtype, special, floortyp, floorsubtyp, mtype, tileset, decotyp,
                        (boolean) FALSE);
     proom->sbrooms[proom->nsubrooms++] = croom;
     croom++;
@@ -328,7 +643,7 @@ makerooms()
                 vault_y = rooms[nroom].ly;
                 rooms[nroom].hx = -1;
             }
-        } else if (!create_room(-1, -1, -1, -1, -1, -1, OROOM, -1, ROOM, 0, NON_PM))
+        } else if (!create_room(-1, -1, -1, -1, -1, -1, OROOM, -1, ROOM, 0, NON_PM, -1, 1))
             return;
     }
     return;
@@ -488,7 +803,7 @@ uchar dmask;
     levl[x][y].typ = type;
     levl[x][y].subtyp = 0;
     levl[x][y].floor_doodad = 0;
-    levl[x][y].feature_doodad = 0;
+    delete_decoration(x, y);
     if (type == DOOR) {
         if (dmask != 0)
         {
@@ -682,7 +997,7 @@ int trap_type;
                             if (!m_carrying(mon, ORCISH_SHORT_BOW))
                                 mongets(mon, ORCISH_SHORT_BOW);
                             if (!m_carrying(mon, ORCISH_ARROW))
-                                m_initthrow(mon, ORCISH_ARROW, 10, 12, TRUE, -1, -1);
+                                m_initthrow(mon, ORCISH_ARROW, 10, 12, TRUE, -1, -1, MAT_NONE);
 
                             m_dowear(mon, TRUE);
                             mongets(mon, CREAM_PIE);
@@ -708,6 +1023,10 @@ int trap_type;
                     {
                         levl[xx][yy].typ = IRONBARS;
                         levl[xx][yy].subtyp = 0;
+                        levl[xx][yy].decoration_typ = 0;
+                        levl[xx][yy].decoration_subtyp = 0;
+                        levl[xx][yy].decoration_dir = 0;
+                        levl[xx][yy].decoration_flags = 0;
                         /* HWALL .horizontal value retained */
                         if (levl[xx][yy].horizontal && isok(xx, yy - 1) && IS_FLOOR(levl[xx][yy - 1].typ))
                         {
@@ -767,7 +1086,7 @@ STATIC_OVL void
 clear_level_structures()
 {
     static struct rm zerorm = { nul_layerinfo,
-                                0, 0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0 };
+                                0, 0, 0, 0, 0,  0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0 };
     register int x, y;
     register struct rm *lev;
 
@@ -982,10 +1301,11 @@ makelevel()
         if (check_room(&vault_x, &w, &vault_y, &h, TRUE)) {
  fill_vault:
             add_room(vault_x, vault_y, vault_x + w, vault_y + h, TRUE, VAULT,
-                     FALSE, ROOM, 0, NON_PM);
+                     FALSE, ROOM, 0, NON_PM, -1, FALSE);
             level.flags.has_vault = 1;
             ++room_threshold;
             fill_room(&rooms[nroom - 1], FALSE);
+            set_room_tileset(&rooms[nroom - 1]);
             mk_knox_portal(vault_x + w, vault_y + h);
             if (!level.flags.noteleport && !rn2(2))
                 makevtele();
@@ -1079,6 +1399,7 @@ makelevel()
     register int altarsplaced = 0;
     register int chance = 60;
     register int u_depth = depth(&u.uz);
+    int level_dif = level_difficulty();
 
     /* Put items and other stuff in the rooms */
     for (croom = rooms; croom->hx > 0; croom++) {
@@ -1146,7 +1467,7 @@ makelevel()
             }
         }
         /* put traps and mimics inside */
-        x = 8 - (level_difficulty() / 6);
+        x = 8 - (level_dif / 6);
         if (x <= 1)
             x = 2;
         while (!rn2(x) && !startingroom)
@@ -1214,7 +1535,7 @@ makelevel()
                 if (context.game_difficulty < 0)
                 {
                     long bits = 0L, bits2 = 0L;
-                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
                     if (otmp)
                     {
                         otmp->bknown = 1;
@@ -1225,7 +1546,7 @@ makelevel()
                             bits2 |= 1L << (otmp->special_quality - 32);
                     }
 
-                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, bits, bits2, MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS);
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, bits, bits2, MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS);
                     if (otmp)
                     {
                         otmp->bknown = 1;
@@ -1267,6 +1588,8 @@ makelevel()
             (void) mkcorpstat(STATUE, (struct monst *) 0,
                               (struct permonst *) 0, somex(croom),
                               somey(croom), CORPSTAT_INIT);
+        
+
         /* put box/chest inside;
          *  40% chance for at least 1 box, regardless of number
          *  of rooms; about 5 - 7.5% for 2 boxes, least likely
@@ -1275,22 +1598,6 @@ makelevel()
         if (!startingroom && !rn2(nroom * 5 / 2))
             (void) mksobj_at((rn2(3)) ? LARGE_BOX : CHEST, somex(croom),
                              somey(croom), TRUE, FALSE);
-
-        /* maybe make some graffiti */
-        if (!rn2(27 + 3 * abs(depth(&u.uz)))) {
-            char buf[BUFSZ];
-            const char *mesg = random_engraving(buf);
-
-            if (mesg) {
-                do {
-                    x = somex(croom);
-                    y = somey(croom);
-                } while (levl[x][y].typ != ROOM && !rn2(40));
-                if (!(IS_POOL(levl[x][y].typ)
-                      || IS_FURNITURE(levl[x][y].typ)))
-                    make_engr_at(x, y, mesg, 0L, MARK, ENGR_FLAGS_NONE);
-            }
-        }
 
  skip_nonrogue:
         if (!rn2(2)) {
@@ -1302,6 +1609,85 @@ makelevel()
                     break;
                 }
                 (void) mkobj_at(0, somex(croom), somey(croom), TRUE);
+            }
+        }
+    }
+
+    /* Carpets */
+    for (croom = rooms; croom->hx > 0; croom++)
+    {
+        int rt = croom->rtype;
+        int rst = croom->rsubtype;
+        int lowx = croom->lx;
+        int lowy = croom->ly;
+        int hix = croom->hx;
+        int hiy = croom->hy;
+        boolean has_fireplace = FALSE;
+
+        for (x = lowx; x <= hix; x++)
+        {
+            if (isok(x, lowy - 1) && levl[x][lowy - 1].decoration_typ == DECORATION_FIREPLACE)
+            {
+                has_fireplace = TRUE;
+                break;
+            }
+        }
+        if (!has_fireplace)
+        {
+            for (y = lowy; y <= hiy; y++)
+            {
+                if (isok(lowx - 1, y) && levl[lowx - 1][y].decoration_typ == DECORATION_FIREPLACE)
+                {
+                    has_fireplace = TRUE;
+                    break;
+                }
+                else if (isok(hix - 1, y) && levl[hix - 1][y].decoration_typ == DECORATION_FIREPLACE)
+                {
+                    has_fireplace = TRUE;
+                    break;
+                }
+            }
+        }
+
+        if ((rt == OROOM && !rn2(has_fireplace ? 2 : 20)) || rt == COURT || rt == TEMPLE || rt == LIBRARY || rt == LEPREHALL || (rt >= SHOPBASE && rn2(3))
+            || (rt == NPCROOM && (has_fireplace || rst == NPC_ELVEN_BARD || rst == NPC_ARTIFICER || !rn2(2))))
+        {
+            int excess_hide_width = hix - lowx + 1 - carpet_type_definitions[CARPET_BROWN_ANIMAL_HIDE].fixed_width;
+            int excess_hide_height = hiy - lowy + 1 - carpet_type_definitions[CARPET_BROWN_ANIMAL_HIDE].fixed_height;
+            int excess_plaque_width = hix - lowx + 1 - carpet_type_definitions[CARPET_MODRON_SPHERICAL_PLAQUE].fixed_width;
+            int excess_plaque_height = hiy - lowy + 1 - carpet_type_definitions[CARPET_MODRON_SPHERICAL_PLAQUE].fixed_height;
+            if (excess_hide_width >= 0 && excess_hide_width <= 2 && excess_hide_width % 2 == 0 && excess_hide_height >= 0 && excess_hide_height <= 2 && excess_hide_height % 2 == 0
+                && !Inhell && rn2(excess_hide_width == 0 && excess_hide_height == 0 ? 5 : 2))
+                create_carpet(lowx + excess_hide_width / 2, lowy + excess_hide_height / 2, hix - excess_hide_width / 2, hiy - excess_hide_height / 2, CARPET_BROWN_ANIMAL_HIDE);
+            else if (rt < SHOPBASE && ((levl[lowx][lowy].floortyp == ROOM && levl[lowx][lowy].floorsubtyp == 0) || (levl[lowx][lowy].typ == ROOM && levl[lowx][lowy].subtyp == 0))
+                && excess_plaque_width >= 0 && excess_plaque_width <= 2 && excess_plaque_width % 2 == 0 && excess_plaque_height >= 0 && excess_plaque_height <= 2 && excess_plaque_height % 2 == 0
+                && (level_dif >= 12 ? rn2(excess_plaque_width == 0 && excess_plaque_height == 0 ? 3 : 2)  : !rn2(excess_plaque_width == 0 && excess_plaque_height == 0 ? 3 : 8)))
+                create_carpet(lowx + excess_plaque_width / 2, lowy + excess_plaque_height / 2, hix - excess_plaque_width / 2, hiy - excess_plaque_height / 2, CARPET_MODRON_SPHERICAL_PLAQUE);
+            else
+                create_carpet(lowx, lowy, hix, hiy, 
+                    rt == DELPHI ? CARPET_VERTICAL_PURPLE : 
+                    Inhell ? CARPET_HORIZONTAL_RED : 
+                    rt >= SHOPBASE || rt == TEMPLE || rt == LIBRARY ? (!rn2(5) ? (!rn2(2) ? CARPET_CRIMSON : CARPET_VERTICAL_PURPLE) : CARPET_YELLOW) :
+                    !rn2(2) || rt == COURT ? CARPET_CRIMSON : (rn2(5) ? CARPET_VERTICAL_PURPLE : CARPET_YELLOW));
+        }
+    }
+
+    for (croom = rooms; croom->hx > 0; croom++) {
+        if (croom->rtype != OROOM)
+            continue;
+
+        /* maybe make some graffiti */
+        if (!rn2(27 + 3 * abs(depth(&u.uz)))) {
+            char buf[BUFSZ];
+            const char* mesg = random_engraving(buf);
+
+            if (mesg) {
+                do {
+                    x = somex(croom);
+                    y = somey(croom);
+                } while (levl[x][y].typ != ROOM && !rn2(40));
+                if (!(IS_POOL(levl[x][y].typ) || IS_FURNITURE(levl[x][y].typ)) && levl[x][y].carpet_typ == 0)
+                    make_engr_at(x, y, mesg, 0L, MARK, ENGR_FLAGS_NONE);
             }
         }
     }
@@ -2517,12 +2903,13 @@ create_level_light_sources(VOID_ARGS)
             int lr = get_location_light_range(x, y);
             if (lr != 0 && (levl[x][y].flags & L_INITIALLY_UNLIT) == 0) // Altars are always on by default
             {
+                int ls = get_location_light_sidedness(x, y);
                 anything id;
                 coord c;
                 c.x = x;
                 c.y = y;
                 id.a_coord = c;
-                new_light_source(x, y, lr, LS_LOCATION, &id);
+                new_light_source(x, y, lr, LS_LOCATION, &id, ls);
                 levl[x][y].lamplit = TRUE;
             }
         }
@@ -2536,12 +2923,13 @@ xchar x, y;
     int lr = get_location_light_range(x, y);
     if (lr != 0)
     {
+        int ls = get_location_light_sidedness(x, y);
         anything id;
         coord c;
         c.x = x;
         c.y = y;
         id.a_coord = c;
-        new_light_source(x, y, lr, LS_LOCATION, &id);
+        new_light_source(x, y, lr, LS_LOCATION, &id, ls);
         levl[x][y].lamplit = TRUE;
     }
 }

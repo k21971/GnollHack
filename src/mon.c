@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mon.c    $NHDT-Date: 1556139724 2019/04/24 21:02:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.284 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -174,6 +174,7 @@ int mndx;
         break;
     case PM_VAMPIRE:
     case PM_VAMPIRE_LORD:
+    case PM_VAMPIRE_KING:
     case PM_VAMPIRE_MAGE:
     case PM_HUMAN_ZOMBIE:
     case PM_HUMAN_MUMMY:
@@ -576,6 +577,7 @@ boolean createcorpse;
     case PM_VAMPIRE:
     case PM_VAMPIRE_MAGE:
     case PM_VAMPIRE_LORD:
+    case PM_VAMPIRE_KING:
         /* include mtmp in the mkcorpstat() call */
         num = undead_to_corpse(mndx);
         corpstatflags |= CORPSTAT_INIT;
@@ -624,7 +626,7 @@ boolean createcorpse;
                     objid = IRON_CHAIN;
                     break;
                 case 1:
-                    objid = IRON_SHOES;
+                    objid = SHOES;
                     break;
                 case 2:
                     objid = HEAVY_IRON_BALL;
@@ -632,7 +634,7 @@ boolean createcorpse;
                 default:
                     break;
                 }
-                obj = mksobj_at(objid, x, y, TRUE, FALSE);
+                obj = mksobj_at_with_flags(objid, x, y, TRUE, FALSE, 0, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
             }
         }
         free_mname(mtmp);
@@ -845,6 +847,18 @@ boolean createcorpse;
         free_mname(mtmp);
         free_umname(mtmp);
         return obj;
+    case PM_TARRASQUE:
+        if (!exist_artifact(DAGGER, artiname(ART_TOOTH_OF_TARRASQUE)))
+        {
+            obj = mksobj_at(DAGGER, x, y, FALSE, FALSE);
+            if (obj)
+            {
+                obj->quan = 1;
+                obj = oname(obj, artiname(ART_TOOTH_OF_TARRASQUE));
+                obj->owt = weight(obj);
+            }
+        }
+        goto default_1;
     default_1:
     default:
         if (mvitals[mndx].mvflags & MV_NOCORPSE) 
@@ -1045,7 +1059,7 @@ register struct monst *mtmp;
         //mtmp->mhp -= dam;
 
         if (mtmp->mhpmax > dam)
-            mtmp->mbasehpmax -= dam;
+            mtmp->mbasehpdrain -= dam;
         
         update_mon_maxhp(mtmp);
         if (DEADMONSTER(mtmp)) 
@@ -1787,7 +1801,7 @@ register struct monst *mtmp;
                 /* Heal up to the object's weight in hp */
                 if (mtmp->mhp < mtmp->mhpmax)
                 {
-                    mtmp->mhp += objects[otmp->otyp].oc_weight;
+                    mtmp->mhp += get_item_base_weight(otmp);
                     if (mtmp->mhp > mtmp->mhpmax)
                         mtmp->mhp = mtmp->mhpmax;
                 }
@@ -1902,7 +1916,7 @@ register struct monst* mtmp;
             /* Heal up to the object's weight in hp */
             if (mtmp->mhp < mtmp->mhpmax)
             {
-                mtmp->mhp += objects[otmp->otyp].oc_weight;
+                mtmp->mhp += get_item_base_weight(otmp);
                 if (mtmp->mhp > mtmp->mhpmax)
                     mtmp->mhp = mtmp->mhpmax;
             }
@@ -2069,7 +2083,7 @@ struct monst *mtmp;
             /* Heal up to the object's weight in hp */
             if (mtmp->mhp < mtmp->mhpmax)
             {
-                mtmp->mhp += objects[otmp->otyp].oc_weight;
+                mtmp->mhp += get_item_base_weight(otmp);
                 if (mtmp->mhp > mtmp->mhpmax)
                     mtmp->mhp = mtmp->mhpmax;
             }
@@ -2146,7 +2160,7 @@ register struct monst *mtmp;
     {
         if (is_obj_no_pickup(gold))
             return;
-        mat_idx = objects[gold->otyp].oc_material;
+        mat_idx = gold->material;
         obj_extract_self(gold);
         add_to_minv(mtmp, gold);
         if (cansee(mtmp->mx, mtmp->my)) 
@@ -2305,7 +2319,7 @@ struct obj *otmp;
         return 0;
     if (otyp == CORPSE && is_rider(&mons[otmp->corpsenm]))
         return 0;
-    if (objects[otyp].oc_material == MAT_SILVER && mon_hates_silver(mtmp)
+    if (otmp->material == MAT_SILVER && mon_hates_silver(mtmp)
         && (otyp != BELL_OF_OPENING || !wants_bell(mdat)))
         return 0;
 
@@ -2831,7 +2845,7 @@ struct monst *mtmp, *mtmp2;
     if (emitted_light_range(mtmp2->data)) 
     {
         /* since this is so rare, we don't have any `mon_move_light_source' */
-        new_light_source(mtmp2->mx, mtmp2->my, emitted_light_range(mtmp2->data), LS_MONSTER, monst_to_any(mtmp2));
+        new_light_source(mtmp2->mx, mtmp2->my, emitted_light_range(mtmp2->data), LS_MONSTER, monst_to_any(mtmp2), 0);
         /* here we rely on fact that `mtmp' hasn't actually been deleted */
         del_light_source(LS_MONSTER, monst_to_any(mtmp));
     }
@@ -3164,6 +3178,7 @@ struct monst *mtmp;
         }
         if (mtmp->mbasehpmax <= 0)
             mtmp->mbasehpmax = 10;
+        mtmp->mbasehpdrain = 0;
         update_mon_maxhp(mtmp);
         mtmp->mhp = mtmp->mhpmax;
         mtmp->heads_left = mtmp->data->heads;
@@ -3241,6 +3256,7 @@ unsigned long mdiedflags;
             mtmp->yell_y = 0;
             if (mtmp->mbasehpmax <= 0)
                 mtmp->mbasehpmax = 10;
+            mtmp->mbasehpdrain = 0;
             update_mon_maxhp(mtmp);
             mtmp->mhp = mtmp->mhpmax;
             mtmp->heads_left = mtmp->data->heads;
@@ -3397,9 +3413,10 @@ unsigned long mdiedflags;
     }
 
     if (!u.uachieve.role_achievement &&
-        (      (Role_if(PM_ARCHAEOLOGIST) && mtmp->mnum == PM_GREATER_MUMMY_PHARAOH && mvitals[mtmp->mnum].died >= 2)
+        (      (Role_if(PM_ARCHAEOLOGIST) && mtmp->mnum == PM_AMONKET)
             || (Role_if(PM_ROGUE) && mtmp->mnum == PM_CROESUS)
-        )
+            || (Role_if(PM_KNIGHT) && mtmp->mnum == PM_ASMODEUS)
+            )
        )
     {
         u.uachieve.role_achievement = 1;
@@ -3888,7 +3905,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
             /* no items from cloned monsters */
             && !mtmp->mcloned) 
         {
-            otmp = mkobj_with_flags(RANDOM_CLASS, TRUE, TRUE, mtmp, is_lord(mdat) || is_prince(mdat) || (mdat->geno & G_UNIQ) ? MKOBJ_FLAGS_ALSO_RARE : 0UL );
+            otmp = mkobj_with_flags(RANDOM_CLASS, TRUE, TRUE, mtmp, MAT_NONE, 0L, 0L, is_lord(mdat) || is_prince(mdat) || (mdat->geno & G_UNIQ) ? MKOBJ_FLAGS_ALSO_RARE : 0UL);
             /* don't create large objects from small monsters */
             otyp = otmp->otyp;
             if (mdat->msize < MZ_HUMAN && otyp != FIGURINE
@@ -4079,6 +4096,7 @@ struct monst *mtmp;
             mtmp->yell_y = 0;
             if (mtmp->mbasehpmax <= 0)
                 mtmp->mbasehpmax = 10;
+            mtmp->mbasehpdrain = 0;
             update_mon_maxhp(mtmp);
             mtmp->mhp = mtmp->mhpmax;
             /* this can happen if previously a fog cloud */
@@ -4882,6 +4900,7 @@ struct monst *mon;
     /*FALLTHRU*/
     case PM_VAMPIRE_MAGE: /* vampire mage or Vlad can become wolf */
     case PM_VAMPIRE_LORD: /* vampire lord or Vlad can become wolf */
+    case PM_VAMPIRE_KING:
         if (!rn2(wolfchance) && !uppercase_only) {
             mndx = PM_WOLF;
             break;
@@ -4939,7 +4958,7 @@ int *mndx_p, monclass;
     if (!is_vampshifter(mon))
         return validspecmon(mon, *mndx_p);
 
-    if (*mndx_p == PM_VAMPIRE || *mndx_p == PM_VAMPIRE_LORD || *mndx_p == PM_VAMPIRE_MAGE
+    if (*mndx_p == PM_VAMPIRE || *mndx_p == PM_VAMPIRE_LORD || *mndx_p == PM_VAMPIRE_KING || *mndx_p == PM_VAMPIRE_MAGE
         || *mndx_p == PM_VLAD_THE_IMPALER) {
         /* player picked some type of vampire; use mon's self */
         *mndx_p = mon->cham;
@@ -5067,6 +5086,7 @@ struct monst *mon;
     case PM_VLAD_THE_IMPALER:
     case PM_VAMPIRE_LORD:
     case PM_VAMPIRE_MAGE:
+    case PM_VAMPIRE_KING:
     case PM_VAMPIRE:
         mndx = pickvampshape(mon);
         break;
@@ -5317,8 +5337,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
         if (emitted_light_range(olddata))
             del_light_source(LS_MONSTER, monst_to_any(mtmp));
         if (emitted_light_range(mtmp->data))
-            new_light_source(mtmp->mx, mtmp->my, emitted_light_range(mtmp->data),
-                             LS_MONSTER, monst_to_any(mtmp));
+            new_light_source(mtmp->mx, mtmp->my, emitted_light_range(mtmp->data), LS_MONSTER, monst_to_any(mtmp), 0);
     }
 
     if (mon_ambient_sound(olddata) != mon_ambient_sound(mtmp->data))

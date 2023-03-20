@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 #include <string.h>
 #include <errno.h>
@@ -23,6 +23,7 @@ static void FDECL(and_dismiss_nhwindow, (winid));
 static void FDECL(and_destroy_nhwindow, (winid));
 static void FDECL(and_curs, (winid,int,int));
 static void FDECL(and_putstr_ex, (winid, int, const char *, int, int));
+static void FDECL(and_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 static void FDECL(and_putmixed_ex, (winid, int, const char *, int, int));
 static void FDECL(and_display_file, (const char *, BOOLEAN_P));
 static void FDECL(and_start_menu_ex, (winid, int));
@@ -61,8 +62,8 @@ static char * NDECL(and_get_color_string);
 #endif
 static void NDECL(and_start_screen);
 static void NDECL(and_end_screen);
-static char* FDECL(and_getmsghistory_ex, (int*, int*, BOOLEAN_P));
-static void FDECL(and_putmsghistory_ex, (const char *, int, int, BOOLEAN_P));
+static char* FDECL(and_getmsghistory_ex, (char**, char**, BOOLEAN_P));
+static void FDECL(and_putmsghistory_ex, (const char *, const char *, const char *, BOOLEAN_P));
 static void save_msg(const char* msg);
 static void FDECL(and_status_update, (int, genericptr_t, int, int, int, unsigned long *));
 static void and_status_flush();
@@ -89,6 +90,7 @@ struct window_procs and_procs = {
 	and_destroy_nhwindow,
 	and_curs,
 	and_putstr_ex,
+	and_putstr_ex2,
 	and_putmixed_ex,
 	and_display_file,
 	and_start_menu_ex,
@@ -784,6 +786,11 @@ void and_putstr_ex(winid wid, int attr, const char *str, int append, int nhcolor
 	destroy_jobject(jstr);
 }
 
+void and_putstr_ex2(winid wid, const char* str, const char* attrs, const char* colors, int attr, int color, int append)
+{
+	and_putstr_ex(wid, attrs ? attrs[0] : attr, str, append, colors ? colors[0] : color);
+}
+
 void and_putstr(winid wid, int attr, const char *str)
 {
 	if(attr)
@@ -1094,13 +1101,13 @@ void and_status_flush()
 
 	static enum statusfields fieldorder_line1[] = {
 		BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, BL_FLUSH,
-		BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH,
+		BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH,
 		BL_FLUSH
 	};
 
 	static enum statusfields fieldorder_line2[] = {
 		BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP,
-		BL_EXP, BL_HD, BL_TIME, BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
+		BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
 		BL_FLUSH
 	};
 
@@ -1900,7 +1907,7 @@ void and_n_getline_r(const char* question, char* buf, int nMax, int showLog, int
 void and_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline)
 {
 //	debuglog("and_getlin '%s'", question);
-	char promptbuf[BUFSZ] = "";
+	char promptbuf[PBUFSZ] = "";
 	//Do not show introline
 	//if (introline && *introline)
 	//	Sprintf(promptbuf, "%s", introline);
@@ -2215,8 +2222,22 @@ int add_msghistory_idx(int idx)
 {
 	return (idx + 1) % (sizeof(msghistory)/sizeof(char*));
 }
-char* and_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
+
+static char tmpattrs[BUFSIZ] = "";
+static char tmpcolors[BUFSIZ] = "";
+
+char* and_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
 {
+	memset(tmpattrs, 0, sizeof(tmpattrs));
+	memset(tmpcolors, NO_COLOR, sizeof(tmpcolors));
+	tmpattrs[sizeof(tmpattrs) - 1] = tmpcolors[sizeof(tmpcolors) - 1] = 0;
+
+	if (attrs_ptr)
+		*attrs_ptr = tmpattrs;
+
+	if (colors_ptr)
+		*colors_ptr = tmpcolors;
+
 	if(init)
 	{
 		msghistory_idx0 = msghistory_idx;
@@ -2250,7 +2271,7 @@ char* and_getmsghistory_ex(int* attr_ptr, int* color_ptr, BOOLEAN_P init)
 //		should it assume that another message will follow this
 //		one, so it should keep all pointers/indexes intact at the
 //		end of each call.
-void and_putmsghistory_ex(const char *msg, int attr, int color, BOOLEAN_P restoring)
+void and_putmsghistory_ex(const char *msg, const char* attrs, const char* colors, BOOLEAN_P restoring)
 {
 	if(!msg) return;
 	if(restoring)

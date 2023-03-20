@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    cmd.c    $NHDT-Date: 1557088405 2019/05/05 20:33:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.333 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -101,6 +101,7 @@ extern int NDECL(dodiscovered);       /**/
 extern int NDECL(doclassdisco);       /**/
 extern int NDECL(doset);              /**/
 extern int NDECL(dotogglepickup);     /**/
+extern int NDECL(dotoggledecorations);/**/
 extern int NDECL(dowhatis);           /**/
 extern int NDECL(doquickwhatis);      /**/
 extern int NDECL(dowhatdoes);         /**/
@@ -775,7 +776,7 @@ doability(VOID_ARGS)
     int abilitynum = 0;
     int glyph = 0;
     glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
-    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     any = zeroany;
     win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_MENU_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon(&youmonst));
@@ -833,7 +834,7 @@ doability(VOID_ARGS)
         any = zeroany;
         any.a_int = abilitynum + 1;
         glyph = flags.female ? female_monnum_to_glyph(u.umonnum) : monnum_to_glyph(u.umonnum);
-        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL));
+        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
         add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
             0, 0, ATR_NONE,
@@ -1033,7 +1034,7 @@ doability(VOID_ARGS)
                 any.a_int = abilitynum + 1;
 
                 glyph = abs(any_mon_to_glyph(mtmp, rn2_on_display_rng));
-                gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL));
+                gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
 
                 add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
                     0, 0, ATR_NONE,
@@ -1088,7 +1089,7 @@ domonsterability(VOID_ARGS)
     int abilitynum = 0;
     int glyph, gui_glyph;
     glyph = abs(u_to_glyph());
-    gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL));
+    gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     struct extended_create_window_info createinfo = extended_create_window_info_from_mon(&youmonst);
     win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_COMMAND_MENU, iflags.using_gui_tiles ? gui_glyph : glyph, createinfo);
@@ -1139,9 +1140,8 @@ boolean ischaractermenu;
     int glyph = 0, gui_glyph = 0;
     const char* fmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
         "%s (&mana; %d)" : "%s (%d mana)";
-    struct extended_menu_info menuinfo = { 0 };
+    struct extended_menu_info menuinfo = nilextendedmenuinfo;
     menuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
-    menuinfo.color = NO_COLOR;
 
     /* Monster abilities */
     if (can_breathe(youmonst.data)
@@ -1423,14 +1423,14 @@ boolean ischaractermenu;
     {
         any = zeroany;
         glyph = abs(any_mon_to_glyph(u.usteed, rn2_on_display_rng));
-        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL));
+        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL, 0UL, MAT_NONE, 0));
         add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, menu_heading_info(),
             0, 0, iflags.menu_headings,
             ischaractermenu ? "Use Your Steed's Abilities            " : "Your Steed's Abilities", MENU_UNSELECTED);
 
         if (can_breathe(u.usteed->data))
         {
-            struct extended_menu_info steedmenuinfo = { 0 };
+            struct extended_menu_info steedmenuinfo = nilextendedmenuinfo;
             steedmenuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
             any = zeroany;
             if (u.usteed->mspec_used > 0)
@@ -2467,6 +2467,39 @@ wiz_save_glyph2tiles(VOID_ARGS) /* Save a csv file for tile data */
             case GLYPH_PLAYER_DEATH_OFF:
                 header = "PLAYER_DEATH_OFF";
                 break;
+            case GLYPH_SPECIAL_EFFECT_OFF:
+                header = "SPECIAL_EFFECT_OFF";
+                break;
+            case GLYPH_SIMPLE_DOODAD_OFF:
+                header = "SIMPLE_DOODAD_OFF";
+                break;
+            case GLYPH_MIRRORABLE_DOODAD_OFF:
+                header = "MIRRORABLE_DOODAD_OFF";
+                break;
+            case GLYPH_CURSOR_OFF:
+                header = "CURSOR_OFF";
+                break;
+            case GLYPH_HIT_TILE_OFF:
+                header = "GENERAL_HIT_TILE_OFF";
+                break;
+            case GLYPH_GENERAL_TILE_OFF:
+                header = "GENERAL_TILE_OFF";
+                break;
+            case GLYPH_UI_TILE_OFF:
+                header = "GENERAL_UI_TILE_OFF";
+                break;
+            case GLYPH_SPELL_TILE_OFF:
+                header = "GENERAL_SPELL_TILE_OFF";
+                break;
+            case GLYPH_SKILL_TILE_OFF:
+                header = "GENERAL_SKILL_TILE_OFF";
+                break;
+            case GLYPH_BUFF_OFF:
+                header = "BUFF_OFF";
+                break;
+            case GLYPH_REPLACEMENT_OFF:
+                header = "REPLACEMENT_OFF";
+                break;
             case GLYPH_ANIMATION_OFF:
                 header = "ANIMATION_OFF";
                 break;
@@ -3084,7 +3117,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
 {
     char buf[BUFSZ], tmpbuf[BUFSZ];
     int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
-    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_ENLIGHTENMENT_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon(&youmonst));
     en_via_menu = !final;
@@ -3344,17 +3377,6 @@ int final;
         }
         you_have(buf, "");
     }
-    
-
-#ifdef SCORE_ON_BOTL
-    if (flags.showscore) {
-        /* describes what's shown on status line, which is an approximation;
-           only show it here if player has the 'showscore' option enabled */
-        Sprintf(buf, "%ld%s", botl_score(), 
-                !final ? "" : "" /*" before end-of-game adjustments"*/); //In GnollHack, it is accurate --JG
-        enl_msg("Your game score ", "is ", "was ", buf, "");
-    }
-#endif
 }
 
 /* hit points, energy points, armor class -- essential information which
@@ -3463,6 +3485,12 @@ int final;
     Sprintf(modebuf, " mode (%s)", get_game_mode_description());
     enl_msg("You ", "are playing in ", "were playing in ", get_game_mode_text(TRUE), modebuf);
 
+    Sprintf(buf, "%ld", get_current_game_score());
+    enl_msg("Your game score ", "is ", "was ", buf, "");
+
+    print_realtime(modebuf, get_current_game_duration());
+    Sprintf(buf, "%s", modebuf);
+    enl_msg("You ", "have been playing the game for ", "had been playing the game for ", buf, "");
 }
 
 /* characteristics: expanded version of bottom line strength, dexterity, &c */
@@ -3496,6 +3524,7 @@ int mode, final, attrindx;
     int acurrent, abase, apeak, alimit;
     const char *paren_pfx;
     char subjbuf[BUFSZ], valubuf[BUFSZ], valstring[32];
+    boolean parenthesis_open = FALSE;
 
     /* being polymorphed or wearing certain cursed items prevents
        hero from reliably tracking changes to characteristics so
@@ -3537,26 +3566,27 @@ int mode, final, attrindx;
         interesting_alimit =
             final ? TRUE /* was originally `(abase != alimit)' */
                   : (alimit != (attrindx != A_STR ? 18 : STR18(100)));
-        paren_pfx = final ? " (" : " (current; ";
+        paren_pfx = final ? " (" : " (current, ";
         if (acurrent != abase) {
+            parenthesis_open = TRUE;
             Sprintf(eos(valubuf), "%sbase:%s", paren_pfx,
                     attrval(attrindx, abase, valstring));
             paren_pfx = ", ";
         }
         if (abase != apeak) {
+            parenthesis_open = TRUE;
             Sprintf(eos(valubuf), "%speak:%s", paren_pfx,
                     attrval(attrindx, apeak, valstring));
             paren_pfx = ", ";
         }
         if (interesting_alimit) {
+            parenthesis_open = TRUE;
             Sprintf(eos(valubuf), "%s%slimit:%s", paren_pfx,
                     /* more verbose if exceeding 'limit' due to magic bonus */
                     (acurrent > alimit) ? "innate " : "",
                     attrval(attrindx, alimit, valstring));
             /* paren_pfx = ", "; */
         }
-        if (acurrent != abase || abase != apeak || interesting_alimit)
-            Strcat(valubuf, ")");
     }
 
     if (attrindx == A_STR)
@@ -3573,7 +3603,8 @@ int mode, final, attrindx;
         Sprintf(tohitbuf, "-%d", tohitbonus_constant + tohitbonus_random);
         Sprintf(dmgbuf, "-%d", dmgbonus_constant + dmgbonus_random);
 
-        Sprintf(eos(valubuf), ": %s%d%s to-hit %s and %s%d%s damage %s", 
+        Sprintf(eos(valubuf), "%s%s%d%s to-hit %s, %s%d%s damage %s", 
+            parenthesis_open ? ", " : " (",
             tohitbonus_constant >= 0 ? "+" : "",
             tohitbonus_constant,
             tohitbonus_random ? tohitbuf : "",
@@ -3583,23 +3614,34 @@ int mode, final, attrindx;
             dmgbonus_random ? dmgbuf : "",
             dmgbonus_constant >= 0 ? "bonus" : "penalty"
             );
+
+        parenthesis_open = TRUE;
     }
     else if (attrindx == A_DEX)
     {
         int tohitbonus = dexterity_tohit_bonus(ACURR(A_DEX));
         int acbonus = -dexterity_ac_bonus(ACURR(A_DEX));
 
-        Sprintf(eos(valubuf), ": %s%d to-hit %s and %s%d AC %s",
+        Sprintf(eos(valubuf), "%s%s%d to-hit %s, %s%d AC %s",
+            parenthesis_open ? ", " : " (",
             tohitbonus >= 0 ? "+" : "", tohitbonus, tohitbonus >= 0 ? "bonus" : "penalty",
             acbonus >= 0 ? "+" : "", acbonus, acbonus <= 0 ? "bonus" : "penalty");
+
+        parenthesis_open = TRUE;
     }
     else if (attrindx == A_CON)
     {
         double hpbonus = constitution_hp_bonus(ACURR(A_CON));
 
-        Sprintf(eos(valubuf), ": %s%0.1f HP %s per level",
+        Sprintf(eos(valubuf), "%s%s%0.1f HP %s per level",
+            parenthesis_open ? ", " : " (",
             hpbonus >= 0 ? "+" : "", hpbonus, hpbonus >= 0 ? "bonus" : "penalty");
+
+        parenthesis_open = TRUE;
     }
+
+    if (parenthesis_open)
+        Strcat(valubuf, ")");
 
     enl_msg(subjbuf, "is ", "was ", valubuf, "");
 }
@@ -3807,6 +3849,10 @@ int final;
         if (magic || cause_known(LAUGHING))
             enl_msg(You_, "laugh uncontrollably", "laughed uncontrollably", "", from_what(LAUGHING));
     }
+    if (Tottering) {
+        if (magic || cause_known(TOTTERING))
+            enl_msg(You_, "shake and totter", "shaked and tottered", "", from_what(TOTTERING));
+    }
     if (OddIdeas) {
         if (magic || cause_known(ODD_IDEAS))
             enl_msg(You_, "get visionary ideas", "got visionary ideas", "", from_what(ODD_IDEAS));
@@ -3930,7 +3976,7 @@ int final;
     if (two_handed_bonus_applies(uwep))
         print_weapon_skill_line_core(P_TWO_HANDED_WEAPON, TRUE, final);
 
-    if (!uwep && P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_UNSKILLED)
+    if (!uwep && (P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_UNSKILLED || Martial_prowess))
     {
         wtype = P_MARTIAL_ARTS;
         char sklvlbuf[20];
@@ -3944,11 +3990,13 @@ int final;
         /* "you have no/basic/expert/master/grand-master skill with <skill>"
            or "you are unskilled/skilled in <skill>" */
 
-        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
-        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
+        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
 
-        Sprintf(buf, "%s %s %s (%s%d to hit and %s%d to damage)", sklvlbuf,
-            hav ? "skill with" : "in", skill_name(wtype, TRUE), hitbonus >= 0 ? "+" : "", hitbonus, dmgbonus >= 0 ? "+" : "", dmgbonus);
+        Sprintf(buf, "%s %s %s%s (%s%d to hit and %s%d to damage)", sklvlbuf,
+            hav ? "skill with" : "in", skill_name(wtype, TRUE), 
+            Martial_prowess ? (final ? " and had martial prowess" : " and have martial prowess") : "",
+            hitbonus >= 0 ? "+" : "", hitbonus, dmgbonus >= 0 ? "+" : "", dmgbonus);
 
         if (can_advance(wtype, FALSE))
             Sprintf(eos(buf), " and %s that",
@@ -3970,7 +4018,7 @@ int final;
         Strcpy(mbuf, "");
         if (martial_bonus())
         {
-            int multihitchance = martial_arts_multishot_percentage_chance(limited_skill_level(wtype, FALSE, TRUE));
+            int multihitchance = martial_arts_multishot_percentage_chance(adjusted_limited_skill_level(wtype, FALSE, TRUE));
             Sprintf(mbuf, ", %d%% double-hit chance", multihitchance); // due to% s", multihitchance, skill_name(wtype, TRUE));
         }
         Sprintf(buf, "fighting weaponless (%s%s)", martial_bonus() ? "full strength bonus" : "half strength damage bonus", mbuf);
@@ -3994,8 +4042,8 @@ int final;
         /* "you have no/basic/expert/master/grand-master skill with <skill>"
            or "you are unskilled/skilled in <skill>" */
 
-        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
-        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
+        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
 
         Sprintf(buf, "%s %s %s (%s%d to hit and %s%d to damage)", sklvlbuf,
             hav ? "skill with" : "in", skill_name(wtype, TRUE), hitbonus >= 0 ? "+" : "", hitbonus, dmgbonus >= 0 ? "+" : "", dmgbonus);
@@ -4052,8 +4100,8 @@ int final;
         char ebuf[BUFSZ] = "";
         if (printweaponstats)
         {
-            int hitbonus = weapon_skill_hit_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
-            int dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0); /* Gives only pure skill bonuses */
+            int hitbonus = weapon_skill_hit_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
+            int dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
             Sprintf(ebuf, "%s%d to hit%s%s%d to damage",
                 hitbonus >= 0 ? "+" : "", hitbonus,
                 wtype == P_SHIELD ? ", " : " and ",
@@ -4077,8 +4125,10 @@ int final;
         if (*ebuf)
             Sprintf(pbuf, " (%s)", ebuf);
 
-        Sprintf(buf, "%s %s %s%s", sklvlbuf, hav ? "skill with" : "in",
-            skill_name(wtype, TRUE), pbuf);
+        Sprintf(buf, "%s %s %s%s%s", sklvlbuf, hav ? "skill with" : "in",
+            skill_name(wtype, TRUE),
+            (wtype == P_BARE_HANDED_COMBAT || wtype == P_MARTIAL_ARTS) && Martial_prowess ? (final ? " and had martial prowess" : " and have martial prowess") : "",
+            pbuf);
 
         if (can_advance(wtype, FALSE))
             Sprintf(eos(buf), " and %s that",
@@ -5511,7 +5561,15 @@ int final;
                     " for any artifacts", "");
     }
 
-    if (Role_if(PM_TOURIST))
+    if (Role_if(PM_ROGUE))
+    {
+        char mbuf[BUFSZ];
+        long valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
+        putstr(en_win, ATR_NONE, " ");
+        Sprintf(mbuf, "You have %ld %s worth of %svaluables with you.", valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
+        putstr(en_win, ATR_TITLE, mbuf);
+    }
+    else if (Role_if(PM_TOURIST))
     {
         putstr(en_win, ATR_NONE, " ");
         putstr(en_win, ATR_TITLE, "Selfies taken with:");
@@ -5561,6 +5619,7 @@ struct ext_func_tab extcmdlist[] = {
             docommandmenu, IFBURIED | GENERALCMD | AUTOCOMPLETE },
     { M(3) /*M('c')*/, "conduct", "list voluntary challenges you have maintained",
             doconduct, IFBURIED | AUTOCOMPLETE },
+    { '\0', "decorations", "toggle display of decorations on and off", dotoggledecorations, IFBURIED | AUTOCOMPLETE },
     { M(6), "deletesavedgame", "delete saved game if it exists",
             dodeletesavedgame, IFBURIED | CASUALMODECMD | AUTOCOMPLETE },
     { C('g'), "dig", "dig the ground", dodig, INCMDMENU },
@@ -9041,6 +9100,8 @@ dolight(VOID_ARGS)
                         {
                             if (is_candle(otmp))
                                 return use_candle(&otmp);
+                            else if (is_torch(otmp))
+                                return use_torch(&otmp);
                             else if (is_obj_candelabrum(otmp))
                                 use_candelabrum(otmp);
                             else if (otmp->otyp == POT_OIL)

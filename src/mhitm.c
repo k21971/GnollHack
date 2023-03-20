@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mhitm.c    $NHDT-Date: 1555720096 2019/04/20 00:28:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -602,8 +602,7 @@ register struct monst *magr, *mdef;
                             endforloop = TRUE;
                         }
                         if (does_split_upon_hit(mdef->data)
-                            && (otmp && (objects[otmp->otyp].oc_material == MAT_IRON
-                                || objects[otmp->otyp].oc_material == MAT_METAL))
+                            && (otmp && is_metallic(otmp))
                             && mdef->mhp > 1
                             && !is_cancelled(mdef))
                         {
@@ -1873,7 +1872,7 @@ register struct obj* omonwep;
             play_sfx_sound_at_location(SFX_DRAIN_LIFE, mdef->mx, mdef->my);
             if (vis && canspotmon(mdef))
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s suddenly seems weaker!", Monnam(mdef));
-            mdef->mbasehpmax -= basehpdrain;
+            mdef->mbasehpdrain -= basehpdrain;
             if (mdef->m_lev == 0)
                 damage = (double)mdef->mhp + 1;
             else
@@ -2124,7 +2123,7 @@ register struct obj* omonwep;
 
         if (extradmg > 0)
         {
-            mdef->mbasehpmax -= extradmg;
+            mdef->mbasehpdrain -= extradmg;
 
             if (extradmg > 0)
             {

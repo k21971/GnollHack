@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 // NetHack 3.6	qt_win.cpp	$NHDT-Date: 1524684508 2018/04/25 19:28:28 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.77 $
 // Copyright (c) Warwick Allison, 1999.
@@ -2599,11 +2599,9 @@ void NetHackQtStatusWindow::updateStats()
 
     if (::flags.time) time.setLabel("Time:",(long)moves);
     else time.setLabel("");
-#ifdef SCORE_ON_BOTL
     if (::flags.showscore) {
 	score.setLabel("Score:",(long)botl_score());
     } else
-#endif
     {
 	score.setLabel("");
     }
@@ -4770,6 +4768,12 @@ void NetHackQtBind::qt_putstr_ex(winid wid, int attr, const char *text, int app,
     window->PutStr(attr, text);
 }
 
+void NetHackQtBind::qt_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app)
+{
+    NetHackQtWindow* window = id_to_window[wid];
+    window->PutStr(attrs ? attrs[0] : attr, text);
+}
+
 void NetHackQtBind::qt_display_file(const char *filename, BOOLEAN_P must_exist)
 {
     NetHackQtTextWindow* window=new NetHackQtTextWindow(keybuffer);
@@ -5042,7 +5046,7 @@ char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph,
 
 void NetHackQtBind::qt_getlin_ex(int style, int attr, int color, const char *prompt, char *line, const char* placeholder, const char* linesuffix, const char* introline)
 {
-    char promptbuf[BUFSZ] = "";
+    char promptbuf[PBUFSZ] = "";
     //Do not show introline
     if (prompt)
         Sprintf(promptbuf, "%s", prompt);
@@ -5282,6 +5286,7 @@ struct window_procs Qt_procs = {
     NetHackQtBind::qt_destroy_nhwindow,
     NetHackQtBind::qt_curs,
     NetHackQtBind::qt_putstr_ex,
+    NetHackQtBind::qt_putstr_ex2,
     genl_putmixed_ex,
     NetHackQtBind::qt_display_file,
     NetHackQtBind::qt_start_menu_ex,

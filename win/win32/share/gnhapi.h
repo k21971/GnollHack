@@ -40,6 +40,7 @@ int RunGnollHack(
     DestroyWindowCallback callback_destroy_nhwindow,
     CursCallback callback_curs,
     PutStrExCallback callback_putstr_ex,
+    PutStrEx2Callback callback_putstr_ex2,
     PutMixedCallback callback_putmixed_ex,
     DisplayFileCallback callback_display_file,
     StartMenuCallback callback_start_menu_ex,
@@ -118,9 +119,6 @@ int RunGnollHack(
 
     GetCwdCallback callback_getcwd,
     MessageBoxCallback callback_messagebox,
-    //OutRipBeginCallback callback_outrip_begin,
-    //OutRipEndCallback callback_outrip_end,
-
     FreeMemoryCallback callback_free_memory,
     ReportPlayerNameCallback callback_report_player_name,
     ReportPlayTimeCallback callback_report_play_time,

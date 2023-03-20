@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    display.h    $NHDT-Date: 1546212620 2018/12/30 23:30:20 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.29 $ */
 /* Copyright (c) Dean Luick, with acknowledgements to Kevin Darcy */
@@ -303,6 +303,7 @@
 #define NUM_CMAP_TYPE_CHARS (MAX_CMAPPED_CHARS - MAX_EXPLOSION_CHARS - MAX_SWALLOW_CHARS)
 #define NUM_INVIS_GLYPHS 1
 #define NUM_MISSILE_DIRS 8
+#define NUM_BASE_TILE_DIRS 3 /* Up, left, up-left */
 #define MAX_BUFF_TILES ((LAST_PROP - 1) / 24 + 1)
 
 #define GLYPH_MON_OFF     (1) /* Changed to 1 so that mirror image of mon 0 maps to -1 */

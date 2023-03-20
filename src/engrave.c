@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    engrave.c    $NHDT-Date: 1456304550 2016/02/24 09:02:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.61 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -435,7 +435,7 @@ unsigned short e_flags;
     if (!in_mklev && (!strcmp(s, Elbereth_word) || !strcmp(s, Gilthoniel_word)))
         exercise(A_WIS, TRUE);
     ep->engr_time = e_time;
-    ep->engr_type = e_type > 0 ? e_type : rnd(N_ENGRAVE - 1);
+    ep->engr_type = e_type > 0 ? e_type : rnd(ENGR_BLOOD);
     ep->engr_flags = e_flags;
     ep->engr_lth = smem;
 }
@@ -665,6 +665,7 @@ doengrave()
     case FOOD_CLASS:
     case SCROLL_CLASS:
     case SPBOOK_CLASS:
+    case ART_CLASS:
         pline("%s would get %s.", Yname2(otmp),
               is_ice(u.ux, u.uy) ? "all frosty" : "too dirty");
         ptext = FALSE;
@@ -1148,7 +1149,7 @@ doengrave()
         if (*sp == ' ')
             continue;
         if (((type == DUST || type == ENGR_BLOOD) && !rn2(25))
-            || (Blind && !rn2(11)) || (Confusion && !rn2(7))
+            || (Blind && !rn2(11)) || (Confusion && !rn2(7)) || (Tottering && rn2(7))
             || (Stunned && !rn2(4)) || (Hallucination && !rn2(2)))
             *sp = ' ' + rnd(96 - 2); /* ASCII '!' thru '~'
                                         (excludes ' ' and DEL) */

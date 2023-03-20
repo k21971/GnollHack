@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    vault.c    $NHDT-Date: 1549921171 2019/02/11 21:39:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.62 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1285,6 +1285,38 @@ hidden_gold()
         if (Has_contents(obj))
             value += contained_gold(obj);
     /* unknown gold stuck inside statues may cause some consternation... */
+
+    return value;
+}
+
+long
+contained_gem_value(obj)
+struct obj* obj;
+{
+    register struct obj* otmp;
+    register long value = 0L;
+
+    /* accumulate contained gold */
+    for (otmp = obj->cobj; otmp; otmp = otmp->nobj)
+        if (obj->otyp >= FIRST_GEM && obj->otyp <= LAST_GEM && (program_state.gameover || objects[obj->otyp].oc_name_known))
+            value += objects[obj->otyp].oc_cost * obj->quan;
+        else if (Has_contents(otmp))
+            value += contained_gem_value(otmp);
+
+    return value;
+}
+
+long
+carried_gem_value(VOID_ARGS)
+{
+    long value = 0L;
+    struct obj* obj;
+
+    for (obj = invent; obj; obj = obj->nobj)
+        if (Has_contents(obj))
+            value += contained_gem_value(obj);
+        else if(obj->otyp >= FIRST_GEM && obj->otyp <= LAST_GEM && (program_state.gameover || objects[obj->otyp].oc_name_known))
+            value += objects[obj->otyp].oc_cost * obj->quan;
 
     return value;
 }

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    uhitm.c    $NHDT-Date: 1555720104 2019/04/20 00:28:24 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.207 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -369,7 +369,7 @@ int *attk_count, *role_roll_penalty;
             tmp += weapon_to_hit_value(weapon, mtmp, &youmonst, 0);
         else if(uarmg)
             tmp += weapon_to_hit_value(uarmg, mtmp, &youmonst, 0);
-        nonpolytmp += weapon_skill_hit_bonus(weapon, P_NONE, FALSE, TRUE, TRUE, 0);
+        nonpolytmp += weapon_skill_hit_bonus(weapon, P_NONE, FALSE, TRUE, TRUE, 0, TRUE);
     } 
     else if (aatyp == AT_KICK && martial_bonus()) 
     {
@@ -377,7 +377,7 @@ int *attk_count, *role_roll_penalty;
             tmp += weapon_to_hit_value(weapon, mtmp, &youmonst, 0);
         else if (uarmf)
             tmp += weapon_to_hit_value(uarmf, mtmp, &youmonst, 0);
-        nonpolytmp += weapon_skill_hit_bonus((struct obj *) 0, P_NONE, FALSE, TRUE, TRUE, 0);
+        nonpolytmp += weapon_skill_hit_bonus((struct obj *) 0, P_NONE, FALSE, TRUE, TRUE, 0, TRUE);
     }
 
     tmp += maybe_polyd(max(polytmp, nonpolytmp), nonpolytmp);
@@ -992,7 +992,7 @@ boolean* obj_destroyed;
             if (martial_arts_applies)
             {
                 /* bonus for martial arts */
-                switch (P_SKILL_LEVEL(P_MARTIAL_ARTS))
+                switch (adjusted_skill_level(P_MARTIAL_ARTS))
                 {
                 case P_BASIC:
                     tmp = rnd(4);
@@ -1130,7 +1130,7 @@ boolean* obj_destroyed;
                 else
                     damage = adjust_damage(rnd(2), &youmonst, mon, objects[obj->otyp].oc_damagetype, ADFLAGS_NONE);
 
-                if (objects[obj->otyp].oc_material == MAT_SILVER
+                if (obj->material == MAT_SILVER
                     && mon_hates_silver(mon)) 
                 {
                     silvermsg = TRUE;
@@ -1263,7 +1263,7 @@ boolean* obj_destroyed;
                 {
                     damage += adjust_damage(special_hit_dmg, &youmonst, mon, spec_adtyp, ADFLAGS_NONE);
                 }
-                if (objects[obj->otyp].oc_material == MAT_SILVER
+                if (obj->material == MAT_SILVER
                     && mon_hates_silver(mon)) 
                 {
                     silvermsg = TRUE;
@@ -1475,6 +1475,7 @@ boolean* obj_destroyed;
                             if (obj->timed)
                                 obj_stop_timers(obj);
                             obj->otyp = ROCK;
+                            obj->material = objects[obj->otyp].oc_material;
                             obj->oclass = GEM_CLASS;
                             obj->oartifact = 0;
                             obj->speflags = 0;
@@ -1598,7 +1599,7 @@ boolean* obj_destroyed;
                      * Things like silver wands can arrive here so
                      * so we need another silver check.
                      */
-                    if (objects[obj->otyp].oc_material == MAT_SILVER
+                    if (obj->material == MAT_SILVER
                         && mon_hates_silver(mon)) 
                     {
                         damage += adjust_damage(rnd(20), &youmonst, mon, objects[obj->otyp].oc_damagetype, ADFLAGS_NONE);
@@ -1632,7 +1633,7 @@ boolean* obj_destroyed;
             {
                 if(!martial_bonus() || (uarmg && is_metallic(uarmg)))
                     damage += adjust_damage(u_str_dmg_bonus() / 2, &youmonst, mon, AD_PHYS, ADFLAGS_NONE);
-                else if(P_SKILL_LEVEL(P_MARTIAL_ARTS) >= P_BASIC)
+                else if(adjusted_skill_level(P_MARTIAL_ARTS) >= P_BASIC)
                     damage += adjust_damage(u_str_dmg_bonus(), &youmonst, mon, AD_PHYS, ADFLAGS_NONE);
             }
             else if(obj && objects[obj->otyp].oc_skill == P_NONE)
@@ -1681,14 +1682,14 @@ boolean* obj_destroyed;
     struct obj* wep;
     wep = (is_golf_swing_with_stone || PROJECTILE(obj)) ? uwep : obj;
     wtype = is_golf_swing_with_stone ? P_THROWN_WEAPON :
-        (!obj || !wep) ? (P_SKILL_LEVEL(P_BARE_HANDED_COMBAT) < P_GRAND_MASTER ? P_BARE_HANDED_COMBAT : P_MARTIAL_ARTS) :
+        (!obj || !wep) ? (adjusted_skill_level(P_BARE_HANDED_COMBAT) < P_GRAND_MASTER ? P_BARE_HANDED_COMBAT : P_MARTIAL_ARTS) :
         weapon_skill_type(wep); //: uwep_skill_type();
 
     if (valid_weapon_attack)
     {
 
         /* to be valid a projectile must have had the correct projector */
-        damage += adjust_damage(weapon_skill_dmg_bonus(wep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, !is_golf_swing_with_stone, TRUE, 0), &youmonst, mon, wep ? objects[wep->otyp].oc_damagetype : AD_PHYS, ADFLAGS_NONE);
+        damage += adjust_damage(weapon_skill_dmg_bonus(wep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, !is_golf_swing_with_stone, TRUE, 0, TRUE), &youmonst, mon, wep ? objects[wep->otyp].oc_damagetype : AD_PHYS, ADFLAGS_NONE);
         /* [this assumes that `!thrown' implies wielded...] */
         use_skill(wtype, 1);
 
@@ -1886,7 +1887,7 @@ boolean* obj_destroyed;
     else if (unarmed && damage > 1 && !thrown && !obj && !Upolyd) 
     {
         /* VERY small chance of stunning opponent if unarmed. */
-        if (rnd(100) < 2 * P_SKILL_LEVEL(P_MARTIAL_ARTS) && !bigmonst(mdat)
+        if (rnd(100) < 2 * adjusted_skill_level(P_MARTIAL_ARTS) && !bigmonst(mdat)
             && !thick_skinned(mdat)) 
         {
             if (canspotmon(mon))
@@ -1908,7 +1909,7 @@ boolean* obj_destroyed;
     boolean skill_critical_success = FALSE;
     if (damage > 0 && !incorrect_weapon_use)
     {
-        int skill_crit_chance = get_skill_critical_strike_chance(wtype, FALSE, TRUE, 0);
+        int skill_crit_chance = get_skill_critical_strike_chance(wtype, FALSE, TRUE, 0, TRUE);
         if (skill_crit_chance > 0 && rn2(100) < skill_crit_chance)
         {
             skill_critical_success = TRUE;
@@ -1976,9 +1977,7 @@ boolean* obj_destroyed;
         /* iron weapon using melee or polearm hit [3.6.1: metal weapon too;
            also allow either or both weapons to cause split when twoweap] */
         && obj && (obj == uwep || obj == uarms)
-        && ((objects[obj->otyp].oc_material == MAT_IRON
-            /* allow scalpel and tsurugi to split puddings */
-            || objects[obj->otyp].oc_material == MAT_METAL)
+        && (is_metallic(obj) /* allow scalpel and tsurugi to split puddings */
             /* but not bashing with darts, arrows or ya */
             && !(is_ammo(obj) || is_missile(obj)))
         && hand_to_hand) {
@@ -2142,7 +2141,7 @@ boolean* obj_destroyed;
 
         if (extradmg > 0)
         {
-            mon->mbasehpmax -= extradmg;
+            mon->mbasehpdrain -= extradmg;
             update_mon_maxhp(mon);
 
             if (mon->mhp > mon->mhpmax)
@@ -2460,7 +2459,7 @@ struct obj *obj;
         || obj->otyp == MIRROR          /* silver in the reflective surface */
         || obj->otyp == MAGIC_MIRROR          /* silver in the reflective surface */
         || obj->otyp == CLOVE_OF_GARLIC /* causes shades to flee */
-        || objects[obj->otyp].oc_material == MAT_SILVER)
+        || obj->material == MAT_SILVER)
         return TRUE;
     return FALSE;
 }
@@ -2998,7 +2997,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
             int xtmp = d(2, 6);
 
             pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s suddenly seems weaker!", Monnam(mdef));
-            mdef->mbasehpmax -= xtmp;
+            mdef->mbasehpdrain -= xtmp;
             update_mon_maxhp(mdef);
             deduct_monster_hp(mdef, adjust_damage(xtmp, &youmonst, mdef, mattk->adtyp, ADFLAGS_NONE));
             /* !m_lev: level 0 monster is killed regardless of hit points
@@ -3216,7 +3215,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
     boolean skill_critical_success = FALSE;
     if (damage > 0 && !incorrect_weapon_use)
     {
-        int skill_crit_chance = get_skill_critical_strike_chance(wtype, FALSE, TRUE, 0);
+        int skill_crit_chance = get_skill_critical_strike_chance(wtype, FALSE, TRUE, 0, TRUE);
         if (skill_crit_chance > 0 && rn2(100) < skill_crit_chance)
         {
             skill_critical_success = TRUE;
@@ -3782,8 +3781,7 @@ register struct monst *mon;
             if (u.twoweap && uarms /* set up 'altwep' flag for next iteration */
                 /* only consider seconary when wielding one-handed primary */
                 && !bimanual(uwep)
-                && !(objects[uarms->otyp].oc_material == MAT_SILVER
-                     && Hate_silver))
+                && !(uarms->material == MAT_SILVER && Hate_silver))
                 altwep = !altwep; /* toggle for next attack */
             weapon = *originalweapon;
             if (!weapon) /* no need to go beyond no-gloves to rings; not ...*/

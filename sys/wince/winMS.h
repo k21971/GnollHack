@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	winMS.h	$NHDT-Date: 1433806609 2015/06/08 23:36:49 $  $NHDT-Branch: master $:$NHDT-Revision: 1.29 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -125,6 +125,7 @@ void mswin_destroy_nhwindow(winid wid);
 void mswin_curs(winid wid, int x, int y);
 void mswin_putstr(winid wid, int attr, const char *text);
 void mswin_putstr_ex(winid wid, int attr, const char *text, int append, int color);
+void mswin_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int append);
 void mswin_display_file(const char *filename, BOOLEAN_P must_exist);
 void mswin_start_menu_ex(winid wid, int style);
 void mswin_add_menu(winid wid, int glyph, const ANY_P *identifier,

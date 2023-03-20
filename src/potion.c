@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    potion.c    $NHDT-Date: 1549074254 2019/02/02 02:24:14 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1826,12 +1826,23 @@ struct obj *otmp;
         {
             /* subtract instead of add when cursed */
             num = -num;
-            u.ubaseenmax -= numxtra;
+            u.ubaseendrain -= numxtra;
             play_sfx_sound(SFX_LOSE_ENERGY);
         }
         else if(otmp->blessed)
         {
             num = num * 2;
+            if (u.ubaseendrain < 0)
+            {
+                u.ubaseendrain += numxtra;
+                if (u.ubaseendrain > 0)
+                {
+                    numxtra = u.ubaseendrain;
+                    u.ubaseendrain = 0;
+                }
+                else
+                    numxtra = 0;
+            }
             u.ubaseenmax += numxtra;
             play_sfx_sound(SFX_FULL_ENERGY);
         }
@@ -1931,10 +1942,32 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
         int max_hp_before = (Upolyd ? u.mhmax : u.uhpmax);
         if (Upolyd)
         {
+            if (u.basemhdrain < 0)
+            {
+                u.basemhdrain += nxtra;
+                if (u.basemhdrain > 0)
+                {
+                    nxtra = u.basemhdrain;
+                    u.basemhdrain = 0;
+                }
+                else
+                    nxtra = 0;
+            }
             u.basemhmax += nxtra;
         }
         else 
         {
+            if (u.ubasehpdrain < 0)
+            {
+                u.ubasehpdrain += nxtra;
+                if (u.ubasehpdrain > 0)
+                {
+                    nxtra = u.ubasehpdrain;
+                    u.ubasehpdrain = 0;
+                }
+                else
+                    nxtra = 0;
+            }
             u.ubasehpmax += nxtra;
         }
         updatemaxhp();
@@ -2167,7 +2200,7 @@ int how;
     struct obj *saddle = (struct obj *) 0;
     boolean hit_saddle = FALSE, your_fault = (how <= POTHIT_HERO_THROW);
     struct obj* obj = *obj_ptr;
-    char dcbuf[BUFSZ] = "";
+    char dcbuf[IBUFSZ] = "";
 
     if (!obj)
         return;
@@ -2372,8 +2405,8 @@ int how;
             }
 
 do_illness: /* Pestilence's potion of healing effect */
-            if ((mon->mbasehpmax > 3) && !check_ability_resistance_success(mon, A_CON, objects[obj->otyp].oc_mc_adjustment))
-                mon->mbasehpmax /= 2;
+            if ((mon->mbasehpmax + mon->mbasehpdrain > 3) && !check_ability_resistance_success(mon, A_CON, objects[obj->otyp].oc_mc_adjustment))
+                mon->mbasehpdrain -= mon->mbasehpmax / 2;
             
             update_mon_maxhp(mon);
             
@@ -2595,7 +2628,7 @@ const char* introline;
 
     int i, kn = 0;
     boolean cureblind = FALSE;
-    char dcbuf[BUFSZ] = "";
+    char dcbuf[IBUFSZ] = "";
 
     /* potion of unholy water might be wielded; prevent
        you_were() -> drop_weapon() from dropping it so that it
@@ -2922,7 +2955,7 @@ const char* introline;
      */
     }
 
-    char dcbuf2[BUFSZ * 2] = "";
+    char dcbuf2[IBUFSZ] = "";
     if (introline && *introline)
     {
         Strcpy(dcbuf2, introline);
@@ -3799,8 +3832,8 @@ dodip()
                 if (!potion->oartifact && !is_obj_indestructible(potion))
                     useup(potion); /* now gone */
 
-                char dcbuf2[BUFSZ] = "";
-                char dcbuf3[BUFSZ * 2] = "";
+                char dcbuf2[IBUFSZ] = "";
+                char dcbuf3[IBUFSZ] = "";
                 /* it would be better to use up the whole stack in advance
                    of the message, but we can't because we need to keep it
                    around for potionbreathe() [and we can't set obj->in_use
@@ -4228,6 +4261,8 @@ struct monst *mon,  /* monster being split */
         {
             mtmp2->mbasehpmax = u.basemhmax / 2;
             u.basemhmax -= mtmp2->mbasehpmax;
+            mtmp2->mbasehpdrain = u.basemhdrain / 2;
+            u.basemhdrain -= mtmp2->mbasehpdrain;
             updatemaxhp();
             update_mon_maxhp(mtmp2);
             context.botl = context.botlx = 1;
@@ -4242,6 +4277,8 @@ struct monst *mon,  /* monster being split */
             /* Gremlins are half strength */
             mtmp2->mbasehpmax = mon->mbasehpmax / 2;
             mon->mbasehpmax -= mtmp2->mbasehpmax;
+            mtmp2->mbasehpdrain = mon->mbasehpdrain / 2;
+            mon->mbasehpdrain -= mtmp2->mbasehpdrain;
             update_mon_maxhp(mon);
             update_mon_maxhp(mtmp2);
             if (canspotmon(mon))

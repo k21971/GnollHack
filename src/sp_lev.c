@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    sp_lev.c    $NHDT-Date: 1553787633 2019/03/28 15:40:33 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.111 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -22,8 +22,8 @@
 
 typedef void FDECL((*select_iter_func), (int, int, genericptr));
 typedef void FDECL((*select_iter_func2), (int, int, genericptr, genericptr));
-#if 0 /* UNUSED */
 typedef void FDECL((*select_iter_func3), (int, int, genericptr, genericptr, genericptr));
+#if 0 /* UNUSED */
 typedef void FDECL((*select_iter_func4), (int, int, genericptr, genericptr, genericptr, genericptr));
 #endif
 typedef void FDECL((*select_iter_func5), (int, int, genericptr, genericptr, genericptr, genericptr, genericptr));
@@ -75,7 +75,7 @@ STATIC_DCL void FDECL(get_room_loc, (schar *, schar *, struct mkroom *));
 STATIC_DCL void FDECL(get_free_room_loc, (schar *, schar *,
                                           struct mkroom *, packed_coord));
 STATIC_DCL boolean FDECL(create_subroom, (struct mkroom *, XCHAR_P, XCHAR_P,
-                                          XCHAR_P, XCHAR_P, XCHAR_P, XCHAR_P, int, int, int));
+                                          XCHAR_P, XCHAR_P, XCHAR_P, XCHAR_P, int, int, int, int, SHORT_P));
 STATIC_DCL void FDECL(create_door, (room_door *, struct mkroom *));
 STATIC_DCL void FDECL(create_trap, (spltrap *, struct mkroom *));
 STATIC_DCL int FDECL(noncoalignment, (ALIGNTYP_P));
@@ -86,6 +86,7 @@ STATIC_DCL void FDECL(create_object, (object *, struct mkroom *));
 STATIC_DCL void FDECL(create_lever, (spllever*, struct mkroom*));
 STATIC_DCL void FDECL(create_altar, (altar *, struct mkroom *));
 STATIC_DCL void FDECL(create_anvil, (anvil*, struct mkroom*));
+STATIC_DCL void FDECL(create_decoration, (decoration*, struct mkroom*));
 STATIC_DCL void FDECL(create_modron_portal, (modron_portal*, struct mkroom*));
 STATIC_DCL void FDECL(create_npc, (npc_create_info*, struct mkroom*));
 STATIC_DCL void FDECL(replace_terrain, (replaceterrain *, struct mkroom *));
@@ -164,9 +165,9 @@ STATIC_DCL void FDECL(selection_iterate, (struct opvar *, select_iter_func,
                                           genericptr_t));
 STATIC_DCL void FDECL(selection_iterate2, (struct opvar*, select_iter_func2,
     genericptr_t, genericptr_t));
-#if 0 /* UNUSED */
 STATIC_DCL void FDECL(selection_iterate3, (struct opvar*, select_iter_func3,
     genericptr_t, genericptr_t, genericptr_t));
+#if 0 /* UNUSED */
 STATIC_DCL void FDECL(selection_iterate4, (struct opvar*, select_iter_func4,
     genericptr_t, genericptr_t, genericptr_t, genericptr_t));
 #endif
@@ -177,14 +178,17 @@ STATIC_DCL void FDECL(sel_set_feature, (int, int, genericptr_t));
 STATIC_DCL void FDECL(sel_set_feature2, (int, int, genericptr_t, genericptr_t));
 STATIC_DCL void FDECL(sel_set_floor, (int, int, genericptr_t, genericptr_t));
 STATIC_DCL void FDECL(sel_set_subtype, (int, int, genericptr_t, genericptr_t));
+STATIC_DCL void FDECL(sel_set_carpet_piece, (int, int, genericptr_t, genericptr_t, genericptr_t));
 STATIC_DCL void FDECL(sel_set_door, (int, int, genericptr_t, genericptr_t, genericptr_t, genericptr_t, genericptr_t));
 STATIC_DCL void FDECL(sel_set_tileset, (int, int, genericptr_t));
 STATIC_DCL void FDECL(spo_door, (struct sp_coder *));
 STATIC_DCL void FDECL(spo_feature, (struct sp_coder *));
 STATIC_DCL void FDECL(spo_fountain, (struct sp_coder*));
 STATIC_DCL void FDECL(spo_anvil, (struct sp_coder*));
+STATIC_DCL void FDECL(spo_decoration, (struct sp_coder*));
 STATIC_DCL void FDECL(spo_floor, (struct sp_coder*));
 STATIC_DCL void FDECL(spo_subtype, (struct sp_coder*));
+STATIC_DCL void FDECL(spo_carpet, (struct sp_coder*));
 STATIC_DCL void FDECL(spo_npc, (struct sp_coder*));
 STATIC_DCL void FDECL(spo_terrain, (struct sp_coder *));
 STATIC_DCL void FDECL(spo_replace_terrain, (struct sp_coder *));
@@ -243,6 +247,9 @@ STATIC_VAR NEARDATA xchar xstart, ystart;
 STATIC_VAR NEARDATA char xsize, ysize;
 
 char *lev_message = 0;
+int lev_message_color = NO_COLOR;
+int lev_message_attr = ATR_NONE;
+
 lev_region *lregions = 0;
 int num_lregions = 0;
 
@@ -1218,12 +1225,13 @@ chk:
  * This is still very incomplete...
  */
 boolean
-create_room(x, y, w, h, xal, yal, rtype, rlit, floortyp, floorsubtyp, mtype)
+create_room(x, y, w, h, xal, yal, rtype, rlit, floortyp, floorsubtyp, mtype, tileset, decotyp)
 xchar x, y;
 xchar w, h;
 xchar xal, yal;
 xchar rtype, rlit;
-int floortyp, floorsubtyp, mtype;
+short decotyp;
+int floortyp, floorsubtyp, mtype, tileset;
 {
     xchar xabs = 0, yabs = 0;
     int wtmp, htmp, xaltmp, yaltmp, xtmp, ytmp;
@@ -1378,7 +1386,7 @@ int floortyp, floorsubtyp, mtype;
     if (!vault) {
         smeq[nroom] = nroom;
         add_room(xabs, yabs, xabs + wtmp - 1, yabs + htmp - 1, rlit, rtype,
-                 FALSE, IS_FLOOR(floortyp) ? floortyp : 0, IS_FLOOR(floortyp) ? floorsubtyp : 0, mtype);
+                 FALSE, IS_FLOOR(floortyp) ? floortyp : 0, IS_FLOOR(floortyp) ? floorsubtyp : 0, mtype, tileset, decotyp);
     } else {
         rooms[nroom].lx = xabs;
         rooms[nroom].ly = yabs;
@@ -1391,12 +1399,13 @@ int floortyp, floorsubtyp, mtype;
  * x & y are relative to the parent room.
  */
 STATIC_OVL boolean
-create_subroom(proom, x, y, w, h, rtype, rlit, floortyp, floorsubtyp, mtype)
+create_subroom(proom, x, y, w, h, rtype, rlit, floortyp, floorsubtyp, mtype, tileset, decotyp)
 struct mkroom *proom;
 xchar x, y;
 xchar w, h;
 xchar rtype, rlit;
-int floortyp, floorsubtyp, mtype;
+short decotyp;
+int floortyp, floorsubtyp, mtype, tileset;
 {
     xchar width, height;
 
@@ -1430,7 +1439,7 @@ int floortyp, floorsubtyp, mtype;
     if (rlit == -1)
         rlit = (rnd(1 + abs(depth(&u.uz))) < 11 && rn2(77)) ? TRUE : FALSE;
     add_subroom(proom, proom->lx + x, proom->ly + y, proom->lx + x + w - 1,
-                proom->ly + y + h - 1, rlit, rtype, FALSE, floortyp, floorsubtyp, mtype);
+                proom->ly + y + h - 1, rlit, rtype, FALSE, floortyp, floorsubtyp, mtype, tileset, decotyp);
     return TRUE;
 }
 
@@ -1627,6 +1636,67 @@ struct mkroom *croom;
     tm.y = y;
 
     (void)mktrap(t->type, 1, (struct mkroom *) 0, &tm);
+}
+
+void
+create_carpet(x1, y1, x2, y2, type)
+xchar x1, y1, x2, y2;
+int type;
+{
+    if (!isok(x1, y1) || !isok(x2, y2) || type < 0 || type >= MAX_CARPETS)
+        return;
+
+    int x, y;
+    for (x = x1; x <= x2; x++)
+    {
+        for (y = y1; y <= y2; y++)
+        {
+            levl[x][y].carpet_typ = (schar)type;
+            int piece = 0;
+            switch (carpet_type_definitions[type].tile_indexation_type)
+            {
+            default:
+            case CARPET_TILE_INDEXATION_TYPE_LONG_CARPET:
+                if (x == x1 && y == y1)
+                    piece = CARPET_PIECE_LONG_TLCORN;
+                else if (x == x1 && y == y2)
+                    piece = CARPET_PIECE_LONG_BLCORN;
+                else if (x == x2 && y == y1)
+                    piece = CARPET_PIECE_LONG_TRCORN;
+                else if (x == x2 && y == y2)
+                    piece = CARPET_PIECE_LONG_BRCORN;
+                else if (x == x1)
+                    piece = CARPET_PIECE_LONG_LEFT;
+                else if (x == x2)
+                    piece = CARPET_PIECE_LONG_RIGHT;
+                else if (y == y1)
+                    piece = CARPET_PIECE_LONG_TOP;
+                else if (y == y2)
+                    piece = CARPET_PIECE_LONG_BOTTOM;
+                else
+                    piece = CARPET_PIECE_LONG_MIDDLE;
+                break;
+            case CARPET_TILE_INDEXATION_TYPE_3X2_CARPET:
+                if (x == x1 && y == y1)
+                    piece = CARPET_PIECE_3X2_TLCORN;
+                else if (x == x1 && y == y2)
+                    piece = CARPET_PIECE_3X2_BLCORN;
+                else if (x == x2 && y == y1)
+                    piece = CARPET_PIECE_3X2_TRCORN;
+                else if (x == x2 && y == y2)
+                    piece = CARPET_PIECE_3X2_BRCORN;
+                else if (y == y1)
+                    piece = CARPET_PIECE_3X2_TOP;
+                else if (y == y2)
+                    piece = CARPET_PIECE_3X2_BOTTOM;
+                else
+                    piece = CARPET_PIECE_3X2_BOTTOM; /* should not happen */
+                break;
+            }
+            levl[x][y].carpet_piece = (schar)piece;
+            levl[x][y].carpet_flags = 0;
+        }
+    }
 }
 
 /*
@@ -1911,7 +1981,7 @@ struct mkroom *croom;
                         if (emitted_light_range(mtmp->data))
                             new_light_source(mtmp->mx, mtmp->my,
                                              emitted_light_range(mtmp->data),
-                                             LS_MONSTER, (genericptr_t) mtmp);
+                                             LS_MONSTER, (genericptr_t) mtmp, 0);
                     }
 
                     if (mon_ambient_sound(olddata) != mon_ambient_sound(mtmp->data))
@@ -1972,7 +2042,7 @@ struct mkroom *croom;
             mtmp->mprops[CANCELLED] = m->cancelled;
         }
         if (m->revived)
-            mtmp->mrevived = 1;
+            mtmp->mrevived = (short)m->revived;
         if (m->avenge)
             mtmp->mavenge = 1;
         if (m->stunned)
@@ -2029,6 +2099,12 @@ struct mkroom *croom;
     else
         c = 0;
 
+    struct monst* mowner = 0;
+    if ((o->containment & SP_OBJ_CONTENT) != 0 && !container_idx && invent_carrying_monster) 
+    {
+        mowner = invent_carrying_monster;
+    }
+
     if (o->class == OBJECT_SPECIAL_CREATE_TYPE_CLASS_TREASURE_ARMOR)
     {
         /* class armor treasure */
@@ -2037,7 +2113,7 @@ struct mkroom *croom;
         else if (Role_if(PM_MONK))
             otmp = mksobj_at(!rn2(5) ? BRACERS_OF_REFLECTION : !rn2(2) ? ROBE_OF_PROTECTION : !rn2(2) ? ROBE_OF_MAGIC_RESISTANCE : CLOAK_OF_MAGIC_RESISTANCE, x, y, TRUE, !named);
         else
-            otmp = mksobj_at(!rn2(2) ? MITHRIL_FULL_PLATE_MAIL : ADAMANTIUM_FULL_PLATE_MAIL, x, y, TRUE, !named);
+            otmp = mksobj_at_with_flags(FULL_PLATE_MAIL, x, y, TRUE, !named, -1, mowner, !rn2(2) ? MAT_MITHRIL : MAT_ADAMANTIUM, 0L, 0L, 0UL);
     }
     else if (o->class == OBJECT_SPECIAL_CREATE_TYPE_CLASS_TREASURE_WEAPON)
     {
@@ -2081,7 +2157,7 @@ struct mkroom *croom;
             otmp = mksobj_at(!rn2(3) ? BELT_OF_FIRE_GIANT_STRENGTH : !rn2(2) ? GAUNTLETS_OF_OGRE_POWER : GLOVES_OF_HASTE, x, y, TRUE, !named);
         else if (Role_if(PM_PRIEST))
         {
-            otmp = mksobj_at(Race_if(PM_GNOLL) && rn2(2) ? (!rn2(4) ? DOUBLE_HEADED_FLAIL : !rn2(2) ? SILVER_FLAIL : FLAIL) : !rn2(2) ? MACE : !rn2(2) ? MORNING_STAR : WAR_HAMMER, x, y, TRUE, !named);
+            otmp = mksobj_at(Race_if(PM_GNOLL) && rn2(2) ? (!rn2(4) ? DOUBLE_HEADED_FLAIL : FLAIL) : !rn2(2) ? MACE : !rn2(2) ? MORNING_STAR : WAR_HAMMER, x, y, TRUE, !named);
             if (!otmp->oartifact)
             {
                 if (can_obj_have_mythic(otmp))
@@ -2124,9 +2200,9 @@ struct mkroom *croom;
         }
         else
         {
-            int treasuretyp = Race_if(PM_GNOLL) && !P_RESTRICTED(P_FLAIL) && !rn2(2) ? (!rn2(4) ? DOUBLE_HEADED_FLAIL : !rn2(2) ? SILVER_FLAIL : FLAIL) :
-                P_RESTRICTED(P_SWORD) ? (!P_RESTRICTED(P_AXE) && !rn2(2) ? (!rn2(2) ? AXE : BATTLE_AXE) : !P_RESTRICTED(P_BLUDGEONING_WEAPON) && !rn2(2) ? (!rn2(4) ? MACE : !rn2(3) ? SILVER_MACE : WAR_HAMMER) : !P_RESTRICTED(P_DAGGER) && !rn2(2) ? (!rn2(3) ? DAGGER : !rn2(2) ? SILVER_DAGGER : ATHAME) : QUARTERSTAFF) :
-                !rn2(3) ? LONG_SWORD : !rn2(2) ? SILVER_LONG_SWORD : TWO_HANDED_SWORD;
+            int treasuretyp = Race_if(PM_GNOLL) && !P_RESTRICTED(P_FLAIL) && !rn2(2) ? (!rn2(4) ? DOUBLE_HEADED_FLAIL : FLAIL) :
+                P_RESTRICTED(P_SWORD) ? (!P_RESTRICTED(P_AXE) && !rn2(2) ? (!rn2(2) ? AXE : BATTLE_AXE) : !P_RESTRICTED(P_BLUDGEONING_WEAPON) && !rn2(2) ? (!rn2(4) ? MACE : WAR_HAMMER) : !P_RESTRICTED(P_DAGGER) && !rn2(2) ? (!rn2(3) ? DAGGER : ATHAME) : QUARTERSTAFF) :
+                !rn2(3) ? LONG_SWORD : TWO_HANDED_SWORD;
             otmp = mksobj_at(treasuretyp, x, y, TRUE, !named);
             if (!otmp->oartifact)
             {
@@ -2211,9 +2287,10 @@ struct mkroom *croom;
         unsigned long mkflags = o->open ? MKOBJ_FLAGS_OPEN_COFFIN : 0UL;
         mkflags |= o->corpsenm > NON_PM ? MKOBJ_FLAGS_MONSTER_SPECIFIED : 0UL;
         
-        otmp = mksobj_at_with_flags(o->id, x, y, TRUE, !named, -1, 0L, 0L, mkflags);
+        otmp = mksobj_at_with_flags(o->id, x, y, TRUE, !named, -1, mowner, MAT_NONE, 0L, 0L, mkflags);
     }
-    else {
+    else 
+    {
         /*
          * The special levels are compiled with the default "text" object
          * class characters.  We must convert them to the internal format.
@@ -2310,6 +2387,8 @@ struct mkroom *croom;
 
     if (o->trapped == 0 || o->trapped == 1)
         otmp->otrapped = o->trapped;
+    if (o->material > 0)
+        otmp->material = (uchar)o->material;
     if (o->elemental_enchantment >= 0)
         otmp->elemental_enchantment = (uchar)o->elemental_enchantment;
     if (o->exceptionality >= 0)
@@ -2730,6 +2809,38 @@ struct mkroom* croom;
 
     smithini(&u.uz, croom, x, y, 0, a->mtype);
     level.flags.has_smithy = TRUE;
+}
+
+/*
+ * Create a decoration in a room.
+ */
+STATIC_OVL void
+create_decoration(d, croom)
+decoration* d;
+struct mkroom* croom;
+{
+    schar x = -1, y = -1;
+
+    get_location_coord(&x, &y, ANY_LOC, croom, d->coord);
+
+    if (isok(x, y) && d->typ > 0 && d->typ < MAX_DECORATIONS)
+    {
+        levl[x][y].decoration_typ = d->typ;
+        levl[x][y].decoration_subtyp = d->subtyp;
+        levl[x][y].decoration_dir = max(0, min(3, d->dir));
+        levl[x][y].decoration_flags = 0;
+        if ((decoration_type_definitions[d->typ].dflags & DECORATION_TYPE_FLAGS_LOOTABLE) != 0)
+        {
+            if (d->item_in_holder & 1)
+                levl[x][y].decoration_flags |= DECORATION_FLAGS_ITEM_IN_HOLDER;
+            if (d->item_in_holder & 2)
+                levl[x][y].decoration_flags |= DECORATION_FLAGS_ITEM2_IN_HOLDER;
+            if (d->item_in_holder & 4)
+                levl[x][y].decoration_flags |= DECORATION_FLAGS_ITEM3_IN_HOLDER;
+        }
+        if (!d->lit && (decoration_type_definitions[d->typ].dflags & DECORATION_TYPE_FLAGS_LIGHTABLE) != 0)
+            levl[x][y].flags |= L_INITIALLY_UNLIT;  //This uses normal flags, since lamplit is shared as well
+    }
 }
 
 
@@ -3240,11 +3351,11 @@ struct mkroom *mkr;
 
     if (mkr) {
         aroom = &subrooms[nsubroom];
-        okroom = create_subroom(mkr, r->x, r->y, r->w, r->h, rtype, r->rlit, r->rfloortyp, r->rfloorsubtyp, r->mtype);
+        okroom = create_subroom(mkr, r->x, r->y, r->w, r->h, rtype, r->rlit, r->rfloortyp, r->rfloorsubtyp, r->mtype, r->tileset, r->decotyp);
     } else {
         aroom = &rooms[nroom];
         okroom = create_room(r->x, r->y, r->w, r->h, r->xalign, r->yalign,
-                             rtype, r->rlit, r->rfloortyp, r->rfloorsubtyp, r->mtype);
+                             rtype, r->rlit, r->rfloortyp, r->rfloorsubtyp, r->mtype, r->tileset, r->decotyp);
     }
 
     if (okroom) {
@@ -3699,15 +3810,17 @@ spo_message(coder)
 struct sp_coder *coder;
 {
     static const char nhFunc[] = "spo_message";
-    struct opvar *op;
+    struct opvar *op, *mtyp_opvar;
     char *msg, *levmsg;
     size_t old_n, n;
 
-    if (!OV_pop_s(op))
+    if (!OV_pop_i(mtyp_opvar) || !OV_pop_s(op))
         return;
     msg = OV_s(op);
     if (!msg)
         return;
+
+    int mtyp = (int)OV_i(mtyp_opvar);
 
     old_n = lev_message ? (strlen(lev_message) + 1) : 0;
     n = strlen(msg);
@@ -3723,8 +3836,13 @@ struct sp_coder *coder;
     (void) memcpy((genericptr_t) &levmsg[old_n], msg, n);
     levmsg[old_n + n] = '\0';
     Free(lev_message);
+    
     lev_message = levmsg;
+    lev_message_color = mtyp;
+    lev_message_attr = ATR_NONE;
+    
     opvar_free(op);
+    opvar_free(mtyp_opvar);
 }
 
 STATIC_VAR const monster emptymons; /* Initialized to zero automatically */
@@ -4071,6 +4189,10 @@ struct sp_coder *coder;
         case SP_O_V_SPEFLAGS:
             if (OV_typ(parm) == SPOVAR_INT)
                 tmpobj.speflags = (unsigned long)OV_i(parm);
+            break;
+        case SP_O_V_MATERIAL:
+            if (OV_typ(parm) == SPOVAR_INT)
+                tmpobj.material = (int)OV_i(parm);
             break;
         case SP_O_V_ELEMENTAL_ENCHANTMENT:
             if (OV_typ(parm) == SPOVAR_INT)
@@ -4611,17 +4733,18 @@ struct sp_coder *coder;
         return;
     } else {
         struct opvar *rflags, *h, *w, *yalign, *xalign, *y, *x, *rlit,
-            *chance, *rtype, * rfloorsubtyp, *rfloortyp, *mtype;
+            *chance, *rtype, * rfloorsubtyp, *rfloortyp, * rtileset, * rdecotyp, *mtype;
         room tmproom;
         struct mkroom *tmpcr;
 
         if (!OV_pop_i(h) || !OV_pop_i(w) || !OV_pop_i(y) || !OV_pop_i(x)
-            || !OV_pop_i(yalign) || !OV_pop_i(xalign) || !OV_pop_i(rflags) || !OV_pop_i(rfloortyp) || !OV_pop_i(rfloorsubtyp) || !OV_pop(mtype)
+            || !OV_pop_i(yalign) || !OV_pop_i(xalign) || !OV_pop_i(rflags) || !OV_pop_i(rfloortyp) || !OV_pop_i(rfloorsubtyp) || !OV_pop_i(rtileset) || !OV_pop_i(rdecotyp) || !OV_pop(mtype)
             || !OV_pop_i(rlit) || !OV_pop_i(chance) || !OV_pop_i(rtype))
             return;
 
         int flmt = (int)OV_i(rfloortyp);
         int flt = (int)OV_i(rfloorsubtyp);
+        short decotyp = (short)OV_i(rdecotyp);
         tmproom.x = (xchar)OV_i(x);
         tmproom.y = (xchar)OV_i(y);
         tmproom.w = (xchar)OV_i(w);
@@ -4636,6 +4759,8 @@ struct sp_coder *coder;
         tmproom.joined = (xchar)!(OV_i(rflags) & (1 << 2));
         tmproom.rfloortyp = (xchar)(flmt >= 0 && IS_FLOOR(flmt) ? flmt : ROOM); /* Rooms have default flooring as ROOM, rather than nothing */
         tmproom.rfloorsubtyp = (xchar)(IS_FLOOR(tmproom.rfloortyp) && flt >= 0 ? flt : 0);
+        tmproom.tileset = (short)OV_i(rtileset);
+        tmproom.decotyp = decotyp < 0 ? (coder->croom ? 0 : 1) : decotyp;
         tmproom.mtype = NON_PM;
         if (OV_typ(mtype) == SPOVAR_MONST)
         {
@@ -4661,6 +4786,8 @@ struct sp_coder *coder;
         opvar_free(rtype);
         opvar_free(rfloortyp);
         opvar_free(rfloorsubtyp);
+        opvar_free(rtileset);
+        opvar_free(rdecotyp);
         opvar_free(mtype);
         opvar_free(chance);
         opvar_free(rlit);
@@ -5698,7 +5825,6 @@ genericptr_t arg, arg2;
                 (*func)(x, y, arg, arg2);
 }
 
-#if 0 /* UNUSED */
 void
 selection_iterate3(ov, func, arg, arg2, arg3)
 struct opvar* ov;
@@ -5714,6 +5840,7 @@ genericptr_t arg, arg2, arg3;
                 (*func)(x, y, arg, arg2, arg3);
 }
 
+#if 0 /* UNUSED */
 void
 selection_iterate4(ov, func, arg, arg2, arg3, arg4)
 struct opvar* ov;
@@ -5881,6 +6008,22 @@ genericptr_t arg1, arg2;
         levl[x][y].subtyp = (*(int*)arg2);
         levl[x][y].vartyp = get_initial_location_vartype(levl[x][y].typ, levl[x][y].subtyp);
     }
+}
+
+void
+sel_set_carpet_piece(x, y, arg1, arg2, arg3)
+int x, y;
+genericptr_t arg1, arg2, arg3;
+{
+    schar typ = (schar)(*(int*)arg1);
+    if(typ >= 0 && typ < MAX_CARPETS)
+        levl[x][y].carpet_typ = typ;
+    
+    schar piece = (schar)(*(int*)arg2);
+    if(piece >= 0)
+        levl[x][y].carpet_piece = piece;
+    
+    levl[x][y].carpet_flags = (uchar)(*(int*)arg3);
 }
 
 void
@@ -6124,6 +6267,33 @@ struct sp_coder* coder;
     opvar_free(acoord);
 }
 
+void spo_decoration(coder)
+struct sp_coder* coder;
+{
+    static const char nhFunc[] = "spo_decoration";
+    struct opvar* acoord, *typ_opvar, *subtyp_opvar, *dir_opvar, *flags_opvar, *lit_opvar;
+    decoration tmpdecoration;
+
+    if (!OV_pop_i(typ_opvar) || !OV_pop_i(subtyp_opvar) || !OV_pop_i(dir_opvar) || !OV_pop_i(flags_opvar) || !OV_pop_i(lit_opvar) || !OV_pop_c(acoord))
+        return;
+
+    tmpdecoration.coord = OV_i(acoord);
+    tmpdecoration.typ = (schar)OV_i(typ_opvar);
+    tmpdecoration.subtyp = (schar)OV_i(subtyp_opvar);
+    tmpdecoration.dir = (schar)OV_i(dir_opvar);
+    tmpdecoration.item_in_holder = (uchar)OV_i(flags_opvar);
+    tmpdecoration.lit = (boolean)OV_i(lit_opvar);
+
+    create_decoration(&tmpdecoration, coder->croom);
+
+    opvar_free(typ_opvar);
+    opvar_free(subtyp_opvar);
+    opvar_free(dir_opvar);
+    opvar_free(flags_opvar);
+    opvar_free(lit_opvar);
+    opvar_free(acoord);
+}
+
 void
 spo_floor(coder)
 struct sp_coder* coder;
@@ -6162,10 +6332,61 @@ struct sp_coder* coder;
     subtyp = (int)OV_i(subtyp_opvar);
     selection_iterate2(sel, sel_set_subtype, (genericptr_t)&typ, (genericptr_t)&subtyp);
 
+    opvar_free(typ_opvar);
     opvar_free(subtyp_opvar);
     opvar_free(sel);
 }
 
+
+void
+spo_carpet(coder)
+struct sp_coder* coder;
+{
+    static const char nhFunc[] = "spo_carpet";
+    struct opvar* carpet_type, * area;
+    xchar dx1, dy1, dx2, dy2;
+    int typ;
+
+    if (!OV_pop_i(carpet_type) || !OV_pop_r(area))
+        return;
+
+    dx1 = (xchar)SP_REGION_X1(OV_i(area));
+    dy1 = (xchar)SP_REGION_Y1(OV_i(area));
+    dx2 = (xchar)SP_REGION_X2(OV_i(area));
+    dy2 = (xchar)SP_REGION_Y2(OV_i(area));
+    typ = (int)OV_i(carpet_type);
+
+    get_location(&dx1, &dy1, ANY_LOC, coder->croom);
+    get_location(&dx2, &dy2, ANY_LOC, coder->croom);
+
+    create_carpet(dx1, dy1, dx2, dy2, typ);
+
+    opvar_free(area);
+    opvar_free(carpet_type);
+}
+
+void
+spo_carpet_piece(coder)
+struct sp_coder* coder;
+{
+    static const char nhFunc[] = "spo_carpet_piece";
+    struct opvar* sel;
+    struct opvar* subtyp_opvar, *typ_opvar, * flags_opvar;
+    int typ, subtyp, cflags;
+
+    if (!OV_pop_i(typ_opvar) || !OV_pop_i(subtyp_opvar) || !OV_pop_i(flags_opvar) || !OV_pop_typ(sel, SPOVAR_SEL))
+        return;
+
+    typ = (int)OV_i(typ_opvar);
+    subtyp = (int)OV_i(subtyp_opvar);
+    cflags = (int)OV_i(flags_opvar);
+    selection_iterate3(sel, sel_set_carpet_piece, (genericptr_t)&typ, (genericptr_t)&subtyp, (genericptr_t)&cflags);
+
+    opvar_free(typ_opvar);
+    opvar_free(subtyp_opvar);
+    opvar_free(flags_opvar);
+    opvar_free(sel);
+}
 
 void spo_npc(coder)
 struct sp_coder* coder;
@@ -6580,16 +6801,21 @@ spo_region(coder)
 struct sp_coder *coder;
 {
     static const char nhFunc[] = "spo_region";
-    struct opvar *rtype, *rlit, *rflags, *area, *rfloortyp, * rfloorsubtyp, *mtype;
+    struct opvar *rtype, *rlit, *rflags, *area, *rfloortyp, * rfloorsubtyp, * rtileset, * rdecotyp, *mtype;
     xchar dx1, dy1, dx2, dy2;
     register struct mkroom *troom;
     boolean prefilled, room_not_needed, irregular, joined;
-    int roommontype = NON_PM;
+    int roommontype = NON_PM, roomtileset = -1;
+    short decotyp;
 
-    if (!OV_pop_i(rfloorsubtyp) || !OV_pop_i(rfloortyp) || !OV_pop_i(rflags) || !OV_pop_i(rtype) || !OV_pop_i(rlit) || !OV_pop(mtype)
+    if (!OV_pop_i(rdecotyp) || !OV_pop_i(rtileset) || !OV_pop_i(rfloorsubtyp) || !OV_pop_i(rfloortyp) || !OV_pop_i(rflags) || !OV_pop_i(rtype) || !OV_pop_i(rlit) || !OV_pop(mtype)
         || !OV_pop_r(area))
         return;
 
+    roomtileset = (int)OV_i(rtileset);
+    decotyp = (short)OV_i(rdecotyp);
+    if (decotyp < 0)
+        decotyp = 0;
     prefilled = (boolean)!(OV_i(rflags) & (1 << 0));
     irregular = (boolean)(OV_i(rflags) & (1 << 1));
     joined = (boolean)!(OV_i(rflags) & (1 << 2));
@@ -6655,6 +6881,8 @@ struct sp_coder *coder;
         opvar_free(rtype);
         opvar_free(rfloorsubtyp);
         opvar_free(rfloortyp);
+        opvar_free(rtileset);
+        opvar_free(rdecotyp);
         opvar_free(mtype);
 
         return;
@@ -6674,13 +6902,13 @@ struct sp_coder *coder;
         min_ry = max_ry = dy1;
         smeq[nroom] = nroom;
         flood_fill_rm(dx1, dy1, nroom + ROOMOFFSET, (boolean)OV_i(rlit), TRUE);
-        add_room(min_rx, min_ry, max_rx, max_ry, FALSE, (schar)OV_i(rtype), TRUE, usedfloortype, usedfloorsubtype, roommontype);
+        add_room(min_rx, min_ry, max_rx, max_ry, FALSE, (schar)OV_i(rtype), TRUE, usedfloortype, usedfloorsubtype, roommontype, roomtileset, decotyp);
         troom->rlit = (schar)OV_i(rlit);
         troom->irregular = TRUE;
     }
     else 
     {
-        add_room(dx1, dy1, dx2, dy2, (boolean)OV_i(rlit), (schar)OV_i(rtype), TRUE, usedfloortype, usedfloorsubtype, roommontype);
+        add_room(dx1, dy1, dx2, dy2, (boolean)OV_i(rlit), (schar)OV_i(rtype), TRUE, usedfloortype, usedfloorsubtype, roommontype, roomtileset, decotyp);
 #ifdef SPECIALIZATION
         topologize(troom, FALSE); /* set roomno */
 #else
@@ -6706,6 +6934,8 @@ struct sp_coder *coder;
     opvar_free(rtype);
     opvar_free(rfloorsubtyp);
     opvar_free(rfloortyp);
+    opvar_free(rtileset);
+    opvar_free(rdecotyp);
     opvar_free(mtype);
 }
 
@@ -7702,11 +7932,20 @@ sp_lev *lvl;
         case SPO_ANVIL:
             spo_anvil(coder);
             break;
+        case SPO_DECORATION:
+            spo_decoration(coder);
+            break;
         case SPO_FLOOR:
             spo_floor(coder);
             break;
         case SPO_SUBTYPE:
             spo_subtype(coder);
+            break;
+        case SPO_CARPET:
+            spo_carpet(coder);
+            break;
+        case SPO_CARPET_PIECE:
+            spo_carpet_piece(coder);
             break;
         case SPO_NPC:
             spo_npc(coder);

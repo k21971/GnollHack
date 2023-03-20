@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    artifact.h    $NHDT-Date: 1433050871 2015/05/31 05:41:11 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -64,6 +64,12 @@
 #define AF2_DUAL_RUNESWORD_BONUS               0x00000080UL  
 #define AF2_HEIGHT_IS_CLIPPING                 0x00000100UL  /* Height clips rather than scales the item graphics */
 #define AF2_NO_CATALOGUE                       0x00000200UL  
+#define AF2_MISSILE_REPLACEMENTS               0x00000400UL  
+#define AF2_MATERIAL_NAME_2ND_WORD_DN          0x00000800UL  
+#define AF2_MATERIAL_NAME_3RD_WORD_DN          0x00001000UL  
+#define AF2_MATERIAL_NAME_4TH_WORD_DN          (AF2_MATERIAL_NAME_2ND_WORD_DN | AF2_MATERIAL_NAME_3RD_WORD_DN)  
+#define AF2_NO_MATERIAL_NAME                   0x00002000UL  
+#define AF2_SHOW_BASE_MATERIAL_NAME            0x00004000UL  
 
 
 #define has_artifact_floor_tile(artifact_idx) \
@@ -128,6 +134,7 @@ struct artifact {
     const char *name;
     const char* desc;       /* unidentified name */
     const char* hit_desc;  /* description used in artifact_hit: e.g., massive hammer, ice-cold blade, etc. */
+    uchar material;
     uchar exceptionality;
     uchar mythic_prefix;
     uchar mythic_suffix;
@@ -182,6 +189,7 @@ enum invoke_prop_types {
     ARTINVOKE_RECHARGE_ITSELF,
     ARTINVOKE_INVOKE_WITH_TIMER,
     ARTINVOKE_TIME_STOP,
+    ARTINVOKE_RUBY_ROD,
     MAX_ARTINVOKES /* this is NOT the number of artifact invokes*/
 };
 

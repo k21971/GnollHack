@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    monmove.c    $NHDT-Date: 1557094802 2019/05/05 22:20:02 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -196,9 +196,6 @@ struct monst* mon;
                             strcpy(someitembuf, "some items");
                         }
 
-                        if (canseemon(mon))
-                            talkeff(mon->mx, mon->my);
-                        
                         switch (mon->talkstate_item_trading)
                         {
                         case 0:
@@ -224,6 +221,10 @@ struct monst* mon;
                         default:
                             break;
                         }
+
+                        if (canseemon(mon))
+                            talkeff(mon->mx, mon->my);
+
                         mon_talked = TRUE;
                     }
                 }
@@ -878,7 +879,7 @@ register struct monst *mtmp;
                 /* since no way is an image going to pay it off */
             }
         }
-        else if (demon_talk(mtmp))
+        else if (demon_talk(mtmp, (boolean*)0)
             return 1; /* you paid it off */
     }
 #endif
@@ -1536,7 +1537,7 @@ register int after;
                          || (uses_items && searches_for_item(mtmp, otmp))
                          || (likerock && otmp->otyp == BOULDER)
                          || (likegems && otmp->oclass == GEM_CLASS
-                             && objects[otmp->otyp].oc_material != MAT_MINERAL)
+                             && otmp->material != MAT_MINERAL)
                          || (conceals && !cansee(otmp->ox, otmp->oy))
                          || (slurps_items(ptr)
                              && !index(indigestion, otmp->oclass)
@@ -1547,7 +1548,7 @@ register int after;
                         if (can_carry(mtmp, otmp) > 0
                             && (throws_rocks(ptr) || !sobj_at(BOULDER, xx, yy))
                             && (!is_unicorn(ptr)
-                                || objects[otmp->otyp].oc_material == MAT_GEMSTONE)
+                                || otmp->material == MAT_GEMSTONE)
                             /* Don't get stuck circling an Elbereth or Gilthoniel */
                             && !onnopickup(xx, yy, mtmp) && !is_obj_no_pickup(otmp)) 
                         {
@@ -2308,7 +2309,7 @@ struct monst *mtmp;
             && obj->oclass != VENOM_CLASS && typ != SACK && typ != ORIENTAL_SILK_SACK && typ != LEATHER_BAG && typ != BACKPACK
             && typ != EXPENSIVE_HANDBAG
             && typ != BAG_OF_HOLDING && typ != BAG_OF_WIZARDRY && typ != BAG_OF_TREASURE_HAULING && typ != BAG_OF_THE_GLUTTON && typ != BAG_OF_TRICKS
-            && !is_candle(obj) && typ != OILSKIN_SACK && typ != LEASH
+            && !is_candle_or_torch(obj) && typ != OILSKIN_SACK && typ != LEASH
             && typ != STETHOSCOPE && typ != BLINDFOLD && typ != TOWEL
             && typ != TIN_WHISTLE && typ != MAGIC_WHISTLE
             && typ != MAGIC_MARKER && typ != TIN_OPENER && typ != SKELETON_KEY

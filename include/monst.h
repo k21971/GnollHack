@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    monst.h    $NHDT-Date: 1550524559 2019/02/18 21:15:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -67,6 +67,7 @@ enum m_ap_types {
 #define U_AP_FLAG (youmonst.m_ap_type & ~M_AP_TYPMASK)
 #define M_AP_TYPE(m) ((m)->m_ap_type & M_AP_TYPMASK)
 #define M_AP_FLAG(m) ((m)->m_ap_type & ~M_AP_TYPMASK)
+#define MAX_MONST_REVIVALS 250
 
 struct monst {
     struct monst *nmon;
@@ -100,10 +101,10 @@ struct monst {
     schar macbonus;
     schar mmcbonus;
 
-    int mhp, mbasehpmax, mhpmax;
+    int mhp, mbasehpmax, mhpmax, mbasehpdrain;
     int mhp_fraction;
 
-    int men, mbaseenmax, menmax;
+    int men, mbaseenmax, menmax, mbaseendrain;
     int men_fraction;
 
     uchar heads_left;
@@ -134,7 +135,7 @@ struct monst {
     xchar yell_x, yell_y;   /* location where the pet heard you yelling from */
     short notalktimer;
     short notraveltimer;
-    short reserved_short1;
+    short reserved_short1;  
     short reserved_short2;
     short rumorsleft;       /* how many rumors the monster still knows, -1 means that the monster has already told the player that it does not know any more rumors */
     uchar action;           /* the monster is currently in the midst of one of its attacks or actions */
@@ -143,6 +144,8 @@ struct monst {
     short mfrozen;
     short mstaying;         /* commanded to stay in place, similar to frozen, but commanded */
     short mcarrying;
+
+    short mrevived;         /* Number of times revived */
 
     /* Bitfield flags -- Keep all bitfields in a row */
     Bitfield(mflee, 1);     /* fleeing */
@@ -158,7 +161,6 @@ struct monst {
                                   * but not mimic (that is, snake, spider,
                                   * trapper, piercer, eel)
                                   */
-    Bitfield(mrevived, 1);  /* has been revived from the dead */
     Bitfield(mcloned, 1);   /* has been cloned from another */
 
     Bitfield(mavenge, 1);   /* did something to deserve retaliation */

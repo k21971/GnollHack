@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    fountain.c    $NHDT-Date: 1544442711 2018/12/10 11:51:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright Scott R. Turner, srt@ucla, 10/27/86 */
@@ -292,6 +292,19 @@ drinkfountain()
         {
             added_mana *= 2;
             added_max_mana += d(1, 3);
+        }
+        if (u.ubaseendrain < 0)
+        {
+            u.ubaseendrain += added_max_mana;
+            if (u.ubaseendrain > 0)
+            {
+                added_max_mana = u.ubaseendrain;
+                u.ubaseendrain = 0;
+            }
+            else
+            {
+                added_max_mana = 0;
+            }
         }
         u.uen += added_mana;
         u.ubaseenmax += added_max_mana;
@@ -633,6 +646,7 @@ register struct obj *obj;
               "From the murky depths, a hand reaches up to bless the sword.");
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As the hand retreats, the fountain disappears!");
             obj->otyp = LONG_SWORD;
+            obj->material = objects[obj->otyp].oc_material;
             obj = oname(obj, artiname(ART_EXCALIBUR));
             discover_artifact(ART_EXCALIBUR);
             bless(obj);

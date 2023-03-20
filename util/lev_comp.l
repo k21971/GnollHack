@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0  lev_comp.l	$NHDT-Date: 1543371690 2018/11/28 02:21:30 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /*	Copyright (c) 1989 by Jean-Christophe Collet */
@@ -143,6 +143,8 @@ LEVEL		ST_RET(LEVEL_ID);
 INIT_MAP	ST_RET(LEV_INIT_ID);
 TILESET	    ST_RET(TILESET_ID);
 SPECIAL_TILESET	    ST_RET(SPECIAL_TILESET_ID);
+tileset	    ST_RET(TILESET_PARAM_ID);
+decoration_style	ST_RET(DECOTYP_ID);
 BOUNDARY_TYPE	ST_RET(BOUNDARY_TYPE_ID);
 FOREST	    ST_RET(FOREST_ID);
 floorsubtype	ST_RET(FLOOR_SUBTYPE_ID);
@@ -182,6 +184,7 @@ TELEPORT_REGION	ST_RET(TELEPRT_ID);
 BRANCH		ST_RET(BRANCH_ID);
 FOUNTAIN	ST_RET(FOUNTAIN_ID);
 FLOOR	    ST_RET(FLOOR_ID);
+DECORATION  ST_RET(DECORATION_ID);
 THRONE	    ST_RET(THRONE_ID);
 MODRON_PORTAL	ST_RET(MODRON_PORTAL_ID);
 SINK		ST_RET(SINK_ID);
@@ -194,6 +197,8 @@ EXIT		ST_RET(EXIT_ID);
 ROOM		ST_RET(ROOM_ID);
 SUBROOM		ST_RET(SUBROOM_ID);
 SUBTYPE		ST_RET(SUBTYPE_ID);
+CARPET		ST_RET(CARPET_ID);
+CARPET_PIECE		ST_RET(CARPET_PIECE_ID);
 RANDOM_CORRIDORS	ST_RET(RAND_CORRIDOR_ID);
 CORRIDOR	ST_RET(CORRIDOR_ID);
 TERRAIN		ST_RET(TERRAIN_ID);
@@ -249,6 +254,7 @@ air		{ savetoken(yytext); yylval.i=AIRLOC;  return HUMIDITY_TYPE; }
 floor   { savetoken(yytext); yylval.i=FLOORLOC;  return HUMIDITY_TYPE; }
 levregion	ST_RET(LEV);
 quantity	ST_RET(QUANTITY_ID);
+material	ST_RET(MATERIAL_ID);
 elemental_enchantment	ST_RET(ELEMENTAL_ENCHANTMENT_ID);
 exceptionality	ST_RET(EXCEPTIONALITY_ID);
 mythic_prefix	ST_RET(MYTHIC_PREFIX_ID);
@@ -358,6 +364,51 @@ cubical		{ savetoken(yytext); yylval.i=MODRON_PORTAL_SUBTYPE_CUBICAL; return MOD
 octahedral	{ savetoken(yytext); yylval.i=MODRON_PORTAL_SUBTYPE_OCTAHEDRAL; return MODRON_PORTAL_TYPE; }
 dodecahedral { savetoken(yytext); yylval.i=MODRON_PORTAL_SUBTYPE_DODECAHEDRAL; return MODRON_PORTAL_TYPE; }
 icosahedral { savetoken(yytext); yylval.i=MODRON_PORTAL_SUBTYPE_ICOSAHEDRAL; return MODRON_PORTAL_TYPE; }
+decoration_cobweb { savetoken(yytext); yylval.i=DECORATION_COBWEB; return DECORATION_TYPE; }
+decoration_cobweb_corner { savetoken(yytext); yylval.i=DECORATION_COBWEB_CORNER; return DECORATION_TYPE; }
+decoration_torch { savetoken(yytext); yylval.i=DECORATION_TORCH; return DECORATION_TYPE; }
+decoration_lantern { savetoken(yytext); yylval.i=DECORATION_LANTERN; return DECORATION_TYPE; }
+decoration_fireplace { savetoken(yytext); yylval.i=DECORATION_FIREPLACE; return DECORATION_TYPE; }
+decoration_painting { savetoken(yytext); yylval.i=DECORATION_PAINTING; return DECORATION_TYPE; }
+decoration_banner { savetoken(yytext); yylval.i=DECORATION_BANNER; return DECORATION_TYPE; }
+decoration_wall_sculpture { savetoken(yytext); yylval.i=DECORATION_WALL_SCULPTURE; return DECORATION_TYPE; }
+decoration_shield_with_swords { savetoken(yytext); yylval.i=DECORATION_SHIELD_WITH_SWORDS; return DECORATION_TYPE; }
+decoration_gargoyle_statue { savetoken(yytext); yylval.i=DECORATION_GARGOYLE_NICHE; return DECORATION_TYPE; }
+decoration_knight_statue { savetoken(yytext); yylval.i=DECORATION_KNIGHT_NICHE; return DECORATION_TYPE; }
+decoration_priest_statue { savetoken(yytext); yylval.i=DECORATION_PRIEST_NICHE; return DECORATION_TYPE; }
+direction_top { savetoken(yytext); yylval.i=0; return DECORATION_DIR; }
+direction_left { savetoken(yytext); yylval.i=1; return DECORATION_DIR; }
+direction_right { savetoken(yytext); yylval.i=2; return DECORATION_DIR; }
+direction_bottom { savetoken(yytext); yylval.i=3; return DECORATION_DIR; }
+empty_holder { savetoken(yytext); yylval.i=0; return DECORATION_ITEM_STATE; }
+item_in_holder { savetoken(yytext); yylval.i=1; return DECORATION_ITEM_STATE; }
+item2_in_holder { savetoken(yytext); yylval.i=2; return DECORATION_ITEM_STATE; }
+item12_in_holder { savetoken(yytext); yylval.i=3; return DECORATION_ITEM_STATE; }
+item3_in_holder { savetoken(yytext); yylval.i=4; return DECORATION_ITEM_STATE; }
+item13_in_holder { savetoken(yytext); yylval.i=5; return DECORATION_ITEM_STATE; }
+item23_in_holder { savetoken(yytext); yylval.i=6; return DECORATION_ITEM_STATE; }
+items_in_holder { savetoken(yytext); yylval.i=7; return DECORATION_ITEM_STATE; }
+painting_wizard_blue { savetoken(yytext); yylval.i=PAINTING_WIZARD_OF_YENDOR_BLUE; return PAINTING_TYPE; }
+painting_wizard_red { savetoken(yytext); yylval.i=PAINTING_WIZARD_OF_YENDOR_RED; return PAINTING_TYPE; }
+painting_vlad { savetoken(yytext); yylval.i=PAINTING_VLAD_THE_IMPALER; return PAINTING_TYPE; }
+painting_vampire_male { savetoken(yytext); yylval.i=PAINTING_VAMPIRE_MALE; return PAINTING_TYPE; }
+painting_vampire_female { savetoken(yytext); yylval.i=PAINTING_VAMPIRE_FEMALE; return PAINTING_TYPE; }
+banner_red { savetoken(yytext); yylval.i=BANNER_RED; return BANNER_TYPE; }
+banner_red_old { savetoken(yytext); yylval.i=BANNER_RED_OLD; return BANNER_TYPE; }
+banner_purple { savetoken(yytext); yylval.i=BANNER_PURPLE; return BANNER_TYPE; }
+banner_purple_old { savetoken(yytext); yylval.i=BANNER_PURPLE_OLD; return BANNER_TYPE; }
+wall_sculpture_modron_spherical { savetoken(yytext); yylval.i=WALL_SCULPTURE_MODRON_SPHERICAL; return WALL_SCULPTURE_TYPE; }
+wall_sculpture_modron_triangular { savetoken(yytext); yylval.i=WALL_SCULPTURE_MODRON_TRIANGULAR; return WALL_SCULPTURE_TYPE; }
+message_normal { savetoken(yytext); yylval.i=NO_COLOR; return MESSAGE_TYPE; }
+message_god { savetoken(yytext); yylval.i=CLR_MSG_GOD; return MESSAGE_TYPE; }
+message_positive { savetoken(yytext); yylval.i=CLR_MSG_POSITIVE; return MESSAGE_TYPE; }
+message_negative { savetoken(yytext); yylval.i=CLR_MSG_NEGATIVE; return MESSAGE_TYPE; }
+message_attention { savetoken(yytext); yylval.i=CLR_MSG_ATTENTION; return MESSAGE_TYPE; }
+message_hint { savetoken(yytext); yylval.i=CLR_MSG_HINT; return MESSAGE_TYPE; }
+message_spell { savetoken(yytext); yylval.i=CLR_MSG_SPELL; return MESSAGE_TYPE; }
+message_mystical { savetoken(yytext); yylval.i=CLR_MSG_MYSTICAL; return MESSAGE_TYPE; }
+message_success { savetoken(yytext); yylval.i=CLR_MSG_SUCCESS; return MESSAGE_TYPE; }
+message_fail { savetoken(yytext); yylval.i=CLR_MSG_FAIL; return MESSAGE_TYPE; }
 npc_random { savetoken(yytext); yylval.i=MAX_NPC_SUBTYPES; return NPC_TYPE; }
 npc_artificer { savetoken(yytext); yylval.i=NPC_ARTIFICER; return NPC_TYPE; }
 npc_geologist { savetoken(yytext); yylval.i=NPC_GEOLOGIST; return NPC_TYPE; }
@@ -384,12 +435,19 @@ random_contents { savetoken(yytext); yylval.i=OBJECT_SPECIAL_CREATE_TYPE_RANDOM_
 dungeons_of_doom_tileset { savetoken(yytext); yylval.i=CMAP_NORMAL; return CMAP_TYPE; }
 gnomish_mines_tileset { savetoken(yytext); yylval.i=CMAP_GNOMISH_MINES; return CMAP_TYPE; }
 gehennom_tileset { savetoken(yytext); yylval.i=CMAP_GEHENNOM; return CMAP_TYPE; }
-undead_tileset { savetoken(yytext); yylval.i=CMAP_UNDEAD_STYLE; return CMAP_TYPE; }
+undead_tileset { savetoken(yytext); yylval.i=CMAP_UNDEAD; return CMAP_TYPE; }
 sokoban_tileset { savetoken(yytext); yylval.i=CMAP_SOKOBAN; return CMAP_TYPE; }
 elemental_tileset { savetoken(yytext); yylval.i=CMAP_ELEMENTAL_PLANES; return CMAP_TYPE; }
 astral_tileset { savetoken(yytext); yylval.i=CMAP_ASTRAL; return CMAP_TYPE; }
 gehennom_cavernous_tileset { savetoken(yytext); yylval.i=CMAP_GEHENNOM_CAVERNOUS; return CMAP_TYPE; }
 garden_tileset { savetoken(yytext); yylval.i=CMAP_GARDEN; return CMAP_TYPE; }
+cityscape_tileset { savetoken(yytext); yylval.i=CMAP_CITYSCAPE; return CMAP_TYPE; }
+nest_tileset { savetoken(yytext); yylval.i=CMAP_NEST; return CMAP_TYPE; }
+temple_tileset { savetoken(yytext); yylval.i=CMAP_TEMPLE; return CMAP_TYPE; }
+opulent_tileset { savetoken(yytext); yylval.i=CMAP_OPULENT; return CMAP_TYPE; }
+modron_tileset { savetoken(yytext); yylval.i=CMAP_MODRON; return CMAP_TYPE; }
+reinforced_tileset { savetoken(yytext); yylval.i=CMAP_REINFORCED; return CMAP_TYPE; }
+tower_tileset { savetoken(yytext); yylval.i=CMAP_TOWER; return CMAP_TYPE; }
 floor_normal { savetoken(yytext); yylval.i=FLOOR_SUBTYPE_NORMAL; return FLOOR_SUBTYPE; }
 floor_marble { savetoken(yytext); yylval.i=FLOOR_SUBTYPE_MARBLE; return FLOOR_SUBTYPE; }
 floor_parquet { savetoken(yytext); yylval.i=FLOOR_SUBTYPE_PARQUET; return FLOOR_SUBTYPE; }
@@ -403,6 +461,12 @@ location_floor { savetoken(yytext); yylval.i=ROOM; return FLOOR_TYPE; }
 location_corridor { savetoken(yytext); yylval.i=CORR; return FLOOR_TYPE; }
 location_grass { savetoken(yytext); yylval.i=GRASS; return FLOOR_TYPE; }
 location_ground { savetoken(yytext); yylval.i=GROUND; return FLOOR_TYPE; }
+carpet_red { savetoken(yytext); yylval.i=CARPET_HORIZONTAL_RED; return CARPET_TYPE; }
+carpet_purple { savetoken(yytext); yylval.i=CARPET_VERTICAL_PURPLE; return CARPET_TYPE; }
+carpet_crimson { savetoken(yytext); yylval.i=CARPET_CRIMSON; return CARPET_TYPE; }
+carpet_brown_hide { savetoken(yytext); yylval.i=CARPET_BROWN_ANIMAL_HIDE; return CARPET_TYPE; }
+carpet_modron_spherical_plaque { savetoken(yytext); yylval.i=CARPET_MODRON_SPHERICAL_PLAQUE; return CARPET_TYPE; }
+carpet_yellow { savetoken(yytext); yylval.i=CARPET_YELLOW; return CARPET_TYPE; }
 flaming { savetoken(yytext); yylval.i=FIRE_ENCHANTMENT; return ELEMENTAL_ENCHANTMENT_TYPE; }
 freezing { savetoken(yytext); yylval.i=COLD_ENCHANTMENT; return ELEMENTAL_ENCHANTMENT_TYPE; }
 electrified { savetoken(yytext); yylval.i=LIGHTNING_ENCHANTMENT; return ELEMENTAL_ENCHANTMENT_TYPE; }
@@ -415,6 +479,19 @@ primordial { savetoken(yytext); yylval.i=EXCEPTIONALITY_PRIMORDIAL; return EXCEP
 infernal { savetoken(yytext); yylval.i=EXCEPTIONALITY_INFERNAL; return EXCEPTIONALITY_TYPE; }
 no_mythic_prefix { savetoken(yytext); yylval.i=MYTHIC_PREFIX_NONE; return MYTHIC_PREFIX_TYPE; }
 no_mythic_suffix { savetoken(yytext); yylval.i=MYTHIC_SUFFIX_NONE; return MYTHIC_SUFFIX_TYPE; }
+material_none { savetoken(yytext); yylval.i=MAT_NONE; return MATERIAL_TYPE; }
+material_silver { savetoken(yytext); yylval.i=MAT_SILVER; return MATERIAL_TYPE; }
+material_orichalcum { savetoken(yytext); yylval.i=MAT_ORICHALCUM; return MATERIAL_TYPE; }
+material_mithril { savetoken(yytext); yylval.i=MAT_MITHRIL; return MATERIAL_TYPE; }
+material_adamantium { savetoken(yytext); yylval.i=MAT_ADAMANTIUM; return MATERIAL_TYPE; }
+material_bronze { savetoken(yytext); yylval.i=MAT_BRONZE; return MATERIAL_TYPE; }
+material_bone { savetoken(yytext); yylval.i=MAT_BONE; return MATERIAL_TYPE; }
+material_iron { savetoken(yytext); yylval.i=MAT_IRON; return MATERIAL_TYPE; }
+material_steel { savetoken(yytext); yylval.i=MAT_STEEL; return MATERIAL_TYPE; }
+material_gold { savetoken(yytext); yylval.i=MAT_GOLD; return MATERIAL_TYPE; }
+material_platinum { savetoken(yytext); yylval.i=MAT_PLATINUM; return MATERIAL_TYPE; }
+material_gemstone { savetoken(yytext); yylval.i=MAT_GEMSTONE; return MATERIAL_TYPE; }
+material_hard_crystal { savetoken(yytext); yylval.i=MAT_HARD_CRYSTAL; return MATERIAL_TYPE; }
 region_general { savetoken(yytext); yylval.i=REGION_GENERAL; return SPECIAL_REGION_TYPE; }
 region_special_level_seen { savetoken(yytext); yylval.i=REGION_SPECIAL_LEVEL_SEEN; return SPECIAL_REGION_TYPE; }
 region_special_level_true_nature_revealed { savetoken(yytext); yylval.i=REGION_SPECIAL_LEVEL_TRUE_NATURE_REVEALED; return SPECIAL_REGION_TYPE; }

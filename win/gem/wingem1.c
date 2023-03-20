@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	wingem1.c	$NHDT-Date: 1433806613 2015/06/08 23:36:53 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Christian Bressler 1999 	  */
@@ -3016,7 +3016,7 @@ char *input;
     OBJECT *z_ob = zz_oblist[LINEGET];
     int d_exit, length;
     char *pr[2], *tmp;
-    char promptbuf[BUFSZ] = "";
+    char promptbuf[PBUFSZ] = "";
     //Do not show introline
     if (ques)
         Sprintf(promptbuf, "%s", ques);

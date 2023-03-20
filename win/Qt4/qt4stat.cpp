@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 // Copyright (c) Warwick Allison, 1999.
 // Qt4 conversion copyright (c) Ray Chason, 2012-2014.
@@ -487,11 +487,9 @@ void NetHackQtStatusWindow::updateStats()
 
     if (::flags.time) time.setLabel("Time:",(long)moves);
     else time.setLabel("");
-#ifdef SCORE_ON_BOTL
     if (::flags.showscore) {
 	score.setLabel("Score:",(long)botl_score());
     } else
-#endif
     {
 	score.setLabel("");
     }

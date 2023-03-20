@@ -337,6 +337,12 @@ LibSaveAndRestoreSavedGame(void)
         && !program_state.gameover && !program_state.panicking 
         && !program_state.exiting && !program_state.freeing_dynamic_data)
     {
+#ifdef INSURANCE
+        save_currentstate();
+#endif
+        issue_gui_command(GUI_CMD_WAIT_FOR_RESUME);
+        /* Already in the right state */
+#if 0
         if (dosave0(TRUE))
         {
             issue_gui_command(GUI_CMD_WAIT_FOR_RESUME);
@@ -351,6 +357,7 @@ LibSaveAndRestoreSavedGame(void)
         }
         else
             (void)doredraw();
+#endif
     }
 }
 
@@ -457,6 +464,7 @@ int RunGnollHack(
     DestroyWindowCallback callback_destroy_nhwindow,
     CursCallback callback_curs,
     PutStrExCallback callback_putstr_ex,
+    PutStrEx2Callback callback_putstr_ex2,
     PutMixedCallback callback_putmixed_ex,
     DisplayFileCallback callback_display_file,
     StartMenuCallback callback_start_menu_ex,
@@ -535,9 +543,6 @@ int RunGnollHack(
 
     GetCwdCallback callback_getcwd,
     MessageBoxCallback callback_messagebox,
-    //OutRipBeginCallback callback_outrip_begin,
-    //OutRipEndCallback callback_outrip_end,
-
     FreeMemoryCallback callback_free_memory,
     ReportPlayerNameCallback callback_report_player_name,
     ReportPlayTimeCallback callback_report_play_time,
@@ -611,6 +616,7 @@ int RunGnollHack(
     lib_callbacks.callback_destroy_nhwindow = callback_destroy_nhwindow;
     lib_callbacks.callback_curs = callback_curs;
     lib_callbacks.callback_putstr_ex = callback_putstr_ex;
+    lib_callbacks.callback_putstr_ex2 = callback_putstr_ex2;
     lib_callbacks.callback_putmixed_ex = callback_putmixed_ex;
     lib_callbacks.callback_display_file = callback_display_file;
     lib_callbacks.callback_start_menu_ex = callback_start_menu_ex;

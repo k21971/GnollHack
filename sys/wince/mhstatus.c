@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	mhstatus.c	$NHDT-Date: 1432512798 2015/05/25 00:13:18 $  $NHDT-Branch: master $:$NHDT-Revision: 1.17 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -224,10 +224,8 @@ FormatStatusString(char *text, int format)
             (u.ualign.type == A_CHAOTIC)
                 ? "  Chaotic"
                 : (u.ualign.type == A_NEUTRAL) ? "  Neutral" : "  Lawful");
-#ifdef SCORE_ON_BOTL
     if (flags.showscore)
         Sprintf(nb = eos(nb), " S:%ld", botl_score());
-#endif
     if (format == NHSTAT_LINES_4 || format == NHSTAT_LINES_2)
         strcat(text, "\r\n");
 

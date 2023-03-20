@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	winami.c	$NHDT-Date: 1501981093 2017/08/06 00:58:13 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993,1996.
@@ -34,7 +34,7 @@ struct window_procs amii_procs = {
     amii_player_selection, amii_askname, amii_get_nh_event,
     amii_exit_nhwindows, amii_suspend_nhwindows, amii_resume_nhwindows,
     amii_create_nhwindow_ex, amii_clear_nhwindow, amii_display_nhwindow,
-    amii_destroy_nhwindow, amii_curs, amii_putstr_ex, genl_putmixed_ex,
+    amii_destroy_nhwindow, amii_curs, amii_putstr_ex, amii_putstr_ex2, genl_putmixed_ex,
     amii_display_file, amii_start_menu_ex, amii_add_menu, amii_add_extended_menu, amii_end_menu_ex,
     amii_select_menu, genl_message_menu, amii_update_inventory,
     amii_mark_synch, amii_wait_synch,
@@ -82,7 +82,7 @@ struct window_procs amiv_procs = {
     amii_player_selection, amii_askname, amii_get_nh_event,
     amii_exit_nhwindows, amii_suspend_nhwindows, amii_resume_nhwindows,
     amii_create_nhwindow_ex, amii_clear_nhwindow, amii_display_nhwindow,
-    amii_destroy_nhwindow, amii_curs, amii_putstr_ex, genl_putmixed_ex,
+    amii_destroy_nhwindow, amii_curs, amii_putstr_ex, amii_putstr_ex2, genl_putmixed_ex,
     amii_display_file, amii_start_menu_ex, amii_add_menu, amii_add_extended_menu, amii_end_menu_ex,
     amii_select_menu, genl_message_menu, amii_update_inventory,
     amii_mark_synch, amii_wait_synch,

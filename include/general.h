@@ -134,6 +134,9 @@ struct replacement_info {
     struct obj* object;
     struct monst* monster;
     unsigned long layer_flags;
+    unsigned long missile_flags;
+    unsigned char missile_material;
+    short missile_special_quality;
 };
 
 struct skill_menu_info
@@ -184,6 +187,8 @@ struct extended_menu_info {
     struct monst* monster;
     char heading_for_group_accelerator;
     int color;
+    const char* attrs;
+    const char* colors;
     int style; /* Generic style or subtype; used in menu data */
     char special_mark;
     unsigned long menu_flags;
@@ -217,45 +222,50 @@ struct extended_create_window_info {
 
 enum obj_material_types {
     MAT_NONE = 0,
-    MAT_LIQUID = 1, /* currently only for venom */  /* Organics start here */
-    MAT_OIL = 2, /* flammable liquid */
-    MAT_WAX = 3,
-    MAT_VEGGY = 4, /* foodstuffs */
-    MAT_FLESH = 5, /*   ditto    */
-    MAT_ORGANIC = 6, /* non-veggy, non-flesh organic material, e.g. bat guano, feathers */
-    MAT_PAPER = 7,
-    MAT_CLOTH = 8,
-    MAT_SILK = 9,
-    MAT_LEATHER = 10, /* Flimsy materials stop here */
-    MAT_WOOD = 11, /* Organics stop here */
-    MAT_BONE = 12,
-    MAT_CHITIN = 13, /* Chitin in insects' exoskeleton, or keratin in nails and horns */
-    MAT_IVORY = 14, /* Worm tooth, ivory, etc. Hard bone-like materials stop here */
-    MAT_DRAGON_HIDE = 15, /* not leather! */
-    MAT_IRON = 16, /* Fe - includes steel */
-    MAT_METAL = 17, /* Sn, &c. */
-    MAT_COPPER = 18, /* Cu - includes brass */
-    MAT_SILVER = 19, /* Ag */
-    MAT_GOLD = 20, /* Au */
-    MAT_PLATINUM = 21, /* Pt */
-    MAT_ORICHALCUM = 22,
-    MAT_ADAMANTIUM = 23,
-    MAT_MITHRIL = 24,
-    MAT_PLASTIC = 25,
-    MAT_GLASS = 26,
-    MAT_CRYSTAL = 27, //Brittle like glass
-    MAT_HARD_CRYSTAL = 28, //Strong like gemstone
-    MAT_GEMSTONE = 29,
-    MAT_MINERAL = 30,
-    MAT_MODRONITE = 31,
-    MAT_PLANARRIFT = 32,
-    MAT_FORCEFIELD = 33,
-    MAT_AIR = 34,
-    MAT_FIRE = 35,
-    MAT_ENERGY = 36,
-    MAT_INCORPOREAL = 37,
-    MAT_ICE = 38,
-    MAT_SOIL = 39,
+    MAT_LIQUID, /* currently only for venom */  /* Organics start here */
+    MAT_OIL, /* flammable liquid */
+    MAT_WAX,
+    MAT_VEGGY, /* foodstuffs */
+    MAT_FLESH, /*   ditto    */
+    MAT_ORGANIC, /* non-veggy, non-flesh organic material, e.g. bat guano, feathers */
+    MAT_PAPER,
+    MAT_CLOTH,
+    MAT_COTTON,
+    MAT_SILK,
+    MAT_LEATHER, /* Flimsy materials stop here */
+    MAT_WOOD, /* Organics stop here */
+    MAT_BONE,
+    MAT_CHITIN, /* Chitin in insects' exoskeleton, or keratin in nails and horns */
+    MAT_TOOTH, /* Worm tooth, ivory, etc. Hard bone-like materials stop here */
+    MAT_DRAGON_HIDE, /* not leather! */
+    MAT_IRON, /* Fe */
+    MAT_STEEL, /* Alloy of Fe and C (carbon)  */
+    MAT_METAL, /* Sn, &c. */
+    MAT_LEAD, /* Pb */
+    MAT_COPPER, /* Cu */
+    MAT_BRASS, /* Alloy of Cu and Zn (zinc) */
+    MAT_BRONZE, /* Alloy of Cu and Sn (tin) */
+    MAT_SILVER, /* Ag */
+    MAT_GOLD, /* Au */
+    MAT_PLATINUM, /* Pt */
+    MAT_ORICHALCUM,
+    MAT_ADAMANTIUM,
+    MAT_MITHRIL,
+    MAT_PLASTIC,
+    MAT_GLASS,
+    MAT_CRYSTAL, /* Brittle like glass */
+    MAT_HARD_CRYSTAL, /* Strong like gemstone */
+    MAT_GEMSTONE,
+    MAT_MINERAL, /* Stone */
+    MAT_MODRONITE,
+    MAT_PLANARRIFT,
+    MAT_FORCEFIELD,
+    MAT_AIR,
+    MAT_FIRE,
+    MAT_ENERGY,
+    MAT_INCORPOREAL,
+    MAT_ICE,
+    MAT_SOIL,
     MAX_MATERIAL_TYPES
 };
 
@@ -339,9 +349,91 @@ enum special_level_naming_types {
 
 enum simple_doodad_tile_types
 {
-    DOODAD_STALAGMITE = 0,
+    DOODAD_TORCH_HOLDER = 0,
+    DOODAD_TORCH_HOLDER_LEFT,
+    DOODAD_TORCH_HOLDER_RIGHT,
+    DOODAD_TORCH_HOLDER_BOTTOM,
+    DOODAD_LANTERN_HOLDER,
+    DOODAD_LANTERN_HOLDER_LEFT,
+    DOODAD_LANTERN_HOLDER_RIGHT,
+    DOODAD_LANTERN_HOLDER_BOTTOM,
+    DOODAD_FIREPLACE,
+    DOODAD_FIREPLACE_LEFT,
+    DOODAD_FIREPLACE_RIGHT,
+    DOODAD_CARPET_RED_HORIZONTAL_TLCORN,
+    DOODAD_CARPET_RED_HORIZONTAL_BLCORN,
+    DOODAD_CARPET_RED_HORIZONTAL_TRCORN,
+    DOODAD_CARPET_RED_HORIZONTAL_BRCORN,
+    DOODAD_CARPET_RED_HORIZONTAL_LEFT,
+    DOODAD_CARPET_RED_HORIZONTAL_RIGHT,
+    DOODAD_CARPET_RED_HORIZONTAL_TOP,
+    DOODAD_CARPET_RED_HORIZONTAL_BOTTOM,
+    DOODAD_CARPET_RED_HORIZONTAL_MIDDLE,
+    DOODAD_CARPET_PURPLE_VERTICAL_TLCORN,
+    DOODAD_CARPET_PURPLE_VERTICAL_BLCORN,
+    DOODAD_CARPET_PURPLE_VERTICAL_TRCORN,
+    DOODAD_CARPET_PURPLE_VERTICAL_BRCORN,
+    DOODAD_CARPET_PURPLE_VERTICAL_LEFT,
+    DOODAD_CARPET_PURPLE_VERTICAL_RIGHT,
+    DOODAD_CARPET_PURPLE_VERTICAL_TOP,
+    DOODAD_CARPET_PURPLE_VERTICAL_BOTTOM,
+    DOODAD_CARPET_PURPLE_VERTICAL_MIDDLE,
+    DOODAD_PAINTING_HOLDER,
+    DOODAD_GARGOYLE_STATUE_NICHE,
+    DOODAD_GARGOYLE_STATUE_NICHE_LEFT,
+    DOODAD_GARGOYLE_STATUE_NICHE_RIGHT,
+    DOODAD_KNIGHT_STATUE_NICHE,
+    DOODAD_KNIGHT_STATUE_NICHE_LEFT,
+    DOODAD_KNIGHT_STATUE_NICHE_RIGHT,
+    DOODAD_EQUIPMENT_HOLDER,
+    DOODAD_EQUIPMENT_HOLDER_LEFT,
+    DOODAD_EQUIPMENT_HOLDER_RIGHT,
+    DOODAD_BANNER_HOLDER,
+    DOODAD_BANNER_HOLDER_LEFT,
+    DOODAD_BANNER_HOLDER_RIGHT,
+    DOODAD_BANNER_HOLDER_BOTTOM,
+    DOODAD_PRIEST_STATUE_NICHE,
+    DOODAD_PRIEST_STATUE_NICHE_LEFT,
+    DOODAD_PRIEST_STATUE_NICHE_RIGHT,
+    DOODAD_WALL_SCULPTURE,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_TLCORN,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_BLCORN,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_TRCORN,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_BRCORN,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_LEFT,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_RIGHT,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_TOP,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_BOTTOM,
+    DOODAD_CARPET_BROWN_ANIMAL_HIDE_MIDDLE,
+    DOODAD_CARPET_CRIMSON_TLCORN,
+    DOODAD_CARPET_CRIMSON_BLCORN,
+    DOODAD_CARPET_CRIMSON_TRCORN,
+    DOODAD_CARPET_CRIMSON_BRCORN,
+    DOODAD_CARPET_CRIMSON_LEFT,
+    DOODAD_CARPET_CRIMSON_RIGHT,
+    DOODAD_CARPET_CRIMSON_TOP,
+    DOODAD_CARPET_CRIMSON_BOTTOM,
+    DOODAD_CARPET_CRIMSON_MIDDLE,
+    DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_TLCORN,
+    DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_BLCORN,
+    DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_TRCORN,
+    DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_BRCORN,
+    DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_TOP,
+    DOODAD_CARPET_MODRON_SPHERICAL_PLAQUE_BOTTOM,
+    DOODAD_CARPET_YELLOW_TLCORN,
+    DOODAD_CARPET_YELLOW_BLCORN,
+    DOODAD_CARPET_YELLOW_TRCORN,
+    DOODAD_CARPET_YELLOW_BRCORN,
+    DOODAD_CARPET_YELLOW_LEFT,
+    DOODAD_CARPET_YELLOW_RIGHT,
+    DOODAD_CARPET_YELLOW_TOP,
+    DOODAD_CARPET_YELLOW_BOTTOM,
+    DOODAD_CARPET_YELLOW_MIDDLE,
     MAX_SIMPLE_DOODAD_TILES
 };
+
+
+#define NUM_DOODAD_DIRECTIONS 4
 
 enum mirrorable_doodad_tile_types
 {
@@ -723,6 +815,9 @@ enum context_menu_styles {
 #define MKOBJ_FLAGS_OWNER_IS_CHAOTIC                   0x00000800
 #define MKOBJ_FLAGS_OWNER_IS_NONALIGNED                0x00001000
 #define MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS       0x00002000
+#define MKOBJ_FLAGS_FORCE_BASE_MATERIAL                0x00004000
+#define MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY           0x00008000
+#define MKOBJ_FLAGS_PARAM_IS_MNUM                      0x00010000
 
 #define MONDIED_FLAGS_NONE                             0x00000000
 #define MONDIED_FLAGS_NO_DEATH_ACTION                  0x00000001
@@ -732,11 +827,7 @@ enum context_menu_styles {
 #define ANGRY(mon) (!NOTANGRY(mon))
 #define IS_SHOP(x) (rooms[x].rtype >= SHOPBASE)
 
-
-/* Turn on score on botl everywhere */
-#define SCORE_ON_BOTL
-
-/* Demo version */
+/* Special effect in GUI upon reaching a certain level */
 #define GUI_SPECIAL_EFFECT_LEVEL_DEPTH_THRESHOLD 10
 
 /* Basic tile information */
@@ -831,6 +922,7 @@ enum yn_function_styles {
 #define WERE_SUMMON_MANA_COST 10
 #define MIND_BLAST_MANA_COST 10
 #define UNICORN_HORN_MANA_COST 25
+#define TELEPORT_AT_WILL_MANA_COST 15
 
 /* Minimum dungeon levels for traps */
 #define MINIMUM_DGN_LEVEL_MEDIUM_LEVEL  2

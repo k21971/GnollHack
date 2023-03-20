@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    pager.c    $NHDT-Date: 1555627307 2019/04/18 22:41:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.151 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,6 +22,7 @@ STATIC_DCL void FDECL(checkfile, (char *, struct permonst *,
 STATIC_DCL void FDECL(look_all, (BOOLEAN_P,BOOLEAN_P));
 STATIC_DCL void FDECL(do_supplemental_info, (char *, struct permonst *,
                                              BOOLEAN_P));
+STATIC_DCL void FDECL(print_decoration_ending, (char*, int, int));
 STATIC_DCL void NDECL(whatdoes_help);
 STATIC_DCL void NDECL(docontact);
 STATIC_DCL void NDECL(dispfile_help);
@@ -427,6 +428,39 @@ int x, y;
     } /* monbuf is non-null */
 }
 
+STATIC_OVL
+void print_decoration_ending(buf, x, y)
+char* buf;
+int x, y;
+{
+    if (levl[x][y].decoration_typ > 0 && (decoration_type_definitions[levl[x][y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_ADD_OTHER_ITEM_DESCRIPTIONS) != 0)
+    {
+        const char* dec2 = 0;
+        const char* dec3 = 0;
+        if (decoration_type_definitions[levl[x][y].decoration_typ].lootable_item2 != STRANGE_OBJECT && (levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM2_IN_HOLDER) != 0)
+        {
+            dec2 = OBJ_NAME(objects[decoration_type_definitions[levl[x][y].decoration_typ].lootable_item2]);
+        }
+        if (decoration_type_definitions[levl[x][y].decoration_typ].lootable_item3 != STRANGE_OBJECT && (levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM3_IN_HOLDER) != 0)
+        {
+            dec3 = OBJ_NAME(objects[decoration_type_definitions[levl[x][y].decoration_typ].lootable_item3]);
+        }
+        boolean same_item = dec2 && dec3 && !strcmp(dec2, dec3);
+        if (same_item)
+        {
+            Sprintf(eos(buf), " with two %s", makeplural(dec2));
+        }
+        else if (dec2 && dec3)
+        {
+            Sprintf(eos(buf), " with %s and %s", an(dec2), an(dec3));
+        }
+        else if (dec2 || dec3)
+        {
+            Sprintf(eos(buf), " with %s", an(dec2 ? dec2 : dec3));
+        }
+    }
+}
+
 /*
  * Return the name of the glyph found at (x,y).
  * If not hallucinating and the glyph is a monster, also monster data.
@@ -634,16 +668,42 @@ char *buf, *monbuf;
             if (!explanation)
                 explanation = get_cmap_or_cmap_variation_glyph_explanation(glyph);
 
-            strcpy(buf, explanation); // defsyms[cmap].explanation);
+            const char* dec_descr = 0;
+            const char* carpet_descr = 0;
+            if (explanation && *explanation)
+            {
+                carpet_descr = get_carpet_description(x, y);
+                dec_descr = get_decoration_description(x, y);
+                if (dec_descr && *dec_descr && carpet_descr && *carpet_descr)
+                    Sprintf(buf, "%s on %s", dec_descr, an(carpet_descr));
+                else if (dec_descr && *dec_descr)
+                {
+                    char dbuf[BUFSZ];
+                    Strcpy(dbuf, dec_descr);
+                    print_decoration_ending(dbuf, x, y);
+                    Sprintf(buf, "%s on %s", dbuf, an(explanation));
+                }
+                else if (carpet_descr && *carpet_descr && strstr(explanation, "floor"))
+                    Sprintf(buf, "%s on %s", carpet_descr, an(explanation));
+                else
+                    Strcpy(buf, explanation); // defsyms[cmap].explanation);
+            }
+
             if (is_cmap_door(gl) && IS_DOOR(levl[x][y].typ))
             {
                 print_lock_with_buf(eos(buf), levl[x][y].key_otyp, levl[x][y].special_quality, is_door_normally_without_lock_at(x, y));
             }
-            if (is_cmap_brazier(gl) && IS_BRAZIER(levl[x][y].typ) && cansee(x, y))
+            if ((
+                (is_cmap_brazier(gl) && IS_BRAZIER(levl[x][y].typ)) || 
+                    (dec_descr && levl[x][y].decoration_typ > 0 
+                        && (decoration_type_definitions[levl[x][y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_LIGHTABLE) != 0
+                        && ((decoration_type_definitions[levl[x][y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_LOOTABLE) == 0 || (levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0)
+                    )
+                ) && cansee(x, y))
             {
                 char buf2[BUFSIZ];
                 Sprintf(buf2, "%s%s", levl[x][y].lamplit ? "lit " : "unlit ", buf);
-                strcpy(buf, buf2);
+                Strcpy(buf, buf2);
             }
             break;
         }
@@ -964,6 +1024,7 @@ struct permonst **for_supplement;
     static const char mon_interior[] = "the interior of a monster",
                       unreconnoitered[] = "unreconnoitered";
     static char look_buf[BUFSZ];
+    static char x_buf[BUFSZ] = "";
     char prefix[BUFSZ];
     int i, alt_i, glyph = NO_GLYPH,
         skipped_venom = 0, found = 0; /* count of matching syms found */
@@ -1155,8 +1216,45 @@ struct permonst **for_supplement;
             if (alt_i++ == 2)
                 i = 0; /* undo loop increment */
             
-            x_str = i == S_fountain ? get_fountain_name(cc.x, cc.y) : defsyms[i].explanation;
-            
+            if (i == S_fountain)
+                x_str = get_fountain_name(cc.x, cc.y);
+            else
+            {
+                x_str = defsyms[i].explanation;
+                if (defsyms[i].explanation && *defsyms[i].explanation)
+                {
+                    static char decoration_buf[BUFSZ] = "";
+                    const char* dec_descr = get_decoration_description(cc.x, cc.y);
+                    const char* carpet_descr = get_carpet_description(cc.x, cc.y);
+                    if (dec_descr && *dec_descr)
+                    {
+                        if(carpet_descr && *carpet_descr)
+                            Sprintf(decoration_buf, "%s on %s", dec_descr, an(carpet_descr));
+                        else
+                        {
+                            char dbuf[BUFSZ];
+                            Strcpy(dbuf, dec_descr);
+                            print_decoration_ending(dbuf, cc.x, cc.y);
+                            Sprintf(decoration_buf, "%s on %s", dbuf, an(defsyms[i].explanation));
+                        }
+                        if ((levl[cc.x][cc.y].decoration_typ > 0
+                            && (decoration_type_definitions[levl[cc.x][cc.y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_LIGHTABLE) != 0
+                            && ((decoration_type_definitions[levl[cc.x][cc.y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_LOOTABLE) == 0 || (levl[cc.x][cc.y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0)
+                            ) && cansee(cc.x, cc.y))
+                        {
+                            char buf2[BUFSIZ];
+                            Sprintf(buf2, "%s%s", levl[cc.x][cc.y].lamplit ? "lit " : "unlit ", decoration_buf);
+                            Strcpy(decoration_buf, buf2);
+                        }
+                        x_str = decoration_buf;
+                    }
+                    else if (carpet_descr && *carpet_descr && strstr(defsyms[i].explanation, "floor"))
+                    {
+                        Sprintf(decoration_buf, "%s on %s", carpet_descr, an(defsyms[i].explanation));
+                        x_str = decoration_buf;
+                    }
+                }
+            }
             if (submerged && !strcmp(x_str, defsyms[0].explanation))
                 x_str = "land"; /* replace "dark part of a room" */
             /* alt_i is now 3 or more and no longer of interest */
@@ -1188,8 +1286,9 @@ struct permonst **for_supplement;
                             article == 2 ? the(x_str)
                             : article == 1 ? an(x_str) : x_str);
                 }
-                *firstmatch = article == 2 ? the(x_str)
-                    : article == 1 ? an(x_str) : x_str;
+                Strcpy(x_buf, article == 2 ? the(x_str)
+                    : article == 1 ? an(x_str) : x_str);
+                *firstmatch = x_buf;
                 found++;
             } 
             else if (!(hit_trap && is_cmap_trap(i))

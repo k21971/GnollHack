@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mhitu.c    $NHDT-Date: 1556649298 2019/04/30 18:34:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1149,7 +1149,7 @@ register struct monst *mtmp;
                             if ((!rn2(2) || is_silenced(mtmp))
                                 && (m_carrying(mtmp, TRIPLE_HEADED_FLAIL) 
                                     || m_carrying(mtmp, DOUBLE_HEADED_FLAIL) || m_carrying(mtmp, FLAIL)
-                                    || m_carrying(mtmp, SILVER_FLAIL) || m_carrying(mtmp, RUNED_FLAIL)))
+                                    || m_carrying(mtmp, RUNED_FLAIL)))
                                 pline("%s swings his flail commandingly.", Monnam(mtmp));
                             else if (!Deaf)
                             {
@@ -1528,10 +1528,11 @@ struct monst *mon;
         if (worn)
         {
             /* MC always from worn */
+            int basemc = get_object_base_mc(o);
             if (objects[o->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_MC)
-                item_mc_bonus += objects[o->otyp].oc_magic_cancellation;
+                item_mc_bonus += basemc;
             else
-                item_mc_bonus += max(0, objects[o->otyp].oc_magic_cancellation - greatest_erosion(o) / 3);
+                item_mc_bonus += max(0, basemc - greatest_erosion(o) / 3);
 
             if (o->oclass == ARMOR_CLASS || o->oclass == MISCELLANEOUS_CLASS || (objects[o->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(o) || (objects[o->otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC))
                 item_mc_bonus += o->enchantment / 3;
@@ -1966,7 +1967,7 @@ register struct obj* omonwep;
                 }
 
                 boolean silvermsg = FALSE;
-                if (objects[otmp->otyp].oc_material == MAT_SILVER && Hate_silver)
+                if (otmp->material == MAT_SILVER && Hate_silver)
                 {
                     damage += adjust_damage(rnd(20), mtmp, &youmonst, objects[otmp->otyp].oc_damagetype, ADFLAGS_NONE);
                     silvermsg = TRUE;
@@ -2014,9 +2015,7 @@ register struct obj* omonwep;
                 /* this redundancy necessary because you have
                    to take the damage _before_ being cloned;
                    need to have at least 2 hp left to split */
-                if (!isinstakilled && (double)u.mh + (((double)u.mh_fraction)/10000) - damage >= 2 && (objects[otmp->otyp].oc_material == MAT_IRON
-                    /* relevant 'metal' objects are scalpel and tsurugi */
-                    || objects[otmp->otyp].oc_material == MAT_METAL)
+                if (!isinstakilled && (double)u.mh + (((double)u.mh_fraction)/10000) - damage >= 2 && is_metallic(otmp) /* relevant 'metal' objects are scalpel and tsurugi */
                     && (u.umonnum >= 0 && does_split_upon_hit(&mons[u.umonnum])))
                 {
                     if (damage > 1)
@@ -2331,8 +2330,7 @@ register struct obj* omonwep;
         {
             if (uarmf) 
             {
-                if (rn2(2) && (uarmf->otyp == LOW_BOOTS
-                               || uarmf->otyp == IRON_SHOES)) 
+                if (rn2(2) && (uarmf->otyp == LOW_BOOTS || uarmf->otyp == SHOES)) 
                 {
                     pline("%s pricks the exposed part of your %s %s for %d damage!",
                           Monst_name, sidestr, leg, damagedealt);
@@ -2702,7 +2700,10 @@ register struct obj* omonwep;
                 if (!rn2(7)) 
                 {
                     /* no upper limit necessary; effect is temporary */
-                    u.basemhmax++;
+                    if(u.basemhdrain < 0)
+                        u.basemhdrain++;
+                    else
+                        u.basemhmax++;
                     if (!rn2(13))
                         goaway = TRUE;
                 }
@@ -2716,7 +2717,9 @@ register struct obj* omonwep;
                 if (!rn2(7))
                 {
                     /* hard upper limit via nurse care: 25 * ulevel */
-                    if (u.uhpmax < 5 * u.ulevel + d(2 * u.ulevel, 10))
+                    if(u.ubasehpdrain < 0)
+                        u.ubasehpdrain++;
+                    else if (u.uhpmax < 5 * u.ulevel + d(2 * u.ulevel, 10))
                         u.ubasehpmax++;
                     if (!rn2(13))
                         goaway = TRUE;
@@ -2917,7 +2920,7 @@ register struct obj* omonwep;
             play_sfx_sound(SFX_LUCKILY_ITS_TOUCH_DID_NOT_WORK);
             if (Death_resistance)
                 u_shieldeff();
-            pline("Lucky for you, it didn't work!");
+            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "Lucky for you, it didn't work!");
             damage = 0;
             break;
         }
@@ -3116,7 +3119,7 @@ register struct obj* omonwep;
     {
         if (permdmg > 0) 
         { /* Death's life force drain */
-            int lowerlimit, * hpmax_p;
+            int *hpdrain_p;
             /*
              * Apply some of the damage to permanent hit points:
              *  polymorphed         100% against poly'd hpmax
@@ -3135,18 +3138,12 @@ register struct obj* omonwep;
                 permdmg += (int)ceil(damage / 4);
 
             if (Upolyd) {
-                hpmax_p = &u.basemhmax;
-                /* [can't use youmonst.m_lev] */
-                lowerlimit = min((int)youmonst.data->mlevel, u.ulevel);
+                hpdrain_p = &u.basemhdrain;
             }
             else {
-                hpmax_p = &u.ubasehpmax;
-                lowerlimit = u.ulevel;
+                hpdrain_p = &u.ubasehpdrain;
             }
-            if (*hpmax_p - permdmg > lowerlimit)
-                * hpmax_p -= permdmg;
-            else if (*hpmax_p > lowerlimit)
-                * hpmax_p = lowerlimit;
+            *hpdrain_p -= permdmg;
 
             updatemaxhp();
             if (Upolyd)
@@ -3171,14 +3168,14 @@ register struct obj* omonwep;
         {
             if (Upolyd)
             {
-                u.basemhmax -= permdmg2;
+                u.basemhdrain -= permdmg2;
                 updatemaxhp();
                 if (u.mh > u.mhmax)
                     u.mh = u.mhmax;
             }
             else
             {
-                u.ubasehpmax -= permdmg2;
+                u.ubasehpdrain -= permdmg2;
                 updatemaxhp();
                 if (u.uhp > u.uhpmax)
                     u.uhp = u.uhpmax;
@@ -4361,7 +4358,7 @@ struct monst *mon;
             play_sfx_sound(SFX_LOSE_ENERGY);
             You_feel("drained of energy.");
             u.uen = 0;
-            u.ubaseenmax -= rnd(Half_physical_damage ? 5 : 10);
+            u.ubaseendrain -= rnd(Half_physical_damage ? 5 : 10);
             updatemaxen();
             exercise(A_CON, FALSE);
             if (u.uenmax < 0)
@@ -4411,7 +4408,8 @@ struct monst *mon;
         case 0:
             You_feel("raised to your full potential.");
             exercise(A_CON, TRUE);
-            u.uen = (u.ubaseenmax += rnd(5));
+            u.ubaseenmax += rnd(5);
+            u.uen = u.ubaseenmax;
             updatemaxen();
             break;
         case 1:
@@ -4828,6 +4826,7 @@ cloneu()
     mon->m_lev = youmonst.data->mlevel;
     //mon might need mbasehpmax stat
     mon->mbasehpmax = u.basemhmax;
+    mon->mbasehpdrain = u.basemhdrain;
     update_mon_maxhp(mon);
     mon->mhp = u.mh / 2;
     u.mh -= mon->mhp;

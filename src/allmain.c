@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    allmain.c    $NHDT-Date: 1555552624 2019/04/18 01:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.100 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -156,8 +156,9 @@ boolean resuming;
                     /* occasionally add another monster; since this takes
                        place after movement has been allotted, the new
                        monster effectively loses its first turn */
-                    if (!rn2(u.uevent.udemigod ? 25
-                        : (depth(&u.uz) > depth(&stronghold_level)) ? 50
+                    if (!rn2(u.uevent.invoked && !In_endgame(&u.uz) ? 15 /* More monsters after invocation, since there is no mysterious force */
+                        : u.uevent.udemigod ? 25 /* If killed the wizard */
+                        : Inhell ? 50
                         : 70))
                     {
                         create_monster_or_encounter();
@@ -245,7 +246,7 @@ boolean resuming;
 
                     if (!u.uinvulnerable) 
                     {
-                        if (Teleportation && !rn2(85))
+                        if (Teleportation && (!Teleport_control || Stunned || Confusion) && !rn2(85))
                         {
                             xchar old_ux = u.ux, old_uy = u.uy;
 
@@ -1404,9 +1405,6 @@ newgame()
     /* Change to intro music */
     update_game_music();
 
-    /* Mark game as started; check special room plays intro here */
-    context.game_started = TRUE;
-
     docrt();
     status_reassess();
 
@@ -1417,8 +1415,11 @@ newgame()
         issue_gui_command(GUI_CMD_UNLOAD_INTRO_SOUND_BANK);
     }
 
+    /* Game is starting now */
+    context.game_started = TRUE;
     urealtime.realtime = 0L;
     urealtime.start_timing = getnow();
+
 #ifdef INSURANCE
     save_currentstate();
 #endif

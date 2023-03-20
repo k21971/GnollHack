@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0	wingem.h	$NHDT-Date: 1433806582 2015/06/08 23:36:22 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /* Copyright (c) Christian Bressler, 1999				  */
@@ -71,6 +71,7 @@ E void FDECL(Gem_dismiss_nhwindow, (winid));
 E void FDECL(Gem_destroy_nhwindow, (winid));
 E void FDECL(Gem_curs, (winid, int, int));
 E void FDECL(Gem_putstr_ex, (winid, int, const char *, int, int));
+E void FDECL(Gem_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 E void FDECL(Gem_display_file, (const char *, BOOLEAN_P));
 E void FDECL(Gem_start_menu_ex, (winid, int));
 E void FDECL(Gem_add_menu, (winid, int, const ANY_P *, CHAR_P, CHAR_P, int,

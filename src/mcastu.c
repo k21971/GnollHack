@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    mcastu.c    $NHDT-Date: 1436753517 2015/07/13 02:11:57 $  $NHDT-Branch: master $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -274,9 +274,10 @@ boolean foundyou;
     boolean next2u = (distmin(u.ux, u.uy, mtmp->mx, mtmp->my) <= 1);
     boolean show_action_tile = (next2u || !nodirspell);
 
+    play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_CAST);
     if(show_action_tile)
         update_m_action(mtmp, action);
-    play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_CAST);
+    play_sfx_sound_at_location(SFX_GENERIC_CAST_EFFECT, mtmp->mx, mtmp->my);
     if (show_action_tile)
         m_wait_until_action();
 
@@ -506,10 +507,10 @@ struct monst *mtmp;
 double damage;
 int spellnum;
 {
-    if (damage == 0 && !is_undirected_spell(AD_SPEL, spellnum)) {
-        impossible("cast directed wizard spell (%d) with damage=0?", spellnum);
-        return;
-    }
+    //if (damage == 0 && !is_undirected_spell(AD_SPEL, spellnum)) {
+    //    impossible("cast directed wizard spell (%d) with damage=0?", spellnum);
+    //    return;
+    //}
     enum hit_tile_types hit_tile = HIT_GENERAL;
     switch (spellnum) 
     {
@@ -539,7 +540,7 @@ int spellnum;
             play_sfx_sound(SFX_LUCKILY_ITS_TOUCH_DID_NOT_WORK);
             //if (Antimagic || magic_resistance_success)
             //    u_shieldeff();
-            pline("Lucky for you, it didn't work!");
+            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "Lucky for you, it didn't work!");
         }
         damage = 0;
         break;
@@ -569,7 +570,7 @@ int spellnum;
             play_voice_wizard_of_yendor_simple_line(mtmp,
                 count > 1 ? WIZARD_OF_YENDOR_LINE_DESTROY_THE_THIEF_MY_PETS :
                 WIZARD_OF_YENDOR_LINE_DESTROY_THE_THIEF_MY_PET);
-            verbalize("Destroy the thief, my pet%s!", plur(count));
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Destroy the thief, my pet%s!", plur(count));
             if(canseemon(mtmp))
                 talkeff(mtmp->mx, mtmp->my);
         }
@@ -604,7 +605,7 @@ int spellnum;
             play_voice_wizard_of_yendor_simple_line(mtmp,
                 count > 1 ? WIZARD_OF_YENDOR_LINE_DESTROY_THE_THIEF_MY_PETS :
                 WIZARD_OF_YENDOR_LINE_DESTROY_THE_THIEF_MY_PET);
-            verbalize("Destroy the thief, my pet%s!", plur(count));
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Destroy the thief, my pet%s!", plur(count));
             if (canseemon(mtmp))
                 talkeff(mtmp->mx, mtmp->my);
         }
@@ -774,10 +775,10 @@ int spellnum;
     if (!mtmp)
         return;
 
-    if (damage == 0 && !is_undirected_spell(AD_CLRC, spellnum)) {
-        impossible("cast directed cleric spell (%d) with damage=0?", spellnum);
-        return;
-    }
+    //if (damage == 0 && !is_undirected_spell(AD_CLRC, spellnum)) {
+    //    impossible("cast directed cleric spell (%d) with damage=0?", spellnum);
+    //    return;
+    //}
 
     enum hit_tile_types hit_tile = HIT_GENERAL;
 
@@ -806,7 +807,7 @@ int spellnum;
         else
         {
             play_sfx_sound(SFX_LUCKILY_ITS_TOUCH_DID_NOT_WORK);
-            pline("Lucky for you, it didn't work!");
+            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "Lucky for you, it didn't work!");
         }
         damage = 0;
         break;

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    youprop.h    $NHDT-Date: 1433291407 2015/06/03 00:30:07 $  $NHDT-Branch: master $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -277,6 +277,14 @@
 #define HLaughing u.uprops[LAUGHING].intrinsic
 #define ELaughing u.uprops[LAUGHING].extrinsic
 #define Laughing (HLaughing || ELaughing)
+
+#define HTottering u.uprops[TOTTERING].intrinsic
+#define ETottering u.uprops[TOTTERING].extrinsic
+#define Tottering (HTottering || ETottering)
+
+#define HMartial_prowess u.uprops[MARTIAL_PROWESS].intrinsic
+#define EMartial_prowess u.uprops[MARTIAL_PROWESS].extrinsic
+#define Martial_prowess (HMartial_prowess || EMartial_prowess)
 
 #define HOddIdeas u.uprops[ODD_IDEAS].intrinsic
 #define EOddIdeas u.uprops[ODD_IDEAS].extrinsic

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-28 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    invent.c    $NHDT-Date: 1555196229 2019/04/13 22:57:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.253 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -69,7 +69,7 @@ struct obj *obj;
        set; it is similar to sortpack's inv_order but items most
        likely to be picked up are moved to the front */
     static char def_srt_order[MAX_OBJECT_CLASSES] = {
-        COIN_CLASS, AMULET_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
+        COIN_CLASS, AMULET_CLASS, ART_CLASS, MISCELLANEOUS_CLASS, RING_CLASS, WAND_CLASS, POTION_CLASS,
         SCROLL_CLASS, SPBOOK_CLASS, GEM_CLASS, FOOD_CLASS, REAGENT_CLASS, TOOL_CLASS,
         WEAPON_CLASS, ARMOR_CLASS, ROCK_CLASS, BALL_CLASS, CHAIN_CLASS, 0,
     };
@@ -197,7 +197,7 @@ struct obj *obj;
          *  7) discovered gray stones ("touchstone"),
          *  8) seen rocks ("rock").
          */
-        switch (objects[obj->otyp].oc_material) {
+        switch (obj->material) {
         case MAT_HARD_CRYSTAL:
         case MAT_GEMSTONE:
             k = !seen ? 1 : !discovered ? 2 : 3;
@@ -853,13 +853,13 @@ struct obj *obj;
                 delay_output_milliseconds(500);
                 play_sfx_sound(SFX_HINT);
             }
-            pline_ex(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE - Sacrifice the Amulet of Yendor on the Astral Plane");
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Sacrifice the Amulet of Yendor on the Astral Plane");
             if (iflags.using_gui_sounds)
             {
                 delay_output_milliseconds(500);
                 play_sfx_sound(SFX_HINT);
             }
-            pline_ex(ATR_NONE, CLR_MSG_HINT, "HINT - Exit the dungeon on level 1 to enter the Elemental Planes");
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "HINT", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "%s", "Exit the dungeon on level 1 to enter the Elemental Planes");
         }
         u.uachieve.amulet = 1;
     }
@@ -935,22 +935,6 @@ struct obj *obj;
                 if (obj->oartifact == ART_CLEAVER)
                     u.uevent.role_achievement_2 = 1;
             }
-        }
-        else if (Role_if(PM_KNIGHT))
-        {
-            check_achievement = TRUE;
-            if (obj->oartifact == ART_EXCALIBUR)
-                u.uevent.role_achievement_1 = 1;
-            if (obj->oartifact == ART_HOLY_GRAIL)
-                u.uevent.role_achievement_2 = 1;
-        }
-        else if (Role_if(PM_PRIEST))
-        {
-            check_achievement = TRUE;
-            if (obj->oartifact == ART_MACE_OF_SAINT_CUTHBERT)
-                u.uevent.role_achievement_1 = 1;
-            if (obj->oartifact == ART_MACE_OF_SAINT_CUTHBERT)
-                u.uevent.role_achievement_2 = 1;
         }
         else if (Role_if(PM_SAMURAI))
         {
@@ -1797,6 +1781,7 @@ const char *drop_fmt, *drop_arg, *hold_msg;
 #if 0
         if (crysknife) {
             obj->otyp = CRYSKNIFE;
+            obj->material = objects[obj->otyp].oc_material;
             obj->oerodeproof = oerode;
         }
 #endif
@@ -2634,8 +2619,7 @@ boolean (*validitemfunc)(struct obj*);
              || (!strcmp(word, "tin")
                  && (otyp != CORPSE || !tinnable(otmp)))
              || (!strcmp(word, "rub")
-                 && ((otmp->oclass == TOOL_CLASS && otyp != OIL_LAMP
-                      && otyp != MAGIC_LAMP && otyp != BRASS_LANTERN)
+                 && ((otmp->oclass == TOOL_CLASS && !is_otyp_lamp(otyp))
                      || (otmp->oclass == GEM_CLASS && !is_graystone(otmp))))
                 || (!strcmp(word, "use or apply")
                  /* Picks, axes, pole-weapons, bullwhips */
@@ -3148,8 +3132,7 @@ struct obj* otmp_only;
                 || (!strcmp(word, "tin")
                     && (otyp != CORPSE || !tinnable(otmp)))
                 || (!strcmp(word, "rub")
-                    && ((otmp->oclass == TOOL_CLASS && otyp != OIL_LAMP
-                        && otyp != MAGIC_LAMP && otyp != BRASS_LANTERN)
+                    && ((otmp->oclass == TOOL_CLASS && !is_otyp_lamp(otyp))
                         || (otmp->oclass == GEM_CLASS && !is_graystone(otmp))))
                 || (!strcmp(word, "use or apply")
                     /* Picks, axes, pole-weapons, bullwhips */
@@ -4153,7 +4136,7 @@ long pickcnt;
     xchar x = 0, y = 0;
     get_obj_location(otmp, &x, &y, CONTAINED_TOO | BURIED_TOO);
     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
     any = zeroany;
     win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_COMMAND_MENU, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_obj(otmp));
@@ -4663,7 +4646,7 @@ nextclass:
             char applied_class_accelerator = wizid ? def_oc_syms[(int)otmp->oclass].sym : 0;
 
             int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-            int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL));
+            int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
             add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, obj_to_extended_menu_info(otmp), ilet,
                 applied_class_accelerator,
                      ATR_NONE, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly) : doname_with_weight_first(otmp, loadstonecorrectly)) : doname(otmp), MENU_UNSELECTED);
@@ -5067,7 +5050,7 @@ char avoidlet;
                     }
                     any.a_char = ilet;
                     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-                    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL));
+                    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
                     add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph,
                              &any, obj_to_extended_menu_info(otmp), ilet, 0, ATR_NONE,
                              (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE) : doname_with_weight_first(otmp, TRUE)), MENU_UNSELECTED);
@@ -5689,6 +5672,13 @@ int x, y;
 
     if (cmap >= 0)
         dfeature = defsyms[cmap].explanation;
+    else if (levl[x][y].decoration_typ > 0)
+    {
+        if((levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0 && decoration_type_definitions[levl[x][y].decoration_typ].description_filled)
+            dfeature = decoration_type_definitions[levl[x][y].decoration_typ].description_filled;
+        else
+            dfeature = decoration_type_definitions[levl[x][y].decoration_typ].description;
+    }
     else if (levl[x][y].floor_doodad && iflags.using_gui_tiles)
     {
         dfeature = get_floor_doodad_explanation_at(x, y);
@@ -6172,7 +6162,7 @@ register struct obj *otmp, *obj;
         return TRUE;
 
     if (obj->unpaid != otmp->unpaid || obj->enchantment != otmp->enchantment || obj->elemental_enchantment != otmp->elemental_enchantment
-        || obj->exceptionality != otmp->exceptionality || obj->mythic_prefix != otmp->mythic_prefix || obj->mythic_suffix != otmp->mythic_suffix
+        || obj->material != otmp->material || obj->exceptionality != otmp->exceptionality || obj->mythic_prefix != otmp->mythic_prefix || obj->mythic_suffix != otmp->mythic_suffix
         || obj->charges != otmp->charges || obj->special_quality != otmp->special_quality || obj->speflags != otmp->speflags
         || obj->cursed != otmp->cursed || obj->blessed != otmp->blessed
         || obj->no_charge != otmp->no_charge || obj->obroken != otmp->obroken
@@ -6219,6 +6209,9 @@ register struct obj *otmp, *obj;
     /* allow candle merging only if their ages are close */
     /* see begin_burn() for a reference for the magic "25" */
     if (is_candle(obj) && obj->age / 25 != otmp->age / 25)
+        return FALSE;
+
+    if (is_torch(obj) && (obj->age / 25 != otmp->age / 25 || obj->lamplit)) /* Only unlit torches are mergeable */
         return FALSE;
 
     /* burning potions of oil never merge */
@@ -6518,7 +6511,7 @@ unsigned long newsym_flags;
 STATIC_VAR NEARDATA const char *names[MAX_OBJECT_CLASSES] = {
     "Random objects", "Illegal objects", "Weapons", "Armor", "Rings", "Amulets", "Tools",
     "Comestibles", "Potions", "Scrolls", "Books", "Wands", "Coins",
-    "Gems/Stones", "Boulders/Statues", "Iron balls", "Chains", "Venoms", "Reagents",  "Miscellaneous"
+    "Gems/Stones", "Boulders/Statues", "Iron balls", "Chains", "Venoms", "Reagents",  "Miscellaneous",  "Art objects"
 };
 STATIC_VAR NEARDATA const char oth_symbols[] = { CONTAINED_SYM, '\0' };
 STATIC_VAR NEARDATA const char *oth_names[] = { "Bagged/Boxed items" };

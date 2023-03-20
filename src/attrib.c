@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
 
 /* GnollHack 4.0    attrib.c    $NHDT-Date: 1553363417 2019/03/23 17:50:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.65 $ */
 /*      Copyright 1988, 1989, 1990, 1992, M. Stephenson           */
@@ -315,7 +315,7 @@ boolean verbose;
     //m_updatemaxen(); //Not implemented
 
     /* Check if AC and MC need to be updated */
-    find_mac(mon);
+    //find_mac(mon);
     //find_mmc(mon); 
 
     return limitexceeded ? 3 : TRUE;
@@ -361,11 +361,11 @@ register int num;
         --num;
         if (Upolyd) {
             u.mh -= 6;
-            u.basemhmax -= 6;
+            u.basemhdrain -= 6;
             updatemaxhp();
         } else {
             u.uhp -= 6;
-            u.ubasehpmax -= 6;
+            u.ubasehpdrain -= 6;
             updatemaxhp();
         }
     }
@@ -829,9 +829,9 @@ update_extrinsics()
                 ))
                 u.uprops[objects[otyp].oc_oprop3].extrinsic |= bit;//W_CARRIED;
 
-            /* Mythic */
             if (bit != W_CARRIED)
             {
+                /* Mythic */
                 for (uchar j = 0; j <= 1; j++)
                 {
                     uchar mythic_quality = (j == 0 ? uitem->mythic_prefix : uitem->mythic_suffix);
@@ -856,6 +856,38 @@ update_extrinsics()
                                 u.uprops[mythic_powers[i].parameter1].extrinsic |= bit;
                             }
                         }
+                    }
+                }
+            }
+
+            /* Material */
+            if (uitem->material != objects[uitem->otyp].oc_material)
+            {
+                if (is_armor(uitem))
+                {
+                    int power = material_definitions[uitem->material].power_armor[objects[otyp].oc_armor_category];
+                    if (power != NO_POWER)
+                    {
+                        u.uprops[power].extrinsic |= bit;
+                    }
+                    int power2 = material_definitions[uitem->material].power2_armor[objects[otyp].oc_armor_category];
+                    if (power2 != NO_POWER)
+                    {
+                        u.uprops[power2].extrinsic |= bit;
+                    }
+                }
+                
+                if (is_weapon(uitem))
+                {
+                    int power = material_definitions[uitem->material].power_weapon;
+                    if (power != NO_POWER)
+                    {
+                        u.uprops[power].extrinsic |= bit;
+                    }
+                    int power2 = material_definitions[uitem->material].power2_weapon;
+                    if (power2 != NO_POWER)
+                    {
+                        u.uprops[power2].extrinsic |= bit;
                     }
                 }
             }
@@ -1721,6 +1753,8 @@ int propidx;
         return A_FROM_ROLE;
     if (u.uprops[propidx].intrinsic & FROM_FORM)
         return A_FROM_FORM;
+    if (u.uprops[propidx].intrinsic & FROM_ACQUIRED)
+        return A_FROM_INTR;
 
     /* Special cases */
     if (propidx == DRAIN_RESISTANCE && u.ulycn >= LOW_PM)
@@ -1749,6 +1783,7 @@ int propidx; /* OBSOLETE: special cases can have negative values */
             char *p;
             struct obj *obj = (struct obj *) 0;
             int innateness = is_innate(propidx);
+            boolean because_used = FALSE;
 
             /*
              * Properties can be obtained from multiple sources and we
@@ -1771,18 +1806,16 @@ int propidx; /* OBSOLETE: special cases can have negative values */
             else if (innateness == A_FROM_INTR) /* [].intrinsic & FROM_ACQUIRED */
                 Strcpy(buf, " intrinsically");
             else if (innateness == A_FROM_EXP)
+            {
                 Strcpy(buf, " because of your experience");
+                because_used = TRUE;
+            }
             else if (innateness == A_FROM_LYCN)
                 Strcpy(buf, " due to your lycanthropy");
             else if (innateness == A_FROM_FORM)
                 Strcpy(buf, " from current creature form");
-            else if (u.uprops[propidx].intrinsic & TIMEOUT)
-            {
-                long dur = u.uprops[propidx].intrinsic & TIMEOUT;
-                Sprintf(buf, " because of %s (%ld rounds remaining)", "a temporary effect", dur);
-            }
             else if (u.uprops[propidx].extrinsic & W_ENVIRONMENT)
-                Sprintf(buf, because_of, "your surroundings");
+                Strcpy(buf, " due to your surroundings");
             else if (u.uprops[propidx].extrinsic & W_STUCK)
             {
                 char ustuckbuf[BUFSIZ];
@@ -1792,11 +1825,15 @@ int propidx; /* OBSOLETE: special cases can have negative values */
                     Sprintf(ustuckbuf, "%s", "the monster holding you");
 
                 Sprintf(buf, because_of, ustuckbuf);
+                because_used = TRUE;
             }
             else if (
                 ((obj = what_gives(propidx)) != 0 && (wizard || object_stats_known(obj)))
                 )
+            {
                 Sprintf(buf, because_of, yname(obj));
+                because_used = TRUE;
+            }
             /*obj->oartifact
                                              ? bare_artifactname(obj)
                                              : ysimple_name(obj));
@@ -1806,7 +1843,10 @@ int propidx; /* OBSOLETE: special cases can have negative values */
                     ? bare_artifactname(obj)
                     : ysimple_name(obj));*/
             else if (propidx == BLINDED && Blind_because_of_blindfold_only)
+            {
                 Sprintf(buf, because_of, ysimple_name(ublindf));
+                because_used = TRUE;
+            }
 
             /* remove some verbosity and/or redundancy */
             if ((p = strstri(buf, " pair of ")) != 0)
@@ -1815,6 +1855,13 @@ int propidx; /* OBSOLETE: special cases can have negative values */
                      && (p = strstri(buf, " of strangulation")) != 0)
                 *p = '\0';
 
+            if (u.uprops[propidx].intrinsic & TIMEOUT)
+            {
+                long dur = u.uprops[propidx].intrinsic & TIMEOUT;
+                if (*buf)
+                    Strcat(buf, " and");
+                Sprintf(eos(buf), " %s%s (%ld rounds left)", because_used ? "" : "because of ", "an effect", dur);
+            }
         }
         else { /* negative property index */
             /* if more blocking capabilities get implemented we'll need to
@@ -1947,22 +1994,23 @@ newhp()
 }
 
 int
-hpmaxadjustment()
+hpmaxadjustment(usemh)
+boolean usemh;
 {
-    return m_hpmaxadjustment(&youmonst);
+    return m_hpmaxadjustment(&youmonst, usemh);
 }
 
 int
-m_hpmaxadjustment(mon)
+m_hpmaxadjustment(mon, usemh)
 struct monst* mon;
+boolean usemh;
 {
     boolean is_you = (mon == &youmonst);
     int basehp = is_you ? u.ubasehpmax : mon->mbasehpmax;
-    int baseadj = (int)(constitution_hp_bonus(M_ACURR(mon, A_CON)) * (double)(is_you ? u.ulevel : mon->m_lev));
+    int baseadj = (int)(constitution_hp_bonus(M_ACURR(mon, A_CON)) * (double)(is_you ? u.ulevel : mon->m_lev)) + (is_you ? (usemh ? u.basemhdrain : u.ubasehpdrain) : mon->mbasehpdrain);
     int adj = baseadj;
     int otyp = 0;
     struct obj* uitem;
-
 
     for (uitem = is_you ? invent : mon->minvent; uitem; uitem = uitem->nobj)
     {
@@ -1993,9 +2041,9 @@ struct monst* mon;
             }
         }
 
-        if (has_obj_mythic_hp_gain_25(uitem) && worn)
+        if (has_obj_mythic_hp_gain(uitem) && worn)
         {
-            adj += 1 * (25 * (basehp + baseadj)) / 100;
+            adj += 1 * (MYTHIC_HP_GAIN_PERCENTAGE * (basehp + baseadj)) / 100;
         }
 
     }
@@ -2016,7 +2064,7 @@ struct monst* mon;
         return;
     }
 
-    mon->mhpmax = mon->mbasehpmax + m_hpmaxadjustment(mon);
+    mon->mhpmax = mon->mbasehpmax + m_hpmaxadjustment(mon, FALSE);
 
     /* EDOG penalty */
     if(mon->mextra && EDOG(mon))
@@ -2040,7 +2088,7 @@ struct monst* mon;
 void
 updatemaxhp()
 {
-    u.uhpmax = u.ubasehpmax + hpmaxadjustment();
+    u.uhpmax = u.ubasehpmax + hpmaxadjustment(FALSE);
 
     if (u.uhpmax < 1)
         u.uhpmax = 1;
@@ -2048,7 +2096,7 @@ updatemaxhp()
     if (u.uhp > u.uhpmax)
         u.uhp = u.uhpmax;
 
-    u.mhmax = u.basemhmax + hpmaxadjustment();
+    u.mhmax = u.basemhmax + hpmaxadjustment(TRUE);
 
     if (u.mhmax < 1)
         u.mhmax = 1;
