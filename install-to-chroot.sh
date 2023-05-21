@@ -18,9 +18,9 @@ COMPRESSBIN="/bin/gzip"
 NH_GIT="/home/build/GnollHack"
 NH_BRANCH="master"
 # HACKDIR from include/config.h; aka nethack subdir inside chroot
-NHSUBDIR="gnollhack-4.1.0.41"
+NHSUBDIR="gnollhack-4.1.0.44"
 # VAR_PLAYGROUND from include/unixconf.h
-NH_VAR_PLAYGROUND="/gnollhack-4.1.0.41/var/"
+NH_VAR_PLAYGROUND="/gnollhack-4.1.0.44/var/"
 # END OF CONFIG
 ##############################################################################
 
