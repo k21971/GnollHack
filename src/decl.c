@@ -274,7 +274,7 @@ NEARDATA const anything zeroany;
 
 NEARDATA const struct layer_info zerolayerinfo = DUMMY;
 NEARDATA const struct replacement_info zeroreplacementinfo = DUMMY;
-NEARDATA const struct extended_menu_info nilextendedmenuinfo = { 0, 0, 0, NO_COLOR, 0, 0, 0, 0, 0UL };
+NEARDATA const struct extended_menu_info zeroextendedmenuinfo = DUMMY;
 NEARDATA const struct extended_create_window_info zerocreatewindowinfo = DUMMY;
 NEARDATA const struct d_level zerodlevel = DUMMY;
 
@@ -358,6 +358,47 @@ NEARDATA char luggagename[PL_PSIZ] = DUMMY;
 NEARDATA char wolfname[PL_PSIZ] = DUMMY;
 char preferred_pet; /* '\0', 'c', 'd', 'n' (none) */
 short doggender, catgender, horsegender, ramgender, wolfgender; /* 0 = random, 1 = male, 2 = female */
+unsigned short dogbreed;
+unsigned short catbreed;
+
+const struct breed_definition dog_breed_definitions[NUM_DOG_BREEDS] = {
+    { "generic", "generic",     (char*)0, (char*)0, (char*)0, 0UL },
+    { "black labrador",         (char*)0, "Labrador Retriever", "black", (char*)0, 0UL },
+    { "brown labrador",         (char*)0, "Labrador Retriever", "brown", (char*)0, 0UL },
+    { "yellow labrador",        (char*)0, "Labrador Retriever", "yellow", (char*)0, 0UL },
+    { "dalmatian",              (char*)0, "Dalmatian", (char*)0, (char*)0, 0UL },
+    { "german shepherd",        (char*)0, "German Shepherd", (char*)0, (char*)0, 0UL },
+    { "black schnauzer",        (char*)0, "Schnauzer", "black", (char*)0, 0UL },
+    { "salt and pepper schnauzer", (char*)0, "Schnauzer", "salt and pepper", (char*)0, 0UL },
+    { "black schnauzer",        (char*)0, "Scottish Terrier", (char*)0, (char*)0, 0UL  },
+    { "pembroke corgi",         (char*)0, "Corgi", "Pembroke", (char*)0, 0UL },
+    { "cardigan corgi",         (char*)0, "Corgi", "Cardigan", (char*)0, 0UL },
+    { "cocker spaniel",         (char*)0, "Cocker Spaniel", (char*)0, (char*)0, 0UL  },
+    { "bloodhound",             (char*)0, "Bloodhound", (char*)0, (char*)0, 0UL  },
+    { "blue rough collie",      (char*)0, "Rough Collie", "blue", "blue and white", 0UL },
+    { "sable rough collie",     (char*)0, "Rough Collie", "sable", "sable and white", 0UL },
+    { "tricolor rough collie",  (char*)0, "Rough Collie", "tricolor", (char*)0, 0UL  },
+    { "finnish lapphund",       (char*)0, "Finnish Lapphund", (char*)0, (char*)0, 0UL  },
+    { "akita",                  (char*)0, "Akita", (char*)0, (char*)0, 0UL  },
+    { "shiba",                  (char*)0, "Shiba", (char*)0, (char*)0, 0UL   },
+    { "black border collie",    (char*)0, "Border Collie", "black", "black and white", 0UL  },
+    { "brown border collie",    (char*)0, "Border Collie", "brown", "brown and white", 0UL  },
+    { "grey border collie",     (char*)0, "Border Collie", "grey", "grey and black", 0UL  },
+    { "english springer spaniel", (char*)0, "English Springer Spaniel", (char*)0, (char*)0, 0UL   },
+    { "welsh springer spaniel", (char*)0, "Welsh Springer Spaniel", (char*)0, (char*)0, 0UL   },
+    { "bulldog",                (char*)0, "Bulldog", (char*)0, (char*)0, 0UL },
+};
+
+const struct breed_definition cat_breed_definitions[NUM_CAT_BREEDS] = {
+    { "generic",                "generic", (char*)0, (char*)0, (char*)0, 0UL },
+    { "black",                  "black cat", "domestic cat", "black", (char*)0, 0UL },
+    { "siamese",                (char*)0, "Siamese", (char*)0, (char*)0, 0UL },
+    { "grey persian",           (char*)0, "Persian", "gray", (char*)0, 0UL },
+    { "white persian",          (char*)0, "Persian", "white", (char*)0, 0UL },
+    { "brown ragdoll",          (char*)0, "Ragdoll", "brown", "brown-white bicolor", 0UL },
+    { "grey ragdoll",           (char*)0, "Ragdoll", "grey", "grey-white bicolor", 0UL },
+    { "white ragdoll",          (char*)0, "Ragdoll", "white", (char*)0, 0UL },
+};
 
 /* monsters that went down/up together with @ */
 NEARDATA struct monst *mydogs = (struct monst *) 0;

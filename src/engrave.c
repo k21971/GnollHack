@@ -403,7 +403,11 @@ int x, y;
                 et = buf;
             } else
                 et = ep->engr_txt;
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s: \"%s\".", (Blind) ? "feel the words" : "read", et);
+
+            char ybuf[BUFSZ];
+            Sprintf(ybuf, "You %s", (Blind) ? "feel the words" : "read");
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_ATTENTION, ybuf, ATR_NONE, CLR_MSG_ATTENTION, ": ", ATR_NONE, CLR_MSG_TEXT, 0U, "\"%s\".", et);
+            //You_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s: \"%s\".", (Blind) ? "feel the words" : "read", et);
             if (context.run > 1)
                 nomul(0);
         }
@@ -591,7 +595,7 @@ doengrave()
      */
     if (!freehand() && otmp != uwep && !otmp->owornmask) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("have no free %s to write with!", body_part(HAND));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "have no free %s to write with!", body_part(HAND));
         return 0;
     }
 
@@ -611,7 +615,7 @@ doengrave()
     }
     if (IS_ANVIL(levl[u.ux][u.uy].typ)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot scratch the anvil with %s.", writer);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot scratch the anvil with %s.", writer);
         return 0;
     }
     if (IS_GRAVE(levl[u.ux][u.uy].typ)) {
@@ -903,7 +907,7 @@ doengrave()
             if (otmp->charges <= 0)
             {
                 play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-                Your("marker has dried out.");
+                Your_ex(ATR_NONE, CLR_MSG_FAIL, "marker has dried out.");
             }
             else
                 type = MARK;
@@ -1056,7 +1060,7 @@ doengrave()
                     eow = TRUE;
             } else if (type == DUST || type == MARK || type == ENGR_BLOOD) {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("cannot wipe out the message that is %s the %s here.",
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot wipe out the message that is %s the %s here.",
                     oep->engr_type == BURN
                         ? (is_ice(u.ux, u.uy) ? "melted into" : "burned into")
                         : "engraved in",

@@ -297,6 +297,22 @@ E short horsegender;
 E short ramgender;
 /* No luggagegender, because luggages are neuter */
 E short wolfgender;
+
+E unsigned short dogbreed;
+E unsigned short catbreed;
+
+struct breed_definition {
+    const char* name;
+    const char* description;
+    const char* breed_name;
+    const char* short_coat_color;
+    const char* long_coat_color;
+    unsigned long breed_flags;
+};
+
+E const struct breed_definition dog_breed_definitions[NUM_DOG_BREEDS];
+E const struct breed_definition cat_breed_definitions[NUM_CAT_BREEDS];
+
 E char preferred_pet;
 
 E NEARDATA unsigned long n_game_recoveries;
@@ -385,7 +401,7 @@ E NEARDATA const anything zeroany;   /* init'd and defined in decl.c */
 
 E NEARDATA const struct layer_info zerolayerinfo;
 E NEARDATA const struct replacement_info zeroreplacementinfo;
-E NEARDATA const struct extended_menu_info nilextendedmenuinfo;
+E NEARDATA const struct extended_menu_info zeroextendedmenuinfo;
 E NEARDATA const struct extended_create_window_info zerocreatewindowinfo;
 
 E NEARDATA const struct d_level zerodlevel;
@@ -498,6 +514,9 @@ E NEARDATA winid WIN_MAP, WIN_INVEN, WIN_HERE;
 #define You_hear_ex1(a, b, cstr) You_hear_ex(a, b, "%s", cstr)
 #define You_cant_ex1(a, b, cstr) You_cant_ex(a, b, "%s", cstr)
 #define verbalize_ex1(a, b, cstr) verbalize_ex(a, b, "%s", cstr)
+#define verbalize_talk1(cstr) verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "%s", cstr)
+#define verbalize_angry1(cstr) verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "%s", cstr)
+#define verbalize_happy1(cstr) verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "%s", cstr)
 
 #define pline_ex1_popup(a, b, cstr, title, dopop) pline_ex1(a, b, cstr); if (dopop) display_popup_text(cstr, title, POPUP_TEXT_GENERAL, a, b, NO_GLYPH, 0)
 

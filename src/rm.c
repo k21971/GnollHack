@@ -334,21 +334,26 @@ NEARDATA struct wall_sculpture_definition wall_sculpture_definitions[MAX_WALL_SC
 NEARDATA struct painting_definition painting_definitions[MAX_PAINTINGS] = {
     { "Portrait of Male Aristocrat", "a male aristocrat", "Otumn", (char*)0, (char*)0, 25L },
     { "Portrait of Male Aristocrat", "a male aristocrat", "Otumn", (char*)0, (char*)0, 50L },
-    { "Portrait of Female Aristocrat", "a female aristocrat", "Otumn", (char*)0, (char*)0, 100L },
-    { "Portrait of Elucid Priestess", "a priestess", "Otumn", (char*)0, (char*)0, 150L },
-    { "Portrait of Serious Dispater", "Dispater, Archduke of Gehennom", "Diedi", (char*)0, (char*)0, 200L },
-    { "Portrait of Smiling Dispater", "Dispater, Archduke of Gehennom", "Diedi", (char*)0, (char*)0, 200L },
-    { "Portrait of Wizard of Yendor in Blue", "Wizard of Yendor", "Diedi", (char*)0, (char*)0, 250L },
-    { "Portrait of Wizard of Yendor in Red", "Wizard of Yendor", "Diedi", (char*)0, (char*)0, 250L },
-    { "Portrait of Vlad the Impaler", "Vlad the Impaler", "Diedi", (char*)0, (char*)0, 250L },
-    { "Portrait of Vampire Lord", "a vampire lord", "Diedi", (char*)0, (char*)0, 200L },
-    { "Portrait of Vampire Lady", "a vampire lady", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Female Aristocrat", "a female aristocrat", "Otumn", (char*)0, (char*)0, 75L },
+    { "Portrait of Elucid Priestess", "a priestess", "Otumn", (char*)0, (char*)0, 100L },
+    { "Portrait of Serious Dispater", "Dispater, Archduke of Gehennom", "Diedi", (char*)0, (char*)0, 150L },
+    { "Portrait of Smiling Dispater", "Dispater, Archduke of Gehennom", "Diedi", (char*)0, (char*)0, 150L },
+    { "Portrait of Wizard of Yendor in Blue", "Wizard of Yendor", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Wizard of Yendor in Red", "Wizard of Yendor", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Vlad the Impaler", "Vlad the Impaler", "Diedi", (char*)0, (char*)0, 200L },
+    { "Portrait of Vampire Lord", "a vampire lord", "Diedi", (char*)0, (char*)0, 150L },
+    { "Portrait of Vampire Lady", "a vampire lady", "Diedi", (char*)0, (char*)0, 150L },
+    { "Portrait of Death", "Death", "Diedi", (char*)0, (char*)0, 250L },
+    { "Portrait of Famine", "Famine", "Diedi", (char*)0, (char*)0, 250L },
+    { "Portrait of Pestilence", "Pestilence", "Diedi", (char*)0, (char*)0, 250L },
+    { "Portrait of Bark Sharpnose", "Bark Sharpnose, Gnoll Ranger", "Diedi", (char*)0, (char*)0, 300L },
+    { "Portrait of Luna Moonsnout", "Luna Moonsnout, Gnoll Supreme Warden", "Diedi", (char*)0, (char*)0, 300L },
 };
 
 NEARDATA const struct carpet_type_definition carpet_type_definitions[MAX_CARPETS] = {
     {
         (char*)0, (char*)0,
-        0, CARPET_TILE_INDEXATION_TYPE_NORMAL, 0, 0,
+        0, CARPET_TILE_INDEXATION_TYPE_NONE, 0, 0,
         CARPET_TYPE_FLAGS_NONE
     },
     {
@@ -386,6 +391,30 @@ NEARDATA const struct carpet_type_definition carpet_type_definitions[MAX_CARPETS
         DOODAD_CARPET_YELLOW_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
         CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
         CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "carpet-beige", "beige carpet",
+        DOODAD_CARPET_BEIGE_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "carpet-blue", "blue carpet",
+        DOODAD_CARPET_BLUE_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_LONG_CARPET, 0, 0,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "grate", "grate",
+        DOODAD_GRATE + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_NONE, 1, 1,
+        CARPET_TYPE_FLAGS_NONE
+    },
+    {
+        "modron-triangular-plaque", "alien plaque",
+        DOODAD_CARPET_MODRON_TRIANGULAR_PLAQUE_TLCORN + GLYPH_SIMPLE_DOODAD_OFF,
+        CARPET_TILE_INDEXATION_TYPE_3X2_CARPET, 3, 2,
+        CARPET_TYPE_FLAGS_FIXED_SIZE
     },
 };
 

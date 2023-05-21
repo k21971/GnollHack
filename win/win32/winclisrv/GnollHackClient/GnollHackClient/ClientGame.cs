@@ -13,6 +13,7 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Xamarin.Essentials;
 using System.Drawing;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace GnollHackClient
 {
@@ -402,7 +403,7 @@ namespace GnollHackClient
 
         }
 
-        public string ClientCallback_AskName(string modeName, string modeDescription)
+        public int ClientCallback_AskName(string modeName, string modeDescription, IntPtr out_string_ptr)
         {
             Debug.WriteLine("ClientCallback_AskName");
             ConcurrentQueue<GHRequest> queue;
@@ -416,10 +417,18 @@ namespace GnollHackClient
                     Thread.Sleep(GHConstants.PollingInterval);
                     pollResponseQueue();
                 }
-                return CharacterName;
+
+                if (out_string_ptr != IntPtr.Zero)
+                {
+                    byte[] utf8text = Encoding.UTF8.GetBytes(CharacterName);
+                    Marshal.Copy(utf8text, 0, out_string_ptr, utf8text.Length);
+                    return 1;
+                }
+                else
+                    return 0;
             }
             else
-                return "AskNameFailed";
+                return 0;
         }
 
         public void ClientCallback_get_nh_event()
@@ -919,16 +928,21 @@ namespace GnollHackClient
         }
 
         private int _msgIndex = 0;
-        public string ClientCallback_GetMsgHistory(IntPtr attributes_ptr, IntPtr colors_ptr, byte init)
+        public int ClientCallback_GetMsgHistory(IntPtr text_ptr, IntPtr attributes_ptr, IntPtr colors_ptr, byte init)
         {
             if (init != 0)
                 _msgIndex = 0;
 
-            string res = null;
+            int res = 0;
             if (_msgIndex < _message_history.Count)
             {
-                res = _message_history[_msgIndex].Text;
-                int msgLength = res.Length;
+                string text = _message_history[_msgIndex].Text;
+                int msgLength = text.Length;
+                if (text_ptr != IntPtr.Zero)
+                {
+                    byte[] utf8text = Encoding.UTF8.GetBytes(text);
+                    Marshal.Copy(utf8text, 0, text_ptr, utf8text.Length);
+                }
                 if (attributes_ptr != IntPtr.Zero)
                 {
                     if(_message_history[_msgIndex].Attributes != null)
@@ -940,7 +954,6 @@ namespace GnollHackClient
                         for (int i = 0; i < msgLength; i++)
                             Marshal.WriteByte(colors_ptr, i, (byte)_message_history[_msgIndex].Attribute);
                     }
-                    //Marshal.WriteInt32(attr, _message_history[_msgIndex].Attribute);
                 }
                 if (colors_ptr != IntPtr.Zero)
                 {
@@ -953,16 +966,13 @@ namespace GnollHackClient
                         for(int i = 0; i < msgLength; i++)
                             Marshal.WriteByte(colors_ptr, i, (byte)_message_history[_msgIndex].NHColor);
                     }
-                    //Marshal.WriteInt32(attr, _message_history[_msgIndex].NHColor);
                 }
 
                 _msgIndex++;
                 if (_msgIndex < 0)
                     _msgIndex = 0;
-            }
-            else
-            {
-                //Do nothing
+
+                res = 1;
             }
 
             return res;
@@ -1008,12 +1018,12 @@ namespace GnollHackClient
                 }
             }
         }
-        public void ClientCallback_AddMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, string text, byte presel, int color)
+        public void ClientCallback_AddMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, int color, string text, byte presel)
         {
-            ClientCallback_AddExtendedMenu(winid, glyph, identifier, accel, groupaccel, attributes, text, presel, color, 
+            ClientCallback_AddExtendedMenu(winid, glyph, identifier, accel, groupaccel, attributes, color, text, presel,
                 0, 0, 0, '\0', '\0', 0, 0, 0, IntPtr.Zero, IntPtr.Zero);
         }
-        public void ClientCallback_AddExtendedMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, string text, byte presel, int color, 
+        public void ClientCallback_AddExtendedMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, int color, string text, byte presel, 
             int maxcount, UInt64 oid, UInt64 mid, char headingaccel, char special_mark, ulong menuflags, byte dataflags, int style, IntPtr otmpdata_ptr, IntPtr otypdata_ptr)
         {
             App.DebugWriteProfilingStopwatchTimeAndStart("AddExtendedMenu");
@@ -1231,7 +1241,7 @@ namespace GnollHackClient
             }
         }
 
-        public string ClientCallback_GetLine(int style, int attr, int color, string query, string placeholder, string linesuffix, string introline)
+        public int ClientCallback_GetLine(int style, int attr, int color, string query, string placeholder, string linesuffix, string introline, IntPtr out_string_ptr)
         {
             Debug.WriteLine("ClientCallback_GetLine");
             if (query == null)
@@ -1248,11 +1258,20 @@ namespace GnollHackClient
                     pollResponseQueue();
                 }
 
-                return _getLineString;
+                byte[] utf8text = Encoding.UTF8.GetBytes(_getLineString);
+                if (out_string_ptr != null)
+                {
+                    Marshal.Copy(utf8text, 0, out_string_ptr, utf8text.Length);
+                    return 1;
+                }
+                else
+                    return 0;
             }
             else
             {
-                return "";
+                if(out_string_ptr != null)
+                   Marshal.WriteByte(out_string_ptr, 0, 0);
+                return 0;
             }
         }
 

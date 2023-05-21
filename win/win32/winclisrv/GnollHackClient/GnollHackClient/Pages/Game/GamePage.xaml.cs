@@ -24,6 +24,7 @@ using GnollHackClient.Controls;
 using System.Runtime.CompilerServices;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.PlatformConfiguration;
+using System.Text.RegularExpressions;
 
 namespace GnollHackClient.Pages.Game
 {
@@ -181,6 +182,7 @@ namespace GnollHackClient.Pages.Game
 
         private int _shownPetRows = GHConstants.DefaultPetRows;
         public int NumDisplayedPetRows { get { return _shownPetRows; } set { _shownPetRows = value; } }
+        public SimpleImageButton StandardMeasurementButton { get { return UseSimpleCmdLayout ? SimpleESCButton : ESCButton; } }
 
         public TTYCursorStyle CursorStyle { get; set; }
         public GHGraphicsStyle GraphicsStyle { get; set; }
@@ -218,6 +220,21 @@ namespace GnollHackClient.Pages.Game
                 CommandCanvas.UseGL = value;
             } 
         }
+        private bool _useSimpleCmdLayout = true;
+        public bool UseSimpleCmdLayout
+        {
+            get { return _useSimpleCmdLayout; }
+            set
+            {
+                _useSimpleCmdLayout = value;
+                ButtonRowStack.IsVisible = !value;
+                UpperCmdLayout.IsVisible = !value;
+                SimpleButtonRowStack.IsVisible = value;
+                SimpleUpperCmdLayout.IsVisible = value;
+            }
+        }
+        public StackLayout UsedButtonRowStack { get { return UseSimpleCmdLayout ? SimpleButtonRowStack : ButtonRowStack; } }
+
         public bool ShowFPS { get; set; }
         private double _fps;
         private long _counterValueDiff;
@@ -406,6 +423,7 @@ namespace GnollHackClient.Pages.Game
             MapRefreshRate = (MapRefreshRateStyle)Preferences.Get("MapRefreshRate", (int)ClientUtils.GetDefaultMapFPS());
             ShowFPS = Preferences.Get("ShowFPS", false);
             UseMainGLCanvas = Preferences.Get("UseMainGLCanvas", GHConstants.IsGPUDefault);
+            UseSimpleCmdLayout = Preferences.Get("UseSimpleCmdLayout", true);
             ShowMemoryUsage = Preferences.Get("ShowMemoryUsage", false);
             MapGrid = Preferences.Get("MapGrid", false);
             HitPointBars = Preferences.Get("HitPointBars", false);
@@ -515,7 +533,7 @@ namespace GnollHackClient.Pages.Game
 
                     App.InitializeArrowButtons(assembly);
                     App.InitializeUIBitmaps(assembly);
-                    App.InitializeMoreCommandButtons(assembly);
+                    App.InitializeMoreCommandButtons(assembly, UseSimpleCmdLayout);
 
                     App.UnexploredGlyph = _gnollHackService.GetUnexploredGlyph();
                     App.NoGlyph = _gnollHackService.GetNoGlyph();
@@ -651,6 +669,7 @@ namespace GnollHackClient.Pages.Game
                     lAbilitiesButton.HeightRequest = statusbarheight;
                     lWornItemsButton.HeightRequest = statusbarheight;
                     UpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
+                    SimpleUpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
                     StartingPositionsSet = true;
                 }
 
@@ -1232,8 +1251,11 @@ namespace GnollHackClient.Pages.Game
         {
             _contextMenuData.Add(data);
             int cmddefchar = data.cmd_def_char;
+            int cmdcurchar = data.cmd_cur_char;
             if (cmddefchar < 0)
                 cmddefchar += 256; /* On this operating system, chars are signed chars; fix to positive values */
+            if (cmdcurchar < 0)
+                cmdcurchar += 256; /* On this operating system, chars are signed chars; fix to positive values */
             string icon_string = "";
             int LastPickedCmd = GHUtils.Meta('<');
             int OfferCmd = GHUtils.Meta('o');
@@ -1241,6 +1263,7 @@ namespace GnollHackClient.Pages.Game
             int DipCmd = GHUtils.Meta('d');
             int DigCmd = GHUtils.Ctrl('g');
             int SitCmd = GHUtils.Ctrl('s');
+            int RideCmd = GHUtils.Meta('R');
 
             switch ((char)cmddefchar)
             {
@@ -1291,7 +1314,10 @@ namespace GnollHackClient.Pages.Game
                             break;
                         default:
                         case (int)context_menu_styles.CONTEXT_MENU_STYLE_GENERAL:
-                            icon_string = "GnollHackClient.Assets.UI.stairs-up.png";
+                            if (data.target_text != null && data.target_text == "Pit")
+                                icon_string = "GnollHackClient.Assets.UI.arrow_up.png";
+                            else
+                                icon_string = "GnollHackClient.Assets.UI.stairs-up.png";
                             break;
                     }
                     break;
@@ -1306,7 +1332,10 @@ namespace GnollHackClient.Pages.Game
                             break;
                         default:
                         case (int)context_menu_styles.CONTEXT_MENU_STYLE_GENERAL:
-                            icon_string = "GnollHackClient.Assets.UI.stairs-down.png";
+                            if(data.target_text != null && data.target_text == "Pit")
+                                icon_string = "GnollHackClient.Assets.UI.arrow_down.png";
+                            else
+                                icon_string = "GnollHackClient.Assets.UI.stairs-down.png";
                             break;
                     }
                     break;
@@ -1345,6 +1374,12 @@ namespace GnollHackClient.Pages.Game
                             break;
                     }
                     break;
+                case 'C':
+                    if(data.cmd_text == "Steed")
+                        icon_string = "GnollHackClient.Assets.UI.chatsteed.png";
+                    else
+                        icon_string = "GnollHackClient.Assets.UI.chat.png";
+                    break;
                 default:
                     if (cmddefchar == LastPickedCmd)
                         icon_string = "GnollHackClient.Assets.UI.lastitem.png";
@@ -1358,6 +1393,8 @@ namespace GnollHackClient.Pages.Game
                         icon_string = "GnollHackClient.Assets.UI.dig.png";
                     else if (cmddefchar == SitCmd)
                         icon_string = "GnollHackClient.Assets.UI.sit.png";
+                    else if (cmddefchar == RideCmd)
+                        icon_string = "GnollHackClient.Assets.UI.ride.png";
                     else
                         icon_string = "GnollHackClient.Assets.Icons.missing_icon.png";
                     break;
@@ -1369,7 +1406,7 @@ namespace GnollHackClient.Pages.Game
             lib.LblText = data.cmd_text;
             lib.SetSideSize(_currentPageWidth, _currentPageHeight);
             lib.GridMargin = new Thickness(lib.ImgWidth / 15, lib.ImgWidth / 30);
-            lib.BtnCommand = cmddefchar;
+            lib.BtnCommand = cmdcurchar;
             lib.BtnClicked += GHButton_Clicked;
             ContextLayout.IsVisible = true;
             ContextLayout.Children.Add(lib);
@@ -1622,6 +1659,7 @@ namespace GnollHackClient.Pages.Game
             }
 
             GameMenuButton.IsEnabled = true;
+            SimpleGameMenuButton.IsEnabled = true;
             lMoreButton.IsEnabled = true;
 
             if (_isFirstAppearance)
@@ -2138,8 +2176,14 @@ namespace GnollHackClient.Pages.Game
         }
 
         private int _getLineStyle = 0;
+        private Regex _getLineRegex = null;
         private void GetLine(string query, string placeholder, string linesuffix, string introline, int style, int attr, int color)
         {
+            GetLineFrame.BorderColor = Color.Black;
+            GetLineOkButton.IsEnabled = true;
+            GetLineCancelButton.IsEnabled = true;
+            GetLineQuestionMarkButton.IsEnabled = true;
+
             Color clr = ClientUtils.NHColor2XColor(color, attr, false, false); /* Non-title / white coloring works better here */
             string PlaceHolderText = null;
             if (!string.IsNullOrWhiteSpace(placeholder) && placeholder.Length > 0)
@@ -2167,6 +2211,8 @@ namespace GnollHackClient.Pages.Game
             GetLineAutoComplete.IsVisible = false;
 
             _getLineStyle = style;
+            _getLineRegex = null;
+
             switch (style)
             {
                 case (int)getline_types.GETLINE_EXTENDED_COMMAND:
@@ -2174,10 +2220,12 @@ namespace GnollHackClient.Pages.Game
                     GetLineQuestionMarkGrid.IsVisible = true;
                     GetLineAutoComplete.IsVisible = true;
                     GetLineEntryText.Placeholder = "Type the command";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_]{0,64}$");
                     break;
                 case (int)getline_types.GETLINE_LEVELPORT:
                     GetLineEntryText.Placeholder = "Type the level here";
                     GetLineEntryText.Keyboard = Keyboard.Numeric;
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_? ]{0,32}$");
                     /* '*' could be possible as well, but not implemented at the moment */
                     break;
                 case (int)getline_types.GETLINE_WIZ_LEVELPORT:
@@ -2185,6 +2233,7 @@ namespace GnollHackClient.Pages.Game
                     GetLineQuestionMarkGrid.IsVisible = true;
                     GetLineEntryText.Placeholder = "Type the level";
                     GetLineEntryText.Keyboard = Keyboard.Numeric;
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_? ]{0,32}$");
                     break;
                 case (int)getline_types.GETLINE_LEVEL_CHANGE:
                 case (int)getline_types.GETLINE_NUMBERS_ONLY:
@@ -2194,34 +2243,45 @@ namespace GnollHackClient.Pages.Game
                         GetLineEntryText.Placeholder = "Type the level here";
                     else
                         GetLineEntryText.Placeholder = "Type the number here";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_? ]{0,32}$");
                     break;
                 case (int)getline_types.GETLINE_WISHING:
                     GetLineEntryText.Placeholder = "Type your wish here";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \(\:\)\+\-]{0,128}$");
                     break;
                 case (int)getline_types.GETLINE_GENESIS:
                 case (int)getline_types.GETLINE_POLYMORPH:
                 case (int)getline_types.GETLINE_GENOCIDE:
                 case (int)getline_types.GETLINE_MONSTER:
                     GetLineEntryText.Placeholder = "Type the monster here";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ ]{0,64}$");
                     break;
                 case (int)getline_types.GETLINE_MONSTER_CLASS:
                     GetLineEntryText.WidthRequest = 230;
                     GetLineEntryText.MaxLength = 1;
                     GetLineQuestionMarkGrid.IsVisible = true;
                     GetLineEntryText.Placeholder = "Type the monster class";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \'\&\#\:\;]{0,64}$");
                     break;
                 case (int)getline_types.GETLINE_TUNE:
                     GetLineEntryText.WidthRequest = 240;
                     GetLineEntryText.Placeholder = "Type the tune here";
+                    _getLineRegex = new Regex(@"^[A-Za-z]{0,10}$");
                     break;
                 case (int)getline_types.GETLINE_QUESTION:
                     GetLineEntryText.Placeholder = "Type the answer here";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \$\*\&\.\,\<\>\=\?\!\#\(\:\;\)\+\-]{0,128}$");
+                    break;
+                case (int)getline_types.GETLINE_MENU_SEARCH:
+                    GetLineEntryText.Placeholder = "Type the search here";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \`\|\~\^\""\'\%\/\\\[\]\{\}\$\*\&\.\,\<\>\=\?\!\#\(\:\;\)\+\-]{0,128}$");
                     break;
                 default:
                     if (PlaceHolderText != null)
                         GetLineEntryText.Placeholder = PlaceHolderText;
                     else
                         GetLineEntryText.Placeholder = "Type the text here";
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ åäöÅÄÖ\$\*\&\.\,\<\>\=\?\!\#\(\:\;\)\+\-]{0,128}$");
                     break;
             }
             GetLineGrid.IsVisible = true;
@@ -2229,6 +2289,11 @@ namespace GnollHackClient.Pages.Game
 
         private void GetLineOkButton_Clicked(object sender, EventArgs e)
         {
+            GetLineOkButton.IsEnabled = false;
+            GetLineCancelButton.IsEnabled = false;
+            GetLineQuestionMarkButton.IsEnabled = false;
+            App.PlayButtonClickedSound();
+
             string res = GetLineEntryText.Text;
             if (string.IsNullOrEmpty(GetLineEntryText.Text))
             {
@@ -2243,8 +2308,19 @@ namespace GnollHackClient.Pages.Game
                 res.Trim();
             }
 
+            if(_getLineRegex != null && !_getLineRegex.IsMatch(res))
+            {
+                GetLineFrame.BorderColor = Color.Red;
+                GetLineEntryText.Focus();
+                GetLineOkButton.IsEnabled = true;
+                GetLineCancelButton.IsEnabled = true;
+                GetLineQuestionMarkButton.IsEnabled = true;
+                return;
+            }
+            GetLineFrame.BorderColor = Color.Black;
+
             /* Style-dependent behavior */
-            switch(_getLineStyle)
+            switch (_getLineStyle)
             {
                 case (int)getline_types.GETLINE_EXTENDED_COMMAND:
                     res = res.ToLower();
@@ -2266,6 +2342,11 @@ namespace GnollHackClient.Pages.Game
 
         private void GetLineQuestionMarkButton_Clicked(object sender, EventArgs e)
         {
+            GetLineOkButton.IsEnabled = false;
+            GetLineCancelButton.IsEnabled = false;
+            GetLineQuestionMarkButton.IsEnabled = false;
+            App.PlayButtonClickedSound();
+
             string res = "?";
             ConcurrentQueue<GHResponse> queue;
             if (ClientGame.ResponseDictionary.TryGetValue(_clientGame, out queue))
@@ -2280,6 +2361,11 @@ namespace GnollHackClient.Pages.Game
 
         private void GetLineCancelButton_Clicked(object sender, EventArgs e)
         {
+            GetLineOkButton.IsEnabled = false;
+            GetLineCancelButton.IsEnabled = false;
+            GetLineQuestionMarkButton.IsEnabled = false;
+            App.PlayButtonClickedSound();
+            
             ConcurrentQueue<GHResponse> queue;
             if (ClientGame.ResponseDictionary.TryGetValue(_clientGame, out queue))
             {
@@ -2332,6 +2418,9 @@ namespace GnollHackClient.Pages.Game
                     _menuHideCancelled = true;
                 }
             }
+
+            MenuCancelButton.IsEnabled = true;
+            /* Enabling OKButton is done below */
 
             /* On iOS, hide MenuStack to start fade in */
             if (App.IsiOS)
@@ -2441,6 +2530,30 @@ namespace GnollHackClient.Pages.Game
             else
             {
                 MenuOKButton.IsEnabled = true;
+            }
+
+            switch(menuinfo.Style)
+            {
+                case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    MenuBackground.BackgroundStyle = BackgroundStyles.FitToScreen;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.LoadingScreen;
+                    MenuBackground.BorderStyle = BorderStyles.None;
+                    MenuCanvas.RevertBlackAndWhite = false;
+                    MenuCanvas.UseTextOutline = true;
+                    MenuCanvas.HideMenuLetters = true;
+                    MenuCanvas.MenuButtonStyle = true;
+                    MenuCanvas.ClickOKOnSelection = true;
+                    break;
+                default:
+                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
+                    MenuBackground.BorderStyle = BorderStyles.Simple;
+                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuCanvas.UseTextOutline = false;
+                    MenuCanvas.HideMenuLetters = false;
+                    MenuCanvas.MenuButtonStyle = false;
+                    MenuCanvas.ClickOKOnSelection = false;
+                    break;
             }
 
             ObservableCollection<GHMenuItem> newmis = new ObservableCollection<GHMenuItem>();
@@ -4508,7 +4621,7 @@ namespace GnollHackClient.Pages.Game
 
                                 textPaint.TextAlign = SKTextAlign.Center;
                                 tx = canvaswidth / 2;
-                                ty = GetStatusBarSkiaHeight() + 1.5f * inverse_canvas_scale * (float)ESCButton.Height - textPaint.FontMetrics.Ascent;
+                                ty = GetStatusBarSkiaHeight() + 1.5f * inverse_canvas_scale * (float)StandardMeasurementButton.Height - textPaint.FontMetrics.Ascent;
                                 if (relativestrokewidth > 0)
                                 {
                                     textPaint.Style = SKPaintStyle.Stroke;
@@ -4630,7 +4743,7 @@ namespace GnollHackClient.Pages.Game
                                         if (_clientGame.Windows[i].WindowType == GHWinType.Message)
                                         {
                                             float newleft = 0;
-                                            float newtop = canvasheight - height * ActualDisplayedMessages - canvasheight * (float)ButtonRowStack.Height / Math.Max(1.0f, (float)canvasView.Height) - 30;
+                                            float newtop = canvasheight - height * ActualDisplayedMessages - canvasheight * (float)UsedButtonRowStack.Height / Math.Max(1.0f, (float)canvasView.Height) - 30;
                                             _clientGame.Windows[i].Left = newleft;
                                             _clientGame.Windows[i].Top = newtop;
                                         }
@@ -4901,7 +5014,7 @@ namespace GnollHackClient.Pages.Game
                     }
 
                     float abilitybuttonbottom = (float)((lAbilitiesButton.Y + lAbilitiesButton.Height) / canvasView.Height) * canvasheight;
-                    float escbuttonbottom = (float)((ESCButton.Y + ESCButton.Height) / canvasView.Height) * canvasheight;
+                    float escbuttonbottom = (float)((StandardMeasurementButton.Y + StandardMeasurementButton.Height) / canvasView.Height) * canvasheight;
                     if (_canvasButtonRect.Top < escbuttonbottom)
                         _canvasButtonRect.Top = escbuttonbottom;
                     if (_canvasButtonRect.Top < abilitybuttonbottom)
@@ -4943,7 +5056,7 @@ namespace GnollHackClient.Pages.Game
                             SKRect darkenrect = new SKRect(0, 0, canvaswidth, statusbarheight);
                             StatusBarRect = darkenrect;
                             _statusBarRectDrawn = true;
-                            _canvasButtonRect.Top = StatusBarRect.Bottom + 1.25f * inverse_canvas_scale * (float)ESCButton.Width;
+                            _canvasButtonRect.Top = StatusBarRect.Bottom + 1.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Width;
                             canvas.DrawRect(darkenrect, textPaint);
                             textPaint.Color = SKColors.White;
                             textPaint.TextAlign = SKTextAlign.Left;
@@ -5462,7 +5575,7 @@ namespace GnollHackClient.Pages.Game
                                     }
                                     if (colorfound)
                                     {
-                                        SKColor dotcolor = ClientUtils.NHColor2SKColorCore(i, 0, true);
+                                        SKColor dotcolor = ClientUtils.NHColor2SKColorCore(i, 0, true, false);
                                         SKPoint dotpoint = new SKPoint(curx + marksize / 4, cury + (rowheight - marksize) / 2 + marksize / 2);
                                         float dotradius = marksize / 8;
                                         textPaint.Color = dotcolor;
@@ -5514,7 +5627,7 @@ namespace GnollHackClient.Pages.Game
                                     textPaint.Color = SKColors.White;
                                     textPaint.Typeface = App.LatoRegular;
                                     textPaint.TextSize = 36;
-                                    float pet_target_height = inverse_canvas_scale * (float)(ESCButton.Height + lAbilitiesButton.Width) / 2;
+                                    float pet_target_height = inverse_canvas_scale * (float)(StandardMeasurementButton.Height + lAbilitiesButton.Width) / 2;
                                     //float pet_name_target_height = pet_target_height * 0.4f;
                                     float pet_picture_target_height = pet_target_height * 0.56f;
                                     float pet_hp_target_height = pet_target_height * 0.24f;
@@ -5525,9 +5638,9 @@ namespace GnollHackClient.Pages.Game
                                                                                                                             //string pet_test_text = "Large Dog";
                                                                                                                             //float pet_target_width = textPaint.MeasureText(pet_test_text);
                                                                                                                             //pet_target_width += textPaint.FontSpacing; // For picture
-                                    float pet_target_width = pet_target_height; // inverse_canvas_scale * (float)ESCButton.Width;
+                                    float pet_target_width = pet_target_height; // inverse_canvas_scale * (float)StandardMeasurementButton.Width;
 
-                                    SKRect menubuttonrect = GetViewScreenRect(GameMenuButton);
+                                    SKRect menubuttonrect = GetViewScreenRect(UseSimpleCmdLayout ? SimpleGameMenuButton : GameMenuButton);
                                     SKRect canvasrect = GetViewScreenRect(canvasView);
                                     SKRect adjustedrect = new SKRect(menubuttonrect.Left - canvasrect.Left, menubuttonrect.Top - canvasrect.Top, menubuttonrect.Right - canvasrect.Left, menubuttonrect.Bottom - canvasrect.Top);
                                     float menu_button_left = adjustedrect.Left;
@@ -6019,14 +6132,14 @@ namespace GnollHackClient.Pages.Game
                     canvas.DrawRect(0, 0, canvaswidth, canvasheight, textPaint);
                     textPaint.Color = SKColors.White;
 
-                    float box_left = canvaswidth < canvasheight ? 1.25f * inverse_canvas_scale * (float)ESCButton.Width :
-                        3.25f * inverse_canvas_scale * (float)ESCButton.Width;
+                    float box_left = canvaswidth < canvasheight ? 1.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Width :
+                        3.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Width;
                     float box_right = canvaswidth - box_left;
                     if (box_right < box_left)
                         box_right = box_left;
-                    float box_top = canvaswidth < canvasheight ? GetStatusBarSkiaHeight() + 1.25f * inverse_canvas_scale * (float)ESCButton.Height :
-                        GetStatusBarSkiaHeight() + 0.25f * inverse_canvas_scale * (float)ESCButton.Height;
-                    float box_bottom = canvasheight - 1.25f * inverse_canvas_scale * (float)ButtonRowStack.Height;
+                    float box_top = canvaswidth < canvasheight ? GetStatusBarSkiaHeight() + 1.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Height :
+                        GetStatusBarSkiaHeight() + 0.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Height;
+                    float box_bottom = canvasheight - 1.25f * inverse_canvas_scale * (float)UsedButtonRowStack.Height;
                     if (box_bottom < box_top)
                         box_bottom = box_top;
 
@@ -6131,7 +6244,7 @@ namespace GnollHackClient.Pages.Game
                                 string[] statstring = new string[6] { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma" };
                                 string printtext = statstring[i] + ":";
                                 canvas.DrawText(printtext, tx, ty, textPaint);
-                                textPaint.Color = ClientUtils.NHColor2SKColorCore(valcolor, 0, true);
+                                textPaint.Color = ClientUtils.NHColor2SKColorCore(valcolor, 0, true, false);
                                 canvas.DrawText(valtext, tx + indentation, ty, textPaint);
                                 textPaint.Color = SKColors.Black;
                                 ty += textPaint.FontSpacing;
@@ -7399,6 +7512,10 @@ namespace GnollHackClient.Pages.Game
         private double _currentPageWidth = 0;
         private double _currentPageHeight = 0;
 
+        private readonly object _isLandScapeLock = new object();
+        private bool _isLandScape = false;
+        public bool IsLandscape { get { lock (_isLandScapeLock) { return _isLandScape; } } set { lock (_isLandScapeLock) { _isLandScape = value; } } }
+
         protected override void OnSizeAllocated(double width, double height)
         {
             base.OnSizeAllocated(width, height);
@@ -7406,6 +7523,8 @@ namespace GnollHackClient.Pages.Game
             {
                 _currentPageWidth = width;
                 _currentPageHeight = height;
+
+                IsLandscape = width > height;
 
                 if (TipView.IsVisible)
                     TipView.InvalidateSurface();
@@ -7417,6 +7536,12 @@ namespace GnollHackClient.Pages.Game
                 ToggleTravelModeButton.SetSideSize(width, height);
                 ToggleZoomMiniButton.SetSideSize(width, height);
                 ToggleZoomAlternateButton.SetSideSize(width, height);
+
+                SimpleGameMenuButton.SetSideSize(width, height);
+                SimpleESCButton.SetSideSize(width, height);
+                SimpleToggleAutoCenterModeButton.SetSideSize(width, height);
+                SimpleLookModeButton.SetSideSize(width, height);
+                SimpleToggleZoomMiniButton.SetSideSize(width, height);
 
                 ZeroButton.SetSideSize(width, height);
                 FirstButton.SetSideSize(width, height);
@@ -7430,7 +7555,9 @@ namespace GnollHackClient.Pages.Game
                 lAbilitiesButton.HeightRequest = statusbarheight;
                 lWornItemsButton.HeightRequest = statusbarheight;
                 //lSkillButton.SetSideSize(width, height);
+
                 UpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
+                SimpleUpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
 
                 foreach (View v in UpperCmdGrid.Children)
                 {
@@ -7442,10 +7569,18 @@ namespace GnollHackClient.Pages.Game
                     LabeledImageButton lib = (LabeledImageButton)v;
                     lib.SetSideSize(width, height);
                 }
+                foreach (View v in SimpleCmdGrid.Children)
+                {
+                    LabeledImageButton lib = (LabeledImageButton)v;
+                    lib.SetSideSize(width, height);
+                }
 
                 LabeledImageButton firstchild = (LabeledImageButton)UpperCmdGrid.Children[0];
                 UpperCmdGrid.HeightRequest = firstchild.GridHeight;
                 LowerCmdGrid.HeightRequest = firstchild.GridHeight;
+
+                LabeledImageButton simplefirstchild = (LabeledImageButton)SimpleCmdGrid.Children[0];
+                SimpleCmdGrid.HeightRequest = simplefirstchild.GridHeight;
 
                 MenuHeaderLabel.Margin = ClientUtils.GetHeaderMarginWithBorder(MenuBackground.BorderStyle, width, height);
                 MenuCloseGrid.Margin = ClientUtils.GetFooterMarginWithBorder(MenuBackground.BorderStyle, width, height);
@@ -7480,6 +7615,12 @@ namespace GnollHackClient.Pages.Game
                     ModeSubLayout2.Orientation = StackOrientation.Horizontal;
                     GameMenuLayout.Orientation = StackOrientation.Horizontal;
                     //UpperCmdLayout.Orientation = StackOrientation.Vertical;
+
+                    SimpleButtonRowStack.Orientation = StackOrientation.Horizontal;
+                    SimpleModeLayout.Orientation = StackOrientation.Vertical;
+                    SimpleModeSubLayout1.Orientation = StackOrientation.Horizontal;
+                    SimpleModeSubLayout2.Orientation = StackOrientation.Horizontal;
+                    SimpleGameMenuLayout.Orientation = StackOrientation.Horizontal;
                 }
                 else
                 {
@@ -7490,6 +7631,12 @@ namespace GnollHackClient.Pages.Game
                     ModeSubLayout2.Orientation = StackOrientation.Vertical;
                     GameMenuLayout.Orientation = StackOrientation.Horizontal;
                     //UpperCmdLayout.Orientation = StackOrientation.Horizontal;
+
+                    SimpleButtonRowStack.Orientation = StackOrientation.Vertical;
+                    SimpleModeLayout.Orientation = StackOrientation.Vertical;
+                    SimpleModeSubLayout1.Orientation = StackOrientation.Vertical;
+                    SimpleModeSubLayout2.Orientation = StackOrientation.Vertical;
+                    SimpleGameMenuLayout.Orientation = StackOrientation.Horizontal;
                 }
 
                 RefreshMenuRowCounts = true;
@@ -8744,10 +8891,12 @@ namespace GnollHackClient.Pages.Game
             if (MapNoClipMode)
             {
                 ToggleAutoCenterModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-autocenter-off.png";
+                SimpleToggleAutoCenterModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-autocenter-off.png";
             }
             else
             {
                 ToggleAutoCenterModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-autocenter-on.png";
+                SimpleToggleAutoCenterModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-autocenter-on.png";
                 if (sender != null && GHUtils.isok(_ux, _uy))
                 {
                     SetTargetClip(_ux, _uy, false);
@@ -8780,11 +8929,13 @@ namespace GnollHackClient.Pages.Game
             if (MapLookMode)
             {
                 LookModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-look-on.png";
+                SimpleLookModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-look-on.png";
                 //LookModeImg.Source = lookmode_on_source;
             }
             else
             {
                 LookModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-look-off.png";
+                SimpleLookModeButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-look-off.png";
                 //LookModeImg.Source = lookmode_off_source;
             }
         }
@@ -8798,12 +8949,14 @@ namespace GnollHackClient.Pages.Game
             if (ZoomMiniMode)
             {
                 ToggleZoomMiniButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-minimap-on.png";
+                SimpleToggleZoomMiniButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-minimap-on.png";
                 //ToggleZoomMiniImg.Source = minimap_on_source;
                 //ToggleZoomMiniButton.BackgroundColor = Color.Green;
             }
             else
             {
                 ToggleZoomMiniButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-minimap-off.png";
+                SimpleToggleZoomMiniButton.ImgSourcePath = "resource://GnollHackClient.Assets.UI.stone-minimap-off.png";
                 //ToggleZoomMiniImg.Source = minimap_off_source;
                 //ToggleZoomMiniButton.BackgroundColor = Color.DarkBlue;
                 if (sender != null && GHUtils.isok(_ux, _uy) && !MapNoClipMode)
@@ -8868,10 +9021,12 @@ namespace GnollHackClient.Pages.Game
         private void GameMenuButton_Clicked(object sender, EventArgs e)
         {
             GameMenuButton.IsEnabled = false;
+            SimpleGameMenuButton.IsEnabled = false;
             App.PlayButtonClickedSound();
             TouchDictionary.Clear();
             ShowGameMenu(sender, e);
             GameMenuButton.IsEnabled = true;
+            SimpleGameMenuButton.IsEnabled = true;
         }
 
         private void PopupOkButton_Clicked(object sender, EventArgs e)
@@ -8919,7 +9074,7 @@ namespace GnollHackClient.Pages.Game
             float x = 0, y = 0;
             string str;
             SKRect textBounds = new SKRect();
-            float scale = canvaswidth / (float)referenceCanvasView.Width;
+            float scale = (float)Math.Sqrt((double)(canvaswidth * canvasheight / (float)(referenceCanvasView.Width * referenceCanvasView.Height)));
 
             canvas.Clear();
             lock (_menuDrawOnlyLock)
@@ -8981,13 +9136,14 @@ namespace GnollHackClient.Pages.Game
 
                     lock (_refreshMenuRowCountLock)
                     {
+                        float extra_vertical_padding = MenuCanvas.MenuButtonStyle ? 12 : 0;
                         for (int idx = 0; idx < referenceCanvasView.MenuItems.Count; idx++)
                         {
                             GHMenuItem mi = referenceCanvasView.MenuItems[idx];
 
                             /* Padding */
-                            bottomPadding = mi.BottomPadding * scale;
-                            topPadding = mi.TopPadding * scale;
+                            bottomPadding = (mi.BottomPadding + extra_vertical_padding) * scale;
+                            topPadding = (mi.TopPadding + extra_vertical_padding) * scale;
 
                             /* Text Size and Minimum Row Height */
                             if ((mi.Attributes & (int)MenuItemAttributes.HalfSize) != 0)
@@ -9013,7 +9169,7 @@ namespace GnollHackClient.Pages.Game
                             {
                                 accel_fixed_width = textPaint.MeasureText("A"); // textPaint.FontMetrics.AverageCharacterWidth; // + 3 * textPaint.MeasureText(" ");
                                 _firstDrawnMenuItemIdx = idx;
-                                maintext_x_start = leftmenupadding + leftinnerpadding + (has_identifiers ? accel_fixed_width : 0) + (has_pictures ? picturepadding + picturewidth + picturepadding : accel_fixed_width /*textPaint.FontMetrics.AverageCharacterWidth*/);
+                                maintext_x_start = leftmenupadding + leftinnerpadding + (has_identifiers && !MenuCanvas.HideMenuLetters ? accel_fixed_width : 0) + (has_pictures ? picturepadding + picturewidth + picturepadding : !MenuCanvas.HideMenuLetters ? accel_fixed_width : 0 /*textPaint.FontMetrics.AverageCharacterWidth*/);
                                 first = false;
                             }
 
@@ -9025,17 +9181,22 @@ namespace GnollHackClient.Pages.Game
                             string[] suffixtextsplit = mi.SuffixTextSplit;
                             string[] suffix2textsplit = mi.Suffix2TextSplit;
 
-                            if (_refreshMenuRowCounts || !mi.TextRowCountsSet)
+                            List<float> mainrowwidths = null, suffixrowwidths = null, suffix2rowwidths = null;
+
+                            if (RefreshMenuRowCounts || !mi.TextRowCountsSet)
                             {
-                                maintextrows = CountTextSplitRows(maintextsplit, maintext_x_start, canvaswidth, rightmenupadding, textPaint, mi.UseSpecialSymbols);
+                                maintextrows = CountTextSplitRows(maintextsplit, maintext_x_start, canvaswidth, rightmenupadding, textPaint, mi.UseSpecialSymbols, out mainrowwidths);
                                 mi.MainTextRows = maintextrows;
+                                mi.MainTextRowWidths = mainrowwidths;
 
                                 textPaint.TextSize = suffixfontsize;
-                                suffixtextrows = CountTextSplitRows(suffixtextsplit, maintext_x_start, canvaswidth, rightmenupadding, textPaint, mi.UseSpecialSymbols);
+                                suffixtextrows = CountTextSplitRows(suffixtextsplit, maintext_x_start, canvaswidth, rightmenupadding, textPaint, mi.UseSpecialSymbols, out suffixrowwidths);
                                 mi.SuffixTextRows = suffixtextrows;
+                                mi.SuffixTextRowWidths = suffixrowwidths;
 
-                                suffix2textrows = CountTextSplitRows(suffix2textsplit, maintext_x_start, canvaswidth, rightmenupadding, textPaint, mi.UseSpecialSymbols);
+                                suffix2textrows = CountTextSplitRows(suffix2textsplit, maintext_x_start, canvaswidth, rightmenupadding, textPaint, mi.UseSpecialSymbols, out suffix2rowwidths);
                                 mi.Suffix2TextRows = suffix2textrows;
+                                mi.Suffix2TextRowWidths = suffix2rowwidths;
 
                                 mi.TextRowCountsSet = true;
                             }
@@ -9044,6 +9205,9 @@ namespace GnollHackClient.Pages.Game
                                 maintextrows = mi.MainTextRows;
                                 suffixtextrows = mi.SuffixTextRows;
                                 suffix2textrows = mi.Suffix2TextRows;
+                                mainrowwidths = mi.MainTextRowWidths;
+                                suffixrowwidths = mi.SuffixTextRowWidths;
+                                suffix2rowwidths = mi.Suffix2TextRowWidths;
                             }
                             textPaint.TextSize = mainfontsize;
 
@@ -9067,11 +9231,18 @@ namespace GnollHackClient.Pages.Game
                             {
                                 /* Selection rectangle */
                                 SKRect selectionrect = new SKRect(x, y, x + totalRowWidth, y + totalRowHeight);
-                                if (isselected)
+                                if(MenuCanvas.MenuButtonStyle)
                                 {
-                                    textPaint.Color = _menuHighlightColor;
-                                    textPaint.Style = SKPaintStyle.Fill;
-                                    canvas.DrawRect(selectionrect, textPaint);
+                                    canvas.DrawBitmap(isselected ? App.ButtonSelectedBitmap : App.ButtonNormalBitmap, selectionrect, textPaint);
+                                }
+                                else
+                                {
+                                    if (isselected)
+                                    {
+                                        textPaint.Color = _menuHighlightColor;
+                                        textPaint.Style = SKPaintStyle.Fill;
+                                        canvas.DrawRect(selectionrect, textPaint);
+                                    }
                                 }
 
                                 float singlelinepadding = Math.Max(0.0f, ((float)(maintextrows - 1) * (textPaint.FontSpacing)) / 2);
@@ -9081,7 +9252,7 @@ namespace GnollHackClient.Pages.Game
                                 y -= textPaint.FontMetrics.Ascent;
                                 x += leftinnerpadding;
 
-                                if (has_identifiers)
+                                if (has_identifiers && !MenuCanvas.HideMenuLetters)
                                 {
                                     if (mi.Identifier == 0 && mi.SpecialMark != '\0')
                                         str = mi.FormattedSpecialMark;
@@ -9120,14 +9291,15 @@ namespace GnollHackClient.Pages.Game
                                     }
                                     x += picturewidth + picturepadding;
                                 }
-                                else
+                                else if (!MenuCanvas.HideMenuLetters)
                                 {
                                     x += accel_fixed_width; // textPaint.FontMetrics.AverageCharacterWidth;
                                 }
 
                                 /* Main text */
-                                SKColor maincolor = ClientUtils.NHColor2SKColorCore(mi.NHColor, mi.Attributes, MenuCanvas.RevertBlackAndWhite);
+                                SKColor maincolor = ClientUtils.NHColor2SKColorCore(mi.NHColor, mi.Attributes, MenuCanvas.RevertBlackAndWhite, MenuCanvas.MenuButtonStyle && isselected);
                                 textPaint.Color = maincolor;
+
                                 //int split_idx_on_row = -1;
                                 bool firstprintonrow = true;
                                 float start_x = x;
@@ -9138,7 +9310,7 @@ namespace GnollHackClient.Pages.Game
                                 {
                                     indent_start_x += textPaint.MeasureText(indentstr);
                                 }
-                                DrawTextSplit(canvas, maintextsplit, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, 0, 0, 0, 0);
+                                DrawTextSplit(canvas, maintextsplit, mainrowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline, MenuCanvas.RevertBlackAndWhite, MenuCanvas.MenuButtonStyle, totalRowWidth, 0, 0, 0, 0);
                                 /* Rewind and next line */
                                 x = start_x;
                                 y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -9151,7 +9323,7 @@ namespace GnollHackClient.Pages.Game
                                     textPaint.TextSize = suffixfontsize;
                                     y += fontspacingpadding;
                                     y -= textPaint.FontMetrics.Ascent;
-                                    DrawTextSplit(canvas, suffixtextsplit, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, 0, 0, 0, 0);
+                                    DrawTextSplit(canvas, suffixtextsplit, suffixrowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline, MenuCanvas.RevertBlackAndWhite, MenuCanvas.MenuButtonStyle, totalRowWidth, 0, 0, 0, 0);
                                     /* Rewind and next line */
                                     x = start_x;
                                     y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -9166,7 +9338,7 @@ namespace GnollHackClient.Pages.Game
                                     fontspacingpadding = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
                                     y += fontspacingpadding;
                                     y -= textPaint.FontMetrics.Ascent;
-                                    DrawTextSplit(canvas, suffix2textsplit, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, 0, 0, 0, 0);
+                                    DrawTextSplit(canvas, suffix2textsplit, suffix2rowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline, MenuCanvas.RevertBlackAndWhite, MenuCanvas.MenuButtonStyle, totalRowWidth, 0, 0, 0, 0);
                                     /* Rewind and next line */
                                     x = start_x;
                                     y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -9179,6 +9351,16 @@ namespace GnollHackClient.Pages.Game
                                 mi.DrawBounds.Bottom = y;
                                 mi.DrawBounds.Right = canvaswidth - rightmenupadding;
                                 _lastDrawnMenuItemIdx = idx;
+
+                                /* Space between buttons / rows */
+                                if(MenuCanvas.MenuButtonStyle)
+                                {
+                                    y += 12 * scale;
+                                }
+                                else
+                                {
+                                    //y += 0;
+                                }
 
                                 /* Count circle */
                                 if (mi.Count > 0 && !(mi.DrawBounds.Bottom <= 0 || mi.DrawBounds.Top >= canvasheight))
@@ -9202,7 +9384,8 @@ namespace GnollHackClient.Pages.Game
                                 }
                             }
                         }
-                        _refreshMenuRowCounts = false;
+                        if(IsLandscape ? canvaswidth > canvasheight : canvaswidth <= canvasheight)
+                            RefreshMenuRowCounts = false;
                     }
                     TotalMenuHeight = y - curmenuoffset;
                 }
@@ -9211,8 +9394,9 @@ namespace GnollHackClient.Pages.Game
             //DebugWriteProfilingStopwatchTime("Draw Menu Canvas End");
         }
 
-        private int CountTextSplitRows(string[] textsplit, float x_start, float canvaswidth, float rightmenupadding, SKPaint textPaint, bool usespecialsymbols)
+        private int CountTextSplitRows(string[] textsplit, float x_start, float canvaswidth, float rightmenupadding, SKPaint textPaint, bool usespecialsymbols, out List<float> rowWidths)
         {
+            rowWidths = new List<float>();
             if (textsplit == null)
                 return 0;
 
@@ -9220,6 +9404,7 @@ namespace GnollHackClient.Pages.Game
             float calc_x_start = x_start;
             int rowidx = -1;
             float spacelength = textPaint.MeasureText(" ");
+            float curendpos = calc_x_start;
 
             foreach (string s in textsplit)
             {
@@ -9227,7 +9412,6 @@ namespace GnollHackClient.Pages.Game
                 if (string.IsNullOrWhiteSpace(s))
                     nowrap = true;
                 rowidx++;
-                float endposition = calc_x_start;
                 SKBitmap symbolbitmap = null;
                 float printlength = 0;
                 float marginlength = 0;
@@ -9245,19 +9429,22 @@ namespace GnollHackClient.Pages.Game
                     printlength = textPaint.MeasureText(s);
                     marginlength = spacelength;
                 }
-                endposition = calc_x_start + printlength;
+                float endposition = calc_x_start + printlength;
                 bool pastend = endposition > canvaswidth - rightmenupadding;
                 if (pastend && rowidx > 0 & !nowrap)
                 {
+                    rowWidths.Add(curendpos - x_start);
                     rows++;
-                    calc_x_start = x_start + printlength + marginlength;
+                    curendpos = x_start + printlength;
                     rowidx = 0;
                 }
                 else
                 {
-                    calc_x_start = endposition + marginlength;
+                    curendpos = endposition;
                 }
+                calc_x_start = curendpos + marginlength;
             }
+            rowWidths.Add(curendpos - x_start);
             return rows;
         }
 
@@ -9353,7 +9540,7 @@ namespace GnollHackClient.Pages.Game
             }
         }
 
-        private void DrawTextSplit(SKCanvas canvas, string[] textsplit, ref float x, ref float y, ref bool isfirstprintonrow, float indent_start_x, float canvaswidth, float canvasheight, float rightmenupadding, SKPaint textPaint, bool usespecialsymbols, float curmenuoffset, float glyphystart, float glyphyend, float glyphpadding)
+        private void DrawTextSplit(SKCanvas canvas, string[] textsplit, List<float> rowwidths, ref float x, ref float y, ref bool isfirstprintonrow, float indent_start_x, float canvaswidth, float canvasheight, float rightmenupadding, SKPaint textPaint, bool usespecialsymbols, bool usetextoutline, bool revertblackandwhite, bool centertext, float totalrowwidth, float curmenuoffset, float glyphystart, float glyphyend, float glyphpadding)
         {
             if (textsplit == null)
                 return;
@@ -9365,6 +9552,15 @@ namespace GnollHackClient.Pages.Game
                 bool nowrap = false;
                 if (string.IsNullOrWhiteSpace(split_str))
                     nowrap = true;
+
+                float centering_padding = 0.0f;
+                if(centertext && rowwidths != null && idx < rowwidths.Count)
+                {
+                    centering_padding = (totalrowwidth - rowwidths[idx]) / 2;
+                }
+
+                x += centering_padding;
+
                 float endposition = x;
                 float usedglyphpadding = 0.0f;
                 if (y - curmenuoffset + textPaint.FontMetrics.Ascent <= glyphyend
@@ -9414,7 +9610,20 @@ namespace GnollHackClient.Pages.Game
                     }
 
                     if (!(y + textPaint.FontSpacing + textPaint.FontMetrics.Ascent <= 0 || y + textPaint.FontMetrics.Ascent >= canvasheight))
+                    {
+                        if(usetextoutline)
+                        {
+                            SKColor oldcolor = textPaint.Color;
+                            textPaint.Color = revertblackandwhite ? SKColors.White : SKColors.Black;
+                            textPaint.StrokeWidth = textPaint.TextSize / 10;
+                            textPaint.Style = SKPaintStyle.Stroke;
+                            canvas.DrawText(split_str, x, y, textPaint);
+                            textPaint.Color = oldcolor;
+                            textPaint.Style = SKPaintStyle.Fill;
+                            textPaint.StrokeWidth = 0;
+                        }
                         canvas.DrawText(split_str, x, y, textPaint);
+                    }
 
                     isfirstprintonrow = false;
                 }
@@ -9776,6 +9985,7 @@ namespace GnollHackClient.Pages.Game
 
         private void MenuCanvas_NormalClickRelease(object sender, SKTouchEventArgs e)
         {
+            bool doclickok = false;
             lock (MenuCanvas.MenuItemLock)
             {
                 if (MenuCanvas.MenuItems == null)
@@ -9826,6 +10036,7 @@ namespace GnollHackClient.Pages.Game
                                 if (idx != MenuCanvas.SelectionIndex && MenuCanvas.SelectionIndex >= 0 && MenuCanvas.SelectionIndex < MenuCanvas.MenuItems.Count)
                                     MenuCanvas.MenuItems[MenuCanvas.SelectionIndex].Count = 0;
 
+                                int oldselidx = MenuCanvas.SelectionIndex;
                                 MenuCanvas.SelectionIndex = idx;
                                 if (MenuCanvas.MenuItems[idx].Count == 0)
                                     MenuCanvas.MenuItems[idx].Count = -1;
@@ -9833,11 +10044,20 @@ namespace GnollHackClient.Pages.Game
                                 /* Else keep the current selection number */
                                 if(!MenuOKButton.IsEnabled)
                                     MenuOKButton.IsEnabled = true;
+
+                                if (MenuCanvas.ClickOKOnSelection)
+                                    doclickok = true;
                             }
                         }
                         break;
                     }
                 }
+            }
+
+            if (doclickok)
+            {
+                MenuCanvas.InvalidateSurface();
+                MenuOKButton_Clicked(sender, e);
             }
         }
 
@@ -9846,6 +10066,10 @@ namespace GnollHackClient.Pages.Game
         private bool _menuHideOn = false;
         private void MenuOKButton_Clicked(object sender, EventArgs e)
         {
+            MenuOKButton.IsEnabled = false;
+            MenuCancelButton.IsEnabled = false;
+            App.PlayButtonClickedSound();
+
             lock (_menuDrawOnlyLock)
             {
                 _menuRefresh = false;
@@ -9898,6 +10122,10 @@ namespace GnollHackClient.Pages.Game
 
         private void MenuCancelButton_Clicked(object sender, EventArgs e)
         {
+            MenuOKButton.IsEnabled = false;
+            MenuCancelButton.IsEnabled = false;
+            App.PlayButtonClickedSound();
+
             lock (_menuDrawOnlyLock)
             {
                 _menuRefresh = false;
@@ -10267,10 +10495,10 @@ namespace GnollHackClient.Pages.Game
                             textPaint.Color = ClientUtils.NHColor2SKColorCore(
                                 instr.Color < (int)nhcolor.CLR_MAX ? instr.Color : TextCanvas.RevertBlackAndWhite ? (int)nhcolor.CLR_BLACK : (int)nhcolor.CLR_WHITE, 
                                 instr.Attributes,
-                                TextCanvas.RevertBlackAndWhite);
+                                TextCanvas.RevertBlackAndWhite, false);
 
                             string[] split = str.Split(' ');
-                            DrawTextSplit(canvas, split, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, TextCanvas.GHWindow.UseSpecialSymbols, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                            DrawTextSplit(canvas, split, null, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, TextCanvas.GHWindow.UseSpecialSymbols, TextCanvas.UseTextOutline, TextCanvas.RevertBlackAndWhite, false, 0, curmenuoffset, glyphystart, glyphyend, glyphpadding);
 
                             //int idx = 0;
                             //foreach (string split_str in split)
@@ -10614,6 +10842,8 @@ namespace GnollHackClient.Pages.Game
         private readonly object _commandFPSCounterLock = new object();
         private long _commandFPSCounterValue = 0;
 
+        public int CurrentMoreButtonPageMaxNumber { get { return UseSimpleCmdLayout ? GHConstants.MoreButtonPages - 1 : GHConstants.MoreButtonPages; } }
+
         private void CommandCanvas_PaintSurface(object sender, SKPaintSurfaceEventArgs e)
         {
             SKImageInfo info = e.Info;
@@ -10635,7 +10865,7 @@ namespace GnollHackClient.Pages.Game
                 float cmdOffsetX = MoreCmdOffsetX;
                 int curpage = MoreCmdPage;
                 int pagemin = cmdOffsetX > 0 ? Math.Max(EnableWizardMode ? 0 : 1, curpage - 1) : curpage;
-                int pagemax = cmdOffsetX < 0 ? Math.Min(GHConstants.MoreButtonPages - 1, curpage + 1) : curpage;
+                int pagemax = cmdOffsetX < 0 ? Math.Min(CurrentMoreButtonPageMaxNumber - 1, curpage + 1) : curpage;
                 SKRect screenRect = new SKRect(0, 0, canvaswidth, canvasheight);
 
                 float smalldotheight = Math.Min(canvaswidth, canvasheight) / 120 * scale;
@@ -10643,9 +10873,9 @@ namespace GnollHackClient.Pages.Game
                 float dotmargin = smalldotheight;
 
                 textPaint.Style = SKPaintStyle.Fill;
-                for (int i = (EnableWizardMode ? 0 : 1); i < GHConstants.MoreButtonPages; i++)
+                for (int i = (EnableWizardMode ? 0 : 1); i < CurrentMoreButtonPageMaxNumber; i++)
                 {
-                    int numdots = (EnableWizardMode ? 4 : 3);
+                    int numdots = CurrentMoreButtonPageMaxNumber - (EnableWizardMode ? 0 : 1);
                     int dotidx = (EnableWizardMode ? i : i - 1);
                     float dotspacing = dotmargin + largedotheight;
                     float dotoffsetx = ((float)dotidx - ((float)(numdots - 1) / 2)) * dotspacing;
@@ -10815,7 +11045,7 @@ namespace GnollHackClient.Pages.Game
                                         if (diffX != 0 || diffY != 0)
                                         {
                                             int minpage = EnableWizardMode ? 0 : 1;
-                                            int maxpage = GHConstants.MoreButtonPages - 1;
+                                            int maxpage = CurrentMoreButtonPageMaxNumber - 1;
                                             cmdOffset += diffX;
                                             if(cmdPage == minpage && cmdOffset > 0)
                                                 MoreCmdOffsetX = cmdOffset = 0;
@@ -10947,7 +11177,7 @@ namespace GnollHackClient.Pages.Game
                                     }
                                     else if (origdiffX < -swipelengththreshold)
                                     {
-                                        if (cmdPage < GHConstants.MoreButtonPages - 1)
+                                        if (cmdPage < CurrentMoreButtonPageMaxNumber - 1)
                                         {
                                             MoreCmdPage = cmdPage + 1;
                                             MoreCmdOffsetX = cmdOffset + btnMatrixWidth;
@@ -10970,7 +11200,7 @@ namespace GnollHackClient.Pages.Game
                                     }
                                     else if (cmdOffset < -btnMatrixWidth / 2)
                                     {
-                                        if (cmdPage < GHConstants.MoreButtonPages - 1)
+                                        if (cmdPage < CurrentMoreButtonPageMaxNumber - 1)
                                         {
                                             MoreCmdPage = cmdPage + 1;
                                             MoreCmdOffsetX = cmdOffset + btnMatrixWidth;
@@ -11107,22 +11337,22 @@ namespace GnollHackClient.Pages.Game
                         canvas.DrawText(str, tx, ty, textPaint);
                         break;
                     case 1:
-                        PaintTipButton(canvas, textPaint, GameMenuButton, "This opens the main menu.", "Main Menu", 1.5f, centerfontsize, fontsize, false, -0.15f, 0);
+                        PaintTipButton(canvas, textPaint, UseSimpleCmdLayout ? SimpleGameMenuButton : GameMenuButton, "This opens the main menu.", "Main Menu", 1.5f, centerfontsize, fontsize, false, -0.15f, 0);
                         break;
                     case 2:
-                        PaintTipButton(canvas, textPaint, ESCButton, "This cancels any command.", "Escape Button", 1.5f, centerfontsize, fontsize, false, -1.5f, 0);
+                        PaintTipButton(canvas, textPaint, UseSimpleCmdLayout ? SimpleESCButton : ESCButton, "This cancels any command.", "Escape Button", 1.5f, centerfontsize, fontsize, false, -1.5f, 0);
                         break;
                     case 3:
-                        PaintTipButton(canvas, textPaint, ToggleAutoCenterModeButton, "This toggles auto-center on player.", "Map Auto-Center", 1.5f, centerfontsize, fontsize, false, -1.5f, 0);
+                        PaintTipButton(canvas, textPaint, UseSimpleCmdLayout ? SimpleToggleAutoCenterModeButton : ToggleAutoCenterModeButton, "This toggles auto-center on player.", "Map Auto-Center", 1.5f, centerfontsize, fontsize, false, -1.5f, 0);
                         break;
                     case 4:
-                        PaintTipButton(canvas, textPaint, ToggleZoomMiniButton, "This zoom shows the entire level.", "Minimap", 1.5f, centerfontsize, fontsize, false, landscape ? -0.15f : -0.5f, landscape ? 0 : 1.5f);
+                        PaintTipButton(canvas, textPaint, UseSimpleCmdLayout ? SimpleToggleZoomMiniButton : ToggleZoomMiniButton, "This zoom shows the entire level.", "Minimap", 1.5f, centerfontsize, fontsize, false, landscape ? -0.15f : -0.5f, landscape ? 0 : 1.5f);
                         break;
                     case 5:
                         PaintTipButton(canvas, textPaint, ToggleZoomAlternateButton, "This is the secondary zoom.", "Alternative Zoom", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, 0);
                         break;
                     case 6:
-                        PaintTipButton(canvas, textPaint, LookModeButton, "This allows you to inspect the map.", "Look Mode", 1.5f, centerfontsize, fontsize, false, -0.15f, landscape ? -0.5f : 0);
+                        PaintTipButton(canvas, textPaint, UseSimpleCmdLayout ? SimpleLookModeButton : LookModeButton, "This allows you to inspect the map.", "Look Mode", 1.5f, centerfontsize, fontsize, false, -0.15f, landscape ? -0.5f : 0);
                         break;
                     case 7:
                         PaintTipButton(canvas, textPaint, ToggleTravelModeButton, "Use this to set how you move around.", "Travel Mode", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, landscape ? -0.5f : 0);
@@ -11211,9 +11441,11 @@ namespace GnollHackClient.Pages.Game
                     break;
                 case SKTouchAction.Released:
                     ShownTip++;
-                    if(ShownTip == 12 && HealthRect.Width == 0)
+                    if (ShownTip == 12 && HealthRect.Width == 0)
                         ShownTip++;
-                    if (ShownTip == 13 && ManaRect.Width == 0)
+                    if (ShownTip == 12 && HealthRect.Width == 0)
+                        ShownTip++;
+                    if (UseSimpleCmdLayout && (ShownTip == 5 || ShownTip == 7))
                         ShownTip++;
                     TipView.InvalidateSurface();
                     if (ShownTip >= 15 - (_blockingTipView ? 0 : 1))
@@ -11273,8 +11505,8 @@ namespace GnollHackClient.Pages.Game
             }
             float relX = (float)(screenCoordinateX / canvasView.Width) * canvaswidth;
             float relY = (float)(screenCoordinateY / canvasView.Height) * canvasheight;
-            float relWidth = (float)(GameMenuButton.Width / canvasView.Width) * canvaswidth;
-            float relHeight = (float)(GameMenuButton.Height / canvasView.Height) * canvasheight;
+            float relWidth = (float)(StandardMeasurementButton.Width / canvasView.Width) * canvaswidth;
+            float relHeight = (float)(StandardMeasurementButton.Height / canvasView.Height) * canvasheight;
 
             SKRect res = new SKRect(relX, relY, relX + relWidth, relY + relHeight);
             return res;
@@ -11476,7 +11708,7 @@ namespace GnollHackClient.Pages.Game
 
         public async void ReportCrashDetected()
         {
-            bool answer = await DisplayAlert("Crash Detected", "A crashed game has been detected. GnollHack will attempt to restore this game. Also, do you want to create a crash report? This will create a zip archive of the files in your game directory and ask it to be shared further.", "Yes", "No");
+            bool answer = await DisplayAlert("Crash Detected", "A crashed game has been detected. GnollHack will attempt to restore this game. Also, do you want to create a crash report? This will create a zip archive of the files in your game directory and ask it to be shared further." + (UseMainGLCanvas ? " If the problem persists, try switching Game GPU Acceleration off in Settings." : ""), "Yes", "No");
             if (answer)
             {
                 await CheckAndRequestWritePermission();

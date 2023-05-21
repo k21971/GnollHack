@@ -936,8 +936,8 @@ randomtruegem()
 
 
 int
-randomreagent(alsotruegems, reagentstyle)
-boolean alsotruegems;
+random_reagent_otyp(alsotruegems, evenoreprobs, reagentstyle)
+boolean alsotruegems, evenoreprobs;
 int reagentstyle; //0 = all, 1 = priest only, 2 = wizard (no priest specific reagents)
 {
     int otyp = 0;
@@ -951,7 +951,7 @@ int reagentstyle; //0 = all, 1 = priest only, 2 = wizard (no priest specific rea
     if (reagentstyle == 0)
     {
         if ((Inhell && !rn2(3)) || (!Inhell && !rn2(5)))
-            return randomore();
+            return randomore(evenoreprobs);
 
         if ((Inhell && !rn2(3)) || (!Inhell && !rn2(5)))
             return rnd_class(DEATH_CAP, ORACULAR_TOADSTOOL);
@@ -968,7 +968,7 @@ int reagentstyle; //0 = all, 1 = priest only, 2 = wizard (no priest specific rea
     else if (reagentstyle == 2)
     {
         if ((Inhell && !rn2(2)) || (!Inhell && !rn2(3)))
-            return randomore();
+            return randomore(evenoreprobs);
 
         otyp = rnd_class(THREAD_OF_SPIDER_SILK, FEATHER);
 
@@ -979,13 +979,14 @@ int reagentstyle; //0 = all, 1 = priest only, 2 = wizard (no priest specific rea
 
 
 int
-randomore()
+randomore(evenprobs)
+boolean evenprobs;
 {
     int totalprob = 0, i;
 
     for (i = NUGGET_OF_IRON_ORE; i <= NUGGET_OF_MITHRIL_ORE; i++)
     {
-        if (Inhell)
+        if (evenprobs)
             totalprob += 1;
         else
             totalprob += max(1, objects[i].oc_prob);
@@ -997,7 +998,7 @@ randomore()
 
     for (i = NUGGET_OF_IRON_ORE; i <= NUGGET_OF_MITHRIL_ORE; i++)
     {
-        if (Inhell)
+        if (evenprobs)
             probcount += 1;
         else
             probcount += max(1, objects[i].oc_prob);
@@ -1478,7 +1479,7 @@ update_monster_timeouts()
                             else
                                 Sprintf(laughbuf, "%s head off", mhis(mtmp));
 
-                            if (is_speaking_monster(mtmp->data))
+                            if (is_speaking(mtmp->data))
                             {
                                 play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_LAUGHTER);
                                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Suddenly, %s laughs %s.", mon_nam(mtmp), laughbuf);
@@ -4462,11 +4463,11 @@ boolean via_attack;
                         context.global_minimum_volume = 0.25f;
                         play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_HALT_YOURE_UNDER_ARREST);
                         context.global_minimum_volume = 0.0f;
-                        verbalize("Halt!  You're under arrest!");
+                        verbalize_angry1("Halt!  You're under arrest!");
                         (void) angry_guards(!!Deaf);
                     } else {
                         if (!rn2(5)) {
-                            verbalize("%s", Exclam[mon->m_id % SIZE(Exclam)]);
+                            verbalize_talk1(Exclam[mon->m_id % SIZE(Exclam)]);
                             exclaimed = TRUE;
                         }
                         /* shopkeepers and temple priests might gasp in

@@ -983,7 +983,7 @@ register struct monst *mtmp;
     else if (mtmp->data->msound >= MS_HUMANOID) {
         if (!canspotmon(mtmp))
             map_invisible(mtmp->mx, mtmp->my);
-        verbalize("I'm hungry.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "I'm hungry.");
     }
 }
 
@@ -1021,8 +1021,8 @@ boolean dopopup, fromchatmenu;
 {
     char verbuf[BUFSZ];
     register const char *pline_msg = 0, /* Monnam(mtmp) will be prepended */
-        *verbl_msg = 0,                 /* verbalize() */
-        *verbl_msg_mcan = 0;            /* verbalize() if cancelled */
+        *verbl_msg = 0,                 /* verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, ) */
+        *verbl_msg_mcan = 0;            /* verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, ) if cancelled */
     struct permonst *ptr = mtmp->data;
     int msound = ptr->msound;
     char furiosbuf[BUFSZ] = "";
@@ -1085,13 +1085,11 @@ boolean dopopup, fromchatmenu;
         {
             play_monster_special_dialogue_line(mtmp, ORACLE_LINE_WELCOME_TO_DELPHI_ADVENTURER);
             Sprintf(verbuf, "Welcome to Delphi, adventurer!");
-            chat_line = 0;
         }
         else
         {
             play_monster_special_dialogue_line(mtmp, ORACLE_LINE_BEGONE_YOU_FOOL);
             Sprintf(verbuf, "Begone, you fool!");
-            chat_line = 1;
         }
         verbl_msg = verbuf;
         break;
@@ -1105,13 +1103,11 @@ boolean dopopup, fromchatmenu;
         {
             play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_WELCOME_TO_TEMPLE_LONG);
             Sprintf(verbuf, "Welcome to the temple of %s, adventurer!", temple_god);
-            chat_line = 0;
         }
         else
         {
             play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_YOU_SHALL_PERISH);
             Sprintf(verbuf, "You shall perish by the divine hand of %s!", temple_god);
-            chat_line = 1;
         }
         verbl_msg = verbuf;
         break;
@@ -1504,13 +1500,13 @@ bark_here:
             {
             default:
             case 0:
-                verbalize("Thou hast strayed from the %s path, %s.", align_str(u.ualignbase[A_ORIGINAL]), is_living(youmonst.data) ? "mortal" : "creature");
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "Thou hast strayed from the %s path, %s.", align_str(u.ualignbase[A_ORIGINAL]), is_living(youmonst.data) ? "mortal" : "creature");
                 break;
             case 1:
-                verbalize("I have been sent by %s to punish thee for thine insolence.", align_gname(u.ualignbase[A_ORIGINAL]));
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "I have been sent by %s to punish thee for thine insolence.", align_gname(u.ualignbase[A_ORIGINAL]));
                 break;
             case 2:
-                verbalize1("The punishment for such insolence is death.");
+                verbalize_angry1("The punishment for such insolence is death.");
                 break;
             }
             mtmp->talkstate_special++;
@@ -1784,7 +1780,7 @@ bark_here:
         if (is_peaceful(mtmp))
         {
             play_monster_special_dialogue_line(mtmp, flags.female ? KOP_LINE_JUST_THE_FACTS_MAAM : KOP_LINE_JUST_THE_FACTS_SIR);
-            verbalize("Just the facts, %s.", flags.female ? "Ma'am" : "Sir");
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Just the facts, %s.", flags.female ? "Ma'am" : "Sir");
         }
         else 
         {
@@ -1958,7 +1954,7 @@ bark_here:
         if (dopopup)
             popup_talk_line(mtmp, verbl_msg_mcan);
         else
-            verbalize1(verbl_msg_mcan);
+            verbalize_talk1(verbl_msg_mcan);
     }
     else if (verbl_msg) 
     {
@@ -2022,6 +2018,47 @@ dotalk()
 
     result = dochat();
     return result;
+}
+
+int
+dotalksteed()
+{
+    if (!u.usteed)
+        return 0;
+    else
+        return dochatmon(u.usteed);
+}
+
+int
+dotalknearby()
+{
+    int x, y;
+    int nummonfound = 0;
+    struct monst* selected_mtmp = 0;
+    if (!Hallucination)
+    {
+        struct monst* mtmp = 0;
+        for (x = u.ux - 1; x <= u.ux + 1; x++)
+        {
+            for (y = u.uy - 1; y <= u.uy + 1; y++)
+                if (!(x == u.ux && y == u.uy) && isok(x, y))
+                {
+                    mtmp = m_at(x, y);
+                    if (mtmp && monster_invokes_context_chat(mtmp))
+                    {
+                        nummonfound++;
+                        selected_mtmp = mtmp;
+                    }
+                }
+        }
+    }
+
+    if (!selected_mtmp || nummonfound != 1)
+        return dotalk();
+    else if (selected_mtmp)
+        return dochatmon(selected_mtmp);
+    else
+        return 0; /* Should not happen */
 }
 
 STATIC_OVL boolean
@@ -2093,7 +2130,7 @@ struct monst* mtmp;
     if (is_silenced(mtmp))
     {
         char Mhis[BUFSIZ];
-        strcpy(Mhis, mhis(mtmp));
+        Strcpy(Mhis, mhis(mtmp));
         *Mhis = highc(*Mhis);
         pline("%s cannot answer you. %s voice is gone!", noittame_Monnam(mtmp), Mhis);
         return 0;
@@ -2113,13 +2150,13 @@ const char* nomoodstr;
     if (!mtmp) 
     {
         play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-        There("is no one here to talk to.");
+        There_ex(ATR_NONE, CLR_MSG_FAIL, "is no one here to talk to.");
         return 0;
     }
     else if (!is_peaceful(mtmp) && !is_quantum_mechanic(mtmp->data) && !is_rider(mtmp->data))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s is in no mood for %s.", noittame_Monnam(mtmp), nomoodstr);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is in no mood for %s.", noittame_Monnam(mtmp), nomoodstr);
         return 0;
     }
 
@@ -2143,13 +2180,12 @@ genl_chat_message()
 STATIC_OVL int
 dochat()
 {
-    struct monst *mtmp;
+    struct monst* mtmp;
     int tx, ty;
-    struct obj *otmp;
-    boolean elbereth_was_known = (boolean)u.uevent.elbereth_known;
+    struct obj* otmp;
     boolean target_is_steed = FALSE;
 
-    if (!getdir("Talk to whom? (in what direction)")) 
+    if (!getdir("Talk to whom? (in what direction)"))
     {
         /* decided not to chat */
         return 0;
@@ -2168,13 +2204,13 @@ dochat()
     if (u.uswallow)
     {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        pline1("They won't hear you out there.");
+        pline_ex1(ATR_NONE, CLR_MSG_FAIL, "They won't hear you out there.");
         return 0;
     }
 
     if (u.usteed && u.dx == 0 && u.dy == 0 && u.dz > 0)
     {
-        if (!mon_can_move(u.usteed)) 
+        if (!mon_can_move(u.usteed))
         {
             play_sfx_sound(SFX_MONSTER_DOES_NOT_NOTICE);
             pline("%s seems not to notice you.", noittame_Monnam(u.usteed));
@@ -2186,10 +2222,10 @@ dochat()
     else if (u.dz)
     {
         play_sfx_sound(SFX_GENERAL_THAT_DID_NOTHING);
-        pline("They won't hear you %s there.", u.dz < 0 ? "up" : "down");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "They won't hear you %s there.", u.dz < 0 ? "up" : "down");
         return 0;
     }
-    else if (u.dx == 0 && u.dy == 0) 
+    else if (u.dx == 0 && u.dy == 0)
     {
         /* Note: Used above for chat message --JG */
 
@@ -2204,7 +2240,7 @@ dochat()
         }
          */
         play_sfx_sound(SFX_GENERAL_THATS_SILLY);
-        pline1("Talking to yourself is a bad habit for a dungeoneer.");
+        pline_ex1(ATR_NONE, CLR_MSG_WARNING, "Talking to yourself is a bad habit for a dungeoneer.");
         return 0;
     }
 
@@ -2222,21 +2258,30 @@ dochat()
         && (otmp = vobj_at(tx, ty)) != 0 && otmp->otyp == STATUE)
     {
         /* Talking to a statue */
-        if (!Blind) 
+        if (!Blind)
         {
             play_sfx_sound(SFX_MONSTER_DOES_NOT_NOTICE);
             pline_The("%s seems not to notice you.",
-                      /* if hallucinating, you can't tell it's a statue */
-                      Hallucination ? rndmonnam((char *) 0) : "statue");
+                /* if hallucinating, you can't tell it's a statue */
+                Hallucination ? rndmonnam((char*)0) : "statue");
         }
         return 0;
     }
 
-    if (!mtmp || mtmp->mundetected || (!canspotmon(mtmp) && !is_tame(mtmp)) || M_AP_TYPE(mtmp) == M_AP_FURNITURE
-        || M_AP_TYPE(mtmp) == M_AP_OBJECT)
+    return dochatmon(mtmp);
+}
+
+int
+dochatmon(mtmp)
+struct monst* mtmp;
+{
+    boolean elbereth_was_known = (boolean)u.uevent.elbereth_known;
+
+    if (!mtmp || 
+        ((!canspotmon(mtmp) || mtmp->mundetected || M_AP_TYPE(mtmp) == M_AP_FURNITURE || M_AP_TYPE(mtmp) == M_AP_OBJECT) && !is_tame(mtmp)))
     {
         play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-        pline1(Blind ? "You cannot see there anyone to talk to." : "There is no-one to talk to.");
+        pline_ex1(ATR_NONE, CLR_MSG_FAIL, Blind ? "You cannot see there anyone to talk to." : "There is no-one to talk to.");
         return 0;
     }
 
@@ -2245,7 +2290,7 @@ dochat()
 
 #if 0
     /* Non-speaking monster */
-    if (!is_speaking_monster(mtmp->data) && !is_tame(mtmp))
+    if (!is_speaking(mtmp->data) && !is_tame(mtmp))
     {
         if (canspotmon(mtmp))
         {
@@ -2345,7 +2390,7 @@ dochat()
         any = zeroany;
 
         /* Hello! This is the old chat, i.e., domonnoise function */
-        strcpy(available_chat_list[chatnum].name, "\"Hello there!\"");
+        Strcpy(available_chat_list[chatnum].name, "\"Hello there!\"");
         available_chat_list[chatnum].function_ptr = &domonnoise_with_popup;
         available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2353,15 +2398,15 @@ dochat()
         any.a_char = available_chat_list[chatnum].charnum;
 
         add_menu(win, NO_GLYPH, &any,
-            any.a_char, 0, ATR_NONE,
+            any.a_char, 0, ATR_NONE, NO_COLOR,
             available_chat_list[chatnum].name, MENU_UNSELECTED);
 
         chatnum++;
 
-        if (is_speaking_monster(mtmp->data) && (is_peaceful(mtmp) || is_quantum_mechanic(mtmp->data) || is_rider(mtmp->data)))
+        if (is_speaking(mtmp->data) && is_mon_talkative(mtmp))
         {
             /* Who are you? */
-            strcpy(available_chat_list[chatnum].name, "\"Who are you?\"");
+            Strcpy(available_chat_list[chatnum].name, "\"Who are you?\"");
             available_chat_list[chatnum].function_ptr = &do_chat_whoareyou;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2369,7 +2414,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -2377,14 +2422,14 @@ dochat()
 
         boolean non_advicing_npc = has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].general_flags & NPC_FLAGS_NO_ADVICE) != 0;
 
-        if(is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && !non_advicing_npc)
+        if(is_speaking(mtmp->data) && is_peaceful(mtmp) && !non_advicing_npc)
         {
             if (!mtmp->isgd && !(mtmp->data->mflags6 & M6_HATCHLING) && (is_izchak(mtmp, TRUE) || mtmp->rumorsleft >= 0))
             {
                 if(is_izchak(mtmp, TRUE))
-                    strcpy(available_chat_list[chatnum].name, mtmp->told_rumor ? "Ask what is further on his mind" : "Ask what is on his mind");
+                    Strcpy(available_chat_list[chatnum].name, mtmp->told_rumor ? "Ask what is further on his mind" : "Ask what is on his mind");
                 else
-                    strcpy(available_chat_list[chatnum].name, mtmp->told_rumor ? "Ask for further adventuring advice" : "Ask for adventuring advice");
+                    Strcpy(available_chat_list[chatnum].name, mtmp->told_rumor ? "Ask for further adventuring advice" : "Ask for adventuring advice");
 
                 available_chat_list[chatnum].function_ptr = &do_chat_rumors;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
@@ -2393,19 +2438,19 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
         }
 
-        if (is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_QUANTUM_QUESTS) != 0)
+        if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_QUANTUM_QUESTS) != 0)
         {
             /* Endicott - Quantum Quests */
             if (mtmp->u_know_mname)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about experiments");
+                Strcpy(available_chat_list[chatnum].name, "Ask about experiments");
                 available_chat_list[chatnum].function_ptr = &do_chat_quantum_experiments;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2413,7 +2458,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2421,7 +2466,7 @@ dochat()
 
             if (mtmp->quantum_told_experiments)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Large Circular Dungeon");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Large Circular Dungeon");
                 available_chat_list[chatnum].function_ptr = &do_chat_quantum_large_circular_dungeon;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2429,7 +2474,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2446,7 +2491,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2462,7 +2507,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2478,17 +2523,17 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
         }
 
-        if (is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_STARTING_QUESTS) != 0)
+        if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_STARTING_QUESTS) != 0)
         {
             /* Hermit - Starting Quests */
-            strcpy(available_chat_list[chatnum].name, "Ask about the Dungeons of Doom");
+            Strcpy(available_chat_list[chatnum].name, "Ask about the Dungeons of Doom");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit_dungeons;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2496,12 +2541,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Ask about the Amulet of Yendor");
+            Strcpy(available_chat_list[chatnum].name, "Ask about the Amulet of Yendor");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit_quests;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2509,12 +2554,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Ask about further advice");
+            Strcpy(available_chat_list[chatnum].name, "Ask about further advice");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit_further_advice;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2522,14 +2567,14 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
             if (mtmp->hermit_told_dungeon)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Gnomish Mines");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Gnomish Mines");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit_gnomish_mines;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2537,12 +2582,12 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
 
-                strcpy(available_chat_list[chatnum].name, "Ask about the Sokoban");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Sokoban");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit_sokoban;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2550,7 +2595,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2558,7 +2603,7 @@ dochat()
 
             if(mtmp->hermit_told_quests || mtmp->hermit_told_castle)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Wizard of Yendor");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Wizard of Yendor");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit_wizard_of_yendor;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2566,7 +2611,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2574,7 +2619,7 @@ dochat()
 
             if (mtmp->hermit_told_quests)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Castle");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Castle");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit_castle;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2582,12 +2627,12 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
 
-                strcpy(available_chat_list[chatnum].name, "Ask about Under World");
+                Strcpy(available_chat_list[chatnum].name, "Ask about Under World");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit_gehennom;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2595,7 +2640,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2603,7 +2648,7 @@ dochat()
 
             //if (mtmp->hermit_told_sokoban)
             //{
-            //    strcpy(available_chat_list[chatnum].name, "Ask about the prizes in Sokoban");
+            //    Strcpy(available_chat_list[chatnum].name, "Ask about the prizes in Sokoban");
             //    available_chat_list[chatnum].function_ptr = &do_chat_hermit_sokoprizes;
             //    available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2611,7 +2656,7 @@ dochat()
             //    any.a_char = available_chat_list[chatnum].charnum;
 
             //    add_menu(win, NO_GLYPH, &any,
-            //        any.a_char, 0, ATR_NONE,
+            //        any.a_char, 0, ATR_NONE, NO_COLOR,
             //        available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             //    chatnum++;
@@ -2619,10 +2664,10 @@ dochat()
 
         }
 
-        if (is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_ADVANCED_QUESTS) != 0)
+        if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_ADVANCED_QUESTS) != 0)
         {
             /* Hermit - Advanced Quests */
-            strcpy(available_chat_list[chatnum].name, "Ask about the Castle");
+            Strcpy(available_chat_list[chatnum].name, "Ask about the Castle");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit2_castle;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2630,12 +2675,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Ask about Gehennom");
+            Strcpy(available_chat_list[chatnum].name, "Ask about Gehennom");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit2_gehennom;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2643,12 +2688,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Ask about the Wizard of Yendor");
+            Strcpy(available_chat_list[chatnum].name, "Ask about the Wizard of Yendor");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit2_wizard_of_yendor;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2656,14 +2701,14 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
             if (mtmp->hermit2_told_gehennom)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Vampire Lord");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Vampire Lord");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit2_vampire_lord;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2671,7 +2716,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2679,7 +2724,7 @@ dochat()
 
             if (mtmp->hermit2_told_vampire_lord || mtmp->hermit2_told_ritual)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Candelabrum of Invocation");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Candelabrum of Invocation");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit2_candelabrum;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2687,7 +2732,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2695,7 +2740,7 @@ dochat()
 
             if (mtmp->hermit2_told_wizard_of_yendor || mtmp->hermit2_told_ritual)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Book of the Dead");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Book of the Dead");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit2_book_of_the_dead;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2703,7 +2748,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2711,7 +2756,7 @@ dochat()
 
             if (mtmp->hermit2_told_ritual)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Silver Bell");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Silver Bell");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit2_silver_bell;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2719,7 +2764,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2727,7 +2772,7 @@ dochat()
 
             if (mtmp->hermit2_told_wizard_of_yendor || mtmp->hermit2_told_vampire_lord || mtmp->hermit2_told_candelabrum || mtmp->hermit2_told_silver_bell || mtmp->hermit2_told_book_of_the_dead)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Passage to Amulet");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Passage to Amulet");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit2_ritual;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2735,7 +2780,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2743,10 +2788,10 @@ dochat()
 
         }
 
-        if (is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_GNOMISH_QUESTS) != 0)
+        if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_GNOMISH_QUESTS) != 0)
         {
             /* Hermit - Gnomish Quests */
-            strcpy(available_chat_list[chatnum].name, "Ask about the Gnomish Mines");
+            Strcpy(available_chat_list[chatnum].name, "Ask about the Gnomish Mines");
             available_chat_list[chatnum].function_ptr = &do_chat_hermit3_gnomish_mines;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2754,14 +2799,14 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
             if (mtmp->hermit3_told_gnomish_mines)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Gladstone");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Gladstone");
                 available_chat_list[chatnum].function_ptr = &do_chat_hermit3_luckstone;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2769,7 +2814,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2777,10 +2822,10 @@ dochat()
 
         }
 
-        if (is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_ORCISH_QUESTS) != 0)
+        if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_ORCISH_QUESTS) != 0)
         {
             /* Hermit - Orcish Quests */
-            strcpy(available_chat_list[chatnum].name, "Ask about the Gnomish Mines");
+            Strcpy(available_chat_list[chatnum].name, "Ask about the Gnomish Mines");
             available_chat_list[chatnum].function_ptr = &do_chat_orc_hermit3_gnomish_mines;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2788,14 +2833,14 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
             if (mtmp->hermit3_told_gnomish_mines)
             {
-                strcpy(available_chat_list[chatnum].name, "Ask about the Gladstone");
+                Strcpy(available_chat_list[chatnum].name, "Ask about the Gladstone");
                 available_chat_list[chatnum].function_ptr = &do_chat_orc_hermit3_luckstone;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2803,7 +2848,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2811,12 +2856,12 @@ dochat()
         }
 
 
-        if (is_speaking_monster(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp))
+        if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp))
         {
             if ((npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_SING_SONGS) != 0)
             {
                 /* Special hints about game mechanics */
-                strcpy(available_chat_list[chatnum].name, "Ask to sing a song");
+                Strcpy(available_chat_list[chatnum].name, "Ask to sing a song");
                 available_chat_list[chatnum].function_ptr = &do_chat_npc_sing_song;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2824,7 +2869,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2832,7 +2877,7 @@ dochat()
             if ((npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_SPECIAL_NPC_HINTS) != 0)
             {
                 /* Special hints about game mechanics */
-                strcpy(available_chat_list[chatnum].name, "Ask about advanced adventuring tactics");
+                Strcpy(available_chat_list[chatnum].name, "Ask about advanced adventuring tactics");
                 available_chat_list[chatnum].function_ptr = &do_chat_npc_special_hints;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2840,7 +2885,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2861,7 +2906,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2869,7 +2914,7 @@ dochat()
 
             if (mtmp->data->mlet == S_DOG && !mtmp->mstaying && mtmp->mwantstomove)
             {
-                strcpy(available_chat_list[chatnum].name, "Command to sit down");
+                Strcpy(available_chat_list[chatnum].name, "Command to sit down");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_sit;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -2878,7 +2923,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2886,7 +2931,7 @@ dochat()
 
             if (mtmp->data->mlet == S_DOG)
             {
-                strcpy(available_chat_list[chatnum].name, "Command to give paw");
+                Strcpy(available_chat_list[chatnum].name, "Command to give paw");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_givepaw;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -2895,7 +2940,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2906,11 +2951,11 @@ dochat()
             {
 
                 if (is_animal(mtmp->data))
-                    strcpy(available_chat_list[chatnum].name, "Command to stay put");
-                else if (is_speaking_monster(mtmp->data))
-                    strcpy(available_chat_list[chatnum].name, "Command to hold position");
+                    Strcpy(available_chat_list[chatnum].name, "Command to stay put");
+                else if (is_speaking(mtmp->data))
+                    Strcpy(available_chat_list[chatnum].name, "Command to hold position");
                 else
-                    strcpy(available_chat_list[chatnum].name, "Command to hold position");
+                    Strcpy(available_chat_list[chatnum].name, "Command to hold position");
 
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_stay;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
@@ -2920,7 +2965,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2930,11 +2975,11 @@ dochat()
             if (mtmp->mstaying || !mtmp->mwantstomove)
             {
                 if (is_animal(mtmp->data))
-                    strcpy(available_chat_list[chatnum].name, "Command to stop staying put");
-                else if (is_speaking_monster(mtmp->data))
-                    strcpy(available_chat_list[chatnum].name, "Command to stop holding position");
+                    Strcpy(available_chat_list[chatnum].name, "Command to stop staying put");
+                else if (is_speaking(mtmp->data))
+                    Strcpy(available_chat_list[chatnum].name, "Command to stop holding position");
                 else
-                    strcpy(available_chat_list[chatnum].name, "Command to stop holding position");
+                    Strcpy(available_chat_list[chatnum].name, "Command to stop holding position");
 
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_standup;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
@@ -2944,7 +2989,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2954,7 +2999,7 @@ dochat()
             if (!mtmp->mcomingtou)
             {
 
-                strcpy(available_chat_list[chatnum].name, "Command to follow you");
+                Strcpy(available_chat_list[chatnum].name, "Command to follow you");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_follow;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -2963,7 +3008,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2971,7 +3016,7 @@ dochat()
 
             if (mtmp->mcomingtou)
             {
-                strcpy(available_chat_list[chatnum].name, "Command to stop following you");
+                Strcpy(available_chat_list[chatnum].name, "Command to stop following you");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_unfollow;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -2980,7 +3025,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -2990,7 +3035,7 @@ dochat()
 
             if (mtmp->minvent)
             {
-                strcpy(available_chat_list[chatnum].name, "Display inventory");
+                Strcpy(available_chat_list[chatnum].name, "Display inventory");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_display_inventory;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -2998,7 +3043,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3006,7 +3051,7 @@ dochat()
 
             if (mtmp->minvent && droppables(mtmp) && !mtmp->issummoned && !mtmp->ispartymember)
             {
-                strcpy(available_chat_list[chatnum].name, "Command to drop items");
+                Strcpy(available_chat_list[chatnum].name, "Command to drop items");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_dropitems;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3015,7 +3060,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3024,7 +3069,7 @@ dochat()
             if (OBJ_AT(mtmp->mx, mtmp->my) && !mtmp->issummoned && !mtmp->ispartymember)
             {
             
-                strcpy(available_chat_list[chatnum].name, "Command to pick the items on the ground");
+                Strcpy(available_chat_list[chatnum].name, "Command to pick the items on the ground");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_pickitems;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3033,7 +3078,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3054,7 +3099,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3075,7 +3120,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3089,7 +3134,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3106,7 +3151,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3122,7 +3167,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3141,7 +3186,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3158,7 +3203,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3174,7 +3219,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3194,7 +3239,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3210,7 +3255,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3227,7 +3272,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3243,7 +3288,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3259,7 +3304,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3277,7 +3322,7 @@ dochat()
             && !(msound == MS_LEADER || msound == MS_GUARDIAN || msound == MS_NEMESIS)
             && mtmp->minvent && count_sellable_items(mtmp) > 0)
         {
-            strcpy(available_chat_list[chatnum].name, "Check items for sale");
+            Strcpy(available_chat_list[chatnum].name, "Check items for sale");
             available_chat_list[chatnum].function_ptr = &do_chat_buy_items;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3285,7 +3330,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3307,7 +3352,7 @@ dochat()
             && !(msound == MS_LEADER || msound == MS_GUARDIAN || msound == MS_NEMESIS)
             )
         {
-            strcpy(available_chat_list[chatnum].name, "Ask to join the party");
+            Strcpy(available_chat_list[chatnum].name, "Ask to join the party");
             available_chat_list[chatnum].function_ptr = &do_chat_join_party;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3316,12 +3361,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Explain current statistics");
+            Strcpy(available_chat_list[chatnum].name, "Explain current statistics");
             available_chat_list[chatnum].function_ptr = &do_chat_explain_statistics;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3329,7 +3374,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3339,7 +3384,7 @@ dochat()
         /* Oracle */
         if (is_peaceful(mtmp) && msound == MS_ORACLE)
         {
-            strcpy(available_chat_list[chatnum].name, "Consultation");
+            Strcpy(available_chat_list[chatnum].name, "Consultation");
             available_chat_list[chatnum].function_ptr = &do_chat_oracle_consult;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3347,12 +3392,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Identify items");
+            Strcpy(available_chat_list[chatnum].name, "Identify items");
             available_chat_list[chatnum].function_ptr = &do_chat_oracle_identify;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3360,12 +3405,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Enlightenment");
+            Strcpy(available_chat_list[chatnum].name, "Enlightenment");
             available_chat_list[chatnum].function_ptr = &do_chat_oracle_enlightenment;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3373,7 +3418,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3382,7 +3427,7 @@ dochat()
         /* Priest */
         if (is_peaceful(mtmp) && (msound == MS_PRIEST || mtmp->ispriest))
         {
-            strcpy(available_chat_list[chatnum].name, "Standard healing");
+            Strcpy(available_chat_list[chatnum].name, "Standard healing");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_normal_healing;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3391,12 +3436,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Full healing");
+            Strcpy(available_chat_list[chatnum].name, "Full healing");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_full_healing;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3405,12 +3450,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Cure sickness");
+            Strcpy(available_chat_list[chatnum].name, "Cure sickness");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_cure_sickness;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3419,12 +3464,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Bless or curse an item");
+            Strcpy(available_chat_list[chatnum].name, "Bless or curse an item");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_blesscurse;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3433,12 +3478,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Divination");
+            Strcpy(available_chat_list[chatnum].name, "Divination");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_divination;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3446,12 +3491,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Teach spells");
+            Strcpy(available_chat_list[chatnum].name, "Teach spells");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_teach_spells;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3459,14 +3504,14 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
             if (mtmp->ispriest && inhistemple(mtmp))
             {
-                strcpy(available_chat_list[chatnum].name, "Chat about a monetary contribution to the temple");
+                Strcpy(available_chat_list[chatnum].name, "Chat about a monetary contribution to the temple");
                 available_chat_list[chatnum].function_ptr = &do_chat_priest_chat;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3474,7 +3519,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3485,7 +3530,7 @@ dochat()
             && msound != MS_LEADER && msound != MS_GUARDIAN)
         {
             /* Non-priest monster priests here */
-            strcpy(available_chat_list[chatnum].name, "Healing");
+            Strcpy(available_chat_list[chatnum].name, "Healing");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_normal_healing;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3494,12 +3539,12 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
-            strcpy(available_chat_list[chatnum].name, "Cure sickness");
+            Strcpy(available_chat_list[chatnum].name, "Cure sickness");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_cure_sickness;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
             available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3508,13 +3553,13 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
 
 
-            strcpy(available_chat_list[chatnum].name, "Divination");
+            Strcpy(available_chat_list[chatnum].name, "Divination");
             available_chat_list[chatnum].function_ptr = &do_chat_priest_divination;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3522,7 +3567,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3531,7 +3576,7 @@ dochat()
         /* Quest */
         if ((is_peaceful(mtmp) && (msound == MS_LEADER || msound == MS_GUARDIAN)) || msound == MS_NEMESIS)
         {
-            strcpy(available_chat_list[chatnum].name, "Talk about your quest");
+            Strcpy(available_chat_list[chatnum].name, "Talk about your quest");
             available_chat_list[chatnum].function_ptr = &do_chat_quest_chat;
             available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3539,7 +3584,7 @@ dochat()
             any.a_char = available_chat_list[chatnum].charnum;
 
             add_menu(win, NO_GLYPH, &any,
-                any.a_char, 0, ATR_NONE,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
                 available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
@@ -3552,7 +3597,7 @@ dochat()
             if(1)
             {
                 if(is_peaceful(mtmp))
-                    strcpy(available_chat_list[chatnum].name, "Ask about the state of business");
+                    Strcpy(available_chat_list[chatnum].name, "Ask about the state of business");
                 else
                     Sprintf(available_chat_list[chatnum].name, "Ask about what's getting on %s nerves", mhis(mtmp));
                 available_chat_list[chatnum].function_ptr = &do_chat_shk_chat;
@@ -3562,14 +3607,14 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
             if (!is_peaceful(mtmp))
             {
-                strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
+                Strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
                 available_chat_list[chatnum].function_ptr = &do_chat_shk_reconciliation;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3578,14 +3623,14 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
-            if(invent && count_unpaid(invent, FALSE))
+            if(invent && count_unpaid(invent, 0, FALSE))
             {
-                strcpy(available_chat_list[chatnum].name, "Pay items");
+                Strcpy(available_chat_list[chatnum].name, "Pay items");
                 available_chat_list[chatnum].function_ptr = &do_chat_shk_payitems;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3594,7 +3639,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3607,7 +3652,7 @@ dochat()
                 shp_indx = ESHK(mtmp)->shoptype - SHOPBASE;
                 const struct shclass* shp = &shtypes[shp_indx];
                 char itembuf[BUFSIZ] = "";
-                strcpy(itembuf, shp->identified_item_description_plural);
+                Strcpy(itembuf, shp->identified_item_description_plural);
             
                 Sprintf(available_chat_list[chatnum].name, "Identify %s", itembuf);
                 available_chat_list[chatnum].function_ptr = &do_chat_shk_identify;
@@ -3617,13 +3662,13 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
 
-
+            struct obj* otmp;
             if (is_peaceful(mtmp) && !Blind && (otmp = shop_object(u.ux, u.uy)) != (struct obj*) 0)
             {
                 /* standing on something in a shop and chatting causes the shopkeeper
@@ -3633,7 +3678,7 @@ dochat()
                    (not angry) and able (not asleep) to speak and the position
                    contains any objects other than just gold.
                 */
-                strcpy(available_chat_list[chatnum].name, "Quote items");
+                Strcpy(available_chat_list[chatnum].name, "Quote items");
                 available_chat_list[chatnum].function_ptr = &do_chat_shk_pricequote;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -3641,7 +3686,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3653,7 +3698,7 @@ dochat()
         {
             if (!is_peaceful(mtmp))
             {
-                strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
+                Strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_reconciliation;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3662,7 +3707,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3679,7 +3724,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3693,12 +3738,12 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
 
-                strcpy(available_chat_list[chatnum].name, "Identify weapons and armor");
+                Strcpy(available_chat_list[chatnum].name, "Identify weapons and armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_identify;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3707,14 +3752,14 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
 
                 char sbuf[BUFSIZ];
                 Sprintf(sbuf, "Sell nuggets of armor ore to %s", noittame_mon_nam(mtmp));
-                strcpy(available_chat_list[chatnum].name, sbuf);
+                Strcpy(available_chat_list[chatnum].name, sbuf);
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_sell_ore;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3723,7 +3768,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3737,7 +3782,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3751,7 +3796,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3765,7 +3810,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3779,7 +3824,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3793,7 +3838,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3807,7 +3852,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3822,7 +3867,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3835,7 +3880,7 @@ dochat()
         {
             if (!is_peaceful(mtmp))
             {
-                strcpy(available_chat_list[chatnum].name, "Offer research support");
+                Strcpy(available_chat_list[chatnum].name, "Offer research support");
                 available_chat_list[chatnum].function_ptr = &do_chat_quantum_mechanic_research_support;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3844,14 +3889,14 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
             else
             {
-                strcpy(available_chat_list[chatnum].name, "Ask to observe your position");
+                Strcpy(available_chat_list[chatnum].name, "Ask to observe your position");
                 available_chat_list[chatnum].function_ptr = &do_chat_quantum_observe_position;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3860,12 +3905,12 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
 
-                strcpy(available_chat_list[chatnum].name, "Ask to observe your speed");
+                Strcpy(available_chat_list[chatnum].name, "Ask to observe your speed");
                 available_chat_list[chatnum].function_ptr = &do_chat_quantum_observe_speed;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3874,7 +3919,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3886,7 +3931,7 @@ dochat()
         {
             if (!is_peaceful(mtmp))
             {
-                strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
+                Strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
                 available_chat_list[chatnum].function_ptr = &do_chat_npc_reconciliation;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -3895,7 +3940,7 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
@@ -3914,7 +3959,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -3932,7 +3977,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -3949,7 +3994,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -3959,7 +4004,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Identify gems and stones");
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_identify_gems_and_stones;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
                     available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3968,7 +4013,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -3978,7 +4023,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Sell gems and stones to %s", noittame_mon_nam(mtmp));
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_sell_gems_and_stones;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
                     available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -3987,7 +4032,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4004,7 +4049,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4021,7 +4066,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4038,7 +4083,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4048,7 +4093,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Sell dilithium crystals and other gems to %s", noittame_mon_nam(mtmp));
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_sell_dilithium_crystals;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
                     available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -4057,7 +4102,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4067,7 +4112,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Sell spellbooks to %s", noittame_mon_nam(mtmp));
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_sell_spellbooks;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
                     available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -4076,7 +4121,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4086,7 +4131,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Identify accessories and charged items");
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_identify_accessories_and_charged_items;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
                     available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -4095,7 +4140,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4105,7 +4150,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Identify gems, stones and charged items");
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_identify_gems_stones_and_charged_items;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
                     available_chat_list[chatnum].stops_dialogue = FALSE;
@@ -4114,7 +4159,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4131,7 +4176,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4141,7 +4186,7 @@ dochat()
                 {
                     char sbuf[BUFSIZ];
                     Sprintf(sbuf, "Teach spells");
-                    strcpy(available_chat_list[chatnum].name, sbuf);
+                    Strcpy(available_chat_list[chatnum].name, sbuf);
                     available_chat_list[chatnum].function_ptr = &do_chat_npc_teach_spells;
                     available_chat_list[chatnum].charnum = 'a' + chatnum;
 
@@ -4149,7 +4194,7 @@ dochat()
                     any.a_char = available_chat_list[chatnum].charnum;
 
                     add_menu(win, NO_GLYPH, &any,
-                        any.a_char, 0, ATR_NONE,
+                        any.a_char, 0, ATR_NONE, NO_COLOR,
                         available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                     chatnum++;
@@ -4165,7 +4210,7 @@ dochat()
         {
             if(!is_peaceful(mtmp))
             {
-                strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
+                Strcpy(available_chat_list[chatnum].name, "Ask for reconciliation");
                 available_chat_list[chatnum].function_ptr = &do_chat_watchman_reconciliation;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
@@ -4174,13 +4219,28 @@ dochat()
                 any.a_char = available_chat_list[chatnum].charnum;
 
                 add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
             }
         }
 
+        if (is_tame(mtmp))
+        {
+            Strcpy(available_chat_list[chatnum].name, "Display statistics");
+            available_chat_list[chatnum].function_ptr = &monsterdescription;
+            available_chat_list[chatnum].charnum = 'a' + chatnum;
+
+            any = zeroany;
+            any.a_char = available_chat_list[chatnum].charnum;
+
+            add_menu(win, NO_GLYPH, &any,
+                any.a_char, 0, ATR_NONE, NO_COLOR,
+                available_chat_list[chatnum].name, MENU_UNSELECTED);
+
+            chatnum++;
+        }
 
         /* Finish the menu */
         end_menu(win, "What do you want to say?");
@@ -4460,11 +4520,11 @@ struct monst* mtmp;
                     char titlebuf[BUFSZ];
                     if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].general_flags & NPC_FLAGS_NO_TITLE_ARTICLE)
                     {
-                        strcpy(titlebuf, npc_subtype_definitions[ENPC(mtmp)->npc_typ].npc_role_name);
+                        Strcpy(titlebuf, npc_subtype_definitions[ENPC(mtmp)->npc_typ].npc_role_name);
                     }
                     else
                     {
-                        strcpy(titlebuf, an(npc_subtype_definitions[ENPC(mtmp)->npc_typ].npc_role_name));
+                        Strcpy(titlebuf, an(npc_subtype_definitions[ENPC(mtmp)->npc_typ].npc_role_name));
                     }
 
                     Sprintf(ansbuf, "I am %s, %s.", MNAME(mtmp), titlebuf);
@@ -4505,7 +4565,7 @@ struct monst* mtmp;
         switch (mtmp->mnum)
         {
         case PM_STUDENT:
-            strcpy(titlebuf, "a student at the College of Archaeology");
+            Strcpy(titlebuf, "a student at the College of Archaeology");
             break;
         case PM_CHIEFTAIN:
         case PM_NEANDERTHAL:
@@ -4523,9 +4583,9 @@ struct monst* mtmp;
             break;
         default:
             if (mtmp->mnum == urole.guardnum)
-                strcpy(titlebuf, "your quest guardian");
+                Strcpy(titlebuf, "your quest guardian");
             else
-                strcpy(titlebuf, "a quest guardian");
+                Strcpy(titlebuf, "a quest guardian");
             break;
 
         }
@@ -4717,7 +4777,7 @@ struct monst* mtmp;
             popup_talk_line_ex(mtmp, rumorbuf, ATR_NONE, CLR_MSG_GOD, TRUE, FALSE);
         }
         else
-            verbalize("%s", rumorbuf);
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "%s", rumorbuf);
 
         display_popup_text(rumorbuf, "Advice", POPUP_TEXT_ADVICE, ATR_NONE, is_death ? CLR_MSG_GOD : NO_COLOR, NO_GLYPH, POPUP_FLAGS_ADD_QUOTES);
 
@@ -4987,7 +5047,7 @@ struct monst* mtmp;
             Sprintf(pbuf, "%s looks determined not to move anywhere.", noittame_Monnam(mtmp));
         else if is_animal(mtmp->data)
             Sprintf(pbuf, "%s sits down and looks determined not to move anywhere.", noittame_Monnam(mtmp));
-        else if (is_speaking_monster(mtmp->data))
+        else if (is_speaking(mtmp->data))
             Sprintf(pbuf, "%s starts to hold its position.", noittame_Monnam(mtmp));
         else
             Sprintf(pbuf, "%s starts to hold its position.", noittame_Monnam(mtmp));
@@ -5018,7 +5078,7 @@ struct monst* mtmp;
             Sprintf(pbuf, "%s stops staying put.", noittame_Monnam(mtmp));
         else if is_animal(mtmp->data)
             Sprintf(pbuf, "%s stands up.", noittame_Monnam(mtmp));
-        else if (is_speaking_monster(mtmp->data))
+        else if (is_speaking(mtmp->data))
             Sprintf(pbuf, "%s stops holding its position.", noittame_Monnam(mtmp));
         else
             Sprintf(pbuf, "%s stops holding its position.", noittame_Monnam(mtmp));
@@ -5297,7 +5357,7 @@ struct monst* mtmp;
                                 {
                                     play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_DROP_THAT_NOW);
                                     pline("%s shouts:", Monnam(shkp));
-                                    verbalize("Drop that, now!");
+                                    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Drop that, now!");
                                     if (iflags.using_gui_sounds)
                                         delay_output_milliseconds(1200);
                                     play_monster_unhappy_sound(mtmp, MONSTER_UNHAPPY_SOUND_WHIMPER);
@@ -5424,7 +5484,7 @@ struct monst* mtmp;
                 if (otmp->owornmask & (W_ARMOR | W_ACCESSORY))
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    You("cannot pass %s over to %s. You are wearing it.", an(singular(otmp, cxname)), noittame_mon_nam(mtmp));
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot pass %s over to %s. You are wearing it.", an(singular(otmp, cxname)), noittame_mon_nam(mtmp));
                 }
                 else
                 {
@@ -5522,7 +5582,7 @@ struct monst* mtmp;
         any = zeroany;
         any.a_int = 1;
         Sprintf(nbuf, "Cast a bless on %s item", s_suffix(mon_nam(mtmp)));
-        add_menu(win, POT_WATER + GLYPH_OBJ_OFF, &any, 0, 0, ATR_NONE, "Dip an item in a potion of water", MENU_UNSELECTED);
+        add_menu(win, POT_WATER + GLYPH_OBJ_OFF, &any, 0, 0, ATR_NONE, NO_COLOR, "Dip an item in a potion of water", MENU_UNSELECTED);
         cnt++;
     }
 
@@ -5541,7 +5601,7 @@ struct monst* mtmp;
         any = zeroany;
         any.a_int = 2;
         Sprintf(nbuf, "Ask %s to read a scroll of remove curse", mon_nam(mtmp));
-        add_menu(win, SCR_REMOVE_CURSE + GLYPH_OBJ_OFF, &any, 0, 0, ATR_NONE, nbuf, MENU_UNSELECTED);
+        add_menu(win, SCR_REMOVE_CURSE + GLYPH_OBJ_OFF, &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
         cnt++;
     }
 
@@ -5561,7 +5621,7 @@ struct monst* mtmp;
         any = zeroany;
         any.a_int = 3;
         Sprintf(nbuf, "Cast a bless spell on %s item", s_suffix(mon_nam(mtmp)));
-        add_menu(win, SPE_BLESS - FIRST_SPELL + GLYPH_SPELL_TILE_OFF, &any, 0, 0, ATR_NONE, nbuf, MENU_UNSELECTED);
+        add_menu(win, SPE_BLESS - FIRST_SPELL + GLYPH_SPELL_TILE_OFF, &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
         cnt++;
     }
 
@@ -5597,7 +5657,7 @@ struct monst* mtmp;
         any = zeroany;
         any.a_int = 4;
         Sprintf(nbuf, "Ask %s to bless %s item", mon_nam(priest), s_suffix(mon_nam(mtmp)));
-        add_menu(win, mon_to_glyph(priest, rn2_on_display_rng), &any, 0, 0, ATR_NONE, nbuf, MENU_UNSELECTED);
+        add_menu(win, mon_to_glyph(priest, rn2_on_display_rng), &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
         cnt++;
     }
 
@@ -5799,7 +5859,7 @@ struct monst* mtmp;
                 if (otmp->owornmask & (W_ARMOR | W_ACCESSORY))
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    You("cannot pass %s over to %s. You are wearing it.", an(singular(otmp, cxname)), noittame_mon_nam(mtmp));
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot pass %s over to %s. You are wearing it.", an(singular(otmp, cxname)), noittame_mon_nam(mtmp));
                 }
                 else
                 {
@@ -6289,8 +6349,8 @@ struct monst* mtmp;
                     madeheader = TRUE;
                     any = zeroany;
 
-                    add_extended_menu(win, NO_GLYPH, &any, menu_group_heading_info(def_oc_syms[(int)oclass].sym), 0, 0, iflags.menu_headings,
-                        get_class_name(oclass), MENU_UNSELECTED);
+                    add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                        get_class_name(oclass), MENU_UNSELECTED, menu_group_heading_info(def_oc_syms[(int)oclass].sym));
                 }
 
                 any = zeroany;
@@ -6309,9 +6369,9 @@ struct monst* mtmp;
 
                 int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
                 int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-                add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, & any, obj_to_extended_menu_info(otmp), 
-                    0, 0, ATR_NONE, 
-                    itembuf, MENU_UNSELECTED);
+                add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, & any, 
+                    0, 0, ATR_NONE, NO_COLOR,
+                    itembuf, MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
 
                 sellable_item_count++;
 
@@ -6339,27 +6399,27 @@ struct monst* mtmp;
     }
     else
     {
-        if (!Deaf && is_speaking_monster(mtmp->data) && !mtmp->isshk && (is_undead(mtmp->data) || is_demon(mtmp->data) || (mtmp->data->maligntyp < 0 && mtmp->data->difficulty > 10) ))
+        if (!Deaf && is_speaking(mtmp->data) && !mtmp->isshk && (is_undead(mtmp->data) || is_demon(mtmp->data) || (mtmp->data->maligntyp < 0 && mtmp->data->difficulty > 10) ))
         {
             if(is_undead(mtmp->data) || is_demon(mtmp->data))
                 play_monster_item_trading_line(mtmp, MONSTER_ITEM_TRADING_LINE_TRADING_GREETINGS_MORTAL);
             play_monster_item_trading_line(mtmp, sellable_item_count == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_IM_WILLING_TO_TRADE_THE_FOLLOWING_ITEM : MONSTER_ITEM_TRADING_LINE_TRADING_IM_WILLING_TO_TRADE_THE_FOLLOWING_ITEMS);
-            verbalize("%sI'm willing to trade the following item%s.", is_undead(mtmp->data) || is_demon(mtmp->data) ? "Greetings, mortal. " : "", plur(sellable_item_count));
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "%sI'm willing to trade the following item%s.", is_undead(mtmp->data) || is_demon(mtmp->data) ? "Greetings, mortal. " : "", plur(sellable_item_count));
             play_monster_item_trading_line(mtmp, MONSTER_ITEM_TRADING_LINE_BUT_BE_QUICK_MY_PATIENCE_IS_LIMITED);
-            verbalize("But be quick, my patience is limited.");
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "But be quick, my patience is limited.");
         }
-        else if (!Deaf && is_speaking_monster(mtmp->data))
+        else if (!Deaf && is_speaking(mtmp->data))
         {
             char itembuf[BUFSZ];
             if (sellable_item_count == 1 && !iflags.using_gui_sounds && (otmp = get_first_sellable_item(mtmp)) != 0)
-                strcpy(itembuf, cxname(otmp));
+                Strcpy(itembuf, cxname(otmp));
             else if (sellable_item_count == 1)
-                strcpy(itembuf,"item");
+                Strcpy(itembuf,"item");
             else
-                strcpy(itembuf, "items");
+                Strcpy(itembuf, "items");
 
             play_monster_item_trading_line(mtmp, sellable_item_count == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_MAY_I_INTEREST_YOU_IN_FOLLOWING_ITEM : MONSTER_ITEM_TRADING_LINE_TRADING_MAY_I_INTEREST_YOU_IN_FOLLOWING_ITEMS);
-            verbalize("Hello, adventurer! May I interest you in the following %s?", itembuf);
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Hello, adventurer! May I interest you in the following %s?", itembuf);
         }
         else
             pline("%s shows you %s merchandise.", noittame_Monnam(mtmp), mhis(mtmp));
@@ -6423,7 +6483,7 @@ struct monst* mtmp;
                 {
                     if (umoney < item_cost) {
                         play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
-                        You("don't have enough money for %s!", cxname(item_to_buy));
+                        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough money for %s!", cxname(item_to_buy));
                         break; /* for break */
                     }
                     bought = TRUE;
@@ -6468,13 +6528,13 @@ struct monst* mtmp;
             {
                 play_monster_item_trading_line(mtmp, MONSTER_ITEM_TRADING_LINE_TRADING_USE_YOUR_PURCHASE_WELL);
                 popup_talk_line_ex(mtmp, "Use your purchase well!", ATR_NONE, NO_COLOR, TRUE, TRUE);
-                //verbalize("Use your purchase well!");
+                //verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Use your purchase well!");
             }
-            else if (!Deaf && (is_speaking_monster(mtmp->data) || (mtmp->isshk && !muteshk(mtmp))))
+            else if (!Deaf && (is_speaking(mtmp->data) || (mtmp->isshk && !muteshk(mtmp))))
             {
                 play_monster_item_trading_line(mtmp, MONSTER_ITEM_TRADING_LINE_TRADING_THANK_YOU_FOR_YOUR_PURCHASE);
                 popup_talk_line_ex(mtmp, "Thank you for your purchase!", ATR_NONE, NO_COLOR, TRUE, TRUE);
-                //verbalize("Thank you for your purchase!");
+                //verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Thank you for your purchase!");
             }
             else
             {
@@ -6545,8 +6605,8 @@ struct monst* mtmp;
                     madeheader = TRUE;
                     any = zeroany;
 
-                    add_extended_menu(win, NO_GLYPH, &any, menu_group_heading_info(def_oc_syms[(int)oclass].sym), 0, 0, iflags.menu_headings,
-                        get_class_name(oclass), MENU_UNSELECTED);
+                    add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                        get_class_name(oclass), MENU_UNSELECTED, menu_group_heading_info(def_oc_syms[(int)oclass].sym));
                 }
 
                 any = zeroany;
@@ -6558,7 +6618,7 @@ struct monst* mtmp;
                 char accel = def_oc_syms[(int)otmp->oclass].sym;
 
                 add_menu(win, NO_GLYPH, &any,
-                    let, accel, ATR_NONE,
+                    let, accel, ATR_NONE, NO_COLOR,
                     itembuf, MENU_UNSELECTED);
 
                 item_count++;
@@ -6592,7 +6652,7 @@ struct monst* mtmp;
                 if ((objects[item_to_take->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED) && item_to_take->cursed) 
                 {
                     play_sfx_sound(SFX_GENERAL_WELDED);
-                    pline("%s not leave %s!", Tobjnam(item_to_take, "do"), noittame_mon_nam(mtmp));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s not leave %s!", Tobjnam(item_to_take, "do"), noittame_mon_nam(mtmp));
                 }
                 else
                 {
@@ -6895,7 +6955,7 @@ struct monst* mtmp;
     case 'y':
         if (umoney < extrahealing_cost) {
             play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
-            You("don't have enough money for that!");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough money for that!");
             return 0;
         }
         u_pay = extrahealing_cost;
@@ -7095,7 +7155,7 @@ struct monst* mtmp;
     if (priest_action == 2)
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_PIOUS_INDIVIDUAL);
-        verbalize("Thou art indeed a pious individual.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "Thou art indeed a pious individual.");
         if (coaligned && u.ualign.record <= ALGN_SINNED)
         {
             play_sfx_sound(SFX_ALTAR_ADD_ALIGNMENT);
@@ -7103,7 +7163,7 @@ struct monst* mtmp;
         }
         play_sfx_sound(SFX_PRAY_BLESS_WATER);
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_BESTOW_BLESSING);
-        verbalize("I bestow upon thee a blessing.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "I bestow upon thee a blessing.");
         incr_itimeout(&HClairvoyant, rn1(500, 500));
         refresh_u_tile_gui_info(TRUE);
     }
@@ -7118,7 +7178,7 @@ struct monst* mtmp;
     {
         play_sfx_sound(SFX_ALTAR_GIFT);
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_DEVOTION_REWARDED);
-        verbalize("Thy devotion has been rewarded.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "Thy devotion has been rewarded.");
         if (u.ublessed == 0)
             u.ublessed = rnd(3);
         else
@@ -7127,7 +7187,7 @@ struct monst* mtmp;
     else
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_GENEROSITY_APPRECIATED);
-        verbalize("Thy selfless generosity is deeply appreciated.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "Thy selfless generosity is deeply appreciated.");
         if (coaligned)
         {
             if (strayed && (moves - u.ucleansed) > 5000L)
@@ -7187,23 +7247,23 @@ struct monst* mtmp;
     u.uconduct.gnostic++;
 
     play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_IS_LIKE);
-    verbalize("Very well, then. Let's see what your fortune is like.");
+    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Very well, then. Let's see what your fortune is like.");
 
     if (can_pray(FALSE))
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_CAN_SAFELY_PRAY);
-        verbalize("First, I see that you can safely pray.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "First, I see that you can safely pray.");
 
     }
     else
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_CANNOT_SAFELY_PRAY);
-        verbalize("First, you should know that you cannot safely pray.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "First, you should know that you cannot safely pray.");
 
         if (u.ugangr)
         {
             play_monster_special_dialogue_line(mtmp, u.ugangr > 6 ? PRIEST_SPECIAL_DIALOGUE_GOD_EXTREMELY_ANGRY : u.ugangr > 3 ? PRIEST_SPECIAL_DIALOGUE_GOD_VERY_ANGRY : PRIEST_SPECIAL_DIALOGUE_GOD_ANGRY );
-            verbalize("I see that %s is %sangry with you.", iflags.using_gui_sounds ? "your god" : u_gname(), u.ugangr > 6 ? "extremely " : u.ugangr > 3 ? "very " : "");
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "I see that %s is %sangry with you.", iflags.using_gui_sounds ? "your god" : u_gname(), u.ugangr > 6 ? "extremely " : u.ugangr > 3 ? "very " : "");
         }
 
         if (u.uprayer_timeout > 0)
@@ -7211,15 +7271,15 @@ struct monst* mtmp;
             if (iflags.using_gui_sounds)
             {
                 play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_PRAYER_CONDUCT_NUMBER);
-                verbalize("For your prayer conduct, a number appears before me. (The number appears to be %d.)", u.uprayer_timeout / 10 + 1);
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your prayer conduct, a number appears before me. (The number appears to be %d.)", u.uprayer_timeout / 10 + 1);
             }
             else
-                verbalize("For your prayer conduct, the number %d appears before me.", u.uprayer_timeout / 10 + 1);
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your prayer conduct, the number %d appears before me.", u.uprayer_timeout / 10 + 1);
 
             if (u.uprayer_timeout > 300)
             {
                 play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_GOD_TIRED_OF_WHINING);
-                verbalize("I can see that %s is quite tired of your constant whining.", iflags.using_gui_sounds ? "your god" : u_gname());
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "I can see that %s is quite tired of your constant whining.", iflags.using_gui_sounds ? "your god" : u_gname());
             }
 
             if(u.uprayer_timeout >= 50)
@@ -7227,7 +7287,7 @@ struct monst* mtmp;
             else
                 play_monster_special_dialogue_line(mtmp, u.uprayer_timeout < 50 ? PRIEST_SPECIAL_DIALOGUE_MUST_WAIT_LITTLE_LONGER : u.uprayer_timeout > 200 ? PRIEST_SPECIAL_DIALOGUE_MUST_WAIT_LONG_TIME : PRIEST_SPECIAL_DIALOGUE_MUST_WAIT);
 
-            verbalize("Thus, %s wait %sbefore bothering %s again.",
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Thus, %s wait %sbefore bothering %s again.",
                 u.uprayer_timeout >= 50 ? "it would be wise to" : "you must",
                 u.uprayer_timeout < 50 ? "a little longer " : u.uprayer_timeout > 200 ? "a long time " : "",
                 iflags.using_gui_sounds ? "your god" : u_gname());
@@ -7246,7 +7306,7 @@ struct monst* mtmp;
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_NUMBER);
         play_monster_special_dialogue_line(mtmp, abs(Luck) >= 10 ? PRIEST_SPECIAL_DIALOGUE_EXTREMELY_UNLUCKY_NUMBER : abs(Luck) >= 5 ? PRIEST_SPECIAL_DIALOGUE_VERY_UNLUCKY_NUMBER : PRIEST_SPECIAL_DIALOGUE_UNLUCKY_NUMBER);
 
-        verbalize("For your fortune, I see a number%s. That is not good, for it is %s unlucky number.%s",
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your fortune, I see a number%s. That is not good, for it is %s unlucky number.%s",
             buf1, abs(Luck) >= 10 ? "an extremely" : abs(Luck) >= 5 ? "a very" : "an", buf2);
     }
     else if (Luck > 0)
@@ -7255,17 +7315,17 @@ struct monst* mtmp;
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_NUMBER);
         play_monster_special_dialogue_line(mtmp, abs(Luck) >= 10 ? PRIEST_SPECIAL_DIALOGUE_EXTREMELY_LUCKY_NUMBER : abs(Luck) >= 5 ? PRIEST_SPECIAL_DIALOGUE_VERY_LUCKY_NUMBER : PRIEST_SPECIAL_DIALOGUE_LUCKY_NUMBER);
 
-        verbalize("For your fortune, I see a number%s. That is good, for it is %s lucky number.%s",
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your fortune, I see a number%s. That is good, for it is %s lucky number.%s",
             buf1, abs(Luck) >= 10 ? "an extremely" : abs(Luck) >= 5 ? "a very" : "an", buf2);
     }
     else
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_NEUTRAL);
-        verbalize("For your fortune, my vision is neutral.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your fortune, my vision is neutral.");
     }
 
     play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_THANK_YOU_FOR_YOUR_INTEREST);
-    verbalize("That's all for now. Thank you for your interest in divine matters.");
+    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "That's all for now. Thank you for your interest in divine matters.");
 
     return 1;
 }
@@ -7343,11 +7403,11 @@ struct monst* mtmp;
     int res = 0;
 
     context.shop_identify_type = ESHK(mtmp)->shoptype - SHOPBASE + 1;
-    if (count_unidentified(invent) == 0)
+    if (count_unidentified(invent, 0, FALSE) == 0)
     {
         context.shop_identify_type = 0;
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex1_popup("have nothing to identify.", "Nothing to Identify", ATR_NONE, CLR_MSG_ATTENTION, NO_GLYPH, POPUP_FLAGS_NONE);
+        You_ex1_popup("have nothing to identify.", "Nothing to Identify", ATR_NONE, CLR_MSG_FAIL, NO_GLYPH, POPUP_FLAGS_NONE);
         return 0;
     }
     context.shop_identify_type = 0;
@@ -7395,7 +7455,7 @@ struct monst* mtmp;
     //    context.shop_identify_type = ESHK(mtmp)->shoptype - SHOPBASE + 1; // shtypes[ESHK(mtmp)->shoptype - SHOPBASE].symb;
 
     //    res = identify_pack(1, FALSE);
-    //    unided = count_unidentified(invent);
+    //    unided = count_unidentified(invent, 0, FALSE);
 
     //    context.shop_identify_type = 0;
 
@@ -7672,42 +7732,42 @@ struct monst* mtmp;
     any.a_char = 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge dragon scales into a dragon scale mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 2;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a shield of reflection", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 3;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a crystal plate mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 4;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge an adamantium full plate mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 5;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a mithril full plate mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 6;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge an orichalcum full plate mail", MENU_UNSELECTED);
 
     /* Finish the menu */
@@ -7781,28 +7841,28 @@ struct monst* mtmp;
     any.a_char = 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a plate mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 2;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a bronze plate mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 3;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a field plate mail", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 4;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge a full plate mail", MENU_UNSELECTED);
 
     /* Finish the menu */
@@ -7876,42 +7936,42 @@ struct monst* mtmp;
     any.a_char = 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge 10 iron sling-bullets", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 2;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge 10 exceptional iron sling-bullets", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 3;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge 10 elite iron sling-bullets", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 4;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge 10 silver sling-bullets", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 5;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge 10 exceptional silver sling-bullets", MENU_UNSELECTED);
 
     any = zeroany;
     any.a_char = 6;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         "Forge 10 elite silver sling-bullets", MENU_UNSELECTED);
 
     /* Finish the menu */
@@ -8025,6 +8085,16 @@ struct obj* otmp;
         return FALSE;
 
     return !!is_dragon_scales(otmp);
+}
+
+boolean
+maybe_refillable_with_oil(otmp)
+struct obj* otmp;
+{
+    if (!otmp)
+        return FALSE;
+
+    return !!is_refillable_with_oil(otmp);
 }
 
 STATIC_OVL boolean
@@ -8423,7 +8493,7 @@ struct monst* mtmp;
     if (!mtmp) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        There("is no one here to talk to.");
+        There_ex(ATR_NONE, CLR_MSG_FAIL, "is no one here to talk to.");
         return 0;
     }
     else if (!m_speak_check(mtmp))
@@ -8506,7 +8576,7 @@ struct monst* mtmp;
 
     if (!mtmp) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        There("is no one here to talk to.");
+        There_ex(ATR_NONE, CLR_MSG_FAIL, "is no one here to talk to.");
         return 0;
     }
     else if (!m_speak_check(mtmp))
@@ -8620,13 +8690,13 @@ struct monst* mtmp;
     if (is_peaceful(mtmp))
     {
         play_monster_special_dialogue_line(mtmp, NPC_LINE_THATS_A_DEAL_BE_MORE_CAREFUL_NEXT_TIME);
-        verbalize("That's a deal. Be more careful next time.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "That's a deal. Be more careful next time.");
 
     }
     else
     {
         play_monster_special_dialogue_line(mtmp, NPC_LINE_ON_SECOND_THOUGHT_MAYBE_YOU_SHOULD_HANG_FOR_YOUR_CRIMES_ANYWAY);
-        verbalize("On second thought, maybe you should hang for your crimes anyway.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "On second thought, maybe you should hang for your crimes anyway.");
     }
 
     return 1;
@@ -8767,7 +8837,7 @@ struct monst* mtmp;
         return 0;
     else if (mvitals[PM_WATCHMAN].died > 0 || mvitals[PM_WATCH_CAPTAIN].died > 0) {
         play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_YOU_WILL_HANG_FOR_YOUR_CRIMES_SCUM);
-        verbalize("You will hang for your crimes, scum!");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "You will hang for your crimes, scum!");
         return 0;
     }
     else if (mtmp->mhp < (3 * mtmp->mhpmax) / 4) {
@@ -8806,12 +8876,12 @@ struct monst* mtmp;
     if (is_peaceful(mtmp))
     {
         play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_FINE_ITS_ALRIGHT_NOW_BE_MORE_CAREFUL_NEXT_TIME);
-        verbalize("Fine, it's alright now. Be more careful next time.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "Fine, it's alright now. Be more careful next time.");
     }
     else
     {
         play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_ON_SECOND_THOUGHT_MAYBE_ILL_HANG_YOU_ANYWAY);
-        verbalize("On second thought, maybe I'll hang you anyway.");
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "On second thought, maybe I'll hang you anyway.");
     }
 
     return 1; 
@@ -8930,10 +9000,10 @@ long minor_id_cost;
     }
 
     context.npc_identify_type = id_idx;
-    if (count_unidentified(invent) == 0)
+    if (count_unidentified(invent, 0, FALSE) == 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You_ex1_popup("have nothing to identify.", "Nothing to Identify", ATR_NONE, CLR_MSG_ATTENTION, NO_GLYPH, POPUP_FLAGS_NONE);
+        You_ex1_popup("have nothing to identify.", "Nothing to Identify", ATR_NONE, CLR_MSG_FAIL, NO_GLYPH, POPUP_FLAGS_NONE);
         context.npc_identify_type = 0;
         return 0;
     }
@@ -9011,7 +9081,7 @@ long id_cost;
     int res = 0, id_res = 0;
     long umoney = money_cnt(invent);
 
-    strcpy(buf, "What would you like to identify?");
+    Strcpy(buf, "What would you like to identify?");
 
     n = query_objlist(buf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE
         | USE_INVLET | INVORDER_SORT),
@@ -9357,7 +9427,7 @@ struct monst* mtmp;
 const char** linearray;
 enum ghsound_types soundid;
 {
-    popup_talk(mtmp, linearray, soundid, ATR_NONE, NO_COLOR, TRUE, TRUE);
+    popup_talk(mtmp, linearray, soundid, ATR_NONE, CLR_MSG_TALK_NORMAL, TRUE, TRUE);
 }
 
 #if 0
@@ -10110,7 +10180,7 @@ int special_dialogue_sound_id;
         if (umoney < service_cost)
         {
             play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
-            You("don't have enough money for that!");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough money for that!");
             return 0;
         }
         u_pay = service_cost;
@@ -10180,7 +10250,7 @@ int special_dialogue_sound_id;
         if (umoney < service_cost)
         {
             play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
-            You("don't have enough money for that!");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough money for that!");
             return 0;
         }
         u_pay = service_cost;
@@ -10346,7 +10416,7 @@ refill_lantern_func(mtmp)
 struct monst* mtmp;
 {
     const char refill_lantern_objects[] = { ALL_CLASSES, TOOL_CLASS, 0 };
-    struct obj* otmp = getobj(refill_lantern_objects, "refill", 0, "");
+    struct obj* otmp = getobj_ex(refill_lantern_objects, "refill", 0, "", maybe_refillable_with_oil);
     char talkbuf[BUFSZ];
 
     if (!otmp)
@@ -10620,7 +10690,7 @@ boolean initialize;
     if (otmp && !maybe_otyp(otmp))
     {
         //play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
-        play_monster_special_dialogue_line(mtmp, mtmp->issmith ? SMITH_LINE_LETS_HAVE_A_LOOK : NPC_LINE_SORRY_THIS_IS_NOT_A_COMPONENT_THAT_I_CAN_FORGE_INTO_THE_REQUESTED_ITEM);
+        play_monster_special_dialogue_line(mtmp, mtmp->issmith ? SMITH_LINE_SORRY_THIS_IS_NOT_AN_ITEM_THAT_I_CAN_FORGE_INTO_THE_REQUESTED_ITEM : NPC_LINE_SORRY_THIS_IS_NOT_A_COMPONENT_THAT_I_CAN_FORGE_INTO_THE_REQUESTED_ITEM);
         Sprintf(talkbuf, "Sorry, this is not an item that I can forge into %s.", an(OBJ_NAME(objects[forge_dest_otyp])));
         popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
         return 0;
@@ -10778,7 +10848,7 @@ int* spell_otyps;
         int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, &pseudo, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
         add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
-            let, 0, ATR_NONE,
+            let, 0, ATR_NONE, NO_COLOR,
             spellbuf, MENU_UNSELECTED);
 
         spell_count++;
@@ -10856,9 +10926,15 @@ struct monst* mtmp;
     int booktype = (short)context.spbook.book->otyp;
     char learnbuf[BUFSZ] = "";
 
+    char splname[BUFSZ];
+    Sprintf(splname, "\"%s\"", OBJ_NAME(objects[booktype]));
+
     for (i = 0; i < MAXSPELL; i++)
         if (spellid(i) == booktype || spellid(i) == NO_SPELL)
             break;
+
+    int initialamount = i < MAXSPELL ? spl_book[i].sp_amount : 0;
+    int addedamount = 0;
 
     if (i == MAXSPELL)
     {
@@ -10867,14 +10943,14 @@ struct monst* mtmp;
     else if (spellid(i) == booktype)
     {
         /* Should not happen */
-        if (spellknow(i) > SPELL_IS_KEEN / 10)
-        {
-            play_sfx_sound(SFX_SPELL_KNOWN_ALREADY);
-            Sprintf(learnbuf, "You know %s quite well already.", OBJ_NAME(objects[booktype]));
-            pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, learnbuf);
-            display_popup_text(learnbuf, "Spell Known Already", POPUP_TEXT_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, NO_GLYPH, POPUP_FLAGS_NONE);
-        }
-        else
+        //if (spellknow(i) > SPELL_IS_KEEN / 10)
+        //{
+        //    play_sfx_sound(SFX_SPELL_KNOWN_ALREADY);
+        //    Sprintf(learnbuf, "You know %s quite well already.", OBJ_NAME(objects[booktype]));
+        //    pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, learnbuf);
+        //    display_popup_text(learnbuf, "Spell Known Already", POPUP_TEXT_GENERAL, ATR_NONE, CLR_MSG_ATTENTION, NO_GLYPH, POPUP_FLAGS_NONE);
+        //}
+        //else
         { /* spellknow(i) <= SPELL_IS_KEEN/10 */
             incr_spell_nknow(i, 1);
             play_sfx_sound(SFX_SPELL_KEENER);
@@ -10882,6 +10958,12 @@ struct monst* mtmp;
                 spellknow(i) ? "keener" : "restored");
             pline_ex1(ATR_NONE, CLR_MSG_POSITIVE, learnbuf);
             display_popup_text(learnbuf, "Knowledge Keener", POPUP_TEXT_GENERAL, ATR_NONE, CLR_MSG_POSITIVE, NO_GLYPH, POPUP_FLAGS_NONE);
+
+            if (spl_book[i].sp_matcomp > 0)
+            {
+                addedamount = matlists[spl_book[i].sp_matcomp].spellsgained;
+                spl_book[i].sp_amount += addedamount;
+            }
         }
     }
     else
@@ -10898,12 +10980,27 @@ struct monst* mtmp;
         spl_book[i].sp_skillchance = (int)objects[booktype].oc_spell_skill_chance;
 
         incr_spell_nknow(i, 1);
+
+        if (spl_book[i].sp_matcomp > 0)
+        {
+            addedamount = matlists[spl_book[i].sp_matcomp].spellsgained;
+            spl_book[i].sp_amount += addedamount;
+        }
+
         sortspells();
 
         play_sfx_sound(SFX_SPELL_LEARN_SUCCESS);
-        Sprintf(learnbuf, i > 0 ? "You add %s to your repertoire." : "You learn %s.", OBJ_NAME(objects[booktype]));
+        Sprintf(learnbuf, i > 0 ? "You add %s to your repertoire." : "You learn %s.", splname);
         pline_ex1(ATR_NONE, CLR_MSG_POSITIVE, learnbuf);
         display_popup_text(learnbuf, "New Spell Learnt", POPUP_TEXT_GENERAL, ATR_NONE, CLR_MSG_POSITIVE, NO_GLYPH, POPUP_FLAGS_NONE);
+    }
+
+    if (addedamount > 0)
+    {
+        if (addedamount == 1)
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have one %scasting of %s prepared.", !initialamount ? "" : "more ", splname);
+        else
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have %d %scastings of %s prepared.", addedamount, !initialamount ? "" : "more ", splname);
     }
 
     return 1;
@@ -10967,7 +11064,7 @@ struct monst* mtmp;
                 Strcpy(nbuf, Monnam(nearbymon[i]));
             else
                 continue;
-            add_menu(win, isyou ? u_to_glyph() : mon_to_glyph(nearbymon[i], rn2_on_display_rng), &any, 0, 0, ATR_NONE, nbuf, MENU_UNSELECTED);
+            add_menu(win, isyou ? u_to_glyph() : mon_to_glyph(nearbymon[i], rn2_on_display_rng), &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
         }
 
         /* Finish the menu */

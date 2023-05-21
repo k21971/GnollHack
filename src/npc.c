@@ -335,7 +335,7 @@ int roomno;
                 play_monster_special_dialogue_line(npc, dialogueline);
                 context.global_minimum_volume = 0.0;
                 Sprintf(buf, "%s", npc_subtype_definitions[npctype].revival_line);
-                verbalize1(buf);
+                verbalize_talk1(buf);
             }
             else if (moves >= enpc_p->enter_time)
             {
@@ -349,7 +349,7 @@ int roomno;
                 else
                     Sprintf(buf, "Adventurer, welcome!");
 
-                verbalize1(buf);
+                verbalize_talk1(buf);
                 enpc_p->enter_time = moves + (long)d(5, 50); /* ~125 */
             }
         }
@@ -396,6 +396,12 @@ int sx, sy;
 uchar npctype;
 int mtype;
 {
+    if (!sroom)
+        return;
+
+    /* Change the npcroom to the right npc subtype */
+    sroom->rsubtype = npctype;
+
     struct monst* npc;
     int i;
     int npc_loc_x = sx;
@@ -464,9 +470,9 @@ int mtype;
 
     unsigned long extraflags = (npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_FEMALE) != 0  ? MM_FEMALE : Inhell || (npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_MALE) != 0 ? MM_MALE : 0UL; /* Since there is only one soundset for unusual creature types */
 
-    npc = makemon_ex(&mons[npc_montype], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, npctype, 0);
+    npc = makemon_ex(&mons[npc_montype], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, 0UL, 0, npctype, 0);
     if(!npc)
-        npc = makemon_ex(&mons[npc_subtype_definitions[npctype].mnum], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, npctype, 0); /* Fallback */
+        npc = makemon_ex(&mons[npc_subtype_definitions[npctype].mnum], npc_loc_x, npc_loc_y, MM_ENPC | extraflags, 0UL, 0, npctype, 0); /* Fallback */
     
     if (npc)
     {
@@ -744,6 +750,16 @@ int mtype;
                 if (otmp)
                     (void)mpickobj(npc, otmp);
             }
+
+            /* Reagents */
+            int cnt = 10 + rnd(10);
+            for (i = 0; i < cnt; i++)
+            {
+                otmp = mksobj(random_reagent_otyp(TRUE, TRUE, 2), FALSE, FALSE, FALSE);
+                if (otmp)
+                    (void)mpickobj(npc, otmp);
+            }
+
             break;
         }
         default:

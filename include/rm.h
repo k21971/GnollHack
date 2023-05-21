@@ -364,6 +364,11 @@ enum painting_types {
     PAINTING_VLAD_THE_IMPALER,
     PAINTING_VAMPIRE_MALE,
     PAINTING_VAMPIRE_FEMALE,
+    PAINTING_DEATH,
+    PAINTING_FAMINE,
+    PAINTING_PESTILENCE,
+    PAINTING_BARK_SHARPNOSE,
+    PAINTING_LUNA_MOONSNOUT,
     MAX_PAINTINGS
 };
 
@@ -379,17 +384,21 @@ extern NEARDATA struct painting_definition painting_definitions[MAX_PAINTINGS];
 
 enum carpet_types {
     CARPET_NONE = 0,
-    CARPET_HORIZONTAL_RED,
-    CARPET_VERTICAL_PURPLE,
+    CARPET_RED,
+    CARPET_PURPLE,
     CARPET_BROWN_ANIMAL_HIDE,
     CARPET_CRIMSON,
     CARPET_MODRON_SPHERICAL_PLAQUE,
     CARPET_YELLOW,
+    CARPET_BEIGE,
+    CARPET_BLUE,
+    CARPET_GRATE,
+    CARPET_MODRON_TRIANGULAR_PLAQUE,
     MAX_CARPETS
 };
 
 enum carpet_tile_indexation_types {
-    CARPET_TILE_INDEXATION_TYPE_NORMAL = 0,
+    CARPET_TILE_INDEXATION_TYPE_NONE = 0,
     CARPET_TILE_INDEXATION_TYPE_LONG_CARPET,
     CARPET_TILE_INDEXATION_TYPE_3X2_CARPET,
     MAX_CARPET_TILE_INDEXATION_TYPES
@@ -1082,11 +1091,11 @@ struct rm {
 
     schar decoration_typ;
     schar decoration_subtyp;
-    schar decoration_dir;
+    schar decoration_dir;    /* -1 = N/A, 0 = on top wall pointing down, 1 = on left wall pointing right, 2 = on right wall pointing left, 3 = on bottom wall pointing up, */
     uchar decoration_flags;
 
-    short key_otyp;            /* For doors, the otyp that unlocks the door */
-    short special_quality;     /* For doors, the special quality of the key that unlocks the door */
+    short key_otyp;          /* For doors, the otyp that unlocks the door */
+    short special_quality;   /* For doors, the special quality of the key that unlocks the door */
 
     uchar seenv;             /* seen vector */
     unsigned short flags;    /* extra information for typ */

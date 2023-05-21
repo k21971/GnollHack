@@ -383,6 +383,7 @@ extern short tile2enlargement[MAX_TILES];
 #define MM2_FORCE_NONRENEGADE           0x00000008UL
 #define MM2_MAYBE_ALLOW_EXTINCT         0x00000010UL
 #define MM2_REVIVING                    0x00000020UL
+#define MM2_RANDOMIZE_SUBTYPE           0x00000040UL
 
 #define GOODPOS_IGNOREYOU               0x80000000UL
 
@@ -448,6 +449,7 @@ extern short tile2enlargement[MAX_TILES];
 #define BUC_UNKNOWN 0x400
 #define BUC_ALLBKNOWN (BUC_BLESSED | BUC_CURSED | BUC_UNCURSED)
 #define BUCX_TYPES (BUC_ALLBKNOWN | BUC_UNKNOWN)
+#define UNIDENTIFIED_TYPES 0x800
 #define ALL_TYPES_SELECTED -2
 
 /* Flags to control find_mid() */
@@ -623,12 +625,12 @@ enum bodypart_types {
 #define plur(x) (((x) == 1) ? "" : "s")
 
 #define ARM_AC_BONUS(obj, ptr) ((int)(((obj)->oclass == ARMOR_CLASS || (obj)->oclass == MISCELLANEOUS_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ?                    \
-    (objects[(obj)->otyp].oc_armor_class + get_obj_material_and_exceptionality_ac_bonus(obj) + (objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC ? 0 : (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment))) \
-     - (objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_AC ? 0 : min((int) greatest_erosion(obj), objects[(obj)->otyp].oc_armor_class))) : 0))
+    (objects[(obj)->otyp].oc_armor_class + get_obj_material_and_exceptionality_ac_bonus(obj) + (!(objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC) || has_obj_mythic_defense(obj) ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) : 0) \
+     - ((objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_AC) ? 0 : min((int) greatest_erosion(obj), objects[(obj)->otyp].oc_armor_class))) : 0))
 
 #define ARM_MC_BONUS(obj, ptr)                      \
-    ((int)(objects[(obj)->otyp].oc_magic_cancellation + get_obj_material_and_exceptionality_mc_bonus(obj) + (objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) / 2 : 0) \
-     - (objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_MC ? 0 : min(greatest_erosion(obj) / 2, objects[(obj)->otyp].oc_magic_cancellation))))
+    ((int)(objects[(obj)->otyp].oc_magic_cancellation + get_obj_material_and_exceptionality_mc_bonus(obj) + ((!(objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_MC) || has_obj_mythic_defense(obj)) ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) / 3 : 0) \
+     - ((objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_MC) ? 0 : min(greatest_erosion(obj) / 2, objects[(obj)->otyp].oc_magic_cancellation))))
 
 
 #define makeknown(x) discover_object((x), TRUE, TRUE)

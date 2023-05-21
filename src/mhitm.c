@@ -1363,7 +1363,7 @@ register struct obj* omonwep;
         if (flags.verbose && !Deaf)
         {
             play_sfx_sound_at_location(SFX_BURP, magr->mx, magr->my);
-            verbalize("Burrrrp!");
+            verbalize_angry1("Burrrrp!");
         }
         // mdef->mhp;
         break;
@@ -1472,7 +1472,7 @@ register struct obj* omonwep;
         {
             if (vis && canseemon(mdef))
             {
-                pline_The("fire doesn't seem to burn %s!", mon_nam(mdef));
+                pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "fire doesn't seem to burn %s!", mon_nam(mdef));
                 play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, mdef->mx, mdef->my);
                 m_shieldeff(mdef);
             }
@@ -1498,7 +1498,7 @@ register struct obj* omonwep;
         {
             if (vis && canseemon(mdef))
             {
-                pline_The("frost doesn't seem to chill %s!", mon_nam(mdef));
+                pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "frost doesn't seem to chill %s!", mon_nam(mdef));
                 play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, mdef->mx, mdef->my);
                 m_shieldeff(mdef);
             }
@@ -1527,7 +1527,7 @@ register struct obj* omonwep;
         {
             if (vis && canseemon(mdef))
             {
-                pline_The("zap doesn't shock %s!", mon_nam(mdef));
+                pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "zap doesn't shock %s!", mon_nam(mdef));
                 play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, mdef->mx, mdef->my);
                 m_shieldeff(mdef);
             }
@@ -1549,7 +1549,7 @@ register struct obj* omonwep;
         {
             play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, mdef->mx, mdef->my);
             if (vis && canseemon(mdef))
-                pline("%s is covered in %s, but it seems harmless.",
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is covered in %s, but it seems harmless.",
                       Monnam(mdef), hliquid("acid"));
             damage = 0;
         } 
@@ -1770,7 +1770,7 @@ register struct obj* omonwep;
             if (has_cancellation_resistance(mdef))
             {
                 play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mdef->mx, mdef->my);
-                pline("However, %s is unaffected!", mon_nam(mdef));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "However, %s is unaffected!", mon_nam(mdef));
                 m_shieldeff(mdef);
             }
             else
@@ -1970,7 +1970,7 @@ register struct obj* omonwep;
             {
                 //play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, mdef->mx, mdef->my);
                 if (vis && canspotmon(mdef) && canspotmon(magr))
-                    pline_The("poison doesn't seem to affect %s.",
+                    pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "poison doesn't seem to affect %s.",
                               mon_nam(mdef));
             }
             else
@@ -1999,7 +1999,7 @@ register struct obj* omonwep;
         {
             play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, mdef->mx, mdef->my);
             if (vis && canspotmon(mdef))
-                pline("%s doesn't seem harmed.", Monnam(mdef));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s doesn't seem harmed.", Monnam(mdef));
             /* Not clear what to do for green slimes */
             damage = 0;
             break;
@@ -2342,7 +2342,7 @@ int amt, saving_throw_adjustment, tellstyle;
         if (tellstyle != NOTELL)
         {
             play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mon->mx, mon->my);
-            pline("%s is unaffected!", Monnam(mon));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is unaffected!", Monnam(mon));
         }
         m_shieldeff(mon);
     }
@@ -2351,7 +2351,7 @@ int amt, saving_throw_adjustment, tellstyle;
         if (tellstyle != NOTELL)
         {
             play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mon->mx, mon->my);
-            pline("%s is unaffected!", Monnam(mon));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is unaffected!", Monnam(mon));
         }
 
         m_shieldeff(mon);
@@ -2505,7 +2505,7 @@ int mdead;
                 if (canseemon(magr))
                 {
                     play_sfx_sound_at_location(SFX_GENERAL_UNHARMED, magr->mx, magr->my);
-                    pline("%s is not affected.", Monnam(magr));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is not affected.", Monnam(magr));
                 }
                 damage = 0;
             }
@@ -2590,7 +2590,7 @@ int mdead;
             {
                 if (canseemon(magr)) 
                 {
-                    pline("%s is mildly chilly.", Monnam(magr));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is mildly chilly.", Monnam(magr));
                     golemeffects(magr, AD_COLD, damage);
                 }
                 damage = 0;
@@ -2599,7 +2599,7 @@ int mdead;
             if (canseemon(magr))
             {
                 play_sfx_sound_at_location(SFX_MONSTER_COVERED_IN_FROST, mdef->mx, mdef->my);
-                pline("%s is suddenly very cold!", Monnam(magr));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is suddenly very cold!", Monnam(magr));
             }
             mdef->mhp += (int)ceil(damage) / 2;
             if (mdef->mhpmax < mdef->mhp)
@@ -2628,9 +2628,9 @@ int mdead;
                 if (canseemon(magr)) 
                 {
                     if (flaming(mdef->data))
-                        pline("%s is engulfed in %s flames, but they do not burn %s.", Monnam(magr), s_suffix(mon_nam(mdef)), mon_nam(magr));
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is engulfed in %s flames, but they do not burn %s.", Monnam(magr), s_suffix(mon_nam(mdef)), mon_nam(magr));
                     else
-                        pline("%s is mildly warmed.", Monnam(magr));
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is mildly warmed.", Monnam(magr));
                     golemeffects(magr, AD_FIRE, damage);
                 }
                 damage = 0;
@@ -2640,9 +2640,9 @@ int mdead;
             {
                 play_sfx_sound_at_location(SFX_MONSTER_ON_FIRE, mdef->mx, mdef->my);
                 if (flaming(mdef->data))
-                    pline("%s is engulfed in %s flames!", Monnam(magr), s_suffix(mon_nam(mdef)));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is engulfed in %s flames!", Monnam(magr), s_suffix(mon_nam(mdef)));
                 else
-                    pline("%s is suddenly very hot!", Monnam(magr));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is suddenly very hot!", Monnam(magr));
             }
             break;
         case AD_ELEC:
@@ -2650,7 +2650,7 @@ int mdead;
             if (is_mon_immune_to_elec(magr))
             {
                 if (canseemon(magr)) {
-                    pline("%s is mildly tingled.", Monnam(magr));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is mildly tingled.", Monnam(magr));
                     golemeffects(magr, AD_ELEC, damage);
                 }
                 damage = 0;
@@ -2659,7 +2659,7 @@ int mdead;
             if (canseemon(magr))
             {
                 play_sfx_sound_at_location(SFX_MONSTER_GETS_ZAPPED, mdef->mx, mdef->my);
-                pline("%s is jolted with electricity!", Monnam(magr));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is jolted with electricity!", Monnam(magr));
             }
             break;
         default:

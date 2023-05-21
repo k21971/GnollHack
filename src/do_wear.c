@@ -2737,7 +2737,7 @@ find_ac()
 int
 get_role_AC_bonus(VOID_ARGS)
 {
-    if (Role_if(PM_MONK) && !Upolyd && !uarm && !uarms && !uwep)
+    if (Role_if(PM_MONK) && !Upolyd && !uarm && (!uarms || is_launcher(uarms)) && (!uwep || is_launcher(uwep)))
         return u.ulevel / 4;
     else
         return 0;
@@ -2746,7 +2746,7 @@ get_role_AC_bonus(VOID_ARGS)
 int
 get_role_MC_bonus(VOID_ARGS)
 {
-    if (Role_if(PM_MONK) && !Upolyd && !uarm && !uarms && !uwep)
+    if (Role_if(PM_MONK) && !Upolyd && !uarm && (!uarms || is_launcher(uarms)) && (!uwep || is_launcher(uwep)))
         return u.ulevel / 12;
     else 
         return 0;
@@ -3558,7 +3558,7 @@ int retry;
         all_worn_categories = FALSE;
         n = query_category("What type of things do you want to take off?",
                            invent, (WORN_TYPES | ALL_TYPES
-                                    | UNPAID_TYPES | BUCX_TYPES),
+                                    | UNPAID_TYPES | UNIDENTIFIED_TYPES | BUCX_TYPES),
                            &pick_list, PICK_ANY);
         if (!n)
             return 0;

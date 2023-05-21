@@ -58,7 +58,7 @@ struct obj* obj;
     if (obj->charges <= 0)
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline("%s", nothing_happens);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s", nothing_happens);
         return 1;
     }
 
@@ -76,13 +76,13 @@ boolean drink_yourself;
     if (obj->charges <= 0)
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline("%s empty.", Tobjnam(obj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s empty.", Tobjnam(obj, "are"));
         return 0;
     }
 
     if (Underwater)
     {
-        pline("Using %s underwater would spoil it.", yname(obj));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Using %s underwater would spoil it.", yname(obj));
         return 0;
     }
 
@@ -152,7 +152,7 @@ boolean drink_yourself;
     if (obj->charges <= 0)
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline("%s now empty.", Tobjnam(obj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s now empty.", Tobjnam(obj, "are"));
     }
     return 1;
 }
@@ -167,7 +167,7 @@ boolean drink_yourself;
     if (obj->charges <= 0)
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline("%s empty.", Tobjnam(obj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s empty.", Tobjnam(obj, "are"));
         return 0;
     }
 
@@ -231,7 +231,7 @@ boolean drink_yourself;
     if (obj->charges <= 0)
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline("%s now empty.", Tobjnam(obj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s now empty.", Tobjnam(obj, "are"));
     }
     return 1;
 }
@@ -287,7 +287,7 @@ struct obj *obj;
     if (obj->charges <= 0)
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline1(nothing_happens);
+        pline_ex1(ATR_NONE, CLR_MSG_FAIL, nothing_happens);
         return 1;
     }
 
@@ -1759,7 +1759,7 @@ struct obj **optr;
     {
         /* needs to be recharged... */
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        pline("But it makes no sound.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "But it makes no sound.");
         learno = TRUE; /* help player figure out why */
 
     } 
@@ -2117,7 +2117,7 @@ struct obj **optr;
                 if (is_obj_candelabrum(cobj)) 
                 {
                     any.a_obj = cobj;
-                    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                         doname(cobj), MENU_UNSELECTED);
                 }
             end_menu(win, "Attach candles to which candelabrum?");
@@ -2224,7 +2224,7 @@ struct obj **optr;
             play_voice_shopkeeper_simple_line(shkp, otmp->lamplit ? ((obj->quan > 1L) ? SHOPKEEPER_LINE_BURN_THEM_BOUGHT_THEM : SHOPKEEPER_LINE_BURN_IT_BOUGHT_IT) :
                 ((obj->quan > 1L) ? SHOPKEEPER_LINE_USE_THEM_BOUGHT_THEM : SHOPKEEPER_LINE_USE_IT_BOUGHT_IT));
         }
-        verbalize("You %s %s, you bought %s!",
+        verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "You %s %s, you bought %s!",
             otmp->lamplit ? "burn" : "use",
             (obj->quan > 1L) ? "them" : "it",
             (obj->quan > 1L) ? "them" : "it");
@@ -2425,13 +2425,13 @@ struct obj *obj;
                 if (shkp && inhishop(shkp) && is_obj_on_shk_bill(obj, shkp))
                 {
                     play_voice_shopkeeper_simple_line(shkp, obj->quan == 1L ? SHOPKEEPER_LINE_IN_ADDITION_TO_COST_OF_ITEM_ITSELF : SHOPKEEPER_LINE_IN_ADDITION_TO_COST_OF_ITEMS_THEMSELVES);
-                    verbalize("That's in addition to the cost of %s %s, of course.",
+                    verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "That's in addition to the cost of %s %s, of course.",
                         obj->quan == 1L ? "the item" : "the items", obj->quan == 1L ? "itself" : "themselves");
                 }
             }
             else
             {
-                verbalize("That's in addition to the cost of %s %s, of course.",
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "That's in addition to the cost of %s %s, of course.",
                     yname(obj), obj->quan == 1L ? "itself" : "themselves");
             }
             bill_dummy_object(obj);
@@ -2477,9 +2477,9 @@ struct obj *obj;
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
         if (obj->otyp == BRASS_LANTERN)
-            Your("lamp has run out of power.");
+            Your_ex(ATR_NONE, CLR_MSG_FAIL, "lamp has run out of power.");
         else
-            pline("This %s has no oil.", xname(obj));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "This %s has no oil.", xname(obj));
         return;
     }
     if ((obj->cursed && !rn2(2)) || (obj->otyp == MAGIC_CANDLE && obj->special_quality == 0))
@@ -2512,12 +2512,87 @@ struct obj *obj;
                 {
                     play_voice_shopkeeper_simple_line(shkp, (obj->quan > 1L) ? SHOPKEEPER_LINE_BURN_THEM_BOUGHT_THEM : SHOPKEEPER_LINE_BURN_IT_BOUGHT_IT);
                 }
-                verbalize("You burn %s, you bought %s!", ithem, ithem);
+                verbalize_ex(ATR_NONE, CLR_MSG_TALK_ANGRY, "You burn %s, you bought %s!", ithem, ithem);
                 bill_dummy_object(obj);
             }
         }
         begin_burn(obj, FALSE);
     }
+}
+
+int
+use_oil(obj)
+struct obj* obj;
+{
+    if (!obj || obj->otyp != POT_OIL)
+        return 0;
+
+    if (obj->lamplit)
+    {
+        light_cocktail(&obj);
+        return 1;
+    }
+    else
+    {
+        if (!objects[obj->otyp].oc_name_known)
+        {
+            makeknown(obj->otyp);
+            pline1("This is a potion of oil.");
+        }
+
+        winid tmpwin = create_nhwindow(NHW_MENU);
+        anything any;
+        char buf[BUFSZ];
+        menu_item* selected;
+
+        any = zeroany; /* set all bits to zero */
+        start_menu_ex(tmpwin, GHMENU_STYLE_CHOOSE_COMMAND);
+
+        any.a_int = 1; /* use index+1 (cant use 0) as identifier */
+        Sprintf(buf, "light %s up", obj->quan == 1 ? "it" : "them");
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf,
+            MENU_UNSELECTED);
+        any.a_int = 2;
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "refill an item with oil",
+            MENU_UNSELECTED);
+        Sprintf(buf, "What do you want to do with %s?", the(cxname(obj)));
+        end_menu(tmpwin, buf);
+        int menures = 0;
+        if (select_menu(tmpwin, PICK_ONE, &selected) > 0)
+        {
+            menures = selected[0].item.a_int;
+        }
+        free((genericptr_t)selected);
+        destroy_nhwindow(tmpwin);
+
+        switch (menures)
+        {
+        case 1:
+            light_cocktail(&obj);
+            return 1;
+        case 2:
+        {
+            const char refill_lantern_objects[] = { ALL_CLASSES, TOOL_CLASS, 0 };
+            struct obj* target_obj = getobj_ex(refill_lantern_objects, "refill", 0, "", maybe_refillable_with_oil);
+            if (!target_obj)
+            {
+                pline1(Never_mind);
+                return 0;
+            }
+            else if (!is_refillable_with_oil(target_obj))
+            {
+                play_sfx_sound(SFX_GENERAL_CANNOT);
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot refill %s with oil.", acxname(target_obj));
+                return 0;
+            }
+            else
+                return refill_obj_with_oil(target_obj, obj);
+        }
+        default:
+            break;
+        }
+    }
+    return 0;
 }
 
 void
@@ -2574,7 +2649,7 @@ struct obj **optr;
         if (shkp && inhishop(shkp) && (obj->where == OBJ_FLOOR || is_obj_on_shk_bill(obj, shkp)))
         {
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_IN_ADDITION_TO_COST_OF_POTION);
-            verbalize("That's in addition to the cost of the potion, of course.");
+            verbalize_angry1("That's in addition to the cost of the potion, of course.");
         }
         bill_dummy_object(obj);
     }
@@ -2611,17 +2686,10 @@ dorub()
         }
     }
 
-    boolean already_uwep = FALSE;
-    if (obj && obj == uwep)
-        already_uwep = TRUE;
-
     if (!obj || !wield_tool(obj, "rub"))
         return 0;
 
-    if(already_uwep)
-        You("rub %s.", yname(uwep));
-    else
-        You("wield %s and start rubbing it.", yname(uwep));
+    You("start rubbing %s.", yname(uwep));
 
     if (iflags.using_gui_sounds && !Deaf && uwep)
     {
@@ -2724,21 +2792,21 @@ boolean showmsg;
         if (showmsg)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("Illegal move!");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Illegal move!");
         }
         return FALSE;
     } else if (distu(x, y) > (magic ? 6 + magic * 3 : 9)) {
         if (showmsg)
         {
             play_sfx_sound(SFX_GENERAL_TOO_FAR);
-            pline("Too far!");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Too far!");
         }
         return FALSE;
     } else if (!isok(x, y)) {
         if (showmsg)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("cannot jump there!");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot jump there!");
         }
         return FALSE;
     } else if (!cansee(x, y)) {
@@ -3063,7 +3131,7 @@ struct obj *obj;
     if (obj->charges <= 0) 
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-        You("seem to be out of tins.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "seem to be out of tins.");
         return;
     }
     if (!(corpse = floorfood("tin", 2)))
@@ -3109,7 +3177,7 @@ struct obj *obj;
     {
         if (revive_corpse(corpse))
         {
-            verbalize("Yes...  But War does not preserve its enemies...");
+            verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Yes...  But War does not preserve its enemies...");
         }
         else
         {
@@ -3159,13 +3227,13 @@ struct obj *obj;
                 if (shkp && inhishop(shkp) && is_obj_on_shk_bill(corpse, shkp))
                 {
                     play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_YOU_TIN_IT_YOU_BOUGHT_IT);
-                    verbalize(you_buy_it);
+                    verbalize_angry1(you_buy_it);
                 }
             }
             useup(corpse);
         } else {
             if (costly_spot(corpse->ox, corpse->oy) && !corpse->no_charge)
-                verbalize(you_buy_it);
+                verbalize_angry1(you_buy_it);
             useupf(corpse, 1L);
         }
         (void) hold_another_object(can, "You make, but cannot pick up, %s.",
@@ -3690,9 +3758,9 @@ struct obj *obj;
     {
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
         if (obj->known)
-            pline("%s empty.", Tobjnam(obj, "are"));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s empty.", Tobjnam(obj, "are"));
         else
-            pline("%s to be empty.", Tobjnam(obj, "seem"));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s to be empty.", Tobjnam(obj, "seem"));
     }
     update_inventory();
 }
@@ -4066,9 +4134,9 @@ struct obj* obj;
         play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
         res = 0;
         if (obj->known)
-            pline("%s out of charges.", Tobjnam(obj, "are"));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s out of charges.", Tobjnam(obj, "are"));
         else
-            pline("%s out of charges.", Tobjnam(obj, "seem"));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s out of charges.", Tobjnam(obj, "seem"));
     }
     update_inventory();
     return res;
@@ -5216,14 +5284,14 @@ struct obj *obj;
         start_menu_ex(tmpwin, GHMENU_STYLE_CHOOSE_COMMAND);
         any.a_int++;
         Sprintf(buf, "an object on the %s", surface(cc.x, cc.y));
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf,
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf,
                  MENU_UNSELECTED);
         any.a_int++;
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, "a monster",
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "a monster",
                  MENU_UNSELECTED);
         any.a_int++;
         Sprintf(buf, "the %s", surface(cc.x, cc.y));
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf,
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf,
                  MENU_UNSELECTED);
         end_menu(tmpwin, "Aim for what?");
         tohit = rn2(4);
@@ -5490,7 +5558,7 @@ struct obj *obj;
             continue;
         } else if (obj->otyp == WAN_CREATE_MONSTER) {
             /* u.ux,u.uy creates it near you--x,y might create it in rock */
-            (void) makemon((struct permonst *) 0, u.ux, u.uy, NO_MM_FLAGS);
+            (void) makemon2((struct permonst *) 0, u.ux, u.uy, NO_MM_FLAGS, MM2_RANDOMIZE_SUBTYPE);
             continue;
         } else if (x != u.ux || y != u.uy) {
             /*
@@ -5886,7 +5954,7 @@ doapply()
             use_lamp(obj);
             break;
         case POT_OIL:
-            light_cocktail(&obj);
+            res = use_oil(obj);
             break;
         case EXPENSIVE_CAMERA:
             res = use_camera(obj);
@@ -6066,7 +6134,7 @@ boolean useonlyautostashes;
             add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
                 applied_invlet,
                 applied_group_accelerator,
-                ATR_NONE, 
+                ATR_NONE, NO_COLOR,
                 doname(otmp), 
                 MENU_UNSELECTED);
 

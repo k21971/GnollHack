@@ -33,7 +33,9 @@
     <None Remove="Assets\archristy.ttf" />
     <None Remove="Assets\Auxiliary.bank" />
     <None Remove="Assets\buttons.png" />
+    <None Remove="Assets\button_disabled.png" />
     <None Remove="Assets\button_normal.png" />
+    <None Remove="Assets\button_selected.png" />
     <None Remove="Assets\consola.ttf" />
     <None Remove="Assets\DejaVuSansMono-Bold.ttf" />
     <None Remove="Assets\DejaVuSansMono-BoldOblique.ttf" />
@@ -83,11 +85,13 @@
     <None Remove="Assets\UI\arrow_upright.png" />
     <None Remove="Assets\UI\attributes.png" />
     <None Remove="Assets\UI\autopickup.png" />
+    <None Remove="Assets\UI\background-loading-screen.jpg" />
     <None Remove="Assets\UI\background-oldpaper.png" />
     <None Remove="Assets\UI\break.png" />
     <None Remove="Assets\UI\cancel.png" />
     <None Remove="Assets\UI\cast.png" />
     <None Remove="Assets\UI\chat.png" />
+    <None Remove="Assets\UI\chatsteed.png" />
     <None Remove="Assets\UI\close.png" />
     <None Remove="Assets\UI\commands.png" />
     <None Remove="Assets\UI\conduct.png" />
@@ -96,6 +100,7 @@
     <None Remove="Assets\UI\dip.png" />
     <None Remove="Assets\UI\discoveries.png" />
     <None Remove="Assets\UI\dropmany.png" />
+    <None Remove="Assets\UI\droptypes.png" />
     <None Remove="Assets\UI\eat.png" />
     <None Remove="Assets\UI\engrave.png" />
     <None Remove="Assets\UI\examine.png" />
@@ -247,7 +252,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets\archristy.ttf" />
     <EmbeddedResource Include="Assets\buttons.png" />
+    <EmbeddedResource Include="Assets\button_disabled.png" />
     <EmbeddedResource Include="Assets\button_normal.png" />
+    <EmbeddedResource Include="Assets\button_selected.png" />
     <EmbeddedResource Include="Assets\DejaVuSansMono-Bold.ttf" />
     <EmbeddedResource Include="Assets\DejaVuSansMono-BoldOblique.ttf" />
     <EmbeddedResource Include="Assets\DejaVuSansMono-Oblique.ttf" />
@@ -266,6 +273,9 @@
     <EmbeddedResource Include="Assets\main-menu-gnoll.jpg" />
     <EmbeddedResource Include="Assets\main-menu-ranger.jpg" />
     <EmbeddedResource Include="Assets\UI\autopickup.png" />
+    <EmbeddedResource Include="Assets\UI\background-loading-screen.jpg" />
+    <EmbeddedResource Include="Assets\UI\chatsteed.png" />
+    <EmbeddedResource Include="Assets\UI\droptypes.png" />
     <EmbeddedResource Include="Assets\UI\unwield.png" />
     <Page Include="Assets\imrl.otf" />
     <EmbeddedResource Include="Assets\Lato-Bold.ttf" />
@@ -449,6 +459,7 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="3.1.14" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Plugin.StoreReview" Version="5.0.1" />
     <PackageReference Include="SkiaSharp.Views.Forms" Version="2.80.3" />
     <PackageReference Include="Xamarin.CommunityToolkit" Version="2.0.1" />
     <PackageReference Include="Xamarin.CommunityToolkit.Markup" Version="2.0.1" />
@@ -456,7 +467,7 @@
     <PackageReference Include="Xamarin.FFImageLoading.Forms" Version="2.4.11.982" />
     <PackageReference Include="Xamarin.FFImageLoading.Transformations" Version="2.4.11.982" />
     <PackageReference Include="Xamarin.Forms" Version="5.0.0.2401" />
-    <PackageReference Include="Xamarin.Essentials" Version="1.7.2" />
+    <PackageReference Include="Xamarin.Essentials" Version="1.7.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -473,7 +484,7 @@
     <EmbeddedResource Update="Controls\SwitchableCanvasView.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
-    <EmbeddedResource Update="Pages\Game\CreditsPage.xaml">
+    <EmbeddedResource Update="Pages\Game\AboutPage.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Pages\Game\DisplayFilePage.xaml">
@@ -525,6 +536,9 @@
   <ItemGroup>
     <Compile Update="Controls\SimpleImageButton.xaml.cs">
       <DependentUpon>SimpleImageButton.xaml</DependentUpon>
+    </Compile>
+    <Compile Update="Pages\Game\AboutPage.xaml.cs">
+      <DependentUpon>AboutPage.xaml</DependentUpon>
     </Compile>
     <Compile Update="Pages\Login\WebViewPage.xaml.cs">
       <DependentUpon>WebViewPage.xaml</DependentUpon>

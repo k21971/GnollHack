@@ -12,7 +12,7 @@ namespace GnollHackServer
 {
     public class ServerGame
     {
-        [DllImport(@"gnollhacklib.dll")]
+        [DllImport(@"gnollhackwin.dll")]
         public static extern int RunGnollHack(
             [MarshalAs(UnmanagedType.LPStr)] string gnhdir,
             [MarshalAs(UnmanagedType.LPStr)] string cmdlineargs,
@@ -110,8 +110,6 @@ namespace GnollHackServer
             VoidIntCallback callback_exit_hack,
             CharVoidCallback callback_getcwd,
             IntCharCharUintCallback callback_messagebox,
-            //VoidIntCallback callback_outrip_begin,
-            //VoidIntCallback callback_outrip_end,
 
             FreeMemoryCallback callback_free_memory,
             ReportPlayerNameCallback callback_report_player_name,
@@ -120,25 +118,25 @@ namespace GnollHackServer
             SendMonsterDataCallback callback_send_monster_data
         );
 
-        [DllImport(@"gnollhacklib.dll")]
+        [DllImport(@"gnollhackwin.dll")]
         public static extern int RunGnollHackSimple(
             ulong wincaps1,
             ulong wincaps2
         );
 
-        [DllImport(@"gnollhacklib.dll")]
+        [DllImport(@"gnollhackwin.dll")]
         public static extern int RunGnollHackSimple2(
             ulong wincaps1,
             ulong wincaps2,
             VoidVoidCallback callback_init_nhwindows);
 
-        [DllImport(@"gnollhacklib.dll")]
+        [DllImport(@"gnollhackwin.dll")]
         public static extern byte dll_validrole(int role);
 
-        [DllImport(@"gnollhacklib.dll")]
+        [DllImport(@"gnollhackwin.dll")]
         public static extern byte dll_str2role([MarshalAs(UnmanagedType.LPStr)] string role_str);
 
-        [DllImport(@"gnollhacklib.dll")]
+        [DllImport(@"gnollhackwin.dll")]
         public static extern int DoSomeCalc2();
 
         private Thread _gnhthread;
@@ -296,10 +294,10 @@ namespace GnollHackServer
         }
 
 
-        protected string GameCallback_AskName(string modeName, string modeDescription)
+        protected int GameCallback_AskName(string modeName, string modeDescription, IntPtr out_string_ptr)
         {
             Debug.WriteLine("GameCallback_AskName");
-            return "Janne Test";
+            return 0;
         }
 
         protected void GameCallback_ExitHack(int status)
@@ -357,12 +355,12 @@ namespace GnollHackServer
 
         }
 
-        protected void GameCallback_AddMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, string text, byte presel, int color)
+        protected void GameCallback_AddMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, int color, string text, byte presel)
         {
 
         }
 
-        protected void GameCallback_AddExtendedMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, string text, byte presel, int color, int maxcount,
+        protected void GameCallback_AddExtendedMenu(int winid, int glyph, Int64 identifier, char accel, char groupaccel, int attributes, int color, string text, byte presel, int maxcount,
             UInt64 oid, UInt64 mid, char heading_group_accel, char special_mark, ulong menu_flags, byte dataflags, int style, IntPtr otmpdata_ptr, IntPtr otypdata_ptr)
         {
 
@@ -373,9 +371,9 @@ namespace GnollHackServer
 
         }
 
-        public string GameCallback_GetMsgHistory(IntPtr attributes_ptr, IntPtr colors_ptr, byte init)
+        public int GameCallback_GetMsgHistory(IntPtr text_ptr, IntPtr attributes_ptr, IntPtr colors_ptr, byte init)
         {
-            return null;
+            return 0;
         }
 
         public void GameCallback_PutMsgHistory(string msg, IntPtr attributes_ptr, IntPtr colors_ptr, byte is_restoring)
@@ -604,9 +602,9 @@ namespace GnollHackServer
         {
             return 0;
         }
-        protected string GameCallback_GetLineCallback(int style, int attr, int color, string query, string placeholder, string linesuffix, string introline)
+        protected int GameCallback_GetLineCallback(int style, int attr, int color, string query, string placeholder, string linesuffix, string introline, IntPtr out_string_ptr)
         {
-            return "";
+            return 0;
         }
         protected string GameCallback_CharPtrBooleanDummy(byte value1)
         {

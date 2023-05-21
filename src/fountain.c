@@ -193,7 +193,7 @@ boolean isyou;
                         context.global_minimum_volume = 0.25f;
                         play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_HEY_STOP_USING_THAT_FOUNTAIN);
                         context.global_minimum_volume = 0.0f;
-                        verbalize("Hey, stop using that fountain!");
+                        verbalize_angry1("Hey, stop using that fountain!");
                     } else {
                         pline("%s earnestly %s %s %s!",
                               Amonnam(mtmp),
@@ -270,7 +270,7 @@ drinkfountain()
             pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "The water makes you feel better.");
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That was a fountain of healing.");
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of healing.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -343,7 +343,7 @@ drinkfountain()
             pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "The water makes magical energies course through your body.");
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That was a fountain of mana.");
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of mana.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -354,7 +354,7 @@ drinkfountain()
         pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "The water fills your body with new energy.");
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That was a fountain of power.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of power.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
     }
@@ -366,7 +366,7 @@ drinkfountain()
         update_hunger_status(FALSE);
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a fountain of spring water.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of spring water.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
     }
@@ -378,7 +378,7 @@ drinkfountain()
         update_hunger_status(FALSE);
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a natural spring.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a natural spring.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
     }
@@ -390,7 +390,7 @@ drinkfountain()
         if (Poison_resistance) 
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
-            pline("However, you are unaffected!");
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "However, you are unaffected!");
         }
         else
         {
@@ -399,7 +399,7 @@ drinkfountain()
         }
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, Poison_resistance ? CLR_MSG_ATTENTION : CLR_MSG_NEGATIVE, "That was a fountain of poison.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of poison.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
         standard_hint("You can test fountains by dipping potions into them. Get poison resistance before drinking from unknown fountains.", &u.uhint.poisoned_by_fountain);
@@ -439,7 +439,7 @@ drinkfountain()
         levl[u.ux][u.uy].blessedftn = 0;
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "That was an enchanted magic fountain.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was an enchanted magic fountain.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
         return;
@@ -592,7 +592,7 @@ drinkfountain()
 
         if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "That was a magic fountain.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a magic fountain.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
 
@@ -629,7 +629,7 @@ register struct obj *obj;
         if (u.ualign.type != A_LAWFUL) 
         {
             /* Ha!  Trying to cheat her. */
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A freezing mist rises from the %s and envelopes the sword.",
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "A freezing mist rises from the %s and envelopes the sword.",
                   hliquid("water"));
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "fountain disappears!");
             curse(obj);
@@ -642,7 +642,7 @@ register struct obj *obj;
         {
             /* The lady of the lake acts! - Eric Backus */
             /* Be *REAL* nice */
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION,
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL,
               "From the murky depths, a hand reaches up to bless the sword.");
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As the hand retreats, the fountain disappears!");
             obj->otyp = LONG_SWORD;
@@ -666,7 +666,7 @@ register struct obj *obj;
         boolean identified = FALSE;
         if (obj && is_weapon(obj) && is_poisonable(obj) && obj->opoisoned)
         {
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A coating wears off %s.", the(xname(obj)));
+            pline_ex(ATR_NONE, CLR_MSG_SPELL, "A coating wears off %s.", the(xname(obj)));
             obj->opoisoned = 0;
             identified = TRUE;
             effecthappened = TRUE;
@@ -676,9 +676,9 @@ register struct obj *obj;
             if (carried(obj))
             {
                 if(objects[obj->otyp].oc_name_known)
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s purified.", Yobjnam2(obj, "are"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s purified.", Yobjnam2(obj, "are"));
                 else 
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s.", Yobjnam2(obj, "clear"));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s.", Yobjnam2(obj, "clear"));
             }
             obj->otyp = POT_WATER;
             obj->dknown = 0;
@@ -737,13 +737,13 @@ register struct obj *obj;
             {
                 identified = TRUE;
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s imbued with healing energies of the fountain.", oldnameare);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s into %s.", oldnameturns, doname(obj));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s imbued with healing energies of the fountain.", oldnameare);
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s into %s.", oldnameturns, doname(obj));
             }
             else if (obj->odiluted != olddiluted)
             {
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s undiluted.", Tobjnam(obj, "become"));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s undiluted.", Tobjnam(obj, "become"));
             }
 
             if (carried(obj))
@@ -757,7 +757,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "That was a fountain of healing.");
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of healing.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -819,13 +819,13 @@ register struct obj *obj;
             {
                 identified = TRUE;
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s imbued with magical energies of the fountain.", oldnameare);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s into %s.", oldnameturns, doname(obj));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s imbued with magical energies of the fountain.", oldnameare);
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s into %s.", oldnameturns, doname(obj));
             }
             else if (obj->odiluted != olddiluted)
             {
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s undiluted.", Tobjnam(obj, "become"));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s undiluted.", Tobjnam(obj, "become"));
             }
 
             if (carried(obj))
@@ -839,7 +839,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "That was a fountain of mana.");
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of mana.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -930,13 +930,13 @@ register struct obj *obj;
             {
                 identified = TRUE;
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s empowered by the energies of the fountain.", oldnameare);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s into %s.", oldnameturns, doname(obj));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s empowered by the energies of the fountain.", oldnameare);
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s into %s.", oldnameturns, doname(obj));
             }
             else if (obj->odiluted != olddiluted)
             {
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s undiluted.", Tobjnam(obj, "become"));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s undiluted.", Tobjnam(obj, "become"));
             }
 
             if (carried(obj))
@@ -950,7 +950,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "That was a fountain of power.");
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of power.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -984,7 +984,7 @@ register struct obj *obj;
         if (obj && is_weapon(obj) && is_poisonable(obj) && !obj->opoisoned)
         {
             play_sfx_sound(SFX_POISON_COATING);
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The fountain forms a coating on %s.", the(xname(obj)));
+            pline_ex(ATR_NONE, CLR_MSG_SPELL, "The fountain forms a coating on %s.", the(xname(obj)));
             obj->opoisoned = TRUE;
             identified = TRUE;
             effecthappened = TRUE;
@@ -999,13 +999,13 @@ register struct obj *obj;
             {
                 identified = TRUE;
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s to smell foul.", oldnamestart);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s into %s.", oldnameturns, doname(obj));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s to smell foul.", oldnamestart);
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s into %s.", oldnameturns, doname(obj));
             }
             else if (obj->odiluted != olddiluted)
             {
                 effecthappened = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s undiluted.", Tobjnam(obj, "become"));
+                pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s undiluted.", Tobjnam(obj, "become"));
             }
 
             if (carried(obj))
@@ -1020,7 +1020,7 @@ register struct obj *obj;
         {
             if (!FOUNTAIN_IS_KNOWN(u.ux, u.uy))
             {
-                pline_ex(ATR_NONE, CLR_MSG_WARNING, "That was a fountain of poison.");
+                pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a fountain of poison.");
                 SET_FOUNTAIN_KNOWN(u.ux, u.uy);
             }
         }
@@ -1040,7 +1040,7 @@ register struct obj *obj;
             {
                 curse(obj);
                 if (!Blind)
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s for a moment.", Tobjnam(obj, "glow"), hcolor(NH_BLACK));
+                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s %s for a moment.", Tobjnam(obj, "glow"), hcolor(NH_BLACK));
                 else
                 {
                     identified = FALSE;
@@ -1060,7 +1060,7 @@ register struct obj *obj;
             if (obj->cursed) 
             {
                 if (!Blind)
-                    pline_The_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s glows for a moment.", hliquid("water"));
+                    pline_The_ex(ATR_NONE, CLR_MSG_SPELL, "%s glows for a moment.", hliquid("water"));
                 uncurse(obj);
             } 
             else 
@@ -1170,7 +1170,7 @@ register struct obj *obj;
 
         if (identified && !FOUNTAIN_IS_KNOWN(u.ux, u.uy))
         {
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That was a magic fountain.");
+            pline_ex(ATR_NONE, CLR_MSG_HINT, "That was a magic fountain.");
             SET_FOUNTAIN_KNOWN(u.ux, u.uy);
         }
 

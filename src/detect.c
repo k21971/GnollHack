@@ -1216,10 +1216,10 @@ struct obj **optr;
         {
         case 1:
             play_sfx_sound(SFX_TOO_MUCH_TO_COMPREHEND);
-            pline("%s too much to comprehend!", Tobjnam(obj, "are"));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s too much to comprehend!", Tobjnam(obj, "are"));
             break;
         case 2:
-            pline("%s you!", Tobjnam(obj, "confuse"));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s you!", Tobjnam(obj, "confuse"));
             if (!Confusion)
                 play_sfx_sound(SFX_ACQUIRE_CONFUSION);
             make_confused(itimeout_incr(HConfusion, rnd(100)), FALSE);
@@ -1227,7 +1227,7 @@ struct obj **optr;
         case 3:
             if (!resists_blnd(&youmonst)) 
             {
-                pline("%s your vision!", Tobjnam(obj, "damage"));
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s your vision!", Tobjnam(obj, "damage"));
                 if(!Blinded)
                     play_sfx_sound(SFX_ACQUIRE_BLINDNESS);
 
@@ -1238,14 +1238,14 @@ struct obj **optr;
             else
             {
                 play_sfx_sound(SFX_GENERAL_UNAFFECTED);
-                pline("%s your vision.", Tobjnam(obj, "assault"));
-                You("are unaffected!");
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s your vision.", Tobjnam(obj, "assault"));
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "are unaffected!");
             }
             break;
         case 4:
             if (!Hallucination)
                 play_sfx_sound(SFX_ACQUIRE_HALLUCINATION);
-            pline("%s your mind!", Tobjnam(obj, "zap"));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s your mind!", Tobjnam(obj, "zap"));
             (void) make_hallucinated(
                 (HHallucination & TIMEOUT) + (long) rnd(100), FALSE, 0L);
             break;
@@ -1253,7 +1253,7 @@ struct obj **optr;
             play_sfx_sound(SFX_EXPLOSION_FIERY);
             play_special_effect_at(SPECIAL_EFFECT_SMALL_FIERY_EXPLOSION, 0, u.ux, u.uy, FALSE);
             special_effect_wait_until_action(0);
-            pline("%s!", Tobjnam(obj, "explode"));
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s!", Tobjnam(obj, "explode"));
             useup(obj);
             *optr = obj = 0; /* it's gone */
             /* physical damage cause by the shards and force */
@@ -1329,7 +1329,7 @@ struct obj **optr;
             if (strcmp(def_monsyms[k].explain, ""))
             {
                 any.a_int = k + 1;
-                add_menu(tmpwin, NO_GLYPH, &any, def_monsyms[k].sym == ' ' ? ',' : def_monsyms[k].sym, 0, ATR_NONE, def_monsyms[k].explain, MENU_UNSELECTED);
+                add_menu(tmpwin, NO_GLYPH, &any, def_monsyms[k].sym == ' ' ? ',' : def_monsyms[k].sym, 0, ATR_NONE, NO_COLOR, def_monsyms[k].explain, MENU_UNSELECTED);
             }
         }
         for (k = 0; k < MAX_OBJECT_CLASSES; k++)
@@ -1337,29 +1337,29 @@ struct obj **optr;
             if (strcmp(def_oc_syms[k].explain, "") && def_oc_syms[k].sym != ILLOBJ_SYM && def_oc_syms[k].sym != '\0')
             {
                 any.a_int = -(k + 1);
-                add_menu(tmpwin, NO_GLYPH, &any, def_oc_syms[k].sym, 0, ATR_NONE, def_oc_syms[k].explain, MENU_UNSELECTED);
+                add_menu(tmpwin, NO_GLYPH, &any, def_oc_syms[k].sym, 0, ATR_NONE, NO_COLOR, def_oc_syms[k].explain, MENU_UNSELECTED);
             }
         }
 
         /* Cmap, which sometimes do not work */
         any.a_int = MAX_MONSTER_CLASSES + S_arrow_trap + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_arrow_trap].sym, 0, ATR_NONE, "traps and portals", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_arrow_trap].sym, 0, ATR_NONE, NO_COLOR, "traps and portals", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_throne + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_throne].sym, 0, ATR_NONE, "thrones", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_throne].sym, 0, ATR_NONE, NO_COLOR, "thrones", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_altar + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_altar].sym, 0, ATR_NONE, "altars and anvils", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_altar].sym, 0, ATR_NONE, NO_COLOR, "altars and anvils", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_dnstair + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_dnstair].sym, 0, ATR_NONE, "stairs and ladders down", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_dnstair].sym, 0, ATR_NONE, NO_COLOR, "stairs and ladders down", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_upstair + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_upstair].sym, 0, ATR_NONE, "stairs and ladders up", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_upstair].sym, 0, ATR_NONE, NO_COLOR, "stairs and ladders up", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_tree + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_tree].sym, 0, ATR_NONE, "trees and sinks", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_tree].sym, 0, ATR_NONE, NO_COLOR, "trees and sinks", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_fountain + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_fountain].sym, 0, ATR_NONE, "fountains", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_fountain].sym, 0, ATR_NONE, NO_COLOR, "fountains", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_pool + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_pool].sym, 0, ATR_NONE, "water or lava", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_pool].sym, 0, ATR_NONE, NO_COLOR, "water or lava", MENU_UNSELECTED);
         any.a_int = MAX_MONSTER_CLASSES + S_grave + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_grave].sym, 0, ATR_NONE, "graves, braziers, and signposts", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, defsyms[S_grave].sym, 0, ATR_NONE, NO_COLOR, "graves, braziers, and signposts", MENU_UNSELECTED);
 
 
         end_menu(tmpwin, "What do you look for?");
@@ -1984,7 +1984,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
         if (!aflag)
         {
             play_sfx_sound(SFX_GENERAL_THATS_SILLY);
-            pline("What are you looking for?  The exit?");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "What are you looking for?  The exit?");
         }
     }
     else 

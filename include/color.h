@@ -65,7 +65,7 @@
 #define HI_REINFORCED CLR_CYAN /* HI_METAL */
 #define HI_NEST CLR_YELLOW
 #define HI_TOWER CLR_BRIGHT_BLUE /* HI_ZAP */
-#define HI_OPULENT CLR_MAGENTA /* could be also CLR_MAGENTA but best choice seems to depend on the color scheme */
+#define HI_OPULENT CLR_MAGENTA
 #define HI_TEMPLE CLR_WHITE
 
 #define CLR_MSG_POSITIVE      CLR_GREEN
@@ -79,6 +79,11 @@
 #define CLR_MSG_SUCCESS       CLR_BRIGHT_GREEN
 #define CLR_MSG_FAIL          CLR_BROWN
 #define CLR_MSG_HINT          CLR_BRIGHT_CYAN
+#define CLR_MSG_TEXT          CLR_BRIGHT_CYAN
+
+#define CLR_MSG_TALK_NORMAL   CLR_WHITE
+#define CLR_MSG_TALK_ANGRY    CLR_ORANGE
+#define CLR_MSG_TALK_HAPPY    CLR_BRIGHT_GREEN
 
 struct menucoloring {
     struct nhregex *match;

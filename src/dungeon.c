@@ -1921,7 +1921,7 @@ boolean unreachable;
     } else {
         any.a_int = lchoices->idx + 1;
     }
-    add_menu(win, NO_GLYPH, &any, lchoices->menuletter, 0, ATR_NONE, entry,
+    add_menu(win, NO_GLYPH, &any, lchoices->menuletter, 0, ATR_NONE, NO_COLOR, entry,
              MENU_UNSELECTED);
     /* this assumes there are at most 52 interesting levels */
     if (lchoices->menuletter == 'z')
@@ -2039,8 +2039,8 @@ xchar *rdgn;
         }
         if (bymenu) {
             any = zeroany;
-            add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings, buf,
-                     MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+                     MENU_UNSELECTED, menu_heading_info());
         } else
             putstr(win, 0, buf);
 

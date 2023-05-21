@@ -158,7 +158,7 @@ struct obj *objs;
 boolean here;
 int *menu_on_demand;
 {
-    char ilets[36], inbuf[BUFSZ] = DUMMY; /* FIXME: hardcoded ilets[] length */
+    char ilets[BUFSZ], inbuf[BUFSZ] = DUMMY; /* FIXME: hardcoded ilets[] length */
     int iletct, oclassct;
     boolean not_everything, filtered;
     char qbuf[QBUFSZ];
@@ -187,8 +187,10 @@ int *menu_on_demand;
     }
     if (itemcount && menu_on_demand)
         ilets[iletct++] = 'm';
-    if (count_unpaid(objs, here))
+    if (count_unpaid(objs, 0, here))
         ilets[iletct++] = 'u';
+    if (count_unidentified(objs, 0, here))
+        ilets[iletct++] = 'I';
 
     tally_BUCX(objs, here, &bcnt, &ucnt, &ccnt, &xcnt, &ocnt, &tcnt);
     if (bcnt)
@@ -239,7 +241,7 @@ int *menu_on_demand;
                 goto ask_again;
             } else if (sym == 'm') {
                 m_seen = TRUE;
-            } else if (index("uBUCX", sym)) {
+            } else if (index("uIBUCX", sym)) {
                 add_valid_menu_class(sym); /* 'u' or 'B','U','C',or 'X' */
                 filtered = TRUE;
             } else {
@@ -355,7 +357,7 @@ struct obj *obj;
 /* list of valid menu classes for query_objlist() and allow_category callback
    (with room for all object classes, 'u'npaid, BUCX, and terminator) */
 STATIC_VAR char valid_menu_classes[MAX_OBJECT_CLASSES + 1 + 4 + 1];
-STATIC_VAR boolean class_filter, bucx_filter, shop_filter;
+STATIC_VAR boolean class_filter, bucx_filter, shop_filter, unidentified_filter;
 
 /* check valid_menu_classes[] for an entry; also used by askchain() */
 boolean
@@ -373,7 +375,7 @@ int c;
 
     if (c == 0) { /* reset */
         vmc_count = 0;
-        class_filter = bucx_filter = shop_filter = FALSE;
+        class_filter = bucx_filter = shop_filter = unidentified_filter = FALSE;
     } else if (!menu_class_present(c)) {
         valid_menu_classes[vmc_count++] = (char) c;
         /* categorize the new class */
@@ -383,6 +385,9 @@ int c;
         case 'C': /*FALLTHRU*/
         case 'X':
             bucx_filter = TRUE;
+            break;
+        case 'I':
+            unidentified_filter = TRUE;
             break;
         case 'u':
             shop_filter = TRUE;
@@ -430,7 +435,8 @@ struct obj *obj;
                     : bucx_filter
                        ? (index(valid_menu_classes, iflags.goldX ? 'X' : 'U')
                           ? TRUE : FALSE)
-                       : TRUE; /* catchall: no filters specified, so accept */
+                       : unidentified_filter ? FALSE :
+                          TRUE; /* catchall: no filters specified, so accept */
 
     if (Role_if(PM_PRIEST))
         obj->bknown = TRUE;
@@ -458,7 +464,10 @@ struct obj *obj;
     /* if unpaid is expected and obj isn't unpaid, reject (treat a container
        holding any unpaid object as unpaid even if isn't unpaid itself) */
     if (shop_filter && !obj->unpaid
-        && !(Has_contents(obj) && count_unpaid(obj->cobj, FALSE) > 0))
+        && !(Has_contents(obj) && count_unpaid(obj->cobj, 0, FALSE) > 0))
+        return FALSE;
+    /* reject fully identified objects */
+    if (unidentified_filter && !not_fully_identified(obj))
         return FALSE;
     /* check for particular bless/curse state */
     if (bucx_filter) {
@@ -1010,12 +1019,12 @@ int show_weights;
                 if (sorted && !printed_type_name) {
                     any = zeroany;
                     add_extended_menu(win, NO_GLYPH, &any, 
-                        menu_group_heading_info(*pack > ILLOBJ_CLASS && *pack < MAX_OBJECT_CLASSES ? def_oc_syms[(int)*pack].sym : '\0'), 
-                        0, 0, iflags.menu_headings,
+                        0, 0, iflags.menu_headings, NO_COLOR,
                              let_to_name(*pack, FALSE,
                                          ((how != PICK_NONE)
                                           && iflags.menu_head_objsym)),
-                             MENU_UNSELECTED);
+                             MENU_UNSELECTED,
+                        menu_group_heading_info(*pack > ILLOBJ_CLASS && *pack < MAX_OBJECT_CLASSES ? def_oc_syms[(int)*pack].sym : '\0'));
                     printed_type_name = TRUE;
                 }
 
@@ -1037,10 +1046,10 @@ int show_weights;
                 int glyph = obj_to_glyph(curr, rn2_on_display_rng);
                 int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, curr, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
-                add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, obj_to_extended_menu_info(curr),
-                    applied_invlet,
-                    applied_group_accelerator,
-                         ATR_NONE, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(curr, loadstonecorrectly) : doname_with_price_and_weight_first(curr, loadstonecorrectly)) : doname_with_price(curr), MENU_UNSELECTED);
+                add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+                    applied_invlet, applied_group_accelerator, ATR_NONE, NO_COLOR, 
+                    show_weights > 0 ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(curr, loadstonecorrectly) : doname_with_price_and_weight_first(curr, loadstonecorrectly)) : doname_with_price(curr), 
+                    MENU_UNSELECTED, obj_to_extended_menu_info(curr));
                 first = FALSE;
             }
         }
@@ -1055,8 +1064,7 @@ int show_weights;
         if (sorted && n > 1) {
             Sprintf(buf, "%s Creatures",
                     is_animal(u.ustuck->data) ? "Swallowed" : "Engulfed");
-            add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings, buf,
-                     MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf, MENU_UNSELECTED, menu_heading_info());
         }
         fake_hero_object = zeroobj;
         fake_hero_object.quan = 1L; /* not strictly necessary... */
@@ -1065,7 +1073,7 @@ int show_weights;
         int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
         add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
                  /* fake inventory letter, no group accelerator */
-                 CONTAINED_SYM, 0, ATR_NONE, an(self_lookat(buf)),
+                 CONTAINED_SYM, 0, ATR_NONE, NO_COLOR, an(self_lookat(buf)),
                  MENU_UNSELECTED);
     }
 
@@ -1133,17 +1141,23 @@ int how;               /* type of query */
     boolean FDECL((*ofilter), (OBJ_P)) = (boolean FDECL((*), (OBJ_P))) 0;
     boolean do_unpaid = FALSE;
     boolean do_blessed = FALSE, do_cursed = FALSE, do_uncursed = FALSE,
-            do_buc_unknown = FALSE;
+            do_buc_unknown = FALSE, do_unidentified = FALSE;
     int num_buc_types = 0;
     int objcnt = count_objects(olist, (qflags & BY_NEXTHERE) != 0);
 
     *pick_list = (menu_item *) 0;
     if (!olist)
         return 0;
-    if ((qflags & UNPAID_TYPES) && count_unpaid(olist, (qflags & BY_NEXTHERE) != 0))
-        do_unpaid = TRUE;
+
     if (qflags & WORN_TYPES)
         ofilter = is_worn;
+
+    if ((qflags & UNPAID_TYPES) && count_unpaid(olist, ofilter, (qflags & BY_NEXTHERE) != 0))
+        do_unpaid = TRUE;
+
+    if ((qflags & UNIDENTIFIED_TYPES) && count_unidentified(olist, ofilter, (qflags & BY_NEXTHERE) != 0)) {
+        do_unidentified = TRUE;
+    }
     if ((qflags & BUC_BLESSED) && count_buc(olist, BUC_BLESSED, ofilter, (qflags & BY_NEXTHERE) != 0)) {
         do_blessed = TRUE;
         num_buc_types++;
@@ -1188,20 +1202,20 @@ int how;               /* type of query */
         invlet = 'A';
         any = zeroany;
         any.a_int = 'A';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  (qflags & WORN_TYPES) ? "Auto-select every item being worn"
                                        : "Auto-select every item",
                  MENU_UNSELECTED);
 
         any = zeroany;
-        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, "", MENU_UNSELECTED);
+        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "", MENU_UNSELECTED);
     }
 
     if ((qflags & ALL_TYPES) && (ccount > 1)) {
         invlet = 'a';
         any = zeroany;
         any.a_int = ALL_TYPES_SELECTED;
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  (qflags & WORN_TYPES) ? "All worn types" : "All types",
                  MENU_UNSELECTED);
         invlet = 'b';
@@ -1219,7 +1233,7 @@ int how;               /* type of query */
                     add_menu(
                         win, NO_GLYPH, &any, invlet++,
                         def_oc_syms[(int) objects[curr->otyp].oc_class].sym,
-                        ATR_NONE, let_to_name(*pack, FALSE,
+                        ATR_NONE, NO_COLOR, let_to_name(*pack, FALSE,
                                               (how != PICK_NONE)
                                                   && iflags.menu_head_objsym),
                         MENU_UNSELECTED);
@@ -1237,7 +1251,7 @@ int how;               /* type of query */
     if (do_unpaid || (qflags & BILLED_TYPES) || do_blessed || do_cursed
         || do_uncursed || do_buc_unknown) {
         any = zeroany;
-        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, "", MENU_UNSELECTED);
+        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "", MENU_UNSELECTED);
     }
 
     /* unpaid items if there are any */
@@ -1245,7 +1259,7 @@ int how;               /* type of query */
         invlet = 'u';
         any = zeroany;
         any.a_int = 'u';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, "Unpaid items",
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR, "Unpaid items",
                  MENU_UNSELECTED);
     }
     /* billed items: checked by caller, so always include if BILLED_TYPES */
@@ -1253,8 +1267,15 @@ int how;               /* type of query */
         invlet = 'x';
         any = zeroany;
         any.a_int = 'x';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  "Unpaid items already used up", MENU_UNSELECTED);
+    }
+    if (do_unidentified) {
+        invlet = 'I';
+        any = zeroany;
+        any.a_int = 'I';
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
+            "Unidentified items", MENU_UNSELECTED);
     }
 
     /* items with b/u/c/unknown if there are any;
@@ -1264,30 +1285,31 @@ int how;               /* type of query */
         invlet = 'B';
         any = zeroany;
         any.a_int = 'B';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  "Items known to be Blessed", MENU_UNSELECTED);
     }
     if (do_cursed) {
         invlet = 'C';
         any = zeroany;
         any.a_int = 'C';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  "Items known to be Cursed", MENU_UNSELECTED);
     }
     if (do_uncursed) {
         invlet = 'U';
         any = zeroany;
         any.a_int = 'U';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  "Items known to be Uncursed", MENU_UNSELECTED);
     }
     if (do_buc_unknown) {
         invlet = 'X';
         any = zeroany;
         any.a_int = 'X';
-        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
                  "Items of unknown Bless/Curse status", MENU_UNSELECTED);
     }
+
     end_menu(win, qstr);
     n = select_menu(win, how, pick_list);
     destroy_nhwindow(win);
@@ -1487,7 +1509,7 @@ int *wt_before, *wt_after;
     }
 
     play_sfx_sound(SFX_GENERAL_TOO_MUCH_ENCUMBRANCE);
-    There("%s %s %s, but %s%s%s%s.", otense(obj, "are"), obj_nambuf, where,
+    There_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s %s, but %s%s%s%s.", otense(obj, "are"), obj_nambuf, where,
           prefx1, prefx2, verb, suffx);
 
     /* *wt_after = iw; */
@@ -2134,7 +2156,7 @@ doloot()
             return 1;
         if (rn2(2)) {
             play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-            pline("Being confused, you find nothing to loot.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Being confused, you find nothing to loot.");
             return 1; /* costs a turn */
         }             /* else fallthrough to normal looting */
     }
@@ -2183,7 +2205,7 @@ doloot()
                  cobj = cobj->nexthere)
                 if (Is_container(cobj)) {
                     any.a_obj = cobj;
-                    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                              doname(cobj), MENU_UNSELECTED);
                 }
             end_menu(win, "Loot which containers?");
@@ -2229,7 +2251,7 @@ doloot()
         }
     } else if (IS_GRAVE(levl[cc.x][cc.y].typ)) {
         play_sfx_sound(SFX_GENERAL_ANOTHER_ACTION_NEEDED);
-        You("need to dig up the grave to effectively loot it...");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "need to dig up the grave to effectively loot it...");
     }
 
     /*
@@ -2260,7 +2282,7 @@ doloot()
         {
             did_something = TRUE;
             play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-            You("%s to loot on the %s.", dont_find_anything,
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "%s to loot on the %s.", dont_find_anything,
                 ceiling(cc.x, cc.y));
             timepassed = 1;
             return timepassed;
@@ -2270,7 +2292,8 @@ doloot()
         if (mtmp)
         {
             timepassed = loot_mon(mtmp, &prev_inquiry, &prev_loot);
-            did_something = TRUE;
+            if(timepassed)
+                did_something = TRUE;
         }
 
         /* always use a turn when choosing a direction is impaired,
@@ -2339,7 +2362,7 @@ doloot()
                             Sprintf(itembuf, "%s", an(OBJ_NAME(objects[item_otyp])));
 
                             add_menu(win, NO_GLYPH, &any,
-                                0, 0, ATR_NONE,
+                                0, 0, ATR_NONE, NO_COLOR,
                                 itembuf, MENU_UNSELECTED);
 
                             item_count++;
@@ -2352,7 +2375,7 @@ doloot()
                             Sprintf(itembuf, "%s", an(OBJ_NAME(objects[item_otyp])));
 
                             add_menu(win, NO_GLYPH, &any,
-                                0, 0, ATR_NONE,
+                                0, 0, ATR_NONE, NO_COLOR,
                                 itembuf, MENU_UNSELECTED);
 
                             item_count++;
@@ -2365,7 +2388,7 @@ doloot()
                             Sprintf(itembuf, "%s", an(OBJ_NAME(objects[item_otyp])));
 
                             add_menu(win, NO_GLYPH, &any,
-                                0, 0, ATR_NONE,
+                                0, 0, ATR_NONE, NO_COLOR,
                                 itembuf, MENU_UNSELECTED);
 
                             item_count++;
@@ -2424,7 +2447,7 @@ doloot()
          * Adjust this if-block to allow container looting
          * from one square away to change that in the future.
          */
-        if (!underfoot && !got_something) 
+        if (!underfoot && !got_something && !did_something) 
         {
             did_something = TRUE;
             if (container_at(cc.x, cc.y, FALSE))
@@ -2439,13 +2462,13 @@ doloot()
                 else
                 {
                     play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
-                    You("have to be at a container to loot it.");
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "have to be at a container to loot it.");
                 }
             } 
             else
             {
                 play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-                You("%s %sthere to loot.", dont_find_anything,
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "%s %sthere to loot.", dont_find_anything,
                     (prev_inquiry || prev_loot) ? "else " : "");
                 return timepassed;
             }
@@ -2453,7 +2476,7 @@ doloot()
 
         if (!did_something)
         {
-            You("%s %sthere to loot.", dont_find_anything,
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "%s %sthere to loot.", dont_find_anything,
                 (prev_inquiry || prev_loot) ? "else " : "");
             play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
         }
@@ -2461,7 +2484,7 @@ doloot()
     else if (c != 'y' && c != 'n')
     {
         play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-        You("%s %s to loot.", dont_find_anything,
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s to loot.", dont_find_anything,
             underfoot ? "here" : "there");
     }
     return timepassed;
@@ -2521,7 +2544,7 @@ reverse_loot()
 
         if (coffers) {
             play_sfx_sound(SFX_VOICE_THRONE_ROOM_THANK_YOU_FOR_YOUR_CONTRIBUTION);
-            verbalize("Thank you for your contribution to reduce the debt.");
+            verbalize_talk1("Thank you for your contribution to reduce the debt.");
             freeinv(goldob);
             (void) add_to_container(coffers, goldob);
             coffers->owt = weight(coffers);
@@ -2590,6 +2613,7 @@ boolean *prev_loot;
                 return 1;
             }
 
+            play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_APPLY);
             obj_extract_self(otmp);
 
             if ((unwornmask = otmp->owornmask) != 0L)
@@ -2730,13 +2754,13 @@ boolean dobot;
     else if (obj == uball || obj == uchain) 
     {
         play_sfx_sound(SFX_GENERAL_THATS_SILLY);
-        You("must be kidding.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "must be kidding.");
         goto default_incontainer_end_here;
     }
     else if (obj == current_container)
     {
         play_sfx_sound(SFX_GENERAL_THATS_SILLY);
-        pline("That would be an interesting topological exercise.");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "That would be an interesting topological exercise.");
         goto default_incontainer_end_here;
     }
     else if (obj->owornmask & (W_ARMOR | W_ACCESSORY)) 
@@ -2783,7 +2807,7 @@ boolean dobot;
     else if (obj->otyp == LEASH && obj->leashmon != 0)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s attached to your pet.", Tobjnam(obj, "are"));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s attached to your pet.", Tobjnam(obj, "are"));
         goto default_incontainer_end_here;
     }
     else if (obj == uwep) 
@@ -3391,11 +3415,11 @@ u_handsy()
 {
     if (nohands(youmonst.data)) {
         play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
-        You("have no hands!"); /* not `body_part(HAND)' */
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "have no hands!"); /* not `body_part(HAND)' */
         return FALSE;
     } else if (!freehand()) {
         play_sfx_sound(SFX_GENERAL_CURRENTLY_UNABLE_TO_DO);
-        You("have no free %s.", body_part(HAND));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "have no free %s.", body_part(HAND));
         return FALSE;
     }
     return TRUE;
@@ -3931,7 +3955,7 @@ struct obj* other_container UNUSED;
     {
         all_categories = FALSE;
         Sprintf(buf, "%s what type of objects?", action);
-        mflags = (ALL_TYPES | UNPAID_TYPES | BUCX_TYPES | CHOOSE_ALL);
+        mflags = (ALL_TYPES | UNPAID_TYPES | BUCX_TYPES | UNIDENTIFIED_TYPES | CHOOSE_ALL);
         if (command_id == 5)
             mflags |= BY_NEXTHERE;
         n = query_category(buf, command_id == 1 ? invent : command_id == 5 ? level.objects[u.ux][u.uy] : current_container->cobj,
@@ -4171,28 +4195,28 @@ boolean outokay, inokay, alreadyused, more_containers;
 
     any.a_int = 1; /* ':' */
     Sprintf(buf, "Look inside %s", thesimpleoname(obj));
-    add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, buf,
+    add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR, buf,
              MENU_UNSELECTED);
 
     if (outokay) 
     {
         any.a_int = 2; /* 'o' */
         Sprintf(buf, "take %s out", something);
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
                  buf, MENU_UNSELECTED);
     }
     if (inokay) 
     {
         any.a_int = 3; /* 'i' */
         Sprintf(buf, "put %s in", something);
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
                  buf, MENU_UNSELECTED);
     }
     if (outokay) 
     {
         any.a_int = 4; /* 'b' */
         Sprintf(buf, "%stake out, then put in", inokay ? "both; " : "");
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
                  buf, MENU_UNSELECTED);
     }
     if (inokay) 
@@ -4200,11 +4224,11 @@ boolean outokay, inokay, alreadyused, more_containers;
         any.a_int = 5; /* 'r' */
         Sprintf(buf, "%sput in, then take out",
                 outokay ? "both reversed; " : "");
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
                  buf, MENU_UNSELECTED);
         any.a_int = 6; /* 's' */
         Sprintf(buf, "stash one item into %s", thesimpleoname(obj));
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
                  buf, MENU_UNSELECTED);
     }
     if (outokay && other_containter_count > 0)
@@ -4213,7 +4237,7 @@ boolean outokay, inokay, alreadyused, more_containers;
         char contbuf[BUFSZ] = "";
         Sprintf(contbuf, "%s container in the inventory", current_container->where == OBJ_INVENT ? "another" : "a");
         Sprintf(buf, "move %s to %s", something, ((0 && other_containter_count == 1 && last_container) ? thesimpleoname(last_container) : contbuf));
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
             buf, MENU_UNSELECTED);
     }
     if (outokay && floor_containter_count > 0)
@@ -4222,33 +4246,33 @@ boolean outokay, inokay, alreadyused, more_containers;
         char contbuf[BUFSZ] = "";
         Sprintf(contbuf, "%s container on the %s", current_container->where == OBJ_FLOOR ? "another" : "a", IS_ALTAR(levl[u.ux][u.uy].typ) ? "altar" : "floor");
         Sprintf(buf, "move %s to %s", something, ((0 && other_containter_count == 1 && last_container) ? thesimpleoname(last_container) : contbuf));
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
             buf, MENU_UNSELECTED);
     }
     if (outokay)
     {
         any.a_int = 11; /* 'd' */
         Sprintf(buf, "take %s out and drop it on the %s", something, IS_ALTAR(levl[u.ux][u.uy].typ) ? "altar" : "floor");
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
             buf, MENU_UNSELECTED);
     }
     if (inokay && level.objects[u.ux][u.uy] && !(level.objects[u.ux][u.uy] == current_container && !level.objects[u.ux][u.uy]->nexthere))
     {
         any.a_int = 12; /* 'p' */
         Sprintf(buf, "pick %s up and put it in %s", something, thesimpleoname(current_container));
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
             buf, MENU_UNSELECTED);
     }
     any.a_int = 0;
-    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, " ", MENU_UNSELECTED);
+    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, " ", MENU_UNSELECTED);
     if (more_containers) {
         any.a_int = 7; /* 'n' */
-        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR,
                  "loot next container", MENU_SELECTED);
     }
     any.a_int = 8; /* 'q' */
     Strcpy(buf, alreadyused ? "done" : "do nothing");
-    add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, buf,
+    add_menu(win, NO_GLYPH, &any, menuselector[any.a_int], 0, ATR_NONE, NO_COLOR, buf,
              more_containers ? MENU_UNSELECTED : MENU_SELECTED);
 
     end_menu(win, prompt);
@@ -4309,18 +4333,18 @@ dotip()
                     if (Is_container(cobj)) {
                         ++i;
                         any.a_obj = cobj;
-                        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE,
+                        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                                  doname(cobj), MENU_UNSELECTED);
                     }
                 if (invent) {
                     any = zeroany;
-                    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                              "", MENU_UNSELECTED);
                     any.a_obj = &dummyobj;
                     /* use 'i' for inventory unless there are so many
                        containers that it's already being used */
                     i = (i <= 'i' - 'a' && !flags.lootabc) ? 'i' : 0;
-                    add_menu(win, NO_GLYPH, &any, i, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, i, 0, ATR_NONE, NO_COLOR,
                              "tip something being carried", MENU_SELECTED);
                 }
                 end_menu(win, "Tip which container?");

@@ -83,7 +83,7 @@ dosave()
     if (iflags.debug_fuzzer)
         return 0;
     clear_nhwindow(WIN_MESSAGE);
-    if (!CasualMode && yn_query("Really save?") == 'n')
+    if (yn_query("Really save?") == 'n')
     {
         clear_nhwindow(WIN_MESSAGE);
         if (multi > 0)
@@ -92,24 +92,25 @@ dosave()
     else 
     {
         boolean contplay = FALSE;
-        if (CasualMode)
-        {
-            clear_nhwindow(WIN_MESSAGE);
-            char ans = ynq("Continue playing after saving?");
-            switch (ans)
-            {
-            case 'q':
-                clear_nhwindow(WIN_MESSAGE);
-                if (multi > 0)
-                    nomul(0);
-                return 0;
-            case 'y':
-                contplay = TRUE;
-                break;
-            default:
-                break;
-            }
-        }
+        /* Not supported anymore */
+        //if (CasualMode)
+        //{
+        //    clear_nhwindow(WIN_MESSAGE);
+        //    char ans = ynq("Continue playing after saving?");
+        //    switch (ans)
+        //    {
+        //    case 'q':
+        //        clear_nhwindow(WIN_MESSAGE);
+        //        if (multi > 0)
+        //            nomul(0);
+        //        return 0;
+        //    case 'y':
+        //        contplay = TRUE;
+        //        break;
+        //    default:
+        //        break;
+        //    }
+        //}
 
         clear_nhwindow(WIN_MESSAGE);
         pline("Saving...");

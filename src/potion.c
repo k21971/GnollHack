@@ -776,7 +776,7 @@ dodrink()
             return use_salve(otmp, TRUE);
         default:
             play_sfx_sound(SFX_GENERAL_THATS_SILLY);
-            pline("That's a silly thing to drink!");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "That's a silly thing to drink!");
             return 0;
             break;
         }
@@ -1378,7 +1378,7 @@ struct obj *otmp;
         if (Poison_resistance)
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
-            pline("However, you are unaffected by the poison.");
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "However, you are unaffected by the poison.");
         }
         else 
         {
@@ -4030,47 +4030,10 @@ dodip()
     /* Allow filling of MAGIC_LAMPs to prevent identification by player */
     if (is_refillable_with_oil(obj) && potion->otyp == POT_OIL) 
     {
-        /* Turn off engine before fueling, turn off fuel too :-)  */
-        if (obj->lamplit || potion->lamplit) 
-        {
-            useup(potion);
-            explode(u.ux, u.uy, 11, &youmonst, 6, 6, 0, obj->otyp, 0, EXPL_FIERY);
-            exercise(A_WIS, FALSE);
-            return 1;
-        }
-        /* Adding oil to an empty magic lamp renders it into an oil lamp */
-        if ((obj->otyp == MAGIC_LAMP) && obj->special_quality == 0)
-        {
-            obj->otyp = OIL_LAMP;
-            obj->age = 0;
-        }
-        if (obj->age > 1000L) 
-        {
-            play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s full.", Yname2(obj), otense(obj, "are"));
-            potion->in_use = FALSE; /* didn't go poof */
-        } 
-        else 
-        {
-            play_sfx_sound(SFX_FILL_OIL_UP);
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "fill %s with oil.", yname(obj));
-            check_unpaid(potion);        /* Yendorian Fuel Tax */
-            /* burns more efficiently in a lamp than in a bottle;
-               diluted potion provides less benefit but we don't attempt
-               to track that the lamp now also has some non-oil in it */
-            obj->age += (!potion->odiluted ? 4L : 3L) * potion->age / 2L;
-            if (obj->age > 1500L)
-                obj->age = 1500L;
-            useup(potion);
-            exercise(A_WIS, TRUE);
-        }
-        makeknown(POT_OIL);
-        obj->special_quality = 1;
-        update_inventory();
-        return 1;
-    }
+        return refill_obj_with_oil(obj, potion);
 
-    if (potion->otyp == JAR_OF_BASILISK_BLOOD)
+    }
+    else if (potion->otyp == JAR_OF_BASILISK_BLOOD)
     {
         return stone_to_flesh_obj(obj);
     }
@@ -4146,6 +4109,54 @@ dodip()
     return 1;
 }
 
+int
+refill_obj_with_oil(obj, potion)
+struct obj* obj, * potion;
+{
+    if (!obj || !potion || !is_refillable_with_oil(obj))
+        return 0;
+
+    /* Turn off engine before fueling, turn off fuel too :-)  */
+    if (obj->lamplit || potion->lamplit)
+    {
+        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s fire!", Tobjnam(potion, "catch"));
+        useup(potion);
+        explode(u.ux, u.uy, 11, &youmonst, 6, 6, 0, obj->otyp, 0, EXPL_FIERY);
+        exercise(A_WIS, FALSE);
+        return 1;
+    }
+    /* Adding oil to an empty magic lamp renders it into an oil lamp */
+    if ((obj->otyp == MAGIC_LAMP) && obj->special_quality == 0)
+    {
+        obj->otyp = OIL_LAMP;
+        obj->age = 0;
+    }
+    if (obj->age > 1000L)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s full.", Yname2(obj), otense(obj, "are"));
+        potion->in_use = FALSE; /* didn't go poof */
+    }
+    else
+    {
+        play_sfx_sound(SFX_FILL_OIL_UP);
+        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "fill %s with oil.", yname(obj));
+        check_unpaid(potion);        /* Yendorian Fuel Tax */
+        /* burns more efficiently in a lamp than in a bottle;
+           diluted potion provides less benefit but we don't attempt
+           to track that the lamp now also has some non-oil in it */
+        obj->age += (!potion->odiluted ? 4L : 3L) * potion->age / 2L;
+        if (obj->age > 1500L)
+            obj->age = 1500L;
+        useup(potion);
+        exercise(A_WIS, TRUE);
+    }
+    makeknown(POT_OIL);
+    //obj->special_quality = 1;
+    update_inventory();
+    return 1;
+}
+
 /* *monp grants a wish and then leaves the game */
 void
 mongrantswish(monp)
@@ -4201,25 +4212,25 @@ struct obj *obj;
     switch (chance) {
     case 0:
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_GRANT_ONE_WISH);
-        verbalize("I am in your debt.  I will grant one wish!");
+        verbalize_happy1("I am in your debt.  I will grant one wish!");
         /* give a wish and discard the monster (mtmp set to null) */
         mongrantswish(&mtmp);
         break;
     case 1:
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_THANK_YOU_FOR_FREEING);
-        verbalize("Thank you for freeing me!");
+        verbalize_talk1("Thank you for freeing me!");
         (void) tamedog(mtmp, (struct obj *) 0, TAMEDOG_FORCE_NON_UNIQUE, FALSE, 0, FALSE, FALSE);
         break;
     case 2:
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_YOU_FREED_ME);
-        verbalize("You freed me!");
+        verbalize_talk1("You freed me!");
         mtmp->mpeaceful = TRUE;
         set_mhostility(mtmp);
         newsym(mtmp->mx, mtmp->my);
         break;
     case 3:
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_IT_IS_ABOUT_TIME);
-        verbalize("It is about time!");
+        verbalize_talk1("It is about time!");
         play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, mtmp->mx, mtmp->my);
         play_sfx_sound(SFX_VANISHES_IN_PUFF_OF_SMOKE);
         if (canspotmon(mtmp))
@@ -4230,7 +4241,7 @@ struct obj *obj;
         break;
     default:
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_YOU_DISTURBED);
-        verbalize("You disturbed me, fool!");
+        verbalize_angry1("You disturbed me, fool!");
         mtmp->mpeaceful = FALSE;
         set_mhostility(mtmp);
         newsym(mtmp->mx, mtmp->my);

@@ -1556,6 +1556,12 @@ struct mkroom *broom;
     levl[x][y].doormask = dflags;
     levl[x][y].key_otyp = dd->key_otyp;
     levl[x][y].special_quality = dd->key_special_quality;
+
+    /* Clear off decorations */
+    levl[x][y].decoration_typ = 0;
+    levl[x][y].decoration_subtyp = 0;
+    levl[x][y].decoration_dir = 0;
+    levl[x][y].decoration_flags = 0;
 }
 
 /*
@@ -1834,7 +1840,7 @@ struct mkroom *croom;
     else if (PM_ARCHAEOLOGIST <= m->id && m->id <= PM_WIZARD)
         mtmp = mk_mplayer(pm, x, y, FALSE);
     else
-        mtmp = makemon_ex(pm, x, y, mmflags, 0, (int)m->level_adjustment);
+        mtmp = makemon_ex(pm, x, y, mmflags, 0UL, 0, 0, (int)m->level_adjustment);
 
     if (mtmp)
     {
@@ -3505,7 +3511,7 @@ fill_empty_maze()
         }
         for (x = rnd((int) (12 * mapfact) / 100); x; x--) {
             maze1xy(&mm, DRY);
-            (void) make_level_monster(mm.x, mm.y, NO_MM_FLAGS);
+            (void) make_level_monster(mm.x, mm.y, NO_MM_FLAGS, MM2_RANDOMIZE_SUBTYPE);
         }
         for (x = rn2((int) (15 * mapfact) / 100); x; x--) {
             maze1xy(&mm, DRY);
@@ -6079,6 +6085,13 @@ genericptr_t arg, arg2, arg3, arg4, arg5;
     levl[x][y].doormask = dmask;
     levl[x][y].key_otyp = key_otyp;
     levl[x][y].special_quality = key_spe_quality;
+
+    /* Clear out any possible decoration */
+    levl[x][y].decoration_typ = 0;
+    levl[x][y].decoration_subtyp = 0;
+    levl[x][y].decoration_dir = 0;
+    levl[x][y].decoration_flags = 0;
+
     SpLev_Map[x][y] = 1;
 }
 
@@ -8498,8 +8511,9 @@ sp_lev *lvl;
      * is currently not possible, we overload the corrmaze flag for this
      * purpose.
      */
+
     //if (!level.flags.corrmaze)
-        wallification(1, 0, COLNO - 1, ROWNO - 1);
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
 
     count_features();
 

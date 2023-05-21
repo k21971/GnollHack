@@ -191,12 +191,12 @@ namespace GnollHackCommon
     [Flags]
     public enum RunGnollHackFlags: ulong
     {
-        None =          0x00000000,
-        SetWinCaps =    0x00000001,
-        WizardMode =    0x00000002,
-        FullVersion =   0x00000004,
-        ModernMode =    0x00000008, /* Upon death, the character teleports back to starting altar */
-        CasualMode =    0x00000010, /* Save games are preserved */
+        None =              0x00000000,
+        SetWinCaps =        0x00000001,
+        WizardMode =        0x00000002,
+        FullVersion =       0x00000004,
+        ModernMode =        0x00000008, /* Upon death, the character teleports back to starting altar */
+        CasualMode =        0x00000010, /* Save games are preserved */
     }
 
     [Flags]
@@ -1045,7 +1045,7 @@ namespace GnollHackCommon
         public int glyph;
         public int gui_glyph;
 
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = GHConstants.BUFSZ)]
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = GHConstants.UTF8BUFSZ)]
         public string name;
         public uint m_id;
         
@@ -1295,6 +1295,7 @@ namespace GnollHackCommon
     {
         public const int InputBufferLength = 32;
         public const int BUFSZ = 256;
+        public const int UTF8BUFSZ = 256 * 4;
         public const int MaxGHWindows = 32;
         public const int MapCols = 80;
         public const int MapRows = 21;
@@ -1413,6 +1414,8 @@ namespace GnollHackCommon
         public const bool DefaultZoomChangeCenterMode = false;
         public const bool DefaultHideNavigation = true;
         public const bool DefaultHideStatusBar = true;
+        public const long StoreReviewRequestNumberOfGames = 4;
+        public const long StoreReviewRequestTotalPlayTime = 60 * 60 * 2;
     }
 
 

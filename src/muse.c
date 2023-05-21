@@ -125,13 +125,13 @@ struct obj *obj;
                 /* can't wish for wands of death here.... */
                 if (rn2(2)) {
                     play_monster_special_dialogue_line(mtmp, DJINN_LINE_YOU_FREED_ME);
-                    verbalize("You freed me!");
+                    verbalize_talk1("You freed me!");
                     mtmp->mpeaceful = 1;
                     set_mhostility(mtmp);
                     newsym(mtmp->mx, mtmp->my);
                 } else {
                     play_monster_special_dialogue_line(mtmp, DJINN_LINE_IT_IS_ABOUT_TIME);
-                    verbalize("It is about time.");
+                    verbalize_talk1("It is about time.");
                     play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, mtmp->mx, mtmp->my);
                     if (vis)
                         pline("%s vanishes.", Monnam(mtmp));
@@ -1013,7 +1013,7 @@ struct monst *mtmp;
             return 0;
         mzapmsg(mtmp, otmp, FALSE);
         otmp->charges--;
-        mon = makemon((struct permonst *) 0, cc.x, cc.y, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_IN_SMOKE_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+        mon = makemon2((struct permonst *) 0, cc.x, cc.y, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_IN_SMOKE_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, MM2_RANDOMIZE_SUBTYPE);
         if (mon && canspotmon(mon) && oseen)
             makeknown(WAN_CREATE_MONSTER);
         return 2;

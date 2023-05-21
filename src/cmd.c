@@ -443,9 +443,9 @@ doextlist(VOID_ARGS)
         any = zeroany;
         start_menu_ex(menuwin, GHMENU_STYLE_CHOOSE_COMMAND);
 #ifndef GNH_MOBILE
-        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_TITLE,
+        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_TITLE, NO_COLOR,
                  "Extended Commands List", MENU_UNSELECTED);
-        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE,
+        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR,
             " ", MENU_UNSELECTED);
 #endif
 
@@ -454,7 +454,7 @@ doextlist(VOID_ARGS)
         if (!menumode)
             Strcat(buf, " (those not marked with [A])");
         any.a_int = 1;
-        add_menu(menuwin, NO_GLYPH, &any, 'a', 0, ATR_NONE, buf,
+        add_menu(menuwin, NO_GLYPH, &any, 'a', 0, ATR_NONE, NO_COLOR, buf,
                  MENU_UNSELECTED);
 
         if (!*searchbuf) {
@@ -464,7 +464,7 @@ doextlist(VOID_ARGS)
                actual list of extended commands shown via separator lines;
                having ':' as an explicit selector overrides the default
                menu behavior for it; we retain 's' as a group accelerator */
-            add_menu(menuwin, NO_GLYPH, &any, ':', 's', ATR_NONE,
+            add_menu(menuwin, NO_GLYPH, &any, ':', 's', ATR_NONE, NO_COLOR,
                      "Search extended commands", MENU_UNSELECTED);
         } else {
             Strcpy(buf, "Show all, clear search");
@@ -476,18 +476,18 @@ doextlist(VOID_ARGS)
                also want to hide it from general menu use) because it won't
                work for interfaces which support ':' to search; use as a
                general menu command takes precedence over group accelerator */
-            add_menu(menuwin, NO_GLYPH, &any, 's', ':', ATR_NONE,
+            add_menu(menuwin, NO_GLYPH, &any, 's', ':', ATR_NONE, NO_COLOR,
                      buf, MENU_UNSELECTED);
         }
         if (wizard) {
             any.a_int = 4;
-            add_menu(menuwin, NO_GLYPH, &any, 'z', 0, ATR_NONE,
+            add_menu(menuwin, NO_GLYPH, &any, 'z', 0, ATR_NONE, NO_COLOR,
                      onelist ? "Show debugging commands in separate section"
                      : "Show all alphabetically, including debugging commands",
                      MENU_UNSELECTED);
         }
         any = zeroany;
-        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE,
+        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR,
                  " ", MENU_UNSELECTED);
         menushown[0] = menushown[1] = menushown[2] = 0;
         n = 0;
@@ -536,24 +536,24 @@ doextlist(VOID_ARGS)
                    results menu. */
                 if (!menushown[pass]) {
                     Strcpy(buf, headings[pass]);
-                    add_extended_menu(menuwin, NO_GLYPH, &any, menu_heading_info(), 0, 0,
-                             iflags.menu_headings | ATR_HEADING, buf, MENU_UNSELECTED);
+                    add_extended_menu(menuwin, NO_GLYPH, &any, 0, 0,
+                             iflags.menu_headings | ATR_HEADING, NO_COLOR, buf, MENU_UNSELECTED, menu_heading_info());
                     menushown[pass] = 1;
                 }
                 Sprintf(buf, " %-14s %-3s %s",
                         efp->ef_txt,
                         (efp->flags & AUTOCOMPLETE) ? "[A]" : "  ",
                         efp->ef_desc);
-                add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_INDENT_AT_BRACKET_OR_DOUBLE_SPACE,
+                add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_INDENT_AT_BRACKET_OR_DOUBLE_SPACE, NO_COLOR,
                          buf, MENU_UNSELECTED);
                 ++n;
             }
             if (n)
-                add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE,
+                add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR,
                          " ", MENU_UNSELECTED);
         }
         if (*searchbuf && !n)
-            add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_NONE,
+            add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                      "no matches", MENU_UNSELECTED);
 #ifndef GNH_MOBILE
         end_menu(menuwin, (char *) 0);
@@ -695,7 +695,7 @@ extcmd_via_menu()
                     /* flush extended cmds for that letter already in buf */
                     Sprintf(buf, fmtstr, prompt);
                     any.a_char = prevaccelerator;
-                    add_menu(win, NO_GLYPH, &any, any.a_char, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, any.a_char, 0, ATR_NONE, NO_COLOR,
                              buf, FALSE);
                     acount = 0;
                     if (!(accelerator != prevaccelerator || one_per_line))
@@ -719,7 +719,7 @@ extcmd_via_menu()
             /* flush buf */
             Sprintf(buf, fmtstr, prompt);
             any.a_char = prevaccelerator;
-            add_menu(win, NO_GLYPH, &any, any.a_char, 0, ATR_NONE, buf,
+            add_menu(win, NO_GLYPH, &any, any.a_char, 0, ATR_NONE, NO_COLOR, buf,
                      FALSE);
         }
         Sprintf(prompt, "Extended Command: %s", cbuf);
@@ -784,9 +784,9 @@ doability(VOID_ARGS)
 
     /* CHARACTER ABILITY INFORMATION */
     any = zeroany;
-    add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-        0, 0, iflags.menu_headings | ATR_HEADING,
-        "Character Abilities                   ", MENU_UNSELECTED);
+    add_extended_menu(win, NO_GLYPH, &any,
+        0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+        "Character Abilities                   ", MENU_UNSELECTED, menu_heading_info());
 
     strcpy(available_ability_list[abilitynum].name, "Statistics");
     available_ability_list[abilitynum].function_ptr = &docharacterstatistics;
@@ -795,7 +795,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -808,7 +808,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -820,7 +820,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -837,7 +837,7 @@ doability(VOID_ARGS)
         gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
         add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
-            0, 0, ATR_NONE,
+            0, 0, ATR_NONE, NO_COLOR,
             available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
         abilitynum++;
@@ -853,7 +853,7 @@ doability(VOID_ARGS)
         any.a_int = abilitynum + 1;
 
         add_menu(win, NO_GLYPH, &any,
-            0, 0, ATR_NONE,
+            0, 0, ATR_NONE, NO_COLOR,
             available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
         abilitynum++;
@@ -862,9 +862,9 @@ doability(VOID_ARGS)
 #ifndef GNH_MOBILE
     /* SKILL-BASED ABILITIES */
     any = zeroany;
-    add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-        0, 0, iflags.menu_headings | ATR_HEADING,
-        "Use Skill-Based Abilities             ", MENU_UNSELECTED);
+    add_extended_menu(win, NO_GLYPH, &any,
+        0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+        "Use Skill-Based Abilities             ", MENU_UNSELECTED, menu_heading_info());
 
     /* Ride */
     strcpy(available_ability_list[abilitynum].name, "Ride");
@@ -875,7 +875,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -889,7 +889,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -898,9 +898,9 @@ doability(VOID_ARGS)
 
     /* Game Status */
     any = zeroany;
-    add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-        0, 0, iflags.menu_headings | ATR_HEADING,
-        "Game Status                           ", MENU_UNSELECTED);
+    add_extended_menu(win, NO_GLYPH, &any,
+        0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+        "Game Status                           ", MENU_UNSELECTED, menu_heading_info());
 
     /*
     strcpy(available_ability_list[abilitynum].name, "Quests");
@@ -910,7 +910,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -923,7 +923,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -935,7 +935,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -947,7 +947,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -959,7 +959,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -971,7 +971,7 @@ doability(VOID_ARGS)
     any.a_int = abilitynum + 1;
 
     add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE,
+        0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
@@ -992,9 +992,9 @@ doability(VOID_ARGS)
     if (petcount > 0)
     {
         any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-            0, 0, iflags.menu_headings | ATR_HEADING,
-            "Companion Statistics                ", MENU_UNSELECTED);
+        add_extended_menu(win, NO_GLYPH, &any,
+            0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+            "Companion Statistics                ", MENU_UNSELECTED, menu_heading_info());
 
         int pet_index = 0;
         for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
@@ -1006,21 +1006,21 @@ doability(VOID_ARGS)
                 if (UMNAME(mtmp))
                 {
                     char umnbuf[BUFSIZ];
-                    strcpy(umnbuf, UMNAME(mtmp));
+                    Strcpy(umnbuf, UMNAME(mtmp));
                     umnbuf[16] = '\0'; /* Limit the length of the name */
-                    strcpy(namebuf, umnbuf);
+                    Strcpy(namebuf, umnbuf);
                 }
                 else if (MNAME(mtmp) && mtmp->u_know_mname)
                 {
                     char mnbuf[BUFSIZ];
-                    strcpy(mnbuf, MNAME(mtmp));
+                    Strcpy(mnbuf, MNAME(mtmp));
                     mnbuf[16] = '\0'; /* Limit the length of the name */
-                    strcpy(namebuf, mnbuf);
+                    Strcpy(namebuf, mnbuf);
                 }
                 else
                 {
                     char buf[BUFSZ];
-                    strcpy(buf, mon_monster_name(mtmp));
+                    Strcpy(buf, mon_monster_name(mtmp));
                     *buf = highc(*buf);
                     strncpy(namebuf, buf, MAXNAMELENGTH - 1);
                     namebuf[MAXNAMELENGTH - 1] = '\0';
@@ -1037,7 +1037,7 @@ doability(VOID_ARGS)
                 gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
 
                 add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
-                    0, 0, ATR_NONE,
+                    0, 0, ATR_NONE, NO_COLOR,
                     available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
                 abilitynum++;
@@ -1140,7 +1140,7 @@ boolean ischaractermenu;
     int glyph = 0, gui_glyph = 0;
     const char* fmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
         "%s (&mana; %d)" : "%s (%d mana)";
-    struct extended_menu_info menuinfo = nilextendedmenuinfo;
+    struct extended_menu_info menuinfo = zeroextendedmenuinfo;
     menuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
 
     /* Monster abilities */
@@ -1162,16 +1162,16 @@ boolean ischaractermenu;
         if(ischaractermenu)
         {
             any = zeroany;
-            add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-                0, 0, iflags.menu_headings | ATR_HEADING,
-                "Use Monster Abilities                 ", MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+                "Use Monster Abilities                 ", MENU_UNSELECTED, menu_heading_info());
         }
         else
         {
             any = zeroany;
-            add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-                0, 0, iflags.menu_headings | ATR_HEADING,
-                "Your Abilities", MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+                "Your Abilities", MENU_UNSELECTED, menu_heading_info());
         }
 
         if (can_breathe(youmonst.data))
@@ -1183,9 +1183,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1199,9 +1199,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1215,9 +1215,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1244,9 +1244,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1260,9 +1260,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1276,9 +1276,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1292,9 +1292,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1308,9 +1308,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1324,9 +1324,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1340,9 +1340,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1356,9 +1356,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1372,9 +1372,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1388,9 +1388,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1407,9 +1407,9 @@ boolean ischaractermenu;
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any, menuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
 
             abilitynum++;
         }
@@ -1424,19 +1424,20 @@ boolean ischaractermenu;
         any = zeroany;
         glyph = abs(any_mon_to_glyph(u.usteed, rn2_on_display_rng));
         gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL, 0UL, MAT_NONE, 0));
-        add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, menu_heading_info(),
-            0, 0, iflags.menu_headings,
-            ischaractermenu ? "Use Your Steed's Abilities            " : "Your Steed's Abilities", MENU_UNSELECTED);
+        add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+            0, 0, iflags.menu_headings, NO_COLOR,
+            ischaractermenu ? "Use Your Steed's Abilities            " : "Your Steed's Abilities", MENU_UNSELECTED, menu_heading_info());
 
         if (can_breathe(u.usteed->data))
         {
-            struct extended_menu_info steedmenuinfo = nilextendedmenuinfo;
+            struct extended_menu_info steedmenuinfo = zeroextendedmenuinfo;
+            int mcolor = NO_COLOR;
             steedmenuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
             any = zeroany;
             if (u.usteed->mspec_used > 0)
             {
-                strcpy(available_ability_list[abilitynum].name, "(Breath weapon cooling down)");
-                menuinfo.color = CLR_GRAY;
+                Strcpy(available_ability_list[abilitynum].name, "(Breath weapon cooling down)");
+                mcolor = CLR_GRAY;
             }
             else
             {
@@ -1444,7 +1445,7 @@ boolean ischaractermenu;
                     "%s (&cool; %s)" : "%s (%s round cooldown)";
                 Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command steed to use breath weapon", "1d10+4");
                 any.a_int = abilitynum + 1;
-                menuinfo.color = NO_COLOR;
+                mcolor = NO_COLOR;
             }
 
             available_ability_list[abilitynum].function_ptr = &dosteedbreathe;
@@ -1452,9 +1453,9 @@ boolean ischaractermenu;
 
             any = zeroany;
 
-            add_extended_menu(win, NO_GLYPH, &any, steedmenuinfo,
-                0, 0, ATR_NONE,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, mcolor,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, steedmenuinfo);
 
             abilitynum++;
         }
@@ -2723,7 +2724,7 @@ wiz_intrinsic(VOID_ARGS)
             if (p == FIRE_IMMUNITY) 
             {
                 any.a_int = 0;
-                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, "--", FALSE);
+                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "--", FALSE);
             }
             any.a_int = i + 1; /* +1: avoid 0 */
             oldtimeout = u.uprops[p].intrinsic & TIMEOUT;
@@ -2731,7 +2732,7 @@ wiz_intrinsic(VOID_ARGS)
                 Sprintf(buf, "%-27s [%li]", propname, oldtimeout);
             else
                 Sprintf(buf, "%s", propname);
-            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
         }
         end_menu(win, "Which intrinsics?");
         n = select_menu(win, PICK_ANY, &pick_list);
@@ -2863,29 +2864,29 @@ doterrain(VOID_ARGS)
     start_menu_ex(men, GHMENU_STYLE_CHOOSE_COMMAND);
     any = zeroany;
     any.a_int = 1;
-    add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE,
+    add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
              "known map without monsters, objects, and traps",
              MENU_SELECTED);
     any.a_int = 2;
-    add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE,
+    add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
              "known map without monsters and objects",
              MENU_UNSELECTED);
     any.a_int = 3;
-    add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE,
+    add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
              "known map without monsters",
              MENU_UNSELECTED);
     if (discover || wizard) {
         any.a_int = 4;
-        add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE,
+        add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                  "full map without monsters, objects, and traps",
                  MENU_UNSELECTED);
         if (wizard) {
             any.a_int = 5;
-            add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE,
+            add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                      "internal levl[][].typ codes in base-36",
                      MENU_UNSELECTED);
             any.a_int = 6;
-            add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE,
+            add_menu(men, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                      "legend of base-36 levl[][].typ codes",
                      MENU_UNSELECTED);
         }
@@ -2965,7 +2966,7 @@ int attr;
         anything any;
 
         any = zeroany;
-        add_menu(en_win, NO_GLYPH, &any, 0, 0, attr, buf, FALSE);
+        add_menu(en_win, NO_GLYPH, &any, 0, 0, attr, NO_COLOR, buf, FALSE);
     } else
         putstr(en_win, attr, buf);
 }
@@ -4931,65 +4932,65 @@ minimal_enlightenment()
     buf[0] = buf2[0] = '\0';
     tmpwin = create_nhwindow(NHW_MENU);
     start_menu(tmpwin);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings,
-             "Starting", FALSE);
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+             "Starting", FALSE, menu_heading_info());
 
     /* Starting name, race, role, gender */
     Sprintf(buf, fmtstr, "name", plname);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     Sprintf(buf, fmtstr, "race", urace.noun);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     Sprintf(buf, fmtstr, "role",
             (flags.initgend && urole.name.f) ? urole.name.f : urole.name.m);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     Sprintf(buf, fmtstr, "gender", genders[flags.initgend].adj);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
 
     /* Starting alignment */
     Sprintf(buf, fmtstr, "alignment", align_str(u.ualignbase[A_ORIGINAL]));
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
 
     /* Current name, race, role, gender */
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, "", FALSE);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings,
-             "Current", FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", FALSE);
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+             "Current", FALSE, menu_heading_info());
     Sprintf(buf, fmtstr, "race", Upolyd ? youmonst.data->mname : urace.noun);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     if (Upolyd) {
         Sprintf(buf, fmtstr, "role (base)",
                 (u.mfemale && urole.name.f) ? urole.name.f
                                             : urole.name.m);
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     } else {
         Sprintf(buf, fmtstr, "role",
                 (flags.female && urole.name.f) ? urole.name.f
                                                : urole.name.m);
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     }
     /* don't want poly_gender() here; it forces `2' for non-humanoids */
     genidx = is_neuter(youmonst.data) ? 2 : flags.female;
     Sprintf(buf, fmtstr, "gender", genders[genidx].adj);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     if (Upolyd && (int) u.mfemale != genidx) {
         Sprintf(buf, fmtstr, "gender (base)", genders[u.mfemale].adj);
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
     }
 
     /* Current alignment */
     Sprintf(buf, fmtstr, "alignment", align_str(u.ualign.type));
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
 
     /* Deity list */
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, "", FALSE);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings,
-             "Deities", FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", FALSE);
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+             "Deities", FALSE, menu_heading_info());
     Sprintf(buf2, deity_fmtstr, align_gname(A_CHAOTIC),
             (u.ualignbase[A_ORIGINAL] == u.ualign.type
              && u.ualign.type == A_CHAOTIC)               ? " (s,c)"
                 : (u.ualignbase[A_ORIGINAL] == A_CHAOTIC) ? " (s)"
                 : (u.ualign.type   == A_CHAOTIC)          ? " (c)" : "");
     Sprintf(buf, fmtstr, "Chaotic", buf2);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
 
     Sprintf(buf2, deity_fmtstr, align_gname(A_NEUTRAL),
             (u.ualignbase[A_ORIGINAL] == u.ualign.type
@@ -4997,7 +4998,7 @@ minimal_enlightenment()
                 : (u.ualignbase[A_ORIGINAL] == A_NEUTRAL) ? " (s)"
                 : (u.ualign.type   == A_NEUTRAL)          ? " (c)" : "");
     Sprintf(buf, fmtstr, "Neutral", buf2);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
 
     Sprintf(buf2, deity_fmtstr, align_gname(A_LAWFUL),
             (u.ualignbase[A_ORIGINAL] == u.ualign.type
@@ -5005,7 +5006,7 @@ minimal_enlightenment()
                 : (u.ualignbase[A_ORIGINAL] == A_LAWFUL)  ? " (s)"
                 : (u.ualign.type   == A_LAWFUL)           ? " (c)" : "");
     Sprintf(buf, fmtstr, "Lawful", buf2);
-    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, buf, FALSE);
+    add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
 
     end_menu(tmpwin, "Base Attributes");
     n = select_menu(tmpwin, PICK_NONE, &selected);
@@ -5174,7 +5175,7 @@ int cmdflag;
 #endif
         Sprintf(buf, "%s  %s", cmdbuf, descbuf);
 
-        add_menu(menuwin, NO_GLYPH, &any, cmdchar, 0, ATR_INDENT_AT_DOUBLE_SPACE,
+        add_menu(menuwin, NO_GLYPH, &any, cmdchar, 0, ATR_INDENT_AT_DOUBLE_SPACE, NO_COLOR,
             buf, MENU_UNSELECTED);
         n++;
     }
@@ -5614,6 +5615,8 @@ struct ext_func_tab extcmdlist[] = {
 #endif
     { 'c', "close", "close a door", doclose },
     { 'C', "chat", "talk to someone", dotalk, IFBURIED | AUTOCOMPLETE },
+    { M(10), "chatsteed", "talk to steed", dotalksteed, IFBURIED },
+    { M(11), "chatnearby", "talk to someone nearby", dotalknearby, IFBURIED },
     { C('c'), "call", "call (name) something", docallcmd, IFBURIED | AUTOCOMPLETE, 0, getobj_callable, "call" },
     { M('c'), "commands", "list of additional actions",
             docommandmenu, IFBURIED | GENERALCMD | AUTOCOMPLETE },
@@ -5710,6 +5713,8 @@ struct ext_func_tab extcmdlist[] = {
     { 'R', "remove", "remove an accessory (ring, amulet, etc)", doremring, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_accessories, "remove" },
     { M('R'), "ride", "mount or dismount a saddled steed",
             doride, AUTOCOMPLETE },
+    { M(12), "ridenearby", "mount or dismount a saddled steed nearby",
+            doridenearby, 0 },
     { M('r'), "rub", "rub a lamp or a stone", dorub, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_cuddly, "rub" },
     { 's', "search", "search for traps and secret doors",
             dosearch, IFBURIED, "searching" },
@@ -7258,7 +7263,7 @@ register char *cmd;
         return;
     case NHKF_CLICKFIRE:
         if (iflags.clickfire) {
-            context.move = FALSE;
+            //context.move = FALSE;
             int fireres = dofire();
             if (!fireres)
                 readchar_queue = ""; //Prevent movement if firing failed.
@@ -7751,7 +7756,7 @@ const char *msg;
             if (!*buf)
                 Sprintf(buf, "Invalid direction for '%s' prefix.",
                         visctrl(Cmd.spkeys[spkey]));
-            pline("%s", buf);
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s", buf);
             return TRUE;
         }
         /* when 'cmdassist' is off and caller doesn't insist, do nothing */
@@ -7915,7 +7920,7 @@ const char *text;
     if ((ch = cmd_from_func(func)) != '\0') {
         any = zeroany;
         any.a_nfunc = func;
-        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, text, MENU_UNSELECTED);
+        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, text, MENU_UNSELECTED);
     }
 }
 
@@ -9003,8 +9008,10 @@ doviewpet(VOID_ARGS)
         {
             if (mtmp->m_id == context.view_pet_mid && is_tame(mtmp))
             {
-                doviewpetstatistics(mtmp);
-                break;
+                if (abs(mtmp->mx - u.ux) <= 1 && abs(mtmp->my - u.uy) <= 1)
+                    return dochatmon(mtmp);
+                else
+                    return doviewpetstatistics(mtmp);
             }
         }
     }
@@ -9226,7 +9233,7 @@ enum create_context_menu_types menu_type;
 
         struct obj* otmp = level.objects[u.ux][u.uy];
         struct rm* lev = &levl[u.ux][u.uy];
-        struct trap* t = 0;
+        struct trap* t = t_at(u.ux, u.uy);
         if (IS_ALTAR(lev->typ))
         {
             add_context_menu(M('o'), cmd_from_func(dosacrifice), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Offer", 0, 0, NO_COLOR);
@@ -9259,11 +9266,28 @@ enum create_context_menu_types menu_type;
             add_context_menu('>', cmd_from_func(dodown), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Go Down",
                 (u.ux == xdnladder && u.uy == ydnladder) ? "Ladder" : "Stairs", 0, NO_COLOR);
         }
-        else if ((Flying || (Levitation && Levitation_control)) && (t = t_at(u.ux, u.uy)) != 0 && t->tseen && is_hole(t->ttyp)
+        else if ((Flying || (Levitation && Levitation_control)) && t && t->tseen && is_hole(t->ttyp)
             && Can_fall_thru(&u.uz))
         {
             add_context_menu('>', cmd_from_func(dodown), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Go Down",
                 t->ttyp == HOLE ? "Hole" : "Trap Door", 0, NO_COLOR);
+        }
+        else if (t && t->tseen && is_pit(t->ttyp))
+        {
+            if (u.utrap > 0)
+            {
+                /* Climb out of the pit */
+                add_context_menu('<', cmd_from_func(doup), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), 
+                    Flying ? "Fly out" : (Levitation && Levitation_control) ? "Levitate out" : "Climb out",
+                    "Pit", 0, NO_COLOR);
+            }
+            else
+            {
+                /* Go down to the pit */
+                add_context_menu('>', cmd_from_func(dodown), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy),
+                    Flying ? "Fly down" : (Levitation && Levitation_control) ? "Levitate down" : has_pitwalk(youmonst.data) ? "Climb down" : "Jump down",
+                    "Pit", 0, NO_COLOR);
+            }
         }
 
         struct monst* shkp = can_pay_to_shkp();
@@ -9274,6 +9298,68 @@ enum create_context_menu_types menu_type;
             {
                 add_context_menu('p', cmd_from_func(dopay), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(shkp, rn2_on_display_rng), "Pay", 0, 0, NO_COLOR);
             }
+        }
+
+        int x, y;
+        boolean addchatmenu = FALSE;
+        boolean addridemenu = FALSE;
+        //boolean addkickmenu = FALSE;
+        struct monst* mtmp = 0;
+        struct monst* steedmtmp = 0;
+        struct monst* chatmtmp = 0;
+        //struct obj* kickotmp = 0;
+        if (!Hallucination)
+        {
+            for (x = u.ux - 1; x <= u.ux + 1; x++)
+            {
+                for (y = u.uy - 1; y <= u.uy + 1; y++)
+                    if (!(x == u.ux && y == u.uy) && isok(x, y))
+                    {
+                        mtmp = m_at(x, y);
+                        if (mtmp)
+                        {
+                            if (monster_invokes_context_chat(mtmp))
+                            {
+                                chatmtmp = mtmp;
+                                addchatmenu = TRUE;
+                            }
+                            if (!u.usteed && is_tame(mtmp) && is_steed(mtmp->data) && canspotmon(mtmp) && which_armor(mtmp, W_SADDLE))
+                            {
+                                steedmtmp = mtmp;
+                                addridemenu = TRUE;
+                            }
+                        }
+                        //otmp = level.objects[x][y];
+                        //if (otmp)
+                        //{
+                        //    if (Is_proper_container(otmp) && otmp->olocked && !otmp->obroken && otmp->lknown)
+                        //    {
+                        //        kickotmp = otmp;
+                        //        addkickmenu = TRUE;
+                        //    }
+                        //}
+                    }
+            }
+        }
+
+        if (addchatmenu && chatmtmp)
+        {
+            add_context_menu('C', cmd_from_func(dotalknearby), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(chatmtmp, rn2_on_display_rng), "Chat", Monnam(chatmtmp), 0, NO_COLOR);
+        }
+        if (addridemenu && steedmtmp)
+        {
+            add_context_menu(M('R'), cmd_from_func(doridenearby), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(steedmtmp, rn2_on_display_rng), "Mount", Monnam(steedmtmp), 0, NO_COLOR);
+        }
+        //if (addkickmenu)
+        //{
+        //    if(kickotmp)
+        //        add_context_menu(C('d'), cmd_from_func(dokicknearby), CONTEXT_MENU_STYLE_GENERAL, obj_to_glyph(kickotmp, rn2_on_display_rng), "Kick", The(cxname(kickotmp)), 0, NO_COLOR);
+        //}
+
+        if (u.usteed)
+        {
+            add_context_menu(M('R'), cmd_from_func(doride), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(u.usteed, rn2_on_display_rng), "Dismount", Monnam(u.usteed), 0, NO_COLOR);
+            add_context_menu('C', cmd_from_func(dotalksteed), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(u.usteed, rn2_on_display_rng), "Steed", Monnam(u.usteed), 0, NO_COLOR);
         }
 
         if (otmp)
@@ -9299,7 +9385,8 @@ enum create_context_menu_types menu_type;
         }
 
         const char* dfeature = adjusted_dfeature_at(u.ux, u.uy);
-        int displ_style = here_window_display_style(dfeature, otmp);
+        struct engr* ep = engr_at(u.ux, u.uy);
+        int displ_style = here_window_display_style(dfeature, ep, otmp);
 
         if (Blind || displ_style == 2)
         {

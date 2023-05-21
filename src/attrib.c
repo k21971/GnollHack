@@ -557,14 +557,14 @@ boolean lifesavedalready;
     //Effects
     if(elemental_enchantment == COLD_ENCHANTMENT)
     {
-        pline("%s%s %s ice-cold!",
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s ice-cold!",
             isupper((uchar)* reason) ? "" : "The ", reason,
             plural ? "are" : "is");
         if (Cold_immunity || Invulnerable) 
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             u_shieldeff();
-            pline_The("cold doesn't seem to affect you.");
+            pline_The_ex(ATR_NONE, CLR_MSG_SUCCESS, "cold doesn't seem to affect you.");
             return;
         }
 
@@ -574,14 +574,14 @@ boolean lifesavedalready;
     }
     else if (elemental_enchantment == FIRE_ENCHANTMENT)
     {
-        pline("%s%s %s burning hot!",
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s burning hot!",
             isupper((uchar)* reason) ? "" : "The ", reason,
             plural ? "are" : "is");
         if (Fire_immunity || Invulnerable)
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             u_shieldeff();
-            pline_The("fire doesn't seem to affect you.");
+            pline_The_ex(ATR_NONE, CLR_MSG_SUCCESS, "fire doesn't seem to affect you.");
             return;
         }
 
@@ -591,14 +591,14 @@ boolean lifesavedalready;
     }
     else if (elemental_enchantment == LIGHTNING_ENCHANTMENT)
     {
-        pline("%s%s %s you with lightning!",
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s you with lightning!",
             isupper((uchar)* reason) ? "" : "The ", reason,
             plural ? "jolt" : "jolts");
         if (Shock_immunity || Invulnerable) 
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             u_shieldeff();
-            pline_The("lightning doesn't seem to affect you.");
+            pline_The_ex(ATR_NONE, CLR_MSG_SUCCESS, "lightning doesn't seem to affect you.");
             return;
         }
 
@@ -608,14 +608,14 @@ boolean lifesavedalready;
     }
     else if (elemental_enchantment == DEATH_ENCHANTMENT)
     {
-        pline("%s%s %s imbued by death magic!",
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s imbued by death magic!",
             isupper((uchar)* reason) ? "" : "The ", reason,
             plural ? "were" : "was");
         if (Death_resistance || is_not_living(youmonst.data) || is_demon(youmonst.data))
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
             u_shieldeff();
-            pline_The("death magic doesn't seem to affect you.");
+            pline_The_ex(ATR_NONE, CLR_MSG_SUCCESS, "death magic doesn't seem to affect you.");
             return;
         }
 

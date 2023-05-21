@@ -180,7 +180,7 @@ struct monst *mon;
     context.makemon_spef_idx = 0;
     while (cnt > 0)
     {
-        mtmp = makemon_limited(&mons[dtype], u.ux, u.uy, MM_EMIN | (dtype == PM_ANGEL ? MM_ROAMER : 0UL) | MM_PLAY_SUMMON_ANIMATION | mmanimtype | (context.makemon_spef_idx == 0 ? MM_PLAY_SUMMON_SOUND : 0UL), 0UL, 0, 0, 0, dtype == PM_ANGEL ? atyp : 0);
+        mtmp = makemon_limited(&mons[dtype], u.ux, u.uy, MM_EMIN | (dtype == PM_ANGEL ? MM_ROAMER : 0UL) | MM_PLAY_SUMMON_ANIMATION | mmanimtype | (context.makemon_spef_idx == 0 ? MM_PLAY_SUMMON_SOUND : 0UL), 0UL, 0, 0, 0, 0, 0, dtype == PM_ANGEL ? atyp : 0);
         if (mtmp) 
         {
             context.makemon_spef_idx++;
@@ -683,7 +683,7 @@ boolean talk;
     }
     else if (mnum == PM_ANGEL) 
     {
-        mon = makemon_limited(&mons[mnum], u.ux, u.uy, MM_EMIN | MM_ROAMER | MM_PLAY_SUMMON_ANIMATION | MM_LAWFUL_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, MM2_FORCE_NONRENEGADE, 0, 0, 0, alignment);
+        mon = makemon_limited(&mons[mnum], u.ux, u.uy, MM_EMIN | MM_ROAMER | MM_PLAY_SUMMON_ANIMATION | MM_LAWFUL_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, MM2_FORCE_NONRENEGADE, 0, 0, 0, 0, 0, alignment);
         //if (mon)
         //{
         //    mon->isminion = 1;
@@ -696,7 +696,7 @@ boolean talk;
     {
         /* This was mons[mnum].pxlth == 0 but is this restriction
            appropriate or necessary now that the structures are separate? */
-        mon = makemon_limited(&mons[mnum], u.ux, u.uy, MM_EMIN | MM_ROAMER | MM_PLAY_SUMMON_ANIMATION | MM_LAWFUL_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, MM2_FORCE_NONRENEGADE, 0, 0, 0, alignment);
+        mon = makemon_limited(&mons[mnum], u.ux, u.uy, MM_EMIN | MM_ROAMER | MM_PLAY_SUMMON_ANIMATION | MM_LAWFUL_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, MM2_FORCE_NONRENEGADE, 0, 0, 0, 0, 0, alignment);
         //if (mon)
         //{
         //    mon->isminion = 1;
@@ -1048,12 +1048,12 @@ struct monst *mon; /* if null, angel hasn't been created yet */
             if (!Deaf) 
             {
                 pline("%s rebukes you, saying:", Monnam(mon));
-                verbalize("Since you desire conflict, have some more!");
+                verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Since you desire conflict, have some more!");
             } 
             else 
             {
                 play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, mon->mx, mon->my);
-                pline("%s vanishes!", Monnam(mon));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s vanishes!", Monnam(mon));
             }
         }
         mongone(mon);

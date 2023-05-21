@@ -895,7 +895,7 @@ register struct monst *mtmp;
             {
                 int n = rn2(3); //0...2
                 while (n--)
-                    (void)mongets(mtmp, randomreagent(FALSE, 0));
+                    (void)mongets(mtmp, random_reagent_otyp(FALSE, FALSE, 0));
             }
             if(!rn2(2))
                 (void)mongets(mtmp, GINSENG_ROOT);
@@ -1557,7 +1557,7 @@ register struct monst *mtmp;
             //Reagents
             n = rn2(3);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 0));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, TRUE, 0));
 
             //Spellbooks
             n = rn2(3); // 0...2
@@ -1631,7 +1631,7 @@ register struct monst *mtmp;
             n = rn2(3);
             for (i = 0; i < n; i++)
             {
-                (void)mongets(mtmp, randomreagent(TRUE, 2));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, TRUE, 2));
             }
 
             //Some spellbooks
@@ -1686,7 +1686,7 @@ register struct monst *mtmp;
         //Reagents
         n = rn2(3) + (ptr == &mons[PM_MASTER_LICH] || ptr == &mons[PM_ARCH_LICH] ? 1 : 0); //1...3 + 2
         for (i = 0; i < n; i++)
-            (void)mongets(mtmp, randomreagent(TRUE, 2));
+            (void)mongets(mtmp, random_reagent_otyp(TRUE, TRUE, 2));
 
         //Some spellbooks
         if (ptr == &mons[PM_ARCH_LICH])
@@ -1733,7 +1733,7 @@ register struct monst *mtmp;
             //Reagents
             n = rn2(4);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 2));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, TRUE, 2));
 
             if (!rn2(4))
                 (void)mongetsgold(mtmp, 100 + rn2(1001));
@@ -1847,7 +1847,7 @@ register struct monst *mtmp;
             /* Some random reagants */
             n = rn2(2);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 0));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, FALSE, 0));
 
             if (!rn2(4))
                 (void)mongets(mtmp, GINSENG_ROOT);
@@ -1874,7 +1874,7 @@ register struct monst *mtmp;
             /* Some random reagants */
             n = rn2(5);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 1));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, TRUE, 1));
 
             n = rn2(2);
             for (i = 0; i < n; i++)
@@ -1885,7 +1885,7 @@ register struct monst *mtmp;
             /* Some random reagants */
             n = rn2(7);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 1));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, TRUE, 1));
 
             n = rn2(2);
             for (i = 0; i < n; i++)
@@ -1898,7 +1898,7 @@ register struct monst *mtmp;
             /* Some random reagants */
             n = rn2(5);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 1));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, Inhell, 1));
 
             n = rn2(2);
             for (i = 0; i < n; i++)
@@ -1909,7 +1909,7 @@ register struct monst *mtmp;
             /* Some random reagants */
             n = rn2(3);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 1));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, Inhell, 1));
 
             n = rn2(2);
             for (i = 0; i < n; i++)
@@ -2045,7 +2045,7 @@ register struct monst *mtmp;
 
                 n = rn2(3);
                 for (i = 0; i < n; i++)
-                    (void)mongets(mtmp, randomreagent(FALSE, 1));
+                    (void)mongets(mtmp, random_reagent_otyp(FALSE, Inhell, 1));
 
                 if (ptr == &mons[PM_GNOLL_SUPREME_WARDEN])
                 {
@@ -2141,7 +2141,7 @@ register struct monst *mtmp;
         {
             n = rn2(3);
             for (i = 0; i < n; i++)
-                (void)mongets(mtmp, randomreagent(TRUE, 2));
+                (void)mongets(mtmp, random_reagent_otyp(TRUE, FALSE, 2));
 
             if (!rn2(2))
                 (void)mongets(mtmp, GINSENG_ROOT);
@@ -2654,7 +2654,7 @@ register struct permonst* ptr;
 register int x, y;
 unsigned long mmflags;
 {
-    return makemon_limited(ptr, x, y, mmflags, 0UL, 0, 0, 0, 0);
+    return makemon_limited(ptr, x, y, mmflags, 0UL, 0, 0, 0, 0, 0, 0);
 }
 
 struct monst*
@@ -2663,17 +2663,18 @@ register struct permonst* ptr;
 register int x, y;
 unsigned long mmflags, mmflags2;
 {
-    return makemon_limited(ptr, x, y, mmflags, mmflags2, 0, 0, 0, 0);
+    return makemon_limited(ptr, x, y, mmflags, mmflags2, 0, 0, 0, 0, 0, 0);
 }
 
 struct monst*
-makemon_ex(ptr, x, y, mmflags, subtype, level_adjustment)
+makemon_ex(ptr, x, y, mmflags, mmflags2, subtype, npcsubtype, level_adjustment)
 register struct permonst* ptr;
 register int x, y;
-unsigned long mmflags;
-int subtype, level_adjustment;
+unsigned long mmflags, mmflags2;
+unsigned short subtype;
+int npcsubtype, level_adjustment;
 {
-    return makemon_limited(ptr, x, y, mmflags, 0UL, subtype, 0, level_adjustment, 0);
+    return makemon_limited(ptr, x, y, mmflags, mmflags2, subtype, subtype, npcsubtype, 0, level_adjustment, 0);
 }
 
 /*
@@ -2684,11 +2685,12 @@ int subtype, level_adjustment;
  *      In case we make a monster group, only return the one at [x,y].
  */
 struct monst *
-makemon_limited(ptr, x, y, mmflags, mmflags2, subtype, level_limit, level_adjustment, alignment)
+makemon_limited(ptr, x, y, mmflags, mmflags2, subtype, subtype_female, npcsubtype, level_limit, level_adjustment, alignment)
 register struct permonst *ptr;
 register int x, y;
 unsigned long mmflags, mmflags2;
-int subtype;
+unsigned short subtype, subtype_female;
+int npcsubtype;
 int level_limit, level_adjustment;
 aligntyp alignment;
 {
@@ -2702,6 +2704,8 @@ aligntyp alignment;
     boolean saddled = ((mmflags & MM_SADDLED) != 0);
     boolean maybe_extinct = ((mmflags2 & MM2_MAYBE_ALLOW_EXTINCT) != 0);
     boolean reviving = ((mmflags2 & MM2_REVIVING) != 0);
+    boolean randomize_subtype = ((mmflags2 & MM2_RANDOMIZE_SUBTYPE) != 0);
+    
     unsigned long gpflags = (mmflags & MM_IGNOREWATER) ? MM_IGNOREWATER : 0;
     int origin_x = x, origin_y = y;
     
@@ -2870,7 +2874,7 @@ aligntyp alignment;
     {
         newenpc(mtmp);
         if (has_enpc(mtmp))
-            ENPC(mtmp)->npc_typ = subtype;
+            ENPC(mtmp)->npc_typ = npcsubtype;
     }
     if (mmflags & MM_ESHK)
         neweshk(mtmp);
@@ -2937,7 +2941,7 @@ aligntyp alignment;
     /* set up known rumors */
     mtmp->told_rumor = 0;
     mtmp->rumorsleft = 0;
-    if (is_speaking_monster(mtmp->data) && !(mmflags & MM_EGD))
+    if (is_speaking(mtmp->data) && !(mmflags & MM_EGD))
     {
         mtmp->rumorsleft = (!rn2(2) ? 1 : 0) + (((is_lord(mtmp->data) && rn2(2)) || ((is_prince(mtmp->data) && rn2(4))) || ((mtmp->data->mflags6 & M6_ELDER) && rn2(3))) ? 1 : 0) + (ptr->intl > 15 && !rn2(2) ? 1 : 0);
     }
@@ -2965,6 +2969,21 @@ aligntyp alignment;
     else
     {
         mtmp->female = randomize_monster_gender(ptr);
+    }
+
+    mtmp->subtype = mtmp->female ? subtype_female : subtype;
+    if (!mtmp->subtype && randomize_subtype)
+    {
+        if (mons[mndx].mflags6 & M6_USES_CAT_SUBTYPES)
+        {
+            if (!rn2(9))
+                mtmp->subtype = rn2(NUM_CAT_BREEDS);
+        }
+        else if (mons[mndx].mflags6 & M6_USES_DOG_SUBTYPES)
+        {
+            if (!rn2(9))
+                mtmp->subtype = rn2(NUM_DOG_BREEDS);
+        }
     }
 
     if ((In_sokoban(&u.uz) && !mindless(ptr)) || (ptr->mflags3 & M3_KNOWS_PITS_AND_HOLES)) /* know about traps here */
@@ -3346,7 +3365,7 @@ boolean neverask;
         if (!mptr && u.uinwater && enexto(&c, x, y, &mons[PM_GIANT_EEL]))
             x = c.x, y = c.y;
 
-        mon = makemon(mptr, x, y,  MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_IN_SMOKE_ANIMATION | MM_PLAY_SUMMON_SOUND);
+        mon = makemon2(mptr, x, y,  MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_IN_SMOKE_ANIMATION | MM_PLAY_SUMMON_SOUND, MM2_RANDOMIZE_SUBTYPE);
         if (mon)
         {
             //play_sfx_sound_at_location(SFX_SUMMON_MONSTER, mon->mx, mon->my);
@@ -4600,7 +4619,7 @@ int *seencount;  /* secondary output */
         if (!rn2(23))
             creatcnt += rnd(7);
         do {
-            mtmp = makemon((struct permonst *) 0, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_IN_SMOKE_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+            mtmp = makemon2((struct permonst *) 0, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_IN_SMOKE_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END, MM2_RANDOMIZE_SUBTYPE);
             if (mtmp) {
                 ++moncount;
                 if (canspotmon(mtmp))
@@ -4621,13 +4640,13 @@ int *seencount;  /* secondary output */
 
 
 struct monst*
-make_level_monster(x, y, mmflags)
+make_level_monster(x, y, mmflags, mmflags2)
 register int x, y;
-unsigned long mmflags; 
+unsigned long mmflags, mmflags2; 
 {
     if (level.flags.nmgeninfos <= 0)
     {
-        return makemon((struct permonst*)0, x, y, mmflags);
+        return makemon2((struct permonst*)0, x, y, mmflags, mmflags2);
     }
 
     int i, totalprob = 0;
@@ -4666,17 +4685,17 @@ unsigned long mmflags;
         {
             if (level.flags.mon_gen_infos[sel_index].mnum >= LOW_PM)
             {
-                mtmp = makemon(&mons[level.flags.mon_gen_infos[sel_index].mnum], x, y, mmflags);
+                mtmp = makemon2(&mons[level.flags.mon_gen_infos[sel_index].mnum], x, y, mmflags, mmflags2);
             }
             else if (level.flags.mon_gen_infos[sel_index].mclass > 0 && level.flags.mon_gen_infos[sel_index].mclass < MAX_MONSTER_CLASSES)
             {
                 struct permonst* pm = mkclass(level.flags.mon_gen_infos[sel_index].mclass, 0);
                 if(pm)
-                    mtmp = makemon(pm, x, y, mmflags);
+                    mtmp = makemon2(pm, x, y, mmflags, mmflags2);
             }
             else
             {
-                mtmp = makemon((struct permonst*)0, x, y, mmflags);
+                mtmp = makemon2((struct permonst*)0, x, y, mmflags, mmflags2);
             }
 
             if (mtmp)
@@ -4694,7 +4713,7 @@ unsigned long mmflags;
 struct monst*
 make_level_monster_anywhere(VOID_ARGS)
 {
-    return make_level_monster(0, 0, NO_MM_FLAGS);
+    return make_level_monster(0, 0, NO_MM_FLAGS, MM2_RANDOMIZE_SUBTYPE);
 }
 
 void

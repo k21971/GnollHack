@@ -29,6 +29,7 @@ using Xamarin.Essentials;
 using System.Collections;
 using System.Collections.Concurrent;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
+using Plugin.StoreReview;
 
 namespace GnollHackClient
 {
@@ -69,6 +70,9 @@ namespace GnollHackClient
             StartLocalGameButton.TextColor = Color.Gray;
             if (App.UsesCarousel)
                 carouselView.Stop();
+
+            long numberofgames = Preferences.Get("NumberOfGames", 0L);
+            Preferences.Set("NumberOfGames", numberofgames + 1L);
 
             var gamePage = new GamePage(this);
             gamePage.EnableWizardMode = wizardModeSwitch.IsToggled;
@@ -129,12 +133,43 @@ namespace GnollHackClient
                 FmodLogoImage.Source = ImageSource.FromResource("GnollHackClient.Assets.FMOD-Logo-192-White.png", thisassembly);
                 StartLogoImage.Source = ImageSource.FromResource("GnollHackClient.Assets.gnollhack-logo-test-2.png", thisassembly);
                 MainLogoImage.Source = ImageSource.FromResource("GnollHackClient.Assets.gnollhack-logo-test-2.png", thisassembly);
+                if (App.PlatformService != null)
+                {
+                    bool removeanimationson = App.PlatformService.IsRemoveAnimationsOn();
+                    if(removeanimationson)
+                    {
+                        await DisplayAlert("Invalid Animator Duration Scale",
+                            "GnollHack has detected invalid animator settings. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting must be set to Off. If your device does not have this setting, please manually adjust the value of \"Animator duration scale\" to 1x under Settings -> Developer Options -> Animator duration scale. ", "OK");
+                        CloseApp();
+                    }
+                    else
+                    {
+                        float scalesetting = App.PlatformService.GetAnimatorDurationScaleSetting();
+                        float scalecurrent = App.PlatformService.GetCurrentAnimatorDurationScale();
+                        if (scalecurrent == 0.0f)
+                        {
+                            if (scalesetting == 0.0f)
+                                await DisplayAlert("Invalid Animator Duration Scale",
+                                    "GnollHack failed to automatically adjust Animator Duration Scale and it remains set to Off. Please manually adjust the value to 1x under Settings -> Developer Options -> Animator duration scale. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting needs to be disabled, too.", "OK");
+                            else
+                                await DisplayAlert("Invalid Animator Duration Scale",
+                                    "GnollHack failed to automatically adjust Animator Duration Scale and it has become turned Off. Please check that the value is 1x under Settings -> Developer Options -> Animator duration scale. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting needs to be disabled, too.", "OK");
+                            CloseApp();
+                        }
+                        else if (scalecurrent == -1.0f)
+                        {
+                            /* GnollHack could determine current animator duration scale */
+                        }
+                    }
+                }
+
                 await StartFadeLogoIn();
                 await StartUpTasks();
                 await StartFadeIn();
                 StartLogoImage.IsVisible = false;
                 FmodLogoImage.IsVisible = false;
-                if(App.InformAboutGameTermination)
+
+                if (App.InformAboutGameTermination)
                 {
                     App.InformAboutGameTermination = false;
                     await DisplayAlert("Unexpected Game Termination", "GnollHack was unexpectedly terminated when running on background. This may have been instructed by the operating system or the user. Your game may have been saved before the termination.", "OK");
@@ -142,7 +177,7 @@ namespace GnollHackClient
             }
             else if (!GameStarted)
             {
-                if ((!App.UsesCarousel && !videoView.IsVisible) || (App.UsesCarousel && !_mainScreenMusicStarted))
+                if (/*(!App.UsesCarousel && !videoView.IsVisible) ||*/ (App.UsesCarousel && !_mainScreenMusicStarted))
                     PlayMainScreenVideoAndMusic();
             }
 
@@ -436,6 +471,7 @@ namespace GnollHackClient
 
         public void PlayMainScreenVideoAndMusic()
         {
+            /*
             if (!App.UsesCarousel)
             {
                 videoView.IsVisible = true;
@@ -443,6 +479,7 @@ namespace GnollHackClient
                 StillImage.IsVisible = false;
             }
             else // if (App.IsiOS)
+            */
             {
                 carouselView.IsVisible = true;
                 carouselView.Play();
@@ -463,7 +500,9 @@ namespace GnollHackClient
         private async Task StartFadeLogoIn()
         {
             await StartLogoImage.FadeTo(1, 250);
+            StartLogoImage.Opacity = 1.0; /* To make sure */
             await FmodLogoImage.FadeTo(1, 250);
+            FmodLogoImage.Opacity = 1.0; /* To make sure */
             //List<Task> tasklist = new List<Task> { t1, t2 };
             //await Task.WhenAll(tasklist);
         }
@@ -471,10 +510,13 @@ namespace GnollHackClient
         private async Task StartFadeIn()
         {
             await StartLogoImage.FadeTo(0, 250);
+            StartLogoImage.Opacity = 0.0; /* To make sure */
             await FmodLogoImage.FadeTo(0, 250);
+            FmodLogoImage.Opacity = 0.0; /* To make sure */
             //Task[] tasklist1 = new Task[2] { t1, t2 };
             //Task.WaitAll(tasklist1);
 
+            /*
             if (!App.UsesCarousel)
             {
                 videoView.IsVisible = true;
@@ -482,87 +524,32 @@ namespace GnollHackClient
                 videoView.Play();
             }
             else
+            */
             {
                 //StillImage.IsVisible = true;
                 //await StillImage.FadeTo(1, 250);
                 carouselView.IsVisible = true;
                 carouselView.InvalidateSurface();
                 await carouselView.FadeTo(1, 250);
+                carouselView.Opacity = 1.0; /* To make sure */
                 carouselView.Play();
             }
 
             UpperButtonGrid.IsVisible = true;
             await UpperButtonGrid.FadeTo(1, 250);
+            UpperButtonGrid.Opacity = 1.0;  /* To make sure */
             StartButtonLayout.IsVisible = true;
             await StartButtonLayout.FadeTo(1, 250);
+            StartButtonLayout.Opacity = 1.0;  /* To make sure */
             LogoGrid.IsVisible = true;
             await LogoGrid.FadeTo(1, 250);
+            LogoGrid.Opacity = 1.0;  /* To make sure */
 
             //List<Task> tasklist2 = new List<Task> { t3, t4, t5 };
             //await Task.WhenAll(tasklist2);
         }
 
-        //public async Task CheckPurchaseStatus(bool atappstart)
-        //{
-        //    int res = await IsProductPurchased(GHConstants.DistributionFeeProductName);
-        //    if(res >= 0)
-        //    {
-        //        if (Preferences.ContainsKey("CheckPurchase_FirstConnectFail"))
-        //        {
-        //            Preferences.Remove("CheckPurchase_FirstConnectFail");
-        //        }
-        //        if (Preferences.ContainsKey("CheckPurchase_ConnectFail_GameStartCount"))
-        //        {
-        //            Preferences.Remove("CheckPurchase_ConnectFail_GameStartCount");
-        //        }
-        //    }
-
-        //    if (res == 0 && App.FullVersionMode)
-        //    {
-        //        App.FullVersionMode = false;
-        //        Preferences.Set("FullVersion", false);
-        //    }
-        //    else if (res == 1 && !App.FullVersionMode)
-        //    {
-        //        App.FullVersionMode = true;
-        //        Preferences.Set("FullVersion", true);
-        //        if(!atappstart)
-        //        {
-        //            await DisplayAlert("Existing Purchase Found", "Your existing purchase of the full version was found and has been activated.", "OK");
-        //        }
-        //    }
-        //    else if(res == -1 && App.FullVersionMode && atappstart)
-        //    {
-        //        if (!Preferences.ContainsKey("CheckPurchase_FirstConnectFail"))
-        //            Preferences.Set("CheckPurchase_FirstConnectFail", DateTime.Now);
-
-        //        DateTime firstfaildate = Preferences.Get("CheckPurchase_FirstConnectFail", DateTime.MinValue);
-        //        TimeSpan ts = DateTime.Now - firstfaildate;
-        //        double ddays = ts.TotalDays;
-
-        //        int game_start_count = Preferences.Get("CheckPurchase_ConnectFail_GameStartCount", 0);
-        //        game_start_count++;
-        //        Preferences.Set("CheckPurchase_ConnectFail_GameStartCount", game_start_count);
-
-        //        if (ddays > 30 || game_start_count > 30)
-        //        {
-        //            App.FullVersionMode = false;
-        //            await DisplayAlert("Verification Connection Failure",
-        //                "GnollHack has been unable to verify the full version purchase for more than " + (ddays > 30 ? "30 days" : "30 app starts") + ". Only demo version features are accessible until verification is successful. Please check your internet connection.", "OK");
-        //        }
-        //        else
-        //        {
-        //            await DisplayAlert("Verification Connection Failure", 
-        //                "GnollHack is unable to connect to verify your full version. Your are able to use the full version still for "
-        //                + (ddays < 29 ? string.Format("{0:0}", ddays) : string.Format("{0:0.0}", ddays))
-        //                + " days" + (game_start_count < 29 ? " up to " + (30 - game_start_count) + " times." : game_start_count == 29 ? " one more time." : ". This is the last time you can use the full version."), "OK");
-        //        }
-        //    }
-        //    UpdateSponsor();
-        //}
-
-
-        private void ExitAppButton_Clicked(object sender, EventArgs e)
+        private async void ExitAppButton_Clicked(object sender, EventArgs e)
         {
             UpperButtonGrid.IsEnabled = false;
             App.PlayButtonClickedSound();
@@ -584,6 +571,14 @@ namespace GnollHackClient
             }
             else
             {
+                bool ReviewRequested = Preferences.Get("StoreReviewRequested", false);
+                long NumberOfGames = Preferences.Get("NumberOfGames", 0L);
+                long TotalPlayTime = Preferences.Get("RealPlayTime", 0L);
+                if (!ReviewRequested && NumberOfGames >= GHConstants.StoreReviewRequestNumberOfGames && TotalPlayTime >= GHConstants.StoreReviewRequestTotalPlayTime)
+                {
+                    Preferences.Set("StoreReviewRequested", true);
+                    await CrossStoreReview.Current.RequestReview(false);
+                }
                 CloseApp();
             }
         }
@@ -665,19 +660,20 @@ namespace GnollHackClient
             App.PlayButtonClickedSound();
             if (App.UsesCarousel)
                 carouselView.Stop();
-            var creditsPage = new CreditsPage();
-            creditsPage.Disappearing += (sender2, e2) =>
+            var aboutPage = new AboutPage();
+            aboutPage.Disappearing += (sender2, e2) =>
             {
                 if (App.UsesCarousel)
                     carouselView.Play();
                 UpperButtonGrid.IsEnabled = true;
             };
-            await App.Current.MainPage.Navigation.PushModalAsync(creditsPage);
+            await App.Current.MainPage.Navigation.PushModalAsync(aboutPage);
             UpperButtonGrid.IsEnabled = true;
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
+            /*
             if (!App.UsesCarousel)
             {
                 StillImage.IsVisible = true;
@@ -685,6 +681,7 @@ namespace GnollHackClient
                 videoView.IsVisible = false;
             }
             else
+            */
             {
                 carouselView.Stop();
             }
@@ -708,8 +705,8 @@ namespace GnollHackClient
             /* Change the situation as it would have been from the start */
             if (App.UsesCarousel)
             {
-                videoView.Stop();
-                videoView.IsVisible = false;
+                //videoView.Stop();
+                //videoView.IsVisible = false;
                 StillImage.IsVisible = false;
                 carouselView.IsVisible = true;
             }
@@ -724,6 +721,7 @@ namespace GnollHackClient
 
         public void UpdateMainScreenBackgroundElement(bool playAfterUpdate)
         {
+            /*
             if (!App.UsesCarousel)
             {
                 videoView.Stop();
@@ -748,6 +746,7 @@ namespace GnollHackClient
                     videoView.Play();
             }
             else
+            */
             {
                 carouselView.InvalidateSurface();
             }
@@ -1247,7 +1246,7 @@ namespace GnollHackClient
                 if (PopupNoAgainCheckBox.IsChecked)
                 {
                     Preferences.Set("HideAutoUpdateAlert", true);
-                    await Task.Delay(25);
+                    await Task.Delay(50);
                 }
 
                 CloseApp();

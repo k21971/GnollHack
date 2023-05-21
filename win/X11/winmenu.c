@@ -631,13 +631,14 @@ int style;
 
 /*ARGSUSED*/
 void
-X11_add_menu(window, glyph, identifier, ch, gch, attr, str, preselected)
+X11_add_menu(window, glyph, identifier, ch, gch, attr, color, str, preselected)
 winid window;
 int glyph; /* unused (for now) */
 const anything *identifier;
 char ch;
 char gch; /* group accelerator (0 = no group) */
 int attr;
+int color;
 const char *str;
 boolean preselected;
 {
@@ -708,18 +709,19 @@ boolean preselected;
 }
 
 void
-X11_add_extended_menu(window, glyph, identifier, info, ch, gch, attr, str, preselected)
+X11_add_extended_menu(window, glyph, identifier, ch, gch, attr, color, str, preselected, info)
 winid window;
 int glyph; /* unused (for now) */
 const anything* identifier;
-struct extended_menu_info info;
 char ch;
 char gch; /* group accelerator (0 = no group) */
 int attr;
+int color;
 const char* str;
 boolean preselected;
+struct extended_menu_info info;
 {
-    X11_add_menu(window, glyph, identifier, ch, gch, attr, str, preselected);
+    X11_add_menu(window, glyph, identifier, ch, gch, attr, color, str, preselected);
 }
 
 void

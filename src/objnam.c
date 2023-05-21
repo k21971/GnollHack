@@ -432,6 +432,18 @@ boolean forward;
         }
     }
 }
+char*
+str_upper_start(str)
+const char* str;
+{
+    char* buf = nextobuf();
+    if(!str)
+        Strcpy(buf, empty_string);
+    else
+        Strcpy(buf, str);
+
+    return upstart(buf);
+}
 
 char *
 xname(obj)
@@ -683,6 +695,8 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     Strcat(actualn_fullbuf, actualn);
     Strcat(dn_fullbuf, dn);
 
+    boolean statueusesname = FALSE;
+
     switch (obj->oclass) {
     case AMULET_CLASS:
         if (!dknown)
@@ -881,6 +895,8 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                     (has_mname(mtmp)) ? (SUPPRESS_SADDLE | SUPPRESS_IT | SUPPRESS_INVISIBLE)
                     : SUPPRESS_IT | SUPPRESS_INVISIBLE,
                     FALSE));
+
+                statueusesname = TRUE;
             }
             else
             {
@@ -892,7 +908,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                        ? "historic "
                        : "",
                     actualn_fullbuf,
-                    is_mname_proper_name(&mons[omndx])
+                    is_mname_proper_name(&mons[omndx]) || (mtmp && has_mname(mtmp) && mtmp->u_know_mname)
                        ? ""
                        : the_unique_pm(&mons[omndx])
                           ? "the "
@@ -1033,21 +1049,21 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         buf += 4;
 
     /* Corpse names from OMONST */
-    if (obj->oextra && OMONST(obj)) 
+    if (obj->oextra && OMONST(obj) && !statueusesname)
     {
-        if (OMONST(obj)->isshk && OMONST(obj)->mextra && ESHK(OMONST(obj)) && OMONST(obj)->u_know_mname)
+        if (OMONST(obj)->isshk && OMONST(obj)->mextra && ESHK(OMONST(obj)))
         {
-            Strcat(buf, " who was named ");
+            Strcat(buf, " named ");
             Strcat(buf, shkname(OMONST(obj)));
         }
         else if(has_mname(OMONST(obj)) && OMONST(obj)->u_know_mname)
         {
-            Strcat(buf, " that was named ");
+            Strcat(buf, " named ");
             Strcat(buf, MNAME(OMONST(obj)));
         }
         else if (has_umname(OMONST(obj)))
         {
-            Strcat(buf, " that you called ");
+            Strcat(buf, " called ");
             Strcat(buf, UMNAME(OMONST(obj)));
         }
     }
@@ -2244,7 +2260,7 @@ struct obj* obj;
 {
     if (obj->otyp == CORPSE)
         return corpse_xname(obj, (const char*)0, CXN_ARTICLE);
-    return obj->oartifact && obj->aknown ? the(xname(obj)) : an(xname(obj));
+    return obj->oartifact && obj->aknown ? the(xname(obj)) : obj->quan != 1 ? xname(obj) : an(xname(obj));
 }
 
 /* like cxname, but ignores quantity */
@@ -4310,7 +4326,7 @@ boolean is_wiz_wish;
             && !strstri(bp, "gauntlets ") && !strstri(bp, "belt ") && !strstri(bp, "girdle ")
             && !strstri(bp, "boots ") && !strstri(bp, "ring ")
             && !strstri(bp, "potion ") && !strstri(bp, "scroll ")
-            && !strstri(bp, "potions ") && !strstri(bp, "scrolls ") && !strstri(bp, "ruby rod ") && !strstri(bp, "triple-headed flail ")
+            && !strstri(bp, "potions ") && !strstri(bp, "scrolls ") && !strstri(bp, "ruby rod ") && !strstri(bp, "triple-headed flail ") && !strstri(bp, "tooth ")
             && !strstri(bp, "finger ")) {
             if ((p = strstri(bp, "tin of ")) != 0) {
                 if (!strcmpi(p + 7, "spinach")) {
@@ -4334,6 +4350,7 @@ boolean is_wiz_wish;
         && strncmpi(bp, "wizard's robe", 13) /* not the "wizard" monster! */
         && strncmpi(bp, "bat guano", 9) /* not the "bat" monster! */
         && strncmpi(bp, "ruby rod of asmodeus", 20) /* not the "Asmodeus" monster! */
+        && strncmpi(bp, "tooth of tarrasque", 18) /* not the "Tarrasque" monster! */
         && strncmpi(bp, "wand of orcus", 13) /* not the "Orcus" monster! */
         && strncmpi(bp, "triple-headed flail of yeenaghu", 31) /* not the "Yeenaghu" monster! */
         && strncmpi(bp, "ninja-to", 8)     /* not the "ninja" rank */
@@ -5926,7 +5943,7 @@ int otyp, material;
         return TRUE; /* base material always works */
 
     int mit = objects[otyp].oc_material_init_type;
-    if (mit <= MATINIT_NORMAL || mit >= MAX_MATINIT_TYPES)
+    if (mit <= MATINIT_BASE_MATERIAL || mit >= MAX_MATINIT_TYPES)
         return FALSE;
 
     int i;

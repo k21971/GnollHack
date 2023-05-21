@@ -469,7 +469,8 @@ learn(VOID_ARGS)
             pline_ex(ATR_NONE, CLR_MSG_FAIL, "Despite your best efforts, you fail to understand the spell in %s.", the(cxname(book)));
         }
 
-        if (gone || !rn2(2)) {
+        if (gone || !rn2(2)) 
+        {
             if (!gone)
             {
                 if (iflags.using_gui_sounds)
@@ -508,6 +509,9 @@ learn(VOID_ARGS)
         if (spellid(i) == booktype || spellid(i) == NO_SPELL)
             break;
 
+    int initialamount = i < MAXSPELL ? spl_book[i].sp_amount : 0;
+    int addedamount = 0;
+
     if (i == MAXSPELL)
     {
         impossible("Too many spells memorized!");
@@ -524,12 +528,12 @@ learn(VOID_ARGS)
             /* reset spestudied as if polymorph had taken place */
             book->spestudied = rn2(book->spestudied);
         }
-        else if (spellknow(i) > SPELL_IS_KEEN / 10)
-        {
-            play_sfx_sound(SFX_SPELL_KNOWN_ALREADY);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "know %s quite well already.", splname);
-            costly = FALSE;
-        }
+        //else if (spellknow(i) > SPELL_IS_KEEN / 10)
+        //{
+        //    play_sfx_sound(SFX_SPELL_KNOWN_ALREADY);
+        //    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "know %s quite well already.", splname);
+        //    costly = FALSE;
+        //}
         else
         { /* spellknow(i) <= SPELL_IS_KEEN/10 */
             play_sfx_sound(SFX_SPELL_KEENER);
@@ -538,6 +542,13 @@ learn(VOID_ARGS)
             incr_spell_nknow(i, 1);
             book->spestudied++;
             exercise(A_WIS, TRUE); /* extra study */
+
+            if (spl_book[i].sp_matcomp > 0)
+            {
+                addedamount = matlists[spl_book[i].sp_matcomp].spellsgained;
+                spl_book[i].sp_amount += addedamount;
+            }
+            learnsuccess = TRUE;
         }
         /* make book become known even when spell is already
            known, in case amnesia made you forget the book */
@@ -556,7 +567,9 @@ learn(VOID_ARGS)
             book->material = objects[book->otyp].oc_material;
             /* reset spestudied as if polymorph had taken place */
             book->spestudied = rn2(book->spestudied);
-        } else {
+        } 
+        else 
+        {
             spl_book[i].sp_id = (short)booktype;
             spl_book[i].sp_lev = (xchar)objects[booktype].oc_spell_level;
             spl_book[i].sp_matcomp = objects[booktype].oc_material_components;
@@ -571,6 +584,12 @@ learn(VOID_ARGS)
             incr_spell_nknow(i, 1);
             book->spestudied++;
 
+            if (spl_book[i].sp_matcomp > 0)
+            {
+                addedamount = matlists[spl_book[i].sp_matcomp].spellsgained;
+                spl_book[i].sp_amount += addedamount;
+            }
+
             sortspells();
 
             play_sfx_sound(SFX_SPELL_LEARN_SUCCESS);
@@ -578,6 +597,14 @@ learn(VOID_ARGS)
             learnsuccess = TRUE;
         }
         makeknown((int) booktype);
+    }
+
+    if (addedamount > 0)
+    {
+        if (addedamount == 1)
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have one %scasting of %s prepared.", !initialamount ? "" : "more ", splname);
+        else
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have %d %scastings of %s prepared.", addedamount, !initialamount ? "" : "more ", splname);
     }
 
     if (book->cursed) 
@@ -1190,27 +1217,28 @@ int* spell_no;
                 Strcpy(descbuf, nodesc);
 
             boolean inactive = FALSE;
-            struct extended_menu_info info = nilextendedmenuinfo;
+            struct extended_menu_info info = zeroextendedmenuinfo;
+            int mcolor = NO_COLOR;
             info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
             if (spellknow(splnum) <= 0)
             {
                 Sprintf(buf, "%s %s", fullname, "(You cannot recall this spell)");
-                info.color = CLR_BLACK;
+                mcolor = CLR_BLACK;
                 info.menu_flags |= MENU_FLAGS_USE_COLOR_FOR_SUFFIXES;
                 inactive = TRUE;
             }
             else
             {
                 Sprintf(buf, "%s (%s)", fullname, descbuf);
-                info.color = NO_COLOR;
+                mcolor = NO_COLOR;
                 info.menu_flags |= MENU_FLAGS_ACTIVE;
             }
             if (!inactive)
                 info.menu_flags |= MENU_FLAGS_ACTIVE;
 
             any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
-            add_extended_menu(tmpwin, glyph, &any, info, 0, 0, ATR_INDENT_AT_DOUBLE_SPACE, buf,
-                (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED);
+            add_extended_menu(tmpwin, glyph, &any, 0, 0, ATR_INDENT_AT_DOUBLE_SPACE, mcolor, buf,
+                (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED, info);
         }
     }
     else if (splaction == SPELLMENU_PREPARE)
@@ -1240,7 +1268,7 @@ int* spell_no;
         {
             /* more than 1 spell, add an extra menu entry */
             any.a_int = SPELLMENU_SORT + 1;
-            add_menu(tmpwin, NO_GLYPH, &any, '+', 0, ATR_NONE,
+            add_menu(tmpwin, NO_GLYPH, &any, '+', 0, ATR_NONE, NO_COLOR,
                 "[sort spells]", MENU_UNSELECTED);
         }
     }
@@ -2681,7 +2709,7 @@ struct monst* targetmonst;
             if (!get_valid_targeted_position(cc.x, cc.y, otyp))
             {
                 play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
-                pline("Not a valid target position.");
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "Not a valid target position.");
                 if (trycnt > 4)
                 {
                     cc.x = u.ux;
@@ -3556,13 +3584,13 @@ spellsortmenu()
             let = 'z'; /* assumes fewer than 26 sort choices... */
             /* separate final choice from others with a blank line */
             any.a_int = 0;
-            add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, "",
+            add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "",
                      MENU_UNSELECTED);
         } else {
             let = 'a' + i;
         }
         any.a_int = i + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, let, 0, ATR_NONE, spl_sortchoices[i],
+        add_menu(tmpwin, NO_GLYPH, &any, let, 0, ATR_NONE, NO_COLOR, spl_sortchoices[i],
                  (i == flags.spellorder) ? MENU_SELECTED : MENU_UNSELECTED);
     }
     end_menu(tmpwin, "View known spells list sorted");
@@ -3600,7 +3628,7 @@ dovspell()
     if (spellid(0) == NO_SPELL)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("don't know any spells right now.");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know any spells right now.");
     } 
     else 
     {
@@ -3723,8 +3751,8 @@ int *spell_no;
             Sprintf(buf, "Name\tH\tDescription");
         }
 
-        add_extended_menu(tmpwin, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings, buf,
-            MENU_UNSELECTED);
+        add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+            MENU_UNSELECTED, menu_heading_info());
 
 
         for (i = 0; i < MAXSPELL /*min(MAXSPELL, 52)*/ && spellid(i) != NO_SPELL; i++) {
@@ -3779,7 +3807,7 @@ int *spell_no;
                 Sprintf(buf, fmt, shortenedname, hotkeychar, descbuf);
 
             any.a_int = splnum + 1; /* must be non-zero */
-            add_menu(tmpwin, NO_GLYPH, &any, 0 /*spellet(splnum)*/, 0, ATR_INDENT_AT_DOUBLE_SPACE, buf,
+            add_menu(tmpwin, NO_GLYPH, &any, 0 /*spellet(splnum)*/, 0, ATR_INDENT_AT_DOUBLE_SPACE, NO_COLOR, buf,
                 (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED);
 
         }
@@ -3875,7 +3903,7 @@ int *spell_no;
         } else {
             /* more than 1 spell, add an extra menu entry */
             any.a_int = SPELLMENU_SORT + 1;
-            add_menu(tmpwin, NO_GLYPH, &any, '+', 0, ATR_NONE,
+            add_menu(tmpwin, NO_GLYPH, &any, '+', 0, ATR_NONE, NO_COLOR,
                      "[sort spells]", MENU_UNSELECTED);
         }
     }
@@ -3954,12 +3982,12 @@ boolean addemptyline;
     if (addemptyline)
     {
         any = zeroany;
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, "", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", MENU_UNSELECTED);
     }
 
     any = zeroany;
-    add_extended_menu(tmpwin, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings, buf,
-        MENU_UNSELECTED);
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+        MENU_UNSELECTED, menu_heading_info());
 
 }
 
@@ -4079,7 +4107,7 @@ boolean usehotkey;
 
 
     any.a_int = splnum + 1; /* must be non-zero */
-    add_menu(tmpwin, NO_GLYPH, &any, letter, 0, ATR_NONE, buf,
+    add_menu(tmpwin, NO_GLYPH, &any, letter, 0, ATR_NONE, NO_COLOR, buf,
         (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED);
 
 }
@@ -4113,12 +4141,12 @@ boolean addemptyline;
     if (addemptyline)
     {
         any = zeroany;
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, "", MENU_UNSELECTED);
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", MENU_UNSELECTED);
     }
 
     any = zeroany;
-    add_extended_menu(tmpwin, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings, buf,
-        MENU_UNSELECTED);
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+        MENU_UNSELECTED, menu_heading_info());
 
 }
 
@@ -4173,25 +4201,22 @@ int splaction;
     }
 
     boolean inactive = FALSE;
-    struct extended_menu_info info = nilextendedmenuinfo;
+    struct extended_menu_info info = zeroextendedmenuinfo;
+    int mcolor = NO_COLOR;
     info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
     if (spellcooldownleft(splnum) > 0 || spellknow(splnum) <= 0)
     {
-        info.color = CLR_GRAY;
+        mcolor = CLR_GRAY;
         info.menu_flags |= MENU_FLAGS_USE_COLOR_FOR_SUFFIXES;
         inactive = TRUE;
-    }
-    else
-    {
-        info.color = NO_COLOR;
     }
     if(!inactive)
         info.menu_flags |= MENU_FLAGS_ACTIVE;
 
     any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
 
-    add_extended_menu(tmpwin, glyph, &any, info, 0, 0, ATR_NONE, buf,
-        (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED);
+    add_extended_menu(tmpwin, glyph, &any, 0, 0, ATR_NONE, mcolor, buf,
+        (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED, info);
 
 }
 
@@ -4234,12 +4259,13 @@ int splaction;
         strcpy(matcompbuf, "No components");
 
     boolean inactive = FALSE;
-    struct extended_menu_info info = nilextendedmenuinfo;
+    struct extended_menu_info info = zeroextendedmenuinfo;
+    int mcolor = NO_COLOR;
     info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
     if (spellknow(splnum) <= 0)
     {
         Sprintf(buf, "%s %s", fullname, "(You cannot recall this spell)");
-        info.color = CLR_GRAY;
+        mcolor = CLR_GRAY;
         info.menu_flags |= MENU_FLAGS_USE_COLOR_FOR_SUFFIXES;
         inactive = TRUE;
     }
@@ -4248,14 +4274,13 @@ int splaction;
         const char* fmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ? "%s (%s) {&casts; %s &adds; %s}" : "%s (%s) {Casts %s Adds %s}";
         Sprintf(buf, fmt, fullname, matcompbuf,
             availablebuf, addsbuf);
-        info.color = NO_COLOR;
     }
     if (!inactive)
         info.menu_flags |= MENU_FLAGS_ACTIVE;
 
     any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
-    add_extended_menu(tmpwin, glyph, &any, info, 0, 0, ATR_NONE, buf,
-        (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED);
+    add_extended_menu(tmpwin, glyph, &any, 0, 0, ATR_NONE, mcolor, buf,
+        (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED, info);
 }
 
 STATIC_OVL
@@ -4404,13 +4429,7 @@ boolean usehotkey;
     else
         letter = 0; // spellet(splnum);
 
-    struct extended_menu_info info = nilextendedmenuinfo;
-    if ((spellcooldownleft(splnum) > 0 && splaction != SPELLMENU_PREPARE) || spellknow(splnum) <= 0)
-        info.color = CLR_BLACK;
-    else
-        info.color = NO_COLOR;
-
-    add_extended_menu(tmpwin, NO_GLYPH, &any, info, letter, 0, ATR_NONE, buf,
+    add_menu(tmpwin, NO_GLYPH, &any, letter, 0, ATR_NONE, (spellcooldownleft(splnum) > 0 && splaction != SPELLMENU_PREPARE) || spellknow(splnum) <= 0 ? CLR_BLACK : NO_COLOR, buf,
         (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED);
 
     //Strcat(shortenedname, "=black");
@@ -4462,7 +4481,7 @@ dospellmanagemenu()
     any.a_char = available_selection_item[selnum].charnum;
 
     add_menu(win, NO_GLYPH, &any,
-        any.a_char, 0, ATR_NONE,
+        any.a_char, 0, ATR_NONE, NO_COLOR,
         available_selection_item[selnum].name, MENU_UNSELECTED);
 
     selnum++;
@@ -4478,7 +4497,7 @@ dospellmanagemenu()
     any.a_char = available_selection_item[selnum].charnum;
 
     add_menu(win, NO_GLYPH, &any,
-        any.a_char, 0, ATR_NONE,
+        any.a_char, 0, ATR_NONE, NO_COLOR,
         available_selection_item[selnum].name, MENU_UNSELECTED);
 
     selnum++;
@@ -4494,7 +4513,7 @@ dospellmanagemenu()
     any.a_char = available_selection_item[selnum].charnum;
 
     add_menu(win, NO_GLYPH, &any,
-        any.a_char, 0, ATR_NONE,
+        any.a_char, 0, ATR_NONE, NO_COLOR,
         available_selection_item[selnum].name, MENU_UNSELECTED);
 
     selnum++;

@@ -69,8 +69,8 @@ const struct propname propertynames[] = {
     { MAGICAL_BREATHING, "magical breathing", "magical breathing" },
     { PASSES_WALLS, "passing thru walls", "pass thru walls" },
     { SLOW_DIGESTION, "digesting slowly", "slow digestion" },
-    { HALF_SPELL_DAMAGE, "receiving half spell damage", "half spell damage" },
-    { HALF_PHYSICAL_DAMAGE, "receiving half physical damage", "half physical damage" },
+    { HALF_SPELL_DAMAGE, "receiving half normal spell damage", "half received spell damage" },
+    { HALF_PHYSICAL_DAMAGE, "receiving half normal physical damage", "half received physical damage" },
     { REGENERATION, "regenerating", "regeneration" },
     { ENERGY_REGENERATION, "regenerating mana", "mana regeneration" },
     { MAGICAL_PROTECTION, "magically protected", "magical protection" },
@@ -182,7 +182,7 @@ const struct propname propertynames[] = {
     { LAUGHING, "laughing uncontrollably", "uncontrollable laughter" },
     { TOTTERING, "shaking and tottering", "shaking and tottering" },
     { MARTIAL_PROWESS, "imbued with martial prowess", "martial prowess" },
-    {  0, 0 },
+    {  0, 0, 0 },
 };
 
 NEARDATA struct prop_info property_definitions[MAX_PROPS] =

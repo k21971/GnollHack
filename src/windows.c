@@ -84,9 +84,9 @@ STATIC_DCL void FDECL(dump_display_nhwindow, (winid, BOOLEAN_P));
 STATIC_DCL void FDECL(dump_destroy_nhwindow, (winid));
 STATIC_DCL void FDECL(dump_start_menu_ex, (winid, int));
 STATIC_DCL void FDECL(dump_add_menu, (winid, int, const ANY_P *, CHAR_P,
-                                      CHAR_P, int, const char *, BOOLEAN_P));
-STATIC_DCL void FDECL(dump_add_extended_menu, (winid, int, const ANY_P*, struct extended_menu_info, CHAR_P,
-    CHAR_P, int, const char*, BOOLEAN_P));
+                                      CHAR_P, int, int, const char *, BOOLEAN_P));
+STATIC_DCL void FDECL(dump_add_extended_menu, (winid, int, const ANY_P*, CHAR_P,
+    CHAR_P, int, int, const char*, BOOLEAN_P, struct extended_menu_info));
 STATIC_DCL void FDECL(dump_end_menu_ex, (winid, const char *, const char*));
 STATIC_DCL int FDECL(dump_select_menu, (winid, int, MENU_ITEM_P **));
 STATIC_DCL void FDECL(dump_putstr_ex, (winid, int, const char *, int, int));
@@ -732,9 +732,9 @@ STATIC_DCL winid FDECL(hup_create_nhwindow_ex, (int, int, int, struct extended_c
 STATIC_DCL void FDECL(hup_start_menu_ex, (winid, int));
 STATIC_DCL int FDECL(hup_select_menu, (winid, int, MENU_ITEM_P **));
 STATIC_DCL void FDECL(hup_add_menu, (winid, int, const anything *, CHAR_P, CHAR_P,
-                                 int, const char *, BOOLEAN_P));
-STATIC_DCL void FDECL(hup_add_extended_menu, (winid, int, const anything*, struct extended_menu_info, CHAR_P, CHAR_P,
-    int, const char*, BOOLEAN_P));
+                                 int, int, const char *, BOOLEAN_P));
+STATIC_DCL void FDECL(hup_add_extended_menu, (winid, int, const anything*, CHAR_P, CHAR_P,
+    int, int, const char*, BOOLEAN_P, struct extended_menu_info));
 STATIC_DCL void FDECL(hup_end_menu_ex, (winid, const char *, const char*));
 STATIC_DCL void FDECL(hup_putstr_ex, (winid, int, const char *, int, int));
 STATIC_DCL void FDECL(hup_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
@@ -941,9 +941,9 @@ struct mi **menu_list UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
-hup_add_menu(window, glyph, identifier, sel, grpsel, attr, txt, preselected)
+hup_add_menu(window, glyph, identifier, sel, grpsel, attr, color, txt, preselected)
 winid window UNUSED;
-int glyph UNUSED, attr UNUSED;
+int glyph UNUSED, attr UNUSED, color UNUSED;
 const anything *identifier UNUSED;
 char sel UNUSED, grpsel UNUSED;
 const char *txt UNUSED;
@@ -953,14 +953,14 @@ boolean preselected UNUSED;
 }
 
 STATIC_OVL void
-hup_add_extended_menu(window, glyph, identifier, info, sel, grpsel, attr, txt, preselected)
+hup_add_extended_menu(window, glyph, identifier, sel, grpsel, attr, color, txt, preselected, info)
 winid window UNUSED;
-int glyph UNUSED, attr UNUSED;
+int glyph UNUSED, attr UNUSED, color UNUSED;
 const anything* identifier UNUSED;
-struct extended_menu_info info UNUSED;
 char sel UNUSED, grpsel UNUSED;
 const char* txt UNUSED;
 boolean preselected UNUSED;
+struct extended_menu_info info UNUSED;
 {
     return;
 }
@@ -1562,9 +1562,9 @@ int attr;
 const char *str;
 int no_forward;
 {
-    char buf[BUFSIZ * 4] = "";
+    char buf[UTF8BUFSZ * 2] = "";
     if (str)
-        write_text2buf_utf8(buf, BUFSIZ * 4, str);
+        write_text2buf_utf8(buf, sizeof(buf), str);
 
     if (dumplog_file)
         fprintf(dumplog_file, "%s\n", buf);
@@ -1579,9 +1579,9 @@ winid win UNUSED;
 int attr UNUSED, app UNUSED, color UNUSED;
 const char *str;
 {
-    char buf[BUFSIZ * 4] = "";
+    char buf[UTF8BUFSZ * 2] = "";
     if(str)
-        write_text2buf_utf8(buf, BUFSIZ * 4, str);
+        write_text2buf_utf8(buf, sizeof(buf), str);
 
     if (dumplog_file)
         fprintf(dumplog_file, "%s\n", buf);
@@ -1656,19 +1656,20 @@ int style UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
-dump_add_menu(win, glyph, identifier, ch, gch, attr, str, preselected)
+dump_add_menu(win, glyph, identifier, ch, gch, attr, color, str, preselected)
 winid win UNUSED;
 int glyph;
 const anything *identifier UNUSED;
 char ch;
 char gch UNUSED;
 int attr UNUSED;
+int color UNUSED;
 const char *str;
 boolean preselected UNUSED;
 {
-    char buf[BUFSIZ * 4] = "";
+    char buf[UTF8BUFSZ * 2] = "";
     if (str)
-        write_text2buf_utf8(buf, BUFSIZ * 4, str);
+        write_text2buf_utf8(buf, sizeof(buf), str);
 
     if (dumplog_file) {
         if (glyph == NO_GLYPH)
@@ -1680,20 +1681,21 @@ boolean preselected UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
-dump_add_extended_menu(win, glyph, identifier, info, ch, gch, attr, str, preselected)
+dump_add_extended_menu(win, glyph, identifier, ch, gch, attr, color, str, preselected, info)
 winid win UNUSED;
 int glyph;
 const anything* identifier UNUSED;
-struct extended_menu_info info UNUSED;
 char ch;
 char gch UNUSED;
 int attr UNUSED;
+int color UNUSED;
 const char* str;
 boolean preselected UNUSED;
+struct extended_menu_info info UNUSED;
 {
-    char buf[BUFSIZ * 4] = "";
+    char buf[UTF8BUFSZ * 2] = "";
     if (str)
-        write_text2buf_utf8(buf, BUFSIZ * 4, str);
+        write_text2buf_utf8(buf, sizeof(buf), str);
 
     if (dumplog_file) {
         if (glyph == NO_GLYPH)
@@ -1709,16 +1711,16 @@ dump_end_menu_ex(win, str, str2)
 winid win UNUSED;
 const char *str, *str2;
 {
-    char buf[BUFSIZ * 4] = "";
-    char buf1[BUFSIZ * 4] = "";
-    char buf2[BUFSIZ * 4] = "";
+    char buf[UTF8BUFSZ * 4 + 3] = "";
+    char buf1[UTF8BUFSZ * 2] = "";
+    char buf2[UTF8BUFSZ * 2] = "";
     const char* txt = 0;
     txt = (str && str2) ? " - " : "";
 
     if (str)
-        write_text2buf_utf8(buf1, BUFSIZ * 4, str);
+        write_text2buf_utf8(buf1, sizeof(buf1), str);
     if (str2)
-        write_text2buf_utf8(buf2, BUFSIZ * 4, str2);
+        write_text2buf_utf8(buf2, sizeof(buf2), str2);
 
     Sprintf(buf, "%s%s%s", buf1, txt, buf2);
 

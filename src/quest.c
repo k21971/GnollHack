@@ -477,7 +477,7 @@ struct monst *mtmp;
         /* Awaken the prisoner */
         if (canseemon(mtmp))
             pline("%s speaks:", Monnam(mtmp));
-        verbalize("I'm finally free!");
+        verbalize_happy1("I'm finally free!");
         mtmp->mstrategy &= ~STRAT_WAITMASK;
         mtmp->mpeaceful = 1;
         newsym(mtmp->mx, mtmp->my);

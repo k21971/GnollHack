@@ -19,6 +19,10 @@ STATIC_DCL int FDECL(m_arrival, (struct monst *));
 STATIC_DCL boolean FDECL(stuff_prevents_passage, (struct monst *));
 STATIC_DCL int FDECL(vamp_shift, (struct monst *, struct permonst *, BOOLEAN_P));
 
+#define mon_wants_to_pick_up_obj(m, o) \
+    ((m) && mon_can_move(m) && !(m)->issummoned && mon_can_reach_floor(m) && !onnopickup((m)->mx, (m)->my, m) \
+     && !((o) && couldsee((m)->mx, (m)->my) && (o)->was_thrown))
+
 /* True if mtmp died */
 boolean
 mb_trapped(mtmp)
@@ -75,12 +79,12 @@ boolean for_unlocking; /* true => credit card ok, false => not ok */
 }
 
 void
-mon_yells(mon, shout, verb, adverb, usethe)
+mon_yells(mon, shout, verb, adverb, usethe, isangry)
 struct monst *mon;
 const char *shout;
 const char* verb;
 const char* adverb;
-boolean usethe;
+boolean usethe, isangry;
 {
     if (Deaf)
     {
@@ -93,7 +97,7 @@ boolean usethe;
             if (adverb && strcmp(adverb, "") != 0)
                 Sprintf(adjbuf, "%s ", adverb);
             
-            pline("%s %s%s %s %s!",
+            pline_ex(ATR_NONE, isangry ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s %s%s %s %s!",
                 usethe ? Monnam(mon) : Amonnam(mon),
                 adjbuf,
                 nohands(mon->data) ? "shakes" : "waves",
@@ -109,7 +113,8 @@ boolean usethe;
             pline("%s %ss:", usethe ? Monnam(mon) : Amonnam(mon), verb);
         else
             You_hear("someone %s:", verb);
-        verbalize1(shout);
+
+        verbalize_ex(ATR_NONE, isangry ? CLR_MSG_TALK_ANGRY : CLR_MSG_TALK_NORMAL, "%s", shout);
     }
 }
 
@@ -129,7 +134,7 @@ struct monst* mon;
         return;
     }
 
-    if (!is_speaking_monster(mon->data) || mindless(mon->data)
+    if (!is_speaking(mon->data) || mindless(mon->data)
         || is_stunned(mon) || is_confused(mon))
         return;
 
@@ -171,7 +176,7 @@ struct monst* mon;
                         if (mon->mnum == PM_PRISONER)
                         {
                             strcpy(yellbuf, "Please help me, adventurer!");
-                            mon_yells(mon, yellbuf, "yell", "desperately", TRUE);
+                            mon_yells(mon, yellbuf, "yell", "desperately", TRUE, FALSE);
                         }
                         mon_talked = TRUE;
                     }
@@ -201,22 +206,22 @@ struct monst* mon;
                         case 0:
                             play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_HOW_ARE_YOU_I_HAVE_AN_ITEM_FOR_SALE : MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_HOW_ARE_YOU_I_HAVE_SOME_ITEMS_FOR_SALE);
                             Sprintf(yellbuf, "Hello, adventurer! How are you? I have %s for sale.", someitembuf);
-                            mon_yells(mon, yellbuf, "say", "politely", TRUE);
+                            mon_yells(mon, yellbuf, "say", "politely", TRUE, FALSE);
                             break;
                         case 1:
                             play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_AGAIN_I_STILL_HAVE_AN_ITEM_FOR_SALE : MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_AGAIN_I_STILL_HAVE_SOME_ITEMS_FOR_SALE);
                             Sprintf(yellbuf, "Hello again, I still have %s for sale.", someitembuf);
-                            mon_yells(mon, yellbuf, "say", "politely", TRUE);
+                            mon_yells(mon, yellbuf, "say", "politely", TRUE, FALSE);
                             break;
                         case 2:
                             play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HOW_IS_YOUR_ADVENTURING_GOING_WOULD_YOU_PERHAPS_HAVE_NOW_INTEREST_IN_BUYING_AN_ITEM : MONSTER_ITEM_TRADING_LINE_TRADING_HOW_IS_YOUR_ADVENTURING_GOING_WOULD_YOU_PERHAPS_HAVE_NOW_INTEREST_IN_BUYING_SOME_ITEMS);
                             Sprintf(yellbuf, "How is your adventuring going? Would you perhaps have now interest in buying %s?", someitembuf);
-                            mon_yells(mon, yellbuf, "say", "inquisitively", TRUE);
+                            mon_yells(mon, yellbuf, "say", "inquisitively", TRUE, FALSE);
                             break;
                         case 3:
                             play_monster_item_trading_line(mon, cnt == 1 ? MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_THERE_AGAIN_ANY_INTEREST_IN_MY_ITEM : MONSTER_ITEM_TRADING_LINE_TRADING_HELLO_THERE_AGAIN_ANY_INTEREST_IN_MY_ITEMS);
                             Sprintf(yellbuf, "Hello there again! Any interest in my %s?", itembuf);
-                            mon_yells(mon, yellbuf, "say", "politely", TRUE);
+                            mon_yells(mon, yellbuf, "say", "politely", TRUE, FALSE);
                             break;
                         default:
                             break;
@@ -260,13 +265,13 @@ register struct monst *mtmp;
                     context.global_minimum_volume = 0.25f;
                     play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_HALT_THIEF_YOURE_UNDER_ARREST);
                     context.global_minimum_volume = 0.0f;
-                    mon_yells(mtmp, "Halt, thief!  You're under arrest!", "yell", "angrily", FALSE);
+                    mon_yells(mtmp, "Halt, thief!  You're under arrest!", "yell", "angrily", FALSE, TRUE);
                     (void) angry_guards(!!Deaf);
                 } else {
                     context.global_minimum_volume = 0.25f;
                     play_monster_special_dialogue_line(mtmp, WATCHMAN_LINE_HEY_STOP_PICKING_THAT_LOCK);
                     context.global_minimum_volume = 0.0f;
-                    mon_yells(mtmp, "Hey, stop picking that lock!", "yell", "angrily", FALSE);
+                    mon_yells(mtmp, "Hey, stop picking that lock!", "yell", "angrily", FALSE, TRUE);
                     levl[x][y].looted |= D_WARNED;
                 }
                 stop_occupation();
@@ -644,7 +649,7 @@ boolean fleemsg;
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s flees from the painful light of %s.",
                           Monnam(mtmp), bare_artifactname(uwep));
                 else
-                    verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Bright light!");
+                    verbalize_angry1("Bright light!");
             } else
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns to flee.", Monnam(mtmp));
         }
@@ -924,7 +929,7 @@ register struct monst *mtmp;
         else
         {
             play_sfx_sound(SFX_GENERAL_UNAFFECTED);
-            You("are unaffected.");
+            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "are unaffected.");
         }
 
         for (m2 = fmon; m2; m2 = nmon) 
@@ -1375,7 +1380,7 @@ register int after;
     if (ptr == &mons[PM_MAIL_DAEMON])
     {
         if (!Deaf && canseemon(mtmp))
-            verbalize("I'm late!");
+            verbalize_talk1("I'm late!");
         mongone(mtmp);
         return 2;
     }
@@ -1543,7 +1548,9 @@ register int after;
                              && !index(indigestion, otmp->oclass)
                              && !(otmp->otyp == CORPSE
                                   && touch_petrifies(&mons[otmp->corpsenm]))))
-                        && touch_artifact(otmp, mtmp))
+                        && touch_artifact(otmp, mtmp) 
+                        && mon_wants_to_pick_up_obj(mtmp, otmp)
+                        )
                     {
                         if (can_carry(mtmp, otmp) > 0
                             && (throws_rocks(ptr) || !sobj_at(BOULDER, xx, yy))
@@ -2045,8 +2052,9 @@ register int after;
         }
 
         struct obj* objhere = o_at(mtmp->mx, mtmp->my);
-        if (OBJ_AT(mtmp->mx, mtmp->my) && mon_can_move(mtmp) && !mtmp->issummoned && mon_can_reach_floor(mtmp) && !onnopickup(mtmp->mx, mtmp->my, mtmp)
-            && !(couldsee(mtmp->mx, mtmp->my) && objhere && objhere->was_thrown)) //Do not pick up ammo or other stuff that the player shoots / throws (this checks just the first item, but that's probably good enough)
+        if (OBJ_AT(mtmp->mx, mtmp->my) && mon_wants_to_pick_up_obj(mtmp, objhere))
+            //mon_can_move(mtmp) && !mtmp->issummoned && mon_can_reach_floor(mtmp) && !onnopickup(mtmp->mx, mtmp->my, mtmp)
+            //&& !(couldsee(mtmp->mx, mtmp->my) && objhere && objhere->was_thrown)) //Do not pick up ammo or other stuff that the player shoots / throws (this checks just the first item, but that's probably good enough)
         {
             /* recompute the likes tests, in case we polymorphed
              * or if the "likegold" case got taken above */

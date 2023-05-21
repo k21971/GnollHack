@@ -5691,9 +5691,10 @@ struct trap* ttmp;
     if (genotyp > STRANGE_OBJECT)
         cnv_trap_obj(genotyp, 1, ttmp, FALSE);
     else
+    {
         deltrap(ttmp);
-
-    newsym(u.ux + u.dx, u.uy + u.dy);
+        newsym(u.ux + u.dx, u.uy + u.dy);
+    }
 
     return 1;
 }
@@ -5717,6 +5718,7 @@ disarm_landmine(ttmp) /* Helge Hafting */
 struct trap *ttmp;
 {
     int fails = try_disarm(ttmp, FALSE);
+    boolean madebyu = ttmp->madeby_u;
 
     if (fails < 2)
     {
@@ -5730,7 +5732,7 @@ struct trap *ttmp;
     cnv_trap_obj(LAND_MINE, 1, ttmp, FALSE);
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, ttmp->madeby_u ? 0 : 14);
+    use_skill(P_DISARM_TRAP, madebyu ? 0 : 14);
 
     return 1;
 }
@@ -5747,6 +5749,7 @@ disarm_squeaky_board(ttmp)
 struct trap *ttmp;
 {
     int fails;
+    boolean madebyu = ttmp->madeby_u;
 
 #if 0
     struct obj* obj;
@@ -5786,7 +5789,7 @@ struct trap *ttmp;
     newsym(u.ux + u.dx, u.uy + u.dy);
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, ttmp->madeby_u ? 0 : 10);
+    use_skill(P_DISARM_TRAP, madebyu ? 0 : 10);
 
     more_experienced(1, 0); // 5);
     newexplevel();
@@ -5800,6 +5803,7 @@ struct trap *ttmp;
 int otyp;
 {
     int fails = try_disarm(ttmp, FALSE);
+    boolean madebyu = ttmp->madeby_u;
 
     if (fails < 2)
     {
@@ -5817,10 +5821,13 @@ int otyp;
     if (getitem)
         cnv_trap_obj(otyp, 50 - rnl(50), ttmp, FALSE);
     else
+    {
         deltrap(ttmp);
+        newsym(u.ux + u.dx, u.uy + u.dy);
+    }
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, ttmp->madeby_u ? 0 : 10);
+    use_skill(P_DISARM_TRAP, madebyu ? 0 : 10);
 
     return 1;
 }
@@ -5877,7 +5884,7 @@ struct trap *ttmp;
     if (!mtmp->mtrapped)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s isn't trapped.", Monnam(mtmp));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s isn't trapped.", Monnam(mtmp));
         return 0;
     }
     /* Do you have the necessary capacity to lift anything? */
@@ -5993,7 +6000,7 @@ boolean force;
     if (!isok(x, y)) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline_The("perils lurking there are beyond your grasp.");
+        pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "perils lurking there are beyond your grasp.");
         return 0;
     }
 
@@ -6889,7 +6896,7 @@ boolean disarm;
             {
                 play_sfx_sound(SFX_GENERAL_UNAFFECTED);
                 u_shieldeff();
-                You("don't seem to be affected.");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "don't seem to be affected.");
                 dmg = 0;
             }
             else
@@ -6932,7 +6939,7 @@ boolean disarm;
             else
             {
                 play_sfx_sound(SFX_GENERAL_UNAFFECTED);
-                You("momentarily stiffen.");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "momentarily stiffen.");
             }
             special_effect_wait_until_end(0);
             break;

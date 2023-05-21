@@ -455,7 +455,7 @@ prompt_for_player_selection(void)
                         else
                             Strcpy(rolenamebuf, roles[i].name.m);
                     }
-                    add_menu(win, NO_GLYPH, &any, thisch, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, thisch, 0, ATR_NONE, NO_COLOR,
                              an(rolenamebuf), MENU_UNSELECTED);
                     lastch = thisch;
                 }
@@ -464,10 +464,10 @@ prompt_for_player_selection(void)
                                   flags.initalign, PICK_RANDOM) + 1;
             if (any.a_int == 0) /* must be non-zero */
                 any.a_int = randrole(FALSE) + 1;
-            add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+            add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                      MENU_UNSELECTED);
             any.a_int = i + 1; /* must be non-zero */
-            add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+            add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                      MENU_UNSELECTED);
             Sprintf(pbuf, "Pick a role for your %s", plbuf);
             end_menu(win, pbuf);
@@ -540,17 +540,17 @@ prompt_for_player_selection(void)
                     {
                         any.a_int = i + 1; /* must be non-zero */
                         add_menu(win, NO_GLYPH, &any, races[i].noun[0], 0,
-                                 ATR_NONE, races[i].noun, MENU_UNSELECTED);
+                                 ATR_NONE, NO_COLOR, races[i].noun, MENU_UNSELECTED);
                     }
 
                 any.a_int = pick_race(flags.initrole, flags.initgend,
                                       flags.initalign, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randrace(flags.initrole) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                          MENU_UNSELECTED);
                 any.a_int = i + 1; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                          MENU_UNSELECTED);
                 Sprintf(pbuf, "Pick the race of your %s", plbuf);
                 end_menu(win, pbuf);
@@ -627,17 +627,17 @@ prompt_for_player_selection(void)
                     {
                         any.a_int = i + 1;
                         add_menu(win, NO_GLYPH, &any, genders[i].adj[0], 0,
-                                 ATR_NONE, genders[i].adj, MENU_UNSELECTED);
+                                 ATR_NONE, NO_COLOR, genders[i].adj, MENU_UNSELECTED);
                     }
 
                 any.a_int = pick_gend(flags.initrole, flags.initrace,
                                       flags.initalign, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randgend(flags.initrole, flags.initrace) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                          MENU_UNSELECTED);
                 any.a_int = i + 1; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                          MENU_UNSELECTED);
                 Sprintf(pbuf, "Pick the gender of your %s", plbuf);
                 end_menu(win, pbuf);
@@ -713,17 +713,17 @@ prompt_for_player_selection(void)
                     {
                         any.a_int = i + 1;
                         add_menu(win, NO_GLYPH, &any, aligns[i].adj[0], 0,
-                                 ATR_NONE, aligns[i].adj, MENU_UNSELECTED);
+                                 ATR_NONE, NO_COLOR, aligns[i].adj, MENU_UNSELECTED);
                     }
 
                 any.a_int = pick_align(flags.initrole, flags.initrace,
                                        flags.initgend, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randalign(flags.initrole, flags.initrace) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                          MENU_UNSELECTED);
                 any.a_int = i + 1; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                          MENU_UNSELECTED);
                 Sprintf(pbuf, "Pick the alignment of your %s", plbuf);
                 end_menu(win, pbuf);
@@ -749,15 +749,24 @@ void
 dll_askname(void)
 {
     dll_logDebug("dll_askname()\n");
-    char* askedname = dll_callbacks.callback_askname("", "");
-    if (!askedname)
+    char utf8buf[PL_NSIZ * 4 + UTF8BUFSZ] = "";
+    int res = dll_callbacks.callback_askname("", "", utf8buf);
+    if (!res)
     {
         dll_bail("bye-bye");
         /* not reached */
     }
     else
     {
-        strncpy(plname, askedname, PL_NSIZ - 1);
+        char ansbuf[PL_NSIZ + BUFSZ] = "";
+        copyUTF8toCP437(ansbuf, sizeof(ansbuf), utf8buf, sizeof(utf8buf));
+        ansbuf[sizeof(ansbuf) - 1] = 0;
+        int i, len = (int)strlen(ansbuf);
+        for (i = 0; i < len; i++)
+            if (ansbuf[i] > 127 || ansbuf[i] < 0)
+                ansbuf[i] = '_';
+
+        strncpy(plname, ansbuf, PL_NSIZ - 1);
         plname[PL_NSIZ - 1] = '\0';
     }
 }
@@ -1182,34 +1191,33 @@ identifier
                    menu is displayed, set preselected to TRUE.
 */
 void
-dll_add_extended_menu(winid wid, int glyph, const ANY_P *identifier, struct extended_menu_info info,
-               CHAR_P accelerator, CHAR_P group_accel, int attr,
-               const char *str, BOOLEAN_P presel)
+dll_add_extended_menu(winid wid, int glyph, const ANY_P *identifier,
+               CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
+               const char *str, BOOLEAN_P presel, struct extended_menu_info info)
 {
     dll_logDebug("dll_add_menu(%d, %d, %p, %c, %c, %d, %s, %d)\n", wid, glyph,
              identifier, (char) accelerator, (char) group_accel, attr, str,
              presel);
      
-    int color = CLR_WHITE;
 #ifdef TEXTCOLOR
     get_menu_coloring(str, &color, &attr);
 #endif
 
     struct objclassdata ocdata = get_objclassdata(info.object);
-    dll_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr,
-        str, presel, color, info.object ? info.object->quan : 0, info.object ? info.object->o_id : 0, 
+    dll_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color,
+        str, presel, info.object ? info.object->quan : 0, info.object ? info.object->o_id : 0, 
         info.monster ? info.monster->m_id : 0, info.heading_for_group_accelerator, info.special_mark, info.menu_flags, 1, info.style, 
         info.object, &ocdata);
 }
 
 void
 dll_add_menu(winid wid, int glyph, const ANY_P* identifier,
-    CHAR_P accelerator, CHAR_P group_accel, int attr,
+    CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
     const char* str, BOOLEAN_P presel)
 {
-    dll_add_extended_menu(wid, glyph, identifier, nilextendedmenuinfo,
-        accelerator, group_accel, attr,
-        str, presel);
+    dll_add_extended_menu(wid, glyph, identifier,
+        accelerator, group_accel, attr, color,
+        str, presel, zeroextendedmenuinfo);
 }
 
 /*
@@ -1780,10 +1788,11 @@ void
 dll_getlin_ex(int style, int attr, int color, const char *question, char *input, const char* placeholder, const char* linesuffix, const char* introline)
 {
     dll_logDebug("dll_getlin(%s, %p)\n", question, input);
-    char* res = dll_callbacks.callback_getlin_ex(style, attr, color, question, placeholder, linesuffix, introline);
+    char utf8buf[UTF8BUFSZ] = "";
+    int res = dll_callbacks.callback_getlin_ex(style, attr, color, question, placeholder, linesuffix, introline, utf8buf);
     if (res && input)
     {
-        strncpy(input, res, BUFSZ - 1);
+        copyUTF8toCP437(input, BUFSZ, utf8buf, sizeof(utf8buf));
         input[BUFSZ - 1] = '\0';
     }
 
@@ -2041,7 +2050,6 @@ dll_outrip(winid wid, int how, time_t when)
     long year;
 
     dll_logDebug("dll_outrip(%d, %d, %ld)\n", wid, how, (long) when);
-    //dll_callbacks.callback_outrip_begin(wid); //Begin
 
     /* Put name on stone */
     Sprintf(buf, "%s", plname);
@@ -2063,8 +2071,6 @@ dll_outrip(winid wid, int how, time_t when)
     year = yyyymmdd(when) / 10000L;
     Sprintf(buf, "%4ld", year);
     putstr(wid, 0, buf);
-
-    //dll_callbacks.callback_outrip_end(wid);  //End
 }
 
 /* handle options updates here */

@@ -958,7 +958,7 @@ int mode;
                 if (mode == DO_MOVE && iflags.mention_walls)
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    You("cannot pass through the bars.");
+                    You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot pass through the bars.");
                 }
                 return FALSE;
             }
@@ -1070,7 +1070,7 @@ int mode;
                         {
                             if (u.usteed) 
                             {
-                                You_cant("lead %s through that closed door.",
+                                You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "lead %s through that closed door.",
                                          y_monnam(u.usteed));
                             }
                             else
@@ -1079,7 +1079,7 @@ int mode;
                                 if (iflags.using_gui_sounds)
                                     delay_output_milliseconds(2 * ANIMATION_FRAME_INTERVAL);
                                 play_player_ouch_sound(MONSTER_OUCH_SOUND_OUCH);
-                                pline("Ouch!  You bump into a door.");
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "Ouch!  You bump into a door.");
                                 exercise(A_DEX, FALSE);
                             }
                         } 
@@ -1125,21 +1125,21 @@ int mode;
             if (mode == DO_MOVE)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("cannot pass that way.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot pass that way.");
             }
             return FALSE;
         case 2:
             if (mode == DO_MOVE)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                You("are carrying too much to get through.");
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "are carrying too much to get through.");
             }
             return FALSE;
         case 1:
             if (mode == DO_MOVE)
             {
                 play_sfx_sound(SFX_GENERAL_CANNOT);
-                Your("body is too large to fit through.");
+                Your_ex(ATR_NONE, CLR_MSG_FAIL, "body is too large to fit through.");
             }
             return FALSE;
         default:
@@ -1152,7 +1152,7 @@ int mode;
         if (mode == DO_MOVE)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("%s is in your way.", Monnam(m_at(ux, y)));
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is in your way.", Monnam(m_at(ux, y)));
         }
         return FALSE;
     }
@@ -3104,12 +3104,12 @@ register boolean newlev;
                 if (!is_peaceful(oracle))
                 {
                     play_monster_special_dialogue_line(oracle, ORACLE_LINE_YOURE_IN_DELPHI_ADVENTURER);
-                    verbalize("You're in Delphi, %s.", iflags.using_gui_sounds ? "adventurer" : plname);
+                    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "You're in Delphi, %s.", iflags.using_gui_sounds ? "adventurer" : plname);
                 }
                 else
                 {
                     play_monster_special_dialogue_line(oracle, ORACLE_LINE_HELLO_ADVENTURER_WELCOME_TO_DELPHI);
-                    verbalize("%s, %s, welcome to Delphi!",
+                    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "%s, %s, welcome to Delphi!",
                         iflags.using_gui_sounds ? "Hello" : Hello((struct monst*)0), iflags.using_gui_sounds ? "adventurer" : plname);
                 }
             } else
@@ -3265,58 +3265,58 @@ pickup_checks()
         if (IS_THRONE(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("It must weigh%s a ton!", lev->looted ? " almost" : "");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "It must weigh%s a ton!", lev->looted ? " almost" : "");
         }
         else if (IS_SINK(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline_The("plumbing connects it to the floor.");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "plumbing connects it to the floor.");
         }
         else if (IS_GRAVE(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("don't need a gravestone.  Yet.");
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "don't need a gravestone.  Yet.");
         }
         else if (IS_FOUNTAIN(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            You("could drink the %s...", hliquid("water"));
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "could drink the %s...", hliquid("water"));
         }
         else if (IS_DOOR(lev->typ) && (lev->doormask & D_ISOPEN))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("It won't come off the hinges.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "It won't come off the hinges.");
         }
         else if (IS_ALTAR(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("Moving the altar would be a very bad idea.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Moving the altar would be a very bad idea.");
         }
         else if (IS_ANVIL(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("The anvil is bolted down to the floor.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "The anvil is bolted down to the floor.");
         }
         else if (IS_BRAZIER(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("The brazier is bolted down to the floor.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "The brazier is bolted down to the floor.");
         }
         else if (IS_SIGNPOST(lev->typ))
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("The signpost is bolted down to the floor.");
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "The signpost is bolted down to the floor.");
         }
         else if (lev->typ == STAIRS)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline_The("stairs are solidly fixed to the %s.",
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "stairs are solidly fixed to the %s.",
                 surface(u.ux, u.uy));
         }
         else
         {
             play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
-            There("is nothing here to pick up.");
+            There_ex(ATR_NONE, CLR_MSG_FAIL, "is nothing here to pick up.");
         }
         return 0;
     }
@@ -3941,7 +3941,7 @@ struct extended_menu_info
 obj_to_extended_menu_info(otmp)
 struct obj* otmp;
 {
-    struct extended_menu_info info = nilextendedmenuinfo;
+    struct extended_menu_info info = zeroextendedmenuinfo;
     info.object = otmp;
 
     return info;
@@ -3950,7 +3950,7 @@ struct obj* otmp;
 struct extended_menu_info
 menu_heading_info()
 {
-    struct extended_menu_info info = nilextendedmenuinfo;
+    struct extended_menu_info info = zeroextendedmenuinfo;
     info.menu_flags = MENU_FLAGS_IS_HEADING;
 
     return info;
@@ -3960,7 +3960,7 @@ struct extended_menu_info
 menu_group_heading_info(groupaccel)
 char groupaccel;
 {
-    struct extended_menu_info info = nilextendedmenuinfo;
+    struct extended_menu_info info = zeroextendedmenuinfo;
     info.menu_flags = MENU_FLAGS_IS_HEADING | MENU_FLAGS_IS_GROUP_HEADING;
     info.heading_for_group_accelerator = groupaccel;
 
@@ -3968,12 +3968,10 @@ char groupaccel;
 }
 
 struct extended_menu_info
-menu_special_mark_info(special_mark, color)
+menu_special_mark_info(special_mark)
 char special_mark;
-int color;
 {
-    struct extended_menu_info info = nilextendedmenuinfo;
-    info.color = color;
+    struct extended_menu_info info = zeroextendedmenuinfo;
     info.special_mark = special_mark;
 
     return info;

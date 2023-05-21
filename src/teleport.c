@@ -878,7 +878,7 @@ dotelecmd()
         for (i = 0; i < SIZE(tports); ++i)
         {
             any.a_int = (int) tports[i].menulet;
-            add_menu(win, NO_GLYPH, &any, (char) any.a_int, 0, ATR_NONE,
+            add_menu(win, NO_GLYPH, &any, (char) any.a_int, 0, ATR_NONE, NO_COLOR,
                      tports[i].menudesc,
                      (tports[i].menulet == 'w') ? MENU_SELECTED
                                                 : MENU_UNSELECTED);
@@ -2141,7 +2141,7 @@ boolean give_feedback;
         if (give_feedback)
         {
             play_sfx_sound_at_location(SFX_GENERAL_RESISTS, mtmp->mx, mtmp->my);
-            pline("%s resists your magic!", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s resists your magic!", Monnam(mtmp));
         }
         return FALSE;
     }

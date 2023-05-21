@@ -384,7 +384,7 @@ doread()
                && scroll->oclass != SPBOOK_CLASS) 
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline(silly_thing_to, "read");
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, silly_thing_to, "read");
         return 0;
     }
     else if (Blind /*&& (scroll->otyp != SPE_BOOK_OF_THE_DEAD)*/) 
@@ -516,7 +516,7 @@ struct obj* otmp;
     else
     {
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s, an inscription appears on %s in fiery letters:", revealed ? "Again" : "Suddenly", yname(otmp));
-        verbalize_ex(ATR_NONE, CLR_MSG_ATTENTION, "Ash na... dur...");
+        verbalize_ex(ATR_NONE, CLR_ORANGE, "Ash na... dur...");
         if (otmp->speflags & SPEFLAGS_INSCRIPTION_REVEALED)
         {
             You("still couldn't make much sense of it.");
@@ -552,7 +552,7 @@ boolean verbose, dopopup;
         {
             if(obj->charges <= 0)
                 play_sfx_sound(SFX_GENERAL_OUT_OF_CHARGES);
-            pline_ex1_popup(ATR_NONE, NO_COLOR, nothing_happens, "No Effect", dopopup);
+            pline_ex1_popup(ATR_NONE, CLR_MSG_FAIL, nothing_happens, "No Effect", dopopup);
         }
     } 
     else 
@@ -1534,7 +1534,7 @@ struct monst* origmonst;
         else if (resists_charm(mtmp))
         {
             play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mtmp->mx, mtmp->my);
-            pline("%s is unaffected.", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is unaffected.", Monnam(mtmp));
         }
         else if (!check_ability_resistance_success(mtmp, A_WIS, adj_save))
         {
@@ -1552,7 +1552,7 @@ struct monst* origmonst;
             if (!tamedog(mtmp, (struct obj*) 0, TAMEDOG_NO_FORCED_TAMING, charmed, duration, TRUE, FALSE) || !is_tame(mtmp))
             {
                 play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mtmp->mx, mtmp->my);
-                pline("%s is unaffected!", Monnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is unaffected!", Monnam(mtmp));
             }
             else
             {
@@ -1566,7 +1566,7 @@ struct monst* origmonst;
         {
             play_sfx_sound_at_location(SFX_GENERAL_RESISTS, mtmp->mx, mtmp->my);
             m_shieldeff(mtmp);
-            pline("%s resists!", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s resists!", Monnam(mtmp));
         }
         if ((!was_peaceful && is_peaceful(mtmp)) || (!was_tame && is_tame(mtmp)))
             return 1;
@@ -1615,14 +1615,14 @@ struct monst* origmonst;
             if (!tamedog(mtmp, (struct obj*)0, TAMEDOG_NO_FORCED_TAMING, controlled, duration, TRUE, FALSE) || !is_tame(mtmp))
             {
                 play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mtmp->mx, mtmp->my);
-                pline("%s is unaffected!", Monnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is unaffected!", Monnam(mtmp));
             }
         }
         else
         {
             play_sfx_sound_at_location(SFX_GENERAL_RESISTS, mtmp->mx, mtmp->my);
             m_shieldeff(mtmp);
-            pline("%s resists!", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s resists!", Monnam(mtmp));
         }
         if ((!was_peaceful && is_peaceful(mtmp)) || (!was_tame && is_tame(mtmp)))
             return 1;
@@ -1630,7 +1630,7 @@ struct monst* origmonst;
     else
     {
         play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mtmp->mx, mtmp->my);
-        pline("%s is unaffected!", Monnam(mtmp));
+        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is unaffected!", Monnam(mtmp));
     }
     return 0;
 }
@@ -1870,8 +1870,8 @@ struct monst* targetmonst;
         }
 
         s = scursed ? -1
-            : (otmp->enchantment >= 9)
-            ? (rn2(max(1, otmp->enchantment)) == 0)
+            : (otmp->enchantment >= (3 * max_ench) / 2)
+            ? (!rn2(max(2, otmp->enchantment / (sblessed ? 2 : 1))))
             : sblessed ? rnd(2) : 1;
 
         if (s >= 0 && is_dragon_scales(otmp)) 
@@ -1900,7 +1900,7 @@ struct monst* targetmonst;
             (Blind || same_color)
             ? "" : hcolor(scursed ? NH_BLACK : NH_SILVER),
             (s * s > 1) ? "while" : "moment");
-        pline_ex1_popup(ATR_NONE, scursed ? CLR_MSG_NEGATIVE : CLR_MSG_POSITIVE, effbuf, 
+        pline_ex1_popup(ATR_NONE, scursed ? CLR_MSG_NEGATIVE : s == 0 ? CLR_MSG_WARNING : CLR_MSG_POSITIVE, effbuf,
             known || otmp->oclass == SPBOOK_CLASS ? "Enchant Armor" : Blind ? "Magical Vibration" : "Magical Glow", 
             is_serviced_spell);
 
@@ -2283,8 +2283,8 @@ struct monst* targetmonst;
         }
 
         boolean isweptwohanded = (otmp && bimanual(otmp));
-        int special_threshold = isweptwohanded ? 24 : 12;
-        int special_chance = max(1, otmp->enchantment / (isweptwohanded ? 2 : 1));
+        int special_threshold = (3 * get_obj_max_enchantment(otmp)) / 2;
+        int special_chance = max(2, otmp->enchantment / ((isweptwohanded ? 2 : 1) * (sblessed ? 2 : 1)));
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
         special_effect_wait_until_action(0);
 
@@ -2343,7 +2343,7 @@ struct monst* targetmonst;
                     if (!get_valid_targeted_position(cc.x, cc.y, otyp))
                     {
                         play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
-                        pline("Not a valid target position.");
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Not a valid target position.");
                         if (trycnt > 4)
                         {
                             cc.x = u.ux;
@@ -3179,7 +3179,7 @@ struct monst* targetmonst;
             if (!get_valid_targeted_position(cc.x, cc.y, otyp))
             {
                 play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
-                pline("Not a valid target position.");
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "Not a valid target position.");
                 if (trycnt > 4)
                 {
                     cc.x = u.ux;
@@ -3225,7 +3225,7 @@ struct monst* targetmonst;
             if (!get_valid_targeted_position(cc.x, cc.y, otyp))
             {
                 play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
-                pline("Not a valid target position.");
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "Not a valid target position.");
                 if (trycnt > 4)
                 {
                     cc.x = u.ux;
@@ -3666,7 +3666,7 @@ do_class_genocide()
                     {
                         *cbuf = highc(*cbuf);
                         any.a_int = k + 1;
-                        add_menu(tmpwin, NO_GLYPH, &any, def_monsyms[k].sym, 0, ATR_NONE, cbuf, MENU_UNSELECTED);
+                        add_menu(tmpwin, NO_GLYPH, &any, def_monsyms[k].sym, 0, ATR_NONE, NO_COLOR, cbuf, MENU_UNSELECTED);
                     }
                 }
                 end_menu(tmpwin, "What class of monsters do you wish to genocide?");
@@ -4288,7 +4288,7 @@ struct _create_particular_data *d;
                 genderflag = MM_FEMALE;
         }
 
-        mtmp = makemon2(whichpm, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | genderflag, MM2_MAYBE_ALLOW_EXTINCT);
+        mtmp = makemon2(whichpm, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_MONSTER_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | genderflag, MM2_MAYBE_ALLOW_EXTINCT | MM2_RANDOMIZE_SUBTYPE);
 
         if (!mtmp)
         {
@@ -4565,7 +4565,7 @@ boolean confused; /* Is caster confused */
            already been given above if reading a scroll) */
         play_sfx_sound(SFX_GENERAL_CANNOT);
         Sprintf(effbuf, "%s %s not carrying anything to be %s.", isyou ? "You" : Monnam(mtmp), isyou ? "are" : "is", (otyp == SPE_BLESS ? "blessed" : "cursed"));
-        pline_ex1_popup(ATR_NONE, NO_COLOR, effbuf, "", is_serviced_spell);
+        pline_ex1_popup(ATR_NONE, CLR_MSG_FAIL, effbuf, "", is_serviced_spell);
         return 0;
     }
     return 1;

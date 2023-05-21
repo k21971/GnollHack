@@ -13,13 +13,13 @@
 #define OBJCLASS_H
 
 enum multigen_types {
-    MULTIGEN_SINGLE        = 0,
+    MULTIGEN_SINGLE     = 0,
     MULTIGEN_1D2        = 1,
     MULTIGEN_1D3        = 2,
     MULTIGEN_1D4        = 3,
     MULTIGEN_1D6        = 4,
     MULTIGEN_1D8        = 5,
-    MULTIGEN_1D10        = 6,
+    MULTIGEN_1D10       = 6,
     MULTIGEN_2D6        = 7,
     MULTIGEN_3D6        = 8,
     MULTIGEN_4D6        = 9,
@@ -324,7 +324,7 @@ enum enchantment_init_types {
 };
 
 enum material_init_types {
-    MATINIT_NORMAL = 0,
+    MATINIT_BASE_MATERIAL = 0,
     MATINIT_MAYBE_SILVER,
     MATINIT_MAYBE_SILVER_OR_BONE,
     MATINIT_LONG_SWORD,
@@ -899,7 +899,7 @@ struct objclass {
 #define O1_CORROSION_RESISTANT               0x00000080UL
 #define O1_ROT_RESISTANT                     0x00000100UL
 
-#define O1_ENCHANTMENT_AFFECTS_MC            0x00000200UL            /* +X of the item influences also its MC */
+#define O1_ENCHANTMENT_DOES_NOT_AFFECT_MC    0x00000200UL            /* +X of the item does not affect its MC */
 #define O1_EROSION_DOES_NOT_AFFECT_MC        0x00000400UL            /* erosion level does not affect the item's MC */
 #define O1_ENCHANTMENT_DOES_NOT_AFFECT_AC    0x00000800UL            /* +X of the item does not affect its AC bonus */
 #define O1_EROSION_DOES_NOT_AFFECT_AC        0x00001000UL            /* erosion level does not affect the item's MC */

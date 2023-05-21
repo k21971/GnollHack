@@ -118,14 +118,15 @@ void lib_player_selection(void)
 
 void lib_askname(void)
 {
-    char* name = 0;
     char mdbuf[BUFSZ] = "";
     char modenamebuf[BUFSZ] = "";
     char modedescbuf[BUFSZ] = "";
+    char utf8buf[PL_NSIZ * 4 + UTF8BUFSZ] = "";
     Sprintf(mdbuf, "%s mode", get_game_mode_text(FALSE));
     strcpy_capitalized_for_title(modenamebuf, mdbuf);
-    strcpy(modedescbuf, get_game_mode_description());
+    Strcpy(modedescbuf, get_game_mode_description());
     *modedescbuf = highc(*modedescbuf);
+    int res = 0;
 
 #ifdef SELECTSAVED
     if (iflags.wc2_selectsaved && !iflags.renameinprogress)
@@ -145,10 +146,19 @@ void lib_askname(void)
                 do
                 {
                     repeataskname = FALSE;
-                    name = lib_callbacks.callback_askname(modenamebuf, modedescbuf);
-                    if (name && *name != 0)
+                    *utf8buf = 0;
+                    res = lib_callbacks.callback_askname(modenamebuf, modedescbuf, utf8buf);
+                    if (res)
                     {
-                        strncpy(plname, name, PL_NSIZ - 1);
+                        char ansbuf[PL_NSIZ + BUFSZ] = "";
+                        copyUTF8toCP437(ansbuf, sizeof(ansbuf), utf8buf, sizeof(utf8buf));
+                        ansbuf[sizeof(ansbuf) - 1] = 0;
+                        int i, len = (int)strlen(ansbuf);
+                        for (i = 0; i < len; i++)
+                            if (ansbuf[i] > 127 || ansbuf[i] < 0)
+                                ansbuf[i] = '_';
+
+                        strncpy(plname, ansbuf, PL_NSIZ - 1);
                         plname[PL_NSIZ - 1] = '\0';
                         if (check_saved_game_exists())
                         {
@@ -168,7 +178,7 @@ void lib_askname(void)
                             }
                             else
                             {
-                                name = 0;
+                                *utf8buf = 0;
                                 *plname = 0;
                                 if (ans == 'n')
                                     repeataskname = TRUE;
@@ -189,17 +199,26 @@ void lib_askname(void)
             case 1:
                 return; /* plname[] has been set */
             }
-        } while (name == 0 || *name == 0);
+        } while (*utf8buf == 0);
         return;
     }
 #endif /* SELECTSAVED */
 
-    name = lib_callbacks.callback_askname(modenamebuf, modedescbuf);
-    if (name == 0 || *name == 0)
+    *utf8buf = 0;
+    res = lib_callbacks.callback_askname(modenamebuf, modedescbuf, utf8buf);
+    if (!res)
         lib_bail((char*)0); /* quit */
     else
     {
-        strncpy(plname, name, PL_NSIZ - 1);
+        char ansbuf[PL_NSIZ + BUFSZ] = "";
+        copyUTF8toCP437(ansbuf, sizeof(ansbuf), utf8buf, sizeof(utf8buf));
+        ansbuf[sizeof(ansbuf) - 1] = 0;
+        int i, len = (int)strlen(ansbuf);
+        for (i = 0; i < len; i++)
+            if (ansbuf[i] > 127 || ansbuf[i] < 0)
+                ansbuf[i] = '_';
+
+        strncpy(plname, ansbuf, PL_NSIZ - 1);
         plname[PL_NSIZ - 1] = '\0';
     }
 }
@@ -257,17 +276,17 @@ void lib_curs(winid wid, int x, int y)
 /* text is supposed to be in CP437; if text is UTF8 encoding, call callback_putstr_ex directly */
 void lib_putstr_ex(winid wid, int attr, const char* text, int append, int color)
 {
-    char buf[BUFSIZ];
+    char buf[UTF8BUFSZ] = "";
     if (text)
-        write_text2buf_utf8(buf, BUFSIZ, text);
+        write_text2buf_utf8(buf, UTF8BUFSZ, text);
     lib_callbacks.callback_putstr_ex(wid, attr, text ? buf : 0, append, color);
 }
 
 void lib_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int append)
 {
-    char buf[BUFSIZ];
+    char buf[UTF8BUFSZ];
     if (text)
-        write_text2buf_utf8(buf, BUFSIZ, text);
+        write_text2buf_utf8(buf, UTF8BUFSZ, text);
     //lib_callbacks.callback_putstr_ex(wid, attrs ? attrs[0] : attr, text ? buf : 0, append, colors ? colors[0] : color);
     lib_callbacks.callback_putstr_ex2(wid, text ? buf : 0, attrs, colors, attr, color, append);
 }
@@ -319,34 +338,32 @@ void lib_start_menu_ex(winid wid, int style)
 }
 
 void lib_add_menu(winid wid, int glyph, const ANY_P* identifier,
-    CHAR_P accelerator, CHAR_P group_accel, int attr,
+    CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
     const char* str, BOOLEAN_P presel)
 {
     if (!str)
         return;
 
-    char buf[BUFSIZ];
+    char buf[UTF8BUFSZ];
     if (str)
-        write_text2buf_utf8(buf, BUFSIZ, str);
-    int color = CLR_WHITE;
+        write_text2buf_utf8(buf, UTF8BUFSZ, str);
 #ifdef TEXTCOLOR
     get_menu_coloring(str, &color, &attr);
 #endif
-    lib_callbacks.callback_add_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, str ? buf : 0, presel, color);
+    lib_callbacks.callback_add_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color, str ? buf : 0, presel);
 }
 
-void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier, struct extended_menu_info info,
-    CHAR_P accelerator, CHAR_P group_accel, int attr,
-    const char* str, BOOLEAN_P presel)
+void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier,
+    CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
+    const char* str, BOOLEAN_P presel, struct extended_menu_info info)
 {
     if (!str)
         return;
 
-    char buf[BUFSIZ];
+    char buf[UTF8BUFSZ];
     if(str)
-        write_text2buf_utf8(buf, BUFSIZ, str);
+        write_text2buf_utf8(buf, UTF8BUFSZ, str);
 
-    int color = info.color;
 #ifdef TEXTCOLOR
     get_menu_coloring(str, &color, &attr);
 #endif
@@ -354,7 +371,7 @@ void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier, struct
         set_obj_glyph(info.object);
 
     struct objclassdata ocdata = get_objclassdata(info.object);
-    lib_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, str ? buf : 0, presel, color, (info.object && !(info.menu_flags & MENU_FLAGS_COUNT_DISALLOWED) ? (int)info.object->quan : 0),
+    lib_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color, str ? buf : 0, presel, (info.object && !(info.menu_flags & MENU_FLAGS_COUNT_DISALLOWED) ? (int)info.object->quan : 0),
         (unsigned long long)(info.object ? info.object->o_id : 0), (unsigned long long)(info.monster ? info.monster->m_id : 0), info.heading_for_group_accelerator, info.special_mark, info.menu_flags,
         (info.object ? MENU_DATAFLAGS_HAS_OBJECT_DATA : 0) | (info.monster ? MENU_DATAFLAGS_HAS_MONSTER_DATA : 0) | (Hallucination ? MENU_DATAFLAGS_HALLUCINATED : 0) | (info.monster && info.monster->female ? MENU_DATAFLAGS_FEMALE : 0),
         info.style, info.object, &ocdata);
@@ -362,12 +379,12 @@ void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier, struct
 
 void lib_end_menu_ex(winid wid, const char* prompt, const char* subtitle)
 {
-    char buf[BUFSIZ];
-    char buf2[BUFSIZ];
+    char buf[UTF8BUFSZ];
+    char buf2[UTF8BUFSZ];
     if (prompt)
-        write_text2buf_utf8(buf, BUFSIZ, prompt);
+        write_text2buf_utf8(buf, UTF8BUFSZ, prompt);
     if (subtitle)
-        write_text2buf_utf8(buf2, BUFSIZ, subtitle);
+        write_text2buf_utf8(buf2, UTF8BUFSZ, subtitle);
 
     lib_callbacks.callback_end_menu_ex(wid, prompt ? buf : 0, subtitle ? buf2 : 0);
 }
@@ -578,17 +595,17 @@ void lib_issue_gui_command(int initid)
 
 void lib_raw_print(const char* str)
 {
-    char buf[BUFSIZ];
+    char buf[UTF8BUFSZ];
     if(str)
-        write_text2buf_utf8(buf, BUFSIZ, str);
+        write_text2buf_utf8(buf, UTF8BUFSZ, str);
     lib_callbacks.callback_raw_print(str ? buf : 0);
 }
 
 void lib_raw_print_bold(const char* str)
 {
-    char buf[BUFSIZ];
+    char buf[UTF8BUFSZ];
     if(str)
-        write_text2buf_utf8(buf, BUFSIZ, str);
+        write_text2buf_utf8(buf, UTF8BUFSZ, str);
     lib_callbacks.callback_raw_print_bold(str ? buf : 0);
 }
 
@@ -634,6 +651,8 @@ void lib_getlin_ex(int style, int attr, int color, const char* question, char* i
     char dvbuf[UTF8BUFSZ] = "";
     char ibuf[UTF8IBUFSZ] = "";
 
+    char utf8buf[UTF8BUFSZ] = "";
+
     if (question)
         write_text2buf_utf8(buf, UTF8QBUFSZ, question);
     if (placeholder)
@@ -643,13 +662,11 @@ void lib_getlin_ex(int style, int attr, int color, const char* question, char* i
     if (introline)
         write_text2buf_utf8(ibuf, UTF8IBUFSZ, introline);
 
-    char* res = lib_callbacks.callback_getlin_ex(style, attr, color, buf, placeholder ? phbuf : 0, linesuffix ? dvbuf : 0, introline ? ibuf : 0);
+    int res = lib_callbacks.callback_getlin_ex(style, attr, color, buf, placeholder ? phbuf : 0, linesuffix ? dvbuf : 0, introline ? ibuf : 0, utf8buf);
     if (res && input)
     {
-        char msgbuf[UTF8BUFSZ] = "";
-        strncpy(msgbuf, res, UTF8BUFSZ - 1);
-        msgbuf[UTF8BUFSZ - 1] = '\0';
-        convertUTF8toCP437(msgbuf, UTF8BUFSZ);
+        char msgbuf[BUFSZ] = "";
+        copyUTF8toCP437(msgbuf, sizeof(msgbuf), utf8buf, sizeof(utf8buf));
         strncpy(input, msgbuf, BUFSZ - 1);
         input[BUFSZ - 1] = '\0';
     }
@@ -657,15 +674,16 @@ void lib_getlin_ex(int style, int attr, int color, const char* question, char* i
 
 int lib_get_ext_cmd(void)
 {
-    char* res = lib_callbacks.callback_getlin_ex(GETLINE_EXTENDED_COMMAND, ATR_NONE, NO_COLOR, "Type an Extended Command", 0, 0, 0);
+    char utf8buf[UTF8BUFSZ] = "";
+    int res = lib_callbacks.callback_getlin_ex(GETLINE_EXTENDED_COMMAND, ATR_NONE, NO_COLOR, "Type an Extended Command", 0, 0, 0, utf8buf);
     if (!res)
         return -1;
 
-    if(*res == 27 || *res == 0)
+    if(*utf8buf == 27 || *utf8buf == 0)
         return -1;
 
     char buf[BUFSZ];
-    strncpy(buf, res, BUFSZ - 1);
+    copyUTF8toCP437(buf, sizeof(buf), utf8buf, sizeof(utf8buf));
     buf[BUFSZ - 1] = 0;
     mungspaces(buf);
     int extcmd = ext_cmd_from_txt(buf);
@@ -754,11 +772,13 @@ char* lib_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
     static char buf[BUFSIZ * 2] = "";
     static char attrs[BUFSIZ * 2] = "";
     static char colors[BUFSIZ * 2] = "";
-    char* res = lib_callbacks.callback_getmsghistory(attrs, colors, (int)init);
+    char utf8buf[UTF8BUFSZ * 4] = "";
+    int res = lib_callbacks.callback_getmsghistory(utf8buf, attrs, colors, (int)init);
     if (res)
     {
-        strncpy(buf, res, BUFSIZ * 2 - 1);
-        buf[BUFSIZ * 2 - 1] = '\0';
+        copyUTF8toCP437(buf, sizeof(buf), utf8buf, sizeof(utf8buf));
+        buf[sizeof(buf) - 1] = 0; /* Insurance */
+
         if (attrs_ptr)
         {
             *attrs_ptr = attrs;
@@ -773,7 +793,11 @@ char* lib_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
 
 void lib_putmsghistory_ex(const char* msg, const char* attrs, const char* colors, BOOLEAN_P is_restoring)
 {
-    lib_callbacks.callback_putmsghistory(msg, attrs, colors, is_restoring);
+    char buf[UTF8BUFSZ * 4] = "";
+    if (msg)
+        write_text2buf_utf8(buf, sizeof(buf), msg);
+
+    lib_callbacks.callback_putmsghistory(buf, attrs, colors, is_restoring);
 }
 
 
@@ -818,11 +842,14 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
     __lib_status_update(idx, ptr, chg, percent, color, colormasks);
 
     char* txt = (char*)0;
+    char utf8buf[UTF8BUFSZ] = "";
     long condbits = 0L;
     if (ptr)
     {
         if (idx != BL_CONDITION)
+        {
             txt = ptr;
+        }
         else
         {
             long* bits_ptr = (long*)ptr;
@@ -841,7 +868,10 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
         }
     }
 
-    lib_callbacks.callback_status_update(idx, txt, condbits, chg, percent, color, !colormasks ? NULL : condcolors);
+    if (txt)
+        write_text2buf_utf8(utf8buf, sizeof(utf8buf), txt);
+
+    lib_callbacks.callback_status_update(idx, txt ? utf8buf : 0, condbits, chg, percent, color, !colormasks ? NULL : condcolors);
 }
 
 void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
@@ -874,8 +904,9 @@ void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
         *buf = highc(*buf);
         strcat(tempbuf, buf);
     }
-    strncpy(mi_ptr->name, tempbuf, BUFSZ - 1);
-    mi_ptr->name[BUFSZ - 1] = '\0';
+    write_text2buf_utf8(mi_ptr->name, sizeof(mi_ptr->name), tempbuf);
+    //strncpy(mi_ptr->name, tempbuf, BUFSZ - 1);
+    mi_ptr->name[sizeof(mi_ptr->name) - 1] = '\0';
 
     mi_ptr->m_id = mtmp->m_id;
     mi_ptr->mhp = mtmp->mhp;
@@ -1130,11 +1161,11 @@ void lib_set_animation_timer_interval(unsigned int param)
 
 int lib_open_special_view(struct special_view_info info)
 {
-    char buf[BUFSIZ], buf2[BUFSIZ];
+    char buf[UTF8BUFSZ], buf2[UTF8BUFSZ];
     if (info.text)
-        write_text2buf_utf8(buf, BUFSIZ, info.text);
+        write_text2buf_utf8(buf, UTF8BUFSZ, info.text);
     if (info.title)
-        write_text2buf_utf8(buf2, BUFSIZ, info.title);
+        write_text2buf_utf8(buf2, UTF8BUFSZ, info.title);
 
     return lib_callbacks.callback_open_special_view(info.viewtype, info.text ? buf : 0, info.title ? buf2 : 0, info.attr, info.color);
 }
@@ -1309,7 +1340,13 @@ lib_clear_context_menu(VOID_ARGS)
 void
 lib_add_context_menu(int cmd_def_char, int cmd_cur_char, int style, int glyph, const char* cmd_text, const char* target_text, int attr, int color)
 {
-    lib_callbacks.callback_add_context_menu(cmd_def_char, cmd_cur_char, style, glyph, cmd_text, target_text, attr, color);
+    char cmdutf8buf[UTF8BUFSZ] = "";
+    char targetutf8buf[UTF8BUFSZ] = "";
+    if (cmd_text)
+        write_text2buf_utf8(cmdutf8buf, sizeof(cmdutf8buf), cmd_text);
+    if (target_text)
+        write_text2buf_utf8(targetutf8buf, sizeof(targetutf8buf), target_text);
+    lib_callbacks.callback_add_context_menu(cmd_def_char, cmd_cur_char, style, glyph, cmd_text ? cmdutf8buf : 0, target_text ? targetutf8buf : 0, attr, color);
 }
 
 void
@@ -1327,19 +1364,37 @@ lib_toggle_animation_timer(int timertype, int timerid, int state, int x, int y, 
 void
 lib_display_floating_text(int x, int y, const char* text, int style, int attr, int color, unsigned long tflags)
 {
-    lib_callbacks.callback_display_floating_text(x, y, text, style, attr, color, tflags);
+    char utf8buf[UTF8BUFSZ] = "";
+    if (text)
+        write_text2buf_utf8(utf8buf, sizeof(utf8buf), text);
+    lib_callbacks.callback_display_floating_text(x, y, text ? utf8buf : 0, style, attr, color, tflags);
 }
 
 void
 lib_display_screen_text(const char* text, const char* supertext, const char* subtext, int style, int attr, int color, unsigned long tflags)
 {
-    lib_callbacks.callback_display_screen_text(text, supertext, subtext, style, attr, color, tflags);
+    char utf8buf[UTF8BUFSZ] = "";
+    char superutf8buf[UTF8BUFSZ] = "";
+    char subutf8buf[UTF8BUFSZ] = "";
+    if (text)
+        write_text2buf_utf8(utf8buf, sizeof(utf8buf), text);
+    if (supertext)
+        write_text2buf_utf8(superutf8buf, sizeof(superutf8buf), supertext);
+    if (subtext)
+        write_text2buf_utf8(subutf8buf, sizeof(subutf8buf), subtext);
+    lib_callbacks.callback_display_screen_text(text ? utf8buf : 0, supertext ? superutf8buf : 0, subtext ? subutf8buf : 0, style, attr, color, tflags);
 }
 
 void
 lib_display_popup_text(const char* text, const char* title, int style, int attr, int color, int glyph, unsigned long tflags)
 {
-    lib_callbacks.callback_display_popup_text(text, title, style, attr, color, glyph, tflags);
+    char utf8buf[UTF8BUFSZ] = "";
+    char titleutf8buf[UTF8BUFSZ] = "";
+    if (text)
+        write_text2buf_utf8(utf8buf, sizeof(utf8buf), text);
+    if (title)
+        write_text2buf_utf8(titleutf8buf, sizeof(titleutf8buf), title);
+    lib_callbacks.callback_display_popup_text(text ? utf8buf : 0, title ? titleutf8buf : 0, style, attr, color, glyph, tflags);
 }
 
 void

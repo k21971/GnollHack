@@ -604,7 +604,7 @@ int gloc;
     if (gcount < 2) { /* gcount always includes the hero */
         free((genericptr_t) garr);
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("cannot %s %s.",
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot %s %s.",
             iflags.getloc_filter == GFILTER_VIEW ? "see" : "detect",
             gloc_descr[gloc][0]);
         return FALSE;
@@ -630,7 +630,7 @@ int gloc;
                               iflags.getpos_coords);
             Sprintf(fullbuf, "%s%s%s", firstmatch,
                     (*tmpbuf ? " " : ""), tmpbuf);
-            add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, fullbuf,
+            add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, fullbuf,
                      MENU_UNSELECTED);
         }
     }
@@ -1049,7 +1049,7 @@ enum game_cursor_types cursor_style;
                         }     /* row */
                     }         /* pass */
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    pline("Can't find dungeon feature '%c'.", c);
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "Can't find dungeon feature '%c'.", c);
                     msg_given = TRUE;
                     goto nxtc;
                 } 
@@ -1371,7 +1371,7 @@ do_mname()
         else 
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline("This %s creature is called %s and cannot be renamed.",
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "This %s creature is called %s and cannot be renamed.",
                   beautiful(), plname);
             return;
         }
@@ -1417,7 +1417,7 @@ do_mname()
         if (!alreadynamed(mtmp, monnambuf, buf))
         {
             mtmp->u_know_mname = 1;
-            verbalize("I'm %s, not %s.", shkname(mtmp), buf);
+            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "I'm %s, not %s.", shkname(mtmp), buf);
         }
     } 
     else if (mtmp->ispriest || mtmp->isminion || mtmp->isshk || mtmp->issmith || mtmp->isnpc) 
@@ -1672,29 +1672,29 @@ docallcmd()
     if (!getobj_autoselect_obj)
     {
         any.a_char = 'm'; /* group accelerator 'C' */
-        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'C', ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'C', ATR_NONE, NO_COLOR,
             "a monster", MENU_UNSELECTED);
     }
     if (invent) {
         /* we use y and n as accelerators so that we can accept user's
             response keyed to old "name an individual object?" prompt */
         any.a_char = 'i'; /* group accelerator 'y' */
-        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'y', ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'y', ATR_NONE, NO_COLOR,
             "a particular object in inventory", MENU_UNSELECTED);
         any.a_char = 'o'; /* group accelerator 'n' */
-        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'n', ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'n', ATR_NONE, NO_COLOR,
             "the type of an object in inventory", MENU_UNSELECTED);
     }
     if (!getobj_autoselect_obj)
     {
         any.a_char = 'f'; /* group accelerator ',' (or ':' instead?) */
-        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, ',', ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, ',', ATR_NONE, NO_COLOR,
             "the type of an object upon the floor", MENU_UNSELECTED);
         any.a_char = 'd'; /* group accelerator '\' */
-        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, '\\', ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, '\\', ATR_NONE, NO_COLOR,
             "the type of an object on discoveries list", MENU_UNSELECTED);
         any.a_char = 'a'; /* group accelerator 'l' */
-        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'l', ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, abc ? 0 : any.a_char, 'l', ATR_NONE, NO_COLOR,
             "record an annotation for the current level", MENU_UNSELECTED);
         end_menu(win, "What do you want to name?");
     }
@@ -1919,11 +1919,11 @@ namefloorobj()
               unames[rn2_on_display_rng(SIZE(unames))]);
     } else if (!objtyp_is_callable(obj->otyp)) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        pline("%s %s can't be assigned a type name.",
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s %s can't be assigned a type name.",
               use_plural ? "Those" : "That", buf);
     } else if (!obj->dknown) {
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("don't know %s %s well enough to name %s.",
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know %s %s well enough to name %s.",
             use_plural ? "those" : "that", buf, use_plural ? "them" : "it");
     } else {
         docall(obj, (char*)0);

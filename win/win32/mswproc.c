@@ -528,7 +528,7 @@ prompt_for_player_selection(void)
                         } else
                             Strcpy(rolenamebuf, roles[i].name.m);
                     }
-                    add_menu(win, NO_GLYPH, &any, thisch, 0, ATR_NONE,
+                    add_menu(win, NO_GLYPH, &any, thisch, 0, ATR_NONE, NO_COLOR,
                              an(rolenamebuf), MENU_UNSELECTED);
                     lastch = thisch;
                 }
@@ -537,10 +537,10 @@ prompt_for_player_selection(void)
                                   flags.initalign, PICK_RANDOM) + 1;
             if (any.a_int == 0) /* must be non-zero */
                 any.a_int = randrole(FALSE) + 1;
-            add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+            add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                      MENU_UNSELECTED);
             any.a_int = i + 1; /* must be non-zero */
-            add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+            add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                      MENU_UNSELECTED);
             Sprintf(pbuf, "Pick a role for your %s", plbuf);
             end_menu(win, pbuf);
@@ -604,16 +604,16 @@ prompt_for_player_selection(void)
                                 flags.initalign)) {
                         any.a_int = i + 1; /* must be non-zero */
                         add_menu(win, NO_GLYPH, &any, races[i].noun[0], 0,
-                                 ATR_NONE, races[i].noun, MENU_UNSELECTED);
+                                 ATR_NONE, NO_COLOR, races[i].noun, MENU_UNSELECTED);
                     }
                 any.a_int = pick_race(flags.initrole, flags.initgend,
                                       flags.initalign, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randrace(flags.initrole) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                          MENU_UNSELECTED);
                 any.a_int = i + 1; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                          MENU_UNSELECTED);
                 Sprintf(pbuf, "Pick the race of your %s", plbuf);
                 end_menu(win, pbuf);
@@ -678,16 +678,16 @@ prompt_for_player_selection(void)
                                 flags.initalign)) {
                         any.a_int = i + 1;
                         add_menu(win, NO_GLYPH, &any, genders[i].adj[0], 0,
-                                 ATR_NONE, genders[i].adj, MENU_UNSELECTED);
+                                 ATR_NONE, NO_COLOR, genders[i].adj, MENU_UNSELECTED);
                     }
                 any.a_int = pick_gend(flags.initrole, flags.initrace,
                                       flags.initalign, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randgend(flags.initrole, flags.initrace) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                          MENU_UNSELECTED);
                 any.a_int = i + 1; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                          MENU_UNSELECTED);
                 Sprintf(pbuf, "Pick the gender of your %s", plbuf);
                 end_menu(win, pbuf);
@@ -751,16 +751,16 @@ prompt_for_player_selection(void)
                                  flags.initgend, i)) {
                         any.a_int = i + 1;
                         add_menu(win, NO_GLYPH, &any, aligns[i].adj[0], 0,
-                                 ATR_NONE, aligns[i].adj, MENU_UNSELECTED);
+                                 ATR_NONE, NO_COLOR, aligns[i].adj, MENU_UNSELECTED);
                     }
                 any.a_int = pick_align(flags.initrole, flags.initrace,
                                        flags.initgend, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randalign(flags.initrole, flags.initrace) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, "Random",
+                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
                          MENU_UNSELECTED);
                 any.a_int = i + 1; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, "Quit",
+                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
                          MENU_UNSELECTED);
                 Sprintf(pbuf, "Pick the alignment of your %s", plbuf);
                 end_menu(win, pbuf);
@@ -965,15 +965,17 @@ mswin_clear_nhwindow(winid wid)
     if ((wid >= 0) && (wid < MAXWINDOWS)
         && (GetNHApp()->windowlist[wid].win != NULL)) {
         if (GetNHApp()->windowlist[wid].type == NHW_MAP) {
-            if (Is_really_rogue_level(&u.uz))
+            if (context.game_started && Is_really_rogue_level(&u.uz))
+            {
                 if (iflags.wc_map_mode == MAP_MODE_ASCII_FIT_TO_SCREEN ||
                     iflags.wc_map_mode == MAP_MODE_TILES_FIT_TO_SCREEN)
 
                     mswin_map_mode(mswin_hwnd_from_winid(WIN_MAP),
-                                   ROGUE_LEVEL_MAP_MODE_FIT_TO_SCREEN);
+                        ROGUE_LEVEL_MAP_MODE_FIT_TO_SCREEN);
                 else
                     mswin_map_mode(mswin_hwnd_from_winid(WIN_MAP),
-                                   ROGUE_LEVEL_MAP_MODE);
+                        ROGUE_LEVEL_MAP_MODE);
+            }
             else
                 mswin_map_mode(mswin_hwnd_from_winid(WIN_MAP),
                                iflags.wc_map_mode);
@@ -1317,16 +1319,15 @@ identifier
                    menu is displayed, set preselected to TRUE.
 */
 void
-mswin_add_extended_menu(winid wid, int glyph, const ANY_P *identifier, struct extended_menu_info info,
-               CHAR_P accelerator, CHAR_P group_accel, int attr,
-               const char *str, BOOLEAN_P presel)
+mswin_add_extended_menu(winid wid, int glyph, const ANY_P *identifier,
+               CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
+               const char *str, BOOLEAN_P presel, struct extended_menu_info info)
 {
     logDebug("mswin_add_menu(%d, %d, %p, %c, %c, %d, %s, %d)\n", wid, glyph,
              identifier, (char) accelerator, (char) group_accel, attr, str,
              presel);
 
     struct obj* otmp = info.object;
-    int color = info.color;
 
     if ((wid >= 0) && (wid < MAXWINDOWS)
         && (GetNHApp()->windowlist[wid].win != NULL)) {
@@ -1349,12 +1350,12 @@ mswin_add_extended_menu(winid wid, int glyph, const ANY_P *identifier, struct ex
 
 void
 mswin_add_menu(winid wid, int glyph, const ANY_P* identifier,
-    CHAR_P accelerator, CHAR_P group_accel, int attr,
+    CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
     const char* str, BOOLEAN_P presel)
 {
-    mswin_add_extended_menu(wid, glyph, identifier, nilextendedmenuinfo,
-        accelerator, group_accel, attr,
-        str, presel);
+    mswin_add_extended_menu(wid, glyph, identifier,
+        accelerator, group_accel, attr, color,
+        str, presel, zeroextendedmenuinfo);
 }
 
 /*

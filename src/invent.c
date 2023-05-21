@@ -40,6 +40,7 @@ STATIC_DCL char FDECL(display_pickinv, (const char *, char *, char *, BOOLEAN_P,
 STATIC_DCL char FDECL(display_used_invlets, (CHAR_P));
 STATIC_DCL boolean FDECL(this_type_only, (struct obj *));
 STATIC_DCL void NDECL(dounpaid);
+STATIC_DCL void NDECL(dounidentified);
 STATIC_DCL struct obj *FDECL(find_unpaid, (struct obj *, struct obj **));
 STATIC_DCL int FDECL(menu_identify, (int));
 STATIC_DCL boolean FDECL(tool_in_use, (struct obj *));
@@ -2762,7 +2763,7 @@ boolean (*validitemfunc)(struct obj*);
         }
 
         play_sfx_sound(SFX_GENERAL_CANNOT);
-        You("don't have anything %sto %s%s", foox ? "else " : "", word, endbuf);
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have anything %sto %s%s", foox ? "else " : "", word, endbuf);
         if(writeendremark)
             pline("(You cannot write on unidentified blank %s.)", unidbuf);
         return (struct obj *) 0;
@@ -3334,7 +3335,7 @@ STATIC_PTR int
 ckunpaid(otmp)
 struct obj *otmp;
 {
-    return (otmp->unpaid || (Has_contents(otmp) && count_unpaid(otmp->cobj, FALSE)));
+    return (otmp->unpaid || (Has_contents(otmp) && count_unpaid(otmp->cobj, 0, FALSE)));
 }
 
 boolean
@@ -3460,7 +3461,7 @@ int show_weights;
     }
 
     iletct = collect_obj_classes(ilets, invent, FALSE, ofilter, &itemcount);
-    unpaid = count_unpaid(invent, FALSE);
+    unpaid = count_unpaid(invent, ofilter, FALSE);
 
     if (ident && !iletct) {
         return -1; /* no further identifications */
@@ -3864,15 +3865,22 @@ int id_limit;
 
 /* count the unidentified items */
 int
-count_unidentified(objchn)
+count_unidentified(objchn, filterfunc, bynexthere)
 struct obj *objchn;
+boolean FDECL((*filterfunc), (OBJ_P));
+boolean bynexthere;
 {
     int unid_cnt = 0;
     struct obj *obj;
 
-    for (obj = objchn; obj; obj = obj->nobj)
+    for (obj = objchn; obj; obj = (bynexthere ? obj->nexthere : obj->nobj))
+    {
+        if (filterfunc && !(*filterfunc)(obj))
+            continue;
+
         if (not_fully_identified(obj))
             ++unid_cnt;
+    }
     return unid_cnt;
 }
 
@@ -3884,7 +3892,7 @@ int id_limit; /* 0 = all, >0 max no of items identified */
 boolean learning_id; /* true if we just read unknown identify scroll */
 {
     struct obj *obj;
-    int n, unid_cnt = count_unidentified(invent);
+    int n, unid_cnt = count_unidentified(invent, 0, FALSE);
     int res = 0;
 
     if (!unid_cnt)
@@ -4128,6 +4136,7 @@ long pickcnt;
         return 0;
 
     int cmd_idx = 0;
+    char invlet = otmp->invlet;
 
     menu_item* pick_list = (menu_item*)0;
     winid win;
@@ -4228,9 +4237,9 @@ long pickcnt;
         Sprintf(hbuf, "%s%s", headings[j], catbuf);
 
         any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(),
-            0, 0, iflags.menu_headings,
-            hbuf, MENU_UNSELECTED);
+        add_extended_menu(win, NO_GLYPH, &any,
+            0, 0, iflags.menu_headings, NO_COLOR,
+            hbuf, MENU_UNSELECTED, menu_heading_info());
 
         for (i = 0; extcmdlist[i].ef_txt; i++)
         {
@@ -4296,7 +4305,7 @@ long pickcnt;
             Sprintf(buf, "%s%s", cmdbuf, shortcutbuf);
 
             add_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE,
+                0, 0, ATR_NONE, NO_COLOR,
                 buf, MENU_UNSELECTED);
 
             actioncount++;
@@ -4341,6 +4350,15 @@ long pickcnt;
             struct obj* otmpsplit = splitobj(otmp, pickcnt);
             getobj_autoselect_obj = otmpsplit;
         }
+
+        /* Change the saved command string to action-item based equivalent to allow use in repeat */
+        if (extcmdlist[selected_action].bound_key && invlet)
+        {
+            savech(0);
+            savech((char)extcmdlist[selected_action].bound_key);
+            savech(invlet);
+        }
+
         res = (extcmdlist[selected_action].ef_funct)();
         getobj_autoselect_obj = (struct obj*)0;
     }
@@ -4558,16 +4576,16 @@ boolean addinventoryheader, wornonly;
         int unid_cnt;
         char prompt[QBUFSZ];
 
-        unid_cnt = count_unidentified(invent);
+        unid_cnt = count_unidentified(invent, 0, FALSE);
         Sprintf(prompt, "Debug Identify"); /* 'title' rather than 'prompt' */
         if (unid_cnt)
             Sprintf(eos(prompt),
                     " -- unidentified or partially identified item%s",
                     plur(unid_cnt));
-        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, prompt, MENU_UNSELECTED);
+        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, prompt, MENU_UNSELECTED);
         if (!unid_cnt) 
         {
-            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE,
+            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                      "(all items are permanently identified already)",
                      MENU_UNSELECTED);
         } 
@@ -4583,7 +4601,7 @@ boolean addinventoryheader, wornonly;
             if (unid_cnt > 1)
                 Sprintf(eos(prompt), " (%s for all)",
                         visctrl(iflags.override_ID));
-            add_menu(win, NO_GLYPH, &any, '_', iflags.override_ID, ATR_NONE,
+            add_menu(win, NO_GLYPH, &any, '_', iflags.override_ID, ATR_NONE, NO_COLOR,
                      prompt, MENU_UNSELECTED);
             wizid = TRUE;
         }
@@ -4592,19 +4610,19 @@ boolean addinventoryheader, wornonly;
     {
         /* wizard override ID and xtra_choice are mutually exclusive */
         if (flags.sortpack)
-            add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings,
-                     "Miscellaneous", MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                     "Miscellaneous", MENU_UNSELECTED, menu_heading_info());
         any.a_char = HANDS_SYM; /* '-' */
-        add_menu(win, NO_GLYPH, &any, HANDS_SYM, 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, HANDS_SYM, 0, ATR_NONE, NO_COLOR,
                  xtra_choice, MENU_UNSELECTED);
     }
 
 #if !defined(GNH_MOBILE)
    if(strcmp(headertext, "") != 0)
    {
-       add_menu(win, NO_GLYPH, &any, ' ', 0, ATR_NONE,
+       add_menu(win, NO_GLYPH, &any, ' ', 0, ATR_NONE, NO_COLOR,
            headertext, MENU_UNSELECTED);
-       add_menu(win, NO_GLYPH, &any, ' ', 0, ATR_NONE,
+       add_menu(win, NO_GLYPH, &any, ' ', 0, ATR_NONE, NO_COLOR,
            "", MENU_UNSELECTED);
    }
 #endif
@@ -4624,12 +4642,12 @@ nextclass:
             ilet = otmp->invlet;
             if (flags.sortpack && !classcount) 
             {
-                add_extended_menu(win, NO_GLYPH, &any, 
-                    menu_group_heading_info(*invlet > ILLOBJ_CLASS && *invlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*invlet)].sym : '\0'),
-                    0, 0, iflags.menu_headings,
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, iflags.menu_headings, NO_COLOR,
                          let_to_name(*invlet, FALSE,
                                      (want_reply && iflags.menu_head_objsym)),
-                         MENU_UNSELECTED);
+                         MENU_UNSELECTED,
+                    menu_group_heading_info(*invlet > ILLOBJ_CLASS&&* invlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*invlet)].sym : '\0'));
                 classcount++;
             }
             if (wizid)
@@ -4647,9 +4665,9 @@ nextclass:
 
             int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
             int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-            add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, obj_to_extended_menu_info(otmp), ilet,
+            add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, ilet,
                 applied_class_accelerator,
-                     ATR_NONE, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly) : doname_with_weight_first(otmp, loadstonecorrectly)) : doname(otmp), MENU_UNSELECTED);
+                     ATR_NONE, NO_COLOR, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly) : doname_with_weight_first(otmp, loadstonecorrectly)) : doname(otmp), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
         }
     }
     if (flags.sortpack) 
@@ -4665,10 +4683,10 @@ nextclass:
     if (iflags.force_invmenu && lets && want_reply) 
     {
         any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings,
-                 "Special", MENU_UNSELECTED);
+        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                 "Special", MENU_UNSELECTED, menu_heading_info());
         any.a_char = '*';
-        add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE,
+        add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR,
                  "(list everything)", MENU_UNSELECTED);
     }
     unsortloot(&sortedinvent);
@@ -4679,7 +4697,7 @@ nextclass:
     if (iflags.perm_invent && !lets && !any.a_char) 
     {
         any = zeroany;
-        add_menu(win, NO_GLYPH, &any, 0, 0, 0,
+        add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                  not_carrying_anything, MENU_UNSELECTED);
         want_reply = FALSE;
     }
@@ -4771,8 +4789,8 @@ int show_weights;
     if (show_weights > 0)
     {
         anything any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0, iflags.menu_headings,
-            "Weight Summary", MENU_UNSELECTED);
+        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+            "Weight Summary", MENU_UNSELECTED, menu_heading_info());
 
         char wtbuf[BUFSZ];
         char carrybuf[BUFSZ];
@@ -4828,7 +4846,7 @@ int show_weights;
             else
                 Sprintf(wtbuf, "  = %s of total weight", weightbuf);
 
-            add_menu(win, NO_GLYPH, &any, 0, 0, 0, wtbuf, MENU_UNSELECTED);
+            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, wtbuf, MENU_UNSELECTED);
         }
 
         if (show_weights > 0 && show_weights <= 3)
@@ -4859,7 +4877,7 @@ int show_weights;
             }
 
             Sprintf(totalbuf, "%s%s", carrybuf, wtbuf);
-            add_menu(win, NO_GLYPH, &any, 0, 0, 0, totalbuf, MENU_UNSELECTED);
+            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, totalbuf, MENU_UNSELECTED);
         }
     }
 }
@@ -5042,18 +5060,18 @@ char avoidlet;
                 if (!flags.sortpack || otmp->oclass == *invlet) {
                     if (flags.sortpack && !classcount) {
                         any = zeroany; /* zero */
-                        add_extended_menu(win, NO_GLYPH, &any, menu_heading_info(), 0, 0,
-                                 iflags.menu_headings,
+                        add_extended_menu(win, NO_GLYPH, &any, 0, 0,
+                                 iflags.menu_headings, NO_COLOR,
                                  let_to_name(*invlet, FALSE, FALSE),
-                                 MENU_UNSELECTED);
+                                 MENU_UNSELECTED, menu_heading_info());
                         classcount++;
                     }
                     any.a_char = ilet;
                     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
                     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
                     add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph,
-                             &any, obj_to_extended_menu_info(otmp), ilet, 0, ATR_NONE,
-                             (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE) : doname_with_weight_first(otmp, TRUE)), MENU_UNSELECTED);
+                             &any, ilet, 0, ATR_NONE, NO_COLOR,
+                             (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE) : doname_with_weight_first(otmp, TRUE)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
                 }
             }
             if (flags.sortpack && *++invlet)
@@ -5078,21 +5096,23 @@ char avoidlet;
  * contained objects.
  */
 int
-count_unpaid(list, bynexthere)
+count_unpaid(list, filterfunc, bynexthere)
 struct obj *list;
+boolean FDECL((*filterfunc), (OBJ_P));
 boolean bynexthere;
 {
     int count = 0;
+    struct obj* otmp;
+    for (otmp = list; otmp; otmp = (bynexthere ? otmp->nexthere : otmp->nobj))
+    {
+        if (filterfunc && !(*filterfunc)(otmp))
+            continue;
 
-    while (list) {
-        if (list->unpaid)
+        if (otmp->unpaid)
             count++;
-        if (Has_contents(list))
-            count += count_unpaid(list->cobj, FALSE); //Contents are always by nobj
-        if (bynexthere)
-            list = list->nexthere;
-        else
-            list = list->nobj;
+
+        if (Has_contents(otmp))
+            count += count_unpaid(otmp->cobj, filterfunc, FALSE); //Contents are always by nobj
     }
     return count;
 }
@@ -5239,7 +5259,7 @@ dounpaid()
     int classcount, count, num_so_far;
     long cost, totcost;
 
-    count = count_unpaid(invent, FALSE);
+    count = count_unpaid(invent, 0, FALSE);
     otmp = marker = contnr = (struct obj *) 0;
 
     if (count == 1) {
@@ -5330,6 +5350,51 @@ dounpaid()
     destroy_nhwindow(win);
 }
 
+STATIC_OVL void
+dounidentified()
+{
+    winid win;
+    struct obj* otmp;
+    register char ilet;
+    char* invlet = flags.inv_order;
+    int classcount, count;
+
+    count = count_unidentified(invent, 0, FALSE);
+    if (!count)
+    {
+        win = create_nhwindow(NHW_MENU);
+        putstr(win, 0, "You have no unidentified items.");
+        display_nhwindow(win, FALSE);
+        destroy_nhwindow(win);
+        return;
+    }
+
+    win = create_nhwindow(NHW_MENU);
+    if (!flags.invlet_constant)
+        reassign();
+
+    do {
+        classcount = 0;
+        for (otmp = invent; otmp; otmp = otmp->nobj) {
+            ilet = otmp->invlet;
+            if (not_fully_identified(otmp)) {
+                if (!flags.sortpack || otmp->oclass == *invlet) {
+                    if (flags.sortpack && !classcount) {
+                        putstr(win, 0, let_to_name(*invlet, 2, FALSE));
+                        classcount++;
+                    }
+
+                    putstr(win, 0, xprname(otmp, distant_name(otmp, doname),
+                        ilet, TRUE, 0L, 0L));
+                }
+            }
+        }
+    } while (flags.sortpack && (*++invlet));
+
+    display_nhwindow(win, FALSE);
+    destroy_nhwindow(win);
+}
+
 /* query objlist callback: return TRUE if obj type matches "this_type" */
 static int this_type;
 
@@ -5372,7 +5437,7 @@ dotypeinv()
     char c = '\0';
     int n, i = 0;
     char *extra_types, types[BUFSZ];
-    int class_count, oclass, unpaid_count, itemcount;
+    int class_count, oclass, unpaid_count, unidentified_count, itemcount;
     int bcnt, ccnt, ucnt, xcnt, ocnt, tcnt;
     boolean billx = *u.ushops && doinvbill(0);
     menu_item *pick_list;
@@ -5383,14 +5448,19 @@ dotypeinv()
         You1("aren't carrying anything.");
         return 0;
     }
-    unpaid_count = count_unpaid(invent, FALSE);
+    unpaid_count = count_unpaid(invent, 0, FALSE);
+    unidentified_count = count_unidentified(invent, 0, FALSE);
     tally_BUCX(invent, FALSE, &bcnt, &ucnt, &ccnt, &xcnt, &ocnt, &tcnt);
 
     if (flags.menu_style != MENU_TRADITIONAL) {
         if (flags.menu_style == MENU_FULL
             || flags.menu_style == MENU_PARTIAL) {
             traditional = FALSE;
-            i = UNPAID_TYPES;
+            i = 0;
+            if(unpaid_count)
+                i |= UNPAID_TYPES;
+            if (unidentified_count)
+                i |= UNIDENTIFIED_TYPES;
             if (billx)
                 i |= BILLED_TYPES;
             if (bcnt)
@@ -5415,12 +5485,14 @@ dotypeinv()
         class_count = collect_obj_classes(types, invent, FALSE,
                                           (boolean FDECL((*), (OBJ_P))) 0,
                                           &itemcount);
-        if (unpaid_count || billx || (bcnt + ccnt + ucnt + xcnt) != 0)
+        if (unpaid_count || billx || unidentified_count || (bcnt + ccnt + ucnt + xcnt) != 0)
             types[class_count++] = ' ';
         if (unpaid_count)
             types[class_count++] = 'u';
         if (billx)
             types[class_count++] = 'x';
+        if (unidentified_count)
+            types[class_count++] = 'I';
         if (bcnt)
             types[class_count++] = 'B';
         if (ucnt)
@@ -5437,6 +5509,8 @@ dotypeinv()
             *extra_types++ = 'u';
         if (!billx)
             *extra_types++ = 'x';
+        if (!unidentified_count)
+            *extra_types++ = 'I';
         if (!bcnt)
             *extra_types++ = 'B';
         if (!ucnt)
@@ -5465,6 +5539,8 @@ dotypeinv()
                 c = 'u';
             else if (billx)
                 c = 'x';
+            else if (unidentified_count)
+                c = 'I';
             else
                 c = types[0];
         }
@@ -5482,6 +5558,13 @@ dotypeinv()
             dounpaid();
         else
             You1("are not carrying any unpaid objects.");
+        return 0;
+    }
+    if (c == 'I') {
+        if (unidentified_count)
+            dounidentified();
+        else
+            You1("are not carrying any unidentified objects.");
         return 0;
     }
     if (traditional) {
@@ -5968,12 +6051,15 @@ print_things_here_to_window(VOID_ARGS)
 
     struct obj* otmp;
     const char* dfeature = (char*)0;
+    struct engr* ep = 0;
     char fbuf[BUFSZ] = "";
     char dfbuf[BUFSZ] = "";
+    char ebuf[BUFSZ] = "";
     struct rm* lev = &levl[u.ux][u.uy];
 
     otmp = level.objects[u.ux][u.uy];
     dfeature = adjusted_dfeature_at(u.ux, u.uy);
+    ep = engr_at(u.ux, u.uy);
 
     if (IS_BRAZIER(lev->typ))
     {
@@ -5986,7 +6072,7 @@ print_things_here_to_window(VOID_ARGS)
     char buf[BUFSZ];
     char buf2[BUFSZ];
     int count = 0;
-    int displ_style = here_window_display_style(dfeature, otmp);
+    int displ_style = here_window_display_style(dfeature, ep, otmp);
     if (displ_style == 0)
         return;
     else if (displ_style == 2)
@@ -6029,6 +6115,45 @@ print_things_here_to_window(VOID_ARGS)
             
             //Sprintf(fbuf, "'%c' %s", sym, an(dfbuf));
             //putstr_ex(tmpwin, attr, fbuf, 0, textcolor);
+        }
+
+        if (ep && ep->engr_txt[0] && !Blind)
+        {
+            switch (ep->engr_type) {
+            case DUST:
+                Sprintf(ebuf, "Writing in the %s:", is_ice(u.ux, u.uy) ? "frost" : "dust");
+                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+               break;
+            case ENGRAVE:
+            case ENGR_HEADSTONE:
+                Sprintf(ebuf, "Engraving on the %s:", surface(u.ux, u.uy));
+                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                break;
+            case ENGR_SIGNPOST:
+                Strcpy(ebuf, "Writing on the signpost:");
+                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                break;
+            case BURN:
+                Sprintf(ebuf, "Writing %s on the %s:", is_ice(u.ux, u.uy) ? "melted" : "burned", surface(u.ux, u.uy));
+                putstr_ex(tmpwin, attr, ebuf, 1, CLR_ORANGE);
+                break;
+            case MARK:
+                Sprintf(ebuf, "Graffiti on the %s:", surface(u.ux, u.uy));
+                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                break;
+            case ENGR_BLOOD:
+                Strcpy(ebuf, "Message scrawled in blood:");
+                putstr_ex(tmpwin, attr, ebuf, 1, CLR_RED);
+                break;
+            default:
+                Strcpy(ebuf, "Message written in a very strange way:");
+                putstr_ex(tmpwin, attr, ebuf, 1, CLR_MSG_FAIL);
+                break;
+            }
+            strncpy(buf, ep->engr_txt, BUFSZ - 5);
+            buf[BUFSZ - 5] = 0;
+            Sprintf(ebuf, " \"%s\".", buf);
+            putstr_ex(tmpwin, attr, ebuf, 0, textcolor);
         }
 
         for (; otmp; otmp = otmp->nexthere) 
@@ -6520,9 +6645,10 @@ STATIC_VAR NEARDATA char *invbuf = (char *) 0;
 STATIC_VAR NEARDATA size_t invbufsiz = 0;
 
 char *
-let_to_name(let, unpaid, showsym)
+let_to_name(let, prefix_style, showsym)
 char let;
-boolean unpaid, showsym;
+uchar prefix_style; //1 = unpaid, 2 = unidentified
+boolean showsym;
 {
     const char *ocsymfmt = " '%c'";
     const size_t invbuf_sympadding = 0; /* arbitrary */
@@ -6538,7 +6664,7 @@ boolean unpaid, showsym;
     else
         class_name = names[0];
 
-    len = strlen(class_name) + (unpaid ? sizeof "unpaid_" : sizeof "")
+    len = strlen(class_name) + (prefix_style == 1 ? sizeof "unpaid_" : prefix_style == 2 ? sizeof "unidentified_" : sizeof "")
           + (oclass ? (strlen(ocsymfmt) + invbuf_sympadding) : 0);
     if (len > invbufsiz) {
         if (invbuf)
@@ -6546,10 +6672,20 @@ boolean unpaid, showsym;
         invbufsiz = len + 10; /* add slop to reduce incremental realloc */
         invbuf = (char *) alloc(invbufsiz);
     }
-    if (unpaid)
+
+    switch (prefix_style)
+    {
+    case 1:
         Strcat(strcpy(invbuf, "Unpaid "), class_name);
-    else
+        break;
+    case 2:
+        Strcat(strcpy(invbuf, "Unidentified "), class_name);
+        break;
+    default:
         Strcpy(invbuf, class_name);
+        break;
+    }
+
     if ((oclass != 0) && showsym) {
         char *bp = eos(invbuf);
         long mlen = (long)invbuf_sympadding - (long)strlen(class_name);
@@ -6901,7 +7037,7 @@ const char *hdr, *txt;
     any = zeroany;
     win = create_nhwindow(NHW_MENU);
     start_menu_ex(win, GHMENU_STYLE_PICK_ITEM_LIST);
-    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, txt, MENU_UNSELECTED);
+    add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, txt, MENU_UNSELECTED);
     end_menu(win, hdr);
     if (select_menu(win, PICK_NONE, &selected) > 0)
         free((genericptr_t) selected);
@@ -7082,8 +7218,9 @@ int x, y;
 }
 
 int
-here_window_display_style(dfeature, first_obj_here)
+here_window_display_style(dfeature, engraving, first_obj_here)
 const char* dfeature;
+struct engr* engraving;
 struct obj* first_obj_here;
 {
     int total_count = 0;
@@ -7091,10 +7228,10 @@ struct obj* first_obj_here;
     for (otmp_cnt = first_obj_here; otmp_cnt; otmp_cnt = otmp_cnt->nexthere)
         total_count++;
 
-    if (total_count == 0 && !dfeature)
+    if (total_count == 0 && !dfeature && (!engraving || !engraving->engr_txt[0] || Blind))
         return 0;
 
-    if (total_count + (dfeature ? 1 : 0) > iflags.wc2_here_window_size)
+    if (total_count + (dfeature ? 1 : 0) + (engraving && engraving->engr_txt[0] && !Blind ? 1 : 0) > iflags.wc2_here_window_size)
         return 2; /* Many things */
 
     return 1;
@@ -7107,6 +7244,23 @@ reset_inventory(VOID_ARGS)
     this_type = 0;
     sortlootmode = 0;
     memset((genericptr_t)&safeq_xprn_ctx, 0, sizeof(safeq_xprn_ctx));
+}
+
+struct obj*
+contains_otyp(container, otyp)
+struct obj* container;
+int otyp;
+{
+    if (!container)
+        return (struct obj*)0;
+
+    struct obj* otmp;
+    for (otmp = container->cobj; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == otyp)
+            return otmp;
+    }
+    return (struct obj*)0;
 }
 
 /*invent.c*/

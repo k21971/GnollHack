@@ -11,10 +11,10 @@ Tile Graphics:   Riikka Laakkonen (Players, monsters, various graphics)
                  Milla Hautapaakkanen (Spells, items, various graphics)
                  Heta Kohonen (Additional monster and item graphics)
                  Gribby Bullock (Doodad, monster and item graphics)
+                 Alex Sundell (Additional graphics)
                  Jenni Berg (Additional monster graphics)
                  Marianne Bekker (Monster and environment graphics)
                  Laura Hölttä (Additional monster graphics)
-                 Alex Sundell (Additional graphics)
                  Benjamin Tuppurainen (Additional monster graphics)
                  Joona Korhonen (Additional monster graphics)
                  Miro Pääkkönen (Additional monster graphics)
@@ -41,7 +41,8 @@ Sound middleware:  FMOD Studio by Firelight Technologies Pty Ltd.
 
                                     MUSIC
 Eric Matyas (soundimage.org)
-Yolanda Mott (www.yolandamott.com): A Elbereth Gilthoniel           
+Yolanda Mott (www.yolandamott.com): A Elbereth Gilthoniel
+Avalkis: A New Path (to the Future), Forest Celebration
 
 
                                 SOUND EFFECTS
@@ -78,7 +79,7 @@ Brian Anderson                High Priest of Moloch
 Nina Nikolic                  High Priestess of Moloch
                               Elder Quantum Mechanic, Female
 Cory Koehler                  God
-Laura Looi                    Goddess
+Leader Looi                   Goddess
 Kat Peterson                  Oracle
 Drew Veurink                  Smith, Male
 Rin Araneta                   Smith, Female
@@ -113,7 +114,7 @@ Harry Frost                   Hippocrates (Healer Quest)
 AveryLuna                     Cyclops (Healer Quest)
 Alex Lafnitzegger             Attendant, Male (Healer Quest)
 Stephen Carlock               King Arthur (Knight Quest)
-Adam Austin                   Ixoth (Knight Quest)
+Austin Adam                   Ixoth (Knight Quest)
                               Yeenaghu
 Jason Hall                    Page, Male (Knight Quest)
 Roanna Cruz                   Page, Female (Knight Quest)

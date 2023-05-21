@@ -770,8 +770,9 @@ register struct obj* obj;
     double wep_avg_dmg = 0;
     double wep_multipliable_avg_dmg = 0; //Multiplied by slaying
     double wep_all_extra_avg_dmg = 0;
+    int knownacbonus = 0;
+    int knownmcbonus = 0;
     int i;
-
     char buf[BUFSZ];
     char buf2[BUFSZ];
     char buf3[BUFSZ];
@@ -1078,7 +1079,7 @@ register struct obj* obj;
     }
 
     /* Material */
-    if (stats_known || objects[otyp].oc_name_known)
+    if (obj->dknown)
     {
         Strcpy(buf2, material_definitions[obj->material].name);
         *buf2 = highc(*buf2);
@@ -1130,7 +1131,7 @@ register struct obj* obj;
     }
 
     boolean weapon_stats_shown = FALSE;
-    if (!uses_spell_flags && (is_weapon(obj) || ((is_gloves(obj) || is_boots(obj) || objects[otyp].oc_class == GEM_CLASS) && stats_known)))
+    if (!uses_spell_flags && objects[otyp].oc_name_known && (is_weapon(obj) || ((is_gloves(obj) || is_boots(obj) || objects[otyp].oc_class == GEM_CLASS) && stats_known)))
     {
         weapon_stats_shown = TRUE;
 
@@ -1645,26 +1646,25 @@ register struct obj* obj;
     }
 
 
-    boolean affectsac = (obj->oclass == ARMOR_CLASS
+    boolean affectsac = ((obj->oclass == ARMOR_CLASS && objects[otyp].oc_name_known)
             || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
-            || has_obj_mythic_defense(obj)
+            || (has_obj_mythic_defense(obj) && obj->mknown)
             || (stats_known && obj->oclass == MISCELLANEOUS_CLASS && objects[otyp].oc_armor_class != 0)
             );
 
-    boolean affectsmc = (obj->oclass == ARMOR_CLASS
+    boolean affectsmc = ((obj->oclass == ARMOR_CLASS && objects[otyp].oc_name_known)
             || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
-            || has_obj_mythic_defense(obj)
+            || (has_obj_mythic_defense(obj) && obj->mknown)
             || (stats_known && obj->oclass == MISCELLANEOUS_CLASS && objects[otyp].oc_magic_cancellation != 0)
-            || (stats_known && objects[otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC)
             );
 
 
     boolean nonexpeptionalarmor = nonexceptionality_armor(obj);
 
-    if (((obj->oclass == ARMOR_CLASS
+    if ((((obj->oclass == ARMOR_CLASS && objects[otyp].oc_name_known)
         || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
-        || has_obj_mythic_defense(obj)) 
-        && obj->exceptionality) || nonexpeptionalarmor)
+        || (has_obj_mythic_defense(obj) && obj->mknown)) 
+        && obj->exceptionality) || (nonexpeptionalarmor && objects[otyp].oc_name_known))
     {
         const char* excep = nonexpeptionalarmor ? "Cannot have quality" : 
             obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL ? "Exceptional" :
@@ -1683,12 +1683,16 @@ register struct obj* obj;
             {
                 Strcat(buf, " (");
                 if (acbon > 0)
+                {
                     Sprintf(eos(buf), "-%d AC", acbon);
+                    knownacbonus += acbon;
+                }
                 if (mcbon > 0)
                 {
                     if (acbon > 0)
                         Strcat(buf, ", ");
                     Sprintf(eos(buf), "+%d MC", mcbon);
+                    knownmcbonus += mcbon;
                 }
                 Strcat(buf, ")");
             }
@@ -1707,6 +1711,7 @@ register struct obj* obj;
         {
             Sprintf(buf, "Base armor class:       %d", 10 + shownacbonus);
         }
+        knownacbonus += -shownacbonus;
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -1715,6 +1720,7 @@ register struct obj* obj;
         int mc = get_object_base_mc(obj);
         Sprintf(buf2, "%s%d", mc >= 0 ? "+" : "", mc);
         Sprintf(buf, "Magic cancellation:     %s", buf2);
+        knownmcbonus += mc;
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -2216,7 +2222,7 @@ register struct obj* obj;
 
                 char bonusbuf[BUFSZ] = "";
                 boolean display_ac = affectsac && !(objects[otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC);
-                boolean display_mc = affectsmc || (objects[otyp].oc_flags & O1_ENCHANTMENT_AFFECTS_MC);
+                boolean display_mc = affectsmc && !(objects[otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_MC);
 
                 if (obj->oclass == WEAPON_CLASS || is_weptool(obj))
                 {
@@ -2257,6 +2263,8 @@ register struct obj* obj;
                         obj->enchantment / 3 >= 0 ? "+" : "",
                         obj->enchantment / 3
                     );
+                    knownacbonus += obj->enchantment;
+                    knownmcbonus += obj->enchantment / 3;
                 }
                 else if (display_ac)
                 {
@@ -2264,6 +2272,7 @@ register struct obj* obj;
                         obj->enchantment <= 0 ? "+" : "",
                         -obj->enchantment,
                         obj->enchantment >= 0 ? "bonus" : "penalty");
+                    knownacbonus += obj->enchantment;
                 }
                 else if (display_mc)
                 {
@@ -2271,6 +2280,7 @@ register struct obj* obj;
                         obj->enchantment / 3 >= 0 ? "+" : "",
                         obj->enchantment / 3,
                         obj->enchantment / 3 >= 0 ? "bonus" : "penalty");
+                    knownmcbonus += obj->enchantment / 3;
                 }
                 if (*bonusbuf)
                     Strcat(bonusbuf, ")");
@@ -2317,6 +2327,7 @@ register struct obj* obj;
             {
                 penalty = min(greatest_erosion(obj), get_object_base_ac(obj));
                 Sprintf(eos(penaltybuf), "(+%d penalty to AC)", penalty);
+                knownacbonus += -penalty;
             }
         }
         Sprintf(buf, "Erosion status:         %s%s", erodebuf, penaltybuf);
@@ -2326,7 +2337,7 @@ register struct obj* obj;
     /* Mythic status */
     boolean nonmythic = (is_weapon(obj) || is_armor(obj)) && otyp_non_mythic(otyp)
         && !obj->oartifact && !objects[otyp].oc_unique && !(objects[otyp].oc_flags3 & O3_UNIQUE);
-    if (obj->dknown && (obj->mythic_prefix || obj->mythic_suffix || nonmythic))
+    if (obj->dknown && objects[otyp].oc_name_known && (obj->mythic_prefix || obj->mythic_suffix || nonmythic))
     {
         Sprintf(buf, "Mythic status:          %s", nonmythic ? "Cannot be mythic" : (obj->mythic_prefix && obj->mythic_suffix) ? "Legendary" : "Mythic");
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -2633,7 +2644,7 @@ register struct obj* obj;
                             else
                                 Strcpy(bonusbuf, "bonus");
 
-                            if (k == 0 && prop & BONUS_TO_STR)
+                            if (k == 0 && (prop & BONUS_TO_STR))
                             {
                                 powercnt++;
 
@@ -2655,7 +2666,7 @@ register struct obj* obj;
                                 else
                                     Sprintf(buf2, "%s %s%d %s to strength", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 1 && prop & BONUS_TO_DEX)
+                            if (k == 1 && (prop & BONUS_TO_DEX))
                             {
                                 powercnt++;
 
@@ -2664,7 +2675,7 @@ register struct obj* obj;
                                 else
                                     Sprintf(buf2, "%s %s%d %s to dexterity", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 2 && prop & BONUS_TO_CON)
+                            if (k == 2 && (prop & BONUS_TO_CON))
                             {
                                 powercnt++;
 
@@ -2673,7 +2684,7 @@ register struct obj* obj;
                                 else
                                     Sprintf(buf2, "%s %s%d %s to constitution", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 3 && prop & BONUS_TO_INT)
+                            if (k == 3 && (prop & BONUS_TO_INT))
                             {
                                 powercnt++;
 
@@ -2682,7 +2693,7 @@ register struct obj* obj;
                                 else
                                     Sprintf(buf2, "%s %s%d %s to intelligence", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 4 && prop & BONUS_TO_WIS)
+                            if (k == 4 && (prop & BONUS_TO_WIS))
                             {
                                 powercnt++;
 
@@ -2691,7 +2702,7 @@ register struct obj* obj;
                                 else
                                     Sprintf(buf2, "%s %s%d %s to wisdom", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 5 && prop & BONUS_TO_CHA)
+                            if (k == 5 && (prop & BONUS_TO_CHA))
                             {
                                 powercnt++;
 
@@ -2700,49 +2711,51 @@ register struct obj* obj;
                                 else
                                     Sprintf(buf2, "%s %s%d %s to charisma", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 6 && prop & BONUS_TO_AC)
+                            if (k == 6 && (prop & BONUS_TO_AC))
                             {
                                 powercnt++;
 
-                                Sprintf(buf2, "%s %s%d %s to armor class", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
+                                Sprintf(buf2, "%s %s%d %s to armor class", grantbuf, -stat >= 0 ? "+" : "", -stat, bonusbuf);
+                                knownacbonus += stat;
                             }
-                            if (k == 7 && prop & BONUS_TO_DAMAGE)
+                            if (k == 7 && (prop & BONUS_TO_DAMAGE))
                             {
                                 powercnt++;
 
                                 Sprintf(buf2, "%s %s%d %s to damage", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 8 && prop & BONUS_TO_HIT)
+                            if (k == 8 && (prop & BONUS_TO_HIT))
                             {
                                 powercnt++;
 
                                 Sprintf(buf2, "%s %s%d %s to hit", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 9 && prop & BONUS_TO_MC)
+                            if (k == 9 && (prop & BONUS_TO_MC))
                             {
                                 powercnt++;
 
                                 Sprintf(buf2, "%s %s%d %s to magic cancellation", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
+                                knownacbonus += stat;
                             }
-                            if (k == 10 && prop & BONUS_TO_UNRESTRICTED_SPELL_CASTING)
+                            if (k == 10 && (prop & BONUS_TO_UNRESTRICTED_SPELL_CASTING))
                             {
                                 powercnt++;
 
                                 Sprintf(buf2, "%s %s%d%% %s to casting unrestricted school spells", grantbuf, stat >= 0 ? "+" : "", stat * 5, bonusbuf);
                             }
-                            if (k == 11 && prop & BONUS_TO_EXPERIENCE)
+                            if (k == 11 && (prop & BONUS_TO_EXPERIENCE))
                             {
                                 powercnt++;
 
                                 Sprintf(buf2, "%s %s%d%% %s to experience", grantbuf, stat >= 0 ? "+" : "", stat * 10, bonusbuf);
                             }
-                            if (k == 12 && prop & BONUS_TO_ARCHERY)
+                            if (k == 12 && (prop & BONUS_TO_ARCHERY))
                             {
                                 powercnt++;
 
                                 Sprintf(buf2, "%s %s%d %s to hit and damage of archery weapons", grantbuf, stat >= 0 ? "+" : "", stat, bonusbuf);
                             }
-                            if (k == 13 && prop & BONUS_TO_ALL_SPELL_CASTING)
+                            if (k == 13 && (prop & BONUS_TO_ALL_SPELL_CASTING))
                             {
                                 powercnt++;
                                 Sprintf(buf2, "%s %s%d%% %s to casting all spells", grantbuf, stat >= 0 ? "+" : "", stat * 5, bonusbuf);
@@ -4142,6 +4155,36 @@ register struct obj* obj;
         }
     }
 
+    /* Armor statistics */
+    int totalacbonus = 0;
+    int totalmcbonus = 0;
+    if (notfullyidentified || !stats_known)
+    {
+        totalacbonus = -knownacbonus;
+        totalmcbonus = knownmcbonus;
+    }
+    else
+    {
+        totalacbonus = -ARM_AC_BONUS(obj, youmonst.data);
+        totalmcbonus = ARM_MC_BONUS(obj, youmonst.data);
+    }
+    if ((stats_known && (is_armor(obj) || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)))
+        || totalacbonus != 0 || totalmcbonus != 0 || (has_obj_mythic_defense(obj) && obj->mknown))
+    {
+        int powercnt = 0;
+        Sprintf(buf, "Armor statistics:");
+        putstr(datawin, ATR_HEADING, buf);
+
+        const char* totalprefix = notfullyidentified ? "Total known" : "Total";
+        powercnt++;
+        Sprintf(buf, " %2d - %s AC %s %s%d", powercnt, totalprefix, totalacbonus > 0 ? "penalty" : "bonus", totalacbonus >= 0 ? "+" : "", totalacbonus);
+        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        powercnt++;
+        Sprintf(buf, " %2d - %s MC %s %s%d", powercnt, totalprefix, totalmcbonus < 0 ? "penalty" : "bonus", totalmcbonus >= 0 ? "+" : "", totalmcbonus);
+        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+
+    }
+
     /* Hints */
     boolean show_identify_hint = (flags.force_hint || context.game_difficulty <= flags.max_hint_difficulty) && obj->dknown && (!stats_known || notfullyidentified);
     if (show_identify_hint || show_corpse_hint)
@@ -4351,6 +4394,36 @@ register struct monst* mon;
     Sprintf(buf, "Alignment:              %s", ptr->maligntyp > 0 ? "Lawful" : ptr->maligntyp < 0 ? "Chaotic" : "Neutral");
     
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
+
+    if (mon->subtype > 0)
+    {
+        if ((mons[mon->mnum].mflags6 & M6_USES_DOG_SUBTYPES) != 0 && mon->subtype < NUM_DOG_BREEDS)
+        {
+            if (dog_breed_definitions[mon->subtype].breed_name)
+            {
+                Sprintf(buf, "Breed:                  %s", str_upper_start(dog_breed_definitions[mon->subtype].breed_name));
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+            if (dog_breed_definitions[mon->subtype].short_coat_color || dog_breed_definitions[mon->subtype].long_coat_color)
+            {
+                Sprintf(buf, "Coat color:             %s", str_upper_start(dog_breed_definitions[mon->subtype].long_coat_color ? dog_breed_definitions[mon->subtype].long_coat_color : dog_breed_definitions[mon->subtype].short_coat_color));
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+        }
+        else if ((mons[mon->mnum].mflags6 & M6_USES_CAT_SUBTYPES) != 0 && mon->subtype < NUM_CAT_BREEDS)
+        {
+            if (cat_breed_definitions[mon->subtype].breed_name)
+            {
+                Sprintf(buf, "Breed:                  %s", str_upper_start(cat_breed_definitions[mon->subtype].breed_name));
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+            if (cat_breed_definitions[mon->subtype].short_coat_color || cat_breed_definitions[mon->subtype].long_coat_color)
+            {
+                Sprintf(buf, "Coat color:             %s", str_upper_start(cat_breed_definitions[mon->subtype].long_coat_color ? cat_breed_definitions[mon->subtype].long_coat_color : cat_breed_definitions[mon->subtype].short_coat_color));
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+        }
+    }
 
     if (!is_neuter(ptr))
     {
@@ -5162,7 +5235,7 @@ const char *word;
         if (*word)
         {
             play_sfx_sound(SFX_GENERAL_CANNOT);
-            pline_The("leash is tied around your %s.", body_part(HAND));
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "leash is tied around your %s.", body_part(HAND));
         }
         return FALSE;
     }
@@ -5545,7 +5618,7 @@ int retry;
     {
         all_categories = FALSE;
         n = query_category("Drop what type of items?", invent,
-                           UNPAID_TYPES | ALL_TYPES | CHOOSE_ALL | BUC_BLESSED
+                           UNPAID_TYPES | UNIDENTIFIED_TYPES | ALL_TYPES | CHOOSE_ALL | BUC_BLESSED
                                | BUC_CURSED | BUC_UNCURSED | BUC_UNKNOWN,
                            &pick_list, PICK_ANY);
         if (!n)
@@ -5781,18 +5854,18 @@ dodown()
 
     if (/*on_level(&valley_level, &u.uz)*/ Is_stronghold(&u.uz) && !u.uevent.gehennom_entered)
     {
-        You("are standing at the gate to Gehennom.");
-        pline("Unspeakable cruelty and harm lurk down there.");
+        You_ex(ATR_NONE, CLR_MSG_GOD, "are standing at the gate to Gehennom.");
+        pline_ex(ATR_NONE, CLR_MSG_GOD, "Unspeakable cruelty and harm lurk down there.");
         if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "Gate to Gehennom", "Are you sure you want to enter?") != 'y')
             return 0;
         else
-            pline("So be it.");
+            pline_ex(ATR_NONE, CLR_MSG_GOD, "So be it.");
         u.uevent.gehennom_entered = 1; /* don't ask again */
     }
 
     if (!next_to_u())
     {
-        You("are held back by your pet!");
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "are held back by your pet!");
         return 0;
     }
 

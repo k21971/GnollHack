@@ -1308,7 +1308,7 @@ E long FDECL(money_cnt, (struct obj *));
 E struct extended_menu_info FDECL(obj_to_extended_menu_info, (struct obj*));
 E struct extended_menu_info NDECL(menu_heading_info);
 E struct extended_menu_info FDECL(menu_group_heading_info, (CHAR_P));
-E struct extended_menu_info FDECL(menu_special_mark_info, (CHAR_P, int));
+E struct extended_menu_info FDECL(menu_special_mark_info, (CHAR_P));
 E const char* FDECL(get_cmap_or_cmap_variation_glyph_explanation, (int));
 E void NDECL(reset_hack);
 
@@ -1381,6 +1381,7 @@ E void FDECL(strbuf_reserve, (strbuf_t *, size_t));
 E void FDECL(strbuf_empty, (strbuf_t *));
 E void FDECL(strbuf_nl_to_crlf, (strbuf_t *));
 E void NDECL(adjusted_delay_output);
+E void FDECL(copyUTF8toCP437, (char*, size_t, char*, size_t));
 E void FDECL(convertUTF8toCP437, (char*, size_t));
 E char FDECL(unicode_to_CP437, (nhsym));
 E boolean NDECL(use_utf8_encoding);
@@ -1448,7 +1449,7 @@ E int FDECL(askchain, (struct obj **, const char *, int, int (*)(OBJ_P),
                        int (*)(OBJ_P), int, const char *));
 E void FDECL(fully_identify_obj, (struct obj *));
 E int FDECL(identify, (struct obj *));
-E int FDECL(count_unidentified, (struct obj *));
+E int FDECL(count_unidentified, (struct obj *, boolean(*)(OBJ_P), BOOLEAN_P));
 E int FDECL(identify_pack, (int, BOOLEAN_P));
 E void NDECL(learn_unseen_invent);
 E void FDECL(prinv, (const char *, struct obj *, long));
@@ -1467,7 +1468,7 @@ E struct obj *FDECL(display_minventory, (struct monst *, int, char *));
 E int NDECL(dotypeinv);
 E const char *FDECL(dfeature_at, (int, int));
 E const char* FDECL(adjusted_dfeature_at, (int, int));
-int FDECL(here_window_display_style, (const char*, struct obj*));
+int FDECL(here_window_display_style, (const char*, struct engr*, struct obj*));
 E const char* FDECL(get_floor_doodad_explanation_at, (int, int));
 E int FDECL(look_here, (int, BOOLEAN_P, BOOLEAN_P));
 E int NDECL(dolook);
@@ -1484,13 +1485,13 @@ E int NDECL(doprtool);
 E int NDECL(doprinuse);
 E void FDECL(useupf, (struct obj *, long));
 E void FDECL(useupf_with_flags, (struct obj*, long, unsigned long));
-E char *FDECL(let_to_name, (CHAR_P, BOOLEAN_P, BOOLEAN_P));
+E char *FDECL(let_to_name, (CHAR_P, UCHAR_P, BOOLEAN_P));
 E const char* FDECL(get_class_name, (CHAR_P));
 E void NDECL(free_invbuf);
 E void NDECL(reassign);
 E int NDECL(doorganize);
 E void NDECL(free_pickinv_cache);
-E int FDECL(count_unpaid, (struct obj *, BOOLEAN_P));
+E int FDECL(count_unpaid, (struct obj *, boolean(*)(OBJ_P), BOOLEAN_P));
 E int FDECL(count_objects, (struct obj*, BOOLEAN_P));
 E int FDECL(count_buc, (struct obj *, int, boolean (*)(OBJ_P), BOOLEAN_P));
 E void FDECL(tally_BUCX, (struct obj *, BOOLEAN_P,
@@ -1502,6 +1503,7 @@ E void FDECL(silly_thing, (const char *, struct obj *));
 E void NDECL(print_things_here_to_window);
 E void NDECL(update_here_window);
 E void NDECL(reset_inventory);
+E struct obj* FDECL(contains_otyp, (struct obj*, int));
 
 /* ### ioctl.c ### */
 
@@ -1645,8 +1647,8 @@ E void FDECL(copy_mextra, (struct monst *, struct monst *));
 E void FDECL(dealloc_mextra, (struct monst *));
 E struct monst *FDECL(makemon, (struct permonst *, int, int, unsigned long));
 E struct monst* FDECL(makemon2, (struct permonst*, int, int, unsigned long, unsigned long));
-E struct monst* FDECL(makemon_ex, (struct permonst*, int, int, unsigned long, int, int));
-E struct monst* FDECL(makemon_limited, (struct permonst*, int, int, unsigned long, unsigned long, int, int, int, ALIGNTYP_P));
+E struct monst* FDECL(makemon_ex, (struct permonst*, int, int, unsigned long, unsigned long, UNSIGNED_SHORT_P, int, int));
+E struct monst* FDECL(makemon_limited, (struct permonst*, int, int, unsigned long, unsigned long, UNSIGNED_SHORT_P, int, int, int, int, ALIGNTYP_P));
 E boolean FDECL(create_critters, (int, struct permonst *, BOOLEAN_P));
 E struct permonst *NDECL(rndmonst);
 E struct permonst* FDECL(rndmonst_limited, (int));
@@ -1681,7 +1683,7 @@ E boolean FDECL(wrong_elem_type, (struct permonst*));
 E void FDECL(m_initthrow, (struct monst*, int, int, int, BOOLEAN_P, int, int, int));
 E boolean FDECL(randomize_monster_gender, (struct permonst*));
 E void NDECL(makemon_animation_wait_until_end);
-E struct monst* FDECL(make_level_monster, (int, int, unsigned long));
+E struct monst* FDECL(make_level_monster, (int, int, unsigned long, unsigned long));
 E struct monst* NDECL(make_level_monster_anywhere);
 E void NDECL(reset_makemon);
 
@@ -1917,7 +1919,7 @@ E unsigned int FDECL(get_item_base_weight, (struct obj*));
 
 /* ### mkroom.c ### */
 
-E int FDECL(mkroom, (int));
+E int FDECL(make_room, (int));
 E void FDECL(fill_zoo, (struct mkroom *));
 E struct permonst *NDECL(antholemon);
 E boolean FDECL(nexttodoor, (int, int));
@@ -2011,8 +2013,8 @@ E void FDECL(decide_to_shapeshift, (struct monst *, int));
 E boolean FDECL(vamp_stone, (struct monst *));
 E void FDECL(m_detach, (struct monst*, struct permonst*, BOOLEAN_P));
 E int NDECL(randomtruegem);
-E int FDECL(randomreagent, (BOOLEAN_P, int));
-E int NDECL(randomore);
+E int FDECL(random_reagent_otyp, (BOOLEAN_P, BOOLEAN_P, int));
+E int FDECL(randomore, (BOOLEAN_P));
 E const char* FDECL(pm_monster_name, (struct permonst*, BOOLEAN_P));
 E const char* FDECL(mon_monster_name, (struct monst*));
 E const char* FDECL(corpse_monster_name, (struct obj*));
@@ -2102,7 +2104,7 @@ E boolean FDECL(onscary, (int, int, struct monst *));
 E boolean FDECL(onnopickup, (int, int, struct monst*));
 E void FDECL(monflee, (struct monst *, int, BOOLEAN_P, BOOLEAN_P));
 E void FDECL(make_mon_fearful, (struct monst*, int));
-E void FDECL(mon_yells, (struct monst *, const char *, const char *, const char*, BOOLEAN_P));
+E void FDECL(mon_yells, (struct monst *, const char *, const char *, const char*, BOOLEAN_P, BOOLEAN_P));
 E void FDECL(check_mon_talk, (struct monst*));
 E int FDECL(dochug, (struct monst *));
 E boolean FDECL(m_digweapon_check, (struct monst *, XCHAR_P, XCHAR_P));
@@ -2403,6 +2405,7 @@ E const char* FDECL(get_lock_description_by_otyp, (int, int, BOOLEAN_P));
 E boolean FDECL(find_key_otyp_by_description, (char*, int*, int*));
 E void FDECL(print_lock_with_buf, (char*, int, int, BOOLEAN_P));
 E char* NDECL(nextobuf);
+E char* FDECL(str_upper_start, (const char*));
 
 /* ### options.c ### */
 
@@ -2669,6 +2672,7 @@ E void FDECL(strange_feeling, (struct obj *, const char *, BOOLEAN_P));
 E void FDECL(potionhit, (struct monst *, struct obj **, int));
 E void FDECL(potionbreathe, (struct obj *, const char*));
 E int NDECL(dodip);
+E int FDECL(refill_obj_with_oil, (struct obj*, struct obj*));
 E void FDECL(mongrantswish, (struct monst **));
 E void FDECL(djinni_from_bottle, (struct obj *));
 E struct monst *FDECL(split_mon, (struct monst *, struct monst *));
@@ -3172,6 +3176,8 @@ E void FDECL(whimper, (struct monst *));
 E void FDECL(beg, (struct monst *));
 E int NDECL(doyell);
 E int NDECL(dotalk);
+E int NDECL(dotalksteed);
+E int NDECL(dotalknearby);
 #ifdef USER_SOUNDS
 E int FDECL(add_sound_mapping, (const char *));
 E void FDECL(play_sound_for_message, (const char *));
@@ -3194,6 +3200,9 @@ E void FDECL(popup_talk_line_ex, (struct monst*, const char*, int, int, BOOLEAN_
 E void FDECL(popup_talk_line_with_know_mname, (struct monst*, const char*, BOOLEAN_P));
 E int FDECL(service_identify, (struct monst*, long));
 E void FDECL(You_ex1_popup, (const char*, const char*, int, int, int, unsigned long));
+E int FDECL(dochatmon, (struct monst*));
+E boolean FDECL(maybe_refillable_with_oil, (struct obj*));
+
 
 /* ### soundset.c ### */
 
@@ -3442,6 +3451,7 @@ E int FDECL(use_saddle, (struct obj *));
 E void FDECL(put_saddle_on_mon, (struct obj *, struct monst *));
 E boolean FDECL(can_ride, (struct monst *));
 E int NDECL(doride);
+E int NDECL(doridenearby);
 E boolean FDECL(mount_steed, (struct monst *));
 E void NDECL(exercise_steed);
 E void NDECL(kick_steed);

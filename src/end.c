@@ -676,7 +676,7 @@ VA_DECL(const char *, str)
         {
             struct special_view_info info = { 0 };
             info.viewtype = SPECIAL_VIEW_PANIC;
-            info.text = str;
+            info.text = buf;
             (void)open_special_view(info);
         }
 #endif
@@ -1412,6 +1412,7 @@ int how;
     update_game_music();
 
     const char* endtext = 0;
+    const char* endinfotext = 0;
     int screentextstyle = 0;
     int clr = NO_COLOR;
 
@@ -1444,11 +1445,13 @@ int how;
         break;
     case PANICKED:
         endtext = "Panic!";
+        endinfotext = "The cause has been recorded in the paniclog.";
         screentextstyle = SCREEN_TEXT_SPECIAL_END;
         clr = CLR_RED;
         break;
     case TRICKED:
         endtext = "Trickery!";
+        endinfotext = "Your game may have become corrupted.";
         screentextstyle = SCREEN_TEXT_SPECIAL_END;
         clr = CLR_RED;
         break;
@@ -1625,7 +1628,12 @@ int how;
     else if (how != QUIT)
     {
         char ebuf[BUFSZ];
-        Sprintf(ebuf, "%s", has_existing_save_file ? "You can load the game from the point at which you last saved the game." : endtext ? endtext : "Your game is over.");
+        Sprintf(ebuf, "%s%s%s%s%s", 
+            endtext ? endtext : "Your game is over.", 
+            endinfotext ? " " : "", 
+            endinfotext ? endinfotext : "", 
+            has_existing_save_file ? " " : "", 
+            has_existing_save_file ? "You can load the game from the point at which you last saved the game." : "");
         display_popup_text(ebuf, "Game Over", POPUP_TEXT_MESSAGE, ATR_NONE, clr, NO_GLYPH, POPUP_FLAGS_NONE);
     }
 
@@ -2275,7 +2283,7 @@ set_vanq_order()
         if (i == VANQ_ALPHA_MIX || i == VANQ_MCLS_HTOL) /* skip these */
             continue;
         any.a_int = i + 1;
-        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, vanqorders[i],
+        add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, vanqorders[i],
                  (i == vanq_sortmode) ? MENU_SELECTED : MENU_UNSELECTED);
     }
     end_menu(tmpwin, "Sort order for vanquished monster counts");
@@ -2915,8 +2923,8 @@ get_current_game_score()
         + 30 * (u.uconduct.literate == 0)
         + 2 * (u.uconduct.polypiles == 0)
         + 2 * (u.uconduct.polyselfs == 0)
-        + 25 * (u.uconduct.unvegan == 0)
-        + 15 * (u.uconduct.unvegetarian == 0)
+        + 15 * (u.uconduct.unvegan == 0)
+        + 10 * (u.uconduct.unvegetarian == 0)
         + 15 * (u.uconduct.weaphit == 0)
         + 2 * (u.uconduct.wisharti == 0)
         + 10 * (u.uconduct.wishes == 0)
@@ -3212,6 +3220,7 @@ reset_game(VOID_ARGS)
     plname_from_imported_savefile = FALSE;
     reset_gamestate_ex();
     n_game_recoveries = 0;
+    status_finish();
     reset_blstats();
     reset_occupations();
     reset_pick();
