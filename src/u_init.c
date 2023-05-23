@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0    u_init.c    $NHDT-Date: 1539510426 2018/10/14 09:47:06 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -910,8 +910,8 @@ u_init()
     u.uevent.uhand_of_elbereth = 0;
     u.uevent.uheard_tune = 0;
     u.uevent.uopened_dbridge = 0;
-    u.uevent.udemigod = 0;              /* not a demi-god yet... */
-    u.udg_cnt = 0;
+    u.uevent.ukilled_wizard = 0;              /* not a demi-god yet... */
+    u.uintervene_timer = 0;
     u.mh = u.mhmax = u.basehpmax = u.mtimedone = 0;
     u.uz.dnum = u.uz0.dnum = 0;
     u.utotype = 0;

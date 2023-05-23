@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0    pray.c    $NHDT-Date: 1549074257 2019/02/02 02:24:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.110 $ */
 /* Copyright (c) Benson I. Margulies, Mike Stephenson, Steve Linhart, 1989. */
@@ -1984,7 +1984,7 @@ crown_here:
 
     u.uprayer_timeout = Role_if(PM_PRIEST) ? rnz(175) : rnz(350);
 
-    kick_on_butt = u.uevent.udemigod ? 1 : 0;
+    kick_on_butt = u.uevent.ukilled_wizard ? 1 : 0;
     if (u.uevent.uhand_of_elbereth)
         kick_on_butt++;
     if (kick_on_butt)

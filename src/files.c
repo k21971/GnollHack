@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-01-06 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0    files.c    $NHDT-Date: 1546144856 2018/12/30 04:40:56 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.249 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1128,12 +1128,12 @@ int
 delete_savefile()
 {
     (void) unlink(fqname(SAVEF, SAVEPREFIX, 0));
-    return 0; /* for restore_saved_game() (ex-xxxmain.c) test */
+    return 0; /* for open_and_validate_saved_game() (ex-xxxmain.c) test */
 }
 
 /* try to open up a save file and prepare to restore it */
 int
-restore_saved_game()
+open_and_validate_saved_game()
 {
     const char *fq_save;
     int fd;
@@ -1198,7 +1198,7 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
         create_gamestate_levelfile();
     }
 
-    int fd = restore_saved_game();
+    int fd = open_and_validate_saved_game();
     if (fd >= 0)
     {
         /* Since wizard is actually flags.debug, restoring might
@@ -4506,7 +4506,7 @@ recover_savefile()
 #ifdef ANDROID
     /* if the new savefile isn't compressed
      * it will be overwritten when the old
-     * savefile is restored in restore_saved_game()
+     * savefile is restored in open_and_validate_saved_game()
      */
     nh_compress(fqname(SAVEF, SAVEPREFIX, 0));
 #endif

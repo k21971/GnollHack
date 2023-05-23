@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0    extern.h    $NHDT-Date: 1557088399 2019/05/05 20:33:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.703 $ */
 /* Copyright (c) Steve Creps, 1988.                  */
@@ -1174,7 +1174,7 @@ E void NDECL(set_imported_savefile);
 E int NDECL(create_savefile);
 E int NDECL(open_savefile);
 E int NDECL(delete_savefile);
-E int NDECL(restore_saved_game);
+E int NDECL(open_and_validate_saved_game);
 E void NDECL(mode_message);
 E void NDECL(create_gamestate_levelfile);
 E int FDECL(load_saved_game, (int));

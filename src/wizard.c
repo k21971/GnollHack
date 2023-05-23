@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0    wizard.c    $NHDT-Date: 1539804905 2018/10/17 19:35:05 $  $NHDT-Branch: keni-makedefsm $:$NHDT-Revision: 1.53 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -873,9 +873,9 @@ void
 wizdead()
 {
     context.no_of_wizards--;
-    if (!u.uevent.udemigod) {
-        u.uevent.udemigod = TRUE;
-        u.udg_cnt = rn1(250, 50);
+    if (!u.uevent.ukilled_wizard) {
+        u.uevent.ukilled_wizard = TRUE;
+        u.uintervene_timer = rn1(250, 50);
     }
 }
 

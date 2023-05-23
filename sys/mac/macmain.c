@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0	macmain.c	$NHDT-Date: 1432512796 2015/05/25 00:13:16 $  $NHDT-Branch: master $:$NHDT-Revision: 1.21 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -86,7 +86,7 @@ main(void)
  * We'll return here if new game player_selection() renames the hero.
  */
 attempt_restore:
-    if ((fd = restore_saved_game()) >= 0) {
+    if ((fd = open_and_validate_saved_game()) >= 0) {
 #ifdef NEWS
         if (iflags.news) {
             display_file(NEWS, FALSE);

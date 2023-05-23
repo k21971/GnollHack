@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* GnollHack 4.0    patchlevel.h    $NHDT-Date: 1557254337 2019/05/07 18:38:57 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.126 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -11,7 +11,7 @@
 /*
  * PATCHLEVEL is updated for each release.
  */
-#define PATCHLEVEL 0
+#define PATCHLEVEL 1
 /*
  * Incrementing EDITLEVEL can be used to force invalidation of old bones
  * and save files.
@@ -19,7 +19,7 @@
  * EDITLEVEL is also used to indicate the pre-alpha / alpha / beta version if PRE_RELEASE compiler preprocessor option is on.
  * Change EDITLEVEL when the changes to the game are save-file-breaking.
  */
-#define EDITLEVEL 44
+#define EDITLEVEL 0
 
 /*
  * HOTFIXLEVEL indicates the hot fix number. 
@@ -27,7 +27,7 @@
  */
 #define HOTFIXLEVEL 0
 //#define PRE_RELEASE
-#define VERSION_DETAILS
+//#define VERSION_DETAILS
 
 #define COPYRIGHT_BANNER_A "GnollHack, Copyright 2023 by Sound Mind Games"
 #define COPYRIGHT_BANNER_B \

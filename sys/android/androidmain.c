@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
 
 /* androidmain.c
  * based on unixmain.c
@@ -160,7 +160,7 @@ int GnollHackMain(int argc, char** argv)
 	 */
 	vision_init();
 
-	if((fd = restore_saved_game()) >= 0)
+	if((fd = open_and_validate_saved_game()) >= 0)
 	{
 #ifdef WIZARD
 		/* Since wizard is actually flags.debug, restoring might
