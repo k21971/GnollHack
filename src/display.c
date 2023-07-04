@@ -310,6 +310,8 @@ register int show;
         int feature_doodad_gui_glyph_before = gbuf[y][x].layers.layer_gui_glyphs[LAYER_FEATURE_DOODAD];
         int cover_feature_gui_glyph_before = gbuf[y][x].layers.layer_gui_glyphs[LAYER_COVER_FEATURE];
 
+        int special_feature_doodad_layer_height_before = gbuf[y][x].layers.special_feature_doodad_layer_height;
+
         //unsigned long flags_before = gbuf[y][x].layers.layer_flags;
         gbuf[y][x].layers.layer_glyphs[LAYER_FLOOR] = new_floor_glyph;
         gbuf[y][x].layers.layer_glyphs[LAYER_CARPET] = new_carpet_glyph;
@@ -333,7 +335,8 @@ register int show;
             || cover_feature_glyph_before != new_cover_feature_glyph
             || floor_gui_glyph_before != new_floor_gui_glyph || carpet_gui_glyph_before != new_carpet_gui_glyph || floor_doodad_gui_glyph_before != new_floor_doodad_gui_glyph
             || feature_gui_glyph_before != new_feature_gui_glyph || feature_doodad_gui_glyph_before != new_feature_doodad_gui_glyph
-            || cover_feature_gui_glyph_before != new_cover_feature_gui_glyph)
+            || cover_feature_gui_glyph_before != new_cover_feature_gui_glyph
+            || special_feature_doodad_layer_height_before != new_feature_doodad_height)
         {
             gbuf[y][x].isnew = 1;
             if (gbuf_start[y] > x)
@@ -2331,6 +2334,9 @@ docrt()
                 show_glyph_ascii(x, y, lev->hero_memory_layers.glyph);
                 add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY);
                 add_glyph_buffer_layer_flags(x, y, lev->hero_memory_layers.layer_flags);
+                set_glyph_buffer_feature_doodad_height(x, y, lev->hero_memory_layers.special_feature_doodad_layer_height);
+                set_glyph_buffer_object_height(x, y, lev->hero_memory_layers.object_height);
+                set_glyph_buffer_oid(x, y, lev->hero_memory_layers.o_id);
                 enum layer_types layer_idx;
                 for (layer_idx = LAYER_FLOOR; layer_idx <= LAYER_GENERAL_UI; layer_idx++)
                     show_gui_glyph_on_layer(x, y, lev->hero_memory_layers.layer_glyphs[layer_idx], lev->hero_memory_layers.layer_gui_glyphs[layer_idx], layer_idx);
@@ -2384,13 +2390,13 @@ redraw_map()
      * the map would currently be showing.
      */
     struct layer_info layers;
-    issue_gui_command(GUI_CMD_START_FLUSH);
+    issue_simple_gui_command(GUI_CMD_START_FLUSH);
     for (y = 0; y < ROWNO; ++y)
         for (x = 1; x < COLNO; ++x) {
             layers = layers_at(x, y); /* not levl[x][y].hero_memory_layers.glyph */
             print_glyph(WIN_MAP, x, y, layers);
         }
-    issue_gui_command(GUI_CMD_FINISH_FLUSH);
+    issue_simple_gui_command(GUI_CMD_FINISH_FLUSH);
     flush_screen(1);
 }
 
@@ -3387,7 +3393,7 @@ int cursor_on_u;
         return;
 #endif
 
-#if defined(GNH_MOBILE)
+#if (defined(GNH_MOBILE) || defined(WIN32)) && defined(USE_TILES)
     char saved_gbuf_start[ROWNO];
     char saved_gbuf_stop[ROWNO];
     memcpy(saved_gbuf_start, gbuf_start, ROWNO);
@@ -3434,7 +3440,7 @@ int cursor_on_u;
                         break;
                     }
 
-                    if (isok(rx, ry))
+                    if (isok(rx, ry) && cansee(rx, ry))
                     {
                         gptr_adj = &gbuf[ry][rx];
                         for (layer_idx = 0; layer_idx < MAX_LAYERS; layer_idx++)
@@ -3473,6 +3479,16 @@ int cursor_on_u;
             {
                 add_glyph_buffer_layer_flags(x, y, LFLAGS_APPEARS_UNLIT);
             }
+
+            //boolean nwead = NO_WALL_END_AUTODRAW(x, y);
+            //boolean cur = (gbuf[y][x].layers.layer_flags & LFLAGS_NO_WALL_END_AUTODRAW) != 0;
+            //if (nwead != cur)
+            //{
+            //    if (nwead)
+            //        add_glyph_buffer_layer_flags(x, y, LFLAGS_NO_WALL_END_AUTODRAW);
+            //    else
+            //        remove_glyph_buffer_layer_flags(x, y, LFLAGS_NO_WALL_END_AUTODRAW);
+            //}
         }
     }
 
@@ -3497,21 +3513,25 @@ int cursor_on_u;
         {
             if (isok(x, y))
             {
-                boolean nwead = NO_WALL_END_AUTODRAW(x, y);
+                boolean nwead = no_wall_end_autodraw(x, y);
                 boolean cur = (gbuf[y][x].layers.layer_flags & LFLAGS_NO_WALL_END_AUTODRAW) != 0;
                 if (nwead != cur)
                 {
                     gbuf[y][x].isnew = 1;
                     gbuf[y][x].layers.layer_flags &= ~LFLAGS_NO_WALL_END_AUTODRAW;
-                    if(nwead)
+                    if (nwead)
                         gbuf[y][x].layers.layer_flags |= LFLAGS_NO_WALL_END_AUTODRAW;
+                    if (gbuf_start[y] > x)
+                        gbuf_start[y] = x;
+                    if (gbuf_stop[y] < x)
+                        gbuf_stop[y] = x;
                 }
             }
         }
     }
 #endif
-    issue_gui_command(Is_really_rogue_level(&u.uz) ? GUI_CMD_FORCE_ASCII : GUI_CMD_UNFORCE_ASCII);
-    issue_gui_command(GUI_CMD_START_FLUSH);
+    issue_simple_gui_command(Is_really_rogue_level(&u.uz) ? GUI_CMD_FORCE_ASCII : GUI_CMD_UNFORCE_ASCII);
+    issue_simple_gui_command(GUI_CMD_START_FLUSH);
     for (y = 0; y < ROWNO; y++) {
         register gbuf_entry *gptr = &gbuf[y][x = gbuf_start[y]];
 
@@ -3521,7 +3541,7 @@ int cursor_on_u;
                 gptr->isnew = 0;
             }
     }
-    issue_gui_command(GUI_CMD_FINISH_FLUSH);
+    issue_simple_gui_command(GUI_CMD_FINISH_FLUSH);
 
     if (cursor_on_u)
         curs(WIN_MAP, u.ux, u.uy); /* move cursor to the hero */
@@ -4545,13 +4565,13 @@ xchar x, y;
 STATIC_DCL const char *FDECL(type_to_name, (int));
 STATIC_DCL void FDECL(error4, (int, int, int, int, int, int));
 
-STATIC_VAR int bad_count[MAX_TYPE]; /* count of positions flagged as bad */
+STATIC_VAR int bad_count[MAX_LEVTYPE]; /* count of positions flagged as bad */
 
 STATIC_DCL const char *
 type_to_name(type)
 int type;
 {
-    return (type < 0 || type >= MAX_TYPE) ? "unknown" : location_type_definitions[type].name;
+    return (type < 0 || type >= MAX_LEVTYPE) ? "unknown" : location_type_definitions[type].name;
 }
 
 STATIC_DCL void
@@ -4724,7 +4744,7 @@ set_wall_state()
     struct rm *lev;
 
 #ifdef WA_VERBOSE
-    for (x = 0; x < MAX_TYPE; x++)
+    for (x = 0; x < MAX_LEVTYPE; x++)
         bad_count[x] = 0;
 #endif
 
@@ -4783,7 +4803,7 @@ set_wall_state()
 
 #ifdef WA_VERBOSE
     /* check if any bad positions found */
-    for (x = y = 0; x < MAX_TYPE; x++)
+    for (x = y = 0; x < MAX_LEVTYPE; x++)
         if (bad_count[x]) {
             if (y == 0) {
                 y = 1; /* only print once */
@@ -5227,7 +5247,7 @@ get_current_cmap_type_index()
         return level.flags.tileset;
     else if (dungeons[u.uz.dnum].flags.has_tileset)
         return dungeons[u.uz.dnum].flags.tileset;
-    else if (In_mines(&u.uz) || Is_quantum_level(&u.uz))
+    else if (In_mines(&u.uz) || Is_quantum_tunnel_level(&u.uz))
         return CMAP_GNOMISH_MINES;
     else if (Is_valley(&u.uz) || Is_orcus_level(&u.uz) || Is_sanctum(&u.uz) || In_V_tower(&u.uz))
         return CMAP_UNDEAD;
@@ -5339,7 +5359,7 @@ struct monst* mtmp;
     int glyph = any_seen_mon_to_glyph(mtmp, rn2_on_display_rng);
     int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
 
-    return iflags.using_gui_tiles ? gui_glyph : glyph;
+    return gui_glyph;
 }
 
 const char*

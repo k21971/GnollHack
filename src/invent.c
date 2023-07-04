@@ -849,6 +849,7 @@ struct obj *obj;
         if (!u.uachieve.amulet)
         {
             achievement_gained("Amulet of Yendor");
+            livelog_printf(LL_ACHIEVE, "%s", "acquired the Amulet of Yendor");
             if (iflags.using_gui_sounds)
             {
                 delay_output_milliseconds(500);
@@ -872,7 +873,10 @@ struct obj *obj;
         if (flags.showscore && !u.uachieve.menorah)
             context.botl = 1;
         if (!u.uachieve.menorah)
+        {
             achievement_gained("Candelabrum of Invocation");
+            livelog_printf(LL_ACHIEVE, "%s", "acquired the Candelabrum of Invocation");
+        }
         u.uachieve.menorah = 1;
     }
     else if (obj->otyp == BELL_OF_OPENING)
@@ -883,7 +887,10 @@ struct obj *obj;
         if (flags.showscore && !u.uachieve.bell)
             context.botl = 1;
         if (!u.uachieve.bell)
+        {
             achievement_gained("Bell of Opening");
+            livelog_printf(LL_ACHIEVE, "%s", "acquired the Bell of Opening");
+        }
         u.uachieve.bell = 1;
     }
     else if (obj->otyp == SPE_BOOK_OF_THE_DEAD)
@@ -893,8 +900,11 @@ struct obj *obj;
         u.uhave.book = 1;
         if (flags.showscore && !u.uachieve.book)
             context.botl = 1;
-        if (!u.uachieve.bell)
+        if (!u.uachieve.book)
+        {
             achievement_gained("Book of the Dead");
+            livelog_printf(LL_ACHIEVE, "%s", "acquired the Book of the Dead");
+        }
         u.uachieve.book = 1;
     } 
     else if (obj->oartifact) 
@@ -914,7 +924,10 @@ struct obj *obj;
             if (flags.showscore && !u.uachieve.prime_codex)
                 context.botl = 1;
             if (!u.uachieve.prime_codex)
+            {
                 achievement_gained("Prime Codex");
+                livelog_printf(LL_ACHIEVE, "%s", "acquired the Prime Codex");
+            }
             u.uachieve.prime_codex = 1;
         }
 
@@ -949,9 +962,11 @@ struct obj *obj;
         if (check_achievement && u.uevent.role_achievement_1 && u.uevent.role_achievement_2 && !u.uachieve.role_achievement)
         {
             u.uachieve.role_achievement = 1;
+            const char* ra_desc = get_role_achievement_description(TRUE);
             char abuf[BUFSZ];
-            strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+            strcpy_capitalized_for_title(abuf, ra_desc);
             achievement_gained(abuf);
+            livelog_printf(LL_ACHIEVE, "%s", ra_desc);
         }
     }
 
@@ -960,7 +975,10 @@ struct obj *obj;
         if (flags.showscore && !u.uachieve.mines_luckstone)
             context.botl = 1;
         if (!u.uachieve.mines_luckstone)
+        {
             achievement_gained("Gladstone");
+            livelog_printf(LL_ACHIEVE, "%s", "acquired the Gladstone from Mines' End");
+        }
         u.uachieve.mines_luckstone = 1;
         obj->speflags &= ~(SPEFLAGS_MINES_PRIZE);
         obj->nomerge = 0;
@@ -970,7 +988,10 @@ struct obj *obj;
         if (flags.showscore && !u.uachieve.finish_sokoban)
             context.botl = 1;
         if (!u.uachieve.finish_sokoban)
+        {
             achievement_gained("Sokoban Solved");
+            livelog_printf(LL_ACHIEVE, "completed Sokoban, acquiring %s", an(xname(obj)));
+        }
         u.uachieve.finish_sokoban = 1;
         obj->speflags &= ~(SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2);
         obj->nomerge = 0;
@@ -983,6 +1004,7 @@ struct obj *obj;
                 context.botl = 1;
             u.uachieve.role_achievement = 1;
             achievement_gained("Found the Holy Grail");
+            livelog_printf(LL_ACHIEVE, "%s", "found the Holy Grail");
         }
     }
 }
@@ -1552,7 +1574,7 @@ boolean verbose;
     if (state_change_detected || condition_change)
     {
         context.botl = context.botlx = TRUE;
-        force_redraw_at(u.ux, u.uy);
+        refresh_u_tile_gui_info(FALSE);
     }
 }
 
@@ -3803,7 +3825,13 @@ struct obj *otmp;
 {
     fully_identify_obj(otmp);
     prinv((char *) 0, otmp, 0L);
-    display_popup_text(xprname(otmp, (char*)0, obj_to_let(otmp), TRUE, 0L, 0UL), "Item Identified", POPUP_TEXT_IDENTIFY, ATR_NONE, NO_COLOR, NO_GLYPH, POPUP_FLAGS_NONE);
+    char* text = xprname(otmp, (char*)0, obj_to_let(otmp), TRUE, 0L, 0UL);
+    int color = NO_COLOR, attr = ATR_NONE;
+    if(iflags.use_menu_color)
+        (void)get_menu_coloring(text, &color, &attr);
+    //int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
+    //int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    display_popup_text(text, "Item Identified", POPUP_TEXT_IDENTIFY, attr, color, NO_GLYPH, POPUP_FLAGS_COLOR_TEXT);
 
     return 1;
 }
@@ -3993,11 +4021,81 @@ const char *prefix;
 struct obj *obj;
 long quan;
 {
+    //if (!prefix)
+    //    prefix = "";
+    //pline("%s%s%s", prefix, *prefix ? " " : "",
+    //      xprname(obj, (char *) 0, obj_to_let(obj), TRUE, 0L, quan));
+    prinv_ex(prefix, obj, quan, ATR_NONE, NO_COLOR, ATR_NONE, NO_COLOR, TRUE, FALSE);
+}
+
+void
+prinv_ex(prefix, obj, quan, prefix_attr, prefix_color, attr, color, apply_menucolor, apply_to_separator)
+const char* prefix;
+struct obj* obj;
+long quan;
+int prefix_attr, prefix_color, attr, color;
+boolean apply_menucolor, apply_to_separator;
+{
     if (!prefix)
         prefix = "";
-    pline("%s%s%s", prefix, *prefix ? " " : "",
-          xprname(obj, (char *) 0, obj_to_let(obj), TRUE, 0L, quan));
+    //char* text = xprname(obj, (char*)0, obj_to_let(obj), TRUE, 0L, quan);
+    char let = obj_to_let(obj);
+    long cost = 0;
+    boolean dot = TRUE;
+#ifdef LINT /* handle static char li[BUFSZ]; */
+    char li[BUFSZ];
+    char li2[BUFSZ];
+#else
+    static char li[BUFSZ];
+    static char li2[BUFSZ];
+#endif
+    boolean use_invlet = (flags.invlet_constant
+        && let != CONTAINED_SYM && let != HANDS_SYM);
+    long savequan = 0;
+
+    if (quan && obj) {
+        savequan = obj->quan;
+        obj->quan = quan;
+    }
+
+
+    /*
+     * If let is:
+     *  -  Then obj == null and 'txt' refers to hands or fingers.
+     *  *  Then obj == null and we are printing a total amount.
+     *  >  Then the object is contained and doesn't have an inventory letter.
+     */
+
+    if (cost != 0 || let == '*') 
+    {
+        /* if dot is true, we're doing Iu, otherwise Ix */
+        Sprintf(li, "%s%c - ", *prefix ? " " : "",
+            (dot && use_invlet ? obj->invlet : let));
+        Sprintf(li2,
+            (iflags.menu_tab_sep ? "%s\t%6ld %s"
+                : "%-45s %6ld %s"),
+            doname(obj), cost, currency(cost));
+    }
+    else 
+    {
+        /* ordinary inventory display or pickup message */
+        Sprintf(li,
+            "%s%c - ", *prefix ? " " : "", (use_invlet ? obj->invlet : let));
+        Sprintf(li2,
+            "%s%s", doname(obj), (dot ? "." : ""));
+    }
+    if (savequan)
+        obj->quan = savequan;
+
+    int mattr = attr, mcolor = color;
+    if (iflags.use_menu_color && apply_menucolor && get_menu_coloring(li2, &mcolor, &mattr))
+    {
+        //Color has been set
+    }
+
+    custompline_ex_prefix(prefix_attr, prefix_color, prefix, apply_to_separator ? attr : ATR_NONE, apply_to_separator ? color : NO_COLOR, li, mattr, mcolor, 0UL, "%s", li2);
 }
+
 
 char *
 xprname(obj, txt, let, dot, cost, quan)
@@ -4148,7 +4246,7 @@ long pickcnt;
     int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
     any = zeroany;
-    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_COMMAND_MENU, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_obj(otmp));
+    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_COMMAND_MENU, gui_glyph, extended_create_window_info_from_obj(otmp));
     start_menu_ex(win, GHMENU_STYLE_ITEM_COMMAND);
 
 #define NUM_CMD_SECTIONS 3
@@ -4647,7 +4745,7 @@ nextclass:
                          let_to_name(*invlet, FALSE,
                                      (want_reply && iflags.menu_head_objsym)),
                          MENU_UNSELECTED,
-                    menu_group_heading_info(*invlet > ILLOBJ_CLASS&&* invlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*invlet)].sym : '\0'));
+                    menu_group_heading_info(*invlet > ILLOBJ_CLASS && *invlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*invlet)].sym : '\0'));
                 classcount++;
             }
             if (wizid)
@@ -4665,7 +4763,7 @@ nextclass:
 
             int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
             int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-            add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any, ilet,
+            add_extended_menu(win, gui_glyph, &any, ilet,
                 applied_class_accelerator,
                      ATR_NONE, NO_COLOR, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly) : doname_with_weight_first(otmp, loadstonecorrectly)) : doname(otmp), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
         }
@@ -5069,7 +5167,7 @@ char avoidlet;
                     any.a_char = ilet;
                     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
                     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-                    add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph,
+                    add_extended_menu(win, gui_glyph,
                              &any, ilet, 0, ATR_NONE, NO_COLOR,
                              (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE) : doname_with_weight_first(otmp, TRUE)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
                 }
@@ -5118,13 +5216,16 @@ boolean bynexthere;
 }
 
 int
-count_objects(list, bynexthere)
+count_objects(list, filterfunc, bynexthere)
 struct obj* list;
+boolean FDECL((*filterfunc), (OBJ_P));
 boolean bynexthere;
 {
     int count = 0;
 
     while (list) {
+        if (filterfunc && !(*filterfunc)(list))
+            continue;
         count++;
         if(bynexthere)
             list = list->nexthere;
@@ -5917,10 +6018,10 @@ boolean picked_some, explicit_cmd;
     }
 
     /* we know there is something here */
-    int total_count = 0;
-    struct obj* otmp_cnt;
-    for (otmp_cnt = otmp; otmp_cnt; otmp_cnt = otmp_cnt->nexthere)
-        total_count++;
+    //int total_count = 0;
+    //struct obj* otmp_cnt;
+    //for (otmp_cnt = otmp; otmp_cnt; otmp_cnt = otmp_cnt->nexthere)
+    //    total_count++;
 
     if (skip_objects)
     {
@@ -6008,8 +6109,17 @@ boolean picked_some, explicit_cmd;
                     totalweight += objects[LUCKSTONE].oc_weight;
                 else
                     totalweight += otmp->owt;
-                Sprintf(buf2, "%2d - %s", count, (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known))); //Looking at what is on the ground
-                putstr(tmpwin, ATR_INDENT_AT_DASH, buf2);
+
+                Sprintf(buf, "%s", (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known))); //Looking at what is on the ground
+                Sprintf(buf2, "%2d - %s", count, ""); //Looking at what is on the ground
+                int attr = ATR_NONE;
+                int color = NO_COLOR;
+                if (iflags.use_menu_color && get_menu_coloring(buf, &color, &attr))
+                {
+                    //Nothing
+                }
+                putstr_ex(tmpwin, buf2, ATR_INDENT_AT_DASH, NO_COLOR, 1);
+                putstr_ex(tmpwin, buf, ATR_INDENT_AT_DASH | attr, color, 0);
             }
 
             if (flags.show_weight_summary)
@@ -6046,7 +6156,7 @@ print_things_here_to_window(VOID_ARGS)
     if (tmpwin == WIN_ERR)
         return;
 
-    int attr = 0;
+    int attr = ATR_NONE;
     int textcolor = CLR_MSG_ATTENTION;
 
     struct obj* otmp;
@@ -6071,18 +6181,17 @@ print_things_here_to_window(VOID_ARGS)
 
     char buf[BUFSZ];
     char buf2[BUFSZ];
-    int count = 0;
     int displ_style = here_window_display_style(dfeature, ep, otmp);
     if (displ_style == 0)
         return;
     else if (displ_style == 2)
     {
-        putstr_ex(tmpwin, attr, Blind ? "[You feel there are many objects here.]" : "[There are many objects here.]", 0, textcolor);
+        putstr_ex(tmpwin, Blind ? "[You feel there are many objects here.]" : "[There are many objects here.]", attr, textcolor, 0);
     }
     else
     {
         Sprintf(buf, "%s that %s here:", "Things", Blind ? "you feel" : "are");
-        putstr_ex(tmpwin, attr, buf, 0, textcolor);
+        putstr_ex(tmpwin, buf, attr, textcolor, 0);
 
         if (dfeature)
         {
@@ -6106,15 +6215,12 @@ print_things_here_to_window(VOID_ARGS)
             }
 
             
-            putstr_ex(tmpwin, attr, "'", 1, textcolor);
+            putstr_ex(tmpwin, "'", attr, textcolor, 1);
             Sprintf(fbuf, "%c", sym);
-            putstr_ex(tmpwin, 0, fbuf, 1, color);
-            putstr_ex(tmpwin, attr, "' ", 1, textcolor);
+            putstr_ex(tmpwin, fbuf, ATR_NONE, color, 1);
+            putstr_ex(tmpwin, "' ", attr, textcolor, 1);
             Sprintf(fbuf, "%s", an(dfbuf));
-            putstr_ex(tmpwin, attr, fbuf, 0, textcolor);
-            
-            //Sprintf(fbuf, "'%c' %s", sym, an(dfbuf));
-            //putstr_ex(tmpwin, attr, fbuf, 0, textcolor);
+            putstr_ex(tmpwin, fbuf, attr, textcolor, 0);
         }
 
         if (ep && ep->engr_txt[0] && !Blind)
@@ -6122,44 +6228,50 @@ print_things_here_to_window(VOID_ARGS)
             switch (ep->engr_type) {
             case DUST:
                 Sprintf(ebuf, "Writing in the %s:", is_ice(u.ux, u.uy) ? "frost" : "dust");
-                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
                break;
             case ENGRAVE:
             case ENGR_HEADSTONE:
                 Sprintf(ebuf, "Engraving on the %s:", surface(u.ux, u.uy));
-                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
                 break;
             case ENGR_SIGNPOST:
                 Strcpy(ebuf, "Writing on the signpost:");
-                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
                 break;
             case BURN:
-                Sprintf(ebuf, "Writing %s on the %s:", is_ice(u.ux, u.uy) ? "melted" : "burned", surface(u.ux, u.uy));
-                putstr_ex(tmpwin, attr, ebuf, 1, CLR_ORANGE);
+                Strcpy(ebuf, "Writing ");
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
+                Sprintf(ebuf, "%s", is_ice(u.ux, u.uy) ? "melted" : "burned");
+                putstr_ex(tmpwin, ebuf, attr, is_ice(u.ux, u.uy) ? CLR_CYAN : CLR_ORANGE, 1);
+                Sprintf(ebuf, " on the %s:", surface(u.ux, u.uy));
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
                 break;
             case MARK:
                 Sprintf(ebuf, "Graffiti on the %s:", surface(u.ux, u.uy));
-                putstr_ex(tmpwin, attr, ebuf, 1, textcolor);
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
                 break;
             case ENGR_BLOOD:
-                Strcpy(ebuf, "Message scrawled in blood:");
-                putstr_ex(tmpwin, attr, ebuf, 1, CLR_RED);
+                Strcpy(ebuf, "Message scrawled in ");
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
+                Strcpy(ebuf, "blood");
+                putstr_ex(tmpwin, ebuf, attr, CLR_RED, 1);
+                Strcpy(ebuf, ":");
+                putstr_ex(tmpwin, ebuf, attr, textcolor, 1);
                 break;
             default:
                 Strcpy(ebuf, "Message written in a very strange way:");
-                putstr_ex(tmpwin, attr, ebuf, 1, CLR_MSG_FAIL);
+                putstr_ex(tmpwin, ebuf, attr, CLR_MSG_FAIL, 1);
                 break;
             }
             strncpy(buf, ep->engr_txt, BUFSZ - 5);
             buf[BUFSZ - 5] = 0;
             Sprintf(ebuf, " \"%s\".", buf);
-            putstr_ex(tmpwin, attr, ebuf, 0, textcolor);
+            putstr_ex(tmpwin, ebuf, attr, CLR_MSG_TEXT, 0);
         }
 
         for (; otmp; otmp = otmp->nexthere) 
         {
-            count++;
-
             struct layer_info layers = nul_layerinfo;
             char sym = 0;
             nhsym ch = 0;
@@ -6178,15 +6290,17 @@ print_things_here_to_window(VOID_ARGS)
                 sym = (char)ch;
             }
             
-            putstr_ex(tmpwin, attr, "'", 1, textcolor);
+            putstr_ex(tmpwin, "'", attr, textcolor, 1);
             Sprintf(buf2, "%c", sym);
-            putstr_ex(tmpwin, 0, buf2, 1, color);
-            putstr_ex(tmpwin, attr, "' ", 1, textcolor);
+            putstr_ex(tmpwin, buf2, ATR_NONE, color, 1);
+            putstr_ex(tmpwin, "' ", attr, textcolor, 1);
             Sprintf(buf2, "%s", (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known)));
-            putstr_ex(tmpwin, attr, buf2, 0, textcolor);
-            
-            //Sprintf(buf2, "'%c' %s", sym, (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known)));
-            //putstr_ex(tmpwin, attr, buf2, 0, textcolor);
+            int mcolor = NO_COLOR, mattr = ATR_NONE;
+            if (iflags.use_menu_color && get_menu_coloring(buf2, &mcolor, &mattr))
+                putstr_ex(tmpwin, buf2, mattr, mcolor, 0);
+            else
+                putstr_ex(tmpwin, buf2, attr, textcolor, 0);
+           
         }
     }
 }

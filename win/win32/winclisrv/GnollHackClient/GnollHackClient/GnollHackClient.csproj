@@ -67,6 +67,8 @@
     <None Remove="Assets\main-menu-ranger.jpg" />
     <None Remove="Assets\Master.bank" />
     <None Remove="Assets\Master.strings.bank" />
+    <None Remove="Assets\Music.bank" />
+    <None Remove="Assets\Preliminary.bank" />
     <None Remove="Assets\shxi.ttf" />
     <None Remove="Assets\splash-snapshot.jpg" />
     <None Remove="Assets\test.wav" />
@@ -182,6 +184,7 @@
     <None Remove="Assets\UI\status-difficulty-very-easy.png" />
     <None Remove="Assets\UI\status-difficulty.png" />
     <None Remove="Assets\UI\status-dungeon-level.png" />
+    <None Remove="Assets\UI\status-empty-handed.png" />
     <None Remove="Assets\UI\status-gold.png" />
     <None Remove="Assets\UI\status-hd.png" />
     <None Remove="Assets\UI\status-mc.png" />
@@ -277,6 +280,7 @@
     <EmbeddedResource Include="Assets\UI\background-loading-screen.png" />
     <EmbeddedResource Include="Assets\UI\chatsteed.png" />
     <EmbeddedResource Include="Assets\UI\droptypes.png" />
+    <EmbeddedResource Include="Assets\UI\status-empty-handed.png" />
     <EmbeddedResource Include="Assets\UI\unwield.png" />
     <Page Include="Assets\imrl.otf" />
     <EmbeddedResource Include="Assets\Lato-Bold.ttf" />
@@ -460,14 +464,13 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="3.1.14" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-    <PackageReference Include="Plugin.StoreReview" Version="5.0.1" />
     <PackageReference Include="SkiaSharp.Views.Forms" Version="2.80.3" />
     <PackageReference Include="Xamarin.CommunityToolkit" Version="2.0.1" />
     <PackageReference Include="Xamarin.CommunityToolkit.Markup" Version="2.0.1" />
     <PackageReference Include="Xamarin.FFImageLoading" Version="2.4.11.982" />
     <PackageReference Include="Xamarin.FFImageLoading.Forms" Version="2.4.11.982" />
     <PackageReference Include="Xamarin.FFImageLoading.Transformations" Version="2.4.11.982" />
-    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2401" />
+    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2578" />
     <PackageReference Include="Xamarin.Essentials" Version="1.7.5" />
   </ItemGroup>
 
@@ -483,6 +486,9 @@
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Controls\SwitchableCanvasView.xaml">
+      <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Controls\CustomImageButton.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Pages\Game\AboutPage.xaml">
@@ -537,6 +543,9 @@
   <ItemGroup>
     <Compile Update="Controls\SimpleImageButton.xaml.cs">
       <DependentUpon>SimpleImageButton.xaml</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\CustomImageButton.xaml.cs">
+      <DependentUpon>CustomImageButton.xaml</DependentUpon>
     </Compile>
     <Compile Update="Pages\Game\AboutPage.xaml.cs">
       <DependentUpon>AboutPage.xaml</DependentUpon>

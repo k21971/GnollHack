@@ -7,7 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
+using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
@@ -25,8 +25,8 @@ namespace GnollHackClient.Pages.Game
             InitializeComponent();
             On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
             _fileName = fileName;
-            Assembly assembly = GetType().GetTypeInfo().Assembly;
-            CloseButtonImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+            //Assembly assembly = GetType().GetTypeInfo().Assembly;
+            //CloseButtonImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
             ScoresView.BindingContext = this;
             MainGrid.BindingContext = this;
         }
@@ -34,17 +34,18 @@ namespace GnollHackClient.Pages.Game
         public TopScorePage()
         {
             InitializeComponent();
+            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
             _fileName = "";
             NoScoresLabel.IsVisible = true;
             ScoresView.IsVisible = false;
-            Assembly assembly = GetType().GetTypeInfo().Assembly;
-            CloseButtonImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+            //Assembly assembly = GetType().GetTypeInfo().Assembly;
+            //CloseButtonImage.Source = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
             ScoresView.BindingContext = this;
         }
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
         {
-            CloseGrid.IsEnabled = false;
+            CloseButton.IsEnabled = false;
             App.PlayButtonClickedSound();
             await App.Current.MainPage.Navigation.PopModalAsync();
         }
@@ -114,7 +115,7 @@ namespace GnollHackClient.Pages.Game
                 _currentPageHeight = height;
 
                 HeaderLabel.Margin = ClientUtils.GetHeaderMarginWithBorder(bkgView.BorderStyle, width, height);
-                CloseGrid.Margin = ClientUtils.GetFooterMarginWithBorderWithTop(bkgView.BorderStyle, width, height, 20.0);
+                CloseButton.Margin = ClientUtils.GetFooterMarginWithBorderWithTop(bkgView.BorderStyle, width, height, 20.0);
                 double bordermargin = ClientUtils.GetBorderWidth(bkgView.BorderStyle, width, height);
                 ScoresView.Margin = new Thickness(bordermargin, 0, bordermargin, 0);
 
@@ -248,6 +249,37 @@ namespace GnollHackClient.Pages.Game
             }
         }
 
+        public async Task<bool> OpenBrowser(Uri uri)
+        {
+            try
+            {
+                await Browser.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
+                return false;
+            }
+        }
+        public async Task<bool> OpenFileInLauncher(string fullPath)
+        {
+            try
+            {
+                await Launcher.OpenAsync(new OpenFileRequest
+                {
+                    File = new ReadOnlyFile(fullPath)
+                }); 
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Cannot Open File", "GnollHack cannot open the file at " + fullPath + " in launcher. Error: " + ex.Message, "OK");
+                return false;
+            }
+        }
+
+
         private async void Button_Clicked(object sender, EventArgs e)
         {
             App.PlayButtonClickedSound();
@@ -260,18 +292,72 @@ namespace GnollHackClient.Pages.Game
             if(tsi != null)
             {
                 string fulltargetpath = Path.Combine(App.GHPath, "dumplog", tsi.GetDumplogFileName());
-                var displFilePage = new DisplayFilePage(fulltargetpath, "Dumplog - " + tsi.Name, 0, true);
-                string errormsg = "";
-                if (!displFilePage.ReadFile(out errormsg))
+                string fullhtmltargetpath = Path.Combine(App.GHPath, "dumplog", tsi.GetHTMLDumplogFileName());
+                bool dumplogexists = File.Exists(fulltargetpath);
+                bool htmldumplogexists = File.Exists(fullhtmltargetpath);
+
+                bool HTMLDumplogDisplayed = false;
+                try
                 {
-                    await DisplayAlert("Error Reading Dumplog File", errormsg, "OK");
+                    if(App.UseHTMLDumpLogs && htmldumplogexists)
+                    {
+                        bool openhtml = true;
+                        if (dumplogexists && htmldumplogexists && !App.UseSingleDumpLog)
+                            openhtml = await DisplayAlert("Open HTML DumpLog", "There are both text and HTML dumplogs available. Do you want to open the HTML dumplog?", "Yes", "No");
+                        if (openhtml)
+                        {
+                            //HTMLDumplogDisplayed = await OpenFileInLauncher(fullhtmltargetpath);
+                            var displFilePage = new DisplayFilePage(fullhtmltargetpath, "Dumplog - " + tsi.Name, 0, true, true);
+                            string errormsg = "";
+                            if (!displFilePage.ReadFile(out errormsg))
+                            {
+                                await DisplayAlert("Error Reading HTML Dumplog File", errormsg, "OK");
+                            }
+                            else
+                            {
+                                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                                HTMLDumplogDisplayed = true;
+                            }
+                        }
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                    await DisplayAlert("Error Reading HTML Dumplog File", "An error occurred when reading HTML dumplog \'" + fullhtmltargetpath + "\' for " + tsi.Name + ": " + ex.Message, "OK");
+                }
+
+                try
+                {
+                    if (!HTMLDumplogDisplayed)
+                    {
+                        if (dumplogexists)
+                        {
+                            var displFilePage = new DisplayFilePage(fulltargetpath, "Dumplog - " + tsi.Name, 0, true);
+                            string errormsg = "";
+                            if (!displFilePage.ReadFile(out errormsg))
+                            {
+                                await DisplayAlert("Error Reading Dumplog File", errormsg, "OK");
+                            }
+                            else
+                            {
+                                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                            }
+                        }
+                        else
+                        {
+                            await DisplayAlert("No Dumplog", "Dumplog \'" + fulltargetpath + "\' for " + tsi.Name + " does not exist.", "OK");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await DisplayAlert("Error Reading Dumplog File", "An error occurred when reading dumplog \'" + fulltargetpath + "\' for " + tsi.Name + ": " + ex.Message, "OK");
                 }
             }
+            else
+            {
+                await DisplayAlert("Top Score Info Missing", "Selected top score information does not exist.", "OK");
+            }
         }
-
     }
 }

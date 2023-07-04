@@ -38,7 +38,12 @@ struct window_procs lib_procs = {
     lib_nh_poskey, lib_nhbell, lib_doprev_message, lib_yn_function_ex,
     lib_getlin_ex, lib_get_ext_cmd, lib_number_pad, lib_delay_output, lib_delay_output_milliseconds, lib_delay_output_intervals,
 #ifdef CHANGE_COLOR /* only a Mac option currently */
-    lib_change_color, lib_change_background,
+    lib_change_color, 
+#ifdef MAC
+    lib_change_background,
+    lib_set_font_name,
+#endif
+    lib_get_color_string,
 #endif
     /* other defs that really should go away (they're tty specific) */
     lib_start_screen, lib_end_screen, lib_outrip,
@@ -231,6 +236,7 @@ void lib_get_nh_event(void)
 void lib_exit_nhwindows(const char* param)
 {
     lib_callbacks.callback_exit_nhwindows(param);
+    iflags.window_inited = 0;
 }
 
 void lib_suspend_nhwindows(const char* param)
@@ -274,12 +280,12 @@ void lib_curs(winid wid, int x, int y)
 }
 
 /* text is supposed to be in CP437; if text is UTF8 encoding, call callback_putstr_ex directly */
-void lib_putstr_ex(winid wid, int attr, const char* text, int append, int color)
+void lib_putstr_ex(winid wid, const char* text, int attr, int color, int append)
 {
     char buf[UTF8BUFSZ] = "";
     if (text)
         write_text2buf_utf8(buf, UTF8BUFSZ, text);
-    lib_callbacks.callback_putstr_ex(wid, attr, text ? buf : 0, append, color);
+    lib_callbacks.callback_putstr_ex(wid, text ? buf : 0, attr, color, append);
 }
 
 void lib_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int append)
@@ -322,7 +328,7 @@ void lib_display_file(const char* filename, BOOLEAN_P must_exist)
                 line[len - 1] = '\x0';
 
             /* The files are already in UTF8 encoding, so do not convert again by using lib_putstr_ex */
-            lib_callbacks.callback_putstr_ex(textwin, ATR_NONE, line, 0, NO_COLOR);
+            lib_callbacks.callback_putstr_ex(textwin, line, ATR_NONE, NO_COLOR, 0);
         }
         (void)dlb_fclose(f);
 
@@ -332,8 +338,10 @@ void lib_display_file(const char* filename, BOOLEAN_P must_exist)
 
 }
 
+static int last_menu_style = 0;
 void lib_start_menu_ex(winid wid, int style)
 {
+    last_menu_style = style;
     lib_callbacks.callback_start_menu_ex(wid, style);
 }
 
@@ -348,7 +356,8 @@ void lib_add_menu(winid wid, int glyph, const ANY_P* identifier,
     if (str)
         write_text2buf_utf8(buf, UTF8BUFSZ, str);
 #ifdef TEXTCOLOR
-    get_menu_coloring(str, &color, &attr);
+    if(iflags.use_menu_color && menu_style_allows_menu_coloring(last_menu_style))
+        get_menu_coloring(str, &color, &attr);
 #endif
     lib_callbacks.callback_add_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color, str ? buf : 0, presel);
 }
@@ -365,7 +374,8 @@ void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier,
         write_text2buf_utf8(buf, UTF8BUFSZ, str);
 
 #ifdef TEXTCOLOR
-    get_menu_coloring(str, &color, &attr);
+    if (iflags.use_menu_color && menu_style_allows_menu_coloring(last_menu_style))
+        get_menu_coloring(str, &color, &attr);
 #endif
     if (info.object)
         set_obj_glyph(info.object);
@@ -555,11 +565,15 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
     }
 }
 
-void lib_issue_gui_command(int initid)
+void lib_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str)
 {
-    lib_callbacks.callback_issue_gui_command(initid);
+    char utf8buf[UTF8BUFSZ];
+    if (cmd_str)
+        write_text2buf_utf8(utf8buf, UTF8BUFSZ, cmd_str);
 
-    switch (initid)
+    lib_callbacks.callback_issue_gui_command(cmd_id, cmd_param, cmd_str ? utf8buf : 0);
+
+    switch (cmd_id)
     {
     case GUI_CMD_CLEAR_PET_DATA:
     {
@@ -719,20 +733,36 @@ void lib_delay_output_intervals(int intervals)
     reduce_counters_intervals(intervals);
 }
 
+#ifdef CHANGE_COLOR
 void lib_change_color(int param1, long param2, int param3)
 {
     return;
 }
 
-char* lib_change_background(void)
+#ifdef MAC
+/*ARGUSED*/
+STATIC_OVL void
+lib_change_background(arg)
+int arg UNUSED;
 {
-    return "";
+    return;
 }
+
+/*ARGSUSED*/
+STATIC_OVL short
+lib_set_font_name(window, fontname)
+winid window;
+char* fontname;
+{
+    return 0;
+}
+#endif /* MAC */
 
 char* lib_get_color_string(void)
 {
     return "";
 }
+#endif
 
 void lib_start_screen(void)
 {
@@ -832,6 +862,22 @@ void lib_status_enablefield(int fieldidx, const char* nm, const char* fmt, BOOLE
 {
     lib_callbacks.callback_status_enablefield(fieldidx, nm, fmt, enable);
     genl_status_enablefield(fieldidx, nm, fmt, enable);
+
+    if (!enable)
+    {
+        if (fieldidx == BL_UWEP || fieldidx == BL_UWEP2)
+        {
+            unsigned long owepflags = 0UL;
+            if (fieldidx == BL_UWEP)
+                owepflags |= OBJDATA_FLAGS_UWEP;
+            else if (fieldidx == BL_UWEP2)
+                owepflags |= OBJDATA_FLAGS_UWEP2;
+
+            lib_callbacks.callback_send_object_data(0, 0, 0, 1, 0, 0, owepflags);
+            if(fieldidx == BL_UWEP)
+                lib_callbacks.callback_send_object_data(0, 0, 0, 1, 0, 0, OBJDATA_FLAGS_UQUIVER);
+        }
+    }
 }
 
 
@@ -872,6 +918,54 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
         write_text2buf_utf8(utf8buf, sizeof(utf8buf), txt);
 
     lib_callbacks.callback_status_update(idx, txt ? utf8buf : 0, condbits, chg, percent, color, !colormasks ? NULL : condcolors);
+
+    if (idx == BL_UWEP || idx == BL_UWEP2)
+    {
+        struct obj* wep = idx == BL_UWEP ? (uwep ? uwep : uarmg) : (uwep2 ? uwep2 : uarmg);
+        unsigned long oflags = 0UL;
+        if (Hallucination)
+            oflags |= OBJDATA_FLAGS_HALLUCINATION;
+
+        unsigned long owepflags = 0UL;
+        boolean islauncher = wep && is_launcher(wep);
+        struct obj* ammo = idx == BL_UWEP ? uquiver : uquiver;
+
+        if (idx == BL_UWEP)
+            owepflags |= OBJDATA_FLAGS_UWEP;
+        else if (idx == BL_UWEP2)
+        {
+            owepflags |= OBJDATA_FLAGS_UWEP2;
+            if(wep && (is_weapon(wep) && !is_shield(wep)) && !u.twoweap)
+                owepflags |= OBJDATA_FLAGS_NOT_BEING_USED2;
+            if (wep && !is_weapon(wep) && u.twoweap)
+                owepflags |= OBJDATA_FLAGS_NOT_WEAPON2;
+        }
+
+        if (islauncher)
+        {
+            if (!ammo)
+                owepflags |= (idx == BL_UWEP ? OBJDATA_FLAGS_OUT_OF_AMMO1 : OBJDATA_FLAGS_OUT_OF_AMMO2);
+            else if (!ammo_and_launcher(ammo, wep))
+                owepflags |= (idx == BL_UWEP ? OBJDATA_FLAGS_WRONG_AMMO_TYPE1 : OBJDATA_FLAGS_WRONG_AMMO_TYPE2);
+        }
+
+        if (wep)
+            set_obj_glyph(wep);
+
+        struct objclassdata ocdata = get_objclassdata(wep);
+        lib_callbacks.callback_send_object_data(0, 0, wep, wep ? 2 : 1, wep ? wep->where : 0, &ocdata, oflags | owepflags);
+
+        if (idx == BL_UWEP)
+        {
+            unsigned long oammoflags = OBJDATA_FLAGS_UQUIVER;
+            struct obj* ammo = uquiver;
+
+            if(ammo)
+                set_obj_glyph(ammo);
+            ocdata = get_objclassdata(ammo);
+            lib_callbacks.callback_send_object_data(0, 0, ammo, ammo ? 2 : 1, ammo ? ammo->where : 0, &ocdata, oflags | oammoflags);
+        }
+    }
 }
 
 void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
@@ -883,14 +977,14 @@ void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
     mi_ptr->gui_glyph = maybe_get_replaced_glyph(mi_ptr->glyph, mtmp->mx, mtmp->my, data_to_replacement_info(mi_ptr->glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
 
     char tempbuf[BUFSIZ] = "";
-    if (mtmp->mextra && UMNAME(mtmp))
+    if (has_umname(mtmp))
     {
         char umnbuf[BUFSIZ];
         strcpy(umnbuf, UMNAME(mtmp));
         umnbuf[16] = '\0'; /* Limit the length of the name */
         strcat(tempbuf, umnbuf);
     }
-    else if (mtmp->mextra && MNAME(mtmp) && mtmp->u_know_mname)
+    else if (has_mname(mtmp) && mtmp->u_know_mname)
     {
         char mnbuf[BUFSIZ];
         strcpy(mnbuf, MNAME(mtmp));
@@ -917,30 +1011,6 @@ void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
     get_m_buff_bits(mtmp, mi_ptr->buff_bits, FALSE);
 
     mi_ptr->monster_flags = 0UL;
-}
-
-int hl_attridx_to_attrmask(int idx)
-{
-    switch (idx)
-    {
-    case HL_ATTCLR_DIM:     return (1 << ATR_DIM);
-    case HL_ATTCLR_BLINK:    return (1 << ATR_BLINK);
-    case HL_ATTCLR_ULINE:   return (1 << ATR_ULINE);
-    case HL_ATTCLR_INVERSE:    return (1 << ATR_INVERSE);
-    case HL_ATTCLR_BOLD:    return (1 << ATR_BOLD);
-    }
-    return 0;
-}
-
-int hl_attrmask_to_attrmask(int mask)
-{
-    int attr = 0;
-    if (mask & HL_DIM) attr |= (1 << ATR_DIM);
-    if (mask & HL_BLINK) attr |= (1 << ATR_BLINK);
-    if (mask & HL_ULINE) attr |= (1 << ATR_ULINE);
-    if (mask & HL_INVERSE) attr |= (1 << ATR_INVERSE);
-    if (mask & HL_BOLD) attr |= (1 << ATR_BOLD);
-    return attr;
 }
 
 void lib_set_health_color(int nhcolor)
@@ -987,8 +1057,8 @@ void lib_print_conditions(const char** names)
             int color = get_condition_color(cond_mask);
             int attr = get_condition_attr(cond_mask);
             //debuglog("cond '%s' active. col=%s attr=%x", name, colname(color), attr);
-            lib_putstr_ex(WIN_STATUS, ATR_NONE, " ", 0, CLR_WHITE);
-            lib_putstr_ex(WIN_STATUS, attr, name, 0, color);
+            lib_putstr_ex(WIN_STATUS, " ", ATR_NONE, CLR_WHITE, 0);
+            lib_putstr_ex(WIN_STATUS, name, hl_attrmask_to_atr(attr), color, 0);
         }
     }
 }
@@ -1014,16 +1084,8 @@ void print_status_field(int idx, boolean first_field)
     {
         /* game mode has no leading space, so if we've moved
            it past the first position, provide one */
-        lib_putstr_ex(WIN_STATUS, ATR_NONE, " ", 0, CLR_WHITE);
+        lib_putstr_ex(WIN_STATUS, " ", ATR_NONE, CLR_WHITE, 0);
     }
-#if 0
-    else if (idx == BL_LEVELDESC && !first_field)
-    {
-        /* leveldesc has no leading space, so if we've moved
-           it past the first position, provide one */
-        lib_putstr_ex(WIN_STATUS, ATR_NONE, " ", 0, CLR_WHITE);
-    }
-#endif
     else if (iflags.wc2_statuslines >= 3)
     {
         /* looks like first field */
@@ -1052,7 +1114,7 @@ void print_status_field(int idx, boolean first_field)
     // Don't want coloring on leading spaces (ATR_INVERSE would show), so print those first
     while (*val == ' ')
     {
-        lib_putstr_ex(WIN_STATUS, ATR_NONE, " ", 0, CLR_WHITE);
+        lib_putstr_ex(WIN_STATUS, " ", ATR_NONE, CLR_WHITE, 0);
         val++;
     }
 
@@ -1086,7 +1148,7 @@ void print_status_field(int idx, boolean first_field)
                 color = status_colors[BL_ENE] & 0xFF;
             }
         }
-        lib_putstr_ex(WIN_STATUS, hl_attrmask_to_attrmask(attr), val, 0, color);
+        lib_putstr_ex(WIN_STATUS, val, hl_attrmask_to_atr(attr), color, 0);
         //    debuglog("field %d: %s color %s", idx+1, val, colname(color));
     }
 }
@@ -1424,6 +1486,7 @@ void lib_bail(const char* mesg)
 
 void lib_init_platform(VOID_ARGS)
 {
+    thread_lock_init();
     /* Tiles */
 #ifdef USE_TILES
     process_tiledata(1, (const char*)0, glyph2tile, glyphtileflags);
@@ -1433,7 +1496,7 @@ void lib_init_platform(VOID_ARGS)
 
 void lib_exit_platform(int status)
 {
-
+    thread_lock_destroy();
 }
 
 

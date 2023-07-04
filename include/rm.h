@@ -256,8 +256,8 @@ enum levl_typ_types {
     GROUND = 40,
 
     UNDEFINED_LOCATION = 41, /* Keep this last */
-    MAX_TYPE = 42,
-    INVALID_TYPE = 127
+    MAX_LEVTYPE = 42,
+    INVALID_LEVTYPE = 127
 };
 
 enum decoration_types {
@@ -274,6 +274,7 @@ enum decoration_types {
     DECORATION_BANNER,
     DECORATION_PRIEST_NICHE,
     DECORATION_WALL_SCULPTURE,
+    DECORATION_ANOTHER_FIREPLACE,
     MAX_DECORATIONS
 };
 
@@ -450,7 +451,7 @@ struct location_type_definition {
     enum location_soundset_types soundset;
 };
 
-extern const struct location_type_definition location_type_definitions[MAX_TYPE];
+extern const struct location_type_definition location_type_definitions[MAX_LEVTYPE];
 
 struct location_subtype_definition {
     const char* subtype_name;
@@ -763,10 +764,11 @@ struct symdef_cmap {
     uchar sym;
     const char *explanation;
     const char* broken_explanation;
+    uchar implied_levtyp;
     uchar layer;
     boolean has_broken_tile;
 
-    int variations;
+    short variations;
     int variation_offset;
 #ifdef TEXTCOLOR
     uchar color[MAX_CMAP_TYPES];
@@ -785,7 +787,7 @@ struct symdef_cmap {
 
 
 struct symdef_cmap_variation {
-    int base_screen_symbol;
+    uchar base_screen_symbol;
     const char* variation_name;
     const char* explanation;
     const char* broken_explanation;
@@ -1125,7 +1127,7 @@ struct rm {
 #define SET_TYPLIT(x, y, ttyp, tsubtyp, llit)                              \
     {                                                             \
         if ((x) >= 0 && (y) >= 0 && (x) < COLNO && (y) < ROWNO) { \
-            if ((ttyp) < MAX_TYPE)  {                             \
+            if ((ttyp) < MAX_LEVTYPE)  {                             \
                 if(IS_FLOOR(ttyp)) {                \
                      levl[(x)][(y)].floortyp = 0; \
                      levl[(x)][(y)].floorsubtyp = 0; \
@@ -1408,6 +1410,9 @@ extern dlevel_t level; /* structure describing the current level */
 #define m_at(x, y) (MON_AT(x, y) ? level.monsters[x][y] : (struct monst *) 0)
 #define m_buried_at(x, y) \
     (MON_BURIED_AT(x, y) ? level.monsters[x][y] : (struct monst *) 0)
+
+/* decoration checks */
+#define has_loc_fireplace(x, y) (levl[x][y].decoration_typ == DECORATION_FIREPLACE || levl[x][y].decoration_typ == DECORATION_ANOTHER_FIREPLACE)
 
 /* restricted movement, potential luck penalties */
 #define Sokoban level.flags.sokoban_rules

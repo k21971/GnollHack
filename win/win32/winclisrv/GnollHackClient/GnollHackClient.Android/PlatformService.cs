@@ -13,6 +13,9 @@ using System.Runtime.InteropServices;
 using GnollHackClient;
 using Android;
 using Java.IO;
+using System.IO;
+using GnollHackCommon;
+using Xamarin.Google.Android.Play.Core.AssetPacks;
 
 [assembly: Dependency(typeof(GnollHackClient.Droid.PlatformService))]
 namespace GnollHackClient.Droid
@@ -212,6 +215,79 @@ namespace GnollHackClient.Droid
                 _originalSet = false;
                 _originalAnimationDurationScale = 1.0f;
             }
+        }
+
+        public string GetBaseUrl()
+        {
+            return "file:///android_asset/";
+        }
+        public string GetAssetsPath()
+        {
+
+            return "file:///android_asset/";
+        }
+
+        public string GetAbsoluteOnDemandAssetPath(string assetPack)
+        {
+            if (MainActivity.CurrentMainActivity == null || MainActivity.CurrentMainActivity.AssetPackManager == null)
+                return null;
+
+            var assetPackPath = MainActivity.CurrentMainActivity.AssetPackManager.GetPackLocation(assetPack);
+            return assetPackPath?.AssetsPath() ?? null;
+        }
+
+        public string GetAbsoluteOnDemandAssetPath(string assetPack, string relativeAssetPath)
+        {
+            if (MainActivity.CurrentMainActivity == null || MainActivity.CurrentMainActivity.AssetPackManager == null)
+                return null;
+
+            string assetsFolderPath = GetAbsoluteOnDemandAssetPath(assetPack);
+            if (assetsFolderPath == null)
+            {
+                // asset pack is not ready
+                return null;
+            }
+
+            string assetPath = Path.Combine(assetsFolderPath, relativeAssetPath);
+            return assetPath;
+        }
+
+        public int FetchOnDemandPack(string pack)
+        {
+            if (MainActivity.CurrentMainActivity == null || MainActivity.CurrentMainActivity.AssetPackManager == null)
+                return 2; /* No asset pack manager */
+
+            var location = MainActivity.CurrentMainActivity.AssetPackManager.GetPackLocation(pack);
+            if (location == null)
+            {
+                // TODO Figure out how to use the GetPackStates.
+                try
+                {
+                    var states = MainActivity.CurrentMainActivity.AssetPackManager.GetPackStates(new string[] { pack });
+                    // TODO add OnComplete Listeners to the Task returned by Fetch.
+                    MainActivity.CurrentMainActivity.AssetPackManager.Fetch(new string[] { pack });
+                    return 0;  /* Success */
+                }
+                catch (Exception ex)
+                {
+                    string msg = ex.Message;
+                    return 1;  /* Exception occurred */
+                }
+            }
+            else
+                return -1; /* Already loaded */
+        }
+
+        public event EventHandler<AssetPackStatusEventArgs> OnDemandPackStatusNotification;
+
+        public void InitOnDemandPackStatusNotificationEventHandler()
+        {
+            MainActivity.CurrentMainActivity.OnDemandPackStatus += OnDemandPackStatusNotified;
+        }
+
+        private void OnDemandPackStatusNotified(object sender, AssetPackStatusEventArgs e)
+        {
+            OnDemandPackStatusNotification?.Invoke(this, e);
         }
     }
 }

@@ -285,7 +285,7 @@ dlb *stream;
         panic(
   "Premature EOF on dungeon description file!\r\nExpected %ld bytes - got %ld.",
               (size * nitems), (size * cnt));
-        nh_terminate(EXIT_FAILURE);
+        //nh_terminate(EXIT_FAILURE);
     }
 }
 
@@ -735,7 +735,8 @@ struct level_map {
                   { "baalz", &baalzebub_level },
                   { "bigrm", &bigroom_level },
                   { "bovine1", &bovine_level },
-                  { "quantum1", &quantum_level },
+                  { "quantum1", &quantum_tunnel_level },
+                  { "quantum2", &quantum_core_level },
                   { "treasure1", &treasure_island_level },
                   { "castle", &stronghold_level },
                   { "earth", &earth_level },
@@ -3214,7 +3215,7 @@ boolean printdun;
                 (!final || (final == 1 && how == ASCENDED)) ? "are"
                   : (final == 1 && how == ESCAPED) ? "left from"
                     : "were");
-    putstr(win, (!final ? ATR_BOLD : 0) | ATR_HEADING | ATR_INDENT_AT_COLON, buf);
+    putstr(win, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, buf);
 
     if (mptr->flags.forgot)
         return;

@@ -465,7 +465,7 @@ boolean devour;
     if (poly || slimer)
     {
         struct permonst *ptr = slimer ? &mons[PM_GREEN_SLIME] : 0;
-        (void) newcham(mtmp, ptr, FALSE, cansee(mtmp->mx, mtmp->my));
+        (void) newcham(mtmp, ptr, 0, FALSE, cansee(mtmp->mx, mtmp->my));
     }
 
     /* limit "instant" growth to prevent potential abuse */
@@ -785,7 +785,7 @@ register struct permonst* ptr;
         if (Hallucination)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems centered in %s personal space.", Monnam(mon), mhis(mon));
         else
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems in control of %self.", Monnam(mon), mhim(mon));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems in control of %sself.", Monnam(mon), mhim(mon));
         break;
     case BLIND_TELEPATHY:
         play_sfx_sound_at_location(SFX_INTRINSIC_ACQUIRED_BLIND_TELEPATHY, mon->mx, mon->my);
@@ -919,7 +919,7 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
             //        has_hallucination(mon) ? "an orange" : "a pile of gold");
             ///* A pile of gold can't ride. */
             ///* ??? what if this was set before? */
-            //newcham(mon, pm, FALSE, FALSE);
+            //newcham(mon, pm, 0, FALSE, FALSE);
             //mon->m_ap_type = M_AP_OBJECT;
             //mon->mappearance = has_hallucination(mon) ? ORANGE : GOLD_PIECE;
             //newsym(mon->mx, mon->my);
@@ -958,7 +958,7 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
         //}
         //else 
         //{
-        //    newcham(mon, (struct permonst*)0, FALSE, TRUE);
+        //    newcham(mon, (struct permonst*)0, 0, FALSE, TRUE);
         //}
         break;
     case PM_DISENCHANTER:
@@ -1296,7 +1296,7 @@ int udist;
 
             carryamt = can_carry(mtmp, obj);
             if (carryamt > 0 && !obj->cursed && !is_obj_unique(obj) && !is_quest_artifact(obj) 
-                && !mtmp->issummoned && !mtmp->ispartymember && !is_packmule(mtmp->data) && !Is_container(obj)
+                && !mtmp->issummoned && !mtmp->ispartymember && !is_packmule(mtmp->data)
                 && could_reach_item(mtmp, obj->ox, obj->oy) && !onnopickup(obj->ox, obj->oy, mtmp) && !is_obj_no_pickup(obj))
             {
                 if (rn2(20) < edog->apport + 3)
@@ -1345,7 +1345,7 @@ boolean
 dog_wants_to_eat(mtmp)
 struct monst* mtmp;
 {
-    if(!mtmp || !mtmp->mextra || !EDOG(mtmp))
+    if(!mtmp || !has_edog(mtmp))
         return FALSE;
 
     if (is_non_eater(mtmp->data))

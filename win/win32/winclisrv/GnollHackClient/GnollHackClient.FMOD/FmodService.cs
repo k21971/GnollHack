@@ -17,6 +17,8 @@ using AVFoundation;
 [assembly: Dependency(typeof(GnollHackClient.iOS.FmodService))]
 namespace GnollHackClient.iOS
 #elif __ANDROID__
+using Android.Content.Res;
+using Java.Util.Zip;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -65,10 +67,16 @@ namespace GnollHackClient.Unknown
     {
         public readonly string FullPathName;
         public readonly int SubType;
-        public LoadableBank(string path, int subType)
+        public readonly bool IsResource;
+        public readonly bool ReadToMemory;
+        public readonly byte[] ByteBuffer;
+        public LoadableBank(string path, int subType, bool isResource, bool readToMemory, byte[] byteBuffer)
         {
             FullPathName = path;
             SubType = subType;
+            IsResource = isResource;
+            ReadToMemory = readToMemory;
+            ByteBuffer = byteBuffer;
         }
     }
 
@@ -184,12 +192,26 @@ namespace GnollHackClient.Unknown
             {
                 if(loadableBank.SubType == subType)
                 {
-                    string bank_path = loadableBank.FullPathName;
-                    if (File.Exists(bank_path))
+                    if(loadableBank.ReadToMemory)
                     {
-                        Bank tmpbank = new Bank();
-                        res = _system.loadBankFile(bank_path, LOAD_BANK_FLAGS.NORMAL, out tmpbank);
-                        _banks.Add(new LoadedBank(tmpbank, loadableBank.SubType));
+                        if(loadableBank.ByteBuffer != null)
+                        {
+                            Bank tmpbank = new Bank();
+                            res = _system.loadBankMemory(loadableBank.ByteBuffer, LOAD_BANK_FLAGS.NORMAL, out tmpbank);
+                            if (res == RESULT.OK)
+                                _banks.Add(new LoadedBank(tmpbank, loadableBank.SubType));
+                        }
+                    }
+                    else
+                    {
+                        string bank_path = loadableBank.FullPathName;
+                        if (loadableBank.IsResource || File.Exists(bank_path))
+                        {
+                            Bank tmpbank = new Bank();
+                            res = _system.loadBankFile(bank_path, LOAD_BANK_FLAGS.NORMAL, out tmpbank);
+                            if (res == RESULT.OK)
+                                _banks.Add(new LoadedBank(tmpbank, loadableBank.SubType));
+                        }
                     }
                 }
             }
@@ -201,9 +223,92 @@ namespace GnollHackClient.Unknown
         {
             _loadableSoundBanks.Clear();
         }
-        public void AddLoadableSoundBank(string fullfilepath, int subType)
+
+
+        public void AddLoadableSoundBank(string fullfilepath, int subType, bool isResource, bool readToMemory)
         {
-            _loadableSoundBanks.Add(new LoadableBank(fullfilepath, subType));
+            byte[] data = null;
+            if (readToMemory)
+            {
+                try
+                {
+                    if (isResource)
+                    {
+#if __IOS__
+                        using(FileStream fs = File.OpenRead(fullfilepath))
+#elif __ANDROID__
+                        AssetManager assets = MainActivity.StaticAssets;
+                        using (Stream fs = assets.Open(fullfilepath))
+#else
+                        using(FileStream fs = File.OpenRead(fullfilepath))
+#endif
+                        {
+                            using (var ms = new MemoryStream())
+                            {
+                                try
+                                {
+                                    fs.CopyTo(ms);
+                                    data = ms.ToArray();
+                                }
+                                catch (Exception ex)
+                                {
+                                    string msg = ex.Message;
+                                }
+                            }
+                            //using (BinaryReader br = new BinaryReader(fs))
+                            //{
+                            //    int mb = 0;
+                            //    bool endreached = false;
+                            //    while(!endreached)
+                            //    {
+                            //        try
+                            //        {
+                            //            byte[] data2 = br.ReadBytes(1024 * 1024);
+                            //            if (data2 == null || data2.Length == 0)
+                            //                break;
+                            //            mb++;
+                            //        }
+                            //        catch(Exception ex)
+                            //        {
+                            //            string str = ex.Message;
+                            //            endreached = true;
+                            //        }
+                            //    }
+                            //    int length = (mb + 1) * 1024 * 1024;
+
+                            //    fs.Seek(0, SeekOrigin.Begin);
+                            //    try
+                            //    {
+                            //        data = br.ReadBytes(length);
+                            //    }
+                            //    catch (Exception ex) 
+                            //    {
+                            //        string msg = ex.Message;
+                            //    }
+                            //}
+                        }
+                    }
+                    else
+                    {
+                        if (File.Exists(fullfilepath))
+                        {
+                            using (FileStream fs = File.OpenRead(fullfilepath))
+                            {
+                                using (BinaryReader br = new BinaryReader(fs))
+                                {
+                                    long length = fs.Length;
+                                    data = br.ReadBytes((int)length);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    string msg = ex.Message;
+                }
+            }
+            _loadableSoundBanks.Add(new LoadableBank(fullfilepath, subType, isResource, readToMemory, data));
         }
 
         public void LoadIntroSoundBank()
@@ -218,7 +323,7 @@ namespace GnollHackClient.Unknown
 
         public void PlayTestSound()
         {
-            string eventPath = "event:/Music/Start/Splash";
+            string eventPath = "event:/Music/Main Screen/Splash";
             EventDescription eventDescription;
             RESULT res = _system.getEvent(eventPath, out eventDescription);
             EventInstance testEventInstance;
@@ -270,12 +375,14 @@ namespace GnollHackClient.Unknown
             RESULT res = _system.update();
         }
 
-        public static RESULT GNHImmediateEventCallback(EVENT_CALLBACK_TYPE type, EventInstance _event, IntPtr parameters)
+        public static RESULT GNHImmediateEventCallback(EVENT_CALLBACK_TYPE type, IntPtr _event, IntPtr parameters)
         {
             FmodService service = _latestService;
 
             if (service == null)
                 return RESULT.ERR_UNSUPPORTED;
+
+            EventInstance instance = new FMOD.Studio.EventInstance(_event);
 
             if (type == EVENT_CALLBACK_TYPE.STOPPED || type == EVENT_CALLBACK_TYPE.START_FAILED)
             {
@@ -284,7 +391,7 @@ namespace GnollHackClient.Unknown
                     if (i >= service.immediateInstances.Count)
                         break;
 
-                    if (service.immediateInstances[i].instance.handle == _event.handle)
+                    if (service.immediateInstances[i].instance.handle == instance.handle)
                     {
                         service.immediateInstances[i].stopped = true;
                         return RESULT.OK;
@@ -295,7 +402,7 @@ namespace GnollHackClient.Unknown
                     if (i >= service.longImmediateInstances.Count)
                         break;
 
-                    if (service.longImmediateInstances[i].instance.handle == _event.handle)
+                    if (service.longImmediateInstances[i].instance.handle == instance.handle)
                     {
                         service.longImmediateInstances[i].stopped = true;
                         return RESULT.OK;
@@ -305,11 +412,13 @@ namespace GnollHackClient.Unknown
             return RESULT.OK;
         }
 
-        public static RESULT GNHDialogueEventCallback(EVENT_CALLBACK_TYPE type, EventInstance _event, IntPtr parameters)
+        //private RESULT GNHDialogueEventCallback(EVENT_CALLBACK_TYPE type, IntPtr _event, IntPtr parameters)
+
+        public static RESULT GNHDialogueEventCallback(EVENT_CALLBACK_TYPE type, IntPtr _event, IntPtr parameters)
         {
             RESULT result;
             FmodService service = _latestService;
-
+            EventInstance instance = new FMOD.Studio.EventInstance(_event);
             if (service == null)
                 return RESULT.ERR_UNSUPPORTED;
 
@@ -320,7 +429,7 @@ namespace GnollHackClient.Unknown
                     if (i >= service.immediateInstances.Count)
                         break;
 
-                    if (service.immediateInstances[i].instance.handle == _event.handle)
+                    if (service.immediateInstances[i].instance.handle == instance.handle)
                     {
                         service.immediateInstances[i].stopped = true;
                         if (service.immediateInstances[i].sound_type == immediate_sound_types.IMMEDIATE_SOUND_DIALOGUE)
@@ -349,7 +458,7 @@ namespace GnollHackClient.Unknown
                     if (i >= service.longImmediateInstances.Count)
                         break;
 
-                    if (service.longImmediateInstances[i].instance.handle == _event.handle)
+                    if (service.longImmediateInstances[i].instance.handle == instance.handle)
                     {
                         service.longImmediateInstances[i].stopped = true;
                         if (service.longImmediateInstances[i].sound_type == immediate_sound_types.IMMEDIATE_SOUND_DIALOGUE)

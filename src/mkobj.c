@@ -14,7 +14,7 @@ STATIC_DCL void FDECL(maybe_adjust_sound_volume, (struct obj*, double));
 STATIC_DCL void FDECL(obj_timer_checks, (struct obj *,
                                          XCHAR_P, XCHAR_P, int));
 STATIC_DCL void FDECL(container_weight, (struct obj *));
-STATIC_DCL struct obj *FDECL(save_mtraits, (struct obj *, struct monst *));
+STATIC_DCL void FDECL(save_mtraits, (struct obj *, struct monst *));
 STATIC_DCL void FDECL(objlist_sanity, (struct obj *, int, const char *));
 STATIC_DCL void FDECL(mon_obj_sanity, (struct monst *, const char *));
 STATIC_DCL const char *FDECL(where_name, (struct obj *));
@@ -762,14 +762,12 @@ struct obj *obj2, *obj1;
                 (genericptr_t)OMONST(obj1), sizeof(struct monst));
             OMONST(obj2)->mextra = (struct mextra*) 0;
             OMONST(obj2)->nmon = (struct monst*) 0;
-#if 0 /* Let's keep the original m_id */
             OMONST(obj2)->m_id = context.ident++;
-            if (OMONST(obj2)->m_id) /* ident overflowed */
+            if (!OMONST(obj2)->m_id) /* ident overflowed */
                 OMONST(obj2)->m_id = context.ident++;
-#endif
+            if (OMONST(obj1)->mextra)
+                copy_mextra(OMONST(obj2), OMONST(obj1));
         }
-        if (OMONST(obj1)->mextra)
-            copy_mextra(OMONST(obj2), OMONST(obj1));
     }
     if (has_omid(obj1)) 
     {
@@ -1682,7 +1680,7 @@ unsigned long mkflags;
                 blessorcurse(otmp, 5);
                 break;
             case LARGE_FIVE_BRANCHED_CANDELABRUM:
-                otmp->special_quality = !rn2(3) ? 0 : !rn2(2) ? objects[otmp->otyp].oc_special_quality : rnd(objects[otmp->otyp].oc_special_quality);
+                otmp->special_quality = !rn2(3) ? 0 : !rn2(2) ? objects[otmp->otyp].oc_special_quality : (short)rnd((int)objects[otmp->otyp].oc_special_quality);
                 otmp->lamplit = 0;
                 if (otmp->special_quality > 0)
                 {
@@ -2217,42 +2215,43 @@ unsigned long mkflags;
 }
 
 
-int
+short
 get_obj_init_charge(otmp)
 struct obj* otmp;
 {
     if (!otmp)
         return 0;
 
-    int init_charge = get_init_charge(objects[otmp->otyp].oc_charged);
+    short init_charge = get_init_charge(objects[otmp->otyp].oc_charged);
 
     /* Possible extra modifications here */
 
     return init_charge;
 }
 
-int
+short
 get_obj_max_charge(otmp)
 struct obj* otmp;
 {
     if (!otmp)
         return 0;
 
-    int init_charge = get_max_charge(objects[otmp->otyp].oc_charged);
+    short max_charge = get_max_charge(objects[otmp->otyp].oc_charged);
 
     /* Possible extra modifications here */
 
-    return init_charge;
+    return max_charge;
 }
 
-int
+short
 get_init_charge(charge_init_index)
-int charge_init_index;
+uchar charge_init_index;
 {
-    int charge = 1;
+    short charge = 0;
 
     switch (charge_init_index)
     {
+    default:
     case CHARGED_NOT_CHARGED:
         charge = 0;
         break;
@@ -2361,14 +2360,15 @@ int charge_init_index;
 }
 
 
-int
+short
 get_max_charge(charge_init_index)
-int charge_init_index;
+uchar charge_init_index;
 {
-    int charge = 1;
+    short charge = 0;
 
     switch (charge_init_index)
     {
+    default:
     case CHARGED_NOT_CHARGED:
         charge = 0;
         break;
@@ -2725,9 +2725,9 @@ int spe_type_index;
     return maxspe;
 }
 
-int 
+long 
 get_multigen_quan(multigen_index)
-int multigen_index;
+uchar multigen_index;
 {
     int quan = 1;
 
@@ -2835,7 +2835,7 @@ int multigen_index;
     default:
         break;
     }
-    return quan;
+    return (long)quan;
 }
 /*
  * Several areas of the code made direct reassignments
@@ -3452,14 +3452,9 @@ unsigned corpstatflags;
     {
         if (mtmp) 
         {
-            struct obj *otmp2;
-
             if (!ptr)
                 ptr = mtmp->data;
-            /* save_mtraits frees original data pointed to by otmp */
-            otmp2 = save_mtraits(otmp, mtmp);
-            if (otmp2)
-                otmp = otmp2;
+            save_mtraits(otmp, mtmp);
         }
         /* use the corpse or statue produced by mksobj() as-is
            unless `ptr' is non-null */
@@ -3520,7 +3515,7 @@ unsigned mid;
     return obj;
 }
 
-STATIC_OVL struct obj *
+STATIC_OVL void
 save_mtraits(obj, mtmp)
 struct obj *obj;
 struct monst *mtmp;
@@ -3537,24 +3532,20 @@ struct monst *mtmp;
     {
         struct monst *mtmp2 = OMONST(obj);
 
+        struct mextra* mextra = mtmp2->mextra;
         *mtmp2 = *mtmp;
-        mtmp2->mextra = (struct mextra *) 0;
+        mtmp2->mextra = mextra;
 
-#if 0 /* All monsters should have data and mnum */
-        if (mtmp->data)
-            mtmp2->mnum = mtmp->mnum;
-#endif
         /* invalidate pointers */
         /* m_id is needed to know if this is a revived quest leader */
         /* but m_id must be cleared when loading bones */
         mtmp2->nmon = (struct monst *) 0;
         //mtmp2->data = (struct permonst *) 0; /* This sounds very dangerous to set to zero */
         mtmp2->minvent = (struct obj *) 0;
-        mtmp2->facing_right = mtmp->facing_right;
+        mtmp2->mw = (struct obj*)0;
         if (mtmp->mextra)
             copy_mextra(mtmp2, mtmp);
     }
-    return obj;
 }
 
 /* returns a pointer to a new monst structure based on

@@ -574,8 +574,27 @@ typedef unsigned char uchar;
    (within the same session) */
 /* #define EDIT_GETLIN */
 
+#ifdef DGAMELAUNCH
+#define EXTRAINFO_FN    "/dgldir/extrainfo-gnoll/%n.extrainfo"
+#define MAILCKFREQ 5    /* SIMPLE_MAIL is in unixconf.h */
+#define WHEREIS_FILE    "whereis/%n.whereis" /* Write out player's current location to player.whereis */
+#define WISH_TRACKER    /* log all wishes made */
+
+/* Live-logging - not particularly experimental, but very optional */
+/* #define LIVELOG_ENABLE */
+#ifdef LIVELOG_ENABLE
+#define LIVELOGFILE "livelog" /* in-game events recorded live */
+#ifdef LIVELOGFILE
+/* LL_flags defined in global.h. Value below is ignored if SYSCF is enabled */
+/* #define LIVELOG_DETAIL (LL_WISH | LL_ACHIEVE | LL_UMONST) */
+#define LIVELOG_DETAIL 0xFF
+#endif
+#endif /* LIVELOG_ENABLE */
+
+#endif /* DGAMELAUNCH */
+
 /* #define DUMPLOG */  /* End-of-game dump logs */
-#ifdef DUMPLOG
+#if defined(DUMPLOG) || defined(DUMPHTML)
 
 #ifndef DUMPLOG_MSG_COUNT
 #define DUMPLOG_MSG_COUNT   50
@@ -598,6 +617,16 @@ typedef unsigned char uchar;
 #endif
 
 #endif
+
+#ifdef DUMPHTML
+
+#ifndef DUMPHTML_FILE
+#define DUMPHTML_FILE        "/tmp/gnollhack.%n.%d.html"
+/* Placeholders as above
+ * DUMPHTML_FILE is not used if SYSCF is defiined
+ */
+#endif
+#endif /* DUMPHTML */
 
 #define USE_ISAAC64 /* Use cross-plattform, bundled RNG */
 

@@ -218,7 +218,7 @@ int
 ask_shk_reconciliation(mtmp)
 struct monst* mtmp;
 {
-    if (!mtmp || !mtmp->isshk || !mtmp->mextra || !ESHK(mtmp))
+    if (!mtmp || !mtmp->isshk || !has_eshk(mtmp))
         return 0;
 
     You("try to appease %s by offering %s some compensation.", noittame_mon_nam(mtmp), mhim(mtmp));
@@ -240,7 +240,7 @@ int rmtyp;
 }
 
 void
-dosounds()
+dosounds(VOID_ARGS)
 {
     register struct mkroom *sroom;
     register int hallu, vx, vy;
@@ -1097,7 +1097,7 @@ boolean dopopup, fromchatmenu;
     case MS_PRIEST:
     {
         const char* temple_god = iflags.using_gui_sounds ? (mon_aligntyp(mtmp) == A_NONE ? Moloch : "our almighty god") :
-            ((mtmp->ispriest && mtmp->mextra && mtmp->mextra->epri) ? align_gname(mtmp->mextra->epri->shralign) : "our almighty god");
+            ((mtmp->ispriest && has_epri(mtmp)) ? align_gname(mtmp->mextra->epri->shralign) : "our almighty god");
 
         if (is_peaceful(mtmp))
         {
@@ -1122,8 +1122,8 @@ boolean dopopup, fromchatmenu;
         if (mtmp->isshk)
         {
             register struct eshk* eshkp = (struct eshk*)0;
-            if (mtmp->mextra && mtmp->mextra->eshk)
-                eshkp = mtmp->mextra->eshk;
+            if (has_eshk(mtmp))
+                eshkp = ESHK(mtmp);
 
             if (eshkp && !Deaf && !muteshk(mtmp))
             {
@@ -1147,6 +1147,11 @@ boolean dopopup, fromchatmenu;
                     play_voice_shopkeeper_simple_line(mtmp, SHOPKEEPER_LINE_YOU_DARE_TO_RETURN_TO_MY_STORE);
                     Sprintf(verbuf, "So, adventurer, you dare to return to my store!");
                 }
+                verbl_msg = verbuf;
+            }
+            else
+            {
+                pline_msg = "does not respond.";
             }
         }
         else
@@ -1161,8 +1166,8 @@ boolean dopopup, fromchatmenu;
                 Sprintf(verbuf, "You rotten thief!");
                 chat_line = 1;
             }
+            verbl_msg = verbuf;
         }
-        verbl_msg = verbuf;
 
 #if 0
         if (!Hallucination || (mtmp->isshk && !rn2(2))) {
@@ -2012,7 +2017,7 @@ doyell()
 
 /* #chat command */
 int
-dotalk()
+dotalk(VOID_ARGS)
 {
     int result;
 
@@ -2021,7 +2026,7 @@ dotalk()
 }
 
 int
-dotalksteed()
+dotalksteed(VOID_ARGS)
 {
     if (!u.usteed)
         return 0;
@@ -2030,7 +2035,7 @@ dotalksteed()
 }
 
 int
-dotalknearby()
+dotalknearby(VOID_ARGS)
 {
     int x, y;
     int nummonfound = 0;
@@ -2044,7 +2049,7 @@ dotalknearby()
                 if (!(x == u.ux && y == u.uy) && isok(x, y))
                 {
                     mtmp = m_at(x, y);
-                    if (mtmp && monster_invokes_context_chat(mtmp))
+                    if (mtmp && !DEADMONSTER(mtmp) && monster_invokes_context_chat(mtmp))
                     {
                         nummonfound++;
                         selected_mtmp = mtmp;
@@ -2062,7 +2067,7 @@ dotalknearby()
 }
 
 STATIC_OVL boolean
-speak_check()
+speak_check(VOID_ARGS)
 {
     if (is_silent(youmonst.data) || !can_speak_language(youmonst.data))
     {
@@ -2098,7 +2103,7 @@ speak_check()
 }
 
 STATIC_OVL boolean
-yell_check()
+yell_check(VOID_ARGS)
 {
     if (is_silent(youmonst.data) || !can_speak_language(youmonst.data))
     {
@@ -2164,7 +2169,7 @@ const char* nomoodstr;
 }
 
 void
-genl_chat_message()
+genl_chat_message(VOID_ARGS)
 {
     while (1)
     {
@@ -2178,7 +2183,7 @@ genl_chat_message()
 }
 
 STATIC_OVL int
-dochat()
+dochat(VOID_ARGS)
 {
     struct monst* mtmp;
     int tx, ty;
@@ -3647,7 +3652,7 @@ struct monst* mtmp;
 
 
             int shp_indx = 0;
-            if(is_peaceful(mtmp) && mtmp->mextra && ESHK(mtmp))
+            if(is_peaceful(mtmp) && has_eshk(mtmp))
             {
                 shp_indx = ESHK(mtmp)->shoptype - SHOPBASE;
                 const struct shclass* shp = &shtypes[shp_indx];
@@ -3713,7 +3718,7 @@ struct monst* mtmp;
                 chatnum++;
             }
 
-            if (is_peaceful(mtmp) && mtmp->mextra && ESMI(mtmp) &&!mtmp->mrevived) /* no mrivived here to prevent abuse*/
+            if (is_peaceful(mtmp) && has_esmi(mtmp) &&!mtmp->mrevived) /* no mrivived here to prevent abuse*/
             {
                 Sprintf(available_chat_list[chatnum].name, "Forge a plate armor");
                 available_chat_list[chatnum].function_ptr = &do_chat_smith_forge_standard_armor;
@@ -4328,8 +4333,8 @@ struct monst* mtmp;
     if (mtmp->isshk)
     {
         register struct eshk* eshkp = (struct eshk*)0;
-        if (mtmp->mextra && mtmp->mextra->eshk)
-            eshkp = mtmp->mextra->eshk;
+        if (has_eshk(mtmp))
+            eshkp = ESHK(mtmp);
 
         if (iflags.using_gui_sounds)
         {
@@ -5177,8 +5182,8 @@ struct monst* mtmp;
     int omy = mtmp->my;
     int udist = distu(omx, omy);
 
-    if(mtmp->mextra && mtmp->mextra->edog)
-        edog = mtmp->mextra->edog;
+    if(has_edog(mtmp))
+        edog = EDOG(mtmp);
 
     if(has_edog && edog && droppables(mtmp))
     {
@@ -5215,9 +5220,8 @@ struct monst* mtmp;
     int omx = mtmp->mx;
     int omy = mtmp->my;
 
-    if (mtmp->mextra && mtmp->mextra->edog)
-        edog = mtmp->mextra->edog;
-
+    if (has_edog(mtmp))
+        edog = EDOG(mtmp);
 
     if (has_edog && edog)
     {
@@ -5349,7 +5353,7 @@ struct monst* mtmp;
                         boolean abort_pickup = FALSE;
                         if (*u.ushops || otmp->unpaid)
                         {
-                            check_shop_obj(otmp, mtmp->mx, mtmp->my, FALSE);
+                            check_shop_obj(otmp, mtmp->mx, mtmp->my, FALSE, FALSE);
                             if (costly_spot(mtmp->mx, mtmp->my))
                             {
                                 struct monst* shkp = shop_keeper(inside_shop(mtmp->mx, mtmp->my));
@@ -5501,7 +5505,7 @@ struct monst* mtmp;
                             if (tamedog(mtmp, otmp, TAMEDOG_NO_FORCED_TAMING, FALSE, 0, TRUE, FALSE))
                                 otmp = 0; /* It is gone */
                         }
-                        else if (is_tame(mtmp) && mtmp->mextra && EDOG(mtmp))
+                        else if (is_tame(mtmp) && has_edog(mtmp))
                         {
                             place_object(otmp, mtmp->mx, mtmp->my);
                             (void)dog_eat(mtmp, otmp, mtmp->mx, mtmp->my, FALSE);
@@ -5871,7 +5875,7 @@ struct monst* mtmp;
                         && (releasesuccess = release_item_from_hero_inventory(otmp)))
                     {
                         if (*u.ushops || otmp->unpaid)
-                            check_shop_obj(otmp, mtmp->mx, mtmp->my, FALSE);
+                            check_shop_obj(otmp, mtmp->mx, mtmp->my, FALSE, FALSE);
                         (void)mpickobj(mtmp, otmp);
                         if (tasty == 1)
                             res |= use_defensive(mtmp);
@@ -6369,7 +6373,7 @@ struct monst* mtmp;
 
                 int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
                 int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-                add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, & any, 
+                add_extended_menu(win, gui_glyph, & any, 
                     0, 0, ATR_NONE, NO_COLOR,
                     itembuf, MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
 
@@ -7381,7 +7385,7 @@ STATIC_OVL int
 do_chat_shk_identify(mtmp)
 struct monst* mtmp;
 {
-    if (!mtmp || !mtmp->mextra || !mtmp->mextra->eshk)
+    if (!mtmp || !has_eshk(mtmp))
         return 0;
 
     long umoney;
@@ -7513,7 +7517,7 @@ STATIC_OVL int
 do_chat_shk_reconciliation(mtmp)
 struct monst* mtmp;
 {
-    if (!mtmp || !mtmp->isshk || !mtmp->mextra || !ESHK(mtmp))
+    if (!mtmp || !mtmp->isshk || !has_eshk(mtmp))
         return 0;
 
     long umoney;
@@ -9307,7 +9311,7 @@ boolean auto_yes;
                 You("sold %s for %ld gold piece%s to %s.", doname(obj), offer, plur(offer), noittame_mon_nam(mtmp));
 
                 if (*u.ushops || obj->unpaid)
-                    check_shop_obj(obj, mtmp->mx, mtmp->my, FALSE);
+                    check_shop_obj(obj, mtmp->mx, mtmp->my, FALSE, FALSE);
 
                 (void)mpickobj(mtmp, obj);
                 money2u(mtmp, offer);
@@ -10847,7 +10851,7 @@ int* spell_otyps;
         int glyph = obj_to_glyph(&pseudo, rn2_on_display_rng);
         int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, &pseudo, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
-        add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+        add_menu(win, gui_glyph, &any,
             let, 0, ATR_NONE, NO_COLOR,
             spellbuf, MENU_UNSELECTED);
 
@@ -10927,7 +10931,7 @@ struct monst* mtmp;
     char learnbuf[BUFSZ] = "";
 
     char splname[BUFSZ];
-    Sprintf(splname, "\"%s\"", OBJ_NAME(objects[booktype]));
+    Sprintf(splname, "%s", OBJ_NAME(objects[booktype]));
 
     for (i = 0; i < MAXSPELL; i++)
         if (spellid(i) == booktype || spellid(i) == NO_SPELL)
@@ -10954,9 +10958,9 @@ struct monst* mtmp;
         { /* spellknow(i) <= SPELL_IS_KEEN/10 */
             incr_spell_nknow(i, 1);
             play_sfx_sound(SFX_SPELL_KEENER);
-            Sprintf(learnbuf, "Your knowledge of %s is %s.", OBJ_NAME(objects[booktype]),
-                spellknow(i) ? "keener" : "restored");
-            pline_ex1(ATR_NONE, CLR_MSG_POSITIVE, learnbuf);
+            Sprintf(learnbuf, "Your knowledge of \'%s\' is %s.", splname, spellknow(i) ? "keener" : "restored");
+            int multicolors[2] = { CLR_BRIGHT_GREEN, NO_COLOR };
+            Your_multi_ex(ATR_NONE, CLR_MSG_POSITIVE, no_multiattrs, multicolors, "knowledge of \'%s\' is %s.", splname, spellknow(i) ? "keener" : "restored");
             display_popup_text(learnbuf, "Knowledge Keener", POPUP_TEXT_GENERAL, ATR_NONE, CLR_MSG_POSITIVE, NO_GLYPH, POPUP_FLAGS_NONE);
 
             if (spl_book[i].sp_matcomp > 0)
@@ -10990,17 +10994,23 @@ struct monst* mtmp;
         sortspells();
 
         play_sfx_sound(SFX_SPELL_LEARN_SUCCESS);
-        Sprintf(learnbuf, i > 0 ? "You add %s to your repertoire." : "You learn %s.", splname);
-        pline_ex1(ATR_NONE, CLR_MSG_POSITIVE, learnbuf);
+        Sprintf(learnbuf, i > 0 ? "You add \'%s\' to your repertoire." : "You learn \'%s\'.", splname);
+        int multicolors[1] = { CLR_MSG_SPELL };
+        You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, i > 0 ? "add \'%s\' to your repertoire." : "learn \'%s\'.", splname);
         display_popup_text(learnbuf, "New Spell Learnt", POPUP_TEXT_GENERAL, ATR_NONE, CLR_MSG_POSITIVE, NO_GLYPH, POPUP_FLAGS_NONE);
     }
 
     if (addedamount > 0)
     {
+        int multicolors[3] = { CLR_BRIGHT_CYAN, NO_COLOR, CLR_BRIGHT_GREEN };
         if (addedamount == 1)
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have one %scasting of %s prepared.", !initialamount ? "" : "more ", splname);
+        {
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "now have %s %scasting of \'%s\' prepared.", "one", !initialamount ? "" : "more ", splname);
+        }
         else
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have %d %scastings of %s prepared.", addedamount, !initialamount ? "" : "more ", splname);
+        {
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "now have %d %scastings of \'%s\' prepared.", addedamount, !initialamount ? "" : "more ", splname);
+        }
     }
 
     return 1;

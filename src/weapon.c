@@ -2028,8 +2028,10 @@ int skill;
     {
         u.uachieve.role_achievement = 1;
         char abuf[BUFSZ];
-        strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+        const char* ra_desc = get_role_achievement_description(TRUE);
+        strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
+        livelog_printf(LL_ACHIEVE, "%s", ra_desc);
     }
 
     update_can_advance_any_skill();
@@ -2060,7 +2062,6 @@ int
 doskill_core()
 {
     int pass, i, n;
-    int to_advance, eventually_advance, maxxed_cnt;
     int color = CLR_WHITE;
     int attr = ATR_NONE;
     boolean speedy = FALSE;
@@ -2076,19 +2077,6 @@ doskill_core()
 
     do
     {
-        to_advance = eventually_advance = maxxed_cnt = 0;
-        for (i = 0; i < P_NUM_SKILLS; i++)
-        {
-            if (P_RESTRICTED(i))
-                continue;
-            if (can_advance(i, speedy))
-                to_advance++;
-            else if (could_advance(i))
-                eventually_advance++;
-            else if (peaked_skill(i))
-                maxxed_cnt++;
-        }
-
         win = create_nhwindow(NHW_MENU);
         start_menu_ex(win, GHMENU_STYLE_SKILLS_ALTERNATE);
 
@@ -2495,13 +2483,13 @@ int skill_id;
 
             const char* lvlname = skill_level_name_core(lvl);
             Sprintf(buf, " %2d - %s", lvlcnt, lvlname);
-            putstr_ex(win, ATR_SUBHEADING, buf, 0 , color);
+            putstr_ex(win, buf, ATR_SUBHEADING, color, 0);
 
             if (lvl > P_SKILL_LEVEL(skill_id))
             {
                 int slots = slots_required_core(skill_id, lvl - 1);
                 Sprintf(buf, "    * %d skill slot%s to advance", slots, plur(slots));
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
 
                 if (!P_NONTRAINABLE(skill_id))
                 {
@@ -2646,92 +2634,92 @@ int skill_id;
             if (strcmp(digbuf, ""))
             {
                 Sprintf(buf, "    * %s speed increased by %s", skill_id == P_AXE ? "Chopping" : "Digging", digbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(acbuf, ""))
             {
                 Sprintf(buf, "    * Armor class bonus %s", acbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(mcbuf, ""))
             {
                 Sprintf(buf, "    * Magic cancellation bonus %s", mcbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(hbuf, ""))
             {
                 Sprintf(buf, "    * To-hit bonus %s%s", hbuf, skill_id == P_RIDING ? " when riding" : "");
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(dbuf, ""))
             {
                 Sprintf(buf, "    * Damage bonus %s%s", dbuf, skill_id == P_RIDING ? " when riding" : "");
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(mbuf, ""))
             {
                 Sprintf(buf, "    * Multistrike chance %s", mbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(cbuf, ""))
             {
                 Sprintf(buf, "    * Critical strike chance %s", cbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(succbuf, ""))
             {
                 Sprintf(buf, "    * Spell success bonus %s", succbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(lvlsuccbuf, ""))
             {
                 Sprintf(buf, "    * Spell success per level %s", lvlsuccbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(discbuf, ""))
             {
                 Sprintf(buf, "    * Spell cost discount %s", discbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(savingbuf, ""))
             {
                 Sprintf(buf, "    * Saving throw modifier %s", savingbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(arrowbuf, ""))
             {
                 Sprintf(buf, "    * Arrow trap untrap chance %s", arrowbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(magicbuf, ""))
             {
                 Sprintf(buf, "    * Magic trap untrap chance %s", magicbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(limitbuf, ""))
             {
                 Sprintf(buf, "    * Weapon skill limit %s", limitbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(whipbuf, ""))
             {
                 Sprintf(buf, "    * Weapon disarm bonus %s", whipbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(joustbuf, ""))
             {
                 Sprintf(buf, "    * Jousting success bonus %s", joustbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(saddlebuf, ""))
             {
                 Sprintf(buf, "    * Saddling success bonus %s", saddlebuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(mountbuf, ""))
             {
                 Sprintf(buf, "    * Mount success bonus %s", mountbuf);
-                putstr_ex(win, ATR_INDENT_AT_ASTR, buf, 0, color);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
         }
     }
@@ -4453,7 +4441,7 @@ dump_skills(VOID_ARGS)
     char skillnamebufC[BUFSZ];
     char skilllevelbuf[BUFSZ];
     char skillmaxbuf[BUFSZ];
-    putstr(0, 0, "Final Skills:");
+    putstr(0, ATR_HEADING, "Final Skills:");
     for (i = 1; i < P_NUM_SKILLS; i++)
     {
         if (P_RESTRICTED(i))
@@ -4465,10 +4453,10 @@ dump_skills(VOID_ARGS)
         (void)skill_level_name(i, skillmaxbuf, TRUE);
 
         Sprintf(buf, " %-34s %s / %s", skillnamebufC, skilllevelbuf, skillmaxbuf);
-        putstr(0, 0, buf);
+        putstr(0, ATR_PREFORM, buf);
     }
     Sprintf(buf, "You had %d skill slot%s available", u.weapon_slots, plur(u.weapon_slots));
-    putstr(0, 0, buf);
+    putstr(0, ATR_SUBHEADING, buf);
 }
 
 short

@@ -50,7 +50,7 @@ public:
 	static void qt_destroy_nhwindow(winid wid);
 	static void qt_curs(winid wid, int x, int y);
 	static void qt_putstr(winid wid, int attr, const char *text);
-	static void qt_putstr_ex(winid wid, int attr, const char* text, int app, int color);
+	static void qt_putstr_ex(winid wid, const char* text, int attr, int color, int app);
 	static void qt_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app);
 	static void qt_putstr(winid wid, int attr, const std::string& text);
 	static void qt_putstr(winid wid, int attr, const QString& text);
@@ -71,7 +71,7 @@ public:
 	static void qt_cliparound(int x, int y, BOOLEAN_P force);
 	static void qt_cliparound_window(winid wid, int x, int y);
 	static void qt_print_glyph(winid wid,XCHAR_P x,XCHAR_P y,struct layer_info layers);
-	static void qt_issue_gui_command(int initid);
+	static void qt_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str);
 	static void qt_raw_print(const char *str);
 	static void qt_raw_print_bold(const char *str);
 	static int qt_nhgetch();

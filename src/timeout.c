@@ -269,6 +269,7 @@ stoned_dialogue()
         nomul(-3); /* can't move anymore */
         multi_reason = "getting stoned";
         nomovemsg = You_can_move_again; /* not unconscious */
+        nomovemsg_color = CLR_MSG_SUCCESS;
         /* "your limbs have turned to stone" so terminate wounded legs */
         if (Wounded_legs && !u.usteed)
             heal_legs(2);
@@ -737,6 +738,10 @@ nh_timeout()
                 done(STONING);
                 break;
             case SLIMED:
+                /* involuntarily break "never changed form" conduct */
+                if (!u.uconduct.polyselfs++)
+                    livelog_printf(LL_CONDUCT, "%s",
+                        "changed form for the first time by turning to slime");
                 slimed_to_death(kptr); /* done(TURNED_SLIME) */
                 break;
             case VOMITING:
@@ -4324,7 +4329,7 @@ boolean was_flying;
             if (Paralyzed_or_immobile)
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "wake up but still cannot move!");
             else
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "wake up!");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "wake up!");
         }
         break;
     case UNDEAD_IMMOBILITY:
@@ -4334,9 +4339,9 @@ boolean was_flying;
             if (Sleeping)
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are no longer paralyzed but still asleep!");
             else if (nolimbs(youmonst.data))
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are no longer paralyzed");
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "are no longer paralyzed");
             else
-                Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "limbs are moving again!");
+                Your_ex(ATR_NONE, CLR_MSG_SUCCESS, "limbs are moving again!");
         }
         break;
     case SLIME_RESISTANCE:

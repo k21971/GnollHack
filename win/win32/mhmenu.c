@@ -43,9 +43,10 @@ typedef struct mswin_menu_item {
     boolean is_animated;
 } NHMenuItem, *PNHMenuItem;
 
-typedef struct mswin_GnollHack_menu_window {
+typedef struct mswin_gnollhack_menu_window {
     int type; /* MENU_TYPE_TEXT or MENU_TYPE_MENU */
     int how;  /* for menus: PICK_NONE, PICK_ONE, PICK_ANY */
+    int style;
 
     union {
         struct menu_list {
@@ -61,6 +62,8 @@ typedef struct mswin_GnollHack_menu_window {
 
         struct menu_text {
             TCHAR *text;
+            char* attrs;
+            char* colors;
             SIZE text_box_size;
         } text;
     };
@@ -512,8 +515,8 @@ MenuWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 ? text_bg_brush
                 : SYSCLR_TO_BRUSH(DEFAULT_COLOR_BG_TEXT));
         }
+        return FALSE;
     }
-                          return FALSE;
 
     case WM_CTLCOLORDLG:
         return (INT_PTR)(text_bg_brush
@@ -529,6 +532,10 @@ MenuWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (data->type == MENU_TYPE_TEXT) {
                 if (data->text.text)
                     free(data->text.text);
+                if (data->text.attrs)
+                    free(data->text.attrs);
+                if (data->text.colors)
+                    free(data->text.colors);
             }
             free(data);
             SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)0);
@@ -546,7 +553,6 @@ MenuWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 ListView_RedrawItems(GetMenuControl(hWnd), i, i);
         }
         break;
-
 
     }
     return FALSE;
@@ -570,23 +576,52 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
         if (data->type != MENU_TYPE_TEXT)
             SetMenuType(hWnd, MENU_TYPE_TEXT);
+        size_t oldsize = 0;
+        size_t newsize = strlen(msg_data->text);
 
         if (!data->text.text) {
-            text_size = strlen(msg_data->text) + 4;
+            text_size = strlen(msg_data->text) + 1 + (msg_data->append ? 0 : 2);
             data->text.text =
                 (TCHAR *) malloc(text_size * sizeof(data->text.text[0]));
-            if (!data->text.text)
+            data->text.attrs =
+                (char*)malloc(text_size * sizeof(char));
+            data->text.colors =
+                (char*)malloc(text_size * sizeof(char));
+            if (!data->text.text || !data->text.attrs || !data->text.colors)
+            {
+                if (data->text.text) free((genericptr_t)data->text.text);
+                if (data->text.attrs) free((genericptr_t)data->text.attrs);
+                if (data->text.colors) free((genericptr_t)data->text.colors);
                 return;
+            }
             ZeroMemory(data->text.text,
                        text_size * sizeof(data->text.text[0]));
+            ZeroMemory(data->text.attrs,
+                text_size * sizeof(char));
+            memset((genericptr_t)data->text.colors, NO_COLOR,
+                text_size * sizeof(char));
         } else {
-            text_size = _tcslen(data->text.text) + strlen(msg_data->text) + 4;
+            oldsize = _tcslen(data->text.text);
+            text_size = _tcslen(data->text.text) + strlen(msg_data->text) + 1 + (msg_data->append ? 0 : 2);
             TCHAR* temptxt_ptr = (TCHAR *) realloc(
-                data->text.text, text_size * sizeof(data->text.text[0]));
-            if (!temptxt_ptr)
+                (genericptr_t)data->text.text, text_size * sizeof(data->text.text[0]));
+            char* tempattr_ptr = (char*)realloc(
+                (genericptr_t)data->text.attrs, text_size * sizeof(char));
+            char* tempcolor_ptr = (char*)realloc(
+                (genericptr_t)data->text.colors, text_size * sizeof(char));
+            if (!temptxt_ptr || !tempattr_ptr || !tempcolor_ptr)
+            {
+                if (temptxt_ptr) free((genericptr_t)temptxt_ptr);
+                if (tempattr_ptr) free((genericptr_t)tempattr_ptr);
+                if (tempcolor_ptr) free((genericptr_t)tempcolor_ptr);
                 return;
+            }
             else
+            {
                 data->text.text = temptxt_ptr;
+                data->text.attrs = tempattr_ptr;
+                data->text.colors = tempcolor_ptr;
+            }
         }
         if (!data->text.text)
             break;
@@ -595,7 +630,22 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         write_CP437_to_buf_unicode(msgbuf, BUFSIZ, msg_data->text);
 
         _tcscat(data->text.text, NH_A2W(msgbuf /*msg_data->text*/, wbuf, BUFSZ));
-        _tcscat(data->text.text, TEXT("\r\n"));
+        if(msg_data->attrs)
+            memcpy(&data->text.attrs[oldsize], msg_data->attrs, newsize);
+        else
+            memset(&data->text.attrs[oldsize], msg_data->attr, newsize);
+
+        if (msg_data->colors)
+            memcpy(&data->text.colors[oldsize], msg_data->colors, newsize);
+        else
+            memset(&data->text.colors[oldsize], msg_data->color, newsize);
+
+        if (!msg_data->append)
+        {
+            _tcscat(data->text.text, TEXT("\r\n"));
+            memset(&data->text.attrs[oldsize + newsize], 0, 2);
+            memset(&data->text.colors[oldsize + newsize], NO_COLOR, 2);
+        }
 
         text_view = GetDlgItem(hWnd, IDC_MENU_TEXT);
         if (!text_view)
@@ -609,10 +659,9 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         hdc = GetDC(text_view);
         cached_font * font = mswin_get_font(NHW_MENU, ATR_NONE, hdc, FALSE);
         saveFont = SelectObject(hdc, font->hFont);
-        SetRect(&text_rt, 0, 0, 0, 0);
-        DrawTextA(hdc, msgbuf, strlen(msgbuf), &text_rt,
-                 DT_CALCRECT | DT_TOP | DT_LEFT | DT_NOPREFIX
-                     | DT_SINGLELINE);
+        DrawText(hdc, NH_A2W(msgbuf, wbuf, BUFSZ), strlen(msgbuf), &text_rt,
+                DT_CALCRECT | DT_TOP | DT_LEFT | DT_NOPREFIX
+                | DT_SINGLELINE);
         data->text.text_box_size.cx =
             max(text_rt.right - text_rt.left, data->text.text_box_size.cx);
         data->text.text_box_size.cy += text_rt.bottom - text_rt.top;
@@ -628,6 +677,7 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         if (data->menu.items)
             free(data->menu.items);
         data->how = PICK_NONE;
+        data->style = (int)lParam;
         data->menu.items = NULL;
         data->menu.size = 0;
         data->menu.allocated = 0;
@@ -1201,7 +1251,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
             buf[0] = item->accelerator;
             buf[1] = '\x0';
 
-            if (iflags.use_menu_color) {
+            if (iflags.use_menu_color && menu_style_allows_menu_coloring(data->style)) {
                 (void)get_menu_coloring(item->str, &color, &attr);
             }
 
@@ -1239,11 +1289,11 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                 flip_tile = TRUE;
 
             boolean is_full_size = !!(glyphtileflags[glyph] & GLYPH_TILE_FLAG_FULL_SIZED_ITEM) || !(glyphtileflags[glyph] & GLYPH_TILE_FLAG_HALF_SIZED_TILE);
-            enum autodraw_types autodraw = AUTODRAW_NONE;
             ntile = glyph2tile[glyph];
-            ntile = maybe_get_replaced_tile(ntile, -1, -1,
-                data_to_replacement_info(signed_glyph, -1, item->object_data.otyp > STRANGE_OBJECT ? &item->object_data : (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0),
-                &autodraw);
+            enum autodraw_types autodraw = tile2autodraw[ntile];
+            //ntile = maybe_get_replaced_tile(ntile, -1, -1,
+            //    data_to_replacement_info(signed_glyph, -1, item->object_data.otyp > STRANGE_OBJECT ? &item->object_data : (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0),
+            //    &autodraw);
             //int tile_animation_idx = get_tile_animation_index_from_glyph(glyph);
             //ntile = maybe_get_animated_tile(ntile, tile_animation_idx, ANIMATION_PLAY_TYPE_ALWAYS, data->intervalCounter, &frame_idx, &main_tile_idx, &item->is_animated, &autodraw);
             int multiplier = flip_tile ? -1 : 1;
@@ -1471,7 +1521,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                     int src_lit_y = 0;
                     int cnt = 0;
 
-                    for (int cidx = 0; cidx < min(objects[item->object_data.otyp].oc_special_quality, item->object_data.special_quality); cidx++)
+                    for (int cidx = 0; cidx < (int)min(objects[item->object_data.otyp].oc_special_quality, item->object_data.special_quality); cidx++)
                     {
                         int src_x = 0, src_y = 0;
                         int dest_x = 0, dest_y = 0;
@@ -1540,7 +1590,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                         cnt++;
                     }
                 }
-                else if (autodraws[autodraw].draw_type == AUTODRAW_DRAW_JAR_CONTENTS && item->object_data.otyp > STRANGE_OBJECT)
+                else if (autodraws[autodraw].draw_type == AUTODRAW_DRAW_JAR_CONTENTS && item->object_data.otyp > STRANGE_OBJECT && 0)
                 {
                     int max_charge = get_obj_max_charge(&item->object_data);
                     double fill_percentage = (max_charge > 0 ? (double)item->object_data.charges / (double)max_charge : 0.0);
@@ -2123,6 +2173,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
         TCHAR wbuf[BUFSZ];
         if (p != NULL)
             *p = '\0'; /* for time being, view tab field as zstring */
+
         DrawText(lpdis->hDC, NH_A2W(p1, wbuf, BUFSZ), strlen(p1), &drawRect,
                  DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 

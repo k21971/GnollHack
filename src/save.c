@@ -33,6 +33,7 @@ STATIC_DCL void FDECL(savemonchn, (int, struct monst *, int));
 STATIC_DCL void FDECL(savetrapchn, (int, struct trap *, int));
 STATIC_DCL void FDECL(savegamestate, (int, int));
 STATIC_OVL void FDECL(save_msghistory, (int, int));
+STATIC_OVL void FDECL(save_gamelog, (int, int));
 #ifdef MFLOPPY
 STATIC_DCL void FDECL(savelev0, (int, XCHAR_P, int));
 STATIC_DCL boolean NDECL(swapout_oldest);
@@ -76,6 +77,7 @@ STATIC_VAR struct save_procs {
 /* need to preserve these during save to avoid accessing freed memory */
 STATIC_VAR unsigned ustuck_id = 0, usteed_id = 0;
 boolean saving = FALSE;
+boolean check_pointing = FALSE;
 
 int
 dosave()
@@ -117,7 +119,8 @@ dosave()
 #if defined(UNIX) || defined(VMS) || defined(__EMX__)
         program_state.done_hup = 0;
 #endif
-        if (dosave0(FALSE))
+        int saveres = dosave0(FALSE);
+        if (saveres)
         {
             //if(contplay)
             //    display_popup_text("Game was saved successfully.", "Game Saved", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, 0UL);
@@ -146,6 +149,10 @@ boolean quietly;
     xchar ltmp;
     d_level uz_save;
     char whynot[BUFSZ];
+
+#ifdef WHEREIS_FILE
+    delete_whereis();
+#endif
 
     /* we may get here via hangup signal, in which case we want to fix up
        a few of things before saving so that they won't be restored in
@@ -331,6 +338,36 @@ boolean quietly;
 }
 
 STATIC_OVL void
+save_gamelog(fd, mode)
+int fd, mode;
+{
+    struct gamelog_line* tmp = gamelog, * tmp2;
+    int slen;
+
+    while (tmp) {
+        tmp2 = tmp->next;
+        if (perform_bwrite(mode)) {
+            slen = (int)strlen(tmp->text);
+            bwrite(fd, (genericptr_t)&slen, sizeof slen);
+            bwrite(fd, (genericptr_t)tmp->text, (size_t)slen);
+            bwrite(fd, (genericptr_t)tmp,
+                sizeof(struct gamelog_line));
+        }
+        if (release_data(mode)) {
+            free((genericptr_t)tmp->text);
+            free((genericptr_t)tmp);
+        }
+        tmp = tmp2;
+    }
+    if (perform_bwrite(mode)) {
+        slen = -1;
+        bwrite(fd, (genericptr_t)&slen, sizeof slen);
+    }
+    if (release_data(mode))
+        gamelog = 0;
+}
+
+STATIC_OVL void
 savegamestate(fd, mode)
 register int fd, mode;
 {
@@ -400,9 +437,10 @@ register int fd, mode;
     savenames(fd, mode);
     save_waterlevel(fd, mode);
     save_msghistory(fd, mode);
+    save_gamelog(fd, mode);
     bflush(fd);
 
-    issue_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+    issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
     /* this is the value to use for the next update of urealtime.realtime */
     urealtime.start_timing = urealtime.finish_time;
 }
@@ -1170,7 +1208,7 @@ savemon(fd, mtmp)
 int fd;
 struct monst *mtmp;
 {
-    size_t buflen;
+    size_t buflen, zerobuf = 0;
 
     buflen = sizeof(struct monst);
     bwrite(fd, (genericptr_t) &buflen, sizeof buflen);
@@ -1248,6 +1286,16 @@ struct monst *mtmp;
         bwrite(fd, (genericptr_t) &buflen, sizeof buflen);
         if (buflen > 0)
             bwrite(fd, (genericptr_t) EDOG(mtmp), buflen);
+
+        if (MMONST(mtmp))
+            savemon(fd, MMONST(mtmp));
+        else
+            bwrite(fd, (genericptr_t)&zerobuf, sizeof zerobuf);
+
+        if (MOBJ(mtmp))
+            saveobj(fd, MOBJ(mtmp));
+        else
+            bwrite(fd, (genericptr_t)&zerobuf, sizeof zerobuf);
 
         /* mcorpsenm is inline int rather than pointer to something,
            so doesn't need to be preceded by a length field */
@@ -1558,7 +1606,7 @@ free_dynamic_data_B(VOID_ARGS)
 void
 free_dynamic_data_C(VOID_ARGS)
 {
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     dumplogfreemessages();
 #endif
 
@@ -1587,6 +1635,7 @@ freedynamicdata(VOID_ARGS)
 #define free_sound_sources(R) save_sound_sources(0, FREE_SAVE, R);
 #define free_engravings() save_engravings(0, FREE_SAVE)
 #define freedamage() savedamage(0, FREE_SAVE)
+#define free_gamelog() save_gamelog(0, FREE_SAVE)
 
     /* move-specific data */
     dmonsfree(); /* release dead monsters */
@@ -1620,6 +1669,7 @@ freedynamicdata(VOID_ARGS)
     freefruitchn();
     freenames();
     free_waterlevel();
+    free_gamelog();
     free_dungeons();
 
     free_dynamic_data_B();

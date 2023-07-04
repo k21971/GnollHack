@@ -1034,7 +1034,7 @@ struct permonst **for_supplement;
 
     if (iflags.using_gui_tiles)
     {
-        strcpy(prefix, "");
+        Strcpy(prefix, "");
     }
     else
     {
@@ -1614,7 +1614,7 @@ coord *click_cc;
         if (found) {
             /* use putmixed() because there may be an encoded glyph present */
             putmixed(WIN_MESSAGE, 0, out_str);
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
             {
                 char dmpbuf[BUFSZ];
 
@@ -1626,7 +1626,7 @@ coord *click_cc;
                 (void) decode_mixed(dmpbuf, out_str);
                 if (dmpbuf[0] < ' ' || dmpbuf[0] >= 127) /* ASCII isprint() */
                     dmpbuf[0] = ' ';
-                dumplogmsg(dmpbuf);
+                dumplogmsg(dmpbuf, (char*)0, (char*)0, ATR_NONE, NO_COLOR);
             }
 #endif
 

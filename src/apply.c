@@ -351,6 +351,7 @@ struct obj *obj;
                 {
                     u.uachieve.role_achievement = 1;
                     achievement_gained("Took a Selfie with Demogorgon");
+                    livelog_printf(LL_ACHIEVE, "%s", "took a selfie with Demogorgon");
                 }
             }
             else
@@ -1941,7 +1942,7 @@ register struct obj *obj;
 
 
     play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY);
-    int max_candles = objects[obj->otyp].oc_special_quality;
+    short max_candles = objects[obj->otyp].oc_special_quality;
     
     if (obj->special_quality < max_candles) 
     {
@@ -2183,7 +2184,7 @@ struct obj **optr;
         return 1;
     }
 
-    long max_candles = objects[otmp->otyp].oc_special_quality;
+    long max_candles = (long)objects[otmp->otyp].oc_special_quality;
     if (otmp->special_quality >= max_candles)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
@@ -3879,7 +3880,7 @@ struct obj* obj;
                 else if (otmp->oclass == FOOD_CLASS)
                 {
                     wandknown = TRUE;
-                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s %s covered in frost, but that's about it.", The(cxname(otmp)), otense(otmp, "are"));
+                    pline_ex(ATR_NONE, HI_ICE, "%s %s covered in frost, but that's about it.", The(cxname(otmp)), otense(otmp, "are"));
                 }
                 else
                 {
@@ -4466,9 +4467,8 @@ set_trap()
         return 1; /* still busy */
 
     ttyp = (otmp->otyp == LAND_MINE) ? LANDMINE : BEAR_TRAP;
-    ttmp = maketrap(u.ux, u.uy, ttyp, NON_PM, MKTRAP_NO_FLAGS);
+    ttmp = maketrap(u.ux, u.uy, ttyp, NON_PM, MKTRAPFLAG_MADE_BY_U);
     if (ttmp) {
-        ttmp->madeby_u = 1;
         feeltrap(ttmp);
         if (*in_rooms(u.ux, u.uy, SHOPBASE)) {
             add_damage(u.ux, u.uy, 0L); /* schedule removal */
@@ -4756,7 +4756,7 @@ struct obj *obj;
 
                         hitvalu = 8 + otmp->enchantment;
                         hitu = thitu(hitvalu, weapon_total_dmg_value(otmp, &youmonst, mtmp, 0),
-                                     &otmp, (char *)0);
+                                     &otmp, (char *)0, (struct monst*)0, (char*)0);
                         if (hitu) {
                             pline_The("%s hits you as you try to snatch it!",
                                       the(onambuf));
@@ -6131,7 +6131,7 @@ boolean useonlyautostashes;
             int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
             int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
-            add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+            add_menu(win, gui_glyph, &any,
                 applied_invlet,
                 applied_group_accelerator,
                 ATR_NONE, NO_COLOR,
@@ -6770,7 +6770,7 @@ struct trap* lever;
         int locsubtyp = (int)lever->effect_param2;
         int locvartyp = (int)lever->effect_param3;
         int locflags = (uchar)lever->effect_flags;
-        if (isok(target_x, target_y) && loctyp >= 0 && loctyp < MAX_TYPE)
+        if (isok(target_x, target_y) && loctyp >= 0 && loctyp < MAX_LEVTYPE)
         {
             create_simple_location(target_x, target_y, loctyp, locsubtyp, locvartyp, locflags, 0, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floortyp, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floorsubtyp, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floorvartyp, TRUE);
             play_sfx_sound_at_location(SFX_SUMMON_MONSTER, target_x, target_y);
@@ -6785,11 +6785,11 @@ struct trap* lever;
         int locsubtyp2 = (int)lever->effect_param4;
         if (isok(target_x, target_y))
         {
-            if (loctyp2 >= 0 && loctyp2 < MAX_TYPE && (lever->tflags & TRAPFLAGS_STATE_MASK) == 0)
+            if (loctyp2 >= 0 && loctyp2 < MAX_LEVTYPE && (lever->tflags & TRAPFLAGS_STATE_MASK) == 0)
             {
                 create_simple_location(target_x, target_y, loctyp2, locsubtyp2, 0, 0, 0, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floortyp, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floorsubtyp, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floorvartyp, TRUE);
             }
-            else if (loctyp >= 0 && loctyp < MAX_TYPE && (lever->tflags & TRAPFLAGS_STATE_MASK) > 0)
+            else if (loctyp >= 0 && loctyp < MAX_LEVTYPE && (lever->tflags & TRAPFLAGS_STATE_MASK) > 0)
             {
                 create_simple_location(target_x, target_y, loctyp, locsubtyp, 0, 0, 0, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floortyp, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floorsubtyp, IS_FLOOR(loctyp) ? 0 : levl[target_x][target_y].floorvartyp, TRUE);
             }

@@ -53,6 +53,7 @@
     </AndroidSigningKeyAlias>
     <AndroidSigningKeyPass>
     </AndroidSigningKeyPass>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -89,9 +90,6 @@
     <Reference Include="System.Numerics.Vectors" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Plugin.StoreReview">
-      <Version>5.0.1</Version>
-    </PackageReference>
     <PackageReference Include="SkiaSharp.Views.Forms">
       <Version>2.80.3</Version>
     </PackageReference>
@@ -110,8 +108,11 @@
     <PackageReference Include="Xamarin.FFImageLoading.Transformations">
       <Version>2.4.11.982</Version>
     </PackageReference>
-    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2401" />
+    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2578" />
     <PackageReference Include="Xamarin.Essentials" Version="1.7.5" />
+    <PackageReference Include="Xamarin.Google.Android.Play.Core">
+      <Version>1.10.3.5</Version>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GHGamePageRenderer.cs" />
@@ -142,12 +143,19 @@
     <AndroidAsset Include="gnh\xlogfile" />
     <AndroidAsset Include="gnh\defaults.gnh" />
     <AndroidAsset Include="gnh\xcredits" />
-    <AndroidAppBundleModules Include="assetpacks\assets.zip" />
     <AndroidAsset Include="banks\Master.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
     <AndroidAsset Include="banks\Auxiliary.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
     <AndroidAsset Include="banks\Intro.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
     <AndroidAsset Include="banks\Master.strings.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="banks\Music.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="banks\Preliminary.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
     <AndroidNativeLibrary Include="libs\arm64-v8a\libc++_shared.so" />
+    <AndroidAsset Include="Assets\DejaVuSansMono-Bold.woff" />
+    <AndroidAsset Include="Assets\DejaVuSansMono-BoldOblique.woff" />
+    <AndroidAsset Include="Assets\DejaVuSansMono-Oblique.woff" />
+    <AndroidAsset Include="Assets\DejaVuSansMono.woff" />
+    <AndroidAppBundleModules Include="assetpacks\ondemandassetpack.zip" />
+    <AndroidAppBundleModules Include="assetpacks\installtimeassetpack.zip" />
     <None Include="Resources\AboutResources.txt" />
     <None Include="Assets\AboutAssets.txt" />
     <None Include="Properties\AndroidManifest.xml" />

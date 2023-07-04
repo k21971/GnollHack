@@ -51,7 +51,6 @@ STATIC_DCL int FDECL(throwspell, (int));
 STATIC_DCL void FDECL(spell_backfire, (int));
 STATIC_DCL boolean FDECL(spell_aim_step, (genericptr_t, int, int));
 #endif
-STATIC_DCL const char *FDECL(spelltypemnemonic, (int));
 STATIC_DCL const char* FDECL(spelltypesymbol, (int));
 STATIC_DCL int FDECL(domaterialcomponentsmenu, (int));
 STATIC_DCL void FDECL(add_spell_cast_menu_item, (winid, int, int, int, BOOLEAN_P));
@@ -64,7 +63,9 @@ STATIC_DCL boolean FDECL(is_acceptable_component_object_type, (struct materialco
 STATIC_DCL boolean FDECL(is_acceptable_component_monster_type, (struct materialcomponent*, int));
 STATIC_DCL uchar FDECL(is_obj_acceptable_component, (struct materialcomponent*, struct obj* otmp, BOOLEAN_P));
 STATIC_DCL int FDECL(count_matcomp_alternatives, (struct materialcomponent*));
-STATIC_DCL struct extended_create_window_info FDECL(extended_create_window_info_from_spell, (int, BOOLEAN_P));
+STATIC_DCL struct extended_create_window_info FDECL(extended_create_window_info_for_spell, (BOOLEAN_P));
+STATIC_DCL const char* FDECL(get_spell_attribute_description, (int));
+STATIC_DCL const char* FDECL(get_targeting_description, (unsigned int));
 
 /* since the spellbook itself doesn't blow up, don't say just "explodes" */
 STATIC_VAR const char explodes[] = "radiates explosive energy";
@@ -85,8 +86,7 @@ NEARDATA const char* spl_sortchoices[NUM_SPELL_SORTBY] = {
 NEARDATA short spl_orderindx[MAXSPELL] = { 0 }; /* array of spl_book[] indices */
 
 STATIC_OVL struct extended_create_window_info
-extended_create_window_info_from_spell(spell_id, active)
-int spell_id UNUSED;
+extended_create_window_info_for_spell(active)
 boolean active;
 {
     struct extended_create_window_info info = { 0 };
@@ -269,8 +269,11 @@ struct obj *book2;
             /* successful invocation */
             mkinvokearea();
             if (!u.uevent.invoked)
+            {
                 achievement_gained("Performed the Invocation Ritual");
-            u.uevent.invoked = 1;
+                livelog_printf(LL_ACHIEVE, "%s", "performed the invocation");
+                u.uevent.invoked = 1;
+            }
             /* in case you haven't killed the Wizard yet, behave as if
                you just did */
             u.uevent.ukilled_wizard = 1; /* wizdead() */
@@ -502,13 +505,11 @@ learn(VOID_ARGS)
     /* SUCCESS */
     exercise(A_WIS, TRUE); /* you're studying. */
 
-    Sprintf(splname,
-            objects[booktype].oc_name_known ? "\"%s\"" : "the \"%s\" spell",
-            OBJ_NAME(objects[booktype]));
+    Sprintf(splname, "%s", OBJ_NAME(objects[booktype]));
     for (i = 0; i < MAXSPELL; i++)
         if (spellid(i) == booktype || spellid(i) == NO_SPELL)
             break;
-
+    
     int initialamount = i < MAXSPELL ? spl_book[i].sp_amount : 0;
     int addedamount = 0;
 
@@ -537,8 +538,8 @@ learn(VOID_ARGS)
         else
         { /* spellknow(i) <= SPELL_IS_KEEN/10 */
             play_sfx_sound(SFX_SPELL_KEENER);
-            Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "knowledge of %s is %s.", splname,
-                 spellknow(i) ? "keener" : "restored");
+            int multicolors[2] = { CLR_MSG_SPELL, NO_COLOR };
+            Your_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "knowledge of \'%s\' is %s.", splname, spellknow(i) ? "keener" : "restored");
             incr_spell_nknow(i, 1);
             book->spestudied++;
             exercise(A_WIS, TRUE); /* extra study */
@@ -593,7 +594,8 @@ learn(VOID_ARGS)
             sortspells();
 
             play_sfx_sound(SFX_SPELL_LEARN_SUCCESS);
-            You_ex(ATR_NONE, CLR_MSG_POSITIVE, i > 0 ? "add %s to your repertoire." : "learn %s.", splname);
+            int multicolors[1] = { CLR_MSG_SPELL };
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, i > 0 ? "add \'%s\' to your repertoire." : "learn \'%s\'.", splname);
             learnsuccess = TRUE;
         }
         makeknown((int) booktype);
@@ -601,10 +603,11 @@ learn(VOID_ARGS)
 
     if (addedamount > 0)
     {
+        int multicolors[3] = { CLR_BRIGHT_CYAN, NO_COLOR, CLR_MSG_SPELL };
         if (addedamount == 1)
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have one %scasting of %s prepared.", !initialamount ? "" : "more ", splname);
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "now have %s %scasting of \'%s\' prepared.", "one", !initialamount ? "" : "more ", splname);
         else
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have %d %scastings of %s prepared.", addedamount, !initialamount ? "" : "more ", splname);
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "now have %d %scastings of \'%s\' prepared.", addedamount, !initialamount ? "" : "more ", splname);
     }
 
     if (book->cursed) 
@@ -641,10 +644,10 @@ check_added_to_your_bill_here:
 }
 
 void
-print_spell_level_text(buf, booktype, includeschool, capitalize_style)
+print_spell_level_text(buf, booktype, includeschool, capitalize_style, include_level)
 char* buf;
 int booktype;
-boolean includeschool;
+boolean includeschool, include_level;
 uchar capitalize_style;
 {
     if (!buf)
@@ -669,9 +672,9 @@ uchar capitalize_style;
         else if (objects[booktype].oc_spell_level == 0)
             Sprintf(lvlbuf, "major cantrip");
         else if (objects[booktype].oc_spell_level > 0)
-            Sprintf(lvlbuf, "%ld", objects[booktype].oc_spell_level);
+            Sprintf(lvlbuf, "%s%ld", include_level ? "level " : "", objects[booktype].oc_spell_level);
         else
-            Strcpy(lvlbuf, "inappropriate level");
+            Sprintf(lvlbuf, "inappropriate%s", include_level ? " level" : "");
     }
     switch(capitalize_style)
     {
@@ -736,7 +739,7 @@ register struct obj *spellbook;
         strcpy(Namebuf2, OBJ_NAME(objects[booktype]));
         *Namebuf2 = highc(*Namebuf2);
 
-        print_spell_level_text(lvlbuf, booktype, TRUE, FALSE);
+        print_spell_level_text(lvlbuf, booktype, TRUE, FALSE, FALSE);
 
         if (!confused && !hallucinated)
         {
@@ -753,15 +756,16 @@ register struct obj *spellbook;
                 }
                 else
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_HINT, "This spellbook contains \"%s\".", namebuf);
+                    int multicolors[1] = { CLR_MSG_SPELL };
+                    pline_multi_ex(ATR_NONE, CLR_MSG_HINT, no_multiattrs, multicolors, "This spellbook contains \'%s\'.", namebuf);
                     makeknown(spellbook->otyp);
                     takeround = 1;
-                    Sprintf(buf, "\"%s\" is %s. Continue?", Namebuf2, an(lvlbuf));
+                    Sprintf(buf, "\'%s\' is %s. Continue?", Namebuf2, an(lvlbuf));
                 }
             }
             else
             {
-                Sprintf(buf, "\"%s\" is %s. Continue?", Namebuf2, an(lvlbuf));
+                Sprintf(buf, "\'%s\' is %s. Continue?", Namebuf2, an(lvlbuf));
             }
         }
         else if (hallucinated)
@@ -835,7 +839,9 @@ register struct obj *spellbook;
             if (read_tribute("books", tribtitle, 0, (char *) 0, 0,
                              spellbook->o_id))
             {
-                u.uconduct.literate++;
+                if (!u.uconduct.literate++)
+                    livelog_printf(LL_CONDUCT,
+                        "became literate by reading %s", tribtitle);
                 check_unpaid(spellbook);
                 makeknown(booktype);
                 if (!u.uevent.read_tribute) 
@@ -1250,9 +1256,26 @@ int* spell_no;
     }
     else
     {
+        int splcnt = 0;
         for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
         {
             add_alt_spell_cast_menu_item(tmpwin, i, splaction);
+            splcnt++;
+        }
+        if (splcnt > 0)
+        {
+            add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
+                "", MENU_UNSELECTED);
+            any.a_int = -1;
+            int glyph = MAXSPELL + GLYPH_SPELL_TILE_OFF;
+            struct extended_menu_info info = zeroextendedmenuinfo;
+            info.menu_flags |= MENU_FLAGS_ACTIVE;
+            add_extended_menu(tmpwin, glyph, &any, '?', 0, ATR_NONE, NO_COLOR,
+                "View Spells", MENU_UNSELECTED, info);
+            any.a_int = -2;
+            glyph = MAXSPELL + 1 + GLYPH_SPELL_TILE_OFF;
+            add_extended_menu(tmpwin, glyph, &any, '!', 0, ATR_NONE, NO_COLOR,
+                "Mix Spells", MENU_UNSELECTED, info);
         }
     }
 
@@ -1302,6 +1325,21 @@ int* spell_no;
 
     if (n > 0) 
     {
+        if (selected[0].item.a_int <= 0)
+        {
+            int res = selected[0].item.a_int;
+            free((genericptr_t)selected);
+            switch (res)
+            {
+            case -1:
+                return dospellview();
+            case -2:
+                return domix();
+            default:
+                return 0;
+            }
+        }
+
         *spell_no = selected[0].item.a_int - 1;
         /* menu selection for `PICK_ONE' does not
            de-select any preselected entry */
@@ -1383,7 +1421,7 @@ dospellview()
     return 0;
 }
 
-STATIC_OVL const char *
+const char *
 spelltypemnemonic(skill)
 int skill;
 {
@@ -1637,6 +1675,87 @@ int otyp;
         return "unknown type";
 }
 
+STATIC_OVL const char*
+get_spell_attribute_description(attrno)
+int attrno;
+{
+    if (attrno >= 0)
+    {
+        switch (attrno)
+        {
+        case A_STR:
+            return "Strength";
+        case A_DEX:
+            return "Dexterity";
+        case A_CON:
+            return "Constitution";
+        case A_INT:
+            return "Intelligence";
+        case A_WIS:
+            return "Wisdom";
+        case A_CHA:
+            return "Charisma";
+            break;
+        case A_MAX_INT_WIS:
+            return "Higher of intelligence and wisdom";
+        case A_MAX_INT_CHA:
+            return "Higher of intelligence and charisma";
+        case A_MAX_WIS_CHA:
+            return "Higher of wisdom and charisma";
+        case A_MAX_INT_WIS_CHA:
+            return "Higher of intelligence, wisdom, and charisma";
+        case A_AVG_INT_WIS:
+            return "Average of intelligence and wisdom";
+        case A_AVG_INT_CHA:
+            return "Average of intelligence and charisma";
+        case A_AVG_WIS_CHA:
+            return "Average of wisdom and charisma";
+        case A_AVG_INT_WIS_CHA:
+            return "Average of intelligence, wisdom, and charisma";
+        default:
+            return "Not applicable";
+        }
+    }
+    return "None";
+}
+
+STATIC_OVL const char*
+get_targeting_description(skill)
+unsigned int skill;
+{
+    if (skill > 0)
+    {
+        switch (skill)
+        {
+        case NODIR:
+            return "None";
+        case IMMEDIATE:
+            return "One target in selected direction";
+        case RAY:
+            if (skill & S1_SPELL_EXPLOSION_EFFECT)                  // TODO: S1_SPELL_EXPLOSION_EFFECT necessary? Bitwise and?
+                return "Ray that explodes on hit";
+            else
+                return "Ray in selected direction";
+        case TARGETED:
+            return "Target selected on screen";
+        case TOUCH:
+            return "Touch";
+        case IMMEDIATE_MULTIPLE_TARGETS:
+            return "Multiple targets in selected direction";
+        case IMMEDIATE_ONE_TO_THREE_TARGETS:
+            return "1/2/3 targets in selected direction depending on blessedness";
+        case IMMEDIATE_ONE_TO_SEVEN_TARGETS:
+            return "1/4/7 targets in selected direction depending on blessedness";
+        case IMMEDIATE_TWO_TO_SIX_TARGETS:
+            return "2/4/6 targets in selected direction depending on blessedness";
+        default:
+            return "Targeting not applicable";
+        }
+    }
+    else
+        return "No targeting";
+}
+
 int
 spelldescription(spell)
 int spell;
@@ -1649,22 +1768,29 @@ int spell;
         return 0;
     }
 
-    winid datawin = WIN_ERR;
-    int glyph = spell_to_glyph(spell);
-    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_SPELL_DESCRIPTION_SCREEN, glyph, extended_create_window_info_from_spell(spell, TRUE));
-
     int booktype = spellid(spell);
+    return spelldescription_core(spell, booktype);
+}
+
+int
+spelldescription_core(spell, booktype)
+int spell, booktype;
+{
     char buf[BUFSZ];
     char buf2[BUFSZ];
     char buf3[BUFSZ];
 
+    winid datawin = WIN_ERR;
+    int glyph = booktype + FIRST_SPELL + GLYPH_SPELL_TILE_OFF;
+    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_SPELL_DESCRIPTION_SCREEN, glyph, extended_create_window_info_for_spell(TRUE));
+
     /* Name */
-    Strcpy(buf, spellname(spell));
+    Strcpy(buf, OBJ_NAME(objects[booktype]));
     *buf = highc(*buf);    
     putstr(datawin, ATR_TITLE, buf);
 
     /* Level & category*/
-    print_spell_level_text(buf, booktype, TRUE, TRUE);    
+    print_spell_level_text(buf, booktype, TRUE, TRUE, FALSE);    
     putstr(datawin, ATR_SUBTITLE, buf);
 
     /* One empty line here */
@@ -1675,67 +1801,22 @@ int spell;
     if (objects[booktype].oc_spell_attribute >= 0)
     {
         char statbuf[BUFSZ];
-        switch (objects[booktype].oc_spell_attribute)
-        {
-        case A_STR:
-            Strcpy(statbuf, "Strength");
-            break;
-        case A_DEX:
-            Strcpy(statbuf, "Dexterity");
-            break;
-        case A_CON:
-            Strcpy(statbuf, "Constitution");
-            break;
-        case A_INT:
-            Strcpy(statbuf, "Intelligence");
-            break;
-        case A_WIS:
-            Strcpy(statbuf, "Wisdom");
-            break;
-        case A_CHA:
-            Strcpy(statbuf, "Charisma");
-            break;
-        case A_MAX_INT_WIS:
-            Strcpy(statbuf, "Higher of intelligence and wisdom");
-            break;
-        case A_MAX_INT_CHA:
-            Strcpy(statbuf, "Higher of intelligence and charisma");
-            break;
-        case A_MAX_WIS_CHA:
-            Strcpy(statbuf, "Higher of wisdom and charisma");
-            break;
-        case A_MAX_INT_WIS_CHA:
-            Strcpy(statbuf, "Higher of intelligence, wisdom, and charisma");
-            break;
-        case A_AVG_INT_WIS:
-            Strcpy(statbuf, "Average of intelligence and wisdom");
-            break;
-        case A_AVG_INT_CHA:
-            Strcpy(statbuf, "Average of intelligence and charisma");
-            break;
-        case A_AVG_WIS_CHA:
-            Strcpy(statbuf, "Average of wisdom and charisma");
-            break;
-        case A_AVG_INT_WIS_CHA:
-            Strcpy(statbuf, "Average of intelligence, wisdom, and charisma");
-            break;
-        default:
-            Strcpy(statbuf, "Not applicable");
-            break;
-        }
-
+        Strcpy(statbuf, get_spell_attribute_description(objects[booktype].oc_spell_attribute));
         Sprintf(buf, "Attributes:       %s", statbuf);        
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
-    /* Success percentage */
-    int successpct = percent_success(spell, TRUE);
-    int successpct_unlimited = percent_success(spell, FALSE);
-    Strcpy(buf2, "");
-    if(successpct_unlimited < 0 || successpct_unlimited > 100)
-        Sprintf(buf2, " (base %d%%)", successpct_unlimited);
-    Sprintf(buf, "Success chance:   %d%%%s", successpct, buf2);
-    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+    if (spell >= 0)
+    {
+        /* Success percentage */
+        int successpct = percent_success(spell, TRUE);
+        int successpct_unlimited = percent_success(spell, FALSE);
+        Strcpy(buf2, "");
+        if (successpct_unlimited < 0 || successpct_unlimited > 100)
+            Sprintf(buf2, " (base %d%%)", successpct_unlimited);
+        Sprintf(buf, "Success chance:   %d%%%s", successpct, buf2);
+        putstr(datawin, ATR_INDENT_AT_COLON, buf);
+    }
 
     /* Mana cost*/
     double manacost = get_spellbook_adjusted_mana_cost(booktype);
@@ -1776,42 +1857,7 @@ int spell;
     /* DirType */
     if (objects[booktype].oc_dir > 0)
     {
-        Strcpy(buf2, "");
-        switch (objects[booktype].oc_dir)
-        {
-        case NODIR:
-            Strcpy(buf2, "None");
-            break;
-        case IMMEDIATE:
-            Strcpy(buf2, "One target in selected direction");
-            break;
-        case RAY:
-            if(objects[booktype].oc_spell_flags & S1_SPELL_EXPLOSION_EFFECT)
-                Strcpy(buf2, "Ray that explodes on hit");
-            else
-                Strcpy(buf2, "Ray in selected direction");
-            break;
-        case TARGETED:
-            Strcpy(buf2, "Target selected on screen");
-            break;
-        case TOUCH:
-            Strcpy(buf2, "Touch");
-            break;
-        case IMMEDIATE_MULTIPLE_TARGETS:
-            Strcpy(buf2, "Multiple targets in selected direction");
-            break;
-        case IMMEDIATE_ONE_TO_THREE_TARGETS:
-            Strcpy(buf2, "1/2/3 targets in selected direction depending on blessedness");
-            break;
-        case IMMEDIATE_ONE_TO_SEVEN_TARGETS:
-            Strcpy(buf2, "1/4/7 targets in selected direction depending on blessedness");
-            break;
-        case IMMEDIATE_TWO_TO_SIX_TARGETS:
-            Strcpy(buf2, "2/4/6 targets in selected direction depending on blessedness");
-            break;
-        default:
-            break;
-        }
+        Strcpy(buf2, get_targeting_description(objects[booktype].oc_dir));
         Sprintf(buf, "Targeting:        %s", buf2);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
@@ -1820,7 +1866,7 @@ int spell;
     if (objects[booktype].oc_spell_range > 0)
     {
         Sprintf(buf, "Range:            %ld'", objects[booktype].oc_spell_range * 5L);        
-        putstr(datawin, 0, buf);
+        putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
     /* Radius */
@@ -2441,8 +2487,10 @@ struct monst* targetmonst;
     {
         u.uachieve.role_achievement = 1;
         char abuf[BUFSZ];
-        strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+        const char* ra_desc = get_role_achievement_description(TRUE);
+        strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
+        livelog_printf(LL_ACHIEVE, "%s", ra_desc);
     }
 
     switch (otyp) {
@@ -2866,6 +2914,7 @@ struct monst* targetmonst;
     case SPE_MASS_CONFLICT:
     case SPE_GLOBE_OF_INVULNERABILITY:
     case SPE_DIVINE_INTERVENTION:
+    {
         //play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
         update_u_action(ACTION_TILE_CAST_NODIR);
         play_sfx_sound_at_location(SFX_GENERIC_CAST_EFFECT, u.ux, u.uy);
@@ -2884,10 +2933,12 @@ struct monst* targetmonst;
         default:
             break;
         }
-        You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully cast \"%s\".", spellname(spell));
+        int multicolors[1] = { CLR_MSG_HINT };
+        You_multi_ex(ATR_NONE, CLR_MSG_SPELL, no_multiattrs, multicolors, "successfully cast \'%s\'.", spellname(spell));
         addspellintrinsictimeout(otyp);
         special_effect_wait_until_end(0);
         break;
+    }
     case SPE_JUMPING:
         //play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_CAST);
         update_u_action(ACTION_TILE_CAST_NODIR);
@@ -4590,8 +4641,8 @@ int spell;
     else if (answerchar == '\0' || answerchar == '-')
     {
         spellhotkey(spell) = 0;
-        Sprintf(buf, "Hotkey for \'%s\' cleared.", spellname(spell));
-        pline1(buf);
+        int multicolors[1] = { CLR_MSG_HINT };
+        pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, buf, "Hotkey for \'%s\' cleared.", spellname(spell));
     }
     else if (answerchar >= '0' && answerchar <= '9')
     {
@@ -4615,8 +4666,8 @@ int spell;
         }
 
         spellhotkey(spell) = selected_hotkey;
-        Sprintf(buf, "Hotkey for \'%s\' set to \'%c\'.", spellname(spell), answerchar);
-        pline1(buf);
+        int multicolors[2] = { CLR_MSG_HINT, CLR_MSG_HINT };
+        pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, buf, "Hotkey for \'%s\' set to \'%c\'.", spellname(spell), answerchar);
     }
     else
         pline("Illegal hotkey.");
@@ -4650,8 +4701,8 @@ int spell;
         }
         sortspells();
         char buf[BUFSZ] = "";
-        Sprintf(buf, "You removed \'%s\' from your memory permanently.", spellnamebuf);
-        pline1(buf);
+        int multicolors[1] = { CLR_MSG_HINT };
+        pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, buf, "You removed \'%s\' from your memory permanently.", spellnamebuf);
     }
 
     return 0;
@@ -4941,6 +4992,7 @@ STATIC_OVL int
 domaterialcomponentsmenu(spell)
 int spell;
 {
+    int i;
     int j;
 
     //This might happen with amnesia etc., the spells no longer "age"
@@ -4990,7 +5042,7 @@ int spell;
     int matcnt = 0;
     int difmatcnt = 0;
 
-    //Check the material components here
+    /* Check the material components here */
     for(j = 0; matlists[spellmatcomp(spell)].matcomp[j].amount != 0; j++)
     {
         matcnt++;
@@ -5002,7 +5054,7 @@ int spell;
         Sprintf(buf, "You need %s%s. ",
             buf3, ((mc->flags & MATCOMP_NOT_SPENT) ? " as a catalyst" : " as a component"));
 
-        Sprintf(buf5, "prepare \"%s\" with", spellname);
+        Sprintf(buf5, "prepare \'%s\' with", spellname);
 
         char allclassletters[MAX_MATCOMP_ALTERNATIVES + 1];
 
@@ -5086,6 +5138,28 @@ int spell;
 
     }
 
+    /* Check that the same object has not been selected more than one time */
+    boolean same_found = FALSE;
+    for (j = 0; j < matcnt; j++)
+    {
+        for (i = j + 1; i < matcnt; i++)
+        {
+            if (selcomps[i] == selcomps[j])
+            {
+                same_found = TRUE;
+                break;
+            }
+        }
+    }
+
+    if (same_found)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You_cant_ex1(ATR_NONE, CLR_MSG_FAIL, "use the same material component more than once.");
+        return 0;
+    }
+
+    /* Determine the amount to be mixed */
     boolean failure = !result || ((Confusion || Stunned) && spellev(spell) > 1 && rn2(spellev(spell)));
     int spells_gained_per_mixing = matlists[spellmatcomp(spell)].spellsgained;
     int selected_multiplier = 1;
@@ -5130,7 +5204,7 @@ int spell;
         }
     }
 
-    //Now go through the selected material components
+    /* Now go through the selected material components */
     for (j = 0; j < matcnt; j++)
     {
         struct obj* otmp = selcomps[j];
@@ -5166,9 +5240,9 @@ int spell;
                 || oresist_fire(otmp)
                 || is_obj_indestructible(otmp)
                 || Is_container(otmp)
-                || objects[otmp->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED
-                || objects[otmp->otyp].oc_flags & O1_BECOMES_CURSED_WHEN_PICKED_UP_AND_DROPPED
-                || otmp->owornmask & ~W_WEAPON
+                || (objects[otmp->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED)
+                || (objects[otmp->otyp].oc_flags & O1_BECOMES_CURSED_WHEN_PICKED_UP_AND_DROPPED)
+                || (otmp->owornmask & ~W_WEAPON)
                 || (otmp->oclass == WEAPON_CLASS && (otmp->owornmask & W_WEAPON)))
                 usecomps = FALSE;
         }
@@ -5179,19 +5253,21 @@ int spell;
             int used_amount = (failure ? 1 : selected_multiplier) * mc->amount;
             if(otmp->quan >= used_amount)
             {
-                int i;
                 for (i = 0; i < used_amount; i++)
                     useup(otmp);
+
+                //Note: otmp cannot appear twice in the selcomps list due to the same_found check, so we are good to continue
             }
             else
             {
                 impossible("There should always be enough material components at this stage");
                 useupall(otmp);
+                failure = TRUE;
             }
         }
     }
 
-    //And now the result
+    /* And now the result */
     if (failure)
     {
         //Explosion
@@ -5230,10 +5306,11 @@ int spell;
         spellamount(spell) += addedamount;
         play_sfx_sound(SFX_MIXING_SUCCESS);
         You_ex(ATR_NONE, CLR_MSG_SUCCESS, "successfully prepared the material components.");
+        int multicolors[2] = { CLR_MSG_HINT, CLR_MSG_SPELL };
         if (addedamount == 1)
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have one more casting of \"%s\" prepared.", spellname);
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "now have %s more casting of \'%s\' prepared.", "one", spellname);
         else
-            You_ex(ATR_NONE, CLR_MSG_SUCCESS, "now have %d more castings of \"%s\" prepared.", addedamount, spellname);
+            You_multi_ex(ATR_NONE, CLR_MSG_SUCCESS, no_multiattrs, multicolors, "now have %d more castings of \'%s\' prepared.", addedamount, spellname);
 
 #if 0
         /* gain skill for successful preparation */
@@ -5448,13 +5525,13 @@ int spell;
     return cooldown;
 }
 
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
 void
 dump_spells()
 {
     if (spellid(0) == NO_SPELL)
     {
-        putstr(0, 0, "You did not know any spells.");
+        putstr(0, ATR_HEADING, "You did not know any spells.");
     }
     else
     {
@@ -5463,7 +5540,7 @@ dump_spells()
         char spellnamebuf[BUFSZ];
         char castingsbuf[BUFSZ] = "";
         char successbuf[BUFSZ] = "";
-        putstr(0, 0, "Spells in your repertoire:");
+        putstr(0, ATR_HEADING, "Spells in your repertoire:");
         for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
         {
             int pct_lim = percent_success(i, TRUE);
@@ -5478,7 +5555,7 @@ dump_spells()
             Sprintf(successbuf, "%d%% success", pct_lim);
 
             Sprintf(buf, " %-34s %-13s%s", spellnamebuf, successbuf, castingsbuf);
-            putstr(0, 0, buf);
+            putstr(0, ATR_PREFORM, buf);
         }
     }
 }

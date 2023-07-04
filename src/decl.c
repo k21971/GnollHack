@@ -37,6 +37,8 @@ int otg_temp; /* used by object_to_glyph() [otg] */
 NEARDATA int in_doagain = 0;
 NEARDATA int skip_savech = 0;
 
+struct gamelog_line* gamelog = 0;
+
 /*
  *      The following structure will be initialized at startup time with
  *      the level numbers of some "important" things in the game.
@@ -53,6 +55,8 @@ NEARDATA char *save_cm = 0;
 NEARDATA struct kinfo killer = DUMMY;
 NEARDATA long done_money = 0;
 const char *nomovemsg = 0;
+int nomovemsg_attr = ATR_NONE;
+int nomovemsg_color = NO_COLOR;
 NEARDATA char plname[PL_NSIZ] = DUMMY; /* player name */
 NEARDATA char recovery_plname[PL_NSIZ] = DUMMY;  /* Set at program start to check for recoverable games before ask_name */
 NEARDATA boolean plname_from_error_savefile = FALSE;
@@ -362,7 +366,7 @@ unsigned short dogbreed;
 unsigned short catbreed;
 
 const struct breed_definition dog_breed_definitions[NUM_DOG_BREEDS] = {
-    { "generic", "generic",     (char*)0, (char*)0, (char*)0, 0UL },
+    { "generic",                "generic", (char*)0, (char*)0, (char*)0, 0UL },
     { "black labrador",         (char*)0, "Labrador Retriever", "black", (char*)0, 0UL },
     { "brown labrador",         (char*)0, "Labrador Retriever", "brown", (char*)0, 0UL },
     { "yellow labrador",        (char*)0, "Labrador Retriever", "yellow", (char*)0, 0UL },
@@ -387,6 +391,10 @@ const struct breed_definition dog_breed_definitions[NUM_DOG_BREEDS] = {
     { "english springer spaniel", (char*)0, "English Springer Spaniel", (char*)0, (char*)0, 0UL   },
     { "welsh springer spaniel", (char*)0, "Welsh Springer Spaniel", (char*)0, (char*)0, 0UL   },
     { "bulldog",                (char*)0, "Bulldog", (char*)0, (char*)0, 0UL },
+    { "rottweiler",             (char*)0, "Rottweiler", (char*)0, (char*)0, 0UL },
+    { "dachshund",              (char*)0, "Dachshund", (char*)0, (char*)0, 0UL },
+    { "beagle",                 (char*)0, "Beagle", (char*)0, (char*)0, 0UL },
+    { "st. bernard",            (char*)0, "St. Bernard", (char*)0, (char*)0, 0UL },
 };
 
 const struct breed_definition cat_breed_definitions[NUM_CAT_BREEDS] = {
@@ -534,6 +542,16 @@ const char *ARGV0;
 /* support for lint.h */
 unsigned nhUse_dummy = 0;
 unsigned long file_end_marker = 0xF23EE6D8;
+
+int no_multiattrs[32] = { 0 };
+int multicolor_red1[1] = { CLR_RED };
+int multicolor_red2[2] = { NO_COLOR, CLR_RED };
+int multicolor_red3[3] = { NO_COLOR, NO_COLOR, CLR_RED };
+int multicolor_red4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_RED };
+int multicolor_orange1[1] = { CLR_ORANGE };
+int multicolor_orange2[2] = { NO_COLOR, CLR_ORANGE };
+int multicolor_orange3[3] = { NO_COLOR, NO_COLOR, CLR_ORANGE };
+int multicolor_orange4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_ORANGE };
 
 
 NEARDATA const char* Moloch = "Moloch";

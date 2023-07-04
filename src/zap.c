@@ -1017,11 +1017,11 @@ struct monst* origmonst;
                 /* no corpse after system shock */
                 xkilled(mtmp, XKILL_GIVEMSG | XKILL_NOCORPSE);
             } 
-            else if (newcham(mtmp, (struct permonst *) 0, polyspot, give_msg) != 0
+            else if (newcham(mtmp, (struct permonst *) 0, 0, polyspot, give_msg) != 0
                        /* if shapechange failed because there aren't
                           enough eligible candidates (most likely for
                           vampshifter), try reverting to original form */
-                       || (mtmp->cham >= LOW_PM && newcham(mtmp, &mons[mtmp->cham], polyspot, give_msg) != 0)) 
+                       || (mtmp->cham >= LOW_PM && newcham(mtmp, &mons[mtmp->cham], mtmp->cham_subtype, polyspot, give_msg) != 0)) 
             {
                 if (give_msg && (canspotmon(mtmp)
                     || (u.uswallow && mtmp == u.ustuck)))
@@ -1064,6 +1064,8 @@ struct monst* origmonst;
         res = 1;
         if (disguised_mimic)
             seemimic(mtmp);
+        if (mtmp->cham && !mtmp->mprops[UNCHANGING])
+            revert_mon_polymorph(mtmp, FALSE, TRUE, TRUE);
         if (!has_cancellation_resistance(mtmp))
         {
             play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
@@ -1078,6 +1080,8 @@ struct monst* origmonst;
         res = 1;
         if (disguised_mimic)
             seemimic(mtmp);
+        if (mtmp->cham && !mtmp->mprops[UNCHANGING])
+            revert_mon_polymorph(mtmp, FALSE, TRUE, TRUE);
         /* Unaffected by cancellation resistance */
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
         special_effect_wait_until_action(0);
@@ -1289,7 +1293,7 @@ cure_petrification_here:
             int damagedealt = hp_before - hp_after;
             if (damagedealt > 0)
             {
-                pline("%s sustains %d damage!", Monnam(mtmp), damagedealt);
+                pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(mtmp), damagedealt);
                 display_m_being_hit(mtmp, HIT_GENERAL, damagedealt, 0UL, FALSE);
             }
             if (DEADMONSTER(mtmp))
@@ -1437,7 +1441,7 @@ cure_petrification_here:
             char *name = Monnam(mtmp);
 
             /* turn into flesh golem */
-            if (newcham(mtmp, &mons[PM_FLESH_GOLEM], FALSE, FALSE)) {
+            if (newcham(mtmp, &mons[PM_FLESH_GOLEM], 0, FALSE, FALSE)) {
                 if (canseemon(mtmp))
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns to flesh!", name);
             } else {
@@ -1593,19 +1597,20 @@ struct monst* mtmp;
 
     datawin = create_nhwindow(NHW_MENU);
 
-    print_monster_intrinsics(datawin, mtmp);
-    print_monster_statistics(datawin, mtmp);
+    print_monster_intrinsics(datawin, mtmp, mtmp->data);
+    print_monster_statistics(datawin, mtmp, mtmp->data);
 
     display_nhwindow(datawin, FALSE);
     destroy_nhwindow(datawin), datawin = WIN_ERR;
 
 }
 
-void print_monster_intrinsics(datawin, mtmp)
+void print_monster_intrinsics(datawin, mtmp, ptr)
 winid datawin;
 struct monst* mtmp;
+struct permonst* ptr;
 {
-    if (!mtmp)
+    if (!ptr)
         return;
 
     if (datawin == WIN_ERR)
@@ -1614,7 +1619,7 @@ struct monst* mtmp;
     boolean is_you = (mtmp == &youmonst);
     char buf[BUFSZ];
 
-    Sprintf(buf, "%s abilities:", is_you ? "Innate" : "Current"); // , s_suffix(noit_Monnam(mtmp)));
+    Sprintf(buf, "%s abilities:", !mtmp || is_you ? "Innate" : "Current"); // , s_suffix(noit_Monnam(mtmp)));
     putstr(datawin, ATR_HEADING, buf);
 
     int abilcnt = 0;
@@ -1631,19 +1636,19 @@ struct monst* mtmp;
         unsigned long ibit = prop_to_innate(i);
         unsigned long ibit2 = prop_to_innate2(i);
 
-        if (mtmp->data->mresists & ibit)
+        if (ptr->mresists & ibit)
             has_innate = TRUE;
 
-        if (mtmp->data->mresists2 & ibit2)
+        if (ptr->mresists2 & ibit2)
             has_innate2 = TRUE;
 
-        if (mtmp->mprops[i] & M_EXTRINSIC)
+        if (mtmp && (mtmp->mprops[i] & M_EXTRINSIC) != 0)
             has_extrinsic = TRUE;
 
-        if (mtmp->mprops[i] & M_INTRINSIC_ACQUIRED)
+        if (mtmp && (mtmp->mprops[i] & M_INTRINSIC_ACQUIRED) != 0)
             has_instrinsic_acquired = TRUE;
         
-        temp_dur = mtmp->mprops[i] & M_TIMEOUT;
+        temp_dur = mtmp  ? (mtmp->mprops[i] & M_TIMEOUT) : 0;
         if (temp_dur)
             has_temporary = TRUE;
 
@@ -1653,8 +1658,8 @@ struct monst* mtmp;
         {
             char endbuf[BUFSZ];
             char endbuf2[BUFSZ];
-            strcpy(endbuf, "");
-            strcpy(endbuf2, "");
+            Strcpy(endbuf, "");
+            Strcpy(endbuf2, "");
 
 #if 0
             if (has_innate || has_innate2)
@@ -1701,21 +1706,18 @@ struct monst* mtmp;
             *namebuf = highc(*namebuf);
 
             abilcnt++;
-            Sprintf(buf, " %2d - %s%s", abilcnt, namebuf, endbuf2);
-            
+            Sprintf(buf, " %2d - %s%s", abilcnt, namebuf, endbuf2);            
             putstr(datawin, ATR_INDENT_AT_DASH, buf);
         }
     }
 
     if (!abilcnt)
     {
-        strcpy(buf, " (None)");
-        
+        strcpy(buf, " (None)");        
         putstr(datawin, 0, buf);
     }
 
-    Sprintf(buf, "Classifications:");// , noit_mon_nam(mtmp));
-    
+    Sprintf(buf, "Classifications:");// , noit_mon_nam(mtmp));    
     putstr(datawin, ATR_HEADING, buf);
 
     abilcnt = 0;
@@ -1729,9 +1731,9 @@ struct monst* mtmp;
                 bit = bit << i;
 
             unsigned long mflags = 
-                j == 1 ? mtmp->data->mflags1 : j == 2 ? mtmp->data->mflags2 : j == 3 ? mtmp->data->mflags3 : j == 4 ? mtmp->data->mflags4 : 
-                j == 5 ? mtmp->data->mflags5 : j == 6 ? mtmp->data->mflags6 : j == 7 ? mtmp->data->mflags7 : j == 8 ? mtmp->data->mflags8 : 
-                mtmp->data->mflags1; /* Fall back case*/
+                j == 1 ? ptr->mflags1 : j == 2 ? ptr->mflags2 : j == 3 ? ptr->mflags3 : j == 4 ? ptr->mflags4 :
+                j == 5 ? ptr->mflags5 : j == 6 ? ptr->mflags6 : j == 7 ? ptr->mflags7 : j == 8 ? ptr->mflags8 :
+                ptr->mflags1; /* Fall back case*/
 
             if (mflags & bit)
             {
@@ -1741,8 +1743,7 @@ struct monst* mtmp;
                 {
                     *descbuf = highc(*descbuf);
                     abilcnt++;
-                    Sprintf(buf, " %2d - %s", abilcnt, descbuf);
-                    
+                    Sprintf(buf, " %2d - %s", abilcnt, descbuf);                    
                     putstr(datawin, ATR_INDENT_AT_DASH, buf);
                 }
             }
@@ -1750,10 +1751,10 @@ struct monst* mtmp;
     }
 
     /* Heads */
-    if (!(mtmp->data->heads == 1 && mtmp->heads_left == 1))
+    if (!(ptr->heads == 1 && (!mtmp || mtmp->heads_left == 1)))
     {
         char headbuf[BUFSZ];
-        switch (mtmp->data->heads)
+        switch (ptr->heads)
         {
         case 0:
             strcpy(headbuf, "Headless");
@@ -1768,113 +1769,100 @@ struct monst* mtmp;
             strcpy(headbuf, "Three-headed");
             break;
         default:
-            Sprintf(headbuf, "%d-headed", mtmp->data->heads);
+            Sprintf(headbuf, "%d-headed", ptr->heads);
             break;
         }
 
-        if (mtmp->heads_left != mtmp->data->heads)
+        if (mtmp && mtmp->heads_left != ptr->heads)
             Sprintf(eos(headbuf), " (%d head%s left)", mtmp->heads_left, plur(mtmp->heads_left));
 
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, headbuf);
-        
+        Sprintf(buf, " %2d - %s", abilcnt, headbuf);        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
     if (!abilcnt)
     {
-        strcpy(buf, " (None)");
-        
+        strcpy(buf, " (None)");        
         putstr(datawin, 0, buf);
     }
 
 
-    Sprintf(buf, "Notable:");// , noit_mon_nam(mtmp));
-    
+    Sprintf(buf, "Notable:");// , noit_mon_nam(mtmp));    
     putstr(datawin, ATR_HEADING, buf);
 
     abilcnt = 0;
 
-    if (mon_hates_silver(mtmp))
+    if (mtmp ? mon_hates_silver(mtmp) : hates_silver(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to silver weapons");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to silver weapons");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (mon_hates_blessed(mtmp))
+    if (mtmp ? mon_hates_blessed(mtmp) : hates_blessed(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to blessed weapons");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to blessed weapons");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (mon_hates_cursed(mtmp))
+    if (mtmp ? mon_hates_cursed(mtmp) : hates_cursed(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to cursed weapons");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to cursed weapons");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (mon_hates_light(mtmp))
+    if (mtmp ? mon_hates_light(mtmp) : hates_light(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to lit weapons");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to lit weapons");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
     abilcnt++;
-    Sprintf(buf, " %2d - %s", abilcnt, mon_eschews_cursed(mtmp) ? "Eschews cursed items" : "Does not eschew cursed items");
-    
+    Sprintf(buf, " %2d - %s", abilcnt, (mtmp ? mon_eschews_cursed(mtmp) : eschews_cursed(ptr) || hates_cursed(ptr)) ? "Eschews cursed items" : "Does not eschew cursed items");    
     putstr(datawin, ATR_INDENT_AT_DASH, buf);
 
-    if (mon_eschews_silver(mtmp))
+    if (mtmp ? mon_eschews_silver(mtmp) : eschews_silver(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Eschews silver items");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Eschews silver items");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (mon_eschews_blessed(mtmp))
+    if (mtmp ? mon_eschews_blessed(mtmp) : eschews_blessed(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Eschews blessed items");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Eschews blessed items");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (mon_eschews_light(mtmp))
+    if (mtmp ? mon_eschews_light(mtmp) : hates_light(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Eschews lit items");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Eschews lit items");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (is_hell_hound(mtmp->data))
+    if (is_hell_hound(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Loves cursed food");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Loves cursed food");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
-    if (is_non_eater(mtmp->data))
+    if (is_non_eater(ptr))
     {
         abilcnt++;
-        Sprintf(buf, " %2d - %s", abilcnt, "Does not eat");
-        
+        Sprintf(buf, " %2d - %s", abilcnt, "Does not eat");        
         putstr(datawin, ATR_INDENT_AT_DASH, buf);
     }
 
 
-    int zombietype = mon_to_zombie(mtmp->mnum);
-    int mummytype = mon_to_mummy(mtmp->mnum);
+    int zombietype = mon_to_zombie((int)(ptr - &mons[0]));
+    int mummytype = mon_to_mummy((int)(ptr - &mons[0]));
 
     if (zombietype > NON_PM || mummytype > NON_PM)
     {
@@ -1888,8 +1876,7 @@ struct monst* mtmp;
 
     if (!abilcnt)
     {
-        strcpy(buf, " (None)");
-        
+        strcpy(buf, " (None)");        
         putstr(datawin, 0, buf);
     }
 
@@ -1990,11 +1977,12 @@ struct monst* mtmp;
     
 }
 
-void print_monster_statistics(datawin, mtmp)
+void print_monster_statistics(datawin, mtmp, ptr)
 winid datawin;
 struct monst* mtmp;
+struct permonst* ptr;
 {
-    if (!mtmp)
+    if (!ptr)
         return;
 
     if (datawin == WIN_ERR)
@@ -2002,13 +1990,13 @@ struct monst* mtmp;
 
     char buf[BUFSZ];
 
-    boolean are_the_same = (
-        mtmp->data->str == M_ACURR(mtmp, A_STR) &&
-        mtmp->data->dex == M_ACURR(mtmp, A_DEX) &&
-        mtmp->data->con == M_ACURR(mtmp, A_CON) &&
-        mtmp->data->intl == M_ACURR(mtmp, A_INT) &&
-        mtmp->data->wis == M_ACURR(mtmp, A_WIS) &&
-        mtmp->data->cha == M_ACURR(mtmp, A_CHA)
+    boolean are_the_same = !mtmp ? TRUE : (
+        ptr->str == M_ACURR(mtmp, A_STR) &&
+        ptr->dex == M_ACURR(mtmp, A_DEX) &&
+        ptr->con == M_ACURR(mtmp, A_CON) &&
+        ptr->intl == M_ACURR(mtmp, A_INT) &&
+        ptr->wis == M_ACURR(mtmp, A_WIS) &&
+        ptr->cha == M_ACURR(mtmp, A_CHA)
         );
 
     if(are_the_same)
@@ -2020,17 +2008,17 @@ struct monst* mtmp;
     putstr(datawin, ATR_HEADING, buf);
 
     Sprintf(buf, " St:%s Dx:%d Co:%d In:%d Wi:%d Ch:%d",
-        get_strength_string(mtmp->data->str),
-        mtmp->data->dex,
-        mtmp->data->con,
-        mtmp->data->intl,
-        mtmp->data->wis,
-        mtmp->data->cha
+        get_strength_string(ptr->str),
+        ptr->dex,
+        ptr->con,
+        ptr->intl,
+        ptr->wis,
+        ptr->cha
     );
     
     putstr(datawin, 0, buf);
 
-    if (!are_the_same)
+    if (!are_the_same && mtmp)
     {
         Sprintf(buf, "Current attribute scores:");
         
@@ -2211,11 +2199,11 @@ int locflags; /* Unused */
 
 /* used by revive() and animate_statue() */
 struct monst *
-montraits(obj, cc, adjacentok, mnum_override, mmflags)
+montraits(obj, cc, adjacentok, mnum_override, mnum_replaceundead, mmflags)
 struct obj *obj;
 coord *cc;
 boolean adjacentok; /* False: at obj's spot only, True: nearby is allowed */
-int mnum_override; /* Use this mnum instead */
+int mnum_override, mnum_replaceundead; /* Use this mnum instead */
 unsigned long mmflags;
 {
     struct monst *mtmp = (struct monst *) 0;
@@ -2227,10 +2215,11 @@ unsigned long mmflags;
     if (mtmp2) 
     {
         /* save_mtraits() validated mtmp2->mnum */
-        if (mnum_override >= LOW_PM || !mtmp2->data)
+        if (mnum_override >= LOW_PM || (mnum_replaceundead >= LOW_PM && is_undead(&mons[mnum_replaceundead])) || !mtmp2->data)
         {
-            int used_mnum = mnum_override >= LOW_PM ? mnum_override : mtmp2->mnum;
+            int used_mnum = mnum_override >= LOW_PM ? mnum_override : (mnum_replaceundead >= LOW_PM && is_undead(&mons[mnum_replaceundead])) ? mnum_replaceundead : mtmp2->mnum;
             mtmp2->mnum = used_mnum;
+            mtmp2->subtype = 0;
             mtmp2->data = &mons[used_mnum];
         }
 
@@ -2386,7 +2375,7 @@ int animateintomon;
 boolean replaceundead;
 {
     struct monst *mtmp = 0;
-    struct permonst *mptr;
+    struct permonst *mptr = 0;
     struct obj *container;
     coord xy;
     xchar x, y;
@@ -2455,7 +2444,7 @@ boolean replaceundead;
     if(animateintomon < 0)
     {
         montype = corpse->corpsenm;
-        if (is_undead(&mons[montype]) && replaceundead)
+        if (montype >= LOW_PM && is_undead(&mons[montype]) && replaceundead)
         {
             /* Human and dwarf corpses etc. but others need to be replaced here are ok */
             if (mons[montype].mlet == S_WRAITH)
@@ -2479,7 +2468,8 @@ boolean replaceundead;
         montype = animateintomon;
     }
 
-    mptr = &mons[montype];
+    if(montype >= LOW_PM)
+        mptr = &mons[montype];
     /* [should probably handle recorporealization first; if corpse and
        ghost are at same location, revived creature shouldn't be bumped
        to an adjacent spot by ghost which joins with it] */
@@ -2502,17 +2492,22 @@ boolean replaceundead;
     {
         /* make a zombie or doppelganger instead */
         /* note: montype has changed; mptr keeps old value for newcham() */
-        mtmp = makemon(&mons[montype], x, y, MM_NO_MONSTER_INVENTORY | MM_NOWAIT | MM_PLAY_SUMMON_ANIMATION | MM_ANIMATE_DEAD_ANIMATION | MM_PLAY_SUMMON_SOUND);
+        mtmp = makemon(montype < LOW_PM ? 0 : &mons[montype], x, y, MM_NO_MONSTER_INVENTORY | MM_NOWAIT | MM_PLAY_SUMMON_ANIMATION | MM_ANIMATE_DEAD_ANIMATION | MM_PLAY_SUMMON_SOUND);
         if (mtmp)
         {
+            int subtype = 0;
             /* skip ghost handling */
             if (has_omid(corpse))
                 free_omid(corpse);
             if (has_omonst(corpse))
+            {
+                struct monst* omon = OMONST(corpse);
+                subtype = omon->subtype;
                 free_omonst(corpse);
+            }
             if (mtmp->cham == PM_DOPPELGANGER) {
                 /* change shape to match the corpse */
-                (void) newcham(mtmp, mptr, FALSE, FALSE);
+                (void) newcham(mtmp, mptr, subtype, FALSE, FALSE);
             } else if (mtmp->data->mlet == S_LESSER_UNDEAD) 
             {
                 mtmp->mhp = mtmp->mhpmax = 100;
@@ -2524,7 +2519,7 @@ boolean replaceundead;
     {
         /* use saved traits */
         xy.x = x, xy.y = y;
-        mtmp = montraits(corpse, &xy, FALSE, animateintomon >= 0 || replaceundead ? montype : -1, MM_PLAY_SUMMON_ANIMATION | MM_ANIMATE_DEAD_ANIMATION | MM_PLAY_SUMMON_SOUND);
+        mtmp = montraits(corpse, &xy, FALSE, animateintomon >= 0 ? montype : NON_PM, animateintomon < 0 && replaceundead ? montype : NON_PM, MM_PLAY_SUMMON_ANIMATION | MM_ANIMATE_DEAD_ANIMATION | MM_PLAY_SUMMON_SOUND);
         if (mtmp && mtmp->mtame && !mtmp->isminion && !mtmp->isfaithful)
             wary_dog(mtmp, TRUE);
     }
@@ -3777,7 +3772,7 @@ struct obj *obj;
                 ptr = mon->data;
                 /* this golem handling is redundant... */
                 if (is_golem(ptr) && ptr != &mons[PM_FLESH_GOLEM])
-                    (void) newcham(mon, &mons[PM_FLESH_GOLEM], TRUE, FALSE);
+                    (void) newcham(mon, &mons[PM_FLESH_GOLEM], 0, TRUE, FALSE);
             } else if ((ptr->geno & (G_NOCORPSE | G_UNIQ)) != 0) {
                 /* didn't revive but can't leave corpse either */
                 res = 0;
@@ -3937,7 +3932,9 @@ struct monst* origmonst;
                 break;
             }
             /* KMH, conduct */
-            u.uconduct.polypiles++;
+            if ((otmp->otyp != WAN_POLYMORPH || otmp->where == OBJ_INVENT) && (!u.uconduct.polypiles++))
+                livelog_printf(LL_CONDUCT, "polymorphed %s first object", uhis());
+
             /* any saved lock context will be dangerously obsolete */
             if (Is_box(obj))
                 (void) boxlock(obj, otmp);
@@ -5737,13 +5734,13 @@ dozap()
     if (obj->cooldownleft > 0)
     {
         play_sfx_sound(SFX_NOT_READY_YET);
-        You("cannot zap %s before its cooldown has expired.", the(cxname(obj)));
+        You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot zap %s before its cooldown has expired.", the(cxname(obj)));
         return 0;
     }
     else if (Cancelled)
     {
         play_sfx_sound(SFX_CANCELLATION_IN_FORCE);
-        Your("magic is not flowing properly to allow for using a wand.");
+        Your_ex(ATR_NONE, CLR_MSG_FAIL, "magic is not flowing properly to allow for using a wand.");
         return 0;
     }
 
@@ -5756,7 +5753,7 @@ dozap()
         pline_ex1(ATR_NONE, CLR_MSG_FAIL, nothing_happens);
 
         //Mark empty query
-        if((obj->speflags & SPEFLAGS_EMPTY_NOTICED) == 0)
+        if((obj->speflags & SPEFLAGS_EMPTY_NOTICED) == 0 && obj->charges >= 0)
         {
             obj->speflags |= SPEFLAGS_EMPTY_NOTICED;
             boolean canstash = can_stash_objs();
@@ -6160,6 +6157,8 @@ boolean ordinary;
     case WAN_DISJUNCTION:
     case SPE_DISJUNCTION:
         damage = 0;
+        if (Upolyd)
+            rehumanize();
         (void) cancel_monst(&youmonst, obj, TRUE, TRUE, TRUE, duration);
         if (obj->otyp != SPE_DISJUNCTION && obj->otyp != WAN_DISJUNCTION)
         {
@@ -7017,7 +7016,7 @@ int duration;
     if (youdefend) 
     {
         play_sfx_sound(SFX_ACQUIRE_CANCELLATION);
-        You_feel("your magic is not flowing properly.");
+        You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "your magic is not flowing properly.");
 
         /* Remove all buffs */
         boolean was_flying = !!Flying;
@@ -7077,8 +7076,9 @@ int duration;
                to 0), but only for shapechangers whose m->cham is already
                to 0), but only for shapechangers whose m->cham is already
                NON_PM and we just verified that it's LOW_PM or higher */
-            newcham(mdef, &mons[mdef->cham], FALSE, FALSE);
+            newcham(mdef, &mons[mdef->cham], mdef->cham_subtype, FALSE, FALSE);
             mdef->cham = NON_PM; /* cancelled shapeshifter can't shift */
+            mdef->cham_subtype = 0;
         }
         if (is_were(mdef->data) && !is_human(mdef->data))
             were_change(mdef);
@@ -7710,13 +7710,19 @@ boolean show_hit_tile_always;
 {
     if ((!cansee(bhitpos.x, bhitpos.y) && !canspotmon(mtmp)
          && !(u.uswallow && mtmp == u.ustuck)) || !flags.verbose)
-        if(damage >  0)
-            pline("%s %s it%s for %d damage%s", The(str), vtense(str, "hit"), adjective, damage, force);
+        if (damage > 0)
+        {
+            int multicolors[5] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_ORANGE, NO_COLOR };
+            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s %s it%s for %d damage%s", The(str), vtense(str, "hit"), adjective, damage, force);
+        }
         else
             pline("%s %s it%s%s", The(str), vtense(str, "hit"), adjective, force);
     else
         if (damage > 0)
-            pline("%s %s %s%s for %d damage%s", The(str), vtense(str, "hit"), mon_nam(mtmp), adjective, damage, force);
+        {
+            int multicolors[6] = { NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR, CLR_ORANGE, NO_COLOR };
+            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s %s %s%s for %d damage%s", The(str), vtense(str, "hit"), mon_nam(mtmp), adjective, damage, force);
+        }
         else
             pline("%s %s %s%s%s", The(str), vtense(str, "hit"), mon_nam(mtmp), adjective, force);
 
@@ -8352,7 +8358,7 @@ int dx, dy;
                 int dmg = weapon_dmg_value(obj, &youmonst, (struct monst*)0, 1);
                 int extradmg = weapon_extra_dmg_value(obj, &youmonst, (struct monst*)0, dmg);
                 (void) thitu(10 + obj->enchantment, dmg + extradmg, &obj,
-                             "boomerang");
+                             "boomerang", &youmonst, "thrown");
                 endmultishot(TRUE);
                 break;
             } else { /* we catch it */
@@ -8976,7 +8982,7 @@ const char *fltxt;
         int damagedealt = hpbefore - hpafter;
         if (damagedealt > 0)
         {
-            You("sustain %d damage!", damagedealt);
+            You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_red1, "sustain %d damage!", damagedealt);
             display_u_being_hit(hit_tile, damagedealt, 0UL);
         }
     }
@@ -11187,7 +11193,7 @@ int dmg, adtyp, tell;
             int damagedealt = hp_before - hp_after;
             if (tell && damagedealt > 0 && polyd_same && !(tell == TELL_LETHAL_STYLE && !resisted))
             {//Lethal damage not shown, resisted though yes
-                You("sustain %d damage!", damagedealt);
+                You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_red1, "sustain %d damage!", damagedealt);
                 display_u_being_hit(hit_tile, damagedealt, 0UL);
             }
         }
@@ -11200,7 +11206,7 @@ int dmg, adtyp, tell;
             int damagedealt = hp_before - hp_after;
             if (tell && damagedealt > 0 && !(tell == TELL_LETHAL_STYLE && !resisted))
             {//Lethal damage not shown, resisted though yes
-                pline("%s sustains %d damage!", Monnam(mtmp), damagedealt);
+                pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(mtmp), damagedealt);
                 display_m_being_hit(mtmp, hit_tile, damagedealt, 0UL, FALSE);
             }
 
@@ -11243,7 +11249,7 @@ int dmg, adtyp, tell;
             int damagedealt = hp_before - hp_after;
             if (tell == TELL && damagedealt > 0 && polyd_same)
             {//Lethal damage not shown
-                You("sustain %d damage!", damagedealt);
+                You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_red1, "sustain %d damage!", damagedealt);
                 display_u_being_hit(hit_tile, damagedealt, 0UL);
             }
         }
@@ -11256,7 +11262,7 @@ int dmg, adtyp, tell;
             int damagedealt = hp_before - hp_after;
             if (tell == TELL && damagedealt > 0)
             {//Lethal damage not shown
-                pline("%s sustains %d damage!", Monnam(mtmp), damagedealt);
+                pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(mtmp), damagedealt);
                 display_m_being_hit(mtmp, hit_tile, damagedealt, 0UL, FALSE);
             }
 
@@ -11339,9 +11345,11 @@ makewish(is_wiz_wish, play_sound)
 boolean is_wiz_wish, play_sound;
 {
     char buf[BUFSZ] = DUMMY;
+    char bufcpy[BUFSZ];
     char promptbuf[BUFSZ];
     struct obj *otmp, nothing;
     int tries = 0;
+    long prev_artwish = u.uconduct.wisharti;
 
     promptbuf[0] = '\0';
     nothing = zeroobj; /* lint suppression; only its address matters */
@@ -11370,13 +11378,15 @@ retry:
      *  has been denied.  Wishing for "nothing" requires a separate
      *  value to remain distinct.
      */
-    otmp = readobjnam(buf, &nothing, is_wiz_wish);
+    Strcpy(bufcpy, buf);
+    boolean isremovedfromgame = FALSE;;
+    otmp = readobjnam(buf, &nothing, is_wiz_wish, &isremovedfromgame);
     if (!otmp) {
-        pline("Nothing fitting that description exists in the game.");
+        pline(isremovedfromgame ? "The requested object has been removed from the game." : "Nothing fitting that description exists in the game.");
         if (++tries < MAXWISHTRY)
             goto retry;
         pline1(thats_enough_tries);
-        otmp = readobjnam((char *) 0, (struct obj *) 0, is_wiz_wish);
+        otmp = readobjnam((char *) 0, (struct obj *) 0, is_wiz_wish, (boolean*)0);
         if (!otmp)
             return; /* for safety; should never happen */
     } else if (otmp == &nothing) {
@@ -11388,9 +11398,25 @@ retry:
     play_sfx_sound(SFX_WISH_FULFILLED);
 
     /* KMH, conduct */
-    u.uconduct.wishes++;
+    if (!u.uconduct.wishes++) 
+    {
+        livelog_printf(LL_CONDUCT | LL_WISH | (prev_artwish < u.uconduct.wisharti ? LL_ARTIFACT : 0),
+            "made %s first wish - \"%s\"", uhis(), bufcpy);
+    }
+    else if (!prev_artwish && u.uconduct.wisharti) 
+    {
+        /* arti conduct handled in readobjnam() above */
+        livelog_printf(LL_CONDUCT | LL_WISH | LL_ARTIFACT,
+            "made %s first artifact wish - \"%s\"", uhis(), bufcpy);
+    }
+    else 
+    {
+        livelog_printf(LL_WISH | (prev_artwish < u.uconduct.wisharti ? LL_ARTIFACT : 0),
+            "wished for \"%s\"", bufcpy);
+    }
 
-    if (otmp != &zeroobj) {
+    if (otmp != &zeroobj)
+    {
         const char
             *verb = ((Is_airlevel(&u.uz) || u.uinwater) ? "slip" : "drop"),
             *oops_msg = (u.uswallow
@@ -11401,6 +11427,10 @@ retry:
                             ? "Oops!  %s away from you!"
                             : "Oops!  %s to the floor!");
 
+#ifdef WISH_TRACKER
+        /* write it out to our universal wishtracker file */
+        trackwish(bufcpy);
+#endif
         /* The(aobjnam()) is safe since otmp is unidentified -dlc */
         (void) hold_another_object(otmp, oops_msg,
                                    The(aobjnam(otmp, verb)),

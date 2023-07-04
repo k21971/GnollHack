@@ -22,7 +22,9 @@
 struct objclassdata
 {
     int tile_height;
-    int special_quality;
+    short special_quality;
+    short max_charges;
+    uchar nhcolor;
 
     /* Temporary extra data */
     uchar lamplit;
@@ -48,7 +50,7 @@ typedef void(__callconv* VoidIntIntBooleanCallback)(int, int, BOOLEAN_P);
 typedef void(__callconv* VoidIntIntIntCallback)(int, int, int);
 typedef void(__callconv* VoidIntBooleanCallback)(int, UCHAR_P);
 typedef void(__callconv* VoidIntIntConstCharCallback)(int, int, const char*);
-typedef void(__callconv* PutStrExColorCallback)(int, int, const char*, int, int);
+typedef void(__callconv* PutStrExColorCallback)(int, const char*, int, int, int);
 typedef void(__callconv* PutStrEx2ColorCallback)(int, const char*, const char*, const char*, int, int, int);
 typedef void(__callconv* VoidConstCharIntCallback)(const char*, int);
 typedef void(__callconv* VoidConstCharBooleanCallback)(const char*, BOOLEAN_P);
@@ -93,7 +95,7 @@ typedef VoidVoidCallback WaitSynchCallback;
 typedef VoidIntIntBooleanCallback ClipAroundCallback;
 typedef VoidCharCallback UpdatePositionBarCallback;
 typedef void(__callconv* PrintGlyphCallback)(int, int, int, int, int, long, int, unsigned long, struct layer_info*);
-typedef VoidIntCallback IssueGuiCommandCallback;
+typedef void(__callconv* IssueGuiCommandCallback)(int, int, const char*);
 typedef VoidConstCharCallback RawPrintCallback;
 typedef VoidConstCharCallback RawPrintBoldCallback;
 typedef IntVoidCallback GetChCallback;

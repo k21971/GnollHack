@@ -1046,7 +1046,7 @@ int show_weights;
                 int glyph = obj_to_glyph(curr, rn2_on_display_rng);
                 int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, curr, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
-                add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+                add_extended_menu(win, gui_glyph, &any,
                     applied_invlet, applied_group_accelerator, ATR_NONE, NO_COLOR, 
                     show_weights > 0 ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(curr, loadstonecorrectly) : doname_with_price_and_weight_first(curr, loadstonecorrectly)) : doname_with_price(curr), 
                     MENU_UNSELECTED, obj_to_extended_menu_info(curr));
@@ -1071,7 +1071,7 @@ int show_weights;
         any.a_obj = &fake_hero_object;
         int glyph = any_mon_to_glyph(&youmonst, rn2_on_display_rng);
         int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
-        add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+        add_menu(win, gui_glyph, &any,
                  /* fake inventory letter, no group accelerator */
                  CONTAINED_SYM, 0, ATR_NONE, NO_COLOR, an(self_lookat(buf)),
                  MENU_UNSELECTED);
@@ -1143,8 +1143,6 @@ int how;               /* type of query */
     boolean do_blessed = FALSE, do_cursed = FALSE, do_uncursed = FALSE,
             do_buc_unknown = FALSE, do_unidentified = FALSE;
     int num_buc_types = 0;
-    int objcnt = count_objects(olist, (qflags & BY_NEXTHERE) != 0);
-
     *pick_list = (menu_item *) 0;
     if (!olist)
         return 0;
@@ -1152,10 +1150,16 @@ int how;               /* type of query */
     if (qflags & WORN_TYPES)
         ofilter = is_worn;
 
-    if ((qflags & UNPAID_TYPES) && count_unpaid(olist, ofilter, (qflags & BY_NEXTHERE) != 0))
+    int objcnt = count_objects(olist, ofilter, (qflags & BY_NEXTHERE) != 0);
+    if (!objcnt)
+        return 0;
+
+    int unpaid_count = 0;
+    if ((qflags & UNPAID_TYPES) && (unpaid_count = count_unpaid(olist, ofilter, (qflags & BY_NEXTHERE) != 0)) > 0)
         do_unpaid = TRUE;
 
-    if ((qflags & UNIDENTIFIED_TYPES) && count_unidentified(olist, ofilter, (qflags & BY_NEXTHERE) != 0)) {
+    int unidentified_count = 0;
+    if ((qflags & UNIDENTIFIED_TYPES) && (unidentified_count = count_unidentified(olist, ofilter, (qflags & BY_NEXTHERE) != 0)) > 0) {
         do_unidentified = TRUE;
     }
     if ((qflags & BUC_BLESSED) && count_buc(olist, BUC_BLESSED, ofilter, (qflags & BY_NEXTHERE) != 0)) {
@@ -1177,7 +1181,7 @@ int how;               /* type of query */
 
     ccount = count_categories(olist, qflags);
     /* no point in actually showing a menu for a single category */
-    if ((objcnt == 1 || ccount == 1) && !(qflags & BILLED_TYPES)) 
+    if ((objcnt == 1 || (ccount == 1 && (!do_unidentified || unidentified_count == objcnt) && (!do_unpaid || unpaid_count == objcnt) && num_buc_types <= 1)) && !(qflags & BILLED_TYPES))
     {
         for (curr = olist; curr; curr = FOLLOW(curr, qflags)) {
             if (ofilter && !(*ofilter)(curr))
@@ -1248,7 +1252,7 @@ int how;               /* type of query */
         }
     } while (*pack);
 
-    if (do_unpaid || (qflags & BILLED_TYPES) || do_blessed || do_cursed
+    if (do_unpaid || do_unidentified || (qflags & BILLED_TYPES) || do_blessed || do_cursed
         || do_uncursed || do_buc_unknown) {
         any = zeroany;
         add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "", MENU_UNSELECTED);
@@ -1659,7 +1663,7 @@ boolean telekinesis; /* not picking it up directly by hand */
         {
             char dcbuf[BUFSZ] = "";
             play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
-            Sprintf(dcbuf, "scroll%s %s to dust as you %s %s up.", plur(obj->quan),
+            Sprintf(dcbuf, "The scroll%s %s to dust as you %s %s up.", plur(obj->quan),
                       otense(obj, "turn"), telekinesis ? "raise" : "pick",
                       (obj->quan == 1L) ? "it" : "them");
 
@@ -1691,8 +1695,7 @@ boolean telekinesis; /* not picking it up directly by hand */
     nearload = near_capacity();
 
     /* Display message regarding a new item in inventory */
-    prinv(nearload == SLT_ENCUMBER ? moderateloadmsg : (char *) 0, obj,
-          count);
+    prinv(nearload == SLT_ENCUMBER ? moderateloadmsg : (char*)0, obj, count);
     mrg_to_wielded = FALSE;
     return 1;
 }
@@ -2005,7 +2008,7 @@ struct obj* cobj;
         if (has_omonst(cobj))
         {
             coord xy = { x, y };
-            mtmp = montraits(cobj, &xy, FALSE, NON_PM, 0UL);
+            mtmp = montraits(cobj, &xy, FALSE, NON_PM, NON_PM, 0UL);
             if (mtmp)
             {
                 free_omonst(cobj);
@@ -2039,7 +2042,7 @@ struct obj* cobj;
             if (iflags.using_gui_sounds)
                 delay_output_milliseconds(300);
             play_sfx_sound(SFX_SURPRISE_ATTACK);
-            pline("Disturbed, %s %srises from the %s!", a_monnam(mtmp), lid_opened ? "opens the lid and " : "", cxname(cobj));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Disturbed, %s %srises from the %s!", a_monnam(mtmp), lid_opened ? "opens the lid and " : "", cxname(cobj));
             flush_screen(1);
             if (iflags.using_gui_sounds)
                 delay_output_milliseconds(300);
@@ -2091,6 +2094,15 @@ boolean* got_something_ptr;
                 {
                     begin_burn(newobj, FALSE);
                 }
+                if (costly_spot(u.ux, u.uy))
+                {
+                    char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
+                    struct monst* shkp = shop_keeper(*o_shop);
+                    if (shkp && inhishop(shkp))
+                    {
+                        add_one_tobill(newobj, FALSE, shkp);
+                    }
+                }
                 play_simple_object_sound(newobj, OBJECT_SOUND_TYPE_PICK_UP);
                 obj_extract_self(newobj);
                 newobj = hold_another_object(newobj, "Oops!  %s out of your grasp!",
@@ -2112,6 +2124,7 @@ boolean* got_something_ptr;
                     levl[x][y].decoration_flags &= ~DECORATION_FLAGS_ITEM3_IN_HOLDER;
 
                 *got_something_ptr = TRUE;
+                play_simple_object_sound_at_location(newobj, u.ux, u.uy, OBJECT_SOUND_TYPE_PICK_UP);
                 newobj = hold_another_object(newobj, "Oops!  %s out of your grasp!",
                     The(aobjnam(newobj, "slip")), (const char*)0);
             }
@@ -2930,6 +2943,9 @@ boolean dobot;
         /* explicitly mention what item is triggering the explosion */
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "As you put %s inside, you are blasted by a magical explosion!",
               doname(obj));
+
+        livelog_printf(LL_ACHIEVE, "just blew up %s %s", uhis(), cxname(obj));
+
         /* did not actually insert obj yet */
         if (was_unpaid)
             addtobill(obj, FALSE, FALSE, TRUE);

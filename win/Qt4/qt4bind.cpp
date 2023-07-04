@@ -324,7 +324,7 @@ void NetHackQtBind::qt_putstr(winid wid, int attr, const char* text)
     window->PutStr(attr, QString::fromLatin1(text));
 }
 
-void NetHackQtBind::qt_putstr_ex(winid wid, int attr, const char *text, int app, int color)
+void NetHackQtBind::qt_putstr_ex(winid wid, const char *text, int attr, int color, int app)
 {
     NetHackQtWindow* window=id_to_window[(int)wid];
     window->PutStr(attr,QString::fromLatin1(text));
@@ -449,7 +449,7 @@ void NetHackQtBind::qt_cliparound_window(winid wid, int x, int y)
     NetHackQtWindow* window=id_to_window[(int)wid];
     window->ClipAround(x,y);
 }
-void NetHackQtBind::qt_issue_gui_command(int initid)
+void NetHackQtBind::qt_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str)
 {
 
 }

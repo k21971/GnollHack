@@ -430,7 +430,8 @@ unsigned long mkflags;
     ttmp->vl = zero_vl;
     ttmp->launch.x = ttmp->launch.y = -1; /* force error if used before set */
     ttmp->dst.dnum = ttmp->dst.dlevel = -1;
-    ttmp->madeby_u = 0;
+    ttmp->madeby_u = (mkflags & MKTRAPFLAG_MADE_BY_U) != 0;
+    ttmp->madeby_mon = (mkflags & MKTRAPFLAG_MADE_BY_MON) != 0;
     ttmp->once = 0;
     ttmp->tseen = (trap_type_definitions[typ].tdflags & TRAPDEF_FLAGS_VISIBLE_AT_START);
     ttmp->ttyp = typ;
@@ -715,7 +716,7 @@ int *fail_reason;
     {
         /* restore a petrified monster */
         cc.x = x, cc.y = y;
-        mon = montraits(statue, &cc, (cause == ANIMATE_SPELL), -1, 0UL);
+        mon = montraits(statue, &cc, (cause == ANIMATE_SPELL), NON_PM, NON_PM, 0UL);
         if (mon && mon->mtame && !mon->isminion)
             wary_dog(mon, TRUE);
     }
@@ -734,7 +735,7 @@ int *fail_reason;
             /* if hero has protection from shape changers, cham field will
                be NON_PM; otherwise, set form to match the statue */
             if (mon && mon->cham >= LOW_PM)
-                (void) newcham(mon, mptr, FALSE, FALSE);
+                (void) newcham(mon, mptr, 0, FALSE, FALSE);
         } 
         else
         {
@@ -1024,12 +1025,12 @@ struct trap *trap;
     struct obj *otmp = mksobj_with_flags(otyp, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
 
     otmp->quan = 1L;
-    otmp->owt = weight(otmp);
     otmp->opoisoned = 0;
     otmp->elemental_enchantment = 0;
     otmp->mythic_prefix = 0;
     otmp->mythic_suffix = 0;
     otmp->ox = trap->tx, otmp->oy = trap->ty;
+    otmp->owt = weight(otmp);
     return otmp;
 }
 
@@ -1150,7 +1151,7 @@ unsigned short trflags;
         {
             ; /* nothing */
         } 
-        else if (thitu(8, weapon_total_dmg_value(otmp, &youmonst, (struct monst*)0, 1), &otmp, (const char*)0)) 
+        else if (thitu(8, weapon_total_dmg_value(otmp, &youmonst, (struct monst*)0, 1), &otmp, (const char*)0, (struct monst*)0, (char*)0))
         {
             if (otmp)
                 obfree(otmp, (struct obj *) 0);
@@ -1184,7 +1185,7 @@ unsigned short trflags;
         {
             ; /* nothing */
         } 
-        else if (thitu(7, weapon_total_dmg_value(otmp, &youmonst, (struct monst*)0, 1), &otmp, "little dart")) 
+        else if (thitu(7, weapon_total_dmg_value(otmp, &youmonst, (struct monst*)0, 1), &otmp, "little dart", (struct monst*)0, (char*)0)) 
         {
             if (otmp)
             {
@@ -1783,7 +1784,7 @@ unsigned short trflags;
             special_effect_wait_until_action(0);
             deltrap(trap);
             newsym(u.ux, u.uy); /* update position */
-            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are caught in a magical explosion!");
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "are caught in a magical explosion!");
             losehp(adjust_damage(rnd(10), (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_NONE), "magical explosion", KILLED_BY_AN);
             Your("body absorbs some of the magical energy!");
             u.ubaseenmax += 2;
@@ -2110,7 +2111,7 @@ struct obj *otmp;
         break;
     case POLY_TRAP:
         if (!resists_magic(steed) && !has_unchanging(steed) && !check_magic_resistance_and_inflict_damage(steed, (struct obj*)0, (struct monst*)0, FALSE, 0, 0, NOTELL)) {
-            (void) newcham(steed, (struct permonst *) 0, FALSE, FALSE);
+            (void) newcham(steed, (struct permonst *) 0, 0, FALSE, FALSE);
             if (!can_saddle(steed) || !can_ride(steed))
                 dismount_steed(DISMOUNT_POLY);
             else
@@ -2168,6 +2169,7 @@ struct trap *trap;
             trap->tflags = 0;
             trap->activation_count = 0;
             trap->madeby_u = FALSE; /* resulting pit isn't yours */
+            trap->madeby_mon = FALSE; /* resulting pit isn't mons */
             seetrap(trap);          /* and it isn't concealed */
         }
     }
@@ -2372,7 +2374,7 @@ int style;
             if(singleobj)
                 play_immediate_ray_sound_at_location(object_soundsets[objects[singleobj->otyp].oc_soundset].ray_soundset, RAY_SOUND_TYPE_HIT_MONSTER, bhitpos.x, bhitpos.y);
             if (thitu(10 + singleobj->enchantment, weapon_total_dmg_value(singleobj, &youmonst, (struct monst*)0, 1),
-                      &singleobj, (char *) 0))
+                      &singleobj, (char *) 0, (struct monst*)0, (char*)0))
                 stop_occupation();
         }
         if (style == ROLL) {
@@ -2731,7 +2733,7 @@ register struct monst *mtmp;
         register int tt = trap->ttyp;
         boolean in_sight, tear_web, see_it, can_see_trap,
             inescapable = force_mintrap || ((tt == HOLE || tt == PIT)
-                                            && Sokoban && !trap->madeby_u);
+                                            && Sokoban && !trap->madeby_u && !trap->madeby_mon);
         const char *fallverb;
 
         can_see_trap = cansee(trap->tx, trap->ty);
@@ -3314,7 +3316,7 @@ register struct monst *mtmp;
                 else if (in_sight) 
                 {
                     play_sfx_sound_at_location(SFX_CAUGHT_IN_WEB, mtmp->mx, mtmp->my);
-                    pline("%s is caught in %s spider web.", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is caught in %s spider web.", Monnam(mtmp),
                           a_your[trap->madeby_u]);
                     seetrap(trap);
                 }
@@ -3518,7 +3520,7 @@ register struct monst *mtmp;
             } 
             else if (!check_magic_resistance_and_inflict_damage(mtmp, (struct obj*) 0, (struct monst*)0, FALSE, 0, 0, NOTELL))
             {
-                if (newcham(mtmp, (struct permonst*)0, FALSE, FALSE))
+                if (newcham(mtmp, (struct permonst*)0, 0, FALSE, FALSE))
                 {
                     play_sfx_sound_at_location(SFX_POLYMORPH_SUCCESS, mtmp->mx, mtmp->my); // Since msg is FALSE in newcham
                     /* we're done with mptr but keep it up to date */
@@ -4116,8 +4118,11 @@ int dice; /* of d6 */
         losehp(damage, tower_of_flame, KILLED_BY_AN); /* fire damage */
         int hp_after = Upolyd ? u.mh : u.uhp;
         int damage_done = hp_before - hp_after;
-        if(damage_done > 0)
-            You("sustain %d damage%s", damage_done, exclam(damage_done));
+        if (damage_done > 0)
+        {
+            int multicolors[2] = { CLR_RED, NO_COLOR };
+            You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "sustain %d damage%s", damage_done, exclam(damage_done));
+        }
     }
 
     burn_away_slime();
@@ -5031,11 +5036,11 @@ int n;
     if (!u.uenmax)
     {
         /* energy is completely gone */
-        You_feel("momentarily lethargic.");
+        You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "momentarily lethargic.");
     } 
     else if (n == -1)
     {
-        You_feel("your magical energy drain away!");
+        You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "your magical energy drain away!");
         u.uen = 0;
         context.botl = 1;
     }
@@ -5045,7 +5050,7 @@ int n;
         //if (n > u.uenmax || n > u.ulevel)
         //    n = rnd(n);
 
-        You_feel("your magical energy drain away%c", (n > u.uen) ? '!' : '.');
+        You_feel_ex(ATR_NONE, CLR_MSG_NEGATIVE, "your magical energy drain away%c", (n > u.uen) ? '!' : '.');
         u.uen -= n;
         if (u.uen < 0) {
             /*
@@ -6935,6 +6940,7 @@ boolean disarm;
                 exercise(A_DEX, FALSE);
 #endif
                 nomovemsg = You_can_move_again;
+                nomovemsg_color = CLR_MSG_SUCCESS;
             }
             else
             {
@@ -7262,7 +7268,10 @@ boolean nocorpse;
         int hp_after = mon->mhp;
         int damage_done = hp_before - hp_after;
         if (damage_done > 0 && canseemon(mon))
-            pline("%s sustains %d damage%s", Monnam(mon), damage_done, exclam(damage_done));
+        {
+            int multicolors[3] = { NO_COLOR, CLR_ORANGE, NO_COLOR };
+            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s sustains %d damage%s", Monnam(mon), damage_done, exclam(damage_done));
+        }
 
         if (DEADMONSTER(mon)) 
         {
@@ -7511,23 +7520,33 @@ maybe_finish_sokoban()
     struct trap *t;
 
     if (Sokoban && !in_mklev) {
-        /* scan all remaining traps, ignoring any created by the hero;
+        /* scan all remaining traps, ignoring any created by the hero (and by monsters);
            if this level has no more pits or holes, the current sokoban
            puzzle has been solved */
         for (t = ftrap; t; t = t->ntrap) {
-            if (t->madeby_u)
+            if (t->madeby_u || t->madeby_mon)
                 continue;
             if (t->ttyp == PIT || t->ttyp == HOLE)
                 break;
         }
         if (!t) {
+            int sokonum = dungeons[u.uz.dnum].entry_lev - u.uz.dlevel + 1;
+
             /* we've passed the last trap without finding a pit or hole;
                clear the sokoban_rules flag so that luck penalties for
                things like breaking boulders or jumping will no longer
                be given, and restrictions on diagonal moves are lifted */
-            Sokoban = 0; /* clear level.flags.sokoban_rules */
-            /* TODO: give some feedback about solving the sokoban puzzle
-               (perhaps say "congratulations" in Japanese?) */
+            Sokoban = 0; /* clear gl.level.flags.sokoban_rules */
+            /*
+             * TODO: give some feedback about solving the sokoban puzzle
+             * (perhaps say "congratulations" in Japanese?).
+             */
+
+             /* log the completion event regardless of whether or not
+                any normal in-game feedback has just been given */
+            livelog_printf(LL_MINORAC | LL_DUMP,
+                "completed %d%s Sokoban level",
+                sokonum, ordin(sokonum));
         }
     }
 }

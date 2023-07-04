@@ -119,6 +119,8 @@ namespace GnollHackClient
                 switch (_menuInfo.Style)
                 {
                     case ghmenu_styles.GHMENU_STYLE_GENERAL:
+                    case ghmenu_styles.GHMENU_STYLE_PREVIOUS_MESSAGES:
+                    case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                         break;
                     case ghmenu_styles.GHMENU_STYLE_INVENTORY:
                     case ghmenu_styles.GHMENU_STYLE_PERMANENT_INVENTORY:
@@ -291,6 +293,8 @@ namespace GnollHackClient
                     switch (_menuInfo.Style)
                     {
                         case ghmenu_styles.GHMENU_STYLE_GENERAL:
+                        case ghmenu_styles.GHMENU_STYLE_PREVIOUS_MESSAGES:
+                        case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                             break;
                         case ghmenu_styles.GHMENU_STYLE_INVENTORY:
                         case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
@@ -360,6 +364,8 @@ namespace GnollHackClient
                     switch (_menuInfo.Style)
                     {
                         case ghmenu_styles.GHMENU_STYLE_GENERAL:
+                        case ghmenu_styles.GHMENU_STYLE_PREVIOUS_MESSAGES:
+                        case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                             break;
                         case ghmenu_styles.GHMENU_STYLE_INVENTORY:
                         case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
@@ -442,6 +448,8 @@ namespace GnollHackClient
                 switch (_menuInfo.Style)
                 {
                     case ghmenu_styles.GHMENU_STYLE_GENERAL:
+                    case ghmenu_styles.GHMENU_STYLE_PREVIOUS_MESSAGES:
+                    case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                         break;
                     case ghmenu_styles.GHMENU_STYLE_INVENTORY:
                         break;
@@ -478,7 +486,7 @@ namespace GnollHackClient
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_COMMAND:
                         break;
                     case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
-                        res = res * 16.0 / 15.0;
+                        res = res * 15.0 / 15.0;
                         break;
                     case ghmenu_styles.GHMENU_STYLE_DELETE_SAVED_GAME:
                     case ghmenu_styles.GHMENU_STYLE_CHOOSE_SAVED_GAME:
@@ -538,7 +546,7 @@ namespace GnollHackClient
                         res = 0.775;
                         break;
                     case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
-                        res = 0.70;
+                        res = 0.675;
                         break;
                     default:
                         break;
@@ -629,6 +637,7 @@ namespace GnollHackClient
         }
 
         public bool Selected { get; set; }
+        public bool Highlighted { get; set; }
 
         public float BottomPadding
         {

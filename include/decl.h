@@ -90,7 +90,8 @@ E struct dgn_topology { /* special dungeon levels for speed */
     xchar d_modron_dnum;
     d_level d_bovine_level;
     xchar d_bovine_dnum;
-    d_level d_quantum_level;
+    d_level d_quantum_tunnel_level;
+    d_level d_quantum_core_level;
     xchar d_large_circular_dgn_dnum;
     d_level d_minetown_level;
     d_level d_mineend_level;
@@ -141,7 +142,8 @@ E struct dgn_topology { /* special dungeon levels for speed */
 #define modron_dnum             (dungeon_topology.d_modron_dnum)
 #define bovine_level            (dungeon_topology.d_bovine_level)
 #define bovine_dnum             (dungeon_topology.d_bovine_dnum)
-#define quantum_level           (dungeon_topology.d_quantum_level)
+#define quantum_tunnel_level    (dungeon_topology.d_quantum_tunnel_level)
+#define quantum_core_level      (dungeon_topology.d_quantum_core_level)
 #define treasure_island_level   (dungeon_topology.d_treasure_island)
 #define large_circular_dgn_dnum (dungeon_topology.d_large_circular_dgn_dnum)
 #define minetown_level          (dungeon_topology.d_minetown_level)
@@ -211,7 +213,10 @@ E NEARDATA struct sinfo {
 E boolean restoring;
 E boolean saving;
 E boolean reseting;
+E boolean check_pointing;
 E boolean ransacked;
+
+E struct gamelog_line* gamelog;
 
 E const char quitchars[];
 E const char vowels[];
@@ -322,6 +327,8 @@ E enum object_soundset_types occsoundset; /* defined when occupation != NULL */
 E enum object_occupation_types occtyp; /* defined when occupation != NULL */
 
 E const char *nomovemsg;
+E int nomovemsg_attr;
+E int nomovemsg_color;
 E char lock[];
 
 E const schar xdir[], ydir[], zdir[];
@@ -519,6 +526,16 @@ E NEARDATA winid WIN_MAP, WIN_INVEN, WIN_HERE;
 #define verbalize_happy1(cstr) verbalize_ex(ATR_NONE, CLR_MSG_TALK_HAPPY, "%s", cstr)
 
 #define pline_ex1_popup(a, b, cstr, title, dopop) pline_ex1(a, b, cstr); if (dopop) display_popup_text(cstr, title, POPUP_TEXT_GENERAL, a, b, NO_GLYPH, 0)
+
+E int no_multiattrs[32];
+E int multicolor_red1[1];
+E int multicolor_red2[2];
+E int multicolor_red3[3];
+E int multicolor_red4[4];
+E int multicolor_orange1[1];
+E int multicolor_orange2[2];
+E int multicolor_orange3[3];
+E int multicolor_orange4[4];
 
 E char toplines[TBUFSZ];
 E char toplineattrs[TBUFSZ];

@@ -40,6 +40,7 @@ STATIC_DCL int FDECL(restlevelfile, (int, XCHAR_P));
 STATIC_OVL void FDECL(restore_msghistory, (int));
 STATIC_DCL void FDECL(reset_oattached_mids, (BOOLEAN_P));
 STATIC_DCL void FDECL(rest_levl, (int, BOOLEAN_P));
+STATIC_DCL void FDECL(restore_gamelog, (int));
 
 STATIC_VAR struct restore_procs {
     const char *name;
@@ -463,6 +464,18 @@ struct monst *mtmp;
             newedog(mtmp);
             mread(fd, (genericptr_t) EDOG(mtmp), sizeof(struct edog));
         }
+        /* mmonst - original form when polymorphed */
+        mread(fd, (genericptr_t)&buflen, sizeof(buflen));
+        if (buflen > 0) {
+            newmmonst(mtmp);
+            restmon(fd, MMONST(mtmp));
+        }
+        /* mobj - object that mimic is posing as */
+        mread(fd, (genericptr_t)&buflen, sizeof(buflen));
+        if (buflen > 0) {
+            newmobj(mtmp);
+            restobj(fd, MOBJ(mtmp));
+        }
         /* mcorpsenm - obj->corpsenm for mimic posing as corpse or
            statue (inline int rather than pointer to something) */
         mread(fd, (genericptr_t) &MCORPSENM(mtmp), sizeof MCORPSENM(mtmp));
@@ -788,20 +801,24 @@ unsigned int *stuckid, *steedid;
     mread(fd, (genericptr_t) pl_character, sizeof pl_character);
 
     mread(fd, (genericptr_t) pl_fruit, sizeof pl_fruit);
-    freefruitchn(ffruit); /* clean up fruit(s) made by read_options() */
+    freefruitchn(ffruit); /* clean up fruit(s) made by process_options_file() */
     ffruit = loadfruitchn(fd);
 
     restnames(fd);
     restore_waterlevel(fd);
     restore_msghistory(fd);
+    restore_gamelog(fd);
+
     /* must come after all mons & objs are restored */
     relink_timers(FALSE);
     relink_light_sources(FALSE);
     relink_sound_sources(FALSE);
     /* inventory display is now viable */
     iflags.perm_invent = defer_perm_invent;
-    issue_gui_command(GUI_CMD_LOAD_GLYPHS);
-
+    issue_simple_gui_command(GUI_CMD_LOAD_GLYPHS);
+#ifdef WHEREIS_FILE
+    touch_whereis();
+#endif
     return TRUE;
 }
 
@@ -902,7 +919,8 @@ int
 dorecover(fd)
 register int fd;
 {
-    if (dorecover_saved_game(fd))
+    int loadres = dorecover_saved_game(fd);
+    if (loadres)
     {
         /* Success! */
         welcome(FALSE);
@@ -1354,6 +1372,28 @@ struct save_game_stats* stats_ptr;
 }
 
 STATIC_OVL void
+restore_gamelog(fd)
+register int fd;
+{
+    int slen = 0;
+    struct gamelog_line tmp;
+    char* tmpstr = 0;
+
+    while (1) {
+        mread(fd, &slen, sizeof slen);
+        if (slen < 0)
+            break;
+        tmpstr = (char*)alloc((size_t)slen + 1);
+        mread(fd, tmpstr, (size_t)slen);
+        mread(fd, &tmp, sizeof tmp);
+        tmpstr[slen] = '\0';
+        gamelog_add(tmp.flags, tmp.turn, tmpstr);
+        free(tmpstr);
+    }
+}
+
+
+STATIC_OVL void
 restore_msghistory(fd)
 register int fd;
 {
@@ -1730,12 +1770,13 @@ struct save_game_data* saved;
 
             Sprintf(savedbuf, "%sGame was saved on %s", prefix, timebuf);
 
-            int glyph = saved[k].gamestats.glyph;
+            //int glyph = saved[k].gamestats.glyph;
             int gui_glyph = saved[k].gamestats.gui_glyph;
             any.a_int = k + 1;
 
-            add_menu(tmpwin, iflags.using_gui_tiles ? gui_glyph : glyph, &any, 0, 0, ATR_HEADING | ATR_BOLD, style == 1 ? CLR_RED : NO_COLOR, namebuf,
-                MENU_UNSELECTED);
+            add_menu(tmpwin, gui_glyph, &any, 0, 0, ATR_HEADING | ATR_BOLD, 
+                style == 1 ? CLR_RED : saved[k].is_running ? CLR_MAGENTA : saved[k].is_error_save_file ? CLR_BROWN : saved[k].is_imported_save_file ? CLR_BLUE : NO_COLOR, 
+                namebuf, MENU_UNSELECTED);
 
             any.a_int = 0;
             add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, characterbuf,

@@ -326,7 +326,7 @@ STATIC_VAR char pushq[BSIZE], saveq[BSIZE];
 STATIC_VAR NEARDATA int phead, ptail, shead, stail;
 
 STATIC_OVL char
-popch()
+popch(VOID_ARGS)
 {
     /* If occupied, return '\0', letting tgetch know a character should
      * be read from the keyboard.  If the character read is not the
@@ -342,7 +342,7 @@ popch()
 }
 
 char
-pgetchar() /* courtesy of aeb@cwi.nl */
+pgetchar(VOID_ARGS) /* courtesy of aeb@cwi.nl */
 {
     register int ch;
 
@@ -779,7 +779,7 @@ doability(VOID_ARGS)
     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     any = zeroany;
-    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_MENU_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon(&youmonst));
+    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_MENU_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
     start_menu_ex(win, GHMENU_STYLE_CHARACTER);
 
     /* CHARACTER ABILITY INFORMATION */
@@ -836,7 +836,7 @@ doability(VOID_ARGS)
         glyph = flags.female ? female_monnum_to_glyph(u.umonnum) : monnum_to_glyph(u.umonnum);
         gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
-        add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+        add_menu(win, gui_glyph, &any,
             0, 0, ATR_NONE, NO_COLOR,
             available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
@@ -996,12 +996,10 @@ doability(VOID_ARGS)
             0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
             "Companion Statistics                ", MENU_UNSELECTED, menu_heading_info());
 
-        int pet_index = 0;
         for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
         {
             if (!DEADMONSTER(mtmp) && is_tame(mtmp))
             {
-                pet_index++;
                 char namebuf[MAXNAMELENGTH];
                 if (UMNAME(mtmp))
                 {
@@ -1036,7 +1034,7 @@ doability(VOID_ARGS)
                 glyph = abs(any_mon_to_glyph(mtmp, rn2_on_display_rng));
                 gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
 
-                add_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+                add_menu(win, gui_glyph, &any,
                     0, 0, ATR_NONE, NO_COLOR,
                     available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
@@ -1092,7 +1090,7 @@ domonsterability(VOID_ARGS)
     gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     struct extended_create_window_info createinfo = extended_create_window_info_from_mon(&youmonst);
-    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_COMMAND_MENU, iflags.using_gui_tiles ? gui_glyph : glyph, createinfo);
+    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_COMMAND_MENU, gui_glyph, createinfo);
     start_menu_ex(win, GHMENU_STYLE_MONSTER_ABILITY);
     print_monster_abilities(win, &abilitynum, FALSE);
     end_menu(win, "Monster Abilities");
@@ -1424,7 +1422,7 @@ boolean ischaractermenu;
         any = zeroany;
         glyph = abs(any_mon_to_glyph(u.usteed, rn2_on_display_rng));
         gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL, 0UL, MAT_NONE, 0));
-        add_extended_menu(win, iflags.using_gui_tiles ? gui_glyph : glyph, &any,
+        add_extended_menu(win, gui_glyph, &any,
             0, 0, iflags.menu_headings, NO_COLOR,
             ischaractermenu ? "Use Your Steed's Abilities            " : "Your Steed's Abilities", MENU_UNSELECTED, menu_heading_info());
 
@@ -2107,7 +2105,7 @@ wiz_map_levltyp(VOID_ARGS)
     return;
 }
 
-#ifndef GNH_MOBILE
+#if !defined(GNH_MOBILE) && defined(DEBUG)
 /* Save monster list */
 STATIC_PTR int
 wiz_save_monsters(VOID_ARGS) /* Save a csv file for monsters */
@@ -2558,11 +2556,40 @@ wiz_save_quest_texts(VOID_ARGS) /* Save a csv file for monsters */
 
     return 0;
 }
-#endif /* ifndef GNH_MOBILE */
+
+/* Save spells into .md files */
+STATIC_PTR int
+wiz_save_spells(VOID_ARGS)
+{
+    if (wizard)
+    {
+        write_spells();
+    }
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_save_spells)));
+
+    return 0;
+}
+
+/* Save monsters into .md files */
+STATIC_PTR int
+wiz_save_monsters2(VOID_ARGS)
+{
+    if (wizard)
+    {
+        write_monsters();
+    }
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_save_monsters2)));
+
+    return 0;
+}
+
+#endif /* !GNH_MOBILE && DEBUG */
 
 /* temporary? hack, since level type codes aren't the same as screen
    symbols and only the latter have easily accessible descriptions */
-STATIC_VAR const char *levltyp[MAX_TYPE + 2] = {
+STATIC_VAR const char *levltyp[MAX_LEVTYPE + 2] = {
     "stone", 
     "vertical wall", 
     "horizontal wall", 
@@ -3120,7 +3147,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
     int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
-    en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_ENLIGHTENMENT_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon(&youmonst));
+    en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_ENLIGHTENMENT_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
     en_via_menu = !final;
     if (en_via_menu)
         start_menu_ex(en_win, GHMENU_STYLE_ATTRIBUTES);
@@ -3206,7 +3233,7 @@ int final;
 #ifndef GNH_MOBILE
     enlght_out("", ATR_NONE); /* separator after title */
 #endif
-    enlght_out("Background:", ATR_HEADING);
+    enlght_out("Background:", ATR_SUBHEADING);
 
     /* if polymorphed, report current shape before underlying role;
        will be repeated as first status: "you are transformed" and also
@@ -3394,7 +3421,7 @@ int final;
         pwmax = u.uenmax, hpmax = (Upolyd ? u.mhmax : u.uhpmax);
 
     enlght_out(" ", ATR_HALF_SIZE); /* separator after background */
-    enlght_out("Basics:", ATR_HEADING);
+    enlght_out("Basics:", ATR_SUBHEADING);
 
     if (hp < 0)
         hp = 0;
@@ -3504,7 +3531,7 @@ int final;
 
     enlght_out(" ", ATR_HALF_SIZE);
     Sprintf(buf, "%s Characteristics:", !final ? "Current" : "Final");
-    enlght_out(buf, ATR_HEADING);
+    enlght_out(buf, ATR_SUBHEADING);
 
     /* bottom line order */
     one_characteristic(mode, final, A_STR); /* strength */
@@ -3671,7 +3698,7 @@ int final;
      *     should be discernible to the hero hence to the player)
     \*/
     enlght_out(" ", ATR_HALF_SIZE); /* separator after title or characteristics */
-    enlght_out(final ? "Final Status:" : "Current Status:", ATR_HEADING);
+    enlght_out(final ? "Final Status:" : "Current Status:", ATR_SUBHEADING);
 
     Strcpy(youtoo, You_);
     /* not a traditional status but inherently obvious to player; more
@@ -4170,7 +4197,7 @@ int final;
      *  Attributes
     \*/
     enlght_out(" ", ATR_HALF_SIZE);
-    enlght_out(final ? "Final Attributes:" : "Current Attributes:", ATR_HEADING);
+    enlght_out(final ? "Final Attributes:" : "Current Attributes:", ATR_SUBHEADING);
 
     if (u.uevent.uhand_of_elbereth) {
         you_are(hofe_titles[u.uevent.uhand_of_elbereth - 1], "");
@@ -5284,9 +5311,19 @@ int final;
 {
     char buf[BUFSZ];
     int ngenocided;
+    int dumpwin;
 
     /* Create the conduct window */
     en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_SEMI_WIDE_LIST, NO_GLYPH, zerocreatewindowinfo);
+
+#if defined (DUMPLOG) || defined(DUMPHTML)
+    if(iflags.in_dumplog)
+        dumpwin = NHW_DUMPTXT;
+    else
+        dumpwin = en_win;
+#else
+    dumpwin = en_win;
+#endif
 
     if (!u.uachieve.ascended || !u.uachieve.amulet || !u.uachieve.role_achievement)
     {
@@ -5320,7 +5357,7 @@ int final;
     }
 
     int num_achievements = 0;
-    putstr(en_win, ATR_NONE, " ");
+    putstr(dumpwin, ATR_NONE, "");
     putstr(en_win, ATR_TITLE, "Achievements:");
     if (!final)
         putstr(en_win, ATR_HALF_SIZE, " ");
@@ -5466,7 +5503,7 @@ int final;
         you_have_not("earned any achievements", "");
     }
 
-    putstr(en_win, ATR_NONE, " ");
+    putstr(dumpwin, ATR_NONE, "");
     putstr(en_win, ATR_TITLE, "Voluntary challenges:");
     if(!final)
         putstr(en_win, ATR_HALF_SIZE, " ");
@@ -5566,13 +5603,13 @@ int final;
     {
         char mbuf[BUFSZ];
         long valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
-        putstr(en_win, ATR_NONE, " ");
-        Sprintf(mbuf, "You have %ld %s worth of %svaluables with you.", valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
+        putstr(dumpwin, ATR_NONE, "");
+        Sprintf(mbuf, "You %s %ld %s worth of %svaluables with you.", final ? "had" : "have", valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
         putstr(en_win, ATR_TITLE, mbuf);
     }
     else if (Role_if(PM_TOURIST))
     {
-        putstr(en_win, ATR_NONE, " ");
+        putstr(dumpwin, ATR_NONE, "");
         putstr(en_win, ATR_TITLE, "Selfies taken with:");
         if (!final)
             putstr(en_win, ATR_HALF_SIZE, " ");
@@ -5617,6 +5654,8 @@ struct ext_func_tab extcmdlist[] = {
     { 'C', "chat", "talk to someone", dotalk, IFBURIED | AUTOCOMPLETE },
     { M(10), "chatsteed", "talk to steed", dotalksteed, IFBURIED },
     { M(11), "chatnearby", "talk to someone nearby", dotalknearby, IFBURIED },
+    { '\0',   "chronicle", "show journal of major events",
+              do_gamelog, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { C('c'), "call", "call (name) something", docallcmd, IFBURIED | AUTOCOMPLETE, 0, getobj_callable, "call" },
     { M('c'), "commands", "list of additional actions",
             docommandmenu, IFBURIED | GENERALCMD | AUTOCOMPLETE },
@@ -5852,7 +5891,7 @@ struct ext_func_tab extcmdlist[] = {
             wiz_level_tele, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { '\0', "wizlightsources", "show mobile light sources",
             wiz_light_sources, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     { '\0', "wizdumplog", "write the dumplog",
             wiz_dumplog, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #endif
@@ -5861,18 +5900,22 @@ struct ext_func_tab extcmdlist[] = {
     { C('f'), "wizmap", "map the level",
             wiz_map, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #if !defined(GNH_MOBILE) && defined(DEBUG)
-    { '\0', "wizsavemon", "save monsters into a file",
+    { '\0', "wizsavemon", "save monsters into a csv file",
             wiz_save_monsters, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { '\0', "wizsaveenc", "save encounters into a file",
+    { '\0', "wizsaveenc", "save encounters into a csv file",
             wiz_save_encounters, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { '\0', "wizsavetiledata", "save tile data into a file",
+    { '\0', "wizsavetiledata", "save tile data into a csv file",
             wiz_save_tiledata, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { '\0', "wizcounttiles", "count the number of tiles",
             wiz_count_tiles, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { '\0', "wizsaveglyph2tiles", "save glyph2tile into a file",
+    { '\0', "wizsaveglyph2tiles", "save glyph2tile into a csv file",
             wiz_save_glyph2tiles, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { '\0', "wizsavequesttexts", "save quest texts into a file",
+    { '\0', "wizsavequesttexts", "save quest texts into a txt file",
             wiz_save_quest_texts, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "wizsavespells", "save spells into .md files",
+            wiz_save_spells, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "wizsavemonsters", "save monsters into .md files",
+            wiz_save_monsters2, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #endif
     { '\0', "wizcrown", "make the god crown you",
             wiz_crown, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
@@ -5966,7 +6009,7 @@ const char *command;
 
 /* initialize all keyboard commands */
 void
-commands_init()
+commands_init(VOID_ARGS)
 {
     struct ext_func_tab *extcmd;
 
@@ -6354,6 +6397,10 @@ boolean incl_wsegs;
             sz += sizeof (struct emin);
         if (EDOG(mtmp))
             sz += sizeof (struct edog);
+        if (MMONST(mtmp))
+            sz += size_monst(MMONST(mtmp), FALSE);
+        if (MOBJ(mtmp))
+            sz += size_obj(MOBJ(mtmp));
         /* mextra->mcorpsenm doesn't point to more memory */
     }
     return sz;
@@ -6528,7 +6575,7 @@ size_t *total_size;
  * Display memory usage of all monsters and objects on the level.
  */
 STATIC_OVL int
-wiz_show_stats()
+wiz_show_stats(VOID_ARGS)
 {
     char buf[BUFSZ];
     winid win;
@@ -6611,7 +6658,7 @@ wiz_show_stats()
 }
 
 void
-sanity_check()
+sanity_check(VOID_ARGS)
 {
     obj_sanity_check();
     timer_sanity_check();
@@ -7009,7 +7056,7 @@ boolean initial;
 }
 
 void
-update_bindings_list()
+update_bindings_list(VOID_ARGS)
 {
     struct ext_func_tab* efp;
     for (efp = extcmdlist; efp->ef_txt; efp++) 
@@ -7057,7 +7104,7 @@ int NDECL((*cmd_func));
 }
 
 char
-randomkey()
+randomkey(VOID_ARGS)
 {
     static int i = 0;
     char c;
@@ -7130,7 +7177,7 @@ register char *cmd;
 
     create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
     update_here_window();
-    issue_gui_command(GUI_CMD_CLEAR_PET_DATA);
+    issue_simple_gui_command(GUI_CMD_CLEAR_PET_DATA);
 
     //reset_all_monster_origin_coordinates();
     check_gui_special_effect();
@@ -7507,7 +7554,7 @@ char sym;
 
 /* grid bug handling which used to be in movecmd() */
 int
-dxdy_moveok()
+dxdy_moveok(VOID_ARGS)
 {
     if (u.dx && u.dy && NODIAG(u.umonnum))
         u.dx = u.dy = 0;
@@ -7849,7 +7896,7 @@ const char *msg;
 }
 
 void
-confdir()
+confdir(VOID_ARGS)
 {
     register int x = NODIAG(u.umonnum) ? 2 * rn2(4) : rn2(8);
 
@@ -8470,7 +8517,7 @@ boolean historical; /* whether to include in message history: True => yes */
 
 
 STATIC_OVL char *
-parse()
+parse(VOID_ARGS)
 {
 #ifdef LINT /* static char in_line[COLNO]; */
     char in_line[COLNO];
@@ -8595,7 +8642,7 @@ int sig_unused UNUSED;
 }
 
 void
-end_of_input()
+end_of_input(VOID_ARGS)
 {
 #ifdef NOSAVEONHANGUP
 #ifdef INSURANCE
@@ -8609,7 +8656,9 @@ end_of_input()
     if (!program_state.done_hup++)
 #endif
         if (program_state.something_worth_saving)
-            (void) dosave0(TRUE);
+        {
+            (void)dosave0(TRUE);
+        }
     if (iflags.window_inited)
         exit_nhwindows((char *) 0);
     clearlocks();
@@ -8620,7 +8669,7 @@ end_of_input()
 #endif /* HANGUPHANDLING */
 
 char
-readchar()
+readchar(VOID_ARGS)
 {
     register int sym;
     int x = u.ux, y = u.uy, mod = 0;
@@ -8776,7 +8825,7 @@ char def;
 unsigned long ynflags; /* 1 means use upper side for half-sized tile */
 {
     char res, qbuf[QBUFSZ];
-#ifdef DUMPLOG
+#if defined(DUMPLOG) || defined(DUMPHTML)
     extern unsigned saved_pline_index; /* pline.c */
     unsigned idx = saved_pline_index;
     /* buffer to hold query+space+formatted_single_char_response */
@@ -8794,14 +8843,14 @@ unsigned long ynflags; /* 1 means use upper side for half-sized tile */
         query = qbuf;
     }
     res = (*windowprocs.win_yn_function_ex)(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags);
-#ifdef DUMPLOG
+#if defined(DUMPLOG) || defined(DUMPHTML)
     if (idx == saved_pline_index) {
         /* when idx is still the same as saved_pline_index, the interface
            didn't put the prompt into saved_plines[]; we put a simplified
            version in there now (without response choices or default) */
         Sprintf(dumplog_buf, "%s ", query);
         (void) key2txt((uchar) res, eos(dumplog_buf));
-        dumplogmsg(dumplog_buf);
+        dumplogmsg(dumplog_buf, (char*)0, (char*)0, attr, color);
     }
 #endif
     return res;
@@ -9008,7 +9057,7 @@ doviewpet(VOID_ARGS)
         {
             if (mtmp->m_id == context.view_pet_mid && is_tame(mtmp))
             {
-                if (abs(mtmp->mx - u.ux) <= 1 && abs(mtmp->my - u.uy) <= 1)
+                if (abs(mtmp->mx - u.ux) <= 1 && abs(mtmp->my - u.uy) <= 1 && !mtmp->meating && mon_can_move(mtmp))
                     return dochatmon(mtmp);
                 else
                     return doviewpetstatistics(mtmp);
@@ -9316,7 +9365,7 @@ enum create_context_menu_types menu_type;
                     if (!(x == u.ux && y == u.uy) && isok(x, y))
                     {
                         mtmp = m_at(x, y);
-                        if (mtmp)
+                        if (mtmp && !DEADMONSTER(mtmp))
                         {
                             if (monster_invokes_context_chat(mtmp))
                             {
@@ -9364,7 +9413,7 @@ enum create_context_menu_types menu_type;
 
         if (otmp)
         {
-            add_context_menu(',', cmd_from_func(dopickup), CONTEXT_MENU_STYLE_GENERAL, iflags.using_gui_tiles ? otmp->gui_glyph : otmp->glyph, "Pick Up", cxname(otmp), 0, NO_COLOR);
+            add_context_menu(',', cmd_from_func(dopickup), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick Up", cxname(otmp), 0, NO_COLOR);
             struct obj* otmp_here;
             boolean eat_added = FALSE;
             boolean loot_added = FALSE;
@@ -9372,13 +9421,13 @@ enum create_context_menu_types menu_type;
             {
                 if (!eat_added && is_edible(otmp_here))
                 {
-                    add_context_menu('e', cmd_from_func(doeat), CONTEXT_MENU_STYLE_GENERAL, iflags.using_gui_tiles ? otmp_here->gui_glyph : otmp_here->glyph, "Eat", cxname(otmp_here), 0, NO_COLOR);
+                    add_context_menu('e', cmd_from_func(doeat), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Eat", cxname(otmp_here), 0, NO_COLOR);
                     eat_added = TRUE;
                 }
 
                 if (!loot_added && Is_container(otmp_here))
                 {
-                    add_context_menu('l', cmd_from_func(doloot), CONTEXT_MENU_STYLE_GENERAL, iflags.using_gui_tiles ? otmp_here->gui_glyph : otmp_here->glyph, "Loot", cxname(otmp_here), 0, NO_COLOR);
+                    add_context_menu('l', cmd_from_func(doloot), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Loot", cxname(otmp_here), 0, NO_COLOR);
                     loot_added = TRUE;
                 }
             }
@@ -9397,7 +9446,7 @@ enum create_context_menu_types menu_type;
         {
             struct obj* lpobj;
             if ((lpobj = o_on(context.last_picked_obj_oid, invent)) != 0)
-                add_context_menu(M('<'), cmd_from_func(dolastpickeditem), CONTEXT_MENU_STYLE_GENERAL, lpobj ? (iflags.using_gui_tiles ? lpobj->gui_glyph : lpobj->glyph) : 0, "Last Item", lpobj ? cxname(lpobj) : "", 0, NO_COLOR);
+                add_context_menu(M('<'), cmd_from_func(dolastpickeditem), CONTEXT_MENU_STYLE_GENERAL, lpobj ? lpobj->gui_glyph : 0, "Last Item", lpobj ? cxname(lpobj) : "", 0, NO_COLOR);
         }
         break;
     }
@@ -9405,7 +9454,7 @@ enum create_context_menu_types menu_type;
 }
 
 int
-domarkautostash()
+domarkautostash(VOID_ARGS)
 {
     struct obj* obj = getobj(getobj_mark_autostashs, "mark as auto-stash", 0, "");
     if (!obj)
@@ -9432,7 +9481,7 @@ domarkautostash()
 }
 
 int
-dounmarkautostash()
+dounmarkautostash(VOID_ARGS)
 {
     struct obj* obj = getobj(getobj_unmark_autostashs, "unmark as auto-stash", 0, "");
     if (!obj)
@@ -9489,6 +9538,19 @@ int x1, y1, x2, y2;
         }
     };
 
+    return 0;
+}
+
+/* #chronicle command */
+int
+do_gamelog(VOID_ARGS)
+{
+    if (gamelog) {
+        show_gamelog(ENL_GAMEINPROGRESS);
+    }
+    else {
+        pline("No chronicled events.");
+    }
     return 0;
 }
 

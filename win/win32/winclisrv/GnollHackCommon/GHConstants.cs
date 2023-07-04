@@ -197,6 +197,7 @@ namespace GnollHackCommon
         FullVersion =       0x00000004,
         ModernMode =        0x00000008, /* Upon death, the character teleports back to starting altar */
         CasualMode =        0x00000010, /* Save games are preserved */
+        DisableBones =      0x00000020, /* Force iflags.bones to off */
     }
 
     [Flags]
@@ -370,6 +371,8 @@ namespace GnollHackCommon
         public int source_glyph3;
         public int source_glyph4;
         public ulong parameter1;
+        public ulong parameter2;
+        public ulong parameter3;
     }
 
     public enum layer_types
@@ -563,6 +566,8 @@ namespace GnollHackCommon
         GHMENU_STYLE_MONSTER_ABILITY,
         GHMENU_STYLE_DELETE_SAVED_GAME,
         GHMENU_STYLE_START_GAME_MENU,
+        GHMENU_STYLE_PREVIOUS_MESSAGES,
+        GHMENU_STYLE_VIEW_FILE,
         MAX_GHMENU_STYLES
     }
 
@@ -984,7 +989,9 @@ namespace GnollHackCommon
     public struct objclassdata
     {
         public int tile_height;
-        public int special_quality;
+        public short special_quality;
+        public short max_charges;
+        public byte nhcolor;
 
         public byte lamplit;
         public byte poisoned;
@@ -1132,6 +1139,17 @@ namespace GnollHackCommon
         OBJDATA_FLAGS_HALLUCINATION =   0x00000002UL,
         OBJDATA_FLAGS_UCHAIN =          0x00000004UL,
         OBJDATA_FLAGS_UBALL =           0x00000008UL,
+        OBJDATA_FLAGS_UWEP =            0x00000010UL,
+        OBJDATA_FLAGS_UWEP2 =           0x00000020UL,
+        OBJDATA_FLAGS_UQUIVER =         0x00000040UL,
+        OBJDATA_FLAGS_OUT_OF_AMMO1 =    0x00000080UL,
+        OBJDATA_FLAGS_WRONG_AMMO_TYPE1 =0x00000100UL,
+        OBJDATA_FLAGS_NOT_BEING_USED1 = 0x00000200UL,
+        OBJDATA_FLAGS_NOT_WEAPON1 =     0x00000400UL,
+        OBJDATA_FLAGS_OUT_OF_AMMO2 =    0x00000800UL,
+        OBJDATA_FLAGS_WRONG_AMMO_TYPE2 =0x00001000UL,
+        OBJDATA_FLAGS_NOT_BEING_USED2 = 0x00002000UL,
+        OBJDATA_FLAGS_NOT_WEAPON2 =     0x00004000UL
     }
 
     [Flags]
@@ -1197,8 +1215,30 @@ namespace GnollHackCommon
         GUI_CMD_UNLOAD_INTRO_SOUND_BANK,
         GUI_CMD_WAIT_FOR_RESUME,
         GUI_CMD_REPORT_PLAY_TIME,
+        GUI_CMD_POST_GAME_STATUS,
+        GUI_CMD_POST_DIAGNOSTIC_DATA,
         GUI_CMD_GAME_START,
         GUI_CMD_GAME_ENDED,
+    }
+
+    public enum game_status_types
+    {
+        GAME_STATUS_START = 0,
+        GAME_STATUS_EVENT,
+        GAME_STATUS_ACHIEVEMENT,
+        GAME_STATUS_RESULT,
+        GAME_STATUS_RESULT_ATTACHMENT,
+        GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_TEXT,
+        GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_HTML,
+    }
+
+    public enum diagnostic_data_types
+    {
+        DIAGNOSTIC_DATA_GENERAL = 0,
+        DIAGNOSTIC_DATA_IMPOSSIBLE,
+        DIAGNOSTIC_DATA_PANIC,
+        DIAGNOSTIC_DATA_CRASH_REPORT,
+        DIAGNOSTIC_DATA_ATTACHMENT,
     }
 
     public enum popup_text_types
@@ -1360,7 +1400,7 @@ namespace GnollHackCommon
         public const int AllMessageRows = 250;
         public const int DefaultPetRows = 2;
         public const int IntroGHSound = 1;
-        public const string IntroEventPath = "event:/Music/Start/Splash";
+        public const string IntroEventPath = "event:/Music/Main Screen/Splash";
         public const int IntroBankId = 0;
         public const int ButtonClickGHSound = 28;
         public const string ButtonClickEventPath = "event:/UI/Button Down";
@@ -1372,8 +1412,10 @@ namespace GnollHackCommon
         public const float MenuSelectVolume = 0.15f;
 #if DEBUG
         public const bool DefaultDeveloperMode = true;
+        public const bool DefaultPosting = true;
 #else
         public const bool DefaultDeveloperMode = false;
+        public const bool DefaultPosting = false;
 #endif
         public const int NUM_ZAP_SOURCE_BASE_DIRS = 8;
         public const int NUM_ZAP_SOURCE_DIRS = (GHConstants.NUM_ZAP_SOURCE_BASE_DIRS * 2);
@@ -1416,6 +1458,15 @@ namespace GnollHackCommon
         public const bool DefaultHideStatusBar = true;
         public const long StoreReviewRequestNumberOfGames = 4;
         public const long StoreReviewRequestTotalPlayTime = 60 * 60 * 2;
+        public const bool DefaultHTMLDumpLogs = true;
+        public const bool DefaultUseSingleDumpLog = true;
+        public const string InstallTimePackName = "installtimepack";
+        public const string OnDemandPackName = "ondemandpack";
+        public const bool DefaultReadStreamingBankToMemory = false;
+        public const bool DefaultCopyStreamingBankToDisk = false;
+        public const bool DefaultDrawWallEnds = true;
+        public const bool DefaultLighterDarkening = true;
+        public const bool DefaultAlternativeLayerDrawing = false;
     }
 
 

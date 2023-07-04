@@ -76,10 +76,11 @@ struct monst {
     unsigned m_id;
     short mnum;           /* permanent monster index number */
     short cham;           /* if shapeshifter, orig mons[] idx goes here */
+    short cham_subtype;   /* if shapeshifter, orig subtype goes here */
     short movement;       /* movement points (derived from permonst definition
                              and added effects */
     uchar m_lev;          /* adjusted difficulty level of monster */
-    aligntyp mhostility;  /* hostility of this monster towards the player, (positive = good to kill) */
+    aligntyp mhostility;  /* hostility of this monster towards the player, (nonnegative = good to kill) */
     xchar mx0, my0;       /* where the monster is moving from */
     xchar mx, my;
     xchar mux, muy;       /* where the monster thinks you are */
@@ -114,7 +115,7 @@ struct monst {
 
     schar mtame;                /* level of tameness, implies peaceful */
 
-    unsigned short mprops[LAST_PROP + 1]; /* simplified props structure for monsters, taking 1/6 u.uprops memory space but doing about the same thing anyway --JG */
+    unsigned short mprops[MAX_PROPS]; /* simplified props structure for monsters, taking 1/6 u.uprops memory space but doing about the same thing anyway --JG */
 
 #define M_TIMEOUT                0x3fff    /* timeout mask for temporary property */
 #define M_INTRINSIC_ACQUIRED     0x4000    /* permanent intrisic acquired e.g. by eating monster corpses */

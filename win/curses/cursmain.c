@@ -153,7 +153,7 @@ curses_init_nhwindows(int *argcp UNUSED,
 #ifdef PDCURSES
     char window_title[BUFSZ];
 #endif
-    curses_issue_gui_command(1);
+    curses_issue_gui_command(1, 0, 0);
 #ifdef XCURSES
     base_term = Xinitscr(*argcp, argv);
 #else
@@ -436,7 +436,7 @@ putstr(window, attr, str)
                    by calling more() or displaying both on the same line.
 */
 void
-curses_putstr_ex(winid wid, int attr, const char *text, int app UNUSED, int color)
+curses_putstr_ex(winid wid, const char *text, int attr, int color, int app)
 {
     if (!text)
         return;
@@ -452,12 +452,12 @@ curses_putstr_ex(winid wid, int attr, const char *text, int app UNUSED, int colo
     else 
     {
         /* We need to convert NetHack attributes to curses attributes */
-        curses_puts_ex(wid, attr, color, text);
+        curses_puts_ex(wid, attr, color, text, app);
     }
 }
 
 void
-curses_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app UNUSED)
+curses_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app)
 {
     if (!text)
         return;
@@ -473,7 +473,7 @@ curses_putstr_ex2(winid wid, const char* text, const char* attrs, const char* co
     else 
     {
         /* We need to convert NetHack attributes to curses attributes */
-        curses_puts_ex2(wid, text, attrs, colors, attr, color);
+        curses_puts_ex2(wid, text, attrs, colors, attr, color, app);
     }
 }
 
@@ -492,12 +492,12 @@ curses_display_file(const char *filename, BOOLEAN_P must_exist)
    be used for menus.
 */
 void
-curses_start_menu_ex(winid wid, int style UNUSED)
+curses_start_menu_ex(winid wid, int style)
 {
     if (inv_update)
         return;
 
-    curses_create_nhmenu(wid);
+    curses_create_nhmenu(wid, style);
 }
 
 /*
@@ -552,7 +552,7 @@ curses_add_menu(winid wid, int glyph, const ANY_P * identifier,
     }
 
     curses_add_nhmenu_item(wid, glyph, identifier, accelerator, group_accel,
-        attr, color, str, (char*)0, (char*)0, presel);
+        attr, color, str, (char*)0, (char*)0, presel, 0);
 }
 
 void
@@ -588,7 +588,7 @@ curses_add_extended_menu(winid wid, int glyph, const ANY_P* identifier,
     }
 
     curses_add_nhmenu_item(wid, glyph, identifier, accelerator, group_accel,
-        attr, color, str, info.attrs, info.colors, presel);
+        attr, color, str, info.attrs, info.colors, presel, 0);
 }
 
 
@@ -706,9 +706,9 @@ curses_cliparound(int x, int y, BOOLEAN_P force UNUSED)
 }
 
 void
-curses_issue_gui_command(int initid)
+curses_issue_gui_command(int cmd_id, int cmd_param UNUSED, const char* cmd_str UNUSED)
 {
-    if (initid == 1)
+    if (cmd_id == 1)
     {
         setlocale(LC_ALL, "en_US.UTF-8");
         setlocale(LC_CTYPE, "");

@@ -1063,7 +1063,7 @@ register struct attack *mattk;
         (void) snuff_lit(obj);
 
     if (mdef->cham >= LOW_PM && is_vampshifter(mdef)
-        && newcham(mdef, &mons[mdef->cham], FALSE, FALSE))
+        && newcham(mdef, &mons[mdef->cham], mdef->cham_subtype, FALSE, FALSE))
     {
         if (vis)
         {
@@ -1455,7 +1455,7 @@ register struct obj* omonwep;
         hit_tile = HIT_ON_FIRE;
         play_sfx_sound_at_location(SFX_MONSTER_ON_FIRE, mdef->mx, mdef->my);
         if (vis && canseemon(mdef))
-            pline("%s is %s!", Monnam(mdef), on_fire(pd, mattk));
+            pline_ex(ATR_NONE, HI_FIRE, "%s is %s!", Monnam(mdef), on_fire(pd, mattk));
         if (completelyburns(pd)) { /* paper golem or straw golem */
             if (vis && canseemon(mdef))
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s burns completely!", Monnam(mdef));
@@ -1493,7 +1493,7 @@ register struct obj* omonwep;
         hit_tile = HIT_FROZEN;
         play_sfx_sound_at_location(SFX_MONSTER_COVERED_IN_FROST, mdef->mx, mdef->my);
         if (vis && canseemon(mdef))
-            pline("%s is covered in frost!", Monnam(mdef));
+            pline_ex(ATR_NONE, HI_ICE, "%s is covered in frost!", Monnam(mdef));
         if (is_mon_immune_to_cold(mdef))
         {
             if (vis && canseemon(mdef))
@@ -1519,7 +1519,7 @@ register struct obj* omonwep;
         hit_tile = HIT_ELECTROCUTED;
         play_sfx_sound_at_location(SFX_MONSTER_GETS_ZAPPED, mdef->mx, mdef->my);
         if (vis && canseemon(mdef))
-            pline("%s gets zapped!", Monnam(mdef));
+            pline_ex(ATR_NONE, HI_ZAP, "%s gets zapped!", Monnam(mdef));
         
         damage += adjust_damage(destroy_mitem(mdef, WAND_CLASS, AD_ELEC), magr, mdef, AD_COLD, ADFLAGS_NONE);
         
@@ -2027,7 +2027,7 @@ register struct obj* omonwep;
             start_delayed_sliming(mdef, FALSE);
 #if 0
             if (!munslime(mdef, FALSE) && !DEADMONSTER(mdef)) {
-                if (newcham(mdef, &mons[PM_GREEN_SLIME], FALSE,
+                if (newcham(mdef, &mons[PM_GREEN_SLIME], 0, FALSE,
                             (boolean) (vis && canseemon(mdef))))
                     pd = mdef->data;
                 mdef->mstrategy &= ~STRAT_WAITFORU;
@@ -2205,7 +2205,7 @@ register struct obj* omonwep;
 
         if (!hittxtalreadydisplayed && damagedealt > 0)
         {
-            pline("%s sustains %d damage!", Monnam(mdef), damagedealt);
+            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(mdef), damagedealt);
         }
     }
 
@@ -2270,11 +2270,11 @@ register struct obj* omonwep;
              * after monkilled() to provide better message ordering */
             if (mdef->cham >= LOW_PM)
             {
-                (void) newcham(magr, (struct permonst *) 0, FALSE, TRUE);
+                (void) newcham(magr, (struct permonst *) 0, 0, FALSE, TRUE);
             }
             else if (pd == &mons[PM_GREEN_SLIME] && !resists_slime(magr)) 
             {
-                (void) newcham(magr, &mons[PM_GREEN_SLIME], FALSE, TRUE);
+                (void) newcham(magr, &mons[PM_GREEN_SLIME], 0, FALSE, TRUE);
             }
             else if (pd == &mons[PM_WRAITH] || pd == &mons[PM_SPECTRE] || pd == &mons[PM_KING_WRAITH])
             {
@@ -2678,7 +2678,7 @@ assess_dmg:
 
         if (canseemon(magr) && damagedealt > 0)
         {
-            pline("%s sustains %d damage!", Monnam(magr), damagedealt);
+            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(magr), damagedealt);
             display_m_being_hit(magr, hit_tile, damagedealt, 0UL, FALSE);
         }
 

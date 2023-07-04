@@ -51,7 +51,7 @@ namespace GnollHackServer
             /* If positionbar is on */
             VoidCharCallback callback_update_positionbar,
             PrintGlyphCallback callback_print_glyph,
-            VoidIntCallback callback_issue_gui_command,
+            IssueGuiCommandCallback callback_issue_gui_command,
             VoidConstCharCallback callback_raw_print,
             VoidConstCharCallback callback_raw_print_bold,
             IntVoidCallback callback_nhgetch,
@@ -212,7 +212,7 @@ namespace GnollHackServer
                 /* If positionbar is on */
                 GameCallback_VoidCharDummy,
                 GameCallback_PrintGlyph,
-                GameCallback_VoidIntDummy,
+                GameCallback_IssueGuiCommand,
                 GameCallback_VoidConstCharDummy,
                 GameCallback_VoidConstCharDummy,
                 GameCallback_IntVoidDummy,
@@ -473,6 +473,10 @@ namespace GnollHackServer
             return 1;
         }
 
+        protected void GameCallback_IssueGuiCommand(int value1, int value2, string cmd_str)
+        {
+
+        }
 
 
         protected void GameCallback_VoidVoidDummy()
@@ -515,7 +519,7 @@ namespace GnollHackServer
         {
 
         }
-        protected void GameCallback_PutStrExColor(int value1, int value2, string value3, int value4, int value5)
+        protected void GameCallback_PutStrExColor(int value1, string value2, int value3, int value4, int value5)
         {
 
         }

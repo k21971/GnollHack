@@ -404,9 +404,9 @@ int floortyp, floorsubtyp, mtype, tileset;
                             levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
                             levl[lowx + roll1 + 1][lowy - 1].decoration_flags = DECORATION_FLAGS_ITEM_IN_HOLDER;
                         }
-                        else if (!rn2(3))
+                        else if (IS_ROOM(levl[lowx + roll1 + 1][lowy].typ) && !rn2(3))
                         {
-                            levl[lowx + roll1 + 1][lowy - 1].decoration_typ = DECORATION_FIREPLACE;
+                            levl[lowx + roll1 + 1][lowy - 1].decoration_typ = !rn2(2) ? DECORATION_FIREPLACE : DECORATION_ANOTHER_FIREPLACE;
                             levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
                             levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
                             levl[lowx + roll1 + 1][lowy - 1].decoration_flags = 0;
@@ -458,9 +458,9 @@ int floortyp, floorsubtyp, mtype, tileset;
                             levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
                             levl[lowx - 1][lowy + roll + 1].decoration_flags = (rn2(6) ? DECORATION_FLAGS_ITEM_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM2_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM3_IN_HOLDER : 0UL);
                         }
-                        else if (!made_fireplace && !rn2(6))
+                        else if (!made_fireplace && IS_ROOM(levl[lowx][lowy + roll + 1].typ) && !rn2(6))
                         {
-                            levl[lowx - 1][lowy + roll + 1].decoration_typ = DECORATION_FIREPLACE;
+                            levl[lowx - 1][lowy + roll + 1].decoration_typ = DECORATION_ANOTHER_FIREPLACE;
                             levl[lowx - 1][lowy + roll + 1].decoration_subtyp = 0;
                             levl[lowx - 1][lowy + roll + 1].decoration_dir = 1;
                             levl[lowx - 1][lowy + roll + 1].decoration_flags = 0;
@@ -501,9 +501,9 @@ int floortyp, floorsubtyp, mtype, tileset;
                             levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
                             levl[hix + 1][lowy + roll + 1].decoration_flags = (rn2(6) ? DECORATION_FLAGS_ITEM_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM2_IN_HOLDER : 0UL) | (rn2(5) ? DECORATION_FLAGS_ITEM3_IN_HOLDER : 0UL);
                         }
-                        else if (!made_fireplace && !rn2(6))
+                        else if (!made_fireplace && IS_ROOM(levl[hix][lowy + roll + 1].typ) && !rn2(6))
                         {
-                            levl[hix + 1][lowy + roll + 1].decoration_typ = DECORATION_FIREPLACE;
+                            levl[hix + 1][lowy + roll + 1].decoration_typ = DECORATION_ANOTHER_FIREPLACE;
                             levl[hix + 1][lowy + roll + 1].decoration_subtyp = 0;
                             levl[hix + 1][lowy + roll + 1].decoration_dir = 2;
                             levl[hix + 1][lowy + roll + 1].decoration_flags = 0;
@@ -527,9 +527,9 @@ int floortyp, floorsubtyp, mtype, tileset;
 
                 if (IS_WALL(levl[lowx + roll1 + 1][lowy - 1].typ))
                 {
-                    if (!rn2(3))
+                    if (IS_ROOM(levl[lowx + roll1 + 1][lowy].typ) && !rn2(3))
                     {
-                        levl[lowx + roll1 + 1][lowy - 1].decoration_typ = DECORATION_FIREPLACE;
+                        levl[lowx + roll1 + 1][lowy - 1].decoration_typ = !rn2(2) ? DECORATION_FIREPLACE : DECORATION_ANOTHER_FIREPLACE;
                         levl[lowx + roll1 + 1][lowy - 1].decoration_subtyp = 0;
                         levl[lowx + roll1 + 1][lowy - 1].decoration_dir = 0;
                         levl[lowx + roll1 + 1][lowy - 1].decoration_flags = 0;
@@ -1635,7 +1635,7 @@ makelevel()
 
         for (x = lowx; x <= hix; x++)
         {
-            if (isok(x, lowy - 1) && levl[x][lowy - 1].decoration_typ == DECORATION_FIREPLACE)
+            if (isok(x, lowy - 1) && has_loc_fireplace(x, lowy - 1))
             {
                 has_fireplace = TRUE;
                 break;
@@ -1645,12 +1645,12 @@ makelevel()
         {
             for (y = lowy; y <= hiy; y++)
             {
-                if (isok(lowx - 1, y) && levl[lowx - 1][y].decoration_typ == DECORATION_FIREPLACE)
+                if (isok(lowx - 1, y) && has_loc_fireplace(lowx - 1, y))
                 {
                     has_fireplace = TRUE;
                     break;
                 }
-                else if (isok(hix - 1, y) && levl[hix - 1][y].decoration_typ == DECORATION_FIREPLACE)
+                else if (isok(hix - 1, y) && has_loc_fireplace(hix - 1, y))
                 {
                     has_fireplace = TRUE;
                     break;
@@ -2510,6 +2510,35 @@ int subtyp;
     {
         if (!isok(x - 1, y) || levl[x - 1][y].typ < DOOR)
             levl[x][y].facing_right = TRUE;
+    }
+
+    int i;
+    for (i = 0; i < 4; i++)
+    {
+        int t_x = x;
+        int t_y = y;
+        switch (i)
+        {
+        case 0:
+            t_x = x - 1;
+            break;
+        case 1:
+            t_x = x + 1;
+            break;
+        case 2:
+            t_y = y - 1;
+            break;
+        case 3:
+            t_y = y + 1;
+            break;
+        }
+        if (isok(t_x, t_y) && (levl[t_x][t_y].decoration_typ == DECORATION_FIREPLACE || levl[t_x][t_y].decoration_typ == DECORATION_ANOTHER_FIREPLACE))
+        {
+            levl[t_x][t_y].decoration_typ = 0;
+            levl[t_x][t_y].decoration_subtyp = 0;
+            levl[t_x][t_y].decoration_dir = 0;
+            levl[t_x][t_y].decoration_flags = 0;
+        }
     }
 }
 

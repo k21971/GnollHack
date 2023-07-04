@@ -26,19 +26,36 @@ sys_early_init()
 
     sysopt.support = (char *) 0;
     sysopt.recover = (char *) 0;
+    sysopt.livelog = 0;
 #ifdef SYSCF
     sysopt.wizards = (char *) 0;
 #else
     sysopt.wizards = dupstr(WIZARD_NAME);
+#ifdef LIVELOGFILE
+    sysopt.livelog = LIVELOG_DETAIL;
+    sysopt.ll_conduct_turns = 0;
+#endif
 #endif
 #if defined(SYSCF) || !defined(DEBUGFILES)
     sysopt.debugfiles = (char *) 0;
 #else
     sysopt.debugfiles = dupstr(DEBUGFILES);
 #endif
-#ifdef DUMPLOG
+#if defined (DUMPLOG)
     sysopt.dumplogfile = (char *) 0;
+    sysopt.dumplogurl = (char*)0;
 #endif
+#if defined (DUMPHTML)
+    sysopt.dumphtmlfile = (char*)0;
+    sysopt.dumphtmlfontname = (char*)0;
+#if defined (DUMPHTML_WEBFONT_LINK)
+    sysopt.dumphtmlfontlink = (char*)0;
+#endif
+#endif
+    sysopt.dumphtml_css_fontface_normal = (char*)0;
+    sysopt.dumphtml_css_fontface_bold = (char*)0;
+    sysopt.dumphtml_css_fontface_italic = (char*)0;
+    sysopt.dumphtml_css_fontface_bolditalic = (char*)0;
     sysopt.env_dbgfl = 0; /* haven't checked getenv("DEBUGFILES") yet */
     sysopt.shellers = (char *) 0;
     sysopt.explorers = (char *) 0;
@@ -108,9 +125,27 @@ sysopt_release()
     if (sysopt.debugfiles)
         free((genericptr_t) sysopt.debugfiles),
         sysopt.debugfiles = (char *) 0;
-#ifdef DUMPLOG
+#if defined (DUMPLOG)
     if (sysopt.dumplogfile)
         free((genericptr_t)sysopt.dumplogfile), sysopt.dumplogfile=(char *)0;
+#endif
+#if defined (DUMPHTML)
+    if (sysopt.dumphtmlfile)
+        free((genericptr_t)sysopt.dumphtmlfile), sysopt.dumphtmlfile = (char*)0;
+    if (sysopt.dumphtmlfontname)
+        free((genericptr_t)sysopt.dumphtmlfontname), sysopt.dumphtmlfontname = (char*)0;
+#if defined (DUMPHTML_WEBFONT_LINK)
+    if (sysopt.dumphtmlfontlink)
+        free((genericptr_t)sysopt.dumphtmlfontlink), sysopt.dumphtmlfontlink = (char*)0;
+#endif
+    if (sysopt.dumphtml_css_fontface_normal)
+        free((genericptr_t)sysopt.dumphtml_css_fontface_normal), sysopt.dumphtml_css_fontface_normal = (char*)0;
+    if (sysopt.dumphtml_css_fontface_bold)
+        free((genericptr_t)sysopt.dumphtml_css_fontface_bold), sysopt.dumphtml_css_fontface_bold = (char*)0;
+    if (sysopt.dumphtml_css_fontface_italic)
+        free((genericptr_t)sysopt.dumphtml_css_fontface_italic), sysopt.dumphtml_css_fontface_italic = (char*)0;
+    if (sysopt.dumphtml_css_fontface_bolditalic)
+        free((genericptr_t)sysopt.dumphtml_css_fontface_bolditalic), sysopt.dumphtml_css_fontface_bolditalic = (char*)0;
 #endif
     if (sysopt.genericusers)
         free((genericptr_t) sysopt.genericusers),
@@ -185,6 +220,8 @@ reset_global_variables(VOID_ARGS)
     WIN_INVEN = WIN_ERR;
     WIN_HERE = WIN_ERR;
 
+    saving = FALSE;
+    check_pointing = FALSE;
     restoring = FALSE;
     ransacked = FALSE;
     occupation = 0;
@@ -204,6 +241,8 @@ reset_global_variables(VOID_ARGS)
     yn_number = 0;
     done_money = 0;
     nomovemsg = 0;
+    nomovemsg_attr = ATR_NONE;
+    nomovemsg_color = NO_COLOR;
     tbx = tby = 0;
     defer_see_monsters = FALSE;
     in_mklev = FALSE;

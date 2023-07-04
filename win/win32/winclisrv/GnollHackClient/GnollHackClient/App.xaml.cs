@@ -39,9 +39,13 @@ namespace GnollHackClient
             InitializeComponent();
             VersionTracking.Track();
             App.GetDependencyServices();
+            App.PlatformService.InitOnDemandPackStatusNotificationEventHandler();
 
             Assembly assembly = GetType().GetTypeInfo().Assembly;
             App.InitBaseTypefaces(assembly);
+            ButtonNormalImageSource = ImageSource.FromResource("GnollHackClient.Assets.button_normal.png", assembly);
+            ButtonSelectedImageSource = ImageSource.FromResource("GnollHackClient.Assets.button_selected.png", assembly);
+            ButtonDisabledImageSource = ImageSource.FromResource("GnollHackClient.Assets.button_disabled.png", assembly);
 
             var mainPage = new MainPage();
             var navPage = new NavigationPage(mainPage);
@@ -59,6 +63,13 @@ namespace GnollHackClient
             App.InformAboutGameTermination = Preferences.Get("WentToSleepWithGameOn", false);
             Preferences.Set("WentToSleepWithGameOn", false);
             App.UsesCarousel = true; // App.IsiOS || Preferences.Get("UsesCarousel", true);
+            App.PostingGameStatus = Preferences.Get("PostingGameStatus", GHConstants.DefaultPosting);
+            App.PostingDiagnosticData = Preferences.Get("PostingDiagnosticData", GHConstants.DefaultPosting);
+            App.CustomGameStatusLink = Preferences.Get("CustomGameStatusLink", "");
+            App.UseHTMLDumpLogs = Preferences.Get("UseHTMLDumpLogs", GHConstants.DefaultHTMLDumpLogs);
+            App.UseSingleDumpLog = Preferences.Get("UseSingleDumpLog", GHConstants.DefaultUseSingleDumpLog);
+            App.ReadStreamingBankToMemory = Preferences.Get("ReadStreamingBankToMemory", GHConstants.DefaultReadStreamingBankToMemory);
+            App.CopyStreamingBankToDisk = Preferences.Get("CopyStreamingBankToDisk", GHConstants.DefaultCopyStreamingBankToDisk);
 
             App.BackButtonPressed += App.EmptyBackButtonPressed;
         }
@@ -174,6 +185,18 @@ namespace GnollHackClient
                 {
                     App.CurrentClientGame.GamePage.StopWaitAndResumeSavedGame();
                 }
+            }
+        }
+
+        public static bool DownloadOnDemandPackage 
+        {
+            get 
+            {
+#if DEBUG
+                return false;
+#else
+                return false;
+#endif
             }
         }
 
@@ -310,9 +333,14 @@ namespace GnollHackClient
         public static bool ClassicMode { get; set; }
         public static bool CasualMode { get; set; }
         public static bool ServerGameAvailable { get; set; }
+        public static bool UseHTMLDumpLogs { get; set; }
+        public static bool UseSingleDumpLog { get; set; }
+        public static bool ReadStreamingBankToMemory { get; set; }
+        public static bool CopyStreamingBankToDisk { get; set; }
 
         public static string GHVersionId { get; set; }
         public static string GHVersionString { get; set; }
+        public static ulong GHVersionNumber { get; set; }
         public static string SkiaVersionString { get; set; }
         public static string SkiaSharpVersionString { get; set; }
         public static string FMODVersionString { get; set; }
@@ -551,6 +579,42 @@ namespace GnollHackClient
             }
         }
 
+        //public static void SaveDumplogTypefaces(Assembly assembly)
+        //{
+        //    string targetdir = Path.Combine(App.GHPath, "dumplog");
+        //    if (!Directory.Exists(targetdir))
+        //        return;
+
+        //    string[] fileNames = { "DejaVuSansMono.woff", "DejaVuSansMono-Bold.woff", "DejaVuSansMono-Oblique.woff", "DejaVuSansMono-BoldOblique.woff" };
+        //    for(int i = 0; i < 4; i++) 
+        //    { 
+        //        string filename = fileNames[i];
+        //        using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets." + filename))
+        //        {
+        //            if (stream != null)
+        //            {
+        //                try
+        //                {
+        //                    string fulltargetpath = Path.Combine(targetdir, filename);
+        //                    if (File.Exists(fulltargetpath))
+        //                        File.Delete(fulltargetpath);
+        //                    if (!File.Exists(fulltargetpath))
+        //                    {
+        //                        using (FileStream filestream = new FileStream(fulltargetpath, FileMode.Create, FileAccess.Write, FileShare.None))
+        //                        {
+        //                            stream.CopyTo(filestream);
+        //                        }
+        //                    }
+        //                }
+        //                catch (Exception ex)
+        //                {
+        //                    Debug.WriteLine(ex.Message);
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
+
         public static SKBitmap MenuBackgroundBitmap { get; set; }
         public static SKBitmap OldPaperBackgroundBitmap { get; set; }
         public static SKBitmap LoadingScreenBackgroundBitmap { get; set; }
@@ -565,6 +629,10 @@ namespace GnollHackClient
 
         public static SKBitmap ScrollBitmap { get; set; }
         public static SKBitmap YouBitmap { get; set; }
+
+        public static ImageSource ButtonNormalImageSource { get; set; }
+        public static ImageSource ButtonSelectedImageSource { get; set; }
+        public static ImageSource ButtonDisabledImageSource { get; set; }
 
         public static void InitGameBitmaps(Assembly assembly)
         {
@@ -762,6 +830,7 @@ namespace GnollHackClient
         public static SKBitmap _statusMCBitmap;
         public static SKBitmap _statusMoveBitmap;
         public static SKBitmap _statusWeaponStyleBitmap;
+        public static SKBitmap _statusEmptyHandedBitmap;
 
         public static SKBitmap _statusGoldBitmap;
         public static SKBitmap _statusTurnsBitmap;
@@ -1193,6 +1262,10 @@ namespace GnollHackClient
             {
                 _statusWeaponStyleBitmap = SKBitmap.Decode(stream);
             }
+            using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.status-empty-handed.png"))
+            {
+                _statusEmptyHandedBitmap = SKBitmap.Decode(stream);
+            }
 
             using (Stream stream = assembly.GetManifestResourceStream("GnollHackClient.Assets.UI.status-gold.png"))
             {
@@ -1384,7 +1457,13 @@ namespace GnollHackClient
 
             App.CheckCreateDirectory(targetpath);
 
-            string filepath = Path.Combine(targetpath, "savedgames.zip");
+            ulong vernum = App.GHVersionNumber;
+            ulong majorver = (vernum >> 24) & 0xFFUL;
+            ulong minorver = (vernum >> 16) & 0xFFUL;
+            ulong patchlvl = (vernum >> 8) & 0xFFUL;
+            ulong editlvl = (vernum) & 0xFFUL;
+            string versionstring = majorver.ToString() + minorver.ToString() + patchlvl.ToString() + "-" + editlvl;
+            string filepath = Path.Combine(targetpath, "savedgames-" + versionstring + ".zip");
             if (File.Exists(filepath))
                 File.Delete(filepath);
 
@@ -1573,6 +1652,190 @@ namespace GnollHackClient
             return bitmap;
         }
 
+        public static bool PostingGameStatus { get; set; }
+        public static bool PostingDiagnosticData { get; set; }
+        public static string CustomGameStatusLink { get; set; }
+
+        public static string GetGameStatusPostAddress()
+        {
+            if(App.CustomGameStatusLink != null && App.CustomGameStatusLink != "")
+            { 
+                return App.CustomGameStatusLink; 
+            }
+            else
+            { 
+#if DEBUG
+                return CurrentSecrets.DefaultDiagnosticDataPostAddress;
+#else
+                return CurrentSecrets.DefaultGamePostAddress;
+#endif
+            }
+        }
+        public static string GetDiagnosticDataPostAddress()
+        {
+            return CurrentSecrets.DefaultDiagnosticDataPostAddress;
+        }
+        public static bool IsValidHttpsURL(string uriString)
+        {
+            try
+            {
+                bool wellformed = Uri.IsWellFormedUriString(uriString, UriKind.Absolute);
+                if (wellformed)
+                {
+                    Uri uri = new Uri(uriString);
+                    if (uri.Scheme == Uri.UriSchemeHttps)
+                        return true;
+                    else
+                        return false;
+                }
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public static bool IsReadToMemoryBank(SecretsFile sf)
+        {
+            return sf.streaming_asset != 0 && sf.on_demand == 0 && IsAndroid && ReadStreamingBankToMemory;
+        }
+
+        public static bool IsSecretsFileSavedToDisk(SecretsFile sf)
+        {
+            if (sf == null) return false;
+            if (IsiOS) return false;
+            if (IsAndroid)
+            {
+                if (IsReadToMemoryBank(sf)) return false;
+                if (IsSecretsFileAndroidOnDemand(sf)) return false;
+                return sf.streaming_asset != 0 && CopyStreamingBankToDisk;
+            }
+            return true;
+        }
+
+        public static bool IsSecretsFileAndroidOnDemand(SecretsFile sf)
+        {
+            if (sf == null) return false;
+            if (IsiOS) return false;
+#if DEBUG
+            return false;
+#else
+            return (IsAndroid && (sf.on_demand & 1) != 0) || (IsiOS && (sf.on_demand & 2) != 0);
+#endif
+        }
+
+        public static int CountSecretsFilesSavedToDirectory(Secrets secrets, SecretsDirectory sd)
+        {
+            if (secrets == null) return 0;
+            if (sd == null) return 0;
+            int cnt = 0;
+            foreach (SecretsFile sf in App.CurrentSecrets.files)
+            {
+                if (sf.target_directory == sd.name && IsSecretsFileSavedToDisk(sf)) cnt++;
+            }
+            return cnt;
+        }
+
+        public static void SetSoundBanksUpForLoading()
+        {
+            FmodService.ClearLoadableSoundBanks();
+            AddLoadableSoundBanks();
+            DeleteBanksFromDisk();
+        }
+        public static void AddLoadableSoundBanks()
+        {
+            foreach (SecretsFile sf in App.CurrentSecrets.files)
+            {
+                if (sf.type == "sound_bank")
+                {
+                    if (App.IsSecretsFileAndroidOnDemand(sf)) //In asset pack directory
+                    {
+                        string rfile = Path.Combine(sf.source_directory, sf.name);
+                        string afile = App.PlatformService.GetAbsoluteOnDemandAssetPath(GHConstants.OnDemandPackName, rfile);
+                        App.FmodService.AddLoadableSoundBank(afile, sf.subtype_id, false, false);
+                    }
+                    else if (App.IsSecretsFileSavedToDisk(sf)) //In gnollhack directory's bank subdirectory
+                    {
+                        string ghdir = App.GnollHackService.GetGnollHackPath();
+                        string sdir = string.IsNullOrWhiteSpace(sf.target_directory) ? ghdir : Path.Combine(ghdir, sf.target_directory); ;
+                        string sfile = Path.Combine(sdir, sf.name);
+                        App.FmodService.AddLoadableSoundBank(sfile, sf.subtype_id, false, false);
+                    }
+                    else //In assets directory
+                    {
+                        string sdir = Path.Combine(App.PlatformService.GetAssetsPath(), sf.source_directory);
+                        string sfile = Path.Combine(sdir, sf.name);
+
+                        string rfile = Path.Combine(sf.source_directory, sf.name);
+                        if (App.IsReadToMemoryBank(sf))  //Read to memory first and use from there
+                            App.FmodService.AddLoadableSoundBank(rfile, sf.subtype_id, true, true);
+                        else
+                            App.FmodService.AddLoadableSoundBank(sfile, sf.subtype_id, true, false);
+                    }
+                }
+            }
+        }
+
+        public static void DeleteBanksFromDisk()
+        {
+            string ghdir = App.GHPath;
+
+            foreach (SecretsFile sf in App.CurrentSecrets.files)
+            {
+                if (!App.IsSecretsFileSavedToDisk(sf))
+                {
+                    try
+                    {
+                        string sdir = string.IsNullOrWhiteSpace(sf.target_directory) ? ghdir : Path.Combine(ghdir, sf.target_directory); ;
+                        string sfile = Path.Combine(sdir, sf.name);
+                        if (File.Exists(sfile))
+                            File.Delete(sfile);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            foreach (SecretsDirectory sd in App.CurrentSecrets.directories)
+            {
+                if (string.IsNullOrWhiteSpace(sd.name))
+                    continue;
+
+                if (App.CountSecretsFilesSavedToDirectory(App.CurrentSecrets, sd) > 0)
+                    continue;
+
+                string sdir = Path.Combine(ghdir, sd.name);
+
+                if (Directory.Exists(sdir))
+                {
+                    try
+                    {
+                        Directory.Delete(sdir);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+            }
+            //foreach (string dir in target_directories)
+            //{
+            //    try
+            //    {
+            //        if (Directory.Exists(dir))
+            //        {
+            //            Directory.Delete(dir, true);
+            //        }
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        Debug.WriteLine(ex.Message);
+            //    }
+            //}
+        }
     }
 
     class SecretsFileSizeComparer : IComparer<SecretsFile>

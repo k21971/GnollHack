@@ -769,7 +769,7 @@ const char *ev;
 
 /* process options, possibly including SYSCF */
 void
-read_options()
+process_options_file()
 {
     init_options();
 #ifdef SYSCF
@@ -2167,6 +2167,50 @@ count_menucolors(VOID_ARGS)
     return count;
 }
 
+boolean
+menu_style_allows_menu_coloring(style)
+int style;
+{
+    switch (style)
+    {
+    case GHMENU_STYLE_INVENTORY:
+    case GHMENU_STYLE_PERMANENT_INVENTORY:
+    case GHMENU_STYLE_OTHERS_INVENTORY:
+    case GHMENU_STYLE_PICK_ITEM_LIST:
+    case GHMENU_STYLE_CHAT_CHOOSE_ITEM:
+    case GHMENU_STYLE_SKILLS:
+    case GHMENU_STYLE_SPELLS:
+        return TRUE;
+    case GHMENU_STYLE_GENERAL:
+    case GHMENU_STYLE_PICK_CATEGORY_LIST:
+    case GHMENU_STYLE_ITEM_COMMAND:
+    case GHMENU_STYLE_CHAT:
+    case GHMENU_STYLE_CHOOSE_SIMPLE:
+    case GHMENU_STYLE_CHOOSE_COMMAND:
+    case GHMENU_STYLE_CHOOSE_SAVED_GAME:
+    case GHMENU_STYLE_CHOOSE_PLAYER:
+    case GHMENU_STYLE_CHOOSE_DIFFICULTY:
+    case GHMENU_STYLE_CHARACTER:
+    case GHMENU_STYLE_ATTRIBUTES:
+    case GHMENU_STYLE_SKILLS_ALTERNATE:
+    case GHMENU_STYLE_SPELLS_ALTERNATE:
+    case GHMENU_STYLE_DUNGEON_OVERVIEW:
+    case GHMENU_STYLE_OPTIONS:
+    case GHMENU_STYLE_HELP:
+    case GHMENU_STYLE_SKILL_COMMAND:
+    case GHMENU_STYLE_SPELL_COMMAND:
+    case GHMENU_STYLE_GENERAL_COMMAND:
+    case GHMENU_STYLE_MONSTER_ABILITY:
+    case GHMENU_STYLE_DELETE_SAVED_GAME:
+    case GHMENU_STYLE_START_GAME_MENU:
+    case GHMENU_STYLE_PREVIOUS_MESSAGES:
+    case GHMENU_STYLE_VIEW_FILE:
+        return FALSE;
+    default:
+        return TRUE;
+    }
+}
+
 STATIC_OVL boolean
 parse_role_opts(negated, fullname, opts, opp)
 boolean negated;
@@ -3163,8 +3207,8 @@ boolean tinitial, tfrom_file;
             (void) fruitadd(pl_fruit, forig);
             pline("Fruit is now \"%s\".", pl_fruit);
         }
-        /* If initial, then read_options is allowed to do it instead
-         * of here (read_options always has to do it even if there's
+        /* If initial, then process_options_file is allowed to do it instead
+         * of here (process_options_file always has to do it even if there's
          * no fruit option at all.  Also, we don't want people
          * setting multiple fruits in their options.)
          */
@@ -5266,12 +5310,12 @@ char* bindings;
     char *bind;
     char key;
     int i;
-    boolean ret = FALSE;
+    //boolean ret = FALSE;
 
     /* break off first binding from the rest; parse the rest */
     if ((bind = index(bindings, ',')) != 0) {
         *bind++ = 0;
-        ret |= parsebindings(bind);
+        /* ret |= */ (void)parsebindings(bind);
     }
 
     /* parse a single binding: first split around : */
@@ -5793,7 +5837,7 @@ doset() /* changing options via menu by Per Liboriussen */
 
     if (need_issue_gui_command)
     {
-        issue_gui_command(GUI_CMD_PREFERENCE_SET);
+        issue_simple_gui_command(GUI_CMD_PREFERENCE_SET);
     }
 
     if (need_stretch_map)

@@ -32,7 +32,7 @@ void
 free_edog(mtmp)
 struct monst *mtmp;
 {
-    if (mtmp->mextra && EDOG(mtmp)) {
+    if (has_edog(mtmp)) {
         free((genericptr_t) EDOG(mtmp));
         EDOG(mtmp) = (struct edog *) 0;
     }
@@ -613,7 +613,6 @@ makedog()
             petbreed = petbreed_female = choose_pet_breed(pettype, petgender == 2);
         else
             petbreed = petbreed_female = catbreed;
-
     }
 
     char givennamebuf[PL_PSIZ] = "";
@@ -639,59 +638,69 @@ makedog()
     }
 
     /* default pet names */
-    if (!*petname && pettype == PM_LITTLE_DOG)
+    if (!petdetails_used)
     {
-        /* All of these names were for dogs. */
-        if (rn2(2))
+        if (!*petname && pettype == PM_LITTLE_DOG)
         {
-            petname_female = "Fifi";
-        }
-        else
-        {
-            petname_female = "Lassie";
-            petbreed_female = DOG_BREED_SABLE_ROUGH_COLLIE;
-        }
-
-        if (Race_if(PM_GNOLL))
-        {
-            if(!rn2(2))                        /* Warcraft III: Dwarf Campaign Chapter 3 -- JG */
-                petname = "Spot";
+            /* All of these names were for dogs. */
+            if (rn2(2))
+            {
+                petname_female = "Fifi";
+            }
             else
-                petname = "Rover";
+            {
+                petname_female = "Lassie";
+                petbreed_female = DOG_BREED_SABLE_ROUGH_COLLIE;
+            }
+
+            if (Race_if(PM_GNOLL))
+            {
+                if (!rn2(2))                        /* Warcraft III: Dwarf Campaign Chapter 3 -- JG */
+                    petname = "Spot";
+                else
+                    petname = "Rover";
+            }
+            else
+            {
+                if (Role_if(PM_CAVEMAN))
+                    petname = "Slasher";         /* The Warrior */
+                if (Role_if(PM_SAMURAI))
+                {
+                    petname = "Hachiko";         /* Shibuya Station */
+                    ismale = TRUE;
+                    petbreed = DOG_BREED_AKITA;
+                }
+                if (Role_if(PM_BARBARIAN))
+                {
+                    petname = "Idefix";          /* Obelix */
+                    ismale = TRUE;
+                    petbreed = DOG_BREED_SALTPEPPER_SCHNAUZER;
+                }
+                if (Role_if(PM_TOURIST))
+                {
+                    petname = "Pepe";            /* Tribute to a male Welsh Springer Spaniel -- JG */
+                    petbreed = DOG_BREED_WELSH_SPRINGER_SPANIEL;
+                    petname_female = "Luna";     /* Tribute to a female Finnish Lapphund -- JG */
+                    petbreed_female = DOG_BREED_FINNISH_LAPPHUND;
+                }
+                if (Role_if(PM_RANGER))
+                    petname = "Sirius";          /* Orion's dog */
+            }
         }
-        else
+        else if (!petbreed && !*petname && pettype == PM_KITTEN)
         {
-            if (Role_if(PM_CAVEMAN))
-                petname = "Slasher";         /* The Warrior */
-            if (Role_if(PM_SAMURAI))
+            if ((Role_if(PM_WIZARD) || Role_if(PM_PRIEST) || Role_if(PM_MONK)) && u.ualign.type == A_CHAOTIC)
             {
-                petname = "Hachiko";         /* Shibuya Station */
-                ismale = TRUE;
-                petbreed = DOG_BREED_AKITA;
+                petbreed = petbreed_female = CAT_BREED_BLACK;
             }
-            if (Role_if(PM_BARBARIAN))
-            {
-                petname = "Idefix";          /* Obelix */
-                ismale = TRUE;
-                petbreed = DOG_BREED_SALTPEPPER_SCHNAUZER;
-            }
-            if (Role_if(PM_TOURIST))
-            {
-                petname = "Pepe";            /* Tribute to a male Welsh Springer Spaniel -- JG */
-                petbreed = DOG_BREED_WELSH_SPRINGER_SPANIEL;
-                petname_female = "Luna";     /* Tribute to a female Finnish Lapphund -- JG */
-                petbreed_female = DOG_BREED_FINNISH_LAPPHUND;
-            }
-            if (Role_if(PM_RANGER))
-                petname = "Sirius";          /* Orion's dog */
         }
-    }
-    else if(!*petname && pettype == PM_DIREWOLF_CUB) 
-    {
-        if (Role_if(PM_VALKYRIE))
+        else if (!*petname && pettype == PM_DIREWOLF_CUB)
         {
-            petname = "Ghost";                /* Game of Thrones */
-            petname_female = "Nymeria";       /* Game of Thrones */
+            if (Role_if(PM_VALKYRIE))
+            {
+                petname = "Ghost";                /* Game of Thrones */
+                petname_female = "Nymeria";       /* Game of Thrones */
+            }
         }
     }
 
@@ -1517,16 +1526,19 @@ register struct obj *obj;
     if (is_non_eater(mptr))
         return TABU;
 
-    if (is_corpse_eater(mptr) && obj->otyp != CORPSE)
+    if (is_obj_no_pickup(obj))
         return TABU;
 
-    switch (obj->oclass) 
+    switch (obj->oclass)
     {
     case FOOD_CLASS:
         if (obj->otyp == CORPSE || obj->otyp == TIN || obj->otyp == EGG)
             fptr = &mons[obj->corpsenm];
 
         if (obj->otyp == CORPSE && is_rider(fptr))
+            return TABU;
+
+        if (is_corpse_eater(mptr) && obj->otyp != CORPSE)
             return TABU;
 
         if ((obj->otyp == CORPSE || obj->otyp == EGG) && fptr && touch_petrifies(fptr)
@@ -1544,7 +1556,7 @@ register struct obj *obj;
             return obj->cursed ? UNDEF : APPORT;
 
         /* a starving pet will eat almost anything */
-        starving = (mon->mtame && mon->mextra && EDOG(mon) && !mon->isminion
+        starving = (mon->mtame && has_edog(mon) && !mon->isminion
                     && EDOG(mon)->mhpmax_penalty);
 
         /* even carnivores will eat carrots if they're temporarily blind */
@@ -1710,7 +1722,7 @@ boolean thrown;
     }
 
     /* feeding it treats makes it tamer */
-    if (mtmp->mtame && obj && mtmp->mextra && EDOG(mtmp))
+    if (mtmp->mtame && obj && has_edog(mtmp))
     {
         int tasty;
 

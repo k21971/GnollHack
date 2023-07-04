@@ -1450,7 +1450,7 @@ struct obj **optr;
             if (!rn2(100)) /* make them nervous */
             {
                 play_sfx_sound(SFX_SURPRISE_ATTACK);
-                You_see("the Wizard of Yendor gazing out at you.");
+                You_see_ex(ATR_NONE, CLR_MSG_WARNING, "the Wizard of Yendor gazing out at you.");
             }
             else
             {
@@ -1540,7 +1540,7 @@ do_mapping()
 
     unconstrained = unconstrain_map();
     for (zx = 1; zx < COLNO; zx++)
-        for (zy = 0; zy < ROWNO; zy++)
+        for (zy = ROWNO - 1; zy >= 0; zy--)
             show_map_spot(zx, zy);
 
     if (!level.flags.hero_memory || unconstrained) {
@@ -2234,7 +2234,7 @@ int default_glyph, which_subset;
     return glyph;
 }
 
-#ifdef DUMPLOG
+#if defined(DUMPLOG) || defined(DUMPHTML)
 void
 dump_map()
 {
@@ -2263,16 +2263,33 @@ dump_map()
         for (x = 1; x < COLNO; x++) 
         {
             nhsym ch;
-            int color;
+            int color, sym;
             unsigned long special;
 
             glyph = reveal_terrain_getglyph(x, y, FALSE, u.uswallow,
                                             default_glyph, subset);
             struct layer_info layers = nul_layerinfo;
             layers.glyph = glyph;
-            (void) mapglyph(layers, &ch, &color, &special, x, y);
 
-            write_nhsym_utf8(&bp, ch, !!SYMHANDLING(H_IBM)); //buf[x - 1] = ch;
+            sym = mapglyph(layers, &ch, &color, &special, x, y);
+            if (SYMHANDLING(H_IBM) || SYMHANDLING(H_UNICODE))
+            {
+                write_nhsym_utf8(&bp, ch, !!SYMHANDLING(H_IBM)); //buf[x - 1] = ch;
+            }
+            else
+            {
+                /* Revert to basic symbols; no better looking processing available */
+                if(sym >= 0 && sym < MAX_CMAPPED_CHARS)
+                    ch = (nhsym)defsyms[sym].sym;
+                write_nhsym_utf8(&bp, ch, FALSE);
+            }
+
+#ifdef DUMPHTML
+            /* HTML map prints in a defined rectangle, so
+               just render every glyph - no skipping. */
+            html_dump_glyph(x, y, sym, ch, color, special);
+#endif
+
             /* UTF-8 must be handled here, because you cannot write nhsym (long) to the buf (char) and convert it later */
             /* Note: write_nhsym_utf8 moves bp forward the right amount (1-4 bytes) */
 

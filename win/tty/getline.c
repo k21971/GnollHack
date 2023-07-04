@@ -258,10 +258,10 @@ getlin_hook_proc hook;
         memset(toplineattrs, ATR_NONE, sizeof(toplineattrs));
         memset(toplinecolors, NO_COLOR, sizeof(toplinecolors));
         toplineattrs[sizeof(toplineattrs) - 1] = toplinecolors[sizeof(toplinecolors) - 1] = 0;
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     } else {
         /* needed because we've bypassed pline() */
-        dumplogmsg(toplines);
+        dumplogmsg(toplines, (char*)0, (char*)0, attr, color);
 #endif
     }
 

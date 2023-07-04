@@ -25,7 +25,7 @@ namespace GnollHackCommon
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void VoidIntIntConstCharCallback(int value1, int value2, [MarshalAs(UnmanagedType.LPStr)] string value3);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    public delegate void PutStrExColorCallback(int value1, int value2, [MarshalAs(UnmanagedType.LPStr)] string value3, int value4, int value5);
+    public delegate void PutStrExColorCallback(int value1, [MarshalAs(UnmanagedType.LPStr)] string value2, int value3, int value4, int value5);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void PutStrEx2ColorCallback(int value1, [MarshalAs(UnmanagedType.LPStr)] string value2, IntPtr value3, IntPtr value4, int value5, int value6, int value7);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -59,6 +59,9 @@ namespace GnollHackCommon
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void PrintGlyphCallback(int value1, int value2, int value3, int value4, int value5, int value6, int value7, uint value8, IntPtr layers_ptr);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    public delegate void IssueGuiCommandCallback(int cmd_id, int cmd_param, [MarshalAs(UnmanagedType.LPStr)] string cmd_str);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void StartMenuCallback(int winid, int style);

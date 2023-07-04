@@ -25,6 +25,10 @@ STATIC_DCL void NDECL(create_monster_or_encounter);
 STATIC_DCL int NDECL(select_rwraith);
 STATIC_DCL boolean NDECL(maybe_create_rwraith);
 
+#ifdef EXTRAINFO_FN
+static long prev_dgl_extrainfo = 0;
+#endif
+
 void
 moveloop(resuming)
 boolean resuming;
@@ -105,6 +109,11 @@ boolean resuming;
 
     /* Main move loop */
     program_state.in_moveloop = 1;
+
+#ifdef WHEREIS_FILE
+    touch_whereis();
+#endif
+
     for (;;)
     {
 #ifdef SAFERHANGUP
@@ -198,6 +207,13 @@ boolean resuming;
                     }
                     if (flags.time && !context.run)
                         iflags.time_botl = TRUE;
+
+#ifdef EXTRAINFO_FN
+                    if ((prev_dgl_extrainfo == 0) || (prev_dgl_extrainfo < (moves + 250))) {
+                        prev_dgl_extrainfo = moves;
+                        mk_dgl_extrainfo();
+                    }
+#endif
 
                     /* One possible result of prayer is healing.  Whether or
                      * not you get healed depends on your current hit points.
@@ -1251,9 +1267,9 @@ boolean iswizardmode, isexporemode, ismodernmode, iscasualmode;
     else if (iscasualmode)
     {
         if (ismodernmode)
-            return "non-scoring mode with revival upon death and loadable saved games";
+            return "revival upon death and loadable saved games";
         else
-            return "non-scoring mode with permanent death but loadable saved games";
+            return "permanent death but loadable saved games";
     }
     else if (ismodernmode)
         return "revival and score reduction upon death";
@@ -1388,7 +1404,7 @@ newgame()
 
     encounter_init();        /* initialize encounters and force linkage */
 
-    issue_gui_command(GUI_CMD_LOAD_GLYPHS);
+    issue_simple_gui_command(GUI_CMD_LOAD_GLYPHS);
 
 #ifndef NO_SIGNAL
     (void) signal(SIGINT, (SIG_RET_TYPE) done1);
@@ -1417,10 +1433,10 @@ newgame()
     status_reassess();
 
     if (flags.legacy) {
-        issue_gui_command(GUI_CMD_LOAD_INTRO_SOUND_BANK);
+        issue_simple_gui_command(GUI_CMD_LOAD_INTRO_SOUND_BANK);
         flush_screen(1);
         com_pager_ex((struct monst*)0, 1, ATR_NONE, CLR_MSG_HINT, FALSE);
-        issue_gui_command(GUI_CMD_UNLOAD_INTRO_SOUND_BANK);
+        issue_simple_gui_command(GUI_CMD_UNLOAD_INTRO_SOUND_BANK);
     }
 
     /* Game is starting now */
@@ -1469,7 +1485,7 @@ boolean new_game; /* false => restoring an old game */
     /* skip "welcome back" if restoring a doomed character */
     if (!new_game && Upolyd && ugenocided()) {
         /* death via self-genocide is pending */
-        pline("You're back, but you still feel %s inside.", udeadinside());
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "You're back, but you still feel %s inside.", udeadinside());
         return;
     }
 
@@ -1490,10 +1506,23 @@ boolean new_game; /* false => restoring an old game */
                 : currentgend != flags.initgend))
         Sprintf(eos(buf), " %s", genders[currentgend].adj);
 
-    pline_ex(ATR_NONE, CLR_MSG_HINT, new_game ? "%s %s, welcome to GnollHack!  You are a%s %s %s."
+    int multicolors[5] = { NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR };
+    pline_multi_ex(ATR_NONE, CLR_MSG_HINT, no_multiattrs, multicolors, new_game ? "%s %s, welcome to GnollHack!  You are a%s %s %s."
                    : "%s %s, the%s %s %s, welcome back to GnollHack!",
           Hello((struct monst *) 0), plname, buf, urace.adj,
           (currentgend && urole.name.f) ? urole.name.f : urole.name.m);
+
+    if (new_game)
+    {
+        char postbuf[BUFSZ * 2];
+        Sprintf(postbuf, "%s the%s %s %s has entered the dungeon on %s difficulty", plname, buf, urace.adj,
+            (currentgend&& urole.name.f) ? urole.name.f : urole.name.m, get_game_difficulty_text(context.game_difficulty));
+        IfModeAllowsPostToForum
+        {
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_START, postbuf);
+        }
+        livelog_printf(LL_ACHIEVE, "%s", postbuf);
+    }
 }
 
 #ifdef POSITIONBAR
@@ -1832,6 +1861,34 @@ boolean return_expected_value;
     }
 
     return moveamt;
+}
+
+void
+lock_thread_lock(VOID_ARGS)
+{
+#if defined(UNIX) && defined(GNH_MOBILE)
+    thread_lock_lock();
+#else
+    return;
+#endif
+}
+
+void
+unlock_thread_lock(VOID_ARGS)
+{
+#if defined(UNIX) && defined(GNH_MOBILE)
+    thread_lock_unlock();
+#else
+    return;
+#endif
+}
+
+void
+reset_allmain(VOID_ARGS)
+{
+#ifdef EXTRAINFO_FN
+    prev_dgl_extrainfo = 0;
+#endif
 }
 
 

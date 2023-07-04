@@ -52,7 +52,7 @@ MAXPLAYERS=10
 
 # If not null, added to string "To get local support, " in the support
 # information help.
-#SUPPORT=call Izchak at extension 42.
+SUPPORT=contact the GnollHack team
 
 # If not null, displayed at the end of a panic-save sequence.
 #RECOVER=Run the recover program.
@@ -99,6 +99,7 @@ SEDUCE=0
 #   %n player name
 #   %N first character of player name
 DUMPLOGFILE=dumplog/gnollhack.%n.%d.txt
+DUMPHTMLFILE=dumplog/gnollhack.%n.%d.html
 
 # Number of bones file pools.
 # The pool you belong to is determined at game start. You will

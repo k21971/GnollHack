@@ -33,9 +33,9 @@ struct window_procs {
     void FDECL((*win_display_nhwindow), (winid, BOOLEAN_P));
     void FDECL((*win_destroy_nhwindow), (winid));
     void FDECL((*win_curs), (winid, int, int));
-    void FDECL((*win_putstr_ex), (winid, int, const char *, int, int));
+    void FDECL((*win_putstr_ex), (winid, const char *, int, int, int));
     void FDECL((*win_putstr_ex2), (winid, const char*, const char*, const char*, int, int, int));
-    void FDECL((*win_putmixed_ex), (winid, int, const char *, int, int));
+    void FDECL((*win_putmixed_ex), (winid, const char *, int, int, int));
     void FDECL((*win_display_file), (const char *, BOOLEAN_P));
     void FDECL((*win_start_menu_ex), (winid, int));
     void FDECL((*win_add_menu), (winid, int, const ANY_P *, CHAR_P, CHAR_P,
@@ -55,7 +55,7 @@ struct window_procs {
     void FDECL((*win_update_positionbar), (char *));
 #endif
     void FDECL((*win_print_glyph), (winid, XCHAR_P, XCHAR_P, struct layer_info));
-    void FDECL((*win_issue_gui_command), (int));
+    void FDECL((*win_issue_gui_command), (int, int, const char*));
     void FDECL((*win_raw_print), (const char *));
     void FDECL((*win_raw_print_bold), (const char *));
     int NDECL((*win_nhgetch));
@@ -146,9 +146,9 @@ extern
 #define curs (*windowprocs.win_curs)
 #define putstr_ex (*windowprocs.win_putstr_ex)
 #define putstr_ex2 (*windowprocs.win_putstr_ex2)
-#define putstr(x, y, z) putstr_ex(x, y, z, 0, NO_COLOR)
+#define putstr(x, y, z) putstr_ex(x, z, y, NO_COLOR, 0)
 #define putmixed_ex (*windowprocs.win_putmixed_ex)
-#define putmixed(x, y, z) putmixed_ex(x, y, z, 0, NO_COLOR)
+#define putmixed(x, y, z) putmixed_ex(x, z, y, NO_COLOR, 0)
 #define display_file (*windowprocs.win_display_file)
 #define start_menu_ex (*windowprocs.win_start_menu_ex)
 #define start_menu(x) start_menu_ex(x, 0)
@@ -169,6 +169,7 @@ extern
 #endif
 #define print_glyph (*windowprocs.win_print_glyph)
 #define issue_gui_command (*windowprocs.win_issue_gui_command)
+#define issue_simple_gui_command(x) (*windowprocs.win_issue_gui_command)(x, 0, (char*)0)
 #define raw_print (*windowprocs.win_raw_print)
 #define raw_print_bold (*windowprocs.win_raw_print_bold)
 #define nhgetch (*windowprocs.win_nhgetch)
@@ -414,9 +415,9 @@ struct chain_procs {
     void FDECL((*win_display_nhwindow), (CARGS, winid, BOOLEAN_P));
     void FDECL((*win_destroy_nhwindow), (CARGS, winid));
     void FDECL((*win_curs), (CARGS, winid, int, int));
-    void FDECL((*win_putstr_ex), (CARGS, winid, int, const char *, int, int));
+    void FDECL((*win_putstr_ex), (CARGS, winid, const char *, int, int, int));
     void FDECL((*win_putstr_ex2), (CARGS, winid, const char*, const char*, const char*, int, int, int));
-    void FDECL((*win_putmixed_ex), (CARGS, winid, int, const char *, int, int));
+    void FDECL((*win_putmixed_ex), (CARGS, winid, const char *, int, int, int));
     void FDECL((*win_display_file), (CARGS, const char *, BOOLEAN_P));
     void FDECL((*win_start_menu_ex), (CARGS, winid, int));
     void FDECL((*win_add_menu), (CARGS, winid, int, const ANY_P *, CHAR_P,
@@ -436,7 +437,7 @@ struct chain_procs {
     void FDECL((*win_update_positionbar), (CARGS, char *));
 #endif
     void FDECL((*win_print_glyph), (CARGS, winid, XCHAR_P, XCHAR_P, struct layer_info));
-    void FDECL((*win_issue_gui_command), (int));
+    void FDECL((*win_issue_gui_command), (int, int, const char*));
     void FDECL((*win_raw_print), (CARGS, const char *));
     void FDECL((*win_raw_print_bold), (CARGS, const char *));
     int FDECL((*win_nhgetch), (CARGS));
@@ -520,9 +521,9 @@ extern void FDECL(safe_clear_nhwindow, (winid));
 extern void FDECL(safe_display_nhwindow, (winid, BOOLEAN_P));
 extern void FDECL(safe_destroy_nhwindow, (winid));
 extern void FDECL(safe_curs, (winid, int, int));
-extern void FDECL(safe_putstr_ex, (winid, int, const char *, int, int));
+extern void FDECL(safe_putstr_ex, (winid, const char *, int, int, int));
 extern void FDECL(safe_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
-extern void FDECL(safe_putmixed_ex, (winid, int, const char *, int, int));
+extern void FDECL(safe_putmixed_ex, (winid, const char *, int, int, int));
 extern void FDECL(safe_display_file, (const char *, BOOLEAN_P));
 extern void FDECL(safe_start_menu_ex, (winid, int));
 extern void FDECL(safe_add_menu, (winid, int, const ANY_P *, CHAR_P, CHAR_P,
@@ -542,7 +543,7 @@ extern void FDECL(safe_cliparound, (int, int, BOOLEAN_P));
 extern void FDECL(safe_update_positionbar, (char *));
 #endif
 extern void FDECL(safe_print_glyph, (winid, XCHAR_P, XCHAR_P, struct layer_info));
-extern void FDECL(safe_issue_gui_command, (int));
+extern void FDECL(safe_issue_gui_command, (int, int, const char*));
 extern void FDECL(safe_raw_print, (const char *));
 extern void FDECL(safe_raw_print_bold, (const char *));
 extern int NDECL(safe_nhgetch);

@@ -10,6 +10,8 @@
 #include "hack.h"
 #include "lev.h"
 #include <math.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 STATIC_DCL void FDECL(trycall, (struct obj *));
 STATIC_DCL void NDECL(polymorph_sink);
@@ -19,7 +21,7 @@ STATIC_PTR int NDECL(wipeoff);
 STATIC_DCL int FDECL(menu_drop, (int));
 STATIC_DCL int NDECL(currentlevel_rewrite);
 STATIC_DCL void NDECL(final_level);
-STATIC_DCL void FDECL(print_corpse_properties, (winid, int, BOOLEAN_P));
+STATIC_DCL void FDECL(print_corpse_properties, (winid, int));
 /* STATIC_DCL boolean FDECL(badspot, (XCHAR_P,XCHAR_P)); */
 
 extern int n_dgns; /* number of dungeons, from dungeon.c */
@@ -52,7 +54,7 @@ docharacterstatistics()
     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
     winid datawin = WIN_ERR;
-    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon_with_flags(&youmonst, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
+    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_SCREEN, gui_glyph, extended_create_window_info_from_mon_with_flags(&youmonst, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
 
     char buf[BUFSZ];
     char buf2[BUFSZ];
@@ -509,10 +511,9 @@ boolean unit_fixed_width;
 }
 
 STATIC_OVL
-void print_corpse_properties(datawin, mnum, isprobing)
+void print_corpse_properties(datawin, mnum)
 winid datawin;
 int mnum;
-boolean isprobing UNUSED;
 {
     struct permonst* ptr = &mons[mnum];
     char buf[BUFSZ];
@@ -753,7 +754,7 @@ register struct obj* obj;
     int glyph = obj_to_glyph(obj, rn2_on_display_rng);
     int gui_glyph = maybe_get_replaced_glyph(glyph, obj->ox, obj->oy, data_to_replacement_info(glyph, LAYER_OBJECT, obj, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
 
-    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_DESCRIPTION_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_obj(obj));
+    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_DESCRIPTION_SCREEN, gui_glyph, extended_create_window_info_from_obj(obj));
 
     boolean stats_known = object_stats_known(obj);
     int otyp = obj->otyp;
@@ -909,7 +910,7 @@ register struct obj* obj;
     }
     if (stats_known && obj->oclass == SPBOOK_CLASS && !(objects[otyp].oc_flags & O1_NON_SPELL_SPELLBOOK))
     {
-        print_spell_level_text(buf2, otyp, TRUE, TRUE);
+        print_spell_level_text(buf2, otyp, TRUE, TRUE, FALSE);
         Sprintf(eos(buf), " - %s", buf2);
     }
 
@@ -1097,7 +1098,7 @@ register struct obj* obj;
 
     if (is_obj_candelabrum(obj))
     {
-        int max_candles = objects[otyp].oc_special_quality;
+        int max_candles = (int)objects[otyp].oc_special_quality;
         Sprintf(buf, "Attachable items:       Up to %d candle%s", max_candles, plur(max_candles));        
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
@@ -1125,7 +1126,7 @@ register struct obj* obj;
 
     if (stats_known && obj->oclass == SPBOOK_CLASS && !(objects[otyp].oc_flags & O1_NON_SPELL_SPELLBOOK))
     {
-        print_spell_level_text(buf2, otyp, FALSE, TRUE);
+        print_spell_level_text(buf2, otyp, FALSE, TRUE, FALSE);
         Sprintf(buf, "Level:                  %s", buf2);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
@@ -2409,19 +2410,19 @@ register struct obj* obj;
 
     if (stats_known && objects[otyp].oc_item_cooldown > 0)
     {
-        Sprintf(buf, "Cooldown time:          %d rounds", objects[otyp].oc_item_cooldown);
+        Sprintf(buf, "Cooldown time:          %d rounds", (int)objects[otyp].oc_item_cooldown);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
         if (obj->cooldownleft > 0)
         {
-            Sprintf(buf, "Cooldown left:          %d rounds", obj->cooldownleft);
+            Sprintf(buf, "Cooldown left:          %d rounds", (int)obj->cooldownleft);
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
     }
 
     if (stats_known && obj->repowerleft > 0)
     {
-        Sprintf(buf, "Repowering time left:   %d rounds", obj->repowerleft);
+        Sprintf(buf, "Repowering time left:   %d rounds", (int)obj->repowerleft);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -2433,7 +2434,7 @@ register struct obj* obj;
 
     if (stats_known && obj->invokeleft > 0)
     {
-        Sprintf(buf, "Invoke time left:       %d rounds", obj->invokeleft);
+        Sprintf(buf, "Invoke time left:       %d rounds", (int)obj->invokeleft);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -3426,7 +3427,7 @@ register struct obj* obj;
                 Sprintf(buf, "Corpse properties:");
                 putstr(datawin, ATR_HEADING, buf);
 
-                print_corpse_properties(datawin, obj->corpsenm, FALSE);
+                print_corpse_properties(datawin, obj->corpsenm);
             }
             else if ((context.game_difficulty <= 0 || flags.force_hint) && flags.max_hint_difficulty >= MIN_DIFFICULTY_LEVEL) /* Shows up on expert, too, just in case, since this is GnollHack-specific */
             {
@@ -4112,8 +4113,22 @@ register struct obj* obj;
         int ac_with_5_chance = diff_to_5_from_ac0 / 5;
 
         powercnt++;
-        Sprintf(buf, " %2d - You have 50%% chance to hit AC %d and 5%% AC %d", powercnt, ac_with_50_chance, ac_with_5_chance);
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+//#if defined(GNH_MOBILE) || defined (WIN32)
+        Sprintf(buf, " %2d - You have ", powercnt);
+        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, NO_COLOR, 1);
+        putstr_ex(datawin, "50%", ATR_INDENT_AT_DASH, CLR_BROWN, 1);
+        putstr_ex(datawin, " chance to hit AC ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+        Sprintf(buf, "%d", ac_with_50_chance);
+        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, CLR_BROWN, 1);
+        putstr_ex(datawin, " and ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+        putstr_ex(datawin, "5%", ATR_INDENT_AT_DASH, CLR_RED, 1);
+        putstr_ex(datawin, " AC ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+        Sprintf(buf, "%d", ac_with_5_chance);
+        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, CLR_RED, 0);
+//#else
+//        Sprintf(buf, " %2d - You have 50%% chance to hit AC %d and 5%% AC %d", powercnt, ac_with_50_chance, ac_with_5_chance);
+//        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+//#endif
 
         struct multishot_result msres = get_multishot_stats(&youmonst, obj, uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : obj, (is_ammo(obj) || throwing_weapon(obj)));
         double average_multi_shot_times = msres.average;
@@ -4273,20 +4288,31 @@ int defensetype;
 
 int
 monsterdescription(mon)
-register struct monst* mon;
+struct monst* mon;
 {
     if (!mon)
         return 0;
+    struct permonst* ptr = mon->data;
+    return monsterdescription_core(mon, ptr);
+}
+
+int
+monsterdescription_core(mon, ptr)
+struct monst* mon;
+struct permonst* ptr;
+{
+    if (!ptr)
+        return 0;
 
     winid datawin = WIN_ERR;
-    int glyph = any_mon_to_glyph(mon, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL, 0UL, MAT_NONE, 0));
+    int glyph = mon ? any_mon_to_glyph(mon, rn2_on_display_rng) : (int)(ptr - &mons[0]) + GLYPH_MON_OFF;
+    int gui_glyph = mon ? maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL, 0UL, MAT_NONE, 0)) : glyph;
 
-    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_DESCRIPTION_SCREEN, iflags.using_gui_tiles ? gui_glyph : glyph, extended_create_window_info_from_mon_with_flags(mon, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
+    datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_DESCRIPTION_SCREEN, gui_glyph, extended_create_window_info_from_mon_with_flags(mon, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
 
     //int mnum = mon->mnum;
-    struct permonst* ptr = mon->data;
     boolean is_you = (mon == &youmonst);
+    short cham = mon ? mon->cham : NON_PM;
 
     char buf[BUFSZ];
     char buf2[BUFSZ];
@@ -4296,8 +4322,8 @@ register struct monst* mon;
     strcpy(buf2, "");
     strcpy(buf3, "");
 
-    const char* monster_name = x_monnam(mon, ARTICLE_NONE, (char*)0, (has_mname(mon)) ? (SUPPRESS_SADDLE | SUPPRESS_IT) : SUPPRESS_IT, FALSE);
-    const char* monster_type_name = mon_monster_name(mon);
+    const char* monster_name = mon ? x_monnam(mon, ARTICLE_NONE, (char*)0, (has_mname(mon)) ? (SUPPRESS_SADDLE | SUPPRESS_IT) : SUPPRESS_IT, FALSE) : ptr->mname;
+    const char* monster_type_name = mon ? mon_monster_name(mon) : ptr->mname;
     boolean contains_type_name = TRUE;
 
     strcpy(buf2, "");
@@ -4312,7 +4338,7 @@ register struct monst* mon;
 
     /* Name */
     Sprintf(buf, "%s%s", 
-        x_monnam(mon, ARTICLE_NONE, (char*)0, (has_mname(mon)) ? (SUPPRESS_SADDLE | SUPPRESS_IT) : SUPPRESS_IT, FALSE),
+        mon ? x_monnam(mon, ARTICLE_NONE, (char*)0, (has_mname(mon)) ? (SUPPRESS_SADDLE | SUPPRESS_IT) : SUPPRESS_IT, FALSE) : ptr->mname,
            !contains_type_name ? buf3 : "");
     *buf = highc(*buf);
     if (ptr->mtitle && strcmp(ptr->mtitle, ""))
@@ -4339,63 +4365,66 @@ register struct monst* mon;
         putstr(datawin, ATR_SUBTITLE, buf);
     }
 
-    strcpy(buf, "");
+    Strcpy(buf, "");
     
     putstr(datawin, 0, buf);
 
-    int relevant_hp = is_you ? (Upolyd ? u.mh : u.uhp) : mon->mhp;
-    int relevant_hpmax = is_you ? (Upolyd ? u.mhmax : u.uhpmax) : mon->mhpmax;
-    int relevant_level = is_you ? ptr->mlevel : mon->m_lev;
+    if (cham >= LOW_PM)
+    {
+        Strcpy(buf2, mon && mon->female && mons[cham].mfemalename ? mons[cham].mfemalename : mons[cham].mname);
+        *buf2 = highc(*buf2);
+        Sprintf(buf, "True form:              %s", buf2);
+        putstr(datawin, ATR_INDENT_AT_COLON, buf);
+    }
 
-    strcpy(buf2, "");
+    int relevant_hp = mon ? (is_you ? (Upolyd ? u.mh : u.uhp) : mon->mhp) : 0;
+    int relevant_hpmax = mon ? (is_you ? (Upolyd ? u.mhmax : u.uhpmax) : mon->mhpmax) : 0;
+    int relevant_level = !mon || is_you ? ptr->mlevel : mon->m_lev;
+
+    Strcpy(buf2, "");
     if (relevant_level != ptr->mlevel)
     {
         Sprintf(buf2, " (base %d)", ptr->mlevel);
     }
 
-    Sprintf(buf, "Hit dice:               %d%s", relevant_level, buf2);
-    
+    Sprintf(buf, "Hit dice:               %d%s", relevant_level, buf2);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-    Sprintf(buf, "Hit points:             %d (%d)", relevant_hp, relevant_hpmax);
-    
+    if (mon)
+    {
+        Sprintf(buf, "Hit points:             %d (%d)", relevant_hp, relevant_hpmax);
+        putstr(datawin, ATR_INDENT_AT_COLON, buf);
+    }
+    Sprintf(buf, "Move:                   %d\"", ptr->mmove);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-    Sprintf(buf, "Move:                   %d\"", ptr->mmove);
-    
-    putstr(datawin, ATR_INDENT_AT_COLON, buf);
-
-    strcpy(buf2, "");
-    int ac = is_you ? u.uac : find_mac(mon);
+    Strcpy(buf2, "");
+    int ac = !mon ? ptr->ac : is_you ? u.uac : find_mac(mon);
     if (ac != ptr->ac)
     {
         Sprintf(buf2, " (base %d)", ptr->ac);
     }
 
-    Sprintf(buf, "Armor class:            %d%s", ac, buf2);
-    
+    Sprintf(buf, "Armor class:            %d%s", ac, buf2);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-    strcpy(buf2, "");
-    int mc = magic_negation(mon);
+    Strcpy(buf2, "");
+    int mc = !mon ? ptr->mc : magic_negation(mon);
     if (mc != ptr->mc)
     {
         Sprintf(buf2, " (base %d)", ptr->mc);
     }
 
-    Sprintf(buf, "Magic cancellation:     %d%s (%d%%)", mc, buf2, magic_negation_percentage(mc));
-    
+    Sprintf(buf, "Magic cancellation:     %d%s (%d%%)", mc, buf2, magic_negation_percentage(mc));    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-    Sprintf(buf, "Magic resistance:       %d%%", ptr->mr);
-    
+    Sprintf(buf, "Magic resistance:       %d%%", ptr->mr);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-    Sprintf(buf, "Alignment:              %s", ptr->maligntyp > 0 ? "Lawful" : ptr->maligntyp < 0 ? "Chaotic" : "Neutral");
-    
+    Sprintf(buf, "Alignment:              %s", ptr->maligntyp > 0 ? "Lawful" : ptr->maligntyp < 0 ? "Chaotic" : "Neutral");  
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-    if (mon->subtype > 0)
+    if (mon && mon->subtype > 0)
     {
         if ((mons[mon->mnum].mflags6 & M6_USES_DOG_SUBTYPES) != 0 && mon->subtype < NUM_DOG_BREEDS)
         {
@@ -4425,32 +4454,29 @@ register struct monst* mon;
         }
     }
 
-    if (!is_neuter(ptr))
+    if (mon && !is_neuter(ptr))
     {
         Sprintf(buf, "Gender:                 %s", mon->female ? "Female" : "Male");
-        
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
-    strcpy(buf2, get_monster_size_text(ptr->msize));
+    Strcpy(buf2, get_monster_size_text(ptr->msize));
     *buf2 = highc(*buf2);
 
-    Sprintf(buf, "Size:                   %s", buf2);
-    
+    Sprintf(buf, "Size:                   %s", buf2);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
     int number_of_attacks = 0;
     int i;
     for (i = 0; i < NATTK; i++)
     {
-        if (mon->data->mattk[i].aatyp == 0 && mon->data->mattk[i].adtyp == 0 && mon->data->mattk[i].damd == 0 && mon->data->mattk[i].damn == 0 && mon->data->mattk[i].damp == 0)
+        if (ptr->mattk[i].aatyp == 0 && ptr->mattk[i].adtyp == 0 && ptr->mattk[i].damd == 0 && ptr->mattk[i].damn == 0 && ptr->mattk[i].damp == 0)
             break;
         else
             number_of_attacks++;
     }
 
-    Sprintf(buf, "Number of attacks:      %d", number_of_attacks);
-    
+    Sprintf(buf, "Number of attacks:      %d", number_of_attacks);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
     for (i = 0; i < number_of_attacks; i++)
@@ -4462,51 +4488,51 @@ register struct monst* mon;
         char specialbuf1[BUFSZ];
         char specialbuf2[BUFSZ];
 
-        strcpy(attypebuf, get_attack_type_text(mon->data->mattk[i].aatyp));
+        strcpy(attypebuf, get_attack_type_text(ptr->mattk[i].aatyp));
         *attypebuf = highc(*attypebuf);
 
         strcpy(adtypebuf, "");
-        const char* adtxt = get_damage_type_text((short)mon->data->mattk[i].adtyp);
+        const char* adtxt = get_damage_type_text((short)ptr->mattk[i].adtyp);
         if (adtxt && strcmp(adtxt, ""))
         {
             Sprintf(adtypebuf, ", %s", adtxt);
         }
 
         strcpy(damagebuf, "");
-        if ((mon->data->mattk[i].damn > 0 && mon->data->mattk[i].damd > 0) || mon->data->mattk[i].damp != 0)
+        if ((ptr->mattk[i].damn > 0 && ptr->mattk[i].damd > 0) || ptr->mattk[i].damp != 0)
         {
             boolean dpart = FALSE;
             strcpy(damagebuf, " ");
 
-            if ((mon->data->mattk[i].damn > 0 && mon->data->mattk[i].damd > 0))
+            if ((ptr->mattk[i].damn > 0 && ptr->mattk[i].damd > 0))
             {
                 dpart = TRUE;
-                Sprintf(eos(damagebuf), "%dd%d", mon->data->mattk[i].damn, mon->data->mattk[i].damd);
+                Sprintf(eos(damagebuf), "%dd%d", ptr->mattk[i].damn, ptr->mattk[i].damd);
             }
 
-            if (dpart && mon->data->mattk[i].damp > 0)
+            if (dpart && ptr->mattk[i].damp > 0)
                 Strcat(damagebuf, "+");
 
-            if(mon->data->mattk[i].damp != 0)
-                Sprintf(eos(damagebuf), "%d", mon->data->mattk[i].damp);
+            if(ptr->mattk[i].damp != 0)
+                Sprintf(eos(damagebuf), "%d", ptr->mattk[i].damp);
         }
         
-        strcpy(specialbuf, "");
-        strcpy(specialbuf1, "");
-        if (mon->data->mattk[i].aatyp == AT_SMMN && mon->data->mattk[i].mlevel > 0)
+        Strcpy(specialbuf, "");
+        Strcpy(specialbuf1, "");
+        if (ptr->mattk[i].aatyp == AT_SMMN && ptr->mattk[i].mlevel > 0)
         {
-            Sprintf(specialbuf1, "success %d%%", mon->data->mattk[i].mlevel);
+            Sprintf(specialbuf1, "success %d%%", ptr->mattk[i].mlevel);
         }
-        else if (mon->data->mattk[i].aatyp == AT_MAGC && mon->data->mattk[i].mlevel > 0)
+        else if (ptr->mattk[i].aatyp == AT_MAGC && ptr->mattk[i].mlevel > 0)
         {
-            Sprintf(specialbuf1, "as level %d caster", mon->data->mattk[i].mlevel);
+            Sprintf(specialbuf1, "as level %d caster", ptr->mattk[i].mlevel);
         }
         
-        strcpy(specialbuf2, "");
-        if (mon->data->mattk[i].mcadj != 0)
+        Strcpy(specialbuf2, "");
+        if (ptr->mattk[i].mcadj != 0)
         {
-            Sprintf(specialbuf2, "%s%d MC %s", mon->data->mattk[i].mcadj > 0 ? "+" : "", mon->data->mattk[i].mcadj,
-                mon->data->mattk[i].mcadj <= 0 ? "penalty" : "bonus");
+            Sprintf(specialbuf2, "%s%d MC %s", ptr->mattk[i].mcadj > 0 ? "+" : "", ptr->mattk[i].mcadj,
+                ptr->mattk[i].mcadj <= 0 ? "penalty" : "bonus");
         }
 
         if (strcmp(specialbuf1, "") || strcmp(specialbuf2, ""))
@@ -4525,8 +4551,8 @@ register struct monst* mon;
 
     }
 
-    print_monster_statistics(datawin, mon);
-    print_monster_intrinsics(datawin, mon);
+    print_monster_statistics(datawin, mon, ptr);
+    print_monster_intrinsics(datawin, mon, ptr);
     print_monster_status(datawin, mon);
 
     display_nhwindow(datawin, FALSE);
@@ -4891,7 +4917,10 @@ register struct obj *obj;
 
     if (obj->oclass != COIN_CLASS) {
         /* KMH, conduct */
-        u.uconduct.gnostic++;
+        if (!u.uconduct.gnostic++)
+            livelog_printf(LL_CONDUCT,
+                "eschewed atheism, by dropping %s on an altar",
+                doname(obj));
     } else {
         /* coins don't have bless/curse status */
         obj->blessed = obj->cursed = 0;
@@ -5408,9 +5437,7 @@ boolean with_impact;
             {
                 if (could_poly || could_slime) 
                 {
-                    (void) newcham(u.ustuck,
-                                   could_poly ? (struct permonst *) 0
-                                              : &mons[PM_GREEN_SLIME],
+                    (void) newcham(u.ustuck, could_poly ? (struct permonst *) 0 : &mons[PM_GREEN_SLIME], 0,
                                    FALSE, could_slime);
                     delobj(obj); /* corpse is digested */
                 }
@@ -6020,7 +6047,7 @@ void
 save_currentstate()
 {
     int fd;
-
+    check_pointing = TRUE;
     if (flags.ins_chkpt) {
         /* write out just-attained level, with pets and everything */
         fd = currentlevel_rewrite();
@@ -6033,6 +6060,7 @@ save_currentstate()
 
     /* write out non-level state */
     savestateinlock();
+    check_pointing = FALSE;
 }
 #endif
 
@@ -6200,7 +6228,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         return;
 
     /* Fade to black */
-    issue_gui_command(GUI_CMD_FADE_TO_BLACK);
+    issue_simple_gui_command(GUI_CMD_FADE_TO_BLACK);
 
     /* discard context which applies to the level we're leaving;
        for lock-picking, container may be carried, in which case we
@@ -6298,12 +6326,12 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     reset_rndmonst(NON_PM); /* u.uz change affects monster generation */
 
     /* Clear certain gui texts and effects */
-    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
-    issue_gui_command(GUI_CMD_CLEAR_FLOATING_TEXTS);
-    issue_gui_command(GUI_CMD_CLEAR_GUI_EFFECTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_FLOATING_TEXTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_GUI_EFFECTS);
 
     /* It is a good time for the garbage collector to function */
-    issue_gui_command(GUI_CMD_COLLECT_GARBAGE);
+    issue_simple_gui_command(GUI_CMD_COLLECT_GARBAGE);
 
     /* set default level change destination areas */
     /* the special level code may override these */
@@ -6338,6 +6366,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         (void) nhclose(fd);
         oinit(); /* reassign level dependent obj probabilities */
     }
+
     reglyph_darkroom();
     /* do this prior to level-change pline messages */
     vision_reset();         /* clear old level's line-of-sight */
@@ -6554,7 +6583,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     play_environment_ambient_sounds();
 
      /* Fade back from black */
-    issue_gui_command(GUI_CMD_FADE_FROM_BLACK);
+    issue_simple_gui_command(GUI_CMD_FADE_FROM_BLACK);
 
     if (play_arrival_teleport_effect)
     {
@@ -6603,43 +6632,56 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             context.botl = 1;
 
         if (!u.uachieve.enter_gehennom)
+        {
             achievement_gained("Entered Gehennom");
+            livelog_printf(LL_ACHIEVE, "%s", "entered Gehennom");
+        }
         u.uachieve.enter_gehennom = 1;
     }
 
-    if (In_mines(&u.uz))
+    if (In_mines(&u.uz) && !u.uachieve.entered_gnomish_mines)
     {
         //if (!u.uachieve.entered_gnomish_mines)
         //    achievement_gained("Entered Gnomish Mines");
+        livelog_printf(LL_ACHIEVE, "%s", "entered the Gnomish Mines");
         u.uachieve.entered_gnomish_mines = 1;
     }
 
     if (In_endgame(&u.uz))
     {
-        if(Is_astralevel(&u.uz))
+        if (Is_astralevel(&u.uz))
+        {
+            if (!u.uachieve.entered_astral_plane)
+                livelog_printf(LL_ACHIEVE, "%s", "entered the Astral Plane");
+
             u.uachieve.entered_astral_plane = 1;
+        }
         else
+        {
+            if(!u.uachieve.entered_elemental_planes)
+                livelog_printf(LL_ACHIEVE, "%s", "entered the Elemental Planes");
             u.uachieve.entered_elemental_planes = 1;
+        }
     }
 
-    if (Is_minetown_level(&u.uz))
+    if (Is_minetown_level(&u.uz) && !u.uachieve.entered_mine_town)
     {
-        //if (!u.uachieve.entered_mine_town)
         //    achievement_gained("Entered Mine Town");
+        livelog_printf(LL_ACHIEVE, "%s", "entered the Mine Town");
         u.uachieve.entered_mine_town = 1;
     }
 
-    if (In_sokoban(&u.uz))
+    if (In_sokoban(&u.uz) && u.uachieve.entered_sokoban)
     {
-        //if (!u.uachieve.entered_sokoban)
         //    achievement_gained("Entered Sokoban");
+        livelog_printf(LL_ACHIEVE, "%s", "entered the Sokoban");
         u.uachieve.entered_sokoban = 1;
     }
 
-    if (Is_bigroom(&u.uz))
+    if (Is_bigroom(&u.uz) && !u.uachieve.entered_bigroom)
     {
-        //if (!u.uachieve.entered_bigroom)
         //    achievement_gained("Entered the Big Room");
+        livelog_printf(LL_ACHIEVE, "%s", "entered the Big Room");
         u.uachieve.entered_bigroom = 1;
     }
 
@@ -6649,20 +6691,43 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     
     if (In_modron_level(&u.uz))
     {
+        if(!u.uachieve.entered_plane_of_modron)
+            livelog_printf(LL_ACHIEVE, "%s", "entered the Plane of the Modron");
         u.uevent.modron_plane_entered = 1;
         u.uachieve.entered_plane_of_modron = 1;
     }
     
     if (In_bovine_level(&u.uz))
     {
+        if (!u.uachieve.entered_hellish_pastures)
+            livelog_printf(LL_ACHIEVE, "%s", "entered the Hellish Pastures");
         u.uevent.hellish_pastures_entered = 1;
         u.uachieve.entered_hellish_pastures = 1;
     }
 
     if (In_large_circular_dgn_level(&u.uz))
     {
+        if (!u.uachieve.entered_large_circular_dungeon)
+            livelog_printf(LL_ACHIEVE, "%s", "entered the Large Circular Dungeon");
         u.uevent.large_circular_dgn_entered = 1;
         u.uachieve.entered_large_circular_dungeon = 1;
+    }
+
+    if (isnew)
+    {
+        char dloc[BUFSZ];
+        /* Astral is excluded as a major event here because entry to it
+           is already one due to that being an achievement */
+        boolean major = In_endgame(&u.uz) && !Is_astralevel(&u.uz);
+        if (major)
+        {
+            (void)endgamelevelname(dloc, depth(&u.uz));
+            livelog_printf(LL_ACHIEVE, "entered the %s", dloc);
+        }
+        else
+        {
+            livelog_printf(LL_DEBUG, "entered new level %d, %s.", dunlev(&u.uz), dungeons[u.uz.dnum].dname);
+        }
     }
 
     if (familiar) 
@@ -6706,13 +6771,13 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
 #ifdef GNH_MOBILE
         if (Is_waterlevel(&u.uz))
         {
-            issue_gui_command(GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE_ON_LEVEL);
+            issue_simple_gui_command(GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE_ON_LEVEL);
             pline_ex1(ATR_NONE, CLR_MSG_HINT, "Beware, it is dangerous to use travel mode on the Plane of Water!");
             pline_ex1(ATR_NONE, CLR_MSG_HINT, "[Travel mode has been disabled]");
         }
         else if (Is_waterlevel(&u.uz0))
         {
-            issue_gui_command(GUI_CMD_RESTORE_TRAVEL_MODE_ON_LEVEL);
+            issue_simple_gui_command(GUI_CMD_RESTORE_TRAVEL_MODE_ON_LEVEL);
             pline_ex1(ATR_NONE, CLR_MSG_HINT, "Phew! It is now safe to use the travel mode again!");
             pline_ex1(ATR_NONE, CLR_MSG_HINT, "[Travel mode has been restored]");
         }
@@ -6777,7 +6842,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "For a moment, you think you hear distant grunting and bellowing, but then the noises are gone.");
         }
 
-        if (!Is_quantum_level(&u.uz0) && !u.uevent.quantum_portal_hint && at_dgn_entrance("The Large Circular Dungeon"))
+        if (!Is_quantum_tunnel_level(&u.uz0) && !u.uevent.quantum_portal_hint && at_dgn_entrance("The Large Circular Dungeon"))
         {
             u.uevent.quantum_portal_hint = 1;
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "For a moment, you feel as if the fabric of reality stretches back and forth a bit, but then the sensation passes.");
@@ -6787,7 +6852,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         {
             u.uevent.polymorph_trap_warning = 1;
             play_sfx_sound(SFX_WARNING);
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Warning - Polymorph traps can be present on dungeon level %d and below.", MINIMUM_DGN_LEVEL_POLY_TRAP);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_WARNING, "WARNING", ATR_NONE, NO_COLOR, " - ", ATR_NONE, CLR_MSG_WARNING, 0U, "Polymorph traps can be present on dungeon level %d and below.", MINIMUM_DGN_LEVEL_POLY_TRAP);
         }
     }
 
@@ -6838,6 +6903,11 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     /* assume this will always return TRUE when changing level */
     (void) in_out_region(u.ux, u.uy);
     (void) pickup(1);
+
+#ifdef WHEREIS_FILE
+    touch_whereis();
+#endif
+
     context.reviving = FALSE;
 }
 
@@ -8142,5 +8212,513 @@ heal_ailments_upon_revival(VOID_ARGS)
     updatemaxhp();
     updatemaxen();
 }
+
+
+#if !defined (GNH_MOBILE) && defined (DEBUG)
+STATIC_DCL winid FDECL(write_create_nhwindow_ex, (int, int, int, struct extended_create_window_info));
+STATIC_DCL void FDECL(write_display_nhwindow, (winid, BOOLEAN_P));
+STATIC_DCL void FDECL(write_destroy_nhwindow, (winid));
+STATIC_DCL void FDECL(write_putstr_ex, (winid, const char*, int, int, int));
+STATIC_PTR int FDECL(CFDECLSPEC spell_wiki_cmp, (const genericptr, const genericptr));
+STATIC_PTR int FDECL(CFDECLSPEC monster_wiki_cmp, (const genericptr, const genericptr));
+
+STATIC_VAR int write_fd = -1;
+
+winid
+write_create_nhwindow_ex(type, style, glyph, info)
+int type UNUSED, style UNUSED, glyph UNUSED;
+struct extended_create_window_info info UNUSED;
+{
+    return 0;
+}
+
+void
+write_display_nhwindow(window, blocking)
+winid window UNUSED;
+boolean blocking UNUSED; /* with ttys, all windows are blocking */
+{
+    return;
+}
+
+void
+write_destroy_nhwindow(window)
+winid window UNUSED;
+{
+    return;
+}
+
+void
+write_putstr_ex(window, str, attr, color, app)
+winid window UNUSED;
+int attr, app, color UNUSED;
+const char* str;
+{
+    if (!str || !*str)
+        return;
+
+    char buf[BUFSIZ];
+    *buf = 0;
+    boolean removetrailingcolon = FALSE;
+    if ((attr & (ATR_SUBTITLE)) == ATR_SUBTITLE || (attr & (ATR_HEADING)) != 0)
+    {
+        Strcat(buf, "## ");
+        removetrailingcolon = TRUE;
+    }
+    else if ((attr & (ATR_TITLE)) == ATR_TITLE)
+        return; // Strcat(buf, "# "); // No need to print the title twice
+
+    if ((attr & (ATR_INDENT_AT_COLON)) != 0)
+        Strcat(buf, "- **");
+
+    Strcat(buf, str);
+    int slen = (int)strlen(buf);
+    if (removetrailingcolon && slen > 0 && buf[slen - 1] == ':')
+        buf[slen - 1] = 0;
+
+    if ((attr & (ATR_INDENT_AT_COLON)) != 0)
+    {
+        char* p = strchr(buf, ':');
+        if (p)
+        {
+            char buf2[BUFSIZ];
+            char* p2 = p + 1;
+            while (*p2 && *p2 == ' ')
+                p2++;
+
+            Strcpy(buf2, p2);
+            Strcpy(p + 1, "** ");
+            Strcat(buf, buf2);
+        }
+    }
+    else if ((attr & (ATR_INDENT_AT_DASH)) != 0)
+    {
+        char* p = strchr(buf, '-');
+        if (p)
+        {
+            char buf2[BUFSIZ];
+            char* p2 = p + 1;
+            while (*p2 && *p2 == ' ')
+                p2++;
+
+            Strcpy(buf2, p2);
+            Strcpy(p - 1, ". ");
+            Strcat(buf, buf2);
+        }
+    }
+
+    if (!app)
+    {
+        mungspaces(buf);
+        Strcat(buf, "\n");
+    }
+
+    (void)write(write_fd, buf, strlen(buf));
+}
+
+STATIC_OVL int CFDECLSPEC
+spell_wiki_cmp(p, q)
+const genericptr p;
+const genericptr q;
+{
+    if (!p || !q)
+        return 0;
+
+    short idx1 = *(short*)p;
+    short idx2 = *(short*)q;
+
+    const char* name1 = OBJ_NAME(objects[idx1]);
+    const char* name2 = OBJ_NAME(objects[idx2]);
+
+    schar skl1 = objects[idx1].oc_skill;
+    schar skl2 = objects[idx2].oc_skill;
+
+    const char* skl_name1 = spelltypemnemonic(skl1);
+    const char* skl_name2 = spelltypemnemonic(skl2);
+
+    long lvl1 = objects[idx1].oc_spell_level;
+    long lvl2 = objects[idx2].oc_spell_level;
+
+    int skill_res = 0;
+    if (skl_name1 && skl_name2)
+        skill_res = strcmpi(skl_name1, skl_name2);
+    else if (skl_name1)
+        return 1;
+    else
+        return -1;
+
+    if (!skill_res && lvl1 != lvl2)
+    {
+        return (int)(lvl1 - lvl2);
+    }
+
+    if (!skill_res && (name1 || name2))
+    {
+        if (name1 && name2)
+            skill_res = strcmpi(name1, name2);
+        else if (name1)
+            return 1;
+        else
+            return -1;
+    }
+
+    return skill_res;
+}
+
+void
+write_spells()
+{
+    pline("Starting writing spells...");
+
+    const char* spelldir = "spells_for_wiki";
+    struct stat st = { 0 };
+    if (stat(spelldir, &st) == -1) {
+#ifdef WIN32
+        (void)mkdir(spelldir);
+#else
+        (void)mkdir(spelldir, 0700);
+#endif
+    }
+    char fq_save[BUFSIZ];
+    char name[BUFSIZ];
+
+    struct window_procs saved_windowprocs = windowprocs;
+    windowprocs.win_putstr_ex = write_putstr_ex;
+    windowprocs.win_create_nhwindow_ex = write_create_nhwindow_ex;
+    windowprocs.win_display_nhwindow = write_display_nhwindow;
+    windowprocs.win_destroy_nhwindow = write_destroy_nhwindow;
+
+    int i, j;
+    for (i = FIRST_SPELL; i < SPE_BLANK_PAPER; i++)
+    {
+        name[0] = '\0';
+        (void)Strcpy(name, OBJ_NAME(objects[i]));
+        int len = (int)strlen(name);
+        for (j = 0; j < len; j++) {
+
+            if (name[j] == ' ')
+                name[j] = '-';
+        }
+
+        *name = highc(*name);
+
+        fq_save[0] = '\0';
+        (void)Strcat(fq_save, spelldir);
+        (void)Strcat(fq_save, "/");
+        (void)Strcat(fq_save, name);
+        (void)Strcat(fq_save, ".md");
+
+        (void)remove(fq_save);
+
+#ifdef MAC
+        write_fd = macopen(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, TEXT_TYPE);
+#else
+        write_fd = open(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, FCMASK);
+#endif
+        if (write_fd < 0)
+            continue;
+
+        spelldescription_core(-1, i);
+
+        (void)close(write_fd);
+    }
+    windowprocs = saved_windowprocs;
+
+    short spell_indices[SPE_BLANK_PAPER - FIRST_SPELL] = { 0 };
+    for (i = FIRST_SPELL; i < SPE_BLANK_PAPER; i++)
+        spell_indices[i - FIRST_SPELL] = (short)(i);
+
+    qsort(spell_indices, SPE_BLANK_PAPER - FIRST_SPELL, sizeof(short), spell_wiki_cmp);
+
+    schar skill_idx = P_NONE;
+    schar prev_skill_idx = P_NONE;
+    int spell_level = -3;
+    int prev_spell_level = -3;
+    int spl_idx = 0;
+    for (i = 0; i < SPE_BLANK_PAPER - FIRST_SPELL; i++)
+    {
+        spl_idx = spell_indices[i];
+        skill_idx = objects[spl_idx].oc_skill;
+        spell_level = (int)objects[spl_idx].oc_spell_level;
+        if (prev_skill_idx != skill_idx)
+        {
+            if (prev_skill_idx != P_NONE && write_fd >= 0)
+            {
+                (void)close(write_fd);
+                write_fd = -1;
+            }
+
+            name[0] = '\0';
+            Strcpy(name, spelltypemnemonic(skill_idx));
+            Strcat(name, " spells");
+            int len = (int)strlen(name);
+            for (j = 0; j < len; j++) {
+
+                if (name[j] == ' ')
+                    name[j] = '-';
+            }
+
+            *name = highc(*name);
+
+            fq_save[0] = '\0';
+            Strcat(fq_save, spelldir);
+            Strcat(fq_save, "/");
+            Strcat(fq_save, name);
+            Strcat(fq_save, ".md");
+
+            (void)remove(fq_save);
+
+#ifdef MAC
+            write_fd = macopen(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, TEXT_TYPE);
+#else
+            write_fd = open(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, FCMASK);
+#endif
+            if (write_fd < 0)
+                continue;
+
+            char buf[BUFSIZ];
+            char buf2[BUFSIZ];
+            Strcpy(buf2, spelltypemnemonic(skill_idx));
+            *buf2 = highc(*buf2);
+            Strcpy(buf, "# ");
+            Strcat(buf, buf2);
+            Strcat(buf, " Spells\n");
+            (void)write(write_fd, buf, strlen(buf));
+        }
+
+        if (prev_spell_level != spell_level)
+        {
+            char buf[BUFSIZ];
+            char buf2[BUFSIZ];
+            print_spell_level_text(buf2, spl_idx, FALSE, 2, TRUE);
+            Strcpy(buf, "## ");
+            Strcat(buf, buf2);
+            Strcat(buf, "\n");
+            (void)write(write_fd, buf, strlen(buf));
+        }
+
+        char buf[BUFSIZ];
+        char buf2[BUFSIZ];
+        Strcpy(buf2, OBJ_NAME(objects[spl_idx]));
+        *buf2 = highc(*buf2);
+        Strcpy(buf, "- [[");
+        Strcat(buf, buf2);
+        Strcat(buf, "]]\n");
+        (void)write(write_fd, buf, strlen(buf));
+
+        prev_skill_idx = skill_idx;
+        prev_spell_level = spell_level;
+    }
+    if (write_fd >= 0)
+    {
+        (void)close(write_fd);
+        write_fd = -1;
+    }
+
+    pline("Done!");
+}
+
+STATIC_OVL int CFDECLSPEC
+monster_wiki_cmp(p, q)
+const genericptr p;
+const genericptr q;
+{
+    if (!p || !q)
+        return 0;
+
+    short idx1 = *(short*)p;
+    short idx2 = *(short*)q;
+
+    const char* name1 = mons[idx1].mname;
+    const char* name2 = mons[idx2].mname;
+
+    return strcmpi(name1, name2);
+}
+
+void
+write_monsters()
+{
+    pline("Starting writing monsters...");
+
+    const char* monsterdir = "monsters_for_wiki";
+    struct stat st = { 0 };
+    if (stat(monsterdir, &st) == -1) {
+#ifdef WIN32
+        (void)mkdir(monsterdir);
+#else
+        (void)mkdir(monsterdir, 0700);
+#endif
+    }
+    char fq_save[BUFSIZ];
+    char name[BUFSIZ];
+    char buf[BUFSIZ];
+    char buf2[BUFSIZ];
+
+    struct window_procs saved_windowprocs = windowprocs;
+    windowprocs.win_putstr_ex = write_putstr_ex;
+    windowprocs.win_create_nhwindow_ex = write_create_nhwindow_ex;
+    windowprocs.win_display_nhwindow = write_display_nhwindow;
+    windowprocs.win_destroy_nhwindow = write_destroy_nhwindow;
+
+    int i, j, len;
+    for (i = LOW_PM; i < NUM_MONSTERS; i++)
+    {
+        name[0] = '\0';
+        Strcpy(name, mons[i].mname);
+        len = (int)strlen(name);
+        for (j = 0; j < len; j++) 
+        {
+            if (name[j] == ' ')
+                name[j] = '-';
+        }
+        *name = highc(*name);
+
+        fq_save[0] = '\0';
+        Strcat(fq_save, monsterdir);
+        Strcat(fq_save, "/");
+        Strcat(fq_save, name);
+        Strcat(fq_save, ".md");
+
+        (void)remove(fq_save);
+
+#ifdef MAC
+        write_fd = macopen(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, TEXT_TYPE);
+#else
+        write_fd = open(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, FCMASK);
+#endif
+        if (write_fd < 0)
+            continue;
+
+        monsterdescription_core((struct monst*)0, &mons[i]);
+
+        Strcpy(buf, "Corpse properties:");
+        putstr(0, ATR_HEADING, buf);
+        print_corpse_properties(0, i);
+
+        Strcpy(buf, "Picture:");
+        putstr(0, ATR_HEADING, buf);
+
+        Strcpy(name, mons[i].mname);
+        len = (int)strlen(name);
+        for (j = 0; j < len; j++) 
+        {
+            if (name[j] == ' ')
+                name[j] = '_';
+
+            name[j] = lowc(name[j]);
+        }
+
+        Strcpy(buf2, mons[i].mname);
+        *buf2 = highc(*buf2);
+
+        Sprintf(buf, "![%s](https://github.com/hyvanmielenpelit/GnollHackTileSet/blob/main/Monsters/%s/%s.png)", buf2, name, name);
+        if (mons[i].mflags5 & M5_FEMALE_TILE)
+        {
+            putstr_ex(0, buf, ATR_NONE, NO_COLOR, 1);
+            putstr_ex(0, " ", ATR_NONE, NO_COLOR, 1);
+            if (mons[i].mfemalename)
+            {
+                Strcpy(buf2, mons[i].mfemalename);
+                *buf2 = highc(*buf2);
+            }
+            Sprintf(buf, "![%s](https://github.com/hyvanmielenpelit/GnollHackTileSet/blob/main/Monsters/%s/%s_female.png)", buf2, name, name);
+        }
+        putstr_ex(0, buf, ATR_NONE, NO_COLOR, 0);
+
+        (void)close(write_fd);
+    }
+    windowprocs = saved_windowprocs;
+
+    short monster_indices[NUM_MONSTERS] = { 0 };
+    for (i = LOW_PM; i < NUM_MONSTERS; i++)
+        monster_indices[i - LOW_PM] = (short)(i);
+
+    qsort(monster_indices, NUM_MONSTERS - LOW_PM, sizeof(short), monster_wiki_cmp);
+
+    name[0] = '\0';
+    fq_save[0] = '\0';
+    Strcat(fq_save, monsterdir);
+    Strcat(fq_save, "/");
+    Strcat(fq_save, "Monsters");
+    Strcat(fq_save, ".md");
+
+    (void)remove(fq_save);
+
+#ifdef MAC
+    write_fd = macopen(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, TEXT_TYPE);
+#else
+    write_fd = open(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, FCMASK);
+#endif
+    if (write_fd >= 0)
+    {
+        for (i = 0; i < 26; i++)
+        {
+            Sprintf(buf, "- [[Monsters starting with %c]]\n", (char)('A' + i));
+            (void)write(write_fd, buf, strlen(buf));
+        }
+        (void)close(write_fd);
+        write_fd = -1;
+    }
+
+    short m_idx;
+    for (i = 0; i < NUM_MONSTERS - LOW_PM; i++)
+    {
+        m_idx = monster_indices[i];
+
+        if (i <= 0 || lowc(*mons[m_idx].mname) != lowc(*mons[monster_indices[i - 1]].mname))
+        {
+            if (i > 0 && write_fd >= 0)
+            {
+                (void)close(write_fd);
+                write_fd = -1;
+            }
+
+            name[0] = '\0';
+            Sprintf(name, "Monsters-starting-with-%c", highc(*mons[m_idx].mname));
+            fq_save[0] = '\0';
+            Strcat(fq_save, monsterdir);
+            Strcat(fq_save, "/");
+            Strcat(fq_save, name);
+            Strcat(fq_save, ".md");
+
+            (void)remove(fq_save);
+
+#ifdef MAC
+            write_fd = macopen(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, TEXT_TYPE);
+#else
+            write_fd = open(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, FCMASK);
+#endif
+            if (write_fd < 0)
+                continue;
+
+            (void)strncpy(buf2, mons[m_idx].mname, 1);
+            buf2[1] = 0;
+            *buf2 = highc(*buf2);
+            Strcpy(buf, "## ");
+            Strcat(buf, buf2);
+            Strcat(buf, "\n");
+            (void)write(write_fd, buf, strlen(buf));
+        }
+
+        if (write_fd < 0)
+            continue;
+
+        Strcpy(buf2, mons[m_idx].mname);
+        *buf2 = highc(*buf2);
+        Strcpy(buf, "- [[");
+        Strcat(buf, buf2);
+        Strcat(buf, "]]\n");
+
+        (void)write(write_fd, buf, strlen(buf));
+    }
+    if (write_fd >= 0)
+    {
+        (void)close(write_fd);
+        write_fd = -1;
+    }
+
+    pline("Done!");
+}
+#endif
+
 
 /*do.c*/

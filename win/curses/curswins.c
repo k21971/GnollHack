@@ -481,19 +481,19 @@ curses_get_window_orientation(winid wid)
    and text attributes */
 
 void
-curses_puts(winid wid, int attr, const char* text)
+curses_puts(winid wid, int attr, const char* text, int app)
 {
-    curses_puts_ex(wid, attr, NO_COLOR, text);
+    curses_puts_ex(wid, attr, NO_COLOR, text, app);
 }
 
 void
-curses_puts_ex(winid wid, int attr, int color, const char *text)
+curses_puts_ex(winid wid, int attr, int color, const char *text, int app)
 {
-    curses_puts_ex2(wid, text, (char*)0, (char*)0, attr, color);
+    curses_puts_ex2(wid, text, (char*)0, (char*)0, attr, color, app);
 }
 
 void
-curses_puts_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color)
+curses_puts_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app)
 {
     anything Id;
     WINDOW* win = NULL;
@@ -522,7 +522,7 @@ curses_puts_ex2(winid wid, const char* text, const char* attrs, const char* colo
             return;
         }
         Id = zeroany;
-        curses_add_nhmenu_item(wid, NO_GLYPH, &Id, 0, 0, attr, color, text, attrs, colors, FALSE);
+        curses_add_nhmenu_item(wid, NO_GLYPH, &Id, 0, 0, attr, color, text, attrs, colors, FALSE, app);
     }
     else {
         waddstr(win, text);

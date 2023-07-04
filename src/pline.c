@@ -29,6 +29,9 @@ STATIC_VAR const char* pline_prefix_text = 0;
 STATIC_VAR int pline_separator_attr = 0;
 STATIC_VAR int pline_separator_color = NO_COLOR;
 STATIC_VAR const char* pline_separator_text = 0;
+STATIC_VAR int* pline_multiattrs = 0;
+STATIC_VAR int* pline_multicolors = 0;
+
 STATIC_VAR char prevmsg[BUFSZ];
 
 STATIC_DCL void FDECL(putmesg, (const char *));
@@ -38,15 +41,18 @@ STATIC_DCL char *FDECL(You_buf, (size_t));
 STATIC_DCL void FDECL(execplinehandler, (const char *));
 #endif
 
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
 /* also used in end.c */
 unsigned saved_pline_index = 0; /* slot in saved_plines[] to use next */
 char *saved_plines[DUMPLOG_MSG_COUNT] = { (char *) 0 };
+char* saved_pline_attrs[DUMPLOG_MSG_COUNT] = { (char*)0 };
+char* saved_pline_colors[DUMPLOG_MSG_COUNT] = { (char*)0 };
 
 /* keep the most recent DUMPLOG_MSG_COUNT messages */
 void
-dumplogmsg(line)
-const char *line;
+dumplogmsg(line, attrs, colors, attr, color)
+const char *line, *attrs, *colors;
+int attr, color;
 {
     /*
      * TODO:
@@ -57,15 +63,42 @@ const char *line;
      */
     unsigned indx = saved_pline_index; /* next slot to use */
     char *oldest = saved_plines[indx]; /* current content of that slot */
+    char* oldest_attrs = saved_pline_attrs[indx]; /* current attrs of that slot */
+    char* oldest_colors = saved_pline_colors[indx]; /* current attrs of that slot */
 
-    if (oldest && strlen(oldest) >= strlen(line)) {
+    size_t len = strlen(line);
+    if (oldest && strlen(oldest) >= len) {
         /* this buffer will gradually shrink until the 'else' is needed;
            there's no pressing need to track allocation size instead */
         Strcpy(oldest, line);
+        if (attrs)
+        {
+            memcpy(oldest_attrs, attrs, len + 1);
+            memcpy(oldest_colors, colors, len + 1);
+        }
+        else
+        {
+            memset(oldest_attrs, attr, len);
+            memset(oldest_colors, color, len);
+            oldest_attrs[len] = 0;
+            oldest_colors[len] = 0;
+        }
     } else {
         if (oldest)
-            free((genericptr_t) oldest);
+        {
+            free((genericptr_t)oldest);
+            free((genericptr_t)oldest_attrs);
+            free((genericptr_t)oldest_colors);
+        }
         saved_plines[indx] = dupstr(line);
+        if(attrs)
+            saved_pline_attrs[indx] = cpystr(line, attrs);
+        else
+            saved_pline_attrs[indx] = setstr(line, (char)attr);
+        if (colors)
+            saved_pline_colors[indx] = cpystr(line, colors);
+        else
+            saved_pline_colors[indx] = setstr(line, (char)color);
     }
     saved_pline_index = (indx + 1) % DUMPLOG_MSG_COUNT;
 }
@@ -79,8 +112,14 @@ dumplogfreemessages()
     unsigned indx;
 
     for (indx = 0; indx < DUMPLOG_MSG_COUNT; ++indx)
+    {
         if (saved_plines[indx])
-            free((genericptr_t) saved_plines[indx]), saved_plines[indx] = 0;
+            free((genericptr_t)saved_plines[indx]), saved_plines[indx] = 0;
+        if (saved_pline_attrs[indx])
+            free((genericptr_t)saved_pline_attrs[indx]), saved_pline_attrs[indx] = 0;
+        if (saved_pline_colors[indx])
+            free((genericptr_t)saved_pline_colors[indx]), saved_pline_colors[indx] = 0;
+    }
     saved_pline_index = 0;
 }
 #endif
@@ -107,7 +146,7 @@ const char *line;
     attr |= pline_attr;
     color = pline_color;
 
-    putstr_ex(WIN_MESSAGE, attr, line, 0, color);
+    putstr_ex(WIN_MESSAGE, line, attr, color, 0);
 }
 
 STATIC_OVL void
@@ -174,6 +213,11 @@ VA_DECL(const char *, line)
     int ln;
     int msgtyp;
     boolean no_repeat;
+    char multi_line[BIGBUFSZ], combined_line[BIGBUFSZ], attrs[BIGBUFSZ], colors[BIGBUFSZ];
+    multi_line[0] = 0;
+    combined_line[0] = 0;
+    attrs[0] = 0;
+    colors[0] = 0;
     /* Do NOT use VA_START and VA_END in here... see above */
 
     if (!line || !*line)
@@ -185,39 +229,157 @@ VA_DECL(const char *, line)
     if (program_state.wizkit_wishing)
         return;
 
-    if (index(line, '%')) {
-        Vsprintf(pbuf, line, VA_ARGS);
-        line = pbuf;
+    const char* used_line = line;
+    boolean domulti = FALSE;
+    if (index(used_line, '%'))
+    {
+        if (pline_multiattrs && pline_multicolors)
+        {
+            domulti = TRUE;
+            const char* echars = "cdieEfgGosuxXpn%";
+            const char* sp = used_line;
+            const char* p, * ep;
+            char cbuf[BIGBUFSZ];
+            char sbuf[BIGBUFSZ];
+            int pos = 0;
+            int idx = -1;
+            do
+            {
+                p = index(sp, '%');
+                if (!p)
+                {
+                    p = ep = eos((char*)sp);
+                }
+                else
+                {
+                    ep = p + 1;
+                    idx++;
+                }
+
+                char typechar = '\0';
+                char* cptr;
+                while (*ep)
+                {
+                    cptr = index(echars, *ep);
+                    if (!cptr)
+                        ep++;
+                    else
+                    {
+                        typechar = *cptr;
+                        break;
+                    }
+                }
+                int len1 = (int)(p - sp);
+                int len2 = (int)(ep - p + 1);
+                if (len1 < 0)
+                    len1 = 0;
+                if (len2 < 0)
+                    len2 = 0;
+
+                if (len1 > 0)
+                {
+                    strncpy(cbuf, sp, len1);
+                    cbuf[len1] = 0;
+                    Strcat(multi_line, cbuf);
+                    memset(&attrs[pos], pline_attr, (size_t)len1);
+                    memset(&colors[pos], pline_color, (size_t)len1);
+                    pos += len1;
+                }
+
+                if (len2 > 0)
+                {
+                    strncpy(sbuf, p, len2);
+                    sbuf[len2] = 0;
+                    switch (typechar)
+                    {
+                    case 'c':
+                        Sprintf(cbuf, sbuf, va_arg(the_args, CHAR_P));
+                        break;
+                    case 'f':
+                        Sprintf(cbuf, sbuf, va_arg(the_args, double));
+                        break;
+                    default:
+                    case 'i':
+                    case 'd':
+                        if (ep > p && *(ep - 1) == 'h')
+                            Sprintf(cbuf, sbuf, va_arg(the_args, SHORT_P));
+                        else if (ep > p && *(ep - 1) == 'l')
+                            Sprintf(cbuf, sbuf, va_arg(the_args, long));
+                        else
+                            Sprintf(cbuf, sbuf, va_arg(the_args, int));
+                        break;
+                    case 's':
+                        Sprintf(cbuf, sbuf, va_arg(the_args, const char*));
+                        break;
+                    case 'p':
+                        Sprintf(cbuf, sbuf, va_arg(the_args, void*));
+                        break;
+                    case 'x':
+                    case 'X':
+                    case 'u':
+                        if(ep > p && *(ep - 1) == 'h')
+                            Sprintf(cbuf, sbuf, va_arg(the_args, UNSIGNED_SHORT_P));
+                        else if (ep > p && *(ep - 1) == 'l')
+                            Sprintf(cbuf, sbuf, va_arg(the_args, unsigned long));
+                        else
+                            Sprintf(cbuf, sbuf, va_arg(the_args, unsigned int));
+                        break;
+                    case '%':
+                        strncpy(cbuf, sbuf, len2 - 1);
+                        cbuf[len2 - 1] = 0;
+                        break;
+                        break;
+                    }
+                    size_t clen = strlen(cbuf);
+                    Strcat(multi_line, cbuf);
+                    memset(&attrs[pos], idx >= 0 && pline_multiattrs[idx] != ATR_NONE ? pline_multiattrs[idx] : pline_attr, clen);
+                    memset(&colors[pos], idx >= 0 && pline_multicolors[idx] != NO_COLOR ? pline_multicolors[idx] : pline_color, clen);
+                    pos += clen;
+                }
+
+                sp = ep + 1;
+            } while (p && *p);
+
+            multi_line[pos] = 0;
+            attrs[pos] = 0;
+            colors[pos] = 0;
+            used_line = multi_line;
+        }
+        else
+        {
+            Vsprintf(pbuf, used_line, VA_ARGS);
+            used_line = pbuf;
+        }
     }
-    if ((ln = (int) strlen(line)) > BUFSZ - 1) {
-        if (line != pbuf)                          /* no '%' was present */
-            (void) strncpy(pbuf, line, BUFSZ - 1); /* caveat: unterminated */
+
+    const char* original_line = used_line;
+    Sprintf(combined_line, "%s%s%s", pline_prefix_text ? pline_prefix_text : "", pline_separator_text ? pline_separator_text : "", original_line);
+    boolean truncated = FALSE;
+    if ((ln = (int)strlen(combined_line)) > BIGBUFSZ - 1) 
+    {
+        //if (original_line != line)                          /* no '%' was present */
+        (void)strncpy(pbuf, combined_line, BIGBUFSZ - 1); /* caveat: unterminated */
         /* truncate, preserving the final 3 characters:
            "___ extremely long text" -> "___ extremely l...ext"
            (this may be suboptimal if overflow is less than 3) */
-        (void) strncpy(pbuf + BUFSZ - 1 - 6, "...", 3);
+        (void)strncpy(pbuf + BIGBUFSZ - 1 - 6, "...", 3);
         /* avoid strncpy; buffers could overlap if excess is small */
-        pbuf[BUFSZ - 1 - 3] = line[ln - 3];
-        pbuf[BUFSZ - 1 - 2] = line[ln - 2];
-        pbuf[BUFSZ - 1 - 1] = line[ln - 1];
-        pbuf[BUFSZ - 1] = '\0';
-        line = pbuf;
+        pbuf[BIGBUFSZ - 1 - 3] = combined_line[ln - 3];
+        pbuf[BIGBUFSZ - 1 - 2] = combined_line[ln - 2];
+        pbuf[BIGBUFSZ - 1 - 1] = combined_line[ln - 1];
+        pbuf[BIGBUFSZ - 1] = '\0';
+        truncated = TRUE;
+        used_line = pbuf;
     }
+    else
+        used_line = combined_line;
 
-#ifdef DUMPLOG
-    /* We hook here early to have options-agnostic output.
-     * Unfortunately, that means Norep() isn't honored (general issue) and
-     * that short lines aren't combined into one longer one (tty behavior).
-     */
-    if ((pline_flags & SUPPRESS_HISTORY) == 0)
-        dumplogmsg(line);
-#endif
     /* use raw_print() if we're called too early (or perhaps too late
        during shutdown) or if we're being called recursively (probably
        via debugpline() in the interface code) */
     if (in_pline++ || !iflags.window_inited) {
         /* [we should probably be using raw_printf("\n%s", line) here] */
-        raw_print(line);
+        raw_print(used_line);
         iflags.last_msg = PLNMSG_UNKNOWN;
         goto pline_done;
     }
@@ -225,10 +387,10 @@ VA_DECL(const char *, line)
     msgtyp = MSGTYP_NORMAL;
     no_repeat = (pline_flags & PLINE_NOREPEAT) ? TRUE : FALSE;
     if ((pline_flags & OVERRIDE_MSGTYPE) == 0) {
-        msgtyp = msgtype_type(line, no_repeat);
+        msgtyp = msgtype_type(used_line, no_repeat);
         if ((pline_flags & URGENT_MESSAGE) == 0
             && (msgtyp == MSGTYP_NOSHOW
-                || (msgtyp == MSGTYP_NOREP && !strcmp(line, prevmsg))))
+                || (msgtyp == MSGTYP_NOREP && !strcmp(used_line, prevmsg))))
             /* FIXME: we need a way to tell our caller that this message
              * was suppressed so that caller doesn't set iflags.last_msg
              * for something that hasn't been shown, otherwise a subsequent
@@ -239,21 +401,48 @@ VA_DECL(const char *, line)
             goto pline_done;
     }
 
-    if (!saving && !restoring)
+    if (!saving && !restoring && !reseting && !check_pointing && iflags.window_inited)
     {
         if (vision_full_recalc)
             vision_recalc(0);
     }
-    if (u.ux && !program_state.in_bones)
+    if (u.ux && !program_state.in_bones && iflags.window_inited)
         flush_screen(!flags.show_cursor_on_u); // show_cursor_on_u actually indicates that there is a getpos going on, in which case the cursor should not be returned to the player
 
-    if (pline_prefix_text || pline_separator_text)
+    boolean usemulti = pline_prefix_text || pline_separator_text || domulti;
+    //if (domulti)
+    //{
+    //    putmesg_ex2(multi_line, attrs, colors);
+    //}
+    //else 
+    if (usemulti)
     {
-        char combined_line[BIGBUFSZ], attrs[BIGBUFSZ], colors[BIGBUFSZ];
-        Sprintf(combined_line, "%s%s%s", pline_prefix_text ? pline_prefix_text : "", pline_separator_text ? pline_separator_text : "", line);
-        size_t line_len = strlen(line);
+        size_t line_len = strlen(original_line);
         size_t prefix_len = pline_prefix_text ? strlen(pline_prefix_text) : 0;
         size_t separator_len = pline_separator_text ? strlen(pline_separator_text) : 0;
+        if (truncated)
+        {
+            size_t used_len = strlen(used_line);
+            int truncatedlen = (int)used_len - (int)prefix_len - (int)separator_len;
+            line_len = truncatedlen >= 0 ? (size_t)truncatedlen : 0UL;
+        }
+        
+        if (domulti && (prefix_len > 0 || separator_len > 0))
+        {
+            int offset = (int)prefix_len + (int)separator_len;
+            int j;
+            for (j = (int)line_len; j >= 0; j--) //also copy ending zero
+            {
+                attrs[j + offset] = attrs[j];
+                colors[j + offset] = colors[j];
+            }
+            for (j = 0; j < offset; j++)
+            {
+                attrs[j] = 0;
+                colors[j] = 0;
+            }
+        }
+
         char* attr_p = attrs;
         char* color_p = colors;
         if (prefix_len > 0)
@@ -270,26 +459,37 @@ VA_DECL(const char *, line)
             memset(color_p, pline_separator_color, separator_len);
             color_p += separator_len;
         }
-        memset(attr_p, pline_attr, line_len);
-        attr_p += line_len;
-        *attr_p = 0;
-        memset(color_p, pline_color, line_len);
-        color_p += line_len;
-        *color_p = 0;
-
+        if (!domulti)
+        {
+            memset(attr_p, pline_attr, line_len);
+            attr_p += line_len;
+            *attr_p = 0;
+            memset(color_p, pline_color, line_len);
+            color_p += line_len;
+            *color_p = 0;
+        }
         putmesg_ex2(combined_line, attrs, colors);
     }
     else
-        putmesg(line);
+        putmesg(used_line);
+
+#if defined (DUMPLOG) || defined (DUMPHTML)
+    /* We hook here early to have options-agnostic output.
+     * Unfortunately, that means Norep() isn't honored (general issue) and
+     * that short lines aren't combined into one longer one (tty behavior).
+     */
+    if ((pline_flags & SUPPRESS_HISTORY) == 0)
+        dumplogmsg(used_line, usemulti ? attrs : 0, usemulti ? colors : 0, pline_attr, pline_color);
+#endif
 
 #if defined(MSGHANDLER) && (defined(POSIX_TYPES) || defined(__GNUC__))
-    execplinehandler(line);
+    execplinehandler(used_line);
 #endif
 
     /* this gets cleared after every pline message */
     iflags.last_msg = PLNMSG_UNKNOWN;
-    (void) strncpy(prevmsg, line, BUFSZ), prevmsg[BUFSZ - 1] = '\0';
-    if (msgtyp == MSGTYP_STOP)
+    (void) strncpy(prevmsg, used_line, BUFSZ), prevmsg[BUFSZ - 1] = '\0';
+    if (msgtyp == MSGTYP_STOP && iflags.window_inited)
         display_nhwindow(WIN_MESSAGE, TRUE); /* --more-- */
 
  pline_done:
@@ -379,6 +579,24 @@ VA_DECL3(int, attr, int, color, const char*, line)
     return;
 }
 
+void pline_multi_ex
+VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*, line)
+{
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    pline_attr = attr;
+    pline_color = color;
+    vpline(line, VA_ARGS);
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    VA_END();
+    return;
+}
+
 
 /*VARARGS1*/
 void You_ex
@@ -391,7 +609,26 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_attr = attr;
     pline_color = color;
     vpline(YouMessage(tmp, "You ", line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    VA_END();
+}
+
+void You_multi_ex
+VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*, line)
+{
+    char* tmp;
+
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_attr = attr;
+    pline_color = color;
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    vpline(YouMessage(tmp, "You ", line), VA_ARGS);
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -407,7 +644,27 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_attr = attr;
     pline_color = color;
     vpline(YouMessage(tmp, "Your ", line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    VA_END();
+}
+
+/*VARARGS1*/
+void Your_multi_ex
+VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*, line)
+{
+    char* tmp;
+
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_attr = attr;
+    pline_color = color;
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    vpline(YouMessage(tmp, "Your ", line), VA_ARGS);
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -427,7 +684,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     else
         YouPrefix(tmp, "You feel ", line);
     vpline(strcat(tmp, line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -443,7 +700,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_attr = attr;
     pline_color = color;
     vpline(YouMessage(tmp, "You can't ", line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -459,7 +716,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_attr = attr;
     pline_color = color;
     vpline(YouMessage(tmp, "The ", line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -475,7 +732,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_attr = attr;
     pline_color = color;
     vpline(YouMessage(tmp, "There ", line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -499,7 +756,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     else
         YouPrefix(tmp, "You hear ", line);
     vpline(strcat(tmp, line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -521,7 +778,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     else
         YouPrefix(tmp, "You see ", line);
     vpline(strcat(tmp, line), VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -541,7 +798,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     Strcat(tmp, line);
     Strcat(tmp, "\"");
     vpline(tmp, VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
 }
@@ -570,7 +827,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_color = color;
     pline_flags = PLINE_NOREPEAT;
     vpline(line, VA_ARGS);
-    pline_attr = 0;
+    pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     pline_flags = 0;
     VA_END();
@@ -816,12 +1073,15 @@ VA_DECL(const char *, s)
         panic("%s", pbuf);
         return;
     }
-    pline("%s", VA_PASS1(pbuf));
+    pline_ex(ATR_NONE, CLR_MSG_ERROR, "impossible: %s", VA_PASS1(pbuf));
+    if (issue_gui_command)
+        issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_IMPOSSIBLE, pbuf);
+
     /* reuse pbuf[] */
     Strcpy(pbuf, "Program in disorder!");
     if (program_state.something_worth_saving)
         Strcat(pbuf, "  (Saving and reloading may fix this problem.)");
-    pline("%s", VA_PASS1(pbuf));
+    pline_ex(ATR_NONE, CLR_MSG_ERROR, "%s", VA_PASS1(pbuf));
 
     program_state.in_impossible = 0;
     VA_END();
@@ -912,6 +1172,28 @@ VA_DECL(const char *, str)
 
 #if !(defined(USE_STDARG) || defined(USE_VARARGS))
     VA_END(); /* (see pline/vpline -- ends nested block for USE_OLDARGS) */
+#endif
+}
+
+void
+reset_pline(VOID_ARGS)
+{
+    pline_attr = 0;
+    pline_color = NO_COLOR;
+    pline_flags = 0;
+    pline_prefix_attr = 0;
+    pline_prefix_color = NO_COLOR;
+    pline_prefix_text = 0;
+    pline_separator_attr = 0;
+    pline_separator_color = NO_COLOR;
+    pline_separator_text = 0;
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+
+    prevmsg[0] = 0;
+
+#if defined(MSGHANDLER) && (defined(POSIX_TYPES) || defined(__GNUC__))
+    use_pline_handler = TRUE;
 #endif
 }
 

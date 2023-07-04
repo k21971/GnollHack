@@ -325,6 +325,7 @@ struct version_info {
     unsigned char int_size;
     unsigned char long_size;
     unsigned char ptr_size;
+    unsigned long version_compatibility; /* used in cases where an older version of GnollHack tries to load a compatible but newer saved game; tells what is the oldest compatible old version */
 };
 
 struct savefile_info {
@@ -407,6 +408,34 @@ struct savefile_info {
 #ifdef UNIX
 #define PANICTRACE_GDB
 #endif
+
+/* LIVELOG message type flags */
+#define LL_WISH       0x0001 /* Report stuff people type at the wish prompt. */
+#define LL_ACHIEVE    0x0002 /* Achievements bitfield + invocation, planes */
+#define LL_UMONST     0x0004 /* Kill, Bribe or otherwise dispatch unique monsters */
+#define LL_DIVINEGIFT 0x0008 /* Sacrifice gifts, crowning */
+#define LL_LIFESAVE   0x0010 /* Use up amulet of lifesaving */
+#define LL_CONDUCT    0x0020 /* Break conduct - not reported early-game */
+#define LL_ARTIFACT   0x0040 /* Excalibur, Sting, Orcrist, plus sac gifts and artwishes */
+#define LL_GENOCIDE   0x0080 /* Logging of genocides */
+#define LL_KILLEDPET  0x0100 /* Killed a tame monster */
+#define LL_ALIGNMENT  0x0200 /* changed alignment temporarily or permanently */
+#define LL_DUMP_ASC   0x0400 /* Log URL for dumplog if ascended */
+#define LL_DUMP_ALL   0x0800 /* Log dumplog url for all games */
+#define LL_MINORAC    0x1000 /* Log 'minor' achievements - can be spammy */
+#define LL_SPOILER    0x2000 /* reveals information so don't show in-game
+                               * via #chronicle unless in wizard mode */
+#define LL_DUMP       0x4000 /* none of the above but should be in dumplog */
+#define LL_DEBUG      0x8000 /* For debugging messages and other spam */
+
+/* #chronicle details */
+/* 'major' events for dumplog; inclusion or exclusion here may need tuning */
+#define LL_majors                                                        \
+    (0L | LL_WISH | LL_ACHIEVE | LL_UMONST | LL_DIVINEGIFT | LL_LIFESAVE \
+     | LL_ARTIFACT | LL_GENOCIDE | LL_DUMP) /* explicitly for dumplog */
+#define majorevent(m) (((m)->flags & LL_majors) != 0)
+#define spoilerevent(m) (((m)->flags & LL_SPOILER) != 0)
+
 
 /* Supply GnollHack_enter macro if not supplied by port */
 #ifndef GnollHack_enter

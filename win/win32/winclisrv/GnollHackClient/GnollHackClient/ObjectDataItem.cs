@@ -10,7 +10,6 @@ namespace GnollHackClient
         public obj ObjData;
         public objclassdata OtypData;
         public List<ObjectDataItem> ContainedObjs;
-        //private short _tileHeight = 0;
 
         public short TileHeight {
             get
@@ -83,6 +82,10 @@ namespace GnollHackClient
         }
 
         public bool Hallucinated { get; set; }
+        public bool OutOfAmmo { get; set; }
+        public bool WrongAmmoType { get; set; }
+        public bool NotBeingUsed { get; set; }
+        public bool NotWeapon { get; set; }
 
         public ObjectDataItem()
         {
@@ -93,6 +96,16 @@ namespace GnollHackClient
             ObjData = objData;
             OtypData = otypdata;
             Hallucinated = hallucinated;
+        }
+        public ObjectDataItem(obj objData, objclassdata otypdata, bool hallucinated, bool outofammo, bool wrongammo, bool notbeingused,  bool notweapon)
+        {
+            ObjData = objData;
+            OtypData = otypdata;
+            Hallucinated = hallucinated;
+            OutOfAmmo = outofammo;
+            WrongAmmoType = wrongammo;
+            NotBeingUsed = notbeingused;
+            NotWeapon = notweapon;
         }
     }
 }

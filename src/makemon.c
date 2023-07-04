@@ -1952,10 +1952,6 @@ register struct monst *mtmp;
         if (ptr == &mons[PM_ICE_DEVIL] && !rn2(4)) {
             (void)mongets(mtmp, SPEAR);
         }
-        else if (ptr == &mons[PM_ASMODEUS]) {
-            (void)mongets(mtmp, WAN_COLD);
-            (void)mongets(mtmp, WAN_FIRE);
-        }
         else if (ptr == &mons[PM_YACC])
         {
             /* Yacc is normally using an artifact ring as the nose ring */
@@ -1975,7 +1971,6 @@ register struct monst *mtmp;
                 conflict_ok = FALSE;
             if (exist_artifact(RIN_SUPREME_POWER, artiname(ART_RULING_RING_OF_YENDOR)))
                 true_ring_ok = FALSE;
-
 
             if (three_wishes_ok)
             {
@@ -2008,7 +2003,16 @@ register struct monst *mtmp;
 
             if (otmp)
                 (void)mpickobj(mtmp, otmp);
-        }       
+        }
+        else if ((is_lord(mtmp->data) || is_prince(mtmp->data)) && !rn2(3))
+        {
+            if (has_neck(mtmp->data) && !nohands(mtmp->data))
+                (void)mongets(mtmp, !rn2(2) ? AMULET_OF_REFLECTION : BRACERS_OF_REFLECTION);
+            else if(has_neck(mtmp->data))
+                (void)mongets(mtmp, AMULET_OF_REFLECTION);
+            else if(!nohands(mtmp->data))
+                (void)mongets(mtmp, BRACERS_OF_REFLECTION);
+        }
         break;
     case S_ORC:
         if (!rn2(2))
@@ -2573,6 +2577,8 @@ newmextra()
     mextra->eshk = 0;
     mextra->emin = 0;
     mextra->edog = 0;
+    mextra->mmonst = 0;
+    mextra->mobj = 0;
     mextra->mcorpsenm = NON_PM;
     return mextra;
 }
@@ -2890,7 +2896,7 @@ aligntyp alignment;
     if (!mtmp->m_id)
         mtmp->m_id = context.ident++; /* ident overflowed */
 
-    set_mon_data(mtmp, ptr); /* mtmp->data = ptr; */
+    set_mon_data(mtmp, ptr, 0); /* mtmp->data = ptr; */
     if (ptr->msound == MS_LEADER && quest_info(MS_LEADER) == mndx)
         quest_status.leader_m_id = mtmp->m_id;
     mtmp->mnum = mndx;
@@ -2976,7 +2982,9 @@ aligntyp alignment;
     {
         if (mons[mndx].mflags6 & M6_USES_CAT_SUBTYPES)
         {
-            if (!rn2(9))
+            if(!rn2(4))
+                mtmp->subtype = CAT_BREED_BLACK;
+            else if (!rn2(9))
                 mtmp->subtype = rn2(NUM_CAT_BREEDS);
         }
         else if (mons[mndx].mflags6 & M6_USES_DOG_SUBTYPES)
@@ -3061,6 +3069,7 @@ aligntyp alignment;
     if (mndx == PM_VLAD_THE_IMPALER)
         mitem = CANDELABRUM_OF_INVOCATION;
     mtmp->cham = NON_PM; /* default is "not a shapechanger" */
+    mtmp->cham_subtype = 0;
 
     if (!Protection_from_shape_changers
         && (mcham = pm_to_cham(mndx)) != NON_PM) 
@@ -3074,7 +3083,7 @@ aligntyp alignment;
                to the level's difficulty but ignoring the changer's usual
                type selection, so was inappropriate for vampshifters.
                Let newcham() pick the shape. */
-            && newcham(mtmp, (struct permonst *) 0, FALSE, FALSE))
+            && newcham(mtmp, (struct permonst *) 0, 0, FALSE, FALSE))
             allow_minvent = FALSE;
     }
     else if (mndx == PM_WIZARD_OF_YENDOR) 
@@ -3107,8 +3116,8 @@ aligntyp alignment;
 
     if (in_mklev) 
     {
-        if ((/* is_ndemon(ptr) ||*/ mndx == PM_WUMPUS
-             || is_long_worm_with_tail(&mons[mndx]) || mndx == PM_GIANT_EEL)
+        if ((/* is_ndemon(ptr) ||mndx == PM_WUMPUS ||  */ 
+             is_long_worm_with_tail(&mons[mndx]) || mndx == PM_GIANT_EEL)
             && !u.uhave.amulet && rn2(5))
             mtmp->msleeping = TRUE;
     } 
@@ -3228,7 +3237,7 @@ aligntyp alignment;
     }
 
     /* Add acceleration to lights in Quantum Tunnel */
-    if (Is_quantum_level(&u.uz) && mons[mtmp->mnum].mlet == S_LIGHT)
+    if (Is_quantum_tunnel_level(&u.uz) && mons[mtmp->mnum].mlet == S_LIGHT)
     {
         mtmp->mprops[!rn2(3) ? LIGHTNING_FAST : !rn2(2) ? SUPER_FAST : ULTRA_FAST] |= 500 + d(5, 100);
     }
@@ -3997,7 +4006,7 @@ struct monst *mtmp, *victim;
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As %s grows up into %s, %s %s!", mon_nam(mtmp),
                       an(pm_monster_name(ptr, mtmp->female)), mhe(mtmp),
                       is_not_living(ptr) ? "expires" : "dies");
-            set_mon_data(mtmp, ptr); /* keep mvitals[] accurate */
+            set_mon_data(mtmp, ptr, mtmp->subtype); /* keep mvitals[] accurate */
             change_mon_ability_scores(mtmp, oldtype, newtype);
             mondied(mtmp);
             return (struct permonst *) 0;
@@ -4024,7 +4033,7 @@ struct monst *mtmp, *victim;
                                                         : "grows up into",
                   an(buf));
         }
-        set_mon_data(mtmp, ptr);
+        set_mon_data(mtmp, ptr, mtmp->subtype);
         change_mon_ability_scores(mtmp, oldtype, newtype);
         newsym(mtmp->mx, mtmp->my);    /* color may change */
         lev_limit = (int) mtmp->m_lev; /* never undo increment */
@@ -4391,6 +4400,8 @@ struct monst *mtmp;
     }
 
     coaligned = (sgn(mal) == sgn(u.ualign.type));
+
+    int absmal = abs(mal) + 1;
     if (mtmp->data->msound == MS_LEADER)
     {
         mtmp->mhostility = -20;
@@ -4398,13 +4409,12 @@ struct monst *mtmp;
     else if (mal == A_NONE) 
     {
         if (is_peaceful(mtmp))
-            mtmp->mhostility = 0;
+            mtmp->mhostility = 1;
         else
             mtmp->mhostility = 20; /* really hostile */
     }
     else if (always_peaceful(mtmp->data))
     {
-        int absmal = abs(mal);
         if (is_peaceful(mtmp))
             mtmp->mhostility = -3 * max(5, absmal);
         else
@@ -4412,22 +4422,20 @@ struct monst *mtmp;
     } 
     else if (always_hostile(mtmp->data)) 
     {
-        int absmal = abs(mal);
         if (coaligned)
-            mtmp->mhostility = 0;
+            mtmp->mhostility = 1;
         else
             mtmp->mhostility = max(5, absmal);
     }
     else if (coaligned) 
     {
-        int absmal = abs(mal);
         if (is_peaceful(mtmp))
             mtmp->mhostility = -3 * max(3, absmal);
         else /* renegade */
             mtmp->mhostility = max(3, absmal);
     } 
     else /* not coaligned and therefore hostile */
-        mtmp->mhostility = abs(mal);
+        mtmp->mhostility = absmal;
 }
 
 /* allocate a new mcorpsenm field for a monster; only need mextra itself */
@@ -4723,4 +4731,173 @@ reset_makemon(VOID_ARGS)
     align_lev = 0;
     reset_rndmonst(NON_PM);
 }
+
+void
+newmmonst(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp->mextra)
+        mtmp->mextra = newmextra();
+    if (!MMONST(mtmp)) {
+        MMONST(mtmp) = (struct monst*)alloc(sizeof(struct monst));
+        (void)memset((genericptr_t)MMONST(mtmp), 0, sizeof(struct monst));
+    }
+}
+
+void
+free_mmonst(mtmp)
+struct monst* mtmp;
+{
+    if (has_mmonst(mtmp)) {
+        if (MMONST(mtmp)->mextra)
+            dealloc_mextra(MMONST(mtmp));
+        free((genericptr_t)MMONST(mtmp));
+        MMONST(mtmp) = (struct monst*)0;
+    }
+}
+
+void
+newmobj(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp->mextra)
+        mtmp->mextra = newmextra();
+    if (!MOBJ(mtmp)) {
+        MOBJ(mtmp) = (struct obj*)alloc(sizeof(struct obj));
+        (void)memset((genericptr_t)MOBJ(mtmp), 0, sizeof(struct obj));
+    }
+}
+
+void
+free_mobj(mtmp)
+struct monst* mtmp;
+{
+    if (has_mobj(mtmp)) {
+        if (MOBJ(mtmp)->oextra)
+            dealloc_oextra(MOBJ(mtmp));
+        free((genericptr_t)MOBJ(mtmp));
+        MOBJ(mtmp) = (struct obj*)0;
+    }
+}
+
+void
+save_mmonst(mon, mon_mmonst)
+struct monst* mon; /* Save to this mon's mextra */
+struct monst* mon_mmonst;
+{
+    if (mon_mmonst->ispriest)
+        forget_temple_entry(mon_mmonst); /* EPRI() */
+    if (mon_mmonst->issmith)
+        forget_smithy_entry(mon_mmonst); /* ESMI() */
+    if (mon_mmonst->isnpc)
+        forget_npc_entry(mon_mmonst); /* ENPC() */
+    if (!has_mmonst(mon))
+        newmmonst(mon);
+    if (has_mmonst(mon))
+    {
+        struct monst* mtmp2 = MMONST(mon);
+
+        *mtmp2 = *mon_mmonst;
+        mtmp2->mextra = (struct mextra*)0;
+
+        /* invalidate pointers */
+        /* m_id is needed to know if this is a revived quest leader */
+        /* but m_id must be cleared when loading bones */
+        mtmp2->nmon = (struct monst*)0;
+        //mtmp2->data = (struct permonst *) 0; /* This sounds very dangerous to set to zero */
+        mtmp2->minvent = (struct obj*)0;
+        if (mon_mmonst->mextra)
+            copy_mextra(mtmp2, mon_mmonst);
+    }
+}
+
+/* returns a pointer to a new monst structure based on
+ * the one contained within the obj.
+ */
+struct monst*
+get_mmonst(mon, copyof)
+struct monst* mon;
+boolean copyof;
+{
+    struct monst* mon_mmonst = (struct monst*)0;
+    struct monst* mnew = (struct monst*)0;
+
+    if (has_mmonst(mon))
+        mon_mmonst = MMONST(mon);
+    if (mon_mmonst) {
+        if (copyof) {
+            mnew = newmonst();
+            *mnew = *mon_mmonst;
+            mnew->mextra = (struct mextra*)0;
+            if (mon_mmonst->mextra)
+                copy_mextra(mnew, mon_mmonst);
+        }
+        else {
+            /* Never insert this returned pointer into mon chains! */
+            mnew = mon_mmonst;
+        }
+
+        if (mnew && !mnew->data)
+            mnew->data = &mons[mnew->mnum];
+    }
+
+    return mnew;
+}
+
+void
+save_mobj(mon, obj_mobj)
+struct monst* mon; /* Save to this mon's mextra */
+struct obj* obj_mobj;
+{
+    if (!has_mobj(mon))
+        newmobj(mon);
+    if (has_mobj(mon))
+    {
+        struct obj* obj2 = MOBJ(mon);
+
+        *obj2 = *obj_mobj;
+        obj2->oextra = (struct oextra*)0;
+
+        /* invalidate pointers */
+        /* m_id is needed to know if this is a revived quest leader */
+        /* but m_id must be cleared when loading bones */
+        obj2->nobj = (struct obj*)0;
+        obj2->nexthere = (struct obj*)0;
+        //mtmp2->data = (struct permonst *) 0; /* This sounds very dangerous to set to zero */
+        obj2->cobj = (struct obj*)0;
+        if (obj_mobj->oextra)
+            copy_oextra(obj2, obj_mobj);
+    }
+}
+
+/* returns a pointer to a new monst structure based on
+ * the one contained within the obj.
+ */
+struct obj*
+get_mobj(mon, copyof)
+struct monst* mon;
+boolean copyof;
+{
+    struct obj* obj_mobj = (struct obj*)0;
+    struct obj* onew = (struct obj*)0;
+
+    if (has_mobj(mon))
+        obj_mobj = MOBJ(mon);
+    if (obj_mobj) {
+        if (copyof) {
+            onew = newobj();
+            *onew = *obj_mobj;
+            onew->oextra = (struct oextra*)0;
+            if (obj_mobj->oextra)
+                copy_oextra(onew, obj_mobj);
+        }
+        else {
+            /* Never insert this returned pointer into obj chains! */
+            onew = obj_mobj;
+        }
+    }
+
+    return onew;
+}
+
 /*makemon.c*/

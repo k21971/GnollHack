@@ -524,7 +524,7 @@ xchar x, y;
             )) 
     {
         play_player_ouch_sound(MONSTER_OUCH_SOUND_OUCH);
-        You("hurt your teeth on the %s.",
+        You_ex(ATR_NONE, CLR_MSG_WARNING, "hurt your teeth on the %s.",
             (lev->typ == IRONBARS)
                 ? "bars"
                 : IS_TREE(lev->typ)
@@ -585,7 +585,18 @@ xchar x, y;
     }
 
     /* Okay, you've chewed through something */
-    u.uconduct.food++;
+    if (!u.uconduct.food++)
+        livelog_printf(LL_CONDUCT, "ate for the first time, by chewing through %s",
+            boulder
+            ? "a boulder"
+            : IS_TREE(lev->typ)
+            ? "a tree"
+            : IS_ROCK(lev->typ)
+            ? "rock"
+            : (lev->typ == IRONBARS)
+            ? "iron bars"
+            : "a door");
+
     u.uhunger += rnd(20);
 
     play_occupation_immediate_sound(oss, OCCUPATION_DIGGING_ROCK, OCCUPATION_SOUND_TYPE_FINISH);
@@ -2363,7 +2374,9 @@ domove_core()
                        killed() so we duplicate some of the latter here */
                     int tmp, mndx;
 
-                    u.uconduct.killer++;
+                    if (!u.uconduct.killer++)
+                        livelog_printf(LL_CONDUCT, "%s", "killed for the first time");
+
                     mndx = mtmp->mnum;
                     tmp = experience(mtmp, (int) mvitals[mndx].died);
                     more_experienced(tmp, 0);
@@ -3626,10 +3639,15 @@ const char *msg_override;
     if (msg_override)
         nomovemsg = msg_override;
     else if (!nomovemsg)
+    {
         nomovemsg = You_can_move_again;
+        nomovemsg_color = CLR_MSG_SUCCESS;
+    }
     if (*nomovemsg)
-        pline("%s", nomovemsg);
+        pline_ex(nomovemsg_attr, nomovemsg_color, "%s", nomovemsg);
     nomovemsg = 0;
+    nomovemsg_attr = ATR_NONE;
+    nomovemsg_color = NO_COLOR;
     u.usleep = 0;
     multi_reason = NULL;
     if (afternmv) {

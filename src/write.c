@@ -241,7 +241,9 @@ found:
     }
 
     /* KMH, conduct */
-    u.uconduct.literate++;
+    if (!u.uconduct.literate++)
+        livelog_printf(LL_CONDUCT,
+            "became literate by writing %s", an(typeword));
 
     new_obj = mksobj(i, FALSE, FALSE, FALSE);
     new_obj->bknown = (paper->bknown && pen->bknown);
@@ -329,7 +331,8 @@ found:
                 wipeout_text(namebuf, (6 + MAXULEV - u.ulevel) / 6, 0);
             } else
                 Sprintf(namebuf, "%s was here!", plname);
-            You_ex(ATR_NONE, CLR_MSG_FAIL, "write \"%s\" and the scroll disappears.", namebuf);
+            int multicolors[1] = { CLR_MSG_HINT };
+            You_multi_ex(ATR_NONE, CLR_MSG_FAIL, no_multiattrs, multicolors, "write \"%s\" and the scroll disappears.", namebuf);
             useup(paper);
         }
         obfree(new_obj, (struct obj *) 0);

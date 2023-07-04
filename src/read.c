@@ -203,10 +203,13 @@ doread()
     if (scroll->otyp == FORTUNE_COOKIE) 
     {
         if (flags.verbose)
-            You("break up the cookie and throw away the pieces.");
+            You1("break up the cookie and throw away the pieces.");
         outrumor((struct monst*)0, scroll, bcsign(scroll), BY_COOKIE);
         if (!Blind)
-            u.uconduct.literate++;
+            if (!u.uconduct.literate++)
+                livelog_printf(LL_CONDUCT, "%s",
+                    "became literate by reading a fortune cookie");
+
         useup(scroll);
         return 1;
     } 
@@ -217,21 +220,27 @@ doread()
 
         if (Blind) 
         {
-            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            You_cant_ex1(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
             return 0;
         }
         /* can't read shirt worn under suit (under cloak is ok though) */
-        if (objects[scroll->otyp].oc_armor_category == ARM_SHIRT && (uarm || uarmo) && scroll == uarmu) {
-            pline("%s shirt is obscured by %s%s.",
+        if (objects[scroll->otyp].oc_armor_category == ARM_SHIRT && (uarm || uarmo) && scroll == uarmu) 
+        {
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s shirt is obscured by %s%s.",
                   scroll->unpaid ? "That" : "Your", shk_your(buf, uarmo ? uarmo : uarm),
                   uarmo ? robe_simple_name(uarmo) : suit_simple_name(uarm));
             return 0;
         }
-        u.uconduct.literate++;
+
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "became literate by reading %s", acxname(scroll));
+
         /* populate 'buf[]' */
         if (scroll->otyp == SHIRT_OF_SOUND_MINDEDNESS)
         {
-            pline("This T-shirt has the words \"Sound Mind Games\" emblazoned upon it in large friendly letters.");
+            pline_ex1(ATR_NONE, CLR_MSG_TEXT, "This T-shirt has the words \"Sound Mind Games\" emblazoned upon it in large friendly letters.");
             if (!objects[scroll->otyp].oc_name_known)
             {
                 makeknown(scroll->otyp);
@@ -240,7 +249,7 @@ doread()
         }
         else if (scroll->otyp == SHIRT_OF_UNCONTROLLABLE_LAUGHTER)
         {
-            pline("This T-shirt has a message of incomparable hilarity emblazoned upon it.");
+            pline_ex1(ATR_NONE, CLR_MSG_TEXT, "This T-shirt has a message of incomparable hilarity emblazoned upon it.");
             if (!objects[scroll->otyp].oc_name_known)
             {
                 makeknown(scroll->otyp);
@@ -249,7 +258,7 @@ doread()
         }
         else if (scroll->otyp == SHIRT_OF_COMELINESS || scroll->otyp == HAWAIIAN_SHIRT)
         {
-            pline("There is no text on this T-shirt.");
+            pline_ex1(ATR_NONE, NO_COLOR, "There is no text on this T-shirt.");
         }
         else
         {
@@ -265,7 +274,7 @@ doread()
                     endpunct = ".";
                 pline("It reads:");
             }
-            pline("\"%s\"%s", mesg, endpunct);
+            pline_ex(ATR_NONE, CLR_MSG_TEXT, "\"%s\"%s", mesg, endpunct);
         }
         return 1;
     } 
@@ -292,14 +301,14 @@ doread()
             You("feel the embossed numbers:");
         } else {
             if (flags.verbose)
-                pline("It reads:");
-            pline("\"%s\"",
+                pline1("It reads:");
+            pline_ex(ATR_NONE, CLR_MSG_TEXT, "\"%s\"",
                   scroll->oartifact
                       ? card_msgs[SIZE(card_msgs) - 1]
                       : card_msgs[scroll->o_id % (SIZE(card_msgs) - 1)]);
         }
         /* Make a credit card number */
-        pline("\"%d0%d %ld%d1 0%d%d0\"%s",
+        pline_ex(ATR_NONE, CLR_MSG_TEXT, "\"%d0%d %ld%d1 0%d%d0\"%s",
               (((int) scroll->o_id % 89) + 10),
               ((int) scroll->o_id % 4),
               ((((long) scroll->o_id * 499L) % 899999L) + 100000L),
@@ -307,7 +316,11 @@ doread()
               (!((int) scroll->o_id % 3)),
               (((int) scroll->o_id * 7) % 10),
               (flags.verbose || Blind) ? "." : "");
-        u.uconduct.literate++;
+
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "%s",
+                "became literate by reading a credit card");
+
         return 1;
     }
     else if (scroll->otyp == CAN_OF_GREASE || scroll->otyp == JAR_OF_MEDICINAL_SALVE || scroll->otyp == JAR_OF_BASILISK_BLOOD || scroll->otyp == JAR_OF_EXTRA_HEALING_SALVE || scroll->otyp == JAR_OF_GREATER_HEALING_SALVE || scroll->otyp == JAR_OF_PRODIGIOUS_HEALING_SALVE || scroll->otyp == GRAIL_OF_HEALING) 
@@ -319,38 +332,43 @@ doread()
     {
         if (Blind) 
         {
-            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
+            You_cant_ex1(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
             return 0;
         }
         if (flags.verbose)
-            pline("It reads:");
-        pline("\"Magic Marker(TM) Red Ink Marker Pen.  Water Soluble.\"");
-        u.uconduct.literate++;
+            pline1("It reads:");
+        pline_ex1(ATR_NONE, CLR_MSG_TEXT, "\"Magic Marker(TM) Red Ink Marker Pen.  Water Soluble.\"");
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "%s",
+                "became literate by reading a magic marker");
         return 1;
     }
     else if (scroll->oclass == COIN_CLASS)
     {
         if (Blind)
-            You("feel the embossed words:");
+            You1("feel the embossed words:");
         else if (flags.verbose)
-            You("read:");
+            You1("read:");
         
         if(Hallucination)
-            pline("\"1 Zorkmid.  857 GUE.  In Frobs We Trust.\"");
+            pline_ex1(ATR_NONE, CLR_MSG_TEXT, "\"1 Zorkmid.  857 GUE.  In Frobs We Trust.\"");
         else
-            pline("\"1 Yendorian Gold Coin.  Treasury of Yendor.\"");
+            pline_ex1(ATR_NONE, CLR_MSG_TEXT, "\"1 Yendorian Gold Coin.  Treasury of Yendor.\"");
 
-        u.uconduct.literate++;
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "%s",
+                "became literate by reading a coin's engravings");
         return 1;
     } 
     else if (scroll->oartifact == ART_ORB_OF_FATE) 
     {
         if (Blind)
-            You("feel the engraved signature:");
+            You1("feel the engraved signature:");
         else
-            pline("It is signed:");
-        pline("\"Odin.\"");
-        u.uconduct.literate++;
+            pline1("It is signed:");
+        pline_ex1(ATR_NONE, CLR_MSG_TEXT, "\"Odin.\"");
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "became literate by reading %s", acxname(scroll));
         return 1;
     }
     else if (scroll->oartifact == ART_RULING_RING_OF_YENDOR) 
@@ -375,9 +393,12 @@ doread()
             You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "feel any Braille writing.");
             return 0;
         }
-        pline("The wrapper reads: \"%s\".",
+        pline1("The wrapper reads:");
+        pline_ex(ATR_NONE, CLR_MSG_TEXT, "\"%s\".",
               wrapper_msgs[scroll->o_id % SIZE(wrapper_msgs)]);
-        u.uconduct.literate++;
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "%s",
+                "became literate by reading a candy bar wrapper");
         return 1;
     }
     else if (scroll->oclass != SCROLL_CLASS
@@ -428,7 +449,12 @@ doread()
     /* Actions required to win the game aren't counted towards conduct */
     /* Novel conduct is handled in read_tribute so exclude it too*/
     if (!(objects[scroll->otyp].oc_flags5 & O5_OK_FOR_ILLITERATE))
-        u.uconduct.literate++;
+    {
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "became literate by reading %s",
+                scroll->oclass == SPBOOK_CLASS ? "a book" :
+                scroll->oclass == SCROLL_CLASS ? "a scroll" : acxname(scroll));
+    }
 
     if (scroll->oclass == SPBOOK_CLASS)
     {
@@ -3631,7 +3657,7 @@ struct obj *obj;
 STATIC_OVL void
 do_class_genocide()
 {
-    int i, j, immunecnt, gonecnt, goodcnt, class, feel_dead = 0;
+    int i, j, immunecnt, gonecnt, goodcnt, class, feel_dead = 0, ll_done = 0;
     char buf[BUFSZ] = DUMMY;
     boolean gameover = FALSE; /* true iff killed self */
 
@@ -3758,6 +3784,7 @@ do_class_genocide()
                     || ((mons[i].geno & G_GENO)
                         && !(mvitals[i].mvflags & MV_GENOCIDED))) 
                 {
+                    int prevnumgenocided = num_genocides();
                     /* This check must be first since player monsters might
                      * have MV_GENOCIDED or !G_GENO.
                      */
@@ -3771,6 +3798,18 @@ do_class_genocide()
                     kill_genocided_monsters();
                     update_inventory(); /* eggs & tins */
                     pline("Wiped out all %s.", nam);
+
+                    if (!ll_done++) 
+                    {
+                        if (!prevnumgenocided)
+                            livelog_printf(LL_CONDUCT | LL_GENOCIDE,
+                                "performed %s first genocide (monsters from class %c, %s)",
+                                uhis(), def_monsyms[class].sym, def_monsyms[class].name);
+                        else
+                            livelog_printf(LL_GENOCIDE, "genocided monsters from class %c (%s)",
+                                def_monsyms[class].sym, def_monsyms[class].name);
+                    }
+
                     if (Upolyd && i == u.umonnum) 
                     {
                         u.mh = -1;
@@ -3980,12 +4019,19 @@ int how;
 
     if (how & REALLY) 
     {
+        int prevnumgenocided = num_genocides();
         play_sfx_sound(SFX_GENOCIDE);
 
         /* setting no-corpse affects wishing and random tin generation */
         mvitals[mndx].mvflags |= (MV_GENOCIDED | MV_NOCORPSE);
         pline("Wiped out %s%s.", which, pluralbuf);
               //(*which != 'a') ? buf : makeplural(buf));
+
+        if (!prevnumgenocided)
+            livelog_printf(LL_CONDUCT | LL_GENOCIDE,
+                "performed %s first genocide (%s)", uhis(), pluralbuf);
+        else
+            livelog_printf(LL_GENOCIDE, "genocided %s", pluralbuf);
 
         if (killplayer) 
         {
@@ -4336,7 +4382,7 @@ struct _create_particular_data *d;
         /* in case we got a doppelganger instead of what was asked
            for, make it start out looking like what was asked for */
         if (mtmp->cham != NON_PM && firstchoice != NON_PM && mtmp->cham != firstchoice)
-            (void) newcham(mtmp, &mons[firstchoice], FALSE, FALSE);
+            (void) newcham(mtmp, &mons[firstchoice], 0, FALSE, FALSE);
 
         newsym(mtmp->mx, mtmp->my);
     }

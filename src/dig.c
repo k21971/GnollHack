@@ -709,6 +709,7 @@ int ttyp;
     struct monst *mtmp = m_at(x, y); /* may be madeby */
     boolean madeby_u = (madeby == BY_YOU);
     boolean madeby_obj = (madeby == BY_OBJECT);
+    boolean madeby_mon = madeby && !madeby_u && !madeby_obj;
     boolean at_u = (x == u.ux) && (y == u.uy);
     boolean wont_fall = Levitation || Flying;
 
@@ -753,11 +754,10 @@ int ttyp;
         Strcpy(surface_type, surface(x, y));
     shopdoor = IS_DOOR(lev->typ) && *in_rooms(x, y, SHOPBASE);
     oldobjs = level.objects[x][y];
-    ttmp = maketrap(x, y, ttyp, NON_PM, MKTRAP_NO_FLAGS);
+    ttmp = maketrap(x, y, ttyp, NON_PM, (madeby_u ? MKTRAPFLAG_MADE_BY_U : 0UL) | (madeby_mon ? MKTRAPFLAG_MADE_BY_MON : 0UL));
     if (!ttmp)
         return;
     newobjs = level.objects[x][y];
-    ttmp->madeby_u = madeby_u;
     ttmp->tseen = 0;
     if (cansee(x, y))
         seetrap(ttmp);
@@ -1145,7 +1145,7 @@ coord *cc;
             if (!Blind)
             {
                 play_sfx_sound(SFX_SURPRISE_ATTACK);
-                pline(Hallucination ? "Dude!  The living dead!"
+                pline_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_WARNING, Hallucination ? "Dude!  The living dead!"
                     : "The grave's owner is very upset!");
             }
             (void)makemon(mkclass(S_LESSER_UNDEAD, 0), dig_x, dig_y, NO_MM_FLAGS);
@@ -1154,7 +1154,7 @@ coord *cc;
             if (!Blind)
             {
                 play_sfx_sound(SFX_SURPRISE_ATTACK);
-                pline(Hallucination ? "I want my mummy!"
+                pline_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_WARNING, Hallucination ? "I want my mummy!"
                     : "You've disturbed a tomb!");
             }
             otmp = mksobj_at_with_flags(SARCOPHAGUS, dig_x, dig_y, FALSE, FALSE, 0, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_OPEN_COFFIN);
@@ -2651,7 +2651,7 @@ struct obj* origobj;
             create_current_floor_location(zx, zy, 0, back_to_broken_glyph(zx, zy), TRUE);
             newsym(zx, zy);
             if (see_it)
-                pline_The("fountain dries up!");
+                pline_The1("fountain dries up!");
             /* The location is seen if the hero/monster is invisible
                or felt if the hero is blind. */
             digdepth -= 1;

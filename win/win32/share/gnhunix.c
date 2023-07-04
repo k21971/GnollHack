@@ -12,6 +12,7 @@
 #if defined(NO_FILE_LINKS) || defined(SUNOS4) || defined(POSIX_TYPES)
 #include <fcntl.h>
 #endif
+#include <pthread.h>
 
 void
 regularize(s)    /* normalize file name - we don't like .'s, /'s, spaces */
@@ -53,6 +54,7 @@ getlock()
     {
         wait_synch();
         error("%s", "");
+        return;
     }
 
     regularize(lock);
@@ -66,6 +68,7 @@ getlock()
         perror(fq_lock);
         unlock_file(HLOCK);
         error("Cannot open %s", fq_lock);
+        return;
     }
     (void) close(fd);
 
@@ -74,6 +77,7 @@ getlock()
         (void) eraseoldlocks();
         unlock_file(HLOCK);
         error("Couldn't recover old game.");
+        return;
     }
 
 gotlock:
@@ -118,6 +122,7 @@ check_crash()
     {
         wait_synch();
         error("%s", "");
+        return;
     }
 
     if (!wizard)
@@ -137,6 +142,7 @@ check_crash()
         perror(fq_lock);
         unlock_file(HLOCK);
         error("Cannot open %s", fq_lock);
+        return;
     }
     (void)close(fd);
 
@@ -145,10 +151,48 @@ check_crash()
     (void)open_special_view(info);
 
     /* Use recover_plname instead */
-    if(!wizard)
-        strcpy(plname, recovery_plname);
+    //if(!wizard)
+    //    strcpy(plname, recovery_plname);
 
 nofilefound:
     unlock_file(HLOCK);
 }
 
+int lock_init_result = -1;
+pthread_mutex_t threadlock = { 0 };
+
+void
+thread_lock_init(VOID_ARGS)
+{
+    if (!lock_init_result)
+        thread_lock_destroy();
+    lock_init_result = pthread_mutex_init(&threadlock, NULL);
+}
+
+void
+thread_lock_destroy(VOID_ARGS)
+{
+    if (!lock_init_result)
+    {
+        (void)pthread_mutex_destroy(&threadlock);
+        lock_init_result = -1;
+    }
+}
+
+void
+thread_lock_lock(VOID_ARGS)
+{
+    if (!lock_init_result)
+    {
+        (void)pthread_mutex_lock(&threadlock);
+    }
+}
+
+void
+thread_lock_unlock(VOID_ARGS)
+{
+    if (!lock_init_result)
+    {
+        (void)pthread_mutex_unlock(&threadlock);
+    }
+}

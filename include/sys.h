@@ -17,8 +17,20 @@ struct sysopt {
     char *shellers;   /* like wizards, for ! command (-DSHELL); also ^Z */
     char *genericusers; /* usernames that prompt for user name */
     char *debugfiles; /* files to show debugplines in. '*' is all. */
-#ifdef DUMPLOG
+#if defined (DUMPLOG)
     char *dumplogfile; /* where the dump file is saved */
+    char* dumplogurl;  /* url path for the above */
+#endif
+#ifdef DUMPHTML
+    char* dumphtmlfile; /* where the html dump is saved */
+    char* dumphtmlfontname; /* font name for html dump */
+#ifdef DUMPHTML_WEBFONT_LINK
+    char* dumphtmlfontlink; /* css web link for the font */
+#endif
+    char* dumphtml_css_fontface_normal; /* css @fontface definition for normal font */
+    char* dumphtml_css_fontface_bold; /* css @fontface definition for bold font */
+    char* dumphtml_css_fontface_italic; /* css @fontface definition for italic font */
+    char* dumphtml_css_fontface_bolditalic; /* css @fontface definition for bold italic font */
 #endif
     int env_dbgfl;    /*  1: debugfiles comes from getenv("DEBUGFILES")
                        *     so sysconf's DEBUGFILES shouldn't override it;
@@ -27,6 +39,8 @@ struct sysopt {
                        */
     int maxplayers;
     int seduce;
+    unsigned int livelog;  /* event types to livelog */
+    int ll_conduct_turns;  /* do not livelog conducts before this turncount */
     int check_save_uid; /* restoring savefile checks UID? */
     int check_plname; /* use plname for checking wizards/explorers/shellers */
     int bones_pools;

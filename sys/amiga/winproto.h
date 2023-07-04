@@ -19,7 +19,7 @@ char *basename(char *str);
 char *dirname(char *str);
 
 /* winstr.c */
-void amii_putstr_ex(winid window, int attr, const char *str, int app, int color);
+void amii_putstr_ex(winid window, const char *str, int attr, int color, int app);
 void amii_putstr_ex2(winid window, const char* str, const char* attrs, const char* colors, int attr, int color, int app);
 void outmore(struct amii_WinDesc *cw);
 void outsubstr(struct amii_WinDesc *cw, char *str, int len, int fudge);
@@ -71,7 +71,7 @@ void Abort(long rc);
 void CleanUp(void);
 void flush_glyph_buffer(struct Window *w);
 void amiga_print_glyph(winid window, int color_index, struct layer_info layers);
-void amiga_issue_gui_command(int initid);
+void amiga_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str);
 void start_glyphout(winid window);
 void amii_end_glyphout(winid window);
 struct NewWindow *DupNewWindow(struct NewWindow *win);
@@ -110,7 +110,7 @@ void amii_bell(void);
 void removetopl(int cnt);
 void port_help(void);
 void amii_print_glyph(winid win, xchar x, xchar y, struct layer_info layers);
-void amii_issue_gui_command(int initid);
+void amii_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str);
 void amii_raw_print(const char *s);
 void amii_raw_print_bold(const char *s);
 void amii_update_inventory(void);

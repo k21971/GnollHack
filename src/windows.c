@@ -77,7 +77,7 @@ extern void *FDECL(trace_procs_chain, (int, int, void *, void *, void *));
 STATIC_DCL void FDECL(def_raw_print, (const char *s));
 STATIC_DCL void NDECL(def_wait_synch);
 
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
 STATIC_DCL winid FDECL(dump_create_nhwindow_ex, (int, int, int, struct extended_create_window_info));
 STATIC_DCL void FDECL(dump_clear_nhwindow, (winid));
 STATIC_DCL void FDECL(dump_display_nhwindow, (winid, BOOLEAN_P));
@@ -89,8 +89,27 @@ STATIC_DCL void FDECL(dump_add_extended_menu, (winid, int, const ANY_P*, CHAR_P,
     CHAR_P, int, int, const char*, BOOLEAN_P, struct extended_menu_info));
 STATIC_DCL void FDECL(dump_end_menu_ex, (winid, const char *, const char*));
 STATIC_DCL int FDECL(dump_select_menu, (winid, int, MENU_ITEM_P **));
-STATIC_DCL void FDECL(dump_putstr_ex, (winid, int, const char *, int, int));
+STATIC_DCL void FDECL(dump_putstr_ex, (winid, const char *, int, int, int));
 STATIC_DCL void FDECL(dump_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
+STATIC_DCL void NDECL(dump_headers);
+STATIC_DCL void NDECL(dump_footers);
+STATIC_DCL void FDECL(dump_status_update, (int, genericptr_t, int, int, int, unsigned long*));
+STATIC_DCL void NDECL(dump_render_status);
+#ifdef DUMPHTML
+STATIC_DCL void FDECL(dump_set_color_attr, (int, int, BOOLEAN_P));
+STATIC_DCL void NDECL(html_init_sym);
+STATIC_DCL void NDECL(dump_css);
+STATIC_DCL void FDECL(dump_outrip, (winid, int, time_t));
+STATIC_DCL void FDECL(html_dump_str, (FILE*, const char*, const char*, const char*, int, int));
+STATIC_DCL void FDECL(html_dump_line, (FILE*, winid, const char*, const char*, int, int, int, const char*));
+STATIC_DCL void FDECL(html_write_tags, (FILE*, winid, int, int, int, BOOLEAN_P, struct extended_menu_info)); /* Tags before/after string */
+#endif
+#ifdef DUMPLOG
+STATIC_VAR FILE* dumplog_file;
+#endif
+#ifdef DUMPHTML
+STATIC_VAR FILE* dumphtml_file;
+#endif
 #endif /* DUMPLOG */
 
 #ifdef HANGUPHANDLING
@@ -736,10 +755,10 @@ STATIC_DCL void FDECL(hup_add_menu, (winid, int, const anything *, CHAR_P, CHAR_
 STATIC_DCL void FDECL(hup_add_extended_menu, (winid, int, const anything*, CHAR_P, CHAR_P,
     int, int, const char*, BOOLEAN_P, struct extended_menu_info));
 STATIC_DCL void FDECL(hup_end_menu_ex, (winid, const char *, const char*));
-STATIC_DCL void FDECL(hup_putstr_ex, (winid, int, const char *, int, int));
+STATIC_DCL void FDECL(hup_putstr_ex, (winid, const char *, int, int, int));
 STATIC_DCL void FDECL(hup_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 STATIC_DCL void FDECL(hup_print_glyph, (winid, XCHAR_P, XCHAR_P, struct layer_info));
-STATIC_DCL void FDECL(hup_issue_gui_command, (int));
+STATIC_DCL void FDECL(hup_issue_gui_command, (int, int, const char*));
 STATIC_DCL void FDECL(hup_outrip, (winid, int, time_t));
 STATIC_DCL void FDECL(hup_curs, (winid, int, int));
 STATIC_DCL void FDECL(hup_display_nhwindow, (winid, BOOLEAN_P));
@@ -977,7 +996,7 @@ const char *subtitle UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
-hup_putstr_ex(window, attr, text, app, color)
+hup_putstr_ex(window, text, attr, color, app)
 winid window UNUSED;
 int attr UNUSED, app UNUSED, color UNUSED;
 const char *text UNUSED;
@@ -1007,8 +1026,9 @@ struct layer_info layers UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
-hup_issue_gui_command(initid)
-int initid UNUSED;
+hup_issue_gui_command(cmd_id, cmd_param, cmd_str)
+int cmd_id UNUSED, cmd_param UNUSED;
+const char* cmd_str UNUSED;
 {
     return;
 }
@@ -1175,7 +1195,7 @@ int reassessment;
 }
 
 void
-genl_status_finish()
+genl_status_finish(VOID_ARGS)
 {
     /* tear down routine */
     int i;
@@ -1419,11 +1439,72 @@ unsigned long *colormasks UNUSED;
     putmixed(WIN_STATUS, 0, newbot2); /* putmixed() due to MAT_GOLD glyph */
 }
 
+#if defined (DUMPLOG) || defined (DUMPHTML)
 STATIC_VAR struct window_procs dumplog_windowprocs_backup;
-STATIC_VAR FILE *dumplog_file;
+STATIC_VAR int menu_headings_backup;
+STATIC_VAR time_t dumplog_now;
 
 #ifdef DUMPLOG
-STATIC_VAR time_t dumplog_now;
+char*
+print_dumplog_filename_to_buffer(buf)
+char* buf;
+{
+    char* fname;
+
+#ifdef SYSCF
+    if (!sysopt.dumplogfile)
+        return 0;
+    fname = dump_fmtstr(sysopt.dumplogfile, buf);
+#elif defined(ANDROID)
+    if (iflags.dumplog)
+    {
+        char buf_[BUFSZ];
+        dump_fmtstr(DUMPLOG_FILE, buf_);
+        and_get_dumplog_dir(buf);
+        if (strlen(buf_) + strlen(buf) < BUFSZ - 1)
+            fname = strcat(buf, buf_);
+        else
+            fname = strcpy(buf, buf_);
+    }
+    else
+        fname = 0;
+#else
+    fname = dump_fmtstr(DUMPLOG_FILE, buf);
+#endif
+    return fname;
+}
+#endif
+
+#ifdef DUMPHTML
+char*
+print_dumphtml_filename_to_buffer(buf)
+char* buf;
+{
+    char* fname;
+
+#ifdef SYSCF
+    if (!sysopt.dumphtmlfile)
+        return 0;
+    fname = dump_fmtstr(sysopt.dumphtmlfile, buf);
+#elif defined(ANDROID)
+    if (iflags.dumplog)
+    {
+        char buf_[BUFSZ];
+        dump_fmtstr(DUMPHTML_FILE, buf_);
+        and_get_dumplog_dir(buf);
+        if (strlen(buf_) + strlen(buf) < BUFSZ - 1)
+            fname = strcat(buf, buf_);
+        else
+            fname = strcpy(buf, buf_);
+    }
+    else
+        fname = 0;
+#else
+    fname = dump_fmtstr(DUMPHTML_FILE, buf);
+#endif
+    return fname;
+}
+#endif
 
 char *
 dump_fmtstr(fmt, buf)
@@ -1488,6 +1569,10 @@ char *buf;
                 break;
             }
 
+            (void)strNsubst(tmpbuf, " ", "_", 0);
+            (void)strNsubst(tmpbuf, "/", "_", 0);
+            (void)strNsubst(tmpbuf, "\\", "_", 0);
+
             slen = strlen(tmpbuf);
             if (len + slen < BUFSZ-1) {
                 len += slen;
@@ -1507,75 +1592,326 @@ char *buf;
     *bp = '\0';
     return buf;
 }
-#endif /* DUMPLOG */
 
-void
-dump_open_log(now)
-time_t now;
+struct dump_status_fields {
+    int idx;
+    int color;
+    int attr;
+};
+
+static const enum statusfields** fieldorder;
+static unsigned long* dump_colormasks;
+static long dump_condition_bits;
+static struct dump_status_fields dump_status[MAXBLSTATS];
+static int hpbar_percent, hpbar_color;
+
+/* condcolor and condattr are needed to render the HTML status bar.
+   These static routines exist verbatim in at least two other window
+   ports. They should be promoted to the core (maybe botl.c).
+   Please delete this comment after the above suggestion has been enacted
+   or ignored.
+ */
+
+static int
+condcolor(bm, bmarray)
+long bm;
+unsigned long* bmarray;
 {
-#ifdef DUMPLOG
-    char buf[BUFSZ];
-    char *fname;
+#if defined(STATUS_HILITES) && defined(TEXTCOLOR)
+    int i;
 
-    dumplog_now = now;
-#ifdef SYSCF
-    if (!sysopt.dumplogfile)
-        return;
-    fname = dump_fmtstr(sysopt.dumplogfile, buf);
-#elif defined(ANDROID)
-    if (iflags.dumplog)
-    {
-        char buf_[BUFSZ];
-        dump_fmtstr(DUMPLOG_FILE, buf_);
-        and_get_dumplog_dir(buf);
-        if (strlen(buf_) + strlen(buf) < BUFSZ - 1)
-            fname = strcat(buf, buf_);
-        else
-            fname = strcpy(buf, buf_);
-    }
-    else
-        fname = 0;
-#else
-    fname = dump_fmtstr(DUMPLOG_FILE, buf);
+    if (bm && bmarray)
+        for (i = 0; i < CLR_MAX; ++i) {
+            if ((bmarray[i] & bm) != 0)
+                return i;
+        }
 #endif
-    dumplog_file = fopen(fname, "w");
-    dumplog_windowprocs_backup = windowprocs;
-
-#else /*!DUMPLOG*/
-    nhUse(now);
-#endif /*?DUMPLOG*/
+    return NO_COLOR;
 }
 
-void
-dump_close_log()
+STATIC_OVL int
+condattr(bm, bmarray)
+long bm;
+unsigned long* bmarray;
 {
-    if (dumplog_file) {
-        (void) fclose(dumplog_file);
-        dumplog_file = (FILE *) 0;
+    int attr = 0;
+#ifdef STATUS_HILITES
+    int i;
+
+    if (bm && bmarray) {
+        for (i = HL_ATTCLR_DIM; i < BL_ATTCLR_MAX; ++i) {
+            if ((bmarray[i] & bm) != 0) {
+                switch (i) {
+                case HL_ATTCLR_DIM:
+                    attr |= HL_DIM;
+                    break;
+                case HL_ATTCLR_BLINK:
+                    attr |= HL_BLINK;
+                    break;
+                case HL_ATTCLR_ULINE:
+                    attr |= HL_ULINE;
+                    break;
+                case HL_ATTCLR_INVERSE:
+                    attr |= HL_INVERSE;
+                    break;
+                case HL_ATTCLR_BOLD:
+                    attr |= HL_BOLD;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
     }
+#endif /* STATUS_HILITES */
+    return attr;
 }
 
-void
-dump_forward_putstr(win, attr, str, no_forward)
-winid win;
-int attr;
-const char *str;
-int no_forward;
+
+
+STATIC_OVL void
+dump_render_status(VOID_ARGS)
 {
-    char buf[UTF8BUFSZ * 2] = "";
-    if (str)
-        write_text2buf_utf8(buf, sizeof(buf), str);
+    long mask, bits;
+    int i, idx, c, row, num_rows, coloridx = 0, attrmask = 0;
+    char* text;
 
-    if (dumplog_file)
-        fprintf(dumplog_file, "%s\n", buf);
-    if (!no_forward)
-        putstr(win, attr, str);
+    num_rows = iflags.wc2_statuslines < 3 ? 2 : iflags.wc2_statuslines > 8 ? 8 : iflags.wc2_statuslines;
+    for (row = 0; row < num_rows; ++row) {
+        if (fieldorder[row] == NULL)
+            break;
+
+        int pad = COLNO + 1;
+        if (dumphtml_file)
+            fprintf(dumphtml_file, "<span class=\"nh_screen\">  "); /* 2 space left margin */
+        for (i = 0; (idx = fieldorder[row][i]) != BL_FLUSH; ++i) {
+            boolean hitpointbar = (idx == BL_TITLE
+                && iflags.wc2_hitpointbar);
+
+            if (!status_activefields[idx])
+                continue;
+            text = status_vals[idx]; /* always "" for BL_CONDITION */
+
+            if (idx == BL_CONDITION) {
+                /* | Condition Codes | */
+                bits = dump_condition_bits;
+                for (c = 0; c < SIZE(condition_definitions) && bits != 0L; ++c) {
+                    mask = condition_definitions[c].mask;
+                    if (bits & mask) {
+                        putstr_ex(NHW_STATUS, " ", ATR_NONE, NO_COLOR, 1);
+                        pad--;
+#ifdef STATUS_HILITES
+                        if (iflags.hilite_delta) {
+                            attrmask = condattr(mask, dump_colormasks);
+                            coloridx = condcolor(mask, dump_colormasks);
+                            dump_set_color_attr(coloridx, attrmask, TRUE);
+                        }
+#endif
+                        putstr_ex(NHW_STATUS, condition_definitions[c].text[0], ATR_NONE, NO_COLOR, 1);
+                        pad -= strlen(condition_definitions[c].text[0]);
+#ifdef STATUS_HILITES
+                        if (iflags.hilite_delta) {
+                            dump_set_color_attr(coloridx, attrmask, FALSE);
+                        }
+#endif
+                        bits &= ~mask;
+                    }
+                }
+            }
+            else if (hitpointbar) {
+                /* | Title with Hitpoint Bar | */
+                /* hitpointbar using hp percent calculation */
+                int bar_len, bar_pos = 0;
+                char bar[MAXCO], * bar2 = (char*)0, savedch = '\0';
+                boolean twoparts = (hpbar_percent < 100);
+
+                /* force exactly 30 characters, padded with spaces
+                   if shorter or truncated if longer */
+                if (strlen(text) != 30) {
+                    Sprintf(bar, "%-30.30s", text);
+                    Strcpy(status_vals[BL_TITLE], bar);
+                }
+                else
+                    Strcpy(bar, text);
+                bar_len = (int)strlen(bar); /* always 30 */
+                /* when at full HP, the whole title will be highlighted;
+                   when injured or dead, there will be a second portion
+                   which is not highlighted */
+                if (twoparts) {
+                    /* figure out where to separate the two parts */
+                    bar_pos = (bar_len * hpbar_percent) / 100;
+                    if (bar_pos < 1 && hpbar_percent > 0)
+                        bar_pos = 1;
+                    if (bar_pos >= bar_len && hpbar_percent < 100)
+                        bar_pos = bar_len - 1;
+                    bar2 = &bar[bar_pos];
+                    savedch = *bar2;
+                    *bar2 = '\0';
+                }
+                putstr_ex(NHW_STATUS,  "[", ATR_NONE, NO_COLOR, 1);
+                if (*bar) { /* always True, unless twoparts+dead (0 HP) */
+                    dump_set_color_attr(hpbar_color, HL_INVERSE, TRUE);
+                    putstr_ex(NHW_STATUS, bar, ATR_NONE, NO_COLOR, 0);
+                    dump_set_color_attr(hpbar_color, HL_INVERSE, FALSE);
+                }
+                if (twoparts) { /* no highlighting for second part */
+                    *bar2 = savedch;
+                    putstr_ex(NHW_STATUS, bar2, ATR_NONE, NO_COLOR, 1);
+                }
+                putstr_ex(NHW_STATUS, "]", ATR_NONE, NO_COLOR, 1);
+                pad -= (bar_len + 2);
+            }
+            else {
+                /* | Everything else not in a special case above | */
+#ifdef STATUS_HILITES
+                if (iflags.hilite_delta) {
+                    while (*text == ' ') {
+                        putstr(NHW_STATUS, 0, " ");
+                        text++;
+                        pad--;
+                    }
+                    if (*text == '/' && idx == BL_EXP) {
+                        putstr(NHW_STATUS, 0, "/");
+                        text++;
+                        pad--;
+                    }
+                    attrmask = dump_status[idx].attr;
+                    coloridx = dump_status[idx].color;
+                    dump_set_color_attr(coloridx, attrmask, TRUE);
+                }
+#endif
+                putstr_ex(NHW_STATUS, text, ATR_NONE, NO_COLOR, 1);
+                pad -= strlen(text);
+#ifdef STATUS_HILITES
+                if (iflags.hilite_delta) {
+                    dump_set_color_attr(coloridx, attrmask, FALSE);
+                }
+#endif
+            }
+        }
+        if (dumphtml_file)
+            fprintf(dumphtml_file, "%*s</span>\n", pad, " ");
+    }
+    return;
 }
+
+
+STATIC_OVL void
+dump_status_update(fldidx, ptr, chg, percent, color, colormasks)
+int fldidx, chg UNUSED, percent, color;
+genericptr_t ptr;
+unsigned long* colormasks;
+{
+    int attrmask;
+    long* condptr = (long*)ptr;
+    char* text = (char*)ptr;
+    char* lastchar, * p;
+    char goldbuf[40] = "";
+    const char* fmt;
+
+    static boolean inited = FALSE;
+
+    if (!inited) {
+        int i;
+        fieldorder = iflags.wc2_statuslines < 3 ? fieldorders_2statuslines : flags.fullstatuslineorder ? fieldorders_alt : fieldorders;
+        for (i = 0; i < MAXBLSTATS; ++i) {
+            dump_status[i].idx = BL_FLUSH;
+            dump_status[i].color = NO_COLOR;
+            dump_status[i].attr = ATR_NONE;
+        }
+        dump_condition_bits = 0L;
+        hpbar_percent = 0, hpbar_color = NO_COLOR;
+        inited = TRUE;
+    }
+
+    if ((fldidx < BL_RESET) || (fldidx >= MAXBLSTATS))
+        return;
+
+    if ((fldidx >= 0 && fldidx < MAXBLSTATS) && !status_activefields[fldidx])
+        return;
+
+    switch (fldidx) {
+    case BL_RESET:
+    case BL_FLUSH:
+        dump_render_status();
+        return;
+    case BL_CONDITION:
+        dump_status[fldidx].idx = fldidx;
+        dump_condition_bits = *condptr;
+        dump_colormasks = colormasks;
+        break;
+    case BL_GOLD:
+        text = decode_mixed(goldbuf, text);
+        /*FALLTHRU*/
+    default:
+        attrmask = (color >> 8) & 0x00FF;
+#ifndef TEXTCOLOR
+        color = NO_COLOR;
+#endif
+        fmt = status_fieldfmt[fldidx];
+        if (!fmt)
+            fmt = "%s";
+        /* should be checking for first enabled field here rather than
+           just first field, but 'fieldorder' doesn't start any rows
+           with fields which can be disabled so [any_row][0] suffices */
+        if (*fmt == ' ' && ((fieldorder[0] != NULL && fldidx == fieldorder[0][0])
+            || (fieldorder[1] != NULL && fldidx == fieldorder[1][0])
+            || (fieldorder[2] != NULL && fldidx == fieldorder[2][0])
+            || (fieldorder[3] != NULL && fldidx == fieldorder[3][0])
+            || (fieldorder[4] != NULL && fldidx == fieldorder[4][0])
+            || (fieldorder[5] != NULL && fldidx == fieldorder[5][0])
+            || (fieldorder[6] != NULL && fldidx == fieldorder[6][0])
+            || (fieldorder[7] != NULL && fldidx == fieldorder[7][0])
+            ))
+            ++fmt; /* skip leading space for first field on line */
+        Sprintf(status_vals[fldidx], fmt, text);
+        dump_status[fldidx].idx = fldidx;
+        dump_status[fldidx].color = (color & 0x00FF);
+        dump_status[fldidx].attr = attrmask;
+        break;
+    }
+
+    /* default processing above was required before these */
+    switch (fldidx) {
+    case BL_HP:
+    case BL_HPMAX:
+        if (iflags.wc2_hitpointbar) {
+            /* Special additional processing for hitpointbar */
+            hpbar_percent = percent;
+            if (fldidx == BL_HP)
+            {
+                hpbar_color = (color & 0x00FF);
+                dump_status[BL_TITLE].color = hpbar_color;
+            }
+        }
+        break;
+    case BL_LEVELDESC:
+    case BL_2WEP:
+    case BL_SKILL:
+    case BL_CAP:
+    case BL_HUNGER:
+        /* The core sends trailing blanks for some fields.
+           Let's suppress the trailing blanks */
+        p = status_vals[fldidx];
+        for (lastchar = eos(p); lastchar > p && *--lastchar == ' '; ) {
+            *lastchar = '\0';
+        }
+        break;
+    }
+    /* 3.6.2 we only render on BL_FLUSH (or BL_RESET) */
+    return;
+}
+
+
 
 /*ARGSUSED*/
 STATIC_OVL void
-dump_putstr_ex(win, attr, str, app, color)
+dump_putstr_ex(win, str, attr, color, app)
+#ifdef DUMPHTML
+winid win;
+#else
 winid win UNUSED;
+#endif
 int attr UNUSED, app UNUSED, color UNUSED;
 const char *str;
 {
@@ -1583,8 +1919,18 @@ const char *str;
     if(str)
         write_text2buf_utf8(buf, sizeof(buf), str);
 
-    if (dumplog_file)
-        fprintf(dumplog_file, "%s\n", buf);
+#ifdef DUMPLOG
+    if (dumplog_file && win != NHW_STATUS)
+        fprintf(dumplog_file, "%s%s", buf, app ? "" : "\n");
+#endif
+#ifdef DUMPHTML
+    if (dumphtml_file && win != NHW_DUMPTXT) {
+        if (win == NHW_STATUS)
+            html_dump_str(dumphtml_file, str, 0, 0, attr, color);
+        else
+            html_dump_line(dumphtml_file, win, 0, 0, attr, color, app, str);
+    }
+#endif
 }
 
 /*ARGSUSED*/
@@ -1594,10 +1940,24 @@ winid win;
 int attr, color, app;
 const char* str, *attrs, *colors;
 {
-    dump_putstr_ex(win, attrs ? attrs[0] : attr, str, app, colors ? colors[0] : color);
-}
+    char buf[UTF8BUFSZ * 2] = "";
+    if (str)
+        write_text2buf_utf8(buf, sizeof(buf), str);
 
 #ifdef DUMPLOG
+    if (dumplog_file && win != NHW_STATUS)
+        fprintf(dumplog_file, "%s%s", buf, app ? "" : "\n");
+#endif
+#ifdef DUMPHTML
+    if (dumphtml_file && win != NHW_DUMPTXT) {
+        if (win == NHW_STATUS)
+            html_dump_str(dumphtml_file, str, attrs, colors, attr, color);
+        else
+            html_dump_line(dumphtml_file, win, attrs, colors, attr, color, app, str);
+    }
+#endif
+}
+
 /*ARGSUSED*/
 void
 dump_putstr_no_utf8(win, attr, str)
@@ -1605,10 +1965,11 @@ winid win UNUSED;
 int attr UNUSED;
 const char* str;
 {
+#ifdef DUMPLOG
     if (dumplog_file)
         fprintf(dumplog_file, "%s\n", str);
-}
 #endif
+}
 
 STATIC_OVL winid
 dump_create_nhwindow_ex(dummy, style, glyph, info)
@@ -1657,35 +2018,26 @@ int style UNUSED;
 /*ARGSUSED*/
 STATIC_OVL void
 dump_add_menu(win, glyph, identifier, ch, gch, attr, color, str, preselected)
-winid win UNUSED;
+winid win;
 int glyph;
-const anything *identifier UNUSED;
+const anything *identifier;
 char ch;
-char gch UNUSED;
-int attr UNUSED;
-int color UNUSED;
+char gch;
+int attr;
+int color;
 const char *str;
-boolean preselected UNUSED;
+boolean preselected;
 {
-    char buf[UTF8BUFSZ * 2] = "";
-    if (str)
-        write_text2buf_utf8(buf, sizeof(buf), str);
-
-    if (dumplog_file) {
-        if (glyph == NO_GLYPH)
-            fprintf(dumplog_file, " %s\n", buf);
-        else
-            fprintf(dumplog_file, "  %c - %s\n", ch, buf);
-    }
+    dump_add_extended_menu(win, glyph, identifier, ch, gch, attr, color, str, preselected, zeroextendedmenuinfo);
 }
 
 /*ARGSUSED*/
 STATIC_OVL void
 dump_add_extended_menu(win, glyph, identifier, ch, gch, attr, color, str, preselected, info)
 winid win UNUSED;
-int glyph;
+int glyph UNUSED;
 const anything* identifier UNUSED;
-char ch;
+char ch UNUSED;
 char gch UNUSED;
 int attr UNUSED;
 int color UNUSED;
@@ -1697,12 +2049,42 @@ struct extended_menu_info info UNUSED;
     if (str)
         write_text2buf_utf8(buf, sizeof(buf), str);
 
+#ifdef DUMPLOG
     if (dumplog_file) {
         if (glyph == NO_GLYPH)
             fprintf(dumplog_file, " %s\n", buf);
         else
             fprintf(dumplog_file, "  %c - %s\n", ch, buf);
     }
+#endif
+#ifdef DUMPHTML
+    if (dumphtml_file) {
+        int htmlcolor;
+        boolean iscolor = FALSE;
+        /* Don't use NHW_MENU for inv items as this makes bullet points */
+        if (!attr && glyph != NO_GLYPH)
+            win = (winid)0;
+        html_write_tags(dumphtml_file, win, attr, color, 0, TRUE, info);
+        if (iflags.use_menu_color && get_menu_coloring(str, &htmlcolor, &attr)) {
+            iscolor = TRUE;
+        }
+        else if (color != NO_COLOR)
+        {
+            htmlcolor = color;
+            iscolor = TRUE;
+        }
+
+        if (iscolor)
+            fprintf(dumphtml_file, "<span class=\"nh_color_%d\">", htmlcolor);
+
+        if (glyph != NO_GLYPH) {
+            fprintf(dumphtml_file, "<span class=\"nh_item_letter\">%c</span> - ", ch);
+        }
+        html_dump_str(dumphtml_file, str, 0, 0, ATR_NONE, NO_COLOR);
+        fprintf(dumphtml_file, "%s", iscolor ? "</span>" : "");
+        html_write_tags(dumphtml_file, win, attr, color, 0, FALSE, info);
+    }
+#endif
 }
 
 /*ARGSUSED*/
@@ -1724,6 +2106,7 @@ const char *str, *str2;
 
     Sprintf(buf, "%s%s%s", buf1, txt, buf2);
 
+#ifdef DUMPLOG
     if (dumplog_file) 
     {
         if (str || str2)
@@ -1731,6 +2114,11 @@ const char *str, *str2;
         else
             fputs("\n", dumplog_file);
     }
+#endif
+#ifdef DUMPHTML
+    if (dumphtml_file)
+        html_dump_line(dumphtml_file, 0, 0, 0, 0, 0, 0, str || str2 ? buf : "");
+#endif
 }
 
 STATIC_OVL int
@@ -1747,8 +2135,20 @@ void
 dump_redirect(onoff_flag)
 boolean onoff_flag;
 {
-    if (dumplog_file) {
-        if (onoff_flag) {
+#if defined (DUMPLOG) && defined (DUMPHTML)
+    if (dumplog_file || dumphtml_file)
+#elif defined (DUMPLOG)
+    if (dumplog_file)
+#elif defined (DUMPHTML)
+    if (dumphtml_file)
+#endif
+    {
+        if (onoff_flag) 
+        {
+#ifdef STATUS_HILITES
+            botl_save_hilites();
+#endif
+            status_finish(); // 
             windowprocs.win_create_nhwindow_ex = dump_create_nhwindow_ex;
             windowprocs.win_clear_nhwindow = dump_clear_nhwindow;
             windowprocs.win_display_nhwindow = dump_display_nhwindow;
@@ -1760,6 +2160,17 @@ boolean onoff_flag;
             windowprocs.win_select_menu = dump_select_menu;
             windowprocs.win_putstr_ex = dump_putstr_ex;
             windowprocs.win_putstr_ex2 = dump_putstr_ex2;
+#ifdef DUMPHTML
+            windowprocs.win_outrip = dump_outrip;
+#endif
+            windowprocs.win_status_init = genl_status_init;
+            windowprocs.win_status_finish = genl_status_finish;
+            windowprocs.win_status_update = dump_status_update;
+            windowprocs.win_status_enablefield = genl_status_enablefield;
+            status_initialize(FALSE);
+#ifdef STATUS_HILITES
+            botl_restore_hilites();
+#endif
         } else {
             windowprocs = dumplog_windowprocs_backup;
         }
@@ -1767,6 +2178,662 @@ boolean onoff_flag;
     } else {
         iflags.in_dumplog = FALSE;
     }
+}
+
+
+
+#ifdef DUMPHTML
+/****************************/
+/* HTML DUMP LOG processing */
+/****************************/
+
+/* various tags - These were in a 2D array, but this is more readable */
+#define HEAD_S "<h2>"
+#define HEAD_E "</h2>"
+#define SUBH_S "<h3>"
+#define SUBH_E "</h3>"
+#define PREF_S "<pre>"
+#define PREF_E "</pre>"
+#define LIST_S "<ul>"
+#define LIST_E "</ul>"
+#define LITM_S "<li>"
+#define LITM_E "</li>"
+#define BOLD_S "<b>"
+#define BOLD_E "</b>"
+#define UNDL_S "<u>"
+#define UNDL_E "</u>"
+/* Blinking text on webpages is gross (and tedious), replace with italics */
+#define BLNK_S "<i>"
+#define BLNK_E "</i>"
+#define SPAN_E "</span>"
+#define LINEBREAK "<br />"
+
+/** HTML putstr() handling **/
+
+/* If we're using the NHW_MENU window,
+   try to make a bullet-list of the contents.
+   [Note, the inventory code uses the add_menu codepath
+   and is not processed here. This is for container contents,
+   dungeon overview, conduct, etc]
+   When we get a heading or subheading we close any existing list with </ul>,
+   and any preformatted block with </pre>.
+   Then print the heading.
+   For non-headings, we start a list if we don't already have one with <ul>
+   then delimit the item with <li></li>
+   for preformatted text, we don't mess with any existing bullet list, but try to
+   keep consecutive preformatted strings in a single block.  */
+STATIC_OVL
+void
+html_write_tags(fp, win, attr, color, app, before, info)
+FILE* fp;
+winid win;
+int attr, color UNUSED, app;
+boolean before; /* Tags before/after string */
+struct extended_menu_info info; 
+{
+    static boolean in_list = FALSE;
+    static boolean in_preform = FALSE;
+    if (!fp) return;
+
+    boolean is_heading = !(info.menu_flags & (MENU_FLAGS_IS_GROUP_HEADING)) && ((attr & ATR_SUBHEADING) == ATR_HEADING || (attr & ATR_SUBTITLE) == ATR_TITLE || (info.menu_flags & (MENU_FLAGS_IS_HEADING)));
+    boolean is_subheading = (attr & ATR_SUBHEADING) == ATR_SUBHEADING || (attr & ATR_SUBTITLE) == ATR_SUBTITLE || (info.menu_flags & (MENU_FLAGS_IS_GROUP_HEADING));
+    boolean is_bold = (attr & ATR_ATTR_MASK) == ATR_BOLD;
+    if (before) { /* before next string is written,
+                     close any finished blocks
+                     and open a new block if necessary */
+        if (attr & ATR_PREFORM) {
+            if (!in_preform) {
+                fprintf(fp, "%s", PREF_S);
+                in_preform = TRUE;
+            }
+            return;
+        }
+        if (in_preform) {
+            fprintf(fp, PREF_E);
+            in_preform = FALSE;
+        }
+        if (!(attr & (ATR_SUBHEADING | ATR_SUBTITLE)) && (info.menu_flags & (MENU_FLAGS_IS_HEADING | MENU_FLAGS_IS_GROUP_HEADING)) == 0 && win == NHW_MENU) {
+            /* This is a bullet point */
+            if (!in_list) {
+                fprintf(fp, "%s\n", LIST_S);
+                in_list = TRUE;
+            }
+            fprintf(fp, LITM_S);
+            return;
+        }
+        if (in_list) {
+            fprintf(fp, "%s\n", LIST_E);
+            in_list = FALSE;
+        }
+                fprintf(fp, "%s", is_heading ? HEAD_S :
+            is_subheading ? SUBH_S : is_bold ? BOLD_S : "");
+        return;
+    }
+    /* after string is written */
+    if (in_preform) {
+        if(!app)
+            fprintf(fp, LINEBREAK); /* preform still gets <br /> at end of line */
+        return; /* don't write </pre> until we get the next thing */
+    }
+    if (in_list) {
+        fprintf(fp, "%s\n", LITM_E); /* </li>, but not </ul> yet */
+        return;
+    }
+    fprintf(fp, "%s", is_heading ? HEAD_E:
+        is_subheading ? SUBH_E : is_bold ? BOLD_E : "");
+
+    if(!app)
+        fprintf(fp, "%s", !is_heading && !is_subheading ? LINEBREAK : "");
+}
+
+extern const nhsym cp437toUnicode[256]; /* From hacklib.c */
+
+/* Write HTML-escaped char to a file */
+STATIC_OVL void
+html_dump_char(fp, c)
+FILE* fp;
+nhsym c; /* assumed to be either CP437 or Unicode */
+{
+    if (!fp) return;
+    switch (c) {
+    case '<':
+        fprintf(fp, "&lt;");
+        break;
+    case '>':
+        fprintf(fp, "&gt;");
+        break;
+    case '&':
+        fprintf(fp, "&amp;");
+        break;
+    case '\"':
+        fprintf(fp, "&quot;");
+        break;
+    case '\'':
+        fprintf(fp, "&#39;");
+        break;
+    case '\n':
+        fprintf(fp, "<br />\n");
+        break;
+    default:
+        if(c < 128)
+            fprintf(fp, "%c", (char)c);
+        else
+        {
+            nhsym ch = c;
+            if (!!SYMHANDLING(H_IBM) && c >= 0 && c < 256) /* Convert CP437 to Unicode */
+                ch = cp437toUnicode[c];
+            fprintf(fp, "&#%d", (int)ch);
+        }
+    }
+}
+
+#ifndef DUMPHTML_DEFAULT_URL_FONT_NORMAL
+#define DUMPHTML_DEFAULT_URL_FONT_NORMAL "https://fonts.cdnfonts.com/s/108/DejaVuSansMono.woff"
+#endif
+#ifndef DUMPHTML_DEFAULT_URL_FONT_BOLD
+#define DUMPHTML_DEFAULT_URL_FONT_BOLD "https://fonts.cdnfonts.com/s/108/DejaVuSansMono-Bold.woff"
+#endif
+#ifndef DUMPHTML_DEFAULT_URL_FONT_ITALIC
+#define DUMPHTML_DEFAULT_URL_FONT_ITALIC "https://fonts.cdnfonts.com/s/108/DejaVuSansMono-Oblique.woff"
+#endif
+#ifndef DUMPHTML_DEFAULT_URL_FONT_BOLD_ITALIC
+#define DUMPHTML_DEFAULT_URL_FONT_BOLD_ITALIC "https://fonts.cdnfonts.com/s/108/DejaVuSansMono-BoldOblique.woff"
+#endif
+
+STATIC_OVL void
+dump_css()
+{
+    int c = 0;
+    FILE* css = 0;
+    if (!dumphtml_file)
+        return;
+
+#ifdef DUMPHTML_CSS_FILE
+    css = fopen_datafile(DUMPHTML_CSS_FILE, "r", DATAPREFIX); //"gnhdump.css"
+#endif
+    if (!css) {
+        int i;
+
+#ifndef DUMPHTML_WEBFONT_LINK
+        const char* default_fontface_strings[4] = {
+            "@font-face { font-family: \"DejaVu Sans Mono\"; font-style: normal; font-weight: normal;  src: local(DejaVu Sans Mono), local(DejaVuSansMono), url(DejaVuSansMono.woff), url(" DUMPHTML_DEFAULT_URL_FONT_NORMAL ")  format(\"woff\") }",
+            "@font-face { font-family: \"DejaVu Sans Mono\"; font-style: normal; font-weight: bold; src: local(DejaVu Sans Mono Bold), local(DejaVuSansMono-Bold), url(DejaVuSansMono-Bold.woff), url(" DUMPHTML_DEFAULT_URL_FONT_BOLD ")  format(\"woff\"); }",
+            "@font-face { font-family: \"DejaVu Sans Mono\"; font-style: oblique; font-weight: normal; src: local(DejaVu Sans Mono Oblique), local(DejaVuSansMono-Oblique), url(DejaVuSansMono-Oblique.woff), url(" DUMPHTML_DEFAULT_URL_FONT_ITALIC ")  format(\"woff\"); }",
+            "@font-face { font-family: \"DejaVu Sans Mono\"; font-style: oblique; font-weight: bold; src: local(DejaVu Sans Mono Bold Oblique), local(DejaVuSansMono-BoldOblique), url(DejaVuSansMono-BoldOblique.woff), url(" DUMPHTML_DEFAULT_URL_FONT_BOLD_ITALIC ")  format(\"woff\"); }",
+        };
+
+        const char* sysopt_fontface_strings[4] = {
+            sysopt.dumphtml_css_fontface_normal,
+            sysopt.dumphtml_css_fontface_bold,
+            sysopt.dumphtml_css_fontface_italic,
+            sysopt.dumphtml_css_fontface_bolditalic,
+        };
+
+        for (i = 0; i < 4; i++)
+        {
+            const char* fontfacestring = sysopt_fontface_strings[i] ? sysopt_fontface_strings[i] : default_fontface_strings[i];
+            fprintf(dumphtml_file, "%s\n", fontfacestring);
+        }
+#endif
+
+        const char* css_strings[] = {
+        "body {",
+        "    color: #CCCCCC;",
+        "    background-color: #222222;",
+        "    font-family: %sDejaVu Sans Mono, Consolas, monospace;",
+        "    font-size: min(2vw, 2vh);",
+        "}",
+        "",
+        "pre.nh_screen {",
+        "    font-family: %sDejaVu Sans Mono, Consolas, monospace;",
+        "    font-size: min(2.25vw, 2.25vh);",
+        "    background-color: black;",
+        "    width: fit-content;",
+        "}",
+        "",
+        ".nh_item_letter {",
+        "    padding-left: 3ex;",
+        "}",
+        "",
+        ".tooltip {",
+        "    position: relative;",
+        "    display: inline-block;",
+        "}",
+        "",
+        /* Tooltip text */
+        ".tooltip .tooltiptext {",
+        "    visibility: hidden;",
+        "    background-color: #222222;",
+        "    color: #fff;",
+        "    text-align: center;",
+        "    font-size: min(2vw, 2vh);",
+        "    padding: 5px 5px;",
+        "    border-radius: 6px;",
+        "    position: absolute;",
+        "    z-index: 1;",
+        "}",
+        "",
+        /* Show the tooltip text when you mouse over the tooltip container */
+        ".tooltip:hover .tooltiptext {",
+        "    visibility: visible;",
+        "}",
+        "",
+        "h2 {",
+        "    color: white;",
+        "    font-size: min(2.5vw, 2.5vh)vw;",
+        "    margin: 0.5ex;",
+        "    padding-top: 1.5em;",
+        "}",
+        "",
+        "h3 {",
+        "    color: white;",
+        "    font-size: min(2.25vw, 2.25vh);",
+        "    margin: 1ex 0ex 0.25ex 1.5ex;",
+        "}",
+        "",
+        "blockquote {",
+        "    margin-top: 0px;",
+        "}",
+        "",
+        "span.nh_screen {",
+        "    background-color: black;",
+        "}",
+        "",
+        ".nh_color_0 { color: #555555; }  /* CLR_BLACK          */",
+        ".nh_color_1 { color: #AA0000; }  /* CLR_RED            */",
+        ".nh_color_2 { color: #00AA00; }  /* CLR_GREEN          */",
+        ".nh_color_3 { color: #AA5500; }  /* CLR_BROWN          */",
+        ".nh_color_4 { color: #0000AA; }  /* CLR_BLUE           */",
+        ".nh_color_5 { color: #AA00AA; }  /* CLR_MAGENTA        */",
+        ".nh_color_6 { color: #00AAAA; }  /* CLR_CYAN           */",
+        ".nh_color_7 { color: #AAAAAA; }  /* CLR_GRAY           */",
+        ".nh_color_8 { color: #555555; }  /* NO_COLOR           */",
+        ".nh_color_9 { color: #FF5555; }  /* CLR_ORANGE         */",
+        ".nh_color_10 { color: #55FF55; } /* CLR_BRIGHT_GREEN   */",
+        ".nh_color_11 { color: #FFFF55; } /* CLR_YELLOW         */",
+        ".nh_color_12 { color: #5555FF; } /* CLR_BRIGHT_BLUE    */",
+        ".nh_color_13 { color: #FF55FF; } /* CLR_BRIGHT_MAGENTA */",
+        ".nh_color_14 { color: #55FFFF; } /* CLR_BRIGHT_CYAN    */",
+        ".nh_color_15 { color: #FCFCFC; } /* CLR_WHITE          */",
+        ".nh_inv_0 { color: black; background-color: #555555; }  /* CLR_BLACK          */",
+        ".nh_inv_1 { color: black; background-color: #AA0000; }  /* CLR_RED            */",
+        ".nh_inv_2 { color: black; background-color: #00AA00; }  /* CLR_GREEN          */",
+        ".nh_inv_3 { color: black; background-color: #AA5500; }  /* CLR_BROWN          */",
+        ".nh_inv_4 { color: black; background-color: #0000AA; }  /* CLR_BLUE           */",
+        ".nh_inv_5 { color: black; background-color: #AA00AA; }  /* CLR_MAGENTA        */",
+        ".nh_inv_6 { color: black; background-color: #00AAAA; }  /* CLR_CYAN           */",
+        ".nh_inv_7 { color: black; background-color: #AAAAAA; }  /* CLR_GRAY           */",
+        ".nh_inv_8 { color: black; background-color: #555555; }  /* NO_COLOR           */",
+        ".nh_inv_9 { color: black; background-color: #FF5555; }  /* CLR_ORANGE         */",
+        ".nh_inv_10 { color: black; background-color: #55FF55; } /* CLR_BRIGHT_GREEN   */",
+        ".nh_inv_11 { color: black; background-color: #FFFF55; } /* CLR_YELLOW         */",
+        ".nh_inv_12 { color: black; background-color: #5555FF; } /* CLR_BRIGHT_BLUE    */",
+        ".nh_inv_13 { color: black; background-color: #FF55FF; } /* CLR_BRIGHT_MAGENTA */",
+        ".nh_inv_14 { color: black; background-color: #55FFFF; } /* CLR_BRIGHT_CYAN    */",
+        ".nh_inv_15 { color: black; background-color: #FCFCFC; } /* CLR_WHITE          */",
+        0
+        };
+
+        i = 0;
+        while (css_strings[i])
+        {
+            if (index(css_strings[i], '%'))
+            {
+                char fontbuf[BUFSZ] = "";
+                char dbuf[BUFSZ];
+                if(sysopt.dumphtmlfontname && *sysopt.dumphtmlfontname)
+                    Sprintf(fontbuf, "%s, ", sysopt.dumphtmlfontname);
+                Sprintf(dbuf, css_strings[i], fontbuf);
+                fprintf(dumphtml_file, "%s\n", dbuf);
+            }
+            else
+                fprintf(dumphtml_file, "%s\n", css_strings[i]);
+            i++;
+        }
+    }
+    else
+    {
+        while ((c = fgetc(css)) != EOF) {
+            fputc(c, dumphtml_file);
+        }
+        fclose(css);
+    }
+}
+
+STATIC_OVL void
+dump_outrip(win, how, when)
+winid win;
+int how;
+time_t when;
+{
+    if (dumphtml_file) {
+        html_write_tags(dumphtml_file, 0, 0, 0, 0, TRUE, zeroextendedmenuinfo); /* </ul>, </pre> if needed */
+        fprintf(dumphtml_file, "%s\n", PREF_S);
+    }
+    genl_outrip(win, how, when);
+    if (dumphtml_file)
+        fprintf(dumphtml_file, "%s\n", PREF_E);
+
+}
+
+/* Write HTML-escaped string to a file */
+STATIC_OVL void
+html_dump_str(fp, str, attrs, colors, attr, color)
+FILE* fp;
+const char* str, *attrs, *colors;
+int attr, color;
+{
+    if (!fp) return;
+
+    const char* p;
+    int curcolor = NO_COLOR, curattr = ATR_NONE;
+    int prevcolor = NO_COLOR, prevattr = ATR_NONE;
+    int i = 0;
+    for (p = str; *p; p++, i++)
+    {
+        curattr = attrs ? attrs[i] : attr;
+        curcolor = colors ? colors[i] : color;
+        if (curattr != prevattr)
+        {
+            if(prevattr != ATR_NONE)
+                dump_set_color_attr(NO_COLOR, prevattr, FALSE);
+            if (curattr != ATR_NONE)
+                dump_set_color_attr(NO_COLOR, curattr, TRUE);
+        }
+        if (curcolor != prevcolor)
+        {
+            if (prevcolor != NO_COLOR)
+                dump_set_color_attr(prevcolor, ATR_NONE, FALSE);
+            if (curcolor != NO_COLOR)
+                dump_set_color_attr(curcolor, ATR_NONE, TRUE);
+        }
+        html_dump_char(fp, (nhsym)*p);
+        prevattr = curattr;
+        prevcolor = curcolor;
+    }
+    if(curcolor != NO_COLOR || curattr != ATR_NONE)
+        dump_set_color_attr(curcolor, curattr, FALSE);
+}
+
+STATIC_OVL void
+html_dump_line(fp, win, attrs, colors, attr, color, app, str)
+FILE* fp;
+winid win;
+int attr, color, app;
+const char* str, *attrs, *colors;
+{
+    if ((strlen(str) == 0 || !strcmp(str, " ")) && !app) {
+        /* if it's a blank line, just print a blank line */
+        fprintf(fp, "%s\n", LINEBREAK);
+        return;
+    }
+
+    html_write_tags(fp, win, attr, color, app, TRUE, zeroextendedmenuinfo);
+    html_dump_str(fp, str, attrs, colors, attr, color);
+    html_write_tags(fp, win, attr, color, app, FALSE, zeroextendedmenuinfo);
+}
+
+/** HTML Map **/
+
+/* Construct a symset for HTML line-drawing symbols.
+   dat/symbols can't be used here because nhsym is uchar,
+   and we require 16 bit values */
+
+static int htmlsym[SYM_MAX] = DUMMY;
+
+STATIC_OVL void
+html_init_sym()
+{
+    /* see https://html-css-js.com/html/character-codes/drawing/ */
+
+    /* Minimal set, based on IBMGraphics_1 set.
+       Add more as required. */
+    htmlsym[S_vwall] = 9474;
+    htmlsym[S_hwall] = 9472;
+    htmlsym[S_tlcorn] = 9484;
+    htmlsym[S_trcorn] = 9488;
+    htmlsym[S_blcorn] = 9492;
+    htmlsym[S_brcorn] = 9496;
+    htmlsym[S_crwall] = 9532;
+    htmlsym[S_tuwall] = 9524;
+    htmlsym[S_tdwall] = 9516;
+    htmlsym[S_tlwall] = 9508;
+    htmlsym[S_trwall] = 9500;
+    htmlsym[S_vbeam] = 9474;
+    htmlsym[S_hbeam] = 9472;
+    htmlsym[S_sw_ml] = 9474;
+    htmlsym[S_sw_mr] = 9474;
+    htmlsym[S_explode4] = 9474;
+    htmlsym[S_explode6] = 9474;
+    /* and some extras */
+    htmlsym[S_corr] = 9617;
+    htmlsym[S_litcorr] = 9618;
+}
+
+/* convert 'special' flags returned from mapglyph to
+  highlight attrs (currently just inverse) */
+STATIC_OVL unsigned
+mg_hl_attr(special)
+unsigned long special;
+{
+    unsigned hl = 0;
+    if ((special & MG_PET) && iflags.hilite_pet)
+        hl |= HL_INVERSE; /* Could use wc2_petattr from curses here */
+    if ((special & MG_DETECT) && iflags.use_inverse)
+        hl |= HL_INVERSE;
+    if ((special & MG_OBJPILE) && iflags.hilite_pile)
+        hl |= HL_INVERSE;
+    if ((special & MG_BW_LAVA) && iflags.use_inverse)
+        hl |= HL_INVERSE;
+    return hl;
+}
+
+void
+html_dump_glyph(x, y, sym, ch, color, special)
+int x, y, sym, color;
+nhsym ch;
+unsigned long special;
+{
+    char buf[BUFSZ]; /* do_screen_description requires this :( */
+    const char* firstmatch = "unknown"; /* and this */
+    coord cc;
+    int desc_found = 0;
+    unsigned attr;
+
+    if (!dumphtml_file) return;
+
+    if (x == 1) /* start row */
+        fprintf(dumphtml_file, "<span class=\"nh_screen\">  "); /* 2 space left margin */
+    cc.x = x;
+    cc.y = y;
+    desc_found = do_screen_description(cc, TRUE, ch, buf, &firstmatch, (struct permonst**)0);
+    if (desc_found)
+        fprintf(dumphtml_file, "<div class=\"tooltip\">");
+    attr = mg_hl_attr(special);
+    dump_set_color_attr(color, attr, TRUE);
+    if (htmlsym[sym])
+        fprintf(dumphtml_file, "&#%d;", htmlsym[sym]);
+    else
+        html_dump_char(dumphtml_file, ch);
+    dump_set_color_attr(color, attr, FALSE);
+    if (desc_found)
+        fprintf(dumphtml_file, "<span class=\"tooltiptext\">%s</span></div>", firstmatch);
+    if (x == COLNO - 1)
+        fprintf(dumphtml_file, "  </span>\n"); /* 2 trailing spaces and newline */
+}
+
+/* Status and map highlighting */
+STATIC_OVL void
+dump_set_color_attr(coloridx, attrmask, onoff)
+int coloridx, attrmask;
+boolean onoff;
+{
+    if (!dumphtml_file) return;
+    if (onoff) {
+        if (attrmask & HL_BOLD)
+            fprintf(dumphtml_file, BOLD_S);
+        if (attrmask & HL_ULINE)
+            fprintf(dumphtml_file, UNDL_S);
+        if (attrmask & HL_BLINK)
+            fprintf(dumphtml_file, BLNK_S);
+        if (attrmask & HL_INVERSE)
+            fprintf(dumphtml_file, "<span class=\"nh_inv_%d\">", coloridx);
+        else if (coloridx != NO_COLOR)
+            fprintf(dumphtml_file, "<span class=\"nh_color_%d\">", coloridx);
+        /* ignore HL_DIM */
+    }
+    else {
+        /* reverse order for nesting */
+        if ((attrmask & HL_INVERSE) || coloridx != NO_COLOR)
+            fprintf(dumphtml_file, SPAN_E);
+        if (attrmask & HL_BLINK)
+            fprintf(dumphtml_file, BLNK_E);
+        if (attrmask & HL_ULINE)
+            fprintf(dumphtml_file, UNDL_E);
+        if (attrmask & HL_BOLD)
+            fprintf(dumphtml_file, BOLD_E);
+    }
+}
+
+#endif /* DUMPHTML */
+
+
+/** HTML Headers and footers **/
+
+STATIC_OVL void
+dump_headers()
+{
+#ifdef DUMPHTML
+    char vers[16]; /* buffer for short version string */
+
+    /* TODO: make portable routine for getting iso8601 datetime */
+    struct tm* t;
+    char iso8601[32];
+    t = localtime(&dumplog_now);
+    strftime(iso8601, 32, "%Y-%m-%dT%H:%M:%S%z", t);
+
+    if (!dumphtml_file)
+        return;
+
+#ifdef DUMPHTML_WEBFONT_LINK
+    const char* fontlink = sysopt.dumphtmlfontlink ? sysopt.dumphtmlfontlink : "https://fonts.cdnfonts.com/css/dejavu-sans-mono";
+#endif
+    fprintf(dumphtml_file, "<!DOCTYPE html>\n");
+    fprintf(dumphtml_file, "<head>\n");
+    fprintf(dumphtml_file, "<title>GnollHack %s (%s)</title>\n", version_string(vers), plname);
+    fprintf(dumphtml_file, "<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\" />\n");
+    fprintf(dumphtml_file, "<meta name=\"generator\" content=\"GnollHack %s (%s)\" />\n", vers, plname);
+    fprintf(dumphtml_file, "<meta name=\"date\" content=\"%s\" />\n", iso8601);
+    fprintf(dumphtml_file, "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n");
+#ifdef DUMPHTML_WEBFONT_LINK
+    fprintf(dumphtml_file, "<link href=\"%s\" title=\"Default\" rel=\"stylesheet\" type=\"text/css\" media=\"all\" />\n", fontlink);
+#endif
+    fprintf(dumphtml_file, "<style type=\"text/css\">\n");
+    dump_css();
+    fprintf(dumphtml_file, "</style>\n</head>\n<body>\n");
+
+#endif
+}
+
+STATIC_OVL void
+dump_footers()
+{
+#ifdef DUMPHTML
+    if (dumphtml_file) {
+        html_write_tags(dumphtml_file, 0, 0, 0, 0, TRUE, zeroextendedmenuinfo); /* close </ul> and </pre> if open */
+        fprintf(dumphtml_file, "</body>\n</html>\n");
+    }
+#endif
+}
+
+/** HTML Map and status bar (collectively, the 'screendump') **/
+
+void
+dump_start_screendump()
+{
+#ifdef DUMPHTML
+    if (!dumphtml_file) return;
+    html_init_sym();
+    fprintf(dumphtml_file, "<pre class=\"nh_screen\">\n");
+#endif
+}
+
+void
+dump_end_screendump()
+{
+#ifdef DUMPHTML
+    if (dumphtml_file)
+        fprintf(dumphtml_file, "%s\n", PREF_E);
+#endif
+}
+
+#endif /* DUMPLOG || DUMPHTML */
+
+
+void
+dump_open_log(now)
+time_t now;
+{
+#if defined (DUMPLOG) || defined (DUMPHTML)
+    char buf[BUFSZ];
+    char* fname;
+    boolean fileexists = FALSE;
+
+    dumplog_now = now;
+#ifdef DUMPLOG
+    fname = print_dumplog_filename_to_buffer(buf);
+    if (fname)
+        dumplog_file = fopen(fname, "w");
+    fileexists = fileexists || (dumplog_file != 0);
+#endif
+#ifdef DUMPHTML
+    fname = print_dumphtml_filename_to_buffer(buf);
+    if (fname)
+        dumphtml_file = fopen(fname, "w");
+    fileexists = fileexists || (dumphtml_file != 0);
+#endif
+    if (fileexists) {
+        dumplog_windowprocs_backup = windowprocs;
+        menu_headings_backup = iflags.menu_headings;
+    }
+    dump_headers();
+#else /*!DUMPLOG*/
+    nhUse(now);
+#endif /*?DUMPLOG*/
+}
+
+void
+dump_close_log(VOID_ARGS)
+{
+#if defined(DUMPLOG) || defined (DUMPHTML)
+    dump_footers();
+#ifdef DUMPLOG
+    if (dumplog_file) {
+        (void)fclose(dumplog_file);
+        dumplog_file = (FILE*)0;
+    }
+#endif
+#ifdef DUMPHTML
+    if (dumphtml_file) {
+        (void)fclose(dumphtml_file);
+        dumphtml_file = (FILE*)0;
+    }
+#endif
+#endif
+}
+
+void
+dump_forward_putstr(win, attr, str, no_forward)
+winid win;
+int attr;
+const char* str;
+int no_forward;
+{
+#if defined(DUMPLOG) || defined (DUMPHTML)
+    dump_putstr_ex(win, str, attr, NO_COLOR, 0);
+#endif
+    if (!no_forward)
+        putstr(win, attr, str);
 }
 
 /*windows.c*/

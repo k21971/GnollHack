@@ -149,7 +149,7 @@ unsigned long entflags;
         mdat = &mons[u.umonster];
     }
     fakemon = zeromonst;
-    set_mon_data(&fakemon, mdat); /* set up for goodpos */
+    set_mon_data(&fakemon, mdat, 0); /* set up for goodpos */
 
     good_ptr = good;
     range = 1;
@@ -1167,7 +1167,7 @@ d_level target_level;
                            for something like this, but we don't want
                            fumbling or already full pack to interfere */
                         amu = addinv(amu);
-                        prinv("Endgame prerequisite:", amu, 0L);
+                        prinv_ex("Endgame prerequisite:", amu, 0L, ATR_NONE, CLR_MSG_GOD, ATR_NONE, NO_COLOR, TRUE, FALSE);
                     }
                 }
                 force_dest = TRUE;

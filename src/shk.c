@@ -497,6 +497,9 @@ struct monst *shkp;
     /* by this point, we know an actual robbery has taken place */
     eshkp->robbed += total;
     You("stole %ld %s worth of merchandise.", total, currency(total));
+    livelog_printf(LL_ACHIEVE, "stole %ld %s worth of merchandise from %s %s",
+        total, currency(total), s_suffix(shkname(shkp)),
+        shtypes[eshkp->shoptype - SHOPBASE].name);
     if (!Role_if(PM_ROGUE)) /* stealing is unlawful */
         adjalign(-sgn(u.ualign.type));
 
@@ -1144,6 +1147,7 @@ register struct monst *shkp;
             bp++;
         }
     }
+    refresh_m_tile_gui_info(shkp, TRUE);
     update_game_music();
 }
 
@@ -2188,10 +2192,10 @@ register struct monst *shkp; /* if angry, impose a surcharge */
             adjustments (unID'd, dunce/tourist, charisma) are made */
         multiplier = 1L, divisor = 1L;
 
-    boolean shkp_is_shopkeeper = (shkp && shkp->isshk && shkp->mextra && ESHK(shkp));
-    boolean shkp_is_priest = (shkp && shkp->ispriest && shkp->mextra && EPRI(shkp));
-    boolean shkp_is_smith = (shkp && shkp->issmith && shkp->mextra && ESMI(shkp));
-    boolean shkp_is_npc = (shkp && shkp->isnpc && shkp->mextra && ENPC(shkp));
+    boolean shkp_is_shopkeeper = (shkp && shkp->isshk && has_eshk(shkp));
+    boolean shkp_is_priest = (shkp && shkp->ispriest && has_epri(shkp));
+    boolean shkp_is_smith = (shkp && shkp->issmith && has_esmi(shkp));
+    boolean shkp_is_npc = (shkp && shkp->isnpc && has_enpc(shkp));
 
     if (!tmp)
         tmp = 5L;
@@ -5039,6 +5043,8 @@ struct monst *shkp;
             Sprintf(ansbuf, "%s talks about the problem of shoplifters.", Shknam(shkp));
             popup_talk_line_noquotes(shkp, ansbuf);
         }
+        else
+            pline("%s does not respond.", Monnam(shkp));
     }
 }
 
@@ -5500,7 +5506,7 @@ struct monst* mtmp;
 struct obj* obj;
 boolean eating;
 {
-    if (!mtmp || !mtmp->mextra || !EDOG(mtmp) || !obj)
+    if (!mtmp || !has_edog(mtmp) || !obj)
         return 0;
 
     boolean chastised = FALSE;

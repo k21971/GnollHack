@@ -9,7 +9,8 @@ namespace GnollHackClient
     {
         void LoadLibrary();
         void UnloadLibrary();
-        void InitializeGnollHack(Secrets secrets);
+        void InitializeGnollHack();
+        void InitializeSecrets(Secrets secrets);
         string GetGnollHackPath();
         void ClearFiles();
         void ClearCoreFiles();
@@ -41,6 +42,7 @@ namespace GnollHackClient
 
         string GetVersionString();
         string GetVersionId();
+        ulong GetVersionNumber();
         string GetPropertyName(int prop_index);
         List<string> GetExtendedCommands();
         string DumplogDateString(long startdate);
@@ -51,6 +53,7 @@ namespace GnollHackClient
 
         void SaveAndRestoreSavedGame();
         void TallyRealTime();
-        bool ValidateSaveFile(string filename);
+        bool ValidateSaveFile(string filename, out string out_str);
+
     }
 }

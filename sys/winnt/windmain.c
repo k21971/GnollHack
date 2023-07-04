@@ -260,7 +260,7 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
     check_recordfile((char *) 0);
 
     iflags.windowtype_deferred = TRUE;
-    read_options();                  
+    process_options_file();                  
 
     if (!validate_prefix_locations(failbuf))
     {
@@ -282,7 +282,7 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
     struct stat st = { 0 };
 
     if (stat(DUMPLOG_DIR, &st) == -1) {
-        mkdir(DUMPLOG_DIR);
+        (void)mkdir(DUMPLOG_DIR);
     }
 #endif
 
@@ -508,7 +508,7 @@ char *argv[];
              */
             if (!strncmp(argv[1], "-s", 2)) {
 #ifdef SYSCF
-                read_options();
+                process_options_file();
 #endif
                 prscore(argc, argv);
 

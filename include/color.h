@@ -52,6 +52,9 @@
 #define HI_MINERAL CLR_GRAY
 #define DRAGON_SILVER CLR_BRIGHT_CYAN
 #define HI_ZAP CLR_BRIGHT_BLUE
+#define HI_FIRE CLR_ORANGE
+#define HI_ICE CLR_BRIGHT_CYAN
+#define HI_SHOCK CLR_BRIGHT_CYAN
 
 #define HI_MINES CLR_BROWN
 #define HI_GEHENNOM CLR_ORANGE
@@ -80,10 +83,12 @@
 #define CLR_MSG_FAIL          CLR_BROWN
 #define CLR_MSG_HINT          CLR_BRIGHT_CYAN
 #define CLR_MSG_TEXT          CLR_BRIGHT_CYAN
+#define CLR_MSG_ERROR         CLR_BRIGHT_MAGENTA
 
 #define CLR_MSG_TALK_NORMAL   CLR_WHITE
 #define CLR_MSG_TALK_ANGRY    CLR_ORANGE
 #define CLR_MSG_TALK_HAPPY    CLR_BRIGHT_GREEN
+#define CLR_MSG_TALK_CUSS     CLR_BRIGHT_CYAN
 
 struct menucoloring {
     struct nhregex *match;

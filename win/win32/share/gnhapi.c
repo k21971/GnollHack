@@ -65,19 +65,6 @@ void GetTile2Enlargement(short** ti2en_ptr, int* size_ptr)
 #endif
 }
 
-void GetTile2Replacement(short** ti2re_ptr, int* size_ptr)
-{
-    if (!ti2re_ptr || !size_ptr)
-        return;
-#ifdef USE_TILES
-    *ti2re_ptr = tile2replacement;
-    *size_ptr = SIZE(tile2replacement);
-#else
-    *ti2re_ptr = 0;
-    *size_ptr = 0;
-#endif
-}
-
 void GetTile2Autodraw(short** ti2ad_ptr, int* size_ptr)
 {
     if (!ti2ad_ptr || !size_ptr)
@@ -209,6 +196,11 @@ const char* LibGetVersionId()
     return VERSION_ID;
 }
 
+unsigned long LibGetVersionNumber()
+{
+    return VERSION_NUMBER;
+}
+
 static const char* extcmdnames[256] = { 0 };
 const char** LibGetExtendedCommands()
 {
@@ -336,17 +328,17 @@ LibSaveAndRestoreSavedGame(void)
     if (program_state.something_worth_saving 
         && !program_state.gameover && !program_state.panicking 
         && !program_state.exiting && !program_state.freeing_dynamic_data
-        && !saving && !restoring && !reseting)
+        && !saving && !restoring && !reseting && !check_pointing)
     {
 #ifdef INSURANCE
         save_currentstate();
 #endif
-        issue_gui_command(GUI_CMD_WAIT_FOR_RESUME);
+        issue_simple_gui_command(GUI_CMD_WAIT_FOR_RESUME);
         /* Already in the right state */
 #if 0
         if (dosave0(TRUE))
         {
-            issue_gui_command(GUI_CMD_WAIT_FOR_RESUME);
+            issue_simple_gui_command(GUI_CMD_WAIT_FOR_RESUME);
             if (!load_saved_game(2))
             {
                 u.uhp = -1; /* universal game's over indicator */
@@ -368,11 +360,42 @@ LibTallyRealTime()
     tally_realtime();
 }
 
+char gnhapi_putstr_buffer[BUFSZ * 4];
+void gnhapi_raw_print(const char* text)
+{
+    char buf[UTF8BUFSZ] = "";
+    if (text)
+    {
+        write_text2buf_utf8(buf, UTF8BUFSZ, text);
+        if (*gnhapi_putstr_buffer)
+            Strcat(gnhapi_putstr_buffer, " ");
+        Strcpy(eos(gnhapi_putstr_buffer), buf);
+    }
+}
+
+void gnhapi_putstr_ex(winid wid, const char* text, int attr, int color, int append)
+{
+    gnhapi_raw_print(text);
+}
+
+void gnhapi_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int append)
+{
+    gnhapi_raw_print(text);
+}
+
 int
-LibValidateSaveFile(const char* filename)
+LibValidateSaveFile(const char* filename, char* output_str)
 {
     int fd;
     int res = 0;
+    *gnhapi_putstr_buffer = 0;
+
+    struct window_procs oldprocs = windowprocs;
+    windowprocs = *get_safe_procs(0);
+    windowprocs.win_putstr_ex = gnhapi_putstr_ex;
+    windowprocs.win_putstr_ex2 = gnhapi_putstr_ex2;
+    windowprocs.win_raw_print = gnhapi_raw_print;
+
     Strcpy(SAVEF, filename);
 #ifdef COMPRESS_EXTENSION
     SAVEF[strlen(SAVEF) - strlen(COMPRESS_EXTENSION)] = '\0';
@@ -385,6 +408,14 @@ LibValidateSaveFile(const char* filename)
         (void)nhclose(fd);
     }
     nh_compress(SAVEF);
+    windowprocs = oldprocs;
+
+    if (output_str && *gnhapi_putstr_buffer)
+    {
+        char buf[UTF8BUFSZ * 4] = "";
+        write_text2buf_utf8(buf, sizeof(buf), gnhapi_putstr_buffer);
+        Strcpy(output_str, buf);
+    }
     return res;
 }
 
@@ -592,6 +623,13 @@ int RunGnollHack(
         if (*cmdbuf)
             Strcat(cmdbuf, " ");
         Strcat(cmdbuf, "-C");
+    }
+
+    if (runflags & GHRUNFLAGS_DISABLE_BONES)
+    {
+        if (*cmdbuf)
+            Strcat(cmdbuf, " ");
+        Strcat(cmdbuf, "-b");
     }
 
     /* Set directly, as other parts of GnollHack do not purposedly set this */

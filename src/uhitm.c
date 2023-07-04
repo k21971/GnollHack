@@ -611,7 +611,8 @@ int dieroll;
 
         /* KMH, conduct */
         if (weapon && (weapon->oclass == WEAPON_CLASS || is_weptool(weapon)))
-            u.uconduct.weaphit++;
+            if (!u.uconduct.weaphit++)
+                livelog_printf(LL_CONDUCT, "%s", "hit with a wielded weapon for the first time");
 
         /* we hit the monster; be careful: it might die or
            be knocked into a different location */
@@ -644,6 +645,9 @@ int dieroll;
             if (mon->wormno && *mhit)
                 cutworm(mon, bhitpos.x, bhitpos.y, slice_or_chop);
         }
+        if (u.uconduct.weaphit && !oldweaphit)
+            livelog_printf(LL_CONDUCT, "%s",
+                "hit with a wielded weapon for the first time");
     }
     return malive;
 }
@@ -1709,13 +1713,13 @@ boolean* obj_destroyed;
         if (Role_if(PM_SAMURAI))
         {
             play_sfx_sound(SFX_CAITIFF);
-            You("dishonorably use a poisoned weapon!");
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "dishonorably use a poisoned weapon!");
             adjalign(-sgn(u.ualign.type));
         }
         else if (u.ualign.type == A_LAWFUL && u.ualign.record > -10)
         {
             play_sfx_sound(SFX_CAITIFF);
-            You_feel("like an evil coward for using a poisoned weapon.");
+            You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "like an evil coward for using a poisoned weapon.");
             adjalign(-1);
         }
         if (obj && !rn2(nopoison)) 
@@ -1816,13 +1820,13 @@ boolean* obj_destroyed;
             if (Role_if(PM_SAMURAI))
             {
                 play_sfx_sound(SFX_CAITIFF);
-                You("dishonorably use a weapon imbued with death magic!");
+                You_ex(ATR_NONE, CLR_MSG_WARNING, "dishonorably use a weapon imbued with death magic!");
                 adjalign(-sgn(u.ualign.type));
             }
             else if (u.ualign.type == A_LAWFUL && u.ualign.record > -10) 
             {
                 play_sfx_sound(SFX_CAITIFF);
-                You_feel("like an evil coward for using a weapon imbued with death magic.");
+                You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "like an evil coward for using a weapon imbued with death magic.");
                 adjalign(-1);
             }
         }
@@ -1841,7 +1845,7 @@ boolean* obj_destroyed;
                 {
                     const char* what = *unconventional ? unconventional : "attack";
 
-                    Your("%s %s harmlessly through %s.", what,
+                    Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s harmlessly through %s.", what,
                         vtense(what, "pass"), mon_nam(mon));
                     hittxt = TRUE;
                 }
@@ -1860,7 +1864,7 @@ boolean* obj_destroyed;
         You("joust %s%s", mon_nam(mon), canseemon(mon) ? exclam((int)ceil(damage)) : ".");
         if (jousting < 0) 
         {
-            pline("%s shatters on impact!", Yname2(obj));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s shatters on impact!", Yname2(obj));
             /* (must be either primary or secondary weapon to get here) */
             //u.twoweap = FALSE; /* untwoweapon() is too verbose here */
             if (obj == uwep)
@@ -1891,7 +1895,7 @@ boolean* obj_destroyed;
             && !thick_skinned(mdat)) 
         {
             if (canspotmon(mon))
-                pline("%s %s from your powerful strike!", Monnam(mon),
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s from your powerful strike!", Monnam(mon),
                     makeplural(stagger(mon->data, "stagger")));
             /* avoid migrating a dead monster */
             if (mon->mhp >(int)ceil(damage)) 
@@ -1989,7 +1993,7 @@ boolean* obj_destroyed;
             withwhat[0] = '\0';
             if (u.twoweap && flags.verbose)
                 Sprintf(withwhat, " with %s", yname(obj));
-            pline("%s divides as you hit it%s!", Monnam(mon), withwhat);
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s divides as you hit it%s!", Monnam(mon), withwhat);
             hittxt = TRUE;
             mintrap(mclone);
         }
@@ -2009,33 +2013,45 @@ boolean* obj_destroyed;
         {
 
             if (!flags.verbose)
-                You("%s%s it for %d damage%s%s", striketext, critical_text, damagedealt, frombehindtext, strikemark);
+            {
+                int multicolors[5] = { NO_COLOR, CLR_ORANGE, CLR_ORANGE, NO_COLOR, NO_COLOR };
+                You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s%s it for %d damage%s%s", striketext, critical_text, damagedealt, frombehindtext, strikemark);
+            }
             else
-                You("%s %s%s for %d damage%s%s", 
-                (obj && (is_shield(obj) || obj->otyp == HEAVY_IRON_BALL))
+            {
+                int multicolors[6] = { NO_COLOR, NO_COLOR, CLR_ORANGE, CLR_ORANGE, CLR_ORANGE, NO_COLOR };
+                You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s %s%s for %d damage%s%s",
+                    (obj && (is_shield(obj) || obj->otyp == HEAVY_IRON_BALL))
                     ? "bash" : Role_if(PM_BARBARIAN) ? "smite" : striketext,
                     mon_nam(mon), critical_text, damagedealt, frombehindtext,
                     canseemon(mon) && !strikefrombehind ? exclam(damagedealt) : strikemark);
+            }
 
             display_m_being_hit(mon, hit_tile, damagedealt, 0UL, TRUE);
         }
         else 
         {
             if (!flags.verbose)
-                You("%s it%s%s%s", striketext, critical_text, frombehindtext, strikemark);
+            {
+                int multicolors[4] = { NO_COLOR, CLR_ORANGE, CLR_ORANGE, NO_COLOR };
+                You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s it%s%s%s", striketext, critical_text, frombehindtext, strikemark);
+            }
             else
-                You("%s %s%s%s",
-                (obj && (is_shield(obj) || obj->otyp == HEAVY_IRON_BALL))
+            {
+                int multicolors[4] = { NO_COLOR, NO_COLOR, CLR_ORANGE, NO_COLOR };
+                You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "%s %s%s%s",
+                    (obj && (is_shield(obj) || obj->otyp == HEAVY_IRON_BALL))
                     ? "bash" : Role_if(PM_BARBARIAN) ? "smite" : striketext,
                     mon_nam(mon), critical_text,
                     canseemon(mon) && !strikefrombehind ? exclam(damagedealt) : strikemark);
+            }
 
             display_m_being_hit(mon, hit_tile, damagedealt, 0UL, TRUE);
         }
     }
     else if (hittxt && displaysustain && damagedealt > 0)
     {
-        pline("%s sustains %d damage.", Monnam(mon), damagedealt);
+        pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(mon), damagedealt);
         display_m_being_hit(mon, hit_tile, damagedealt, 0UL, TRUE);
     }
 
@@ -2073,7 +2089,7 @@ boolean* obj_destroyed;
         /* note: s_suffix returns a modifiable buffer */
         if (!is_incorporeal(mdat) && !amorphous(mdat))
             whom = strcat(s_suffix(whom), " flesh");
-        pline(fmt, whom);
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, fmt, whom);
     }
     if (lightobj)
     {
@@ -2099,7 +2115,7 @@ boolean* obj_destroyed;
         /* note: s_suffix returns a modifiable buffer */
         if (!is_incorporeal(mdat) && !amorphous(mdat))
             whom = strcat(s_suffix(whom), " flesh");
-        pline(fmt, whom);
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, fmt, whom);
     }
 
     boolean uses_spell_flags = obj ? object_uses_spellbook_wand_flags_and_properties(obj) : FALSE;
@@ -2155,7 +2171,7 @@ boolean* obj_destroyed;
             char* whom = mon_nam(mon);
             if (canspotmon(mon))
             {
-                pline("%s deeply into %s!", Yobjnam2(obj, "cut"), whom);
+                pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s deeply into %s!", Yobjnam2(obj, "cut"), whom);
             }
         }
     }
@@ -2214,7 +2230,7 @@ boolean* obj_destroyed;
                 char* whom = mon_nam(mon);
                 if (canspotmon(mon))
                 {
-                    pline("%s the life energy from %s to you!", Yobjnam2(obj, "leech"), whom);
+                    pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s the life energy from %s to you!", Yobjnam2(obj, "leech"), whom);
                 }
             }
         }
@@ -2238,7 +2254,7 @@ boolean* obj_destroyed;
         else
             Sprintf(dcbuf, "One of %s shatters from the blow!", yname(obj));
 
-        pline1(dcbuf);
+        pline_ex1(ATR_NONE, CLR_MSG_WARNING, dcbuf);
         if (obj->oclass == GEM_CLASS)
         {
             if (obj->dknown && !objects[obj->otyp].oc_name_known
@@ -2377,7 +2393,7 @@ boolean* obj_destroyed;
     {
         *obj_destroyed = TRUE;
         if (*u.ushops || obj->unpaid)
-            check_shop_obj(obj, mx, my, TRUE);
+            check_shop_obj(obj, mx, my, TRUE, FALSE);
 
         if (obj->where == OBJ_INVENT)
         {
@@ -2573,9 +2589,9 @@ demonpet()
         if (canseemon(dtmp))
         {
             if (is_demon(dtmp->data))
-                pline("%s appears in a cloud of smoke!", Amonnam(dtmp));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s appears in a cloud of smoke!", Amonnam(dtmp));
             else
-                pline("%s appears!", Amonnam(dtmp));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s appears!", Amonnam(dtmp));
         }
     }
     exercise(A_WIS, TRUE);
@@ -2821,12 +2837,12 @@ int specialdmg; /* blessed and/or silver bonus against various things */
 #endif
         hit_tile = HIT_ON_FIRE;
         if (!Blind)
-            pline("%s is %s!", Monnam(mdef), on_fire(pd, mattk));
+            pline_ex(ATR_NONE, HI_FIRE, "%s is %s!", Monnam(mdef), on_fire(pd, mattk));
         if (completelyburns(pd)) { /* paper golem or straw golem */
             if (!Blind)
-                pline("%s burns completely!", Monnam(mdef));
+                pline_ex(ATR_NONE, HI_FIRE, "%s burns completely!", Monnam(mdef));
             else
-                You("smell burning%s.",
+                You_ex(ATR_NONE, HI_FIRE, "smell burning%s.",
                     (pd == &mons[PM_PAPER_GOLEM]) ? " paper"
                       : (pd == &mons[PM_STRAW_GOLEM]) ? " straw" : " material");
             xkilled(mdef, XKILL_NOMSG | XKILL_NOCORPSE);
@@ -2861,7 +2877,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
 #endif
         hit_tile = HIT_FROZEN;
         if (!Blind)
-            pline("%s is covered in frost!", Monnam(mdef));
+            pline_ex(ATR_NONE, HI_ICE, "%s is covered in frost!", Monnam(mdef));
 
         if (is_mon_immune_to_cold(mdef)) 
         {
@@ -2885,7 +2901,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
 
         hit_tile = HIT_ELECTROCUTED;
         if (!Blind)
-            pline("%s is zapped!", Monnam(mdef));
+            pline_ex(ATR_NONE, HI_ZAP, "%s is zapped!", Monnam(mdef));
 
         damage += adjust_damage(destroy_mitem(mdef, WAND_CLASS, AD_ELEC), &youmonst, mdef, mattk->adtyp, ADFLAGS_NONE);
         
@@ -3156,7 +3172,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
                 /* this assumes newcham() won't fail; since hero has
                    a slime attack, green slimes haven't been geno'd */
                 You_ex(ATR_NONE, CLR_MSG_SUCCESS, "turn %s into slime.", mon_nam(mdef));
-                if (newcham(mdef, &mons[PM_GREEN_SLIME], FALSE, FALSE))
+                if (newcham(mdef, &mons[PM_GREEN_SLIME], 0, FALSE, FALSE))
                     pd = mdef->data;
             }
             /* munslime attempt could have been fatal */
@@ -3258,10 +3274,12 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         {
             if (hit_tile == HIT_GENERAL)
                 hit_tile = HIT_CRITICAL;
-            Your("critical strike inflicts %d damage!", damagedealt);
+            Your_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange1, "critical strike inflicts %d damage!", damagedealt);
         }
         else
-            You("inflict %d damage.", damagedealt);
+        {
+            You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange1, "inflict %d damage.", damagedealt);
+        }
         display_m_being_hit(mdef, hit_tile, damagedealt, 0UL, FALSE);
     }
     return 1;
@@ -3476,7 +3494,7 @@ register struct attack *mattk;
         /* force vampire in bat, cloud, or wolf form to revert back to
            vampire form now instead of dealing with that when it dies */
         if (is_vampshifter(mdef)
-            && newcham(mdef, &mons[mdef->cham], FALSE, FALSE))
+            && newcham(mdef, &mons[mdef->cham], mdef->cham_subtype, FALSE, FALSE))
         {
             You("engulf it, then expel it.");
             if (canspotmon(mdef))
@@ -3516,7 +3534,7 @@ register struct attack *mattk;
                 /* eating a Rider or its corpse is fatal */
                 if (is_rider(pd)) 
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Unfortunately, digesting any of it is fatal.");
+                    pline_ex1(ATR_NONE, CLR_MSG_NEGATIVE, "Unfortunately, digesting any of it is fatal.");
                     end_engulf();
                     Sprintf(killer.name, "unwisely tried to eat %s",
                         mon_monster_name(mdef));
@@ -3718,7 +3736,7 @@ register struct monst *mon;
     struct attack *mattk, alt_attk;
     struct obj *weapon, **originalweapon;
     boolean altwep = FALSE, weapon_used = FALSE, weapon2_used = FALSE, odd_claw = TRUE;
-    int i, tmp, armorpenalty, sum[NATTK], nsum = 0, dhit = 0, attknum = 0;
+    int i, tmp, armorpenalty, sum[NATTK], /* nsum = 0, */ dhit = 0, attknum = 0;
     int dieroll, multi_claw = 0;
 
     /* with just one touch/claw/weapon attack, both rings matter;
@@ -4164,10 +4182,10 @@ register struct monst *mon;
         if (sum[i] == 2) {
             /* defender dead */
             (void) passive(mon, weapon, 1, 0, mattk->aatyp, FALSE);
-            nsum = 0; /* return value below used to be 'nsum > 0' */
+            //nsum = 0; /* return value below used to be 'nsum > 0' */
         } else {
             (void) passive(mon, weapon, sum[i], 1, mattk->aatyp, FALSE);
-            nsum |= sum[i];
+            //nsum |= sum[i];
         }
 
         /* don't use sum[i] beyond this point;
@@ -4589,7 +4607,7 @@ struct monst *mtmp;
     { 
         update_m_facing(mtmp, u.ux - mtmp->mx, TRUE);
         play_sfx_sound(SFX_STUMBLE_ON_MIMIC);
-        pline(fmt, what);
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, fmt, what);
     }
 
     wakeup(mtmp, FALSE); /* clears mimicking */
@@ -4918,12 +4936,63 @@ schar difficulty_level;
 
 }
 
+int
+calculate_damage_dealt_to_player(hp_d)
+double hp_d;
+{
+    int integer_hp = (int)hp_d;
+    double fracionalpart_hp_d = hp_d - (double)integer_hp;
+    int fractional_hp = (int)(10000 * fracionalpart_hp_d);
+
+    int target_integer_part = 0;
+    int target_fractional_part = 0;
+    int target_max = 0;
+
+    if (Upolyd)
+    {
+        target_integer_part = u.mh;
+        target_fractional_part = u.mh_fraction;
+        target_max = u.mhmax;
+    }
+    else
+    {
+        target_integer_part = u.uhp;
+        target_fractional_part = u.uhp_fraction;
+        target_max = u.uhpmax;
+    }
+
+    int hp_before = target_integer_part;
+    target_integer_part -= integer_hp;
+    target_fractional_part -= fractional_hp;
+
+    if (target_fractional_part < 0)
+    {
+        int multiple = (abs(target_fractional_part) / 10000) + 1;
+        target_integer_part -= multiple;
+        target_fractional_part += multiple * 10000;
+    }
+    else if (target_fractional_part >= 10000)
+    {
+        int multiple = target_fractional_part / 10000;
+        target_integer_part += multiple;
+        target_fractional_part -= multiple * 10000;
+    }
+
+    if (target_integer_part >= target_max)
+    {
+        target_integer_part = target_max;
+        target_fractional_part = 0;
+    }
+
+    int hp_after = target_integer_part;
+    int damage_dealt = hp_before - hp_after;
+    return max(0, damage_dealt);
+}
 
 int
 deduct_player_hp(hp_d)
 double hp_d;
 {
-
     int integer_hp = (int)hp_d;
     double fracionalpart_hp_d = hp_d - (double)integer_hp;
     int fractional_hp = (int)(10000 * fracionalpart_hp_d);

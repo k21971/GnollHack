@@ -20,7 +20,7 @@ void lib_clear_nhwindow(winid wid);
 void lib_display_nhwindow(winid wid, BOOLEAN_P block);
 void lib_destroy_nhwindow(winid wid);
 void lib_curs(winid wid, int x, int y);
-void lib_putstr_ex(winid wid, int attr, const char* text, int app, int color);
+void lib_putstr_ex(winid wid, const char* text, int attr, int color, int app);
 void lib_putstr_ex2(winid wid,const char* text, const char* attrs, const char* colors, int attr, int color, int append);
 void lib_display_file(const char* filename, BOOLEAN_P must_exist);
 void lib_start_menu_ex(winid wid, int style);
@@ -37,7 +37,7 @@ void lib_mark_synch(void);
 void lib_wait_synch(void);
 void lib_cliparound(int x, int y, BOOLEAN_P force);
 void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers);
-void lib_issue_gui_command(int initid);
+void lib_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str);
 void lib_raw_print(const char* str);
 void lib_raw_print_bold(const char* str);
 int lib_nhgetch(void);
@@ -51,9 +51,14 @@ void lib_number_pad(int state);
 void lib_delay_output(void);
 void lib_delay_output_milliseconds(int interval);
 void lib_delay_output_intervals(int intervals);
+#ifdef CHANGE_COLOR
 void lib_change_color(int, long, int);
-char* lib_change_background(void);
+#ifdef MAC
+void FDECL(lib_change_background, (int));
+short FDECL(lib_set_font_name, (winid, char*));
+#endif
 char* lib_get_color_string(void);
+#endif
 void lib_start_screen(void);
 void lib_end_screen(void);
 void lib_outrip(winid wid, int how, time_t when);

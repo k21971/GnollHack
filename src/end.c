@@ -62,7 +62,7 @@ STATIC_DCL int NDECL(set_vanq_order);
 STATIC_DCL void FDECL(list_vanquished, (CHAR_P, BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL void FDECL(list_genocided, (CHAR_P, BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL boolean FDECL(should_query_disclose_option, (int, char *));
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
 STATIC_DCL void NDECL(dump_plines);
 #endif
 STATIC_DCL void FDECL(dump_everything, (int, time_t));
@@ -428,37 +428,34 @@ int sig;
 #endif /* NO_SIGNAL */
 
 void
-done_in_by(mtmp, how)
-struct monst *mtmp;
-int how;
+get_killer_name_and_format(mtmp, buf, fmt_ptr)
+struct monst* mtmp;
+char* buf;
+int* fmt_ptr;
 {
-    char buf[BUFSZ];
-    struct permonst *mptr = mtmp->data,
-                    *champtr = ((mtmp->cham >= LOW_PM)
-                                   ? &mons[mtmp->cham]
-                                   : mptr);
-    boolean distorted = (boolean) (Hallucination && canspotmon(mtmp)),
-            mimicker = (M_AP_TYPE(mtmp) == M_AP_MONSTER),
-            imitator = (mptr != champtr || mimicker);
+    struct permonst* mptr = mtmp->data,
+        * champtr = ((mtmp->cham >= LOW_PM)
+            ? &mons[mtmp->cham]
+            : mptr);
+    boolean distorted = (boolean)(Hallucination && canspotmon(mtmp)),
+        mimicker = (M_AP_TYPE(mtmp) == M_AP_MONSTER),
+        imitator = (mptr != champtr || mimicker);
 
-    if(how == STONING)
-        play_sfx_sound(SFX_PETRIFY);
-    You_ex1(ATR_NONE, CLR_MSG_NEGATIVE, (how == STONING) ? "turn to stone..." : "die...");
-    mark_synch(); /* flush buffered screen output */
+
     buf[0] = '\0';
-    killer.format = KILLED_BY_AN;
+    *fmt_ptr = KILLED_BY_AN;
     /* "killed by the high priest of Crom" is okay,
        "killed by the high priest" alone isn't */
     if ((mptr->geno & G_UNIQ) != 0 && !(imitator && !mimicker)
         && !(mptr == &mons[PM_HIGH_PRIEST] && !mtmp->ispriest)) {
         if (!is_mname_proper_name(mptr))
             Strcat(buf, "the ");
-        killer.format = KILLED_BY;
+        *fmt_ptr = KILLED_BY;
     }
     /* _the_ <invisible> <distorted> ghost of Dudley */
     if (mptr == &mons[PM_GHOST] && has_mname(mtmp)) {
         Strcat(buf, "the ");
-        killer.format = KILLED_BY;
+        *fmt_ptr = KILLED_BY;
     }
     if (is_invisible(mtmp))
         Strcat(buf, "invisible ");
@@ -467,7 +464,7 @@ int how;
 
     if (imitator) {
         char shape[BUFSZ];
-        const char *realnm = pm_monster_name(champtr, mtmp->female), *fakenm = pm_monster_name(mptr, mtmp->female);
+        const char* realnm = pm_monster_name(champtr, mtmp->female), * fakenm = pm_monster_name(mptr, mtmp->female);
         boolean alt = is_vampshifter(mtmp);
 
         if (mimicker) {
@@ -475,8 +472,9 @@ int how;
                set up fake mptr for is_mname_proper_name/the_unique_pm */
             mptr = &mons[mtmp->mappearance];
             fakenm = pm_monster_name(mptr, mtmp->female);
-        } else if (alt && strstri(realnm, "vampire")
-                   && !strcmp(fakenm, "vampire bat")) {
+        }
+        else if (alt && strstri(realnm, "vampire")
+            && !strcmp(fakenm, "vampire bat")) {
             /* special case: use "vampire in bat form" in preference
                to redundant looking "vampire in vampire bat form" */
             fakenm = "bat";
@@ -492,36 +490,143 @@ int how;
             Strcpy(shape, an(fakenm));
         /* omit "called" to avoid excessive verbosity */
         Sprintf(eos(buf),
-                alt ? "%s in %s form"
-                    : mimicker ? "%s disguised as %s"
-                               : "%s imitating %s",
-                realnm, shape);
+            alt ? "%s in %s form"
+            : mimicker ? "%s disguised as %s"
+            : "%s imitating %s",
+            realnm, shape);
         mptr = mtmp->data; /* reset for mimicker case */
-    } else if (mptr == &mons[PM_GHOST]) {
+    }
+    else if (mptr == &mons[PM_GHOST]) {
         Strcat(buf, "ghost");
         if (has_mname(mtmp))
             Sprintf(eos(buf), " of %s", MNAME(mtmp));
-    } else if (mtmp->isshk) {
-        const char *shknm = shkname(mtmp),
-                   *honorific = shkname_is_pname(mtmp) ? ""
-                                   : mtmp->female ? "Ms. " : "Mr. ";
+    }
+    else if (mtmp->isshk) {
+        const char* shknm = true_shkname(mtmp), //True shopkeeper name, not hallucinated
+            * honorific = shkname_is_pname(mtmp) ? ""
+            : mtmp->female ? "Ms. " : "Mr. ";
 
         Sprintf(eos(buf), "%s%s, the shopkeeper", honorific, shknm);
-        killer.format = KILLED_BY;
-    } else if (mtmp->ispriest || mtmp->isminion) {
+        *fmt_ptr = KILLED_BY;
+    }
+    else if (mtmp->ispriest || mtmp->isminion) {
         /* m_monnam() suppresses "the" prefix plus "invisible", and
            it overrides the effect of Hallucination on priestname() */
         Strcat(buf, m_monnam(mtmp));
-    } else {
+    }
+    else {
         if (has_mname(mtmp) && mtmp->u_know_mname)
         {
-            killer.format = KILLED_BY;
+            *fmt_ptr = KILLED_BY;
             Sprintf(eos(buf), "%s, the ", MNAME(mtmp));
         }
         Strcat(buf, pm_monster_name(mptr, mtmp->female));
         if (has_umname(mtmp))
             Sprintf(eos(buf), " called %s", UMNAME(mtmp));
     }
+}
+
+void
+done_in_by(mtmp, how)
+struct monst *mtmp;
+int how;
+{
+    char buf[BUFSZ];
+    Strcpy(buf, "");
+    struct permonst* mptr = mtmp->data;
+
+    //struct permonst *mptr = mtmp->data,
+    //                *champtr = ((mtmp->cham >= LOW_PM)
+    //                               ? &mons[mtmp->cham]
+    //                               : mptr);
+    //boolean distorted = (boolean) (Hallucination && canspotmon(mtmp)),
+    //        mimicker = (M_AP_TYPE(mtmp) == M_AP_MONSTER),
+    //        imitator = (mptr != champtr || mimicker);
+
+    if(how == STONING)
+        play_sfx_sound(SFX_PETRIFY);
+    You_ex1(ATR_NONE, CLR_MSG_NEGATIVE, (how == STONING) ? "turn to stone..." : "die...");
+    mark_synch(); /* flush buffered screen output */
+   
+    get_killer_name_and_format(mtmp, buf, &killer.format);
+
+    //buf[0] = '\0';
+    //killer.format = KILLED_BY_AN;
+    ///* "killed by the high priest of Crom" is okay,
+    //   "killed by the high priest" alone isn't */
+    //if ((mptr->geno & G_UNIQ) != 0 && !(imitator && !mimicker)
+    //    && !(mptr == &mons[PM_HIGH_PRIEST] && !mtmp->ispriest)) {
+    //    if (!is_mname_proper_name(mptr))
+    //        Strcat(buf, "the ");
+    //    killer.format = KILLED_BY;
+    //}
+    ///* _the_ <invisible> <distorted> ghost of Dudley */
+    //if (mptr == &mons[PM_GHOST] && has_mname(mtmp)) {
+    //    Strcat(buf, "the ");
+    //    killer.format = KILLED_BY;
+    //}
+    //if (is_invisible(mtmp))
+    //    Strcat(buf, "invisible ");
+    //if (distorted)
+    //    Strcat(buf, "hallucinogen-distorted ");
+
+    //if (imitator) {
+    //    char shape[BUFSZ];
+    //    const char *realnm = pm_monster_name(champtr, mtmp->female), *fakenm = pm_monster_name(mptr, mtmp->female);
+    //    boolean alt = is_vampshifter(mtmp);
+
+    //    if (mimicker) {
+    //        /* realnm is already correct because champtr==mptr;
+    //           set up fake mptr for is_mname_proper_name/the_unique_pm */
+    //        mptr = &mons[mtmp->mappearance];
+    //        fakenm = pm_monster_name(mptr, mtmp->female);
+    //    } else if (alt && strstri(realnm, "vampire")
+    //               && !strcmp(fakenm, "vampire bat")) {
+    //        /* special case: use "vampire in bat form" in preference
+    //           to redundant looking "vampire in vampire bat form" */
+    //        fakenm = "bat";
+    //    }
+    //    /* for the alternate format, always suppress any article;
+    //       pname and the_unique should also have s_suffix() applied,
+    //       but vampires don't take on any shapes which warrant that */
+    //    if (alt || is_mname_proper_name(mptr)) /* no article */
+    //        Strcpy(shape, fakenm);
+    //    else if (the_unique_pm(mptr)) /* "the"; don't use the() here */
+    //        Sprintf(shape, "the %s", fakenm);
+    //    else /* "a"/"an" */
+    //        Strcpy(shape, an(fakenm));
+    //    /* omit "called" to avoid excessive verbosity */
+    //    Sprintf(eos(buf),
+    //            alt ? "%s in %s form"
+    //                : mimicker ? "%s disguised as %s"
+    //                           : "%s imitating %s",
+    //            realnm, shape);
+    //    mptr = mtmp->data; /* reset for mimicker case */
+    //} else if (mptr == &mons[PM_GHOST]) {
+    //    Strcat(buf, "ghost");
+    //    if (has_mname(mtmp))
+    //        Sprintf(eos(buf), " of %s", MNAME(mtmp));
+    //} else if (mtmp->isshk) {
+    //    const char *shknm = true_shkname(mtmp), //True shopkeeper name, not hallucinated
+    //               *honorific = shkname_is_pname(mtmp) ? ""
+    //                               : mtmp->female ? "Ms. " : "Mr. ";
+
+    //    Sprintf(eos(buf), "%s%s, the shopkeeper", honorific, shknm);
+    //    killer.format = KILLED_BY;
+    //} else if (mtmp->ispriest || mtmp->isminion) {
+    //    /* m_monnam() suppresses "the" prefix plus "invisible", and
+    //       it overrides the effect of Hallucination on priestname() */
+    //    Strcat(buf, m_monnam(mtmp));
+    //} else {
+    //    if (has_mname(mtmp) && mtmp->u_know_mname)
+    //    {
+    //        killer.format = KILLED_BY;
+    //        Sprintf(eos(buf), "%s, the ", MNAME(mtmp));
+    //    }
+    //    Strcat(buf, pm_monster_name(mptr, mtmp->female));
+    //    if (has_umname(mtmp))
+    //        Sprintf(eos(buf), " called %s", UMNAME(mtmp));
+    //}
 
     if (how == DROWNED)
     {
@@ -604,7 +709,7 @@ int how;
 }
 
 #if defined(WIN32) && !defined(SYSCF)
-#define NOTIFY_GnollHack_BUGS
+#define NOTIFY_GNOLLHACK_BUGS
 #endif
 
 /*VARARGS1*/
@@ -630,17 +735,17 @@ VA_DECL(const char *, str)
                         ? "Program initialization has failed."
                         : "Suddenly, the dungeon collapses.");
 #ifndef MICRO
-#ifdef NOTIFY_GnollHack_BUGS
+#ifdef NOTIFY_GNOLLHACK_BUGS
     if (!wizard)
         raw_printf("Report the following error to \"%s\" or at \"%s\".",
                    DEVTEAM_EMAIL, DEVTEAM_URL);
     else if (program_state.something_worth_saving)
         raw_print("\nError save file being written.\n");
-#else /* !NOTIFY_GnollHack_BUGS */
+#else /* !NOTIFY_GNOLLHACK_BUGS */
     if (!wizard) {
         const char *maybe_rebuild = !program_state.something_worth_saving
                                      ? "."
-                                     : "\nand it may be possible to rebuild.";
+                                     : ", and it may be possible to rebuild.";
 
         if (sysopt.support)
             raw_printf("To report this error, %s%s", sysopt.support,
@@ -652,13 +757,14 @@ VA_DECL(const char *, str)
             raw_printf("Report error to \"%s\"%s", WIZARD_NAME,
                        maybe_rebuild);
     }
-#endif /* ?NOTIFY_GnollHack_BUGS */
+#endif /* ?NOTIFY_GNOLLHACK_BUGS */
     /* XXX can we move this above the prints?  Then we'd be able to
      * suppress "it may be possible to rebuild" based on dosave0()
      * or say it's NOT possible to rebuild. */
     if (program_state.something_worth_saving && !iflags.debug_fuzzer) {
         set_error_savefile();
-        if (dosave0(TRUE)) {
+        int saveres = dosave0(TRUE);
+        if (saveres) {
             /* os/win port specific recover instructions */
             if (sysopt.recover)
                 raw_printf("%s", sysopt.recover);
@@ -672,6 +778,8 @@ VA_DECL(const char *, str)
         raw_print(buf);
         paniclog("panic", buf);
 #ifdef GNOLLHACK_MAIN_PROGRAM
+        if (issue_gui_command)
+            issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, buf);
         if (open_special_view)
         {
             struct special_view_info info = { 0 };
@@ -738,25 +846,34 @@ char *defquery;
     return TRUE;
 }
 
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
 STATIC_OVL void
 dump_plines()
 {
     int i, j;
-    char buf[BUFSZ], **strp;
+    char buf[BUFSZ], buf2[BUFSZ], buf3[BUFSZ], ** strp;
     extern char *saved_plines[];
+    extern char* saved_pline_attrs[];
+    extern char* saved_pline_colors[];
     extern unsigned saved_pline_index;
 
     Strcpy(buf, " "); /* one space for indentation */
-    putstr(0, 0, "Latest messages:");
+    *buf2 = ATR_NONE;
+    *buf3 = NO_COLOR;
+    putstr(0, ATR_HEADING, "Latest messages:");
     for (i = 0, j = (int) saved_pline_index; i < DUMPLOG_MSG_COUNT;
          ++i, j = (j + 1) % DUMPLOG_MSG_COUNT) {
         strp = &saved_plines[j];
         if (*strp) {
             copynchars(&buf[1], *strp, BUFSZ - 1 - 1);
-            putstr(0, 0, buf);
+            size_t len = strlen(&buf[1]);
+            memcpy(&buf2[1], saved_pline_attrs[j], min(BUFSZ - 1, len));
+            memcpy(&buf3[1], saved_pline_colors[j], min(BUFSZ - 1, len));
+            putstr_ex2(0, buf, buf2, buf3, ATR_PREFORM, NO_COLOR, 0);
 #ifdef FREE_ALL_MEMORY
             free(*strp), *strp = 0;
+            free((genericptr_t)saved_pline_attrs[j]), saved_pline_attrs[j] = 0;
+            free((genericptr_t)saved_pline_colors[j]), saved_pline_colors[j] = 0;
 #endif
         }
     }
@@ -770,7 +887,7 @@ dump_everything(how, when)
 int how;
 time_t when; /* date+time at end of game */
 {
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     char pbuf[BUFSZ], datetimebuf[24]; /* [24]: room for 64-bit bogus value */
 
     dump_redirect(TRUE);
@@ -783,8 +900,8 @@ time_t when; /* date+time at end of game */
        it's conceivable that the game started with a different
        build date+time or even with an older GnollHack version,
        but we only have access to the one it finished under */
-    putstr(0, 0, getversionstring(pbuf));
-    putstr(0, 0, "");
+    putstr(0, ATR_SUBHEADING, getversionstring(pbuf));
+    putstr(NHW_DUMPTXT, 0, "");
 
     /* game start and end date+time to disambiguate version date+time */
     Strcpy(datetimebuf, yyyymmddhhmmss(ubirthday));
@@ -795,8 +912,8 @@ time_t when; /* date+time at end of game */
     Sprintf(eos(pbuf), ", ended %4.4s-%2.2s-%2.2s %2.2s:%2.2s:%2.2s",
             &datetimebuf[0], &datetimebuf[4], &datetimebuf[6],
             &datetimebuf[8], &datetimebuf[10], &datetimebuf[12]);
-    putstr(0, 0, pbuf);
-    putstr(0, 0, "");
+    putstr(0, ATR_SUBHEADING, pbuf);
+    putstr(NHW_DUMPTXT, 0, "");
 
     /* character name and basic role info */
     Sprintf(pbuf, "%s, %s %s %s %s", plname,
@@ -804,36 +921,59 @@ time_t when; /* date+time at end of game */
             genders[flags.female].adj,
             urace.adj,
             (flags.female && urole.name.f) ? urole.name.f : urole.name.m);
-    putstr(0, 0, pbuf);
-    putstr(0, 0, "");
+    putstr(0, ATR_SUBHEADING, pbuf);
+    putstr(NHW_DUMPTXT, 0, "");
 
+    dump_start_screendump();
     dump_map();
-    putstr(0, 0, do_statusline1());
-    putstr(0, 0, do_statusline2());
-    if(iflags.wc2_statuslines > 2)
-        putstr(0, 0, do_statusline3());
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, do_statusline1());
+    putstr(NHW_DUMPTXT, 0, do_statusline2());
+    if (iflags.wc2_statuslines > 2)
+    {
+        putstr(NHW_DUMPTXT, 0, do_statusline3());
+    }
+    if (iflags.wc2_statuslines > 3)
+    {
+        char partybuf[BUFSIZ];
+        char partybuf2[BUFSIZ];
+        char partybuf3[BUFSIZ];
+        char partybuf4[BUFSIZ];
+        char partybuf5[BUFSIZ];
+        compose_partystatline(partybuf, partybuf2, partybuf3, partybuf4, partybuf5);
+        char* partylines[5] = { partybuf, partybuf2, partybuf3, partybuf4, partybuf5 };
+        int i;
+        for (i = 0; i < iflags.wc2_statuslines - 3 && i < 5; i++)
+        {
+            putstr(NHW_DUMPTXT, 0, partylines[i]);
+        }
+    }
+    status_initialize(TRUE);
+    bot();
+    dump_end_screendump();
+    putstr(NHW_DUMPTXT, 0, "");
 
     dump_plines();
-    putstr(0, 0, "");
-    putstr(0, 0, "Inventory:");
+    putstr(NHW_DUMPTXT, 0, "");
+    putstr(0, ATR_HEADING, "Inventory:");
     (void) display_inventory((char *) 0, TRUE, 0);
     container_contents(invent, TRUE, TRUE, FALSE, 0);
     enlightenment((BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
                   (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
     dump_skills();
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
     dump_spells();
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
+    show_gamelog((how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
+    putstr(NHW_DUMPTXT, 0, "");
     list_vanquished('d', FALSE, TRUE); /* 'd' => 'y' */
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
     list_genocided('d', FALSE, TRUE); /* 'd' => 'y' */
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
     show_conduct((how >= PANICKED) ? 1 : 2);
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
     show_overview((how >= PANICKED) ? 1 : 2, how);
-    putstr(0, 0, "");
+    putstr(NHW_DUMPTXT, 0, "");
     dump_redirect(FALSE);
 #else
     nhUse(how);
@@ -845,29 +985,23 @@ time_t when; /* date+time at end of game */
 int
 wiz_dumplog(VOID_ARGS)
 {
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     if (wizard) {
         time_t dumptime = getnow();
         char buf[BUFSZ] = "";
-        char fbuf[BUFSZ] = "";
-        char* fname;
-#ifdef SYSCF
-        if (!sysopt.dumplogfile)
-        {
-            pline1("No dumplog file specified in sysconf. Aborting.");
-            return 0;
-        }
-        fname = dump_fmtstr(sysopt.dumplogfile, fbuf);
-        if(fname)
-            strcpy(buf, fname);
-#else
-#ifdef DUMPLOG_FILE
-        fname = dump_fmtstr(DUMPLOG_FILE, fbuf);
-        if(fname)
-            strcpy(buf, fname);
+        char htmlbuf[BUFSZ] = "";
+        char* dumplogfilename = 0;
+        char* htmldumplogfilename = 0;
+#if defined (DUMPLOG)
+        dumplogfilename = print_dumplog_filename_to_buffer(buf);
 #endif
+#if defined (DUMPHTML)
+        htmldumplogfilename = print_dumphtml_filename_to_buffer(htmlbuf);
 #endif
-        pline("Writing dumplog to %s...", buf);
+        if(dumplogfilename)
+            pline("Writing dumplog to %s...", dumplogfilename);
+        if (htmldumplogfilename)
+            pline("Writing HTML dumplog to %s...", htmldumplogfilename);
         dump_open_log(dumptime);
         dump_everything(ASCENDED, dumptime);
         dump_close_log();
@@ -968,7 +1102,7 @@ int how;
     if (Upolyd) /* Unchanging, or death which bypasses losing hit points */
         u.mh = u.mhmax;
 
-    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
 
     if (u.uhunger < 500 || how == CHOKING) {
         init_uhunger();
@@ -988,6 +1122,7 @@ int how;
     }
 
     nomovemsg = "You survived that attempt on your life.";
+    nomovemsg_color = CLR_MSG_SUCCESS;
     context.move = 0;
     if (multi > 0)
         multi = 0;
@@ -1301,6 +1436,9 @@ int how;
         if (how == GENOCIDED) {
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Unfortunately you are still genocided...");
         } else {
+            char killbuf[BUFSZ];
+            formatkiller(killbuf, BUFSZ, how, FALSE);
+            livelog_printf(LL_LIFESAVE, "averted death (%s)", killbuf);
             survive = TRUE;
         }
     }
@@ -1477,7 +1615,7 @@ int how;
         break;
     }
 
-    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
  
     if(endtext)
         display_screen_text(endtext, (const char*)0, (const char*)0, screentextstyle, ATR_NONE, clr, 0UL);
@@ -1497,7 +1635,34 @@ int how;
        time or even day if player is slow responding to --More-- */
     urealtime.finish_time = endtime = getnow();
     urealtime.realtime += (long) (endtime - urealtime.start_timing);
-    issue_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+    issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+
+
+    char postbuf[BUFSZ * 3];
+    Strcpy(postbuf, "");
+
+    /* Write forum post and livelog */
+    if (how < PANICKED || how == ASCENDED || how == ESCAPED)
+    {
+        char basebuf[BUFSZ * 3] = "";
+        if (how < PANICKED)
+        {
+            char killerbuf[BUFSZ * 2];
+            formatkiller(killerbuf, sizeof killerbuf, how, TRUE);
+            Strcpy(basebuf, killerbuf);
+            Sprintf(postbuf, "%s died, %s", plname, basebuf);
+        }
+        else
+        {
+            if (how == ASCENDED)
+                Strcpy(basebuf, "ascended to demigodhood");
+            else if (how == ESCAPED)
+                Strcpy(basebuf, "escaped the dungeon");
+            Sprintf(postbuf, "%s %s", plname, basebuf);
+        }
+
+        livelog_printf(LL_ACHIEVE, "%s", basebuf);
+    }
 
     /* Write dumplog */
     if(disclose_and_dumplog_ok)
@@ -1765,15 +1930,16 @@ int how;
 
     if (disclose_and_dumplog_ok)
     {
-
-#ifdef DUMPLOG
+        int dumpwin = endwin;
+#if defined (DUMPLOG) || defined (DUMPHTML)
         /* 'how' reasons beyond genocide shouldn't show tombstone;
            for normal end of game, genocide doesn't either */
+        dumpwin = NHW_DUMPTXT;
         if (how <= GENOCIDED)
         {
             dump_redirect(TRUE);
             if (iflags.in_dumplog)
-                genl_outrip(0, how, endtime);
+                outrip(0, how, endtime);
             dump_redirect(FALSE);
         }
 #endif
@@ -1796,8 +1962,8 @@ int how;
                 ? urole.name.f
                 : urole.name.m)
             : (const char*)(flags.female ? "Demigoddess" : "Demigod"));
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-        dump_forward_putstr(endwin, 0, "", done_stopprint);
+        dump_forward_putstr(endwin, ATR_HEADING, pbuf, done_stopprint);
+        dump_forward_putstr(dumpwin, 0, "", done_stopprint);
 
         if (how == ESCAPED || how == ASCENDED)
         {
@@ -1852,7 +2018,7 @@ int how;
                     //nowrap_add(u.u_gamescore, mhp);
                     Strcat(eos(pbuf), " and Schroedinger's cat");
                 }
-                dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+                dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
                 pbuf[0] = '\0';
             }
             else
@@ -1863,13 +2029,13 @@ int how;
                 how == ASCENDED ? "went to your reward"
                 : "escaped from the dungeon",
                 u.u_gamescore, plur(u.u_gamescore));
-            dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+            dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
 
 #if 0
             if (!done_stopprint)
                 artifact_score(invent, FALSE, endwin); /* list artifacts */
 
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
             dump_redirect(TRUE);
             if (iflags.in_dumplog)
                 artifact_score(invent, FALSE, 0);
@@ -1907,7 +2073,7 @@ int how;
                         Sprintf(pbuf, "%8ld worthless piece%s of colored glass,",
                             count, plur(count));
                     }
-                    dump_forward_putstr(endwin, 0, pbuf, 0);
+                    dump_forward_putstr(endwin, ATR_PREFORM, pbuf, 0);
                 }
             }
 #endif
@@ -1937,28 +2103,28 @@ int how;
             }
 
             Sprintf(eos(pbuf), " with %ld point%s,", u.u_gamescore, plur(u.u_gamescore));
-            dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+            dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
         }
 
         Sprintf(pbuf, "and %ld piece%s of gold, after %ld move%s.", umoney,
             plur(umoney), moves, plur(moves));
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
 
         char realtimebuf[BUFSZ] = "";
         print_realtime(realtimebuf, urealtime.realtime);
         Sprintf(pbuf, "You played on %s difficulty in %s mode for %s.", get_game_difficulty_text(context.game_difficulty),
             get_game_mode_text(TRUE), realtimebuf);
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
         if (!n_game_recoveries)
             Strcpy(pbuf, "The dungeon never collapsed on you.");
         else
             Sprintf(pbuf, "The dungeon collapsed on you %lu time%s.", n_game_recoveries, plur(n_game_recoveries));
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
         Sprintf(pbuf,
             "You were level %d with a maximum of %d hit point%s when you %s.",
             u.ulevel, u.uhpmax, plur(u.uhpmax), ends[how]);
-        dump_forward_putstr(endwin, 0, pbuf, done_stopprint);
-        dump_forward_putstr(endwin, 0, "", done_stopprint);
+        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_PREFORM, "", done_stopprint);
 
         if (!done_stopprint)
             display_nhwindow(endwin, TRUE);
@@ -1967,6 +2133,28 @@ int how;
 
         dump_close_log();
     }
+
+    /* Dumplog is closed so can post it now */
+    if (*postbuf)
+    {
+        IfModeAllowsPostToForum
+        {
+    #if defined (DUMPLOG) || defined (DUMPHTML)
+            char dlbuf[BUFSZ * 4];
+            char* dlfilename = print_dumplog_filename_to_buffer(dlbuf);
+            if (dlfilename)
+                issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_TEXT, dlfilename);
+
+    #if defined(DUMPHTML)
+            dlfilename = print_dumphtml_filename_to_buffer(dlbuf);
+            if (dlfilename)
+                issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_HTML, dlfilename);
+    #endif
+    #endif
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT, postbuf);
+        }
+    }
+
     /* "So when I die, the first thing I will see in Heaven is a
      * score list?" */
     if (have_windows && !iflags.toptenwin)
@@ -1979,7 +2167,7 @@ int how;
     if (CasualMode && how == ASCENDED && has_existing_save_file)
         (void)delete_savefile(); /* The casual mode character gets deleted only upon ascension */
 
-    issue_gui_command(GUI_CMD_GAME_ENDED);
+    issue_simple_gui_command(GUI_CMD_GAME_ENDED);
 
     if (have_windows)
         exit_nhwindows((char*)0);
@@ -1989,6 +2177,7 @@ int how;
         raw_print("");
         raw_print("");
     }
+    livelog_dump_url(LL_DUMP_ALL | (how == ASCENDED ? LL_DUMP_ASC : 0));
     nh_terminate(EXIT_SUCCESS);
 }
 
@@ -2478,11 +2667,11 @@ boolean ask, isend;
         pline1(nomsg);
         if (!isend)
             display_popup_text(nomsg, "No Vanquished Monsters", POPUP_TEXT_NO_MONSTERS_IN_LIST, ATR_NONE, NO_COLOR, NO_GLYPH, POPUP_FLAGS_NONE);
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     }
     else if (dumping)
     {
-        putstr(0, 0, "No creatures were vanquished."); /* not pline() */
+        putstr(0, ATR_HEADING, "No creatures were vanquished."); /* not pline() */
 #endif
     }
 }
@@ -2662,11 +2851,11 @@ boolean ask, isend;
         pline1(nomsg); /* Game is still ongoing, so pline is ok */
         if(!isend)
             display_popup_text(nomsg, "No Genocided Monsters", POPUP_TEXT_NO_MONSTERS_IN_LIST, ATR_NONE, NO_COLOR, NO_GLYPH, POPUP_FLAGS_NONE);
-#ifdef DUMPLOG
+#if defined (DUMPLOG) || defined (DUMPHTML)
     } 
     else if (dumping) 
     {
-        putstr(0, 0, "No species were genocided or became extinct.");
+        putstr(0, ATR_HEADING, "No species were genocided or became extinct.");
 #endif
     }
 }
@@ -2933,7 +3122,7 @@ get_current_game_score()
         + 10 * (ngenocided == 0)
         );
 
-    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 5000L + Small_Achievements_Score * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L 
+    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 1000L + Small_Achievements_Score * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L 
         + Rogue_Loot_Score + Tourist_Selfie_Score;
 
     double Turn_Count_Multiplier = sqrt(50000.0) / sqrt((double)max(1L, moves));
@@ -3085,10 +3274,10 @@ STATIC_OVL void
 reset_levchn(VOID_ARGS)
 {
     s_level* tmplev, * tmplev2;
-    int cnt = 0;
+    //int cnt = 0;
 
-    for (tmplev = sp_levchn; tmplev; tmplev = tmplev->next)
-        cnt++;
+    //for (tmplev = sp_levchn; tmplev; tmplev = tmplev->next)
+    //    cnt++;
 
     for (tmplev = sp_levchn; tmplev; tmplev = tmplev2) {
         tmplev2 = tmplev->next;
@@ -3100,12 +3289,12 @@ reset_levchn(VOID_ARGS)
 STATIC_OVL void
 reset_msghistory(VOID_ARGS)
 {
-    issue_gui_command(GUI_CMD_CLEAR_MESSAGE_HISTORY);
+    issue_simple_gui_command(GUI_CMD_CLEAR_MESSAGE_HISTORY);
 
     /* Let's clean something else, too, here just in case */
-    issue_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
-    issue_gui_command(GUI_CMD_CLEAR_FLOATING_TEXTS);
-    issue_gui_command(GUI_CMD_CLEAR_GUI_EFFECTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_CONDITION_TEXTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_FLOATING_TEXTS);
+    issue_simple_gui_command(GUI_CMD_CLEAR_GUI_EFFECTS);
 }
 
 
@@ -3163,6 +3352,7 @@ reset_gamestate(VOID_ARGS)
     reset_names();
     reset_waterlevel();
     reset_msghistory();
+    reset_gamelog();
 }
 
 STATIC_DCL void
@@ -3171,6 +3361,7 @@ reset_remaining_static_variables()
 #ifdef PANICTRACE
     aborting = FALSE;
 #endif
+    reset_allmain();
     reset_hunger_status();
     reset_drawbridge();
     reset_dig();
@@ -3179,6 +3370,7 @@ reset_remaining_static_variables()
     reset_dogmove();
     reset_doname();
     reset_dowear();
+    reset_files();
     reset_hack();
     reset_inventory();
     reset_kick();
@@ -3187,6 +3379,7 @@ reset_remaining_static_variables()
     reset_mon();
     reset_mthrowu();
     reset_pickup();
+    reset_pline();
     reset_polyself();
     reset_potion();
     reset_read();
@@ -3243,7 +3436,7 @@ tally_realtime(VOID_ARGS)
 {
     urealtime.finish_time = getnow();
     urealtime.realtime += (long)(urealtime.finish_time - urealtime.start_timing);
-    issue_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+    issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
     urealtime.start_timing = urealtime.finish_time;
 }
 

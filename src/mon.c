@@ -29,11 +29,17 @@ STATIC_DCL boolean FDECL(validspecmon, (struct monst *, int));
 STATIC_DCL struct permonst *FDECL(accept_newcham_form, (int));
 STATIC_DCL struct obj *FDECL(make_corpse, (struct monst *, unsigned, BOOLEAN_P));
 STATIC_DCL void FDECL(lifesaved_monster, (struct monst *));
+STATIC_DCL void FDECL(save_traits_mon, (struct monst*, BOOLEAN_P));
+STATIC_DCL struct monst* FDECL(get_saved_traits_mon, (struct monst*, BOOLEAN_P));
 
 /* note: duplicated in dog.c */
 #define LEVEL_SPECIFIC_NOCORPSE(mdat) \
     (Is_really_rogue_level(&u.uz)            \
      || ((level.flags.graveyard || In_quest(&u.uz)) && is_undead(mdat) && rn2(3)))
+
+#define livelog_mon_nam(mtmp) \
+    x_monnam(mtmp, ARTICLE_THE, (char *) 0,                 \
+             (SUPPRESS_IT | SUPPRESS_HALLUCINATION), FALSE)
 
 #if 0
 /* part of the original warning code which was replaced in 3.3.1 */
@@ -1384,7 +1390,7 @@ update_monster_timeouts()
                         {
                             if (!resists_slime(mtmp))
                             {
-                                (void)newcham(mtmp, &mons[PM_GREEN_SLIME], FALSE, TRUE);
+                                (void)newcham(mtmp, &mons[PM_GREEN_SLIME], 0, FALSE, TRUE);
                                 break_charm(mtmp, FALSE);
 
                                 if (mtmp->mtame)
@@ -1825,7 +1831,7 @@ register struct monst *mtmp;
                     ptr = mtmp->data;
                     if (poly) 
                     {
-                        if (newcham(mtmp, (struct permonst *) 0, FALSE, FALSE))
+                        if (newcham(mtmp, (struct permonst *) 0, 0, FALSE, FALSE))
                             ptr = mtmp->data;
                     }
                     else if (grow) 
@@ -1942,7 +1948,7 @@ register struct monst* mtmp;
                 ptr = mtmp->data;
                 if (poly)
                 {
-                    if (newcham(mtmp, (struct permonst*)0, FALSE, FALSE))
+                    if (newcham(mtmp, (struct permonst*)0, 0, FALSE, FALSE))
                         ptr = mtmp->data;
                 }
                 else if (grow)
@@ -2113,7 +2119,7 @@ struct monst *mtmp;
             ptr = mtmp->data;
             if (poly) 
             {
-                if (newcham(mtmp, (struct permonst *) 0, FALSE, FALSE))
+                if (newcham(mtmp, (struct permonst *) 0, 0, FALSE, FALSE))
                     ptr = mtmp->data;
             } 
             else if (grow) 
@@ -3013,6 +3019,40 @@ struct monst *mtmp2, *mtmp1;
         if (EDOG(mtmp2))
             *EDOG(mtmp2) = *EDOG(mtmp1);
     }
+    if (MMONST(mtmp1))
+    {
+        if (!MMONST(mtmp2))
+            newmmonst(mtmp2);
+        if (MMONST(mtmp2))
+        {
+            *MMONST(mtmp2) = *MMONST(mtmp1);
+            MMONST(mtmp2)->mextra = 0;
+            MMONST(mtmp2)->nmon = 0;
+            MMONST(mtmp2)->m_id = context.ident++;
+            if (!MMONST(mtmp2)->m_id) /* ident overflowed */
+                MMONST(mtmp2)->m_id = context.ident++;
+            if(MMONST(mtmp1)->mextra)
+                copy_mextra(MMONST(mtmp2), MMONST(mtmp1));
+        }
+    }
+    if (MOBJ(mtmp1))
+    {
+        if (!MOBJ(mtmp2))
+            newmobj(mtmp2);
+        if (MOBJ(mtmp2))
+        {
+            *MOBJ(mtmp2) = *MOBJ(mtmp1);
+            MOBJ(mtmp2)->oextra = 0;
+            MOBJ(mtmp2)->nobj = 0;
+            MOBJ(mtmp2)->nexthere = 0;
+            MOBJ(mtmp2)->cobj = 0;
+            MOBJ(mtmp2)->o_id = context.ident++;
+            if (!MOBJ(mtmp2)->o_id) /* ident overflowed */
+                MOBJ(mtmp2)->o_id = context.ident++;
+            if (MOBJ(mtmp1)->oextra)
+                copy_oextra(MOBJ(mtmp2), MOBJ(mtmp1));
+        }
+    }
     if (has_mcorpsenm(mtmp1))
         MCORPSENM(mtmp2) = MCORPSENM(mtmp1);
 }
@@ -3043,6 +3083,10 @@ struct monst *m;
             free((genericptr_t) x->emin);
         if (x->edog)
             free((genericptr_t) x->edog);
+        if (x->mmonst)
+            free_mmonst(m);
+        if (x->mobj)
+            free_mobj(m);
         /* [no action needed for x->mcorpsenm] */
 
         free((genericptr_t) x);
@@ -3222,6 +3266,7 @@ unsigned long mdiedflags;
     if (is_vampshifter(mtmp))
     {
         int mndx = mtmp->cham;
+        int subtype = mtmp->cham_subtype;
         int x = mtmp->mx, y = mtmp->my;
 
         /* this only happens if shapeshifted */
@@ -3280,12 +3325,17 @@ unsigned long mdiedflags;
                     rloc_to(mtmp, new_xy.x, new_xy.y);
                 }
             }
-            newcham(mtmp, &mons[mndx], FALSE, FALSE);
+            newcham(mtmp, &mons[mndx], 0, FALSE, FALSE);
             if (mtmp->data == &mons[mndx])
+            {
                 mtmp->cham = NON_PM;
+                mtmp->cham_subtype = 0;
+            }
             else
+            {
                 mtmp->cham = mndx;
-
+                mtmp->cham_subtype = subtype;
+            }
             boolean spef_on = FALSE;
             if (canspotmon(mtmp)) 
             {
@@ -3333,17 +3383,18 @@ unsigned long mdiedflags;
     /* restore chameleon, lycanthropes to true form at death */
     if (mtmp->cham >= LOW_PM) 
     {
-        set_mon_data(mtmp, &mons[mtmp->cham]);
+        set_mon_data(mtmp, &mons[mtmp->cham], mtmp->cham_subtype);
         mtmp->cham = NON_PM;
-    } 
+        mtmp->cham_subtype = 0;
+    }
     else if (mtmp->data == &mons[PM_WEREJACKAL])
-        set_mon_data(mtmp, &mons[PM_HUMAN_WEREJACKAL]);
+        set_mon_data(mtmp, &mons[PM_HUMAN_WEREJACKAL], mtmp->subtype);
     else if (mtmp->data == &mons[PM_WEREWOLF])
-        set_mon_data(mtmp, &mons[PM_HUMAN_WEREWOLF]);
+        set_mon_data(mtmp, &mons[PM_HUMAN_WEREWOLF], mtmp->subtype);
     else if (mtmp->data == &mons[PM_WEREBEAR])
-        set_mon_data(mtmp, &mons[PM_HUMAN_WEREBEAR]);
+        set_mon_data(mtmp, &mons[PM_HUMAN_WEREBEAR], mtmp->subtype);
     else if (mtmp->data == &mons[PM_WERERAT])
-        set_mon_data(mtmp, &mons[PM_HUMAN_WERERAT]);
+        set_mon_data(mtmp, &mons[PM_HUMAN_WERERAT], mtmp->subtype);
 
     /*
      * mvitals[].died does double duty as total number of dead monsters
@@ -3394,23 +3445,73 @@ unsigned long mdiedflags;
         nemdead();
     if (mtmp->data == &mons[PM_MEDUSA])
     {
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.killed_medusa)
             context.botl = 1;
-#endif
         if (!u.uachieve.killed_medusa)
+        {
             achievement_gained("Defeated Medusa");
+            livelog_printf(LL_ACHIEVE | LL_UMONST, "%s", "killed Medusa");
+        }
         u.uachieve.killed_medusa = 1;
     }
-    if (mtmp->data == &mons[PM_YACC])
+    else if (mtmp->data == &mons[PM_YACC])
     {
-#ifdef SHOW_SCORE_ON_BOTL
         if (flags.showscore && !u.uachieve.killed_yacc)
             context.botl = 1;
-#endif
         if (!u.uachieve.killed_yacc)
+        {
             achievement_gained("Defeated Yacc");
+            livelog_printf(LL_ACHIEVE | LL_UMONST, "%s", "killed Yacc");
+        }
         u.uachieve.killed_yacc = 1;
+    }
+    else if (mtmp->data == &mons[PM_DEATH]) 
+    {
+        switch (mvitals[tmp].died) 
+        {
+        case 1:
+            livelog_printf(LL_UMONST, "put %s down for a little nap",
+                livelog_mon_nam(mtmp));
+            break;
+        case 5:
+        case 10:
+        case 50:
+        case 100:
+        case 150:
+        case 200:
+        case 250:
+            livelog_printf(LL_UMONST, "put %s down for a little nap (%d times)",
+                livelog_mon_nam(mtmp), mvitals[tmp].died);
+            break;
+        default:
+            /* don't spam the log every time */
+            break;
+        }
+    }
+    else if (unique_corpstat(mtmp->data)) 
+    {
+        switch (mvitals[tmp].died) 
+        {
+        case 1:
+            livelog_printf(LL_UMONST, "%s %s",
+                is_not_living(mtmp->data) ? "destroyed" : "killed",
+                livelog_mon_nam(mtmp));
+            break;
+        case 5:
+        case 10:
+        case 50:
+        case 100:
+        case 150:
+        case 200:
+        case 250:
+            livelog_printf(LL_UMONST, "%s %s (%d times)",
+                is_not_living(mtmp->data) ? "destroyed" : "killed",
+                livelog_mon_nam(mtmp), mvitals[tmp].died);
+            break;
+        default:
+            /* don't spam the log every time */
+            break;
+        }
     }
 
     if (!u.uachieve.role_achievement &&
@@ -3422,8 +3523,10 @@ unsigned long mdiedflags;
     {
         u.uachieve.role_achievement = 1;
         char abuf[BUFSZ];
-        strcpy_capitalized_for_title(abuf, get_role_achievement_description(TRUE));
+        const char* ra_desc = get_role_achievement_description(TRUE);
+        strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
+        livelog_printf(LL_ACHIEVE, "%s", ra_desc);
     }
 
     if (glyph_is_invisible(levl[mtmp->mx][mtmp->my].hero_memory_layers.glyph))
@@ -3775,7 +3878,8 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
 
     mtmp->mhp = 0; /* caller will usually have already done this */
     if (!noconduct) /* KMH, conduct */
-        u.uconduct.killer++;
+        if (!u.uconduct.killer++)
+            livelog_printf(LL_CONDUCT, "%s", "killed for the first time");
 
     if (!nomsg)
     {
@@ -3828,7 +3932,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
 
     /* shopkeeper adds lost money in debit bill */
     long shkmoney = 0;
-    if (mtmp->isshk && mtmp->mextra && ESHK(mtmp))
+    if (mtmp->isshk && has_eshk(mtmp))
     {
         shkmoney += money_cnt(mtmp->minvent);
         shkmoney += max(0, ESHK(mtmp)->robbed + ESHK(mtmp)->debit - ESHK(mtmp)->credit);
@@ -3856,7 +3960,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
     disintegested = FALSE; /* reset */
 
     /* shopkeeper adds lost money in debit bill in the case heor she is revived */
-    if (mtmp->isshk && mtmp->mextra && ESHK(mtmp))
+    if (mtmp->isshk && has_eshk(mtmp))
     {
         ESHK(mtmp)->debit += shkmoney;
     }
@@ -3943,7 +4047,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
 
 cleanup:
     /* punish bad behaviour */
-    if (is_human(mdat) && !is_not_living(mdat) && !is_were(mdat) 
+    if (is_human(mdat) && !is_not_living(mdat) && !is_were(mdat)
         && !(mtmp->ispriest && has_epri(mtmp) && EPRI(mtmp)->shralign == A_NONE) /* Killing Moloch's (high) priests do not make you murderer */
         && (!always_hostile(mdat) && mtmp->mhostility <= 0)
         && (mndx < PM_ARCHAEOLOGIST || mndx > PM_WIZARD)
@@ -4045,7 +4149,7 @@ struct monst *mtmp;
         if (canseemon(mtmp))
             pline("%s solidifies...", Monnam(mtmp));
 
-        if (newcham(mtmp, &mons[PM_STONE_GOLEM], FALSE, FALSE))
+        if (newcham(mtmp, &mons[PM_STONE_GOLEM], 0, FALSE, FALSE))
         {
             if (canseemon(mtmp))
                 pline("Now it's %s.", an(mon_monster_name(mtmp)));
@@ -4067,6 +4171,7 @@ struct monst *mtmp;
     if (is_vampshifter(mtmp)) 
     {
         int mndx = mtmp->cham;
+        int subtype = mtmp->cham_subtype;
         int x = mtmp->mx, y = mtmp->my;
 
         /* this only happens if shapeshifted */
@@ -4114,11 +4219,17 @@ struct monst *mtmp;
                 pline("%s!", buf);
                 display_nhwindow(WIN_MESSAGE, FALSE);
             }
-            newcham(mtmp, &mons[mndx], FALSE, FALSE);
+            newcham(mtmp, &mons[mndx], 0, FALSE, FALSE);
             if (mtmp->data == &mons[mndx])
+            {
                 mtmp->cham = NON_PM;
+                mtmp->cham_subtype = 0;
+            }
             else
+            {
                 mtmp->cham = mndx;
+                mtmp->cham_subtype = subtype;
+            }
             if (canspotmon(mtmp)) {
                 pline("%s rises from the %s with renewed agility!",
                       Amonnam(mtmp), surface(mtmp->mx, mtmp->my));
@@ -4607,8 +4718,9 @@ rescham()
         mcham = (int) mtmp->cham;
         if (mcham >= LOW_PM) 
         {
-            (void) newcham(mtmp, &mons[mcham], FALSE, FALSE);
+            (void) newcham(mtmp, &mons[mcham], mtmp->cham_subtype, FALSE, FALSE);
             mtmp->cham = NON_PM;
+            mtmp->cham_subtype = 0;
         }
         if (is_were(mtmp->data) && mtmp->data->mlet != S_HUMAN)
             new_were(mtmp);
@@ -4632,7 +4744,10 @@ restartcham()
         if (DEADMONSTER(mtmp))
             continue;
         if (!is_cancelled(mtmp))
+        {
             mtmp->cham = pm_to_cham(mtmp->mnum);
+            mtmp->cham_subtype = mtmp->cham != NON_PM ? mtmp->subtype : 0;
+        }
         if (is_mimic(mtmp->data) && mtmp->msleeping
             && cansee(mtmp->mx, mtmp->my)) 
         {
@@ -4657,7 +4772,8 @@ struct monst *mon;
         if (mcham >= LOW_PM) 
         {
             mon->cham = NON_PM;
-            (void) newcham(mon, &mons[mcham], FALSE, FALSE);
+            mon->cham_subtype = 0;
+            (void) newcham(mon, &mons[mcham], mon->cham_subtype, FALSE, FALSE);
         }
         else if (is_were(mon->data) && !is_human(mon->data)) 
         {
@@ -4667,6 +4783,7 @@ struct monst *mon;
     else if (mon->cham == NON_PM) 
     {
         mon->cham = pm_to_cham(mon->mnum);
+        mon->cham_subtype = mon->cham != NON_PM ? mon->subtype : 0;
     }
 }
 
@@ -4823,7 +4940,7 @@ int shiftflags;
         return;
 
     struct permonst *ptr = 0;
-    int mndx;
+    int mndx, subtype = 0;
     unsigned was_female = mon->female;
     boolean msg = FALSE, dochng = FALSE;
 
@@ -4849,6 +4966,7 @@ int shiftflags;
                 && mon->cham >= LOW_PM) 
             {
                 ptr = &mons[mon->cham];
+                subtype = mon->cham_subtype;
                 dochng = TRUE;
             } 
             else if (mon->data == &mons[PM_FOG_CLOUD]
@@ -4863,6 +4981,7 @@ int shiftflags;
                 mndx = pickvampshape(mon);
                 if (mndx >= LOW_PM) {
                     ptr = &mons[mndx];
+                    subtype = 0;
                     dochng = (ptr != mon->data);
                 }
             }
@@ -4874,7 +4993,7 @@ int shiftflags;
         }
     }
     if (dochng) {
-        if (newcham(mon, ptr, FALSE, msg) && is_vampshifter(mon)) {
+        if (newcham(mon, ptr, subtype, FALSE, msg) && is_vampshifter(mon)) {
             /* for vampshift, override the 10% chance for sex change */
             ptr = mon->data;
             if (!is_male(ptr) && !is_female(ptr) && !is_neuter(ptr))
@@ -5218,9 +5337,10 @@ struct permonst *mdat;
    (possibly self-inflicted) become a different monster;
    returns 1 if it actually changes form */
 int
-newcham(mtmp, mdat, polyspot, msg)
+newcham(mtmp, mdat, subtype, polyspot, msg)
 struct monst *mtmp;
 struct permonst *mdat;
+unsigned short subtype;
 boolean polyspot; /* change is the result of wand or spell of polymorph */
 boolean msg;      /* "The oldmon turns into a newmon!" */
 {
@@ -5240,17 +5360,25 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
            anomalous extinction feedback during final disclsoure */
         if (mbirth_limit(oldmnum) < MAXMONNO)
             return 0;
+
+        if (!has_mmonst(mtmp))
+            save_traits_mon(mtmp, FALSE);
+    }
+    else
+    {
         /* cancelled shapechangers become uncancelled prior
            to being given a new shape */
-        if (is_cancelled(mtmp) && !Protection_from_shape_changers) 
+        if (is_cancelled(mtmp) && !Protection_from_shape_changers)
         {
             mtmp->cham = pm_to_cham(mtmp->mnum);
+            mtmp->cham_subtype = mtmp->cham != NON_PM ? mtmp->subtype : 0;
             if (mtmp->cham != NON_PM)
                 mtmp->mprops[CANCELLED] = 0;
         }
     }
 
-    if (msg) {
+    if (msg)
+    {
         /* like Monnam() but never mention saddle */
         Strcpy(oldname, x_monnam(mtmp, ARTICLE_THE, (char *) 0,
                                  SUPPRESS_SADDLE, FALSE));
@@ -5261,11 +5389,13 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
                                has_mname(mtmp) ? SUPPRESS_SADDLE : 0, FALSE));
 
     /* mdat = 0 -> caller wants a random monster shape */
-    if (mdat == 0) {
+    if (mdat == 0) 
+    {
         /* select_newcham_form() loops when resorting to random but
            it doesn't always pick that so we still retry here too */
         tryct = 20;
-        do {
+        do 
+        {
             mndx = select_newcham_form(mtmp);
             mdat = accept_newcham_form(mndx);
             /* for the first several tries we require upper-case on
@@ -5273,12 +5403,16 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
             if (tryct > 15 && Is_really_rogue_level(&u.uz)
                 && mdat && !isupper((uchar) mdat->mlet))
                 mdat = 0;
+            
             if (mdat)
                 break;
-        } while (--tryct > 0);
+        } 
+        while (--tryct > 0);
+
         if (!tryct)
             return 0;
-    } else if (mvitals[monsndx(mdat)].mvflags & MV_GENOCIDED)
+    }
+    else if (mvitals[monsndx(mdat)].mvflags & MV_GENOCIDED)
         return 0; /* passed in mdat is genocided */
 
     if (mdat == olddata)
@@ -5309,7 +5443,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
     hpd = mtmp->mhpmax;
 
     /* take on the new form... */
-    set_mon_data(mtmp, mdat);
+    set_mon_data(mtmp, mdat, subtype);
 
     /* Adjust monster ability scores to the new form */
     int oldtype = oldmnum;
@@ -5422,8 +5556,10 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
        a full-fledged vampshifter unless shape-changing is blocked */
     if (mtmp->cham == NON_PM && mdat->mlet == S_VAMPIRE
         && !Protection_from_shape_changers)
+    {
         mtmp->cham = pm_to_cham(monsndx(mdat));
-
+        mtmp->cham_subtype = 0;
+    }
     possibly_unwield(mtmp, polyspot); /* might lose use of weapon */
     mon_break_armor(mtmp, polyspot);
     if (!(mtmp->worn_item_flags & W_ARMG))
@@ -5599,7 +5735,7 @@ kill_genocided_monsters()
         if ((mvitals[mndx].mvflags & MV_GENOCIDED) || kill_cham) 
         {
             if (mtmp->cham >= LOW_PM && !kill_cham)
-                (void) newcham(mtmp, (struct permonst *) 0, FALSE, FALSE);
+                (void) newcham(mtmp, (struct permonst *) 0, 0, FALSE, FALSE);
             else
                 mondead(mtmp);
         }
@@ -6142,10 +6278,396 @@ struct monst* mon;
     return cnt;
 }
 
+STATIC_OVL void
+save_traits_mon(mtmp, save_mextra)
+struct monst* mtmp;
+boolean save_mextra;
+{
+    if (mtmp->ispriest)
+        forget_temple_entry(mtmp); /* EPRI() */
+    if (mtmp->issmith)
+        forget_smithy_entry(mtmp); /* ESMI() */
+    if (mtmp->isnpc)
+        forget_npc_entry(mtmp); /* ENPC() */
+
+    if (!has_mmonst(mtmp))
+        newmmonst(mtmp);
+    if (has_mmonst(mtmp))
+    {
+        struct monst* mtmp2 = MMONST(mtmp);
+
+        struct mextra* mextra = mtmp2->mextra;
+        *mtmp2 = *mtmp;
+        mtmp2->mextra = mextra;
+        if (!save_mextra && mtmp2->mextra)
+            dealloc_mextra(mtmp2);
+
+        /* invalidate pointers */
+        /* m_id is needed to know if this is a revived quest leader */
+        /* but m_id must be cleared when loading bones */
+        mtmp2->nmon = (struct monst*)0;
+        //mtmp2->data = (struct permonst *) 0; /* This sounds very dangerous to set to zero */
+        mtmp2->minvent = (struct obj*)0;
+        mtmp2->mw = (struct obj*)0;
+
+        if (save_mextra && mtmp->mextra)
+        {
+            struct monst* saved_mmonst = MMONST(mtmp);
+            MMONST(mtmp) = 0;
+            copy_mextra(mtmp2, mtmp);
+            MMONST(mtmp) = saved_mmonst;
+        }
+    }
+}
+
+/* returns a pointer to a new monst structure based on
+ * the one contained within the obj.
+ */
+STATIC_OVL struct monst*
+get_saved_traits_mon(mtmp, copyof)
+struct monst* mtmp;
+boolean copyof;
+{
+    struct monst* mtmp2 = (struct monst*)0;
+    struct monst* mnew = (struct monst*)0;
+
+    if (has_mmonst(mtmp))
+        mtmp2 = MMONST(mtmp);
+    if (mtmp2) {
+        if (copyof) {
+            mnew = newmonst();
+            *mnew = *mtmp2;
+            mnew->mextra = (struct mextra*)0;
+            if (mtmp2->mextra)
+                copy_mextra(mnew, mtmp2);
+        }
+        else {
+            /* Never insert this returned pointer into mon chains! */
+            mnew = mtmp2;
+        }
+
+        if (mnew && !mnew->data)
+            mnew->data = &mons[mnew->mnum];
+    }
+
+    return mnew;
+}
+
+int
+revert_mon_polymorph(mtmp, override_mextra, polyspot, msg)
+struct monst* mtmp;
+boolean override_mextra, polyspot, msg;
+{
+    if (!mtmp)
+        return 0;
+
+    short oldmnum = mtmp->mnum;
+    short oldsubtype = mtmp->subtype;
+    unsigned int oldfemale = mtmp->female;
+    unsigned int oldmappearance = mtmp->mappearance;
+    uchar oldmaptype = mtmp->m_ap_type;
+
+    struct permonst* olddata = mtmp->data;
+    char oldname[BUFSZ] = "", l_oldname[BUFSZ] = "", newname[BUFSZ] = "";
+    if (msg)
+    {
+        /* like Monnam() but never mention saddle */
+        Strcpy(oldname, x_monnam(mtmp, ARTICLE_THE, (char*)0,
+            SUPPRESS_SADDLE, FALSE));
+        oldname[0] = highc(oldname[0]);
+    }
+    /* we need this one whether msg is true or not */
+    Strcpy(l_oldname, x_monnam(mtmp, ARTICLE_THE, (char*)0,
+        has_mname(mtmp) ? SUPPRESS_SADDLE : 0, FALSE));
+
+    if (has_mmonst(mtmp))
+    {
+        struct monst* mtraits = get_saved_traits_mon(mtmp, FALSE);
+        if (mtraits)
+        {
+            if (mtmp->wormno) { /* throw tail away */
+                wormgone(mtmp);
+                place_monster(mtmp, mtmp->mx, mtmp->my);
+            }
+            if (M_AP_TYPE(mtmp) && !is_mimic(&mons[mtraits->mnum]))
+                seemimic(mtmp); /* revert to normal monster */
+
+            //Copy data one by one rather than using *mtmp = *mtraits. About half of the data needs to be copied and half not.
+            mtmp->data = &mons[mtraits->mnum];
+            mtmp->mnum = mtraits->mnum;
+            mtmp->subtype = mtraits->subtype;
+            mtmp->cham = NON_PM;
+            mtmp->cham_subtype = 0;
+            mtmp->movement = 0;
+            mtmp->m_lev = mtraits->m_lev;
+            mtmp->acurr = mtraits->acurr; 
+            mtmp->abonus = mtraits->abonus;
+            mtmp->afixmin = mtraits->afixmin;
+            mtmp->afixmax = mtraits->afixmax;
+            mtmp->amin = mtraits->amin;
+            mtmp->amax = mtraits->amax;
+            mtmp->atemp = mtraits->atemp;
+            mtmp->atime = mtraits->atime;
+            mtmp->mhp = mtraits->mhp;
+            mtmp->mbasehpmax = mtraits->mbasehpmax;
+            mtmp->mhpmax = mtraits->mhpmax;
+            mtmp->mbasehpdrain = mtraits->mbasehpdrain;
+            mtmp->mhp_fraction = mtraits->mhp_fraction;
+            mtmp->men = mtraits->men;
+            mtmp->mbaseenmax = mtraits->mbaseenmax;
+            mtmp->menmax = mtraits->menmax;
+            mtmp->mbaseendrain = mtraits->mbaseendrain;
+            mtmp->men_fraction = mtraits->men_fraction;
+            mtmp->heads_left = mtraits->heads_left;
+            mtmp->mappearance = mtraits->mappearance;
+            mtmp->m_ap_type = mtraits->m_ap_type;
+            mtmp->female = mtraits->female;
+            mtmp->heads_tamed = mtraits->heads_tamed;
+            if (override_mextra)
+            {
+                struct monst* saved_mmonst = 0;
+                // Deallocate existing mtmp->mextra, except for MMONST, which is pointed at by mtraits
+                if (mtmp->mextra)
+                {
+                    if (has_mmonst(mtmp))
+                    {
+                        saved_mmonst = MMONST(mtmp); // Since it is the same as mtraits
+                        MMONST(mtmp) = 0;
+                    }
+                    dealloc_mextra(mtmp);
+                }
+                // mtmp->mextra is now zero
+
+                // Create now a copy of mtraits->mextra to mtmp->mextra
+                if (mtraits->mextra)
+                    copy_mextra(mtmp, mtraits);
+
+                // Deallocate now also MMONST = mtraits
+                if (saved_mmonst) {
+                    if (saved_mmonst->mextra)
+                        dealloc_mextra(saved_mmonst);
+                    free((genericptr_t)saved_mmonst);
+                    saved_mmonst = 0;
+                }
+                mtraits = 0;
+                // Note: mtraits should not have had MMONST, so we do not need to deallocate it
+            }
+            else
+            {
+                // Deallocate MMONST, since mon is now in its original form; keep existing mextra otherwise
+                free_mmonst(mtmp);
+                mtraits = 0;
+            }
+
+            //struct monst* nmon = mtmp->nmon;
+            //struct obj* minvent = mtmp->minvent;
+            //struct obj* mw = mtmp->mw;
+            //xchar mx = mtmp->mx, my = mtmp->my;
+            //int meating = mtmp->meating;
+            //long mtrapseen = mtmp->mtrapseen;
+            //long worn_item_flags = mtmp->worn_item_flags;
+            //xchar weapon_strategy = mtmp->weapon_strategy;
+            //short mprops[MAX_PROPS] = { 0 };
+            //int i;
+            //for (i = 0; i < MAX_PROPS; i++)
+            //    mprops[i] = mtmp->mprops[i];
+
+            //Keeping current mextra rather than copying it from mtraits (the other way commented out below)
+            //struct mextra* mextra = mtmp->mextra;
+            //struct monst* saved_mmonst = 0;
+            //if (mtmp->mextra)
+            //{
+            //    if (has_mmonst(mtmp))
+            //    {
+            //        saved_mmonst = MMONST(mtmp); // Since it is the same as mtraits
+            //        MMONST(mtmp) = 0;
+            //    }
+            //    dealloc_mextra(mtmp);
+            //}
+
+            //*mtmp = *mtraits;
+
+            ///* Restore pointers */
+            //mtmp->nmon = nmon;
+            //mtmp->data = &mons[mtmp->mnum]; //Just in case
+            //mtmp->minvent = minvent;
+            //mtmp->mextra = mextra;
+
+            //mtmp->mw = mw;
+            //mtmp->mx0 = mtmp->mx = mx;
+            //mtmp->my0 = mtmp->my = my;
+            //mtmp->movement = 0;
+            //mtmp->meating = meating;
+            //mtmp->mtrapseen = mtrapseen;
+            //mtmp->worn_item_flags = worn_item_flags;
+            //mtmp->weapon_strategy = weapon_strategy;
+
+            //for (i = 0; i < MAX_PROPS; i++)
+            //    mtmp->mprops[i] = mprops[i];
+
+            //if (saved_mmonst) {
+            //    //No need to delete saved_mmonst->mextra since it is now used as mextra for mtmp
+            //    if (saved_mmonst->mextra)
+            //        saved_mmonst->mextra = 0;
+            //    free((genericptr_t)saved_mmonst);
+            //}
+            //free_mmonst(mtmp);
+            //mtraits = 0;
+
+            //mtmp->cham = NON_PM;
+            //mtmp->cham_subtype = 0;
+        }
+        else
+        {
+            // Should not happen, but if did, use newcham and deallocate MMONST
+            free_mmonst(mtmp);
+            mtraits = 0;
+            return newcham(mtmp, &mons[mtmp->cham], mtmp->cham_subtype, FALSE, canspotmon(mtmp));
+        }
+    }
+    else if (mtmp->cham >= LOW_PM)
+    {
+        return newcham(mtmp, &mons[mtmp->cham], mtmp->cham_subtype, FALSE, canspotmon(mtmp));
+    }
+    else
+        return 0;
+
+    struct permonst* mdat = mtmp->data;
+    if (emitted_light_range(olddata) != emitted_light_range(mtmp->data)) {
+        /* used to give light, now doesn't, or vice versa,
+           or light's range has changed */
+        if (emitted_light_range(olddata))
+            del_light_source(LS_MONSTER, monst_to_any(mtmp));
+        if (emitted_light_range(mtmp->data))
+            new_light_source(mtmp->mx, mtmp->my, emitted_light_range(mtmp->data), LS_MONSTER, monst_to_any(mtmp), 0);
+    }
+
+    if (mon_ambient_sound(olddata) != mon_ambient_sound(mtmp->data))
+    {
+        if (mon_ambient_sound(olddata))
+            del_sound_source(SOUNDSOURCE_MONSTER, monst_to_any(mtmp));
+        if (mon_ambient_sound(mtmp->data))
+            new_sound_source(mtmp->mx, mtmp->my, mon_ambient_sound(mtmp->data), (double)mon_ambient_volume(mtmp->data),
+                SOUNDSOURCE_MONSTER, mon_ambient_subtype(mtmp->data), monst_to_any(mtmp));
+    }
+
+    if (mtmp->mundetected)
+        (void)hideunder(mtmp);
+    if (u.ustuck == mtmp) {
+        if (u.uswallow) {
+            if (!attacktype(mdat, AT_ENGL)) {
+                /* Does mdat care? */
+                if (!is_incorporeal(mdat) && !amorphous(mdat)
+                    && !is_whirly(mdat) && (mdat != &mons[PM_YELLOW_LIGHT])) {
+                    char msgtrail[BUFSZ];
+
+                    if (is_vampshifter(mtmp)) {
+                        Sprintf(msgtrail, " which was a shapeshifted %s",
+                            noname_monnam(mtmp, ARTICLE_NONE));
+                    }
+                    else if (is_animal(mdat)) {
+                        Strcpy(msgtrail, "'s stomach");
+                    }
+                    else {
+                        msgtrail[0] = '\0';
+                    }
+
+                    /* Do this even if msg is FALSE */
+                    You_ex(ATR_NONE, CLR_MSG_WARNING, "%s %s%s!",
+                        (amorphous(olddata) || is_whirly(olddata))
+                        ? "emerge from" : "break out of",
+                        l_oldname, msgtrail);
+                    msg = FALSE; /* message has been given */
+                    mtmp->mhp = 1; /* almost dead */
+                }
+                expels(mtmp, olddata, FALSE);
+            }
+            else {
+                /* update swallow glyphs for new monster */
+                swallowed(0);
+            }
+        }
+        else if (!sticks(mdat) && !sticks(youmonst.data))
+             unstuck(mtmp);
+    }
+
+#ifndef DCC30_BUG
+    if (is_long_worm_with_tail(mdat) && (mtmp->wormno = get_wormno()) != 0) {
+#else
+    /* DICE 3.0 doesn't like assigning and comparing mtmp->wormno in the
+     * same expression.
+     */
+    if (is_long_worm_with_tail(mdat)
+        && (mtmp->wormno = get_wormno(), mtmp->wormno != 0)) {
+#endif
+        /* we can now create worms with tails - 11/91 */
+        initworm(mtmp, rn2(5));
+        place_worm_tail_randomly(mtmp, mtmp->mx, mtmp->my);
+    }
+
+    newsym(mtmp->mx, mtmp->my);
+
+    if (oldmnum == mtmp->mnum && oldsubtype == mtmp->subtype && oldfemale == mtmp->female && oldmappearance == mtmp->mappearance && oldmaptype == mtmp->m_ap_type) // Is the same
+        return 1;
+
+    if (msg) {
+        play_sfx_sound_at_location(SFX_POLYMORPH_SUCCESS, mtmp->mx, mtmp->my);
+        Strcpy(newname, noname_monnam(mtmp, ARTICLE_A));
+        /* oldname was capitalized above; newname will be lower case */
+        if (!strcmpi(newname, "it")) { /* can't see or sense it now */
+            if (!!strcmpi(oldname, "it")) /* could see or sense it before */
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s disappears!", oldname);
+            (void)usmellmon(mdat);
+        }
+        else { /* can see or sense it now */
+            if (!strcmpi(oldname, "it")) /* couldn't see or sense it before */
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s appears!", upstart(newname));
+            else
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns into %s!", oldname, newname);
+        }
+    }
+
+    possibly_unwield(mtmp, polyspot); /* might lose use of weapon */
+    mon_break_armor(mtmp, polyspot);
+    if (!(mtmp->worn_item_flags & W_ARMG))
+        mselftouch(mtmp, "No longer petrify-resistant, ", !context.mon_moving);
+
+    m_dowear(mtmp, FALSE);
+
+    /* This ought to re-test can_carry() on each item in the inventory
+     * rather than just checking ex-giants & boulders, but that'd be
+     * pretty expensive to perform.  If implemented, then perhaps
+     * minvent should be sorted in order to drop heaviest items first.
+     */
+     /* former giants can't continue carrying boulders */
+    if (mtmp->minvent && !throws_rocks(mdat)) {
+        register struct obj* otmp, * otmp2;
+
+        for (otmp = mtmp->minvent; otmp; otmp = otmp2) {
+            otmp2 = otmp->nobj;
+            if (otmp->otyp == BOULDER) {
+                /* this keeps otmp from being polymorphed in the
+                   same zap that the monster that held it is polymorphed */
+                if (polyspot)
+                    bypass_obj(otmp);
+                obj_extract_self(otmp);
+                /* probably ought to give some "drop" message here */
+                if (flooreffects(otmp, mtmp->mx, mtmp->my, ""))
+                    continue;
+                place_object(otmp, mtmp->mx, mtmp->my);
+            }
+        }
+    }
+
+    return 1;
+}
+
+
 void
 reset_mon(VOID_ARGS)
 {
     vamp_rise_msg = disintegested = 0;
 }
+
 
 /*mon.c*/

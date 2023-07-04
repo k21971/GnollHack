@@ -414,9 +414,9 @@ E void FDECL(X11_clear_nhwindow, (winid));
 E void FDECL(X11_display_nhwindow, (winid, BOOLEAN_P));
 E void FDECL(X11_destroy_nhwindow, (winid));
 E void FDECL(X11_curs, (winid, int, int));
-E void FDECL(X11_putstr_ex, (winid, int, const char *, int, int));
+E void FDECL(X11_putstr_ex, (winid, const char *, int, int, int));
 E void FDECL(X11_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
-#define X11_putstr(x, y, z) X11_putstr_ex(x, y, z, 0 , 0)
+#define X11_putstr(x, y, z) X11_putstr_ex(x, z, y, 0, 0)
 E void FDECL(X11_display_file, (const char *, BOOLEAN_P));
 E void FDECL(X11_start_menu_ex, (winid, int));
 E void FDECL(X11_add_menu, (winid, int, const ANY_P *, CHAR_P, CHAR_P, int,
@@ -432,7 +432,7 @@ E void NDECL(X11_wait_synch);
 E void FDECL(X11_cliparound, (int, int, BOOLEAN_P));
 #endif
 E void FDECL(X11_print_glyph, (winid, XCHAR_P, XCHAR_P, struct layer_info));
-E void FDECL(X11_issue_gui_command, (int));
+E void FDECL(X11_issue_gui_command, (int, int, const char*));
 E void FDECL(X11_raw_print, (const char *));
 E void FDECL(X11_raw_print_bold, (const char *));
 E int NDECL(X11_nhgetch);

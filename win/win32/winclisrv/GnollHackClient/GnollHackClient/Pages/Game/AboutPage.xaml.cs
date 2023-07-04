@@ -1,5 +1,5 @@
 ﻿using GnollHackCommon;
-using Plugin.StoreReview;
+//using Plugin.StoreReview;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -117,12 +117,12 @@ namespace GnollHackClient.Pages.Game
         {
             AboutTableView.IsEnabled = false;
             App.PlayButtonClickedSound();
-            btnRateApp.TextColor = Color.Gray;
-            btnRateApp.Text = "Connecting...";
-            await CrossStoreReview.Current.RequestReview(false);
-            await Task.Delay(100);
-            btnRateApp.Text = "Give App Rating";
-            btnRateApp.TextColor = Color.White;
+            //btnRateApp.TextColor = Color.Gray;
+            //btnRateApp.Text = "Connecting...";
+            //await CrossStoreReview.Current.RequestReview(false);
+            //await Task.Delay(100);
+            //btnRateApp.Text = "Give App Rating";
+            //btnRateApp.TextColor = Color.White;
             AboutTableView.IsEnabled = true;
         }
 
@@ -189,7 +189,7 @@ namespace GnollHackClient.Pages.Game
 
         private async void Button_Clicked(object sender, EventArgs e)
         {
-            CloseGrid.IsEnabled = false;
+            CloseButton.IsEnabled = false;
             App.PlayButtonClickedSound();
             await App.Current.MainPage.Navigation.PopModalAsync();
         }
@@ -373,7 +373,7 @@ namespace GnollHackClient.Pages.Game
                 _currentPageHeight = height;
 
                 lblHeader.Margin = ClientUtils.GetHeaderMarginWithBorder(bkgView.BorderStyle, width, height);
-                CloseGrid.Margin = ClientUtils.GetFooterMarginWithBorder(bkgView.BorderStyle, width, height);
+                CloseButton.Margin = ClientUtils.GetFooterMarginWithBorder(bkgView.BorderStyle, width, height);
             }
         }
 
@@ -440,7 +440,8 @@ namespace GnollHackClient.Pages.Game
                                     {
                                         if(System.IO.File.Exists(filestr))
                                         {
-                                            if(App.GnollHackService.ValidateSaveFile(filestr))
+                                            string out_str = "";
+                                            if(App.GnollHackService.ValidateSaveFile(filestr, out out_str))
                                             {
                                                 FileInfo fileInfo = new FileInfo(filestr);
                                                 string finalname = Path.Combine(savedirpath, fileInfo.Name + ".i");
@@ -451,7 +452,7 @@ namespace GnollHackClient.Pages.Game
                                             }
                                             else
                                             {
-                                                await DisplayAlert("Invalid Save Game in Zip", "Saved game \'" + filestr + "\' is invalid.", "OK");
+                                                await DisplayAlert("Invalid Save Game in Zip", "Saved game \'" + filestr + "\' is invalid: " + out_str, "OK");
                                             }
                                         }
                                     }
@@ -467,7 +468,8 @@ namespace GnollHackClient.Pages.Game
                             }
                             else
                             {
-                                if (App.GnollHackService.ValidateSaveFile(file.FullPath))
+                                string out_str = "";
+                                if (App.GnollHackService.ValidateSaveFile(file.FullPath, out out_str))
                                 {
                                     string targetfilename = file.FileName + ".i";
                                     string savedirpath = Path.Combine(gnhpath, "save");
@@ -484,7 +486,7 @@ namespace GnollHackClient.Pages.Game
                                 }
                                 else
                                 {
-                                    await DisplayAlert("Invalid Saved Game", "Saved game \'" + file.FullPath + "\' is invalid.", "OK");
+                                    await DisplayAlert("Invalid Saved Game", "Saved game \'" + file.FullPath + "\' is invalid: " + out_str, "OK");
                                 }
                             }
                         }

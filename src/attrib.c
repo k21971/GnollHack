@@ -431,7 +431,7 @@ int poison_strength;   /* d6 per level damage*/
         boolean plural = (reason[strlen(reason) - 1] == 's') ? 1 : 0;
 
         /* avoid "The" Orcus's sting was poisoned... */
-        pline("%s%s %s poisoned!",
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s poisoned!",
               isupper((uchar) *reason) ? "" : "The ", reason,
               plural ? "were" : "was");
     }
@@ -440,7 +440,7 @@ int poison_strength;   /* d6 per level damage*/
     {
         if (!strcmp(reason, "blast"))
             u_shieldeff();
-        pline_The("poison doesn't seem to affect you.");
+        pline_The_ex(ATR_NONE, CLR_MSG_SUCCESS, "poison doesn't seem to affect you.");
         return;
     }
 
@@ -516,7 +516,7 @@ int poison_strength;   /* d6 per level damage*/
         int damage_dealt = hp_before - hp_after;
         if (damage_dealt > 0)
         {
-            You("sustain %d damage!", damage_dealt);
+            You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_red1, "sustain %d damage!", damage_dealt);
             display_u_being_hit(HIT_POISONED, damage_dealt, 0UL);
         }
     }
@@ -2067,7 +2067,7 @@ struct monst* mon;
     mon->mhpmax = mon->mbasehpmax + m_hpmaxadjustment(mon, FALSE);
 
     /* EDOG penalty */
-    if(mon->mextra && EDOG(mon))
+    if(has_edog(mon))
     {
         struct edog* edog = EDOG(mon);
         if (edog->mhpmax_penalty) 
@@ -2127,7 +2127,7 @@ struct monst* mon;
     struct obj* uitem;
 
     int blessed_luck_count = 0;
-    int uncursed_luck_count = 0;
+    //int uncursed_luck_count = 0;
     int cursed_luck_count = 0;
 
     schar* abon_ptr[A_MAX] = { 0 };
@@ -2421,8 +2421,8 @@ struct monst* mon;
                 u.moreluck += uitem->quan;
                 if (uitem->blessed)
                     blessed_luck_count += uitem->quan;
-                else
-                    uncursed_luck_count += uitem->quan;
+                //else
+                //    uncursed_luck_count += uitem->quan;
             }
 
             if ((artifact_confers_unluck(uitem) || confers_unluck(uitem)))
@@ -2430,8 +2430,8 @@ struct monst* mon;
                 u.moreluck -= uitem->quan;
                 if (uitem->cursed)
                     cursed_luck_count += uitem->quan;
-                else
-                    uncursed_luck_count -= uitem->quan;
+                //else
+                //    uncursed_luck_count -= uitem->quan;
             }
         }
     }
@@ -2661,6 +2661,8 @@ int reason; /* 0==conversion, 1==helm-of-OA on, 2==helm-of-OA off */
     context.botl = TRUE; /* status line needs updating */
     if (reason == 0) {
         /* conversion via altar */
+        livelog_printf(LL_ALIGNMENT, "permanently converted to %s",
+            aligns[1 - newalign].adj);
         u.ualignbase[A_CURRENT] = (aligntyp) newalign;
         /* worn helm of opposite alignment might block change */
         if (!uarmh || uarmh->otyp != HELM_OF_OPPOSITE_ALIGNMENT)
@@ -2674,6 +2676,8 @@ int reason; /* 0==conversion, 1==helm-of-OA on, 2==helm-of-OA off */
         u.ualign.type = (aligntyp) newalign;
         if (reason == 1)
         {
+            livelog_printf(LL_ALIGNMENT, "used a helm to turn %s",
+                aligns[1 - newalign].adj);
             play_sfx_sound(SFX_ALIGNMENT_CHANGE_HELM_ON);
             Your("mind oscillates %s.", Hallucination ? "wildly" : "briefly");
         }

@@ -18,16 +18,22 @@ namespace GnollHackClient.Pages.Game
     {
         private string _fileName;
         private int _fixedWidth;
+        private bool _isHtml;
 
         public DisplayFilePage(string fileName, string header) : this(fileName, header, 0)
         {
         }
 
-        public DisplayFilePage(string fileName, string header, int fixedWidth) : this(fileName, header, fixedWidth, false)
+        public DisplayFilePage(string fileName, string header, int fixedWidth) : this(fileName, header, fixedWidth, false, false)
         {
         }
 
-        public DisplayFilePage(string fileName, string header, int fixedWidth, bool displayshare)
+        public DisplayFilePage(string fileName, string header, int fixedWidth, bool displayshare) : this(fileName, header, fixedWidth, displayshare, false)
+        {
+
+        }
+
+        public DisplayFilePage(string fileName, string header, int fixedWidth, bool displayshare, bool isHtml)
         {
             InitializeComponent();
             On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
@@ -37,6 +43,7 @@ namespace GnollHackClient.Pages.Game
             HeaderLabel.Text = header;
             BottomLayout.IsVisible = displayshare;
             CloseGrid.IsVisible = !displayshare;
+            _isHtml = isHtml;
         }
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
@@ -51,30 +58,45 @@ namespace GnollHackClient.Pages.Game
             string res = "";
             try
             {
-                string text = File.ReadAllText(_fileName, Encoding.UTF8);
-                if(_fixedWidth > 0)
+                if (_isHtml)
                 {
-                    int firstLineBreak = text.IndexOf(Environment.NewLine);
-                    int len = 0;
-                    if (firstLineBreak < 0)
-                    {
-                        len = text.Length;
-                        if (len < _fixedWidth)
-                        {
-                            text = text + new string(' ', _fixedWidth - len);
-                        }
-                    }
-                    else
-                    {
-                        len = firstLineBreak;
-                        if (len < _fixedWidth)
-                        {
-                            text = text.Substring(0, firstLineBreak) + new string(' ', _fixedWidth - len) + text.Substring(firstLineBreak);
-                        }
-                    }
-
+                    string text = File.ReadAllText(_fileName, Encoding.UTF8);
+                    var htmlSource = new HtmlWebViewSource();
+                    htmlSource.Html = text;
+                    htmlSource.BaseUrl = App.PlatformService.GetBaseUrl();
+                    DisplayWebView.Source = htmlSource;
+                    if(App.IsiOS)
+                        DisplayWebView.Opacity = 0;
+                    DisplayWebView.IsVisible = true;
                 }
-                TextLabel.Text = text;
+                else
+                {
+                    string text = File.ReadAllText(_fileName, Encoding.UTF8);
+                    if (_fixedWidth > 0)
+                    {
+                        int firstLineBreak = text.IndexOf(Environment.NewLine);
+                        int len = 0;
+                        if (firstLineBreak < 0)
+                        {
+                            len = text.Length;
+                            if (len < _fixedWidth)
+                            {
+                                text = text + new string(' ', _fixedWidth - len);
+                            }
+                        }
+                        else
+                        {
+                            len = firstLineBreak;
+                            if (len < _fixedWidth)
+                            {
+                                text = text.Substring(0, firstLineBreak) + new string(' ', _fixedWidth - len) + text.Substring(firstLineBreak);
+                            }
+                        }
+
+                    }
+                    TextLabel.Text = text;
+                    TextLabel.IsVisible = true;
+                }
             }
             catch (Exception e)
             {
@@ -98,7 +120,7 @@ namespace GnollHackClient.Pages.Game
                 margins = TextLabel.Margin;
                 Thickness safearea = new Thickness();
                 bool usingsafe = On<Xamarin.Forms.PlatformConfiguration.iOS>().UsingSafeArea();
-                if(usingsafe)
+                if (usingsafe)
                 {
                     safearea = On<Xamarin.Forms.PlatformConfiguration.iOS>().SafeAreaInsets();
                 }
@@ -114,7 +136,7 @@ namespace GnollHackClient.Pages.Game
                 {
                     TextLabel.FontSize = testsize;
                     double textwidth = TextLabel.MeasureWidth(new string('A', _fixedWidth));
-                    if(textwidth > 0)
+                    if (textwidth > 0)
                         newsize = testsize * target_width / textwidth;
                 }
                 TextLabel.FontSize = newsize;
@@ -127,7 +149,7 @@ namespace GnollHackClient.Pages.Game
 
         private async void ShareButton_Clicked(object sender, EventArgs e)
         {
-            ShareGrid.IsEnabled = false;
+            ShareButton.IsEnabled = false;
             App.PlayButtonClickedSound();
             try
             {
@@ -141,7 +163,21 @@ namespace GnollHackClient.Pages.Game
             {
                 await DisplayAlert("Share File Failure", "GnollHack failed to share " + HeaderLabel.Text + ": " + ex.Message, "OK");
             }
-            ShareGrid.IsEnabled = true;
+            ShareButton.IsEnabled = true;
+        }
+
+        private void ContentPage_Appearing(object sender, EventArgs e)
+        {
+            if (App.IsiOS && _isHtml)
+            {
+                Device.StartTimer(TimeSpan.FromSeconds(1.0 / 20), () =>
+                {
+                    Animation displayFileAnimation = new Animation(v => DisplayWebView.Opacity = (double)v, 0.0, 1.0);
+                        displayFileAnimation.Commit(MainGrid, "DisplayFileShowAnimation", length: 256,
+                    rate: 16, repeat: () => false);
+                    return false;
+                });
+            }
         }
     }
-}
+ }

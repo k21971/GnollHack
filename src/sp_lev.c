@@ -1976,7 +1976,7 @@ struct mkroom *croom;
                     struct permonst *olddata = mtmp->data;
 
                     mgender_from_permonst(mtmp, mdat);
-                    set_mon_data(mtmp, mdat);
+                    set_mon_data(mtmp, mdat, 0);
 
                     if (emitted_light_range(olddata) != emitted_light_range(mtmp->data))
                     {
@@ -2090,7 +2090,7 @@ create_object(o, croom)
 object *o;
 struct mkroom *croom;
 {
-    struct obj *otmp;
+    struct obj *otmp = 0;
     schar x, y;
     char c;
     boolean named; /* has a name been supplied in level description? */
@@ -2314,6 +2314,9 @@ struct mkroom *croom;
         else
             otmp = mkobj_at(oclass, x, y, !named);
     }
+
+    if (!otmp)
+        return;
 
     /* Set these first, and then everything else that might affect speflags */
     if (o->speflags > 0)
@@ -2587,7 +2590,7 @@ struct mkroom *croom;
             }
         }
     }
-
+    otmp->owt = weight(otmp);
     stackobj(otmp);
 
     if (o->lit) {
@@ -2938,7 +2941,7 @@ struct mkroom *croom;
 {
     schar x, y, x1, y1, x2, y2;
 
-    if (terr->toter >= MAX_TYPE)
+    if (terr->toter >= MAX_LEVTYPE)
         return;
 
     x1 = terr->x1;
@@ -4636,7 +4639,7 @@ struct sp_coder* coder;
         return;
     boundary_location_type = (schar)OV_i(bt_opvar);
 
-    if (boundary_location_type < 0 || boundary_location_type >= MAX_TYPE || !IS_FLOOR(boundary_location_type))
+    if (boundary_location_type < 0 || boundary_location_type >= MAX_LEVTYPE || !IS_FLOOR(boundary_location_type))
     {
         level.flags.boundary_type = ROOM;
     }
@@ -7406,7 +7409,7 @@ struct sp_coder *coder;
             for (x = xstart; x < xstart + xsize; x++) {
                 mptyp = (mpmap->vardata.str[(y - ystart) * xsize
                                                   + (x - xstart)] - 1);
-                if (mptyp >= MAX_TYPE)
+                if (mptyp >= MAX_LEVTYPE)
                     continue;
 
                 struct rm* lev = &levl[x][y];

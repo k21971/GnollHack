@@ -54,7 +54,7 @@ void gnome_display_nhwindow(winid wid, BOOLEAN_P block);
 void gnome_destroy_nhwindow(winid wid);
 void gnome_curs(winid wid, int x, int y);
 void gnome_putstr(winid wid, int attr, const char *text);
-void gnome_putstr_ex(winid wid, int attr, const char* text, int app, int color);
+void gnome_putstr_ex(winid wid, const char* text, int attr, int color, int app);
 void gnome_putstr_ex2(winid wid, const char* text, const char* attrs, const char* colors, int attr, int color, int app);
 void gnome_display_file(const char *filename, BOOLEAN_P must_exist);
 void gnome_start_menu_ex(winid wid, int style);
@@ -76,7 +76,7 @@ void gnome_cliparound(int x, int y, BOOLEAN_P force);
 */
 void gnome_cliparound_proper(winid wid, int x, int y);
 void gnome_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, int glyph);
-void gnome_issue_gui_command(int initid);
+void gnome_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str);
 void gnome_raw_print(const char *str);
 void gnome_raw_print_bold(const char *str);
 int gnome_nhgetch(void);

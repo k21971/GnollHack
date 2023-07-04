@@ -434,7 +434,7 @@ char **argv UNUSED;
 {
     int wid, hgt, i;
 
-    tty_issue_gui_command(1);
+    tty_issue_gui_command(1, 0, 0);
 
     /* options aren't processed yet so wc2_statuslines might be 0;
        make sure that it has a reasonable value during tty setup */
@@ -444,7 +444,7 @@ char **argv UNUSED;
      *
      *  gettty() must be called before tty_startup()
      *    due to ordering of LI/CO settings
-     *  tty_startup() must be called before read_options()
+     *  tty_startup() must be called before process_options_file()
      *    due to ordering of graphics settings
      */
 #if defined(UNIX) || defined(VMS)
@@ -1491,7 +1491,7 @@ const char *str;
 
 winid
 tty_create_nhwindow_ex(type, style, glyph, info)
-int type, style UNUSED, glyph UNUSED;
+int type, style, glyph UNUSED;
 struct extended_create_window_info info UNUSED;
 {
     struct WinDesc *newwin;
@@ -1505,6 +1505,8 @@ struct extended_create_window_info info UNUSED;
     newwin->type = type;
     newwin->flags = 0;
     newwin->active = FALSE;
+    newwin->window_style = style;
+    newwin->menu_style = 0;
     newwin->curx = newwin->cury = 0;
     newwin->morestr = 0;
     newwin->mlist = (tty_menu_item *) 0;
@@ -1643,15 +1645,29 @@ boolean free_data;
         if (cw == wins[WIN_MESSAGE] && cw->rows > cw->maxrow)
             cw->maxrow = cw->rows; /* topl data */
         for (i = 0; i < cw->maxrow; i++)
+        {
             if (cw->data[i]) {
-                free((genericptr_t) cw->data[i]);
-                cw->data[i] = (char *) 0;
+                free((genericptr_t)cw->data[i]);
+                cw->data[i] = (char*)0;
                 if (cw->datlen)
                     cw->datlen[i] = 0;
             }
+            if (cw->datattrs[i]) {
+                free((genericptr_t)cw->datattrs[i]);
+                cw->datattrs[i] = (char*)0;
+            }
+            if (cw->datcolors[i]) {
+                free((genericptr_t)cw->datcolors[i]);
+                cw->datcolors[i] = (char*)0;
+            }
+        }
         if (free_data) {
             free((genericptr_t) cw->data);
             cw->data = (char **) 0;
+            free((genericptr_t)cw->datattrs);
+            cw->datattrs = (char**)0;
+            free((genericptr_t)cw->datcolors);
+            cw->datcolors = (char**)0;
             if (cw->datlen)
                 free((genericptr_t) cw->datlen);
             cw->datlen = (short *) 0;
@@ -2019,7 +2035,7 @@ struct WinDesc *cw;
                     (void) putchar(' ');
                     ++ttyDisplay->curx;
 
-                    if (!iflags.use_menu_color
+                    if (!iflags.use_menu_color || !menu_style_allows_menu_coloring(cw->menu_style)
                         || !get_menu_coloring(curr->str, &color, &attr))
                     {
                         attr = curr->attr;
@@ -2323,7 +2339,7 @@ struct WinDesc *cw;
     boolean linestart;
     register char *cp,*ccp,*cap;
 
-    issue_gui_command(GUI_CMD_START_FLUSH);
+    issue_simple_gui_command(GUI_CMD_START_FLUSH);
 
     for (n = 0, i = 0; i < cw->maxrow; i++) 
     {
@@ -2432,7 +2448,7 @@ struct WinDesc *cw;
             cw->flags |= WIN_CANCELLED;
     }
 
-    issue_gui_command(GUI_CMD_FINISH_FLUSH);
+    issue_simple_gui_command(GUI_CMD_FINISH_FLUSH);
 }
 
 /*ARGSUSED*/
@@ -2782,7 +2798,7 @@ const char *str;
 }
 
 void
-tty_putstr_ex(window, attr, str, app, color)
+tty_putstr_ex(window, str, attr, color, app)
 winid window;
 int attr, app, color;
 const char* str;
@@ -2945,16 +2961,22 @@ const char *str, *attrs, *colors;
         /* always grows one at a time, but alloc 12 at a time */
         if (cw->cury >= cw->rows) {
             char **tmp, ** tmp2, ** tmp3;
-
+            long oldrows = cw->rows;
             cw->rows += 12;
             tmp = (char **) alloc(sizeof(char *) * (size_t)cw->rows);
             tmp2 = (char**) alloc(sizeof(char *) * (size_t)cw->rows);
             tmp3 = (char**) alloc(sizeof(char *) * (size_t)cw->rows);
-            for (i = 0; i < cw->maxrow; i++)
+            for (i = 0; i < oldrows; i++)
             {
                 tmp[i] = cw->data[i];
                 tmp2[i] = cw->datcolors[i];
                 tmp3[i] = cw->datattrs[i];
+            }
+            for (i = oldrows; i < cw->rows; i++)
+            {
+                tmp[i] = 0;
+                tmp2[i] = 0;
+                tmp3[i] = 0;
             }
             if (cw->data)
                 free((genericptr_t) cw->data);
@@ -2965,43 +2987,60 @@ const char *str, *attrs, *colors;
             cw->data = tmp;
             cw->datcolors = tmp2;
             cw->datattrs = tmp3;
-
-            for (i = cw->maxrow; i < cw->rows; i++)
-            {
-                cw->data[i] = 0;
-                cw->datcolors[i] = 0;
-                cw->datattrs[i] = 0;
-            }
         }
+
+        size_t appoffset = 0;
         if (cw->data[cw->cury])
-            free((genericptr_t) cw->data[cw->cury]);
-        if (cw->datattrs[cw->cury])
-            free((genericptr_t)cw->datattrs[cw->cury]);
-        if (cw->datcolors[cw->cury])
-            free((genericptr_t)cw->datcolors[cw->cury]);
-        n0 = (long) strlen(str) + 1L;
-        ob = cw->data[cw->cury] = (char *) alloc((size_t)n0 + 1);
-        cw->datattrs[cw->cury] = (char*)alloc((size_t)n0 + 1);
-        cw->datcolors[cw->cury] = (char*)alloc((size_t)n0 + 1);
-        *ob++ = (char) (used_attr + 1); /* avoid nuls, for convenience */
+        {
+            size_t e0 = (long)strlen(cw->data[cw->cury] + 1);
+            n0 = (long)strlen(str) + e0 + 1L;
+            ob = cw->data[cw->cury] = (char*)realloc(cw->data[cw->cury], (size_t)n0 + 1);
+            cw->datattrs[cw->cury] = (char*)realloc(cw->datattrs[cw->cury], (size_t)n0 + 1);
+            cw->datcolors[cw->cury] = (char*)realloc(cw->datcolors[cw->cury], (size_t)n0 + 1);
+            *ob++ = (char)(used_attr + 1); /* avoid nuls, for convenience */
+            ob += e0;
+            appoffset = e0;
+        }
+        else
+        {
+            if (cw->data[cw->cury])
+                free((genericptr_t)cw->data[cw->cury]);
+            if (cw->datattrs[cw->cury])
+                free((genericptr_t)cw->datattrs[cw->cury]);
+            if (cw->datcolors[cw->cury])
+                free((genericptr_t)cw->datcolors[cw->cury]);
+            n0 = (long)strlen(str) + 1L;
+            ob = cw->data[cw->cury] = (char*)alloc((size_t)n0 + 1);
+            cw->datattrs[cw->cury] = (char*)alloc((size_t)n0 + 1);
+            cw->datcolors[cw->cury] = (char*)alloc((size_t)n0 + 1);
+            *ob++ = (char)(used_attr + 1); /* avoid nuls, for convenience */
+        }
         Strcpy(ob, str);
         size_t len = strlen(ob);
         if(attrs)
-            memcpy(cw->datattrs[cw->cury], attrs, len);
+            memcpy(&cw->datattrs[cw->cury][appoffset], attrs, len);
         else
-            memset(cw->datattrs[cw->cury], attr, len);
+            memset(&cw->datattrs[cw->cury][appoffset], attr, len);
         if (colors)
-            memcpy(cw->datcolors[cw->cury], colors, len);
+            memcpy(&cw->datcolors[cw->cury][appoffset], colors, len);
         else
-            memset(cw->datcolors[cw->cury], color, len);
-        cw->datattrs[cw->cury][len] = 0;
-        cw->datcolors[cw->cury][len] = 0;
+            memset(&cw->datcolors[cw->cury][appoffset], color, len);
+        cw->datattrs[cw->cury][appoffset + len] = 0;
+        cw->datcolors[cw->cury][appoffset + len] = 0;
 
         if (n0 > cw->maxcol)
             cw->maxcol = n0;
-        if (++cw->cury > cw->maxrow)
+
+        if (!app)
+        {
+            cw->curx = 0;
+            cw->cury++;
+        }
+
+        if (cw->cury > cw->maxrow)
             cw->maxrow = cw->cury;
-        if (n0 > CO) {
+        if (n0 > CO && cw->cury > 0) 
+        {
             /* attempt to break the line */
             for (i = CO - 1; i && str[i] != ' ' && str[i] != '\n';)
                 i--;
@@ -3114,9 +3153,12 @@ boolean complain;
 void
 tty_start_menu_ex(window, style)
 winid window;
-int style UNUSED;
+int style;
 {
     tty_clear_nhwindow(window);
+    struct WinDesc* cw = 0;
+    if (window != WIN_ERR && (cw = wins[window]) != (struct WinDesc*)0)
+        cw->menu_style = style;
     return;
 }
 
@@ -3477,7 +3519,7 @@ register int xmin, ymax;
     }
 #endif /*0*/
 
-    issue_gui_command(GUI_CMD_START_FLUSH);
+    issue_simple_gui_command(GUI_CMD_START_FLUSH);
 
 #if defined(SIGWINCH) && defined(CLIPPING)
     if (ymax > LI)
@@ -3503,7 +3545,7 @@ register int xmin, ymax;
         row_refresh(xmin - (int) cw->offx, COLNO - 1, y - (int) cw->offy);
 #endif
     }
-    issue_gui_command(GUI_CMD_FINISH_FLUSH);
+    issue_simple_gui_command(GUI_CMD_FINISH_FLUSH);
 
     end_glyphout();
     if (ymax >= (int) wins[WIN_STATUS]->offy) {
@@ -3669,12 +3711,13 @@ boolean force UNUSED;
 #endif /* CLIPPING */
 
 void
-tty_issue_gui_command(initid)
-int initid;
+tty_issue_gui_command(cmd_id, cmd_param, cmd_str)
+int cmd_id, cmd_param UNUSED;
+const char* cmd_str UNUSED;
 {
     if (use_utf8_encoding())
     {
-        switch (initid)
+        switch (cmd_id)
         {
         case 0: /* Set locale to default */
             break;
@@ -3853,7 +3896,7 @@ tty_nhgetch()
      * is non-reentrant code in the internal _filbuf() routine, called by
      * getc().
      */
-    static volatile int nesting = 0;
+    static volatile int tty_nesting = 0;
     char nestbuf;
 #endif
 
@@ -3871,11 +3914,11 @@ tty_nhgetch()
         i = randomkey();
     } else {
 #ifdef UNIX
-        i = (++nesting == 1)
+        i = (++tty_nesting == 1)
               ? tgetch()
               : (read(fileno(stdin), (genericptr_t) &nestbuf, 1) == 1)
                   ? (int) nestbuf : EOF;
-        --nesting;
+        --tty_nesting;
 #else
         i = tgetch();
 #endif
@@ -4047,35 +4090,7 @@ static unsigned long *tty_colormasks;
 static long tty_condition_bits;
 static struct tty_status_fields tty_status[2][MAXBLSTATS]; /* 2: NOW,BEFORE */
 static int hpbar_percent, hpbar_color;
-static struct condition_t {
-    long mask;
-    const char *text[3]; /* 3: potential display vals, progressively shorter */
-} conditions[NUM_BL_CONDITIONS] = {
-    /* The sequence order of these matters */
-    { BL_MASK_GRAB,     { "Grab",     "Grb",   "Gr"  } },
-    { BL_MASK_STONE,    { "Stone",    "Ston",  "Sto" } },
-    { BL_MASK_SLIME,    { "Slime",    "Slim",  "Slm" } },
-    { BL_MASK_STRNGL,   { "Strngl",   "Stngl", "Str" } },
-    { BL_MASK_SUFFOC,   { "Suffoc",   "Suff",  "Suf" } },
-    { BL_MASK_FOODPOIS, { "FoodPois", "Fpois", "Poi" } },
-    { BL_MASK_TERMILL,  { "TermIll" , "Ill",   "Ill" } },
-    { BL_MASK_BLIND,    { "Blind",    "Blnd",  "Bl"  } },
-    { BL_MASK_DEAF,     { "Deaf",     "Def",   "Df"  } },
-    { BL_MASK_STUN,     { "Stun",     "Stun",  "St"  } },
-    { BL_MASK_CONF,     { "Conf",     "Cnf",   "Cf"  } },
-    { BL_MASK_HALLU,    { "Hallu",    "Hal",   "Hl"  } },
-    { BL_MASK_LEV,      { "Lev",      "Lev",   "Lv"  } },
-    { BL_MASK_FLY,      { "Fly",      "Fly",   "Fl"  } },
-    { BL_MASK_RIDE,     { "Ride",     "Rid",   "Rd"  } },
-    { BL_MASK_SLOWED,   { "Slow",     "Slo",   "Sl"  } },
-    { BL_MASK_PARALYZED,{ "Paral",    "Par",   "Pa"  } },
-    { BL_MASK_FEARFUL,  { "Fear",     "Fea",   "Fe"  } },
-    { BL_MASK_SLEEPING, { "Sleep",    "Slp",   "Sl"  } },
-    { BL_MASK_CANCELLED,{ "Cancl",    "Cnl",   "Cl"  } },
-    { BL_MASK_SILENCED, { "Silent",   "Sil",   "Si"  } },
-    { BL_MASK_ROT,      { "Rot",      "Rot",   "Rt"  } },
-    { BL_MASK_LYCANTHROPY,{ "Lyca",   "Lyc",   "Ly"  } },
-};
+
 static const char *encvals[3][6] = {
     { "", "Burdened", "Stressed", "Strained", "Overtaxed", "Overloaded" },
     { "", "Burden",   "Stress",   "Strain",   "Overtax",   "Overload"   },
@@ -4569,10 +4584,10 @@ condition_size()
 
     lth = 0;
     if (tty_condition_bits) {
-        for (c = 0; c < SIZE(conditions); ++c) {
-            mask = conditions[c].mask;
+        for (c = 0; c < SIZE(condition_definitions); ++c) {
+            mask = condition_definitions[c].mask;
             if ((tty_condition_bits & mask) == mask)
-                lth += 1 + (int) strlen(conditions[c].text[cond_shrinklvl]);
+                lth += 1 + (int) strlen(condition_definitions[c].text[cond_shrinklvl]);
         }
     }
     tty_status[NOW][BL_CONDITION].lth = lth;
@@ -4802,8 +4817,8 @@ render_status(VOID_ARGS)
 #endif
 
                     bits = tty_condition_bits;
-                    for (c = 0; c < SIZE(conditions); ++c) {
-                        mask = conditions[c].mask;
+                    for (c = 0; c < SIZE(condition_definitions); ++c) {
+                        mask = condition_definitions[c].mask;
                         if (bits & mask) {
                             const char *condtext;
 
@@ -4820,7 +4835,7 @@ render_status(VOID_ARGS)
                                 if (coloridx != NO_COLOR)
                                     term_start_color(coloridx);
                             }
-                            condtext = conditions[c].text[cond_shrinklvl];
+                            condtext = condition_definitions[c].text[cond_shrinklvl];
                             if (x >= cw->cols && !truncation_expected) {
                                 impossible(
                                    "Unexpected condition placement overflow");

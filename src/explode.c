@@ -535,7 +535,7 @@ int expltype;
                 {
                     if (mtmp->m_ap_type)
                         seemimic(mtmp);
-                    pline("%s is caught in the %s!", Monnam(mtmp), str);
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is caught in the %s!", Monnam(mtmp), str);
                 }
 
                 idamres += adjust_damage(destroy_mitem(mtmp, SCROLL_CLASS, (int) adtyp), (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
@@ -600,7 +600,9 @@ int expltype;
                         int hp_after = mtmp->mhp;
                         int damage_dealt = hp_before - hp_after;
                         if (damage_dealt > 0 && canseemon(mtmp))
-                            pline("%s sustains %d damage!", Monnam(mtmp), damage_dealt);
+                        {
+                            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_orange2, "%s sustains %d damage!", Monnam(mtmp), damage_dealt);
+                        }
 
                         //mtmp->mhp -= mdam;
                         //mtmp->mhp -= (idamres + idamnonres);
@@ -670,7 +672,7 @@ int expltype;
 
                 str = hallu_buf;
             }
-            You("are caught in the %s!", str);
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "are caught in the %s!", str);
             iflags.last_msg = PLNMSG_CAUGHT_IN_EXPLOSION;
         }
         /* do property damage first, in case we end up leaving bones */
@@ -714,7 +716,9 @@ int expltype;
                 int hp_after = Upolyd ? u.mh : u.uhp;
                 int damage_dealt = hp_before - hp_after;
                 if (damage_dealt > 0)
-                    You("sustain %d damage!", damage_dealt);
+                {
+                    You_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_red1, "sustain %d damage!", damage_dealt);
+                }
             }
         }
 
@@ -943,7 +947,7 @@ struct obj *obj; /* only scatter this obj        */
                         if (bigmonst(youmonst.data))
                             hitvalu++;
                         hitu = thitu(hitvalu, weapon_total_dmg_value(stmp->obj, &youmonst, (struct monst*)0, 1),
-                                     &stmp->obj, (char *) 0);
+                                     &stmp->obj, (char *) 0, (struct monst*)0, "exploded");
                         if (!stmp->obj)
                             stmp->stopped = TRUE;
                         if (hitu) {

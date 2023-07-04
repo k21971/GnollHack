@@ -31,7 +31,7 @@ void
 free_epri(mtmp)
 struct monst *mtmp;
 {
-    if (mtmp->mextra && EPRI(mtmp)) 
+    if (has_epri(mtmp)) 
     {
         free((genericptr_t) EPRI(mtmp));
         EPRI(mtmp) = (struct epri *) 0;
@@ -57,7 +57,7 @@ void
 free_esmi(mtmp)
 struct monst* mtmp;
 {
-    if (mtmp->mextra && ESMI(mtmp)) 
+    if (has_esmi(mtmp)) 
     {
         free((genericptr_t)ESMI(mtmp));
         ESMI(mtmp) = (struct esmi*)0;
@@ -909,6 +909,7 @@ int roomno;
             nomul(-3);
             multi_reason = "being terrified of a ghost";
             nomovemsg = "You regain your composure.";
+            nomovemsg_color = CLR_MSG_SUCCESS;
         }
     }
 }
@@ -1027,7 +1028,10 @@ register struct monst *priest;
     boolean strayed = (u.ualign.record < 0);
 
     /* KMH, conduct */
-    u.uconduct.gnostic++;
+    if (!u.uconduct.gnostic++)
+        livelog_printf(LL_CONDUCT,
+            "rejected atheism by consulting with %s",
+            mon_nam(priest));
 
     if (is_fleeing(priest) || (!priest->ispriest && coaligned && strayed)) 
     {
@@ -1576,7 +1580,7 @@ boolean showheads;
            just expose the fact that this current form isn't it */
         Strcat(info, ", shapechanger");
 
-    if (is_tame(mtmp) && !is_non_eater(mtmp->data) && !mtmp->isminion && mtmp->mextra && EDOG(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime)
+    if (is_tame(mtmp) && !is_non_eater(mtmp->data) && !mtmp->isminion && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime)
     {
         struct edog* edog = EDOG(mtmp);
 

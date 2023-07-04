@@ -8,6 +8,11 @@ using Android.Content.Res;
 using Android.Views;
 using Xamarin.Forms;
 using Xamarin.Essentials;
+using System.IO;
+using Android.Content;
+using Xamarin.Google.Android.Play.Core.AssetPacks;
+using Xamarin.Google.Android.Play.Core.AssetPacks.Model;
+using GnollHackCommon;
 
 namespace GnollHackClient.Droid
 {
@@ -17,6 +22,11 @@ namespace GnollHackClient.Droid
         public static MainActivity CurrentMainActivity = null;
 
         public static AssetManager StaticAssets;
+
+        const int REQUEST_USER_CONFIRM_INSTALL_CODE = 101;
+
+        public IAssetPackManager AssetPackManager { get; private set; }
+        public AssetPackStateUpdateListenerWrapper listener { get; private set; }
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
@@ -57,11 +67,94 @@ namespace GnollHackClient.Droid
 
             Platform.Init(this, savedInstanceState);
             global::Xamarin.Forms.Forms.Init(this, savedInstanceState);
+            Org.Fmod.FMOD.Init(this);
 
             MainActivity.StaticAssets = this.Assets;
             CurrentMainActivity = this;
             FFImageLoading.Forms.Platform.CachedImageRenderer.Init(enableFastRenderer: true);
+
+            AssetPackManager = AssetPackManagerFactory.GetInstance(this);
+            listener = new AssetPackStateUpdateListenerWrapper();
+            listener.StateUpdate += Listener_StateUpdate;
             LoadApplication(new App());
+        }
+
+        private string GetAbsoluteOnDemandPackAssetPath(string assetPack, string relativeAssetPath)
+        {
+            AssetPackLocation assetPackPath = AssetPackManager.GetPackLocation(assetPack);
+            string assetsFolderPath = assetPackPath?.AssetsPath() ?? null;
+            if (assetsFolderPath == null)
+            {
+                // asset pack is not ready
+                return null;
+            }
+
+            string assetPath = Path.Combine(assetsFolderPath, relativeAssetPath);
+            return assetPath;
+        }
+
+        public event EventHandler<AssetPackStatusEventArgs> OnDemandPackStatus;
+
+        private void Listener_StateUpdate(object sender, AssetPackStateUpdateListenerWrapper.AssetPackStateEventArgs e)
+        {
+            var status = e.State.Status();
+            switch (status)
+            {
+                case AssetPackStatus.Pending:
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status));
+                    break;
+                case AssetPackStatus.Downloading:
+                    long downloaded = e.State.BytesDownloaded();
+                    long totalSize = e.State.TotalBytesToDownload();
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status, downloaded, totalSize));
+                    break;
+
+                case AssetPackStatus.Transferring:
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status));
+                    break;
+
+                case AssetPackStatus.Completed:
+                    AssetPackLocation assetPackPath = AssetPackManager.GetPackLocation(GHConstants.OnDemandPackName);
+                    string assetsFolderPath = assetPackPath?.AssetsPath() ?? null;
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status, assetsFolderPath));
+                    break;
+
+                case AssetPackStatus.Failed:
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status));
+                    break;
+
+                case AssetPackStatus.Canceled:
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status));
+                    break;
+
+                case AssetPackStatus.WaitingForWifi:
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status));
+                    AssetPackManager.ShowCellularDataConfirmation(this);
+                    break;
+
+                case AssetPackStatus.NotInstalled:
+                    OnDemandPackStatus?.Invoke(null, new AssetPackStatusEventArgs(status));
+                    break;
+            }
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            Org.Fmod.FMOD.Close();
+        }
+
+        protected override void OnResume()
+        {
+            // regsiter our Listener Wrapper with the SplitInstallManager so we get feedback.
+            AssetPackManager.RegisterListener(listener.Listener);
+            base.OnResume();
+        }
+
+        protected override void OnPause()
+        {
+            AssetPackManager.UnregisterListener(listener.Listener);
+            base.OnPause();
         }
 
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Android.Content.PM.Permission[] grantResults)
@@ -83,6 +176,18 @@ namespace GnollHackClient.Droid
         {
             //process key press
             return base.OnKeyUp(keyCode, e);
+        }
+
+        protected override void OnActivityResult(int requestCode, [GeneratedEnum] Result resultCode, Intent data)
+        {
+            if (requestCode == REQUEST_USER_CONFIRM_INSTALL_CODE)
+            {
+                if (resultCode == Result.Canceled)
+                    Android.Util.Log.Debug("AssetPack", "User Cancelled.");
+                else
+                    Android.Util.Log.Debug("AssetPack", "User Accepted.");
+            }
+            base.OnActivityResult(requestCode, resultCode, data);
         }
     }
 }

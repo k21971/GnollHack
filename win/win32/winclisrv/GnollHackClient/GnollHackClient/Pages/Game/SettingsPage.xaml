@@ -2,7 +2,7 @@
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" 
              xmlns:ff="clr-namespace:FFImageLoading.Forms;assembly=FFImageLoading.Forms" 
-             xmlns:gnollhackclient="clr-namespace:GnollHackClient"
+             xmlns:gnollhackclient="clr-namespace:GnollHackClient" xmlns:controls="clr-namespace:GnollHackClient.Controls"
              x:Class="GnollHackClient.Pages.Game.SettingsPage"
              BackgroundColor="Black"
              Appearing="ContentPage_Appearing"
@@ -21,7 +21,7 @@
                 <TableView Grid.Row="1" WidthRequest="400" HorizontalOptions="CenterAndExpand" VerticalOptions="Fill" BackgroundColor="Transparent"
                            Intent="Settings" Margin="18,0">
                     <TableRoot>
-                        <TableSection>
+                        <TableSection x:Name="MainSection" >
                             <ViewCell>
                                 <StackLayout Orientation="Horizontal">
                                     <Label Text="Simple Command Layout"
@@ -342,6 +342,26 @@
                             </ViewCell>
                             <ViewCell>
                                 <StackLayout Orientation="Horizontal">
+                                    <Label Text="Lighter Unlit Areas"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="LighterDarkeningSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Draw Wall Ends"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center"
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="WallEndSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
                                     <Label Text="Master Volume"
                                            FontFamily="Underwood" TextColor="Black"
                                            FontSize="15"
@@ -446,6 +466,17 @@
                                     <Switch x:Name="GPUSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
                                 </StackLayout>
                             </ViewCell>
+                            <ViewCell x:Name="AlternativeDrawingViewCell">
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Alternative Layer Drawing"
+                                           x:Name="AlternativeDrawingLabel"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="AlternativeLayerDrawingSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
                             <ViewCell>
                                 <StackLayout Orientation="Horizontal">
                                     <Label Text="Load Sound Banks"
@@ -454,6 +485,96 @@
                                            VerticalOptions="Center" 
                                            HorizontalOptions="Start" />
                                     <Switch x:Name="SoundBankSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Streaming Bank to Memory"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="StreamingBankToMemorySwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Streaming Bank to Disk"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="StreamingBankToDiskSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Allow Ghost Levels"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="BonesSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Post Game Status"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="PostGameStatusSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="  Webhook Link"
+                                               FontFamily="Underwood" TextColor="Black"
+                                               FontSize="15"
+                                               VerticalOptions="CenterAndExpand" 
+                                               HorizontalOptions="Start" />
+                                    <Label x:Name="CustomLinkLabel"
+                                               Text="Default"
+                                               FontFamily="Underwood" TextColor="Blue"
+                                               FontSize="15"
+                                               VerticalOptions="CenterAndExpand" 
+                                               HorizontalOptions="EndAndExpand" />
+                                    <controls:CustomImageButton x:Name="CustomLinkButton" Text="Edit" FontSize="13" WidthRequest="80" HeightRequest="50" FontFamily="Diablo"
+                                                BackgroundColor="Transparent" TextColor="White"
+                                                Clicked="CustomLinkButton_Clicked"
+                                                VerticalOptions="CenterAndExpand" 
+                                                HorizontalOptions="End" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Post Diagnostic Data"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="PostDiagnosticDataSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Use HTML Dumplogs"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="HTMLDumpLogSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
+                                </StackLayout>
+                            </ViewCell>
+                            <ViewCell>
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="Use Single Dumplog"
+                                           FontFamily="Underwood" TextColor="Black"
+                                           FontSize="15"
+                                           VerticalOptions="Center" 
+                                           HorizontalOptions="Start" />
+                                    <Switch x:Name="SingleDumpLogSwitch" HorizontalOptions="EndAndExpand" VerticalOptions="Center" />
                                 </StackLayout>
                             </ViewCell>
                             <!--<ViewCell>
@@ -469,12 +590,45 @@
                         </TableSection>
                     </TableRoot>
                 </TableView>
-                <Grid Grid.Row="2" x:Name="CloseGrid" WidthRequest="250" HeightRequest="60" Margin="0,10,0,10" HorizontalOptions="Center" VerticalOptions="EndAndExpand">
+                <!--<Grid Grid.Row="2" x:Name="CloseGrid" WidthRequest="250" HeightRequest="60" Margin="0,10,0,10" HorizontalOptions="Center" VerticalOptions="EndAndExpand">
                     <ff:CachedImage Source="resource://GnollHackClient.Assets.button_normal.png" WidthRequest="250" HeightRequest="60" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" Aspect="Fill" />
                     <Button Text="Close" WidthRequest="250" HeightRequest="60" FontFamily="Diablo" FontSize="19" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" BackgroundColor="Transparent" TextColor="White"
                         Clicked="Button_Clicked" />
+                </Grid>-->
+                <controls:CustomImageButton Grid.Row="2" x:Name="CloseButton" Margin="0,10,0,10" Text="Close" WidthRequest="250" HeightRequest="60" FontFamily="Diablo" FontSize="19" HorizontalOptions="Center" VerticalOptions="EndAndExpand" BackgroundColor="Transparent" TextColor="White"
+                        Clicked="Button_Clicked" />
+            </Grid>
+            <Grid x:Name="TextGrid" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" 
+                         Padding="10" BackgroundColor="#66000000" IsVisible="False">
+                <Grid WidthRequest="440" HorizontalOptions="CenterAndExpand" VerticalOptions="StartAndExpand" Margin="0,50,0,10" >
+                    <Frame x:Name="TextFrame" BackgroundColor="#66000000" BorderColor="Black" CornerRadius="10" HorizontalOptions="FillAndExpand" VerticalOptions="CenterAndExpand">
+                        <StackLayout x:Name="TextLayout" HorizontalOptions="FillAndExpand" VerticalOptions="CenterAndExpand">
+                            <Label x:Name="TextCaption" Text="" FontFamily="Immortal" FontSize="20" HorizontalOptions="CenterAndExpand" TextColor="White" />
+                            <Entry x:Name="TextEntry" WidthRequest="360" HorizontalOptions="Center" Placeholder="Enter the link here" PlaceholderColor="Gray" TextColor="White" BackgroundColor="#40000000"
+                                       HorizontalTextAlignment="Center" FontSize="20" />
+                            <Grid WidthRequest="360" HorizontalOptions="Center" VerticalOptions="CenterAndExpand">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="65" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <controls:CustomImageButton Grid.Column="0" x:Name="TextOkButton" Text="OK" FontSize="19" WidthRequest="160" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
+                                            BackgroundColor="Transparent" TextColor="White"
+                                            Clicked="TextOkButton_Clicked" />
+                                <controls:CustomImageButton Grid.Column="1" x:Name="TextCancelButton" Text="Cancel" FontSize="19" WidthRequest="170" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
+                                            BackgroundColor="Transparent" TextColor="White"
+                                            Clicked="TextCancelButton_Clicked" />
+                            </Grid>
+                        </StackLayout>
+                    </Frame>
                 </Grid>
             </Grid>
+            <AbsoluteLayout x:Name="WaitLayout" IsVisible="False" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" BackgroundColor="#AA000000">
+                <Label Text="Please Wait..." x:Name="PopupTitleLabel" FontFamily="Immortal" FontSize="30" TextColor="White"
+                                       VerticalTextAlignment="Center" HorizontalOptions="Center" AbsoluteLayout.LayoutBounds="0.5, 0.5, 1, 1" AbsoluteLayout.LayoutFlags="All" />
+            </AbsoluteLayout>
         </Grid>
     </ContentPage.Content>
 </ContentPage>

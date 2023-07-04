@@ -1196,6 +1196,11 @@ make_version()
     version.int_size = (unsigned char)sizeof(int);
     version.long_size = (unsigned char)sizeof(long);
     version.ptr_size = (unsigned char)sizeof(char*);
+#ifdef VERSION_COMPATIBILITY
+    version.version_compatibility = VERSION_COMPATIBILITY;
+#else
+    version.version_compatibility = version.incarnation;
+#endif
     return;
 }
 
@@ -1246,6 +1251,11 @@ const char *delim;
     print_beta_string(eos(outbuf));
 #elif defined (BETA)
     Sprintf(eos(outbuf), "-%d", EDITLEVEL);
+#else
+#ifdef VERSION_DETAILS
+    if(EDITLEVEL > 0)
+        Sprintf(eos(outbuf), " (%s %d)", date_via_env ? "Revision" : "Build", EDITLEVEL);
+#endif
 #endif
     return outbuf;
 }
@@ -1255,17 +1265,14 @@ version_id_string(outbuf, build_date)
 char *outbuf;
 const char *build_date;
 {
-    char subbuf[64], versbuf[64], elbuf[64] = "";
+    char subbuf[64], versbuf[64];
     subbuf[0] = '\0';
 #ifdef PORT_SUB_ID
     subbuf[0] = ' ';
     Strcpy(&subbuf[1], PORT_SUB_ID);
 #endif
-#ifdef VERSION_DETAILS
-    Sprintf(elbuf, date_via_env ? " (Revision %d)" : " (Build %d)", EDITLEVEL);
-#endif
-    Sprintf(outbuf, "%s GnollHack%s Version %s%s - last %s %s.", PORT_ID,
-            subbuf, version_string(versbuf, "."), elbuf,
+    Sprintf(outbuf, "%s GnollHack%s Version %s - last %s %s.", PORT_ID,
+            subbuf, version_string(versbuf, "."),
             date_via_env ? "revision" : "build", build_date);
     return outbuf;
 }
@@ -1281,10 +1288,10 @@ const char *build_date;
     subbuf[0] = ' ';
     Strcpy(&subbuf[1], PORT_SUB_ID);
 #endif
-#ifdef VERSION_DETAILS
-    Sprintf(elbuf, date_via_env ? " (Revision %d)" : " (Build %d)", EDITLEVEL);
-#endif
-
+//#ifdef VERSION_DETAILS
+//    Sprintf(elbuf, date_via_env ? " (Revision %d)" : " (Build %d)", EDITLEVEL);
+//#endif
+//
     Sprintf(outbuf, "         Version %s%s %s%s, %s %s.",
             version_string(versbuf, "."), elbuf, PORT_ID, subbuf,
             date_via_env ? "revised" : "built", &build_date[4]);
@@ -1415,6 +1422,8 @@ do_date()
     Fprintf(ofp, "\n");
     Fprintf(ofp, "#define VERSION_NUMBER 0x%08lx%s\n", version.incarnation,
             ul_sfx);
+    Fprintf(ofp, "#define EARLIEST_COMPATIBLE_VERSION_NUMBER 0x%08lx%s\n", version.version_compatibility,
+        ul_sfx);
     Fprintf(ofp, "#define VERSION_FEATURES 0x%08lx%s\n", version.feature_set,
             ul_sfx);
 #ifdef IGNORED_FEATURES
@@ -1591,8 +1600,11 @@ static const char *build_opts[] = {
 #ifdef DLB
     "data librarian",
 #endif
-#ifdef DUMPLOG
+#if defined (DUMPLOG)
     "end-of-game dumplogs",
+#endif
+#if defined (DUMPHTML)
+    "end-of-game HTML dumplogs",
 #endif
 #ifdef HOLD_LOCKFILE_OPEN
     "exclusive lock on level 0 file",

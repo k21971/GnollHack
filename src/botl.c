@@ -35,10 +35,37 @@ const enum statusfields* fieldorders_2statuslines[MAX_STATUS_LINES + 1] = { fiel
 const enum statusfields* fieldorders[MAX_STATUS_LINES + 1] = { fieldorder1, fieldorder2, fieldorder3, fieldorder4, fieldorder5, fieldorder6, fieldorder7, fieldorder8, NULL };
 const enum statusfields* fieldorders_alt[MAX_STATUS_LINES + 1] = { fieldorder1_alt, fieldorder2_alt, fieldorder3_alt, fieldorder4, fieldorder5, fieldorder6, fieldorder7, fieldorder8, NULL };
 
+
+const struct condition_t condition_definitions[NUM_BL_CONDITIONS] = {
+    /* The sequence order of these matters */
+    { BL_MASK_GRAB,     { "Grab",     "Grb",   "Gr"  } },
+    { BL_MASK_STONE,    { "Stone",    "Ston",  "Sto" } },
+    { BL_MASK_SLIME,    { "Slime",    "Slim",  "Slm" } },
+    { BL_MASK_STRNGL,   { "Strngl",   "Stngl", "Str" } },
+    { BL_MASK_SUFFOC,   { "Suffoc",   "Suff",  "Suf" } },
+    { BL_MASK_FOODPOIS, { "FoodPois", "Fpois", "Poi" } },
+    { BL_MASK_TERMILL,  { "TermIll" , "Ill",   "Ill" } },
+    { BL_MASK_BLIND,    { "Blind",    "Blnd",  "Bl"  } },
+    { BL_MASK_DEAF,     { "Deaf",     "Def",   "Df"  } },
+    { BL_MASK_STUN,     { "Stun",     "Stun",  "St"  } },
+    { BL_MASK_CONF,     { "Conf",     "Cnf",   "Cf"  } },
+    { BL_MASK_HALLU,    { "Hallu",    "Hal",   "Hl"  } },
+    { BL_MASK_LEV,      { "Lev",      "Lev",   "Lv"  } },
+    { BL_MASK_FLY,      { "Fly",      "Fly",   "Fl"  } },
+    { BL_MASK_RIDE,     { "Ride",     "Rid",   "Rd"  } },
+    { BL_MASK_SLOWED,   { "Slow",     "Slo",   "Sl"  } },
+    { BL_MASK_PARALYZED,{ "Paral",    "Par",   "Pa"  } },
+    { BL_MASK_FEARFUL,  { "Fear",     "Fea",   "Fe"  } },
+    { BL_MASK_SLEEPING, { "Sleep",    "Slp",   "Sl"  } },
+    { BL_MASK_CANCELLED,{ "Cancl",    "Cnl",   "Cl"  } },
+    { BL_MASK_SILENCED, { "Silent",   "Sil",   "Si"  } },
+    { BL_MASK_ROT,      { "Rot",      "Rot",   "Rt"  } },
+    { BL_MASK_LYCANTHROPY,{ "Lyca",   "Lyc",   "Ly"  } },
+};
+
 STATIC_OVL NEARDATA size_t mrank_sz = 0; /* loaded by max_rank_sz (from u_init) */
 STATIC_DCL void NDECL(bot_via_windowport);
 STATIC_DCL void NDECL(stat_update_time);
-STATIC_DCL void FDECL(compose_partystatline, (char*, char*, char*, char*, char*));
 STATIC_DCL char* FDECL(conditionbitmask2str, (unsigned long));
 STATIC_DCL char* FDECL(format_duration_with_units, (long));
 
@@ -256,9 +283,10 @@ do_statusline2()
     hpmax = Upolyd ? u.mhmax : u.uhpmax;
     if (hp < 0)
         hp = 0;
-    Sprintf(hlth, "HP:%d(%d) MP:%d(%d) AC:%d",
+    Sprintf(hlth, "HP:%d(%d) MP:%d(%d) AC:%d MC:%d/%d%%",
             min(hp, 9999), min(hpmax, 9999),
-            min(u.uen, 9999), min(u.uenmax, 9999), u.uac);
+            min(u.uen, 9999), min(u.uenmax, 9999), 
+            u.uac, u.umc, magic_negation_percentage(u.umc));
     hln = strlen(hlth);
 
     /* experience */
@@ -272,7 +300,7 @@ do_statusline2()
 
     /* move */
     if (flags.showmove)
-        Sprintf(move, "M:%d", get_u_move_speed(TRUE));
+        Sprintf(move, "MS:%d", get_u_move_speed(TRUE));
     else
         move[0] = '\0';
     mln = strlen(move);
@@ -598,12 +626,12 @@ timebot()
     iflags.time_botl = FALSE;
 }
 
-/* convert experience level (1..30) to rank index (0..8) */
+/* convert experience level (1...MAXULEV) to rank index (0...NUM_RANKS - 1) */
 int
 xlev_to_rank(xlev)
 int xlev;
 {
-    return (xlev <= 2) ? 0 : (xlev <= 30) ? ((xlev + 2) / 4) : 8;
+    return (xlev <= RANK_MIN_THRESHOLD) ? 0 : (xlev <= MAXULEV) ? ((xlev + RANK_ADD_CONSTANT) / RANK_LEVEL_INCREMENT) : NUM_RANKS - 1;
 }
 
 #if 0 /* not currently needed */
@@ -1365,13 +1393,13 @@ boolean loc_is_you, ispeaceful, ispet, isdetected;
             break;
         case STATUS_MARK_HUNGRY:
             if ((loc_is_you && u.uhs == HUNGRY)
-                || (!loc_is_you && ispet && mtmp->mextra && EDOG(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty == 0)
+                || (!loc_is_you && ispet && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty == 0)
                 )
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_WEAK:
             if ((loc_is_you && u.uhs == WEAK)
-                || (!loc_is_you && ispet && mtmp->mextra && EDOG(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty > 0)
+                || (!loc_is_you && ispet && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty > 0)
                 )
                 display_this_status_mark = TRUE;
             break;
@@ -1497,7 +1525,6 @@ boolean loc_is_you;
     }
 }
 
-STATIC_OVL
 void
 compose_partystatline(outbuf, outbuf2, outbuf3, outbuf4, outbuf5)
 char* outbuf;
@@ -1506,11 +1533,11 @@ char* outbuf3;
 char* outbuf4;
 char* outbuf5;
 {
-    strcpy(outbuf, "");
-    strcpy(outbuf2, "");
-    strcpy(outbuf3, "");
-    strcpy(outbuf4, "");
-    strcpy(outbuf5, "");
+    Strcpy(outbuf, "");
+    Strcpy(outbuf2, "");
+    Strcpy(outbuf3, "");
+    Strcpy(outbuf4, "");
+    Strcpy(outbuf5, "");
 
     char* outbufs[5] = { outbuf, outbuf2, outbuf3, outbuf4, outbuf5 };
     boolean first = TRUE;
@@ -1524,9 +1551,9 @@ char* outbuf5;
     struct monst* mtmp;
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
     {
-        char* targetbuf = outbufs[line_idx-1];
+        char* targetbuf = outbufs[line_idx - 1];
         char tempbuf[BUFSIZ];
-        strcpy(tempbuf, "");
+        Strcpy(tempbuf, "");
 
         if (!DEADMONSTER(mtmp) && is_tame(mtmp))
         {
@@ -1542,7 +1569,7 @@ char* outbuf5;
             {
                 if (strcmp(targetbuf, ""))
                 {
-                    strcat(targetbuf, "  ");
+                    Strcat(targetbuf, "  ");
                     first_in_line = FALSE;
                 }
             }
@@ -1552,28 +1579,28 @@ char* outbuf5;
             if (!targetbuf)
                 break;
 
-            if (mtmp->mextra && UMNAME(mtmp))
+            if (has_umname(mtmp))
             {
                 char umnbuf[BUFSIZ];
-                strcpy(umnbuf, UMNAME(mtmp));
+                Strcpy(umnbuf, UMNAME(mtmp));
                 umnbuf[16] = '\0'; /* Limit the length of the name */
-                strcat(tempbuf, umnbuf);
+                Strcat(tempbuf, umnbuf);
             }
-            else if (mtmp->mextra && MNAME(mtmp) && mtmp->u_know_mname)
+            else if (has_mname(mtmp) && mtmp->u_know_mname)
             {
                 char mnbuf[BUFSIZ];
-                strcpy(mnbuf, MNAME(mtmp));
+                Strcpy(mnbuf, MNAME(mtmp));
                 mnbuf[16] = '\0'; /* Limit the length of the name */
-                strcat(tempbuf, mnbuf);
+                Strcat(tempbuf, mnbuf);
             }
             else
             {
                 char buf[BUFSZ];
-                strcpy(buf, mon_monster_name(mtmp));
+                Strcpy(buf, mon_monster_name(mtmp));
                 *buf = highc(*buf);
-                strcat(tempbuf, buf);
+                Strcat(tempbuf, buf);
             }
-            strcat(tempbuf, ": HP:");
+            Strcat(tempbuf, ": HP:");
             Sprintf(eos(tempbuf), "%d(%d)", mtmp->mhp, mtmp->mhpmax);
 
 #define changepartyline() \
@@ -1586,66 +1613,66 @@ char* outbuf5;
 
             if (flags.partydetails)
             {
-                strcat(tempbuf, " AC:");
+                Strcat(tempbuf, " AC:");
                 Sprintf(eos(tempbuf), "%d", find_mac(mtmp));
 
                 int mc = magic_negation(mtmp);
                 int mcpct = magic_negation_percentage(mc);
-                strcat(tempbuf, " MC:");
+                Strcat(tempbuf, " MC:");
                 Sprintf(eos(tempbuf), "%d/%d%%", mc, mcpct);
             }
 
-            if (mtmp->mextra && EDOG(mtmp))
+            if (has_edog(mtmp))
             {
                 if (EDOG(mtmp)->hungrytime + 500 <= monstermoves)
-                    strcat(tempbuf, " Weak");
+                    Strcat(tempbuf, " Weak");
                 else if (EDOG(mtmp)->hungrytime <= monstermoves)
-                    strcat(tempbuf, " Hungry");
+                    Strcat(tempbuf, " Hungry");
             }
 //            changepartyline();
 //            strcat(targetbuf, tempbuf);
 
             if (is_sick(mtmp))
-                strcat(tempbuf, " TermIll");
+                Strcat(tempbuf, " TermIll");
 
             if (is_food_poisoned(mtmp))
-                strcat(tempbuf, " FoodPois");
+                Strcat(tempbuf, " FoodPois");
 
             if (is_mummy_rotted(mtmp))
-                strcat(tempbuf, " Rot");
+                Strcat(tempbuf, " Rot");
 
             if (is_were(mtmp->data))
-                strcat(tempbuf, " Lyca");
+                Strcat(tempbuf, " Lyca");
 
             if (is_stoning(mtmp))
-                strcat(tempbuf, " Stoned");
+                Strcat(tempbuf, " Stoned");
 
             if (is_turning_into_slime(mtmp))
-                strcat(tempbuf, " Slime");
+                Strcat(tempbuf, " Slime");
 
             if (is_hallucinating(mtmp))
-                strcat(tempbuf, " Hallu");
+                Strcat(tempbuf, " Hallu");
 
             if(is_stunned(mtmp))
-                strcat(tempbuf, " Stun");
+                Strcat(tempbuf, " Stun");
 
             if (is_blinded(mtmp))
-                strcat(tempbuf, " Blind");
+                Strcat(tempbuf, " Blind");
 
             if (is_confused(mtmp))
-                strcat(tempbuf, " Conf");
+                Strcat(tempbuf, " Conf");
 
             if (is_sleeping(mtmp))
-                strcat(tempbuf, " Sleep");
+                Strcat(tempbuf, " Sleep");
 
             if (is_paralyzed(mtmp))
-                strcat(tempbuf, " Paral");
+                Strcat(tempbuf, " Paral");
 
             if (any_spec_used(mtmp))
-                strcat(tempbuf, " Cooldown");
+                Strcat(tempbuf, " Cooldown");
 
             changepartyline();
-            strcat(targetbuf, tempbuf);
+            Strcat(targetbuf, tempbuf);
 
             if (!flags.partymultiline && line_idx == maxlines && strlen(outbuf) >= MAXVALWIDTH)
                 break;
@@ -1767,7 +1794,7 @@ boolean *valsetlist;
 
         if (anytype != ANY_MASK32) {
 #ifdef STATUS_HILITES
-            if (chg || chgmax || *curr->val) {
+             if (chg || chgmax || *curr->val) {
                 curr->hilite_rule = get_hilite(idx, fld,
                                                (genericptr_t) &curr->a,
                                                chg, pc, &color);
@@ -1796,7 +1823,7 @@ evaluate_and_notify_windowport(valsetlist, idx)
 int idx;
 boolean *valsetlist;
 {
-    int i, updated = 0, notpresent = 0;
+    int i, updated = 0 /*, notpresent = 0 */;
 
     /*
      *  Now pass the changed values to window port.
@@ -1811,7 +1838,7 @@ boolean *valsetlist;
             || ((i == BL_UWEP2) && (!flags.show_weapon_style || (uwep && is_wieldable_weapon(uwep) && objects[uwep->otyp].oc_bimanual) || (!u.twoweap && !uarms)))
             || ((i == BL_HD) && !Upolyd)
             || ((i == BL_XP || i == BL_EXP) && Upolyd)) {
-            notpresent++;
+            //notpresent++;
             continue;
         }
         if (eval_notify_windowport_field(i, valsetlist, idx))
@@ -1892,8 +1919,11 @@ boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
                    : initblstats[i].fldfmt;
         status_enablefield(fld, fieldname, fieldfmt, fldenabl);
     }
+
     update_all = TRUE;
 }
+
+STATIC_VAR boolean initalready = FALSE;
 
 void
 status_finish(VOID_ARGS)
@@ -1926,6 +1956,8 @@ status_finish(VOID_ARGS)
             }
 #endif /* STATUS_HILITES */
         }
+        blinit = FALSE;
+        initalready = FALSE;
     }
 }
 
@@ -1937,8 +1969,6 @@ status_reassess(VOID_ARGS)
         status_initialize(REASSESS_ONLY);
 #endif
 }
-
-STATIC_VAR boolean initalready = FALSE;
 
 STATIC_OVL void
 init_blstats()
@@ -4776,6 +4806,32 @@ shlmenu_redo:
     return TRUE;
 }
 
+STATIC_VAR struct hilite_s* saved_hilites[MAXBLSTATS] = { 0 };
+
+void
+botl_save_hilites(VOID_ARGS)
+{
+    int i;
+    for (i = 0; i < MAXBLSTATS; i++)
+    {
+        saved_hilites[i] = blstats[0][i].thresholds;
+        blstats[0][i].thresholds = blstats[1][i].thresholds = 0;
+        blstats[0][i].hilite_rule = blstats[1][i].hilite_rule = 0;
+    }
+}
+
+void
+botl_restore_hilites(VOID_ARGS)
+{
+    int i;
+    for (i = 0; i < MAXBLSTATS; i++)
+    {
+        blstats[0][i].thresholds = blstats[1][i].thresholds = saved_hilites[i];
+        saved_hilites[i] = 0;
+    }
+}
+
 #endif /* STATUS_HILITES */
+
 
 /*botl.c*/

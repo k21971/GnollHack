@@ -953,6 +953,8 @@ gcrownu()
         in_hand2 = (uarms && uarms->oartifact == ART_KATANA_OF_MASAMUNE);
         play_voice_god_simple_line_by_align(u.ualign.type, GOD_LINE_I_CROWN_THEE_THE_HAND_OF_ELBERETH);
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "I crown thee...  The Hand of Elbereth!");
+        livelog_printf(LL_DIVINEGIFT,
+            "was crowned \"The Hand of Elbereth\" by %s", u_gname());
         break;
     case A_NEUTRAL:
         u.uevent.uhand_of_elbereth = 2;
@@ -961,6 +963,8 @@ gcrownu()
         already_exists = exist_artifact(LONG_SWORD, artiname(ART_VORPAL_BLADE));
         play_voice_god_simple_line_by_align(u.ualign.type, GOD_LINE_THOU_SHALT_BE_MY_ENVOY_OF_BALANCE);
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Thou shalt be my Envoy of Balance!");
+        livelog_printf(LL_DIVINEGIFT, "became %s Envoy of Balance",
+            s_suffix(u_gname()));
         break;
     case A_CHAOTIC:
         u.uevent.uhand_of_elbereth = 3;
@@ -971,6 +975,7 @@ gcrownu()
         {
             play_voice_god_simple_line_by_align(u.ualign.type, GOD_LINE_I_CROWN_THEE_THE_GLORY_OF_ARIOCH);
             verbalize_ex(ATR_NONE, CLR_MSG_GOD, "I crown thee... The Glory of Arioch!");
+            livelog_printf(LL_DIVINEGIFT, "%s", "became The Glory of Arioch");
         }
         else
         {
@@ -978,6 +983,8 @@ gcrownu()
             play_voice_god_simple_line_by_align(u.ualign.type, takelives ? GOD_LINE_THOU_ART_CHOSEN_TO_TAKE_LIVES_FOR_MY_GLORY : GOD_LINE_THOU_ART_CHOSEN_TO_STEAL_SOULS_FOR_MY_GLORY);
             verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Thou art chosen to %s for My Glory!",
                 takelives ? "take lives" : "steal souls");
+            livelog_printf(LL_DIVINEGIFT, "was chosen to %s for the Glory of %s", takelives ? "take lives" : "steal souls",
+                u_gname());
         }
         break;
     }
@@ -994,7 +1001,12 @@ gcrownu()
         u.ugifts++;
         obj->aknown = obj->nknown = 1;
         if (obj && obj->oartifact == ART_GAUNTLETS_OF_YIN_AND_YANG)
+        {
             discover_artifact(ART_GAUNTLETS_OF_YIN_AND_YANG);
+            livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                "was bestowed with %s",
+                artiname(ART_GAUNTLETS_OF_YIN_AND_YANG));
+        }
     }
     else if (Role_if(PM_WIZARD))
     {
@@ -1097,7 +1109,8 @@ gcrownu()
             bless(otmp);
             (void)add_to_container(obj, otmp);
         }
-
+        livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+            "was bestowed with %s", an(actualoname(obj)));
         at_your_feet("A golden chest");
         dropy(obj);
         u.ugifts++;
@@ -1126,6 +1139,7 @@ gcrownu()
             otmp->enchantment = 1 + rnd(3);
             otmp->mythic_suffix = MYTHIC_SUFFIX_BANISHMENT;
             otmp->oerodeproof = 1;
+            otmp->owt = weight(otmp);
             (void)add_to_container(obj, otmp);
 
             if (!already_learnt_spell_type(SPE_OBLITERATE))
@@ -1297,6 +1311,8 @@ gcrownu()
             }
 
         }
+        livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+            "was bestowed with %s", an(actualoname(obj)));
         at_your_feet("A golden chest");
         dropy(obj);
         u.ugifts++;
@@ -1319,6 +1335,8 @@ gcrownu()
             obj = mksobj(class_gift, TRUE, FALSE, FALSE);
             bless(obj);
             obj->bknown = TRUE;
+            livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                "was bestowed with %s", an(actualoname(obj)));
             at_your_feet("A spellbook");
             dropy(obj);
             u.ugifts++;
@@ -1355,6 +1373,9 @@ gcrownu()
                 {
                     obj->aknown = obj->nknown = TRUE;
                     discover_artifact(ART_RHONGOMYNIAD);
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                        "was bestowed with %s",
+                        artiname(ART_RHONGOMYNIAD));
                 }
             }
             else if ((Role_if(PM_KNIGHT) || Role_if(PM_ARCHAEOLOGIST)) && !grail_already_exists)
@@ -1369,6 +1390,9 @@ gcrownu()
                 {
                     obj->aknown = obj->nknown = TRUE;
                     discover_artifact(ART_HOLY_GRAIL);
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s",
+                        artiname(ART_HOLY_GRAIL));
                 }
             }
             else if (obj && in_hand)
@@ -1396,6 +1420,9 @@ gcrownu()
                 {
                     obj->aknown = obj->nknown = TRUE;
                     discover_artifact(ART_KATANA_OF_MASAMUNE);
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                        "was bestowed with %s",
+                        artiname(ART_KATANA_OF_MASAMUNE));
                 }
             }
             else if (obj && objects[obj->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj) < 2000L && !obj->oartifact)
@@ -1409,6 +1436,9 @@ gcrownu()
                 {
                     u.ugifts++;
                     obj->aknown = obj->nknown = TRUE;
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s",
+                        artiname(ART_EXCALIBUR));
                 }
             }
             /* acquire Excalibur's skill regardless of weapon or gift */
@@ -1423,6 +1453,9 @@ gcrownu()
                 {
                     u.ugifts++;
                     obj2->aknown = obj2->nknown = TRUE;
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                        "was bestowed with %s",
+                        artiname(ART_EXCALIBUR));
                 }
             }
             else
@@ -1433,6 +1466,8 @@ gcrownu()
                 dropy(obj);
                 u.ugifts++;
                 obj->aknown = obj->nknown = TRUE;
+                livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                    "was bestowed with %s", an(actualoname(obj)));
             }
 
             /* acquire Excalibur's skill regardless of weapon or gift */
@@ -1467,6 +1502,9 @@ gcrownu()
                 {
                     obj->aknown = obj->nknown = TRUE;
                     discover_artifact(ART_HOLY_GRAIL);
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s",
+                        artiname(ART_HOLY_GRAIL));
                 }
             }
             else if (obj && in_hand)
@@ -1490,6 +1528,12 @@ gcrownu()
                 dropy(obj);
                 u.ugifts++;
                 obj->aknown = obj->nknown = TRUE;
+                if (obj->oartifact == ART_VORPAL_BLADE)
+                {
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s",
+                        artiname(ART_VORPAL_BLADE));
+                }
             }
             /* acquire Vorpal Blade's skill regardless of weapon or gift */
             unrestrict_weapon_skill(P_SWORD);
@@ -1538,6 +1582,12 @@ gcrownu()
                 dropy(obj);
                 u.ugifts++;
                 obj->aknown = obj->nknown = TRUE;
+                if (obj->oartifact == chaotic_crowning_gift_oartifact)
+                {
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s",
+                        artiname(chaotic_crowning_gift_oartifact));
+                }
             }
             /* Acquire two-weapon combat for dual-wielding Stormbringer and Mournblade  */
             if (chaotic_crowning_gift_oartifact == ART_STORMBRINGER || chaotic_crowning_gift_oartifact == ART_MOURNBLADE)
@@ -2205,7 +2255,7 @@ dosacrifice()
     STATIC_VAR NEARDATA const char cloud_of_smoke[] =
         "A cloud of %s smoke surrounds you...";
     register struct obj* otmp;
-    int value = 0, pm;
+    int value = 0, mndx;
     boolean highaltar, molochaltar, godlessaltar;
     aligntyp altaralign = a_align(u.ux, u.uy);
     int altarsubtyp = levl[u.ux][u.uy].subtyp;
@@ -2245,7 +2295,10 @@ dosacrifice()
         struct monst *mtmp;
 
         /* KMH, conduct */
-        u.uconduct.gnostic++;
+        if (!u.uconduct.gnostic++)
+            livelog_printf(LL_CONDUCT,
+                "rejected atheism by offering %s on an altar of %s",
+                The(xname(otmp)), a_gname());
 
         /* you're handling this corpse, even if it was killed upon the altar
          */
@@ -2317,9 +2370,9 @@ dosacrifice()
 
                 if (!dmon)
                 {
-                    pm = dlord(altaralign);
-                    if(pm)
-                        dmon = makemon(&mons[pm], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+                    mndx = dlord(altaralign);
+                    if(mndx >= LOW_PM && mndx < NUM_MONSTERS)
+                        dmon = makemon(&mons[mndx], u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
                 }
 
                 if (dmon)
@@ -2863,6 +2916,11 @@ dosacrifice()
                     u.ugifts++;
                     u.uprayer_timeout = Role_if(PM_PRIEST) ? rnz(150 + (25 * nartifacts)) : rnz(300 + (50 * nartifacts));
                     exercise(A_WIS, TRUE);
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s by %s",
+                        artiname(otmp->oartifact),
+                        align_gname(u.ualign.type));
+
                     /* make sure we can use this weapon */
                     enum p_skills wep_skill_idx = weapon_skill_type(otmp);
                     if (wep_skill_idx > P_NONE)
@@ -3065,7 +3123,13 @@ dopray()
         }
     }
     
-    u.uconduct.gnostic++;
+    if (!u.uconduct.gnostic++)
+        /* breaking conduct should probably occur in can_pray() at
+         * "You begin praying to %s", as demons who find praying repugnant
+         * should not break conduct.  Also we can add more detail to the
+         * livelog message as p_aligntyp will be known.
+         */
+        livelog_printf(LL_CONDUCT, "%s", "rejected atheism with a prayer");
 
     /* set up p_type and p_alignment */
     if (!can_pray(TRUE))
@@ -3241,7 +3305,9 @@ doturn()
         You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know how to turn undead!");
         return 0;
     }
-    u.uconduct.gnostic++;
+
+    if (!u.uconduct.gnostic++)
+        livelog_printf(LL_CONDUCT, "%s", "rejected atheism by turning undead");
 
     if ((u.ualign.type != A_CHAOTIC
          && (is_demon(youmonst.data) || is_undead(youmonst.data)))
@@ -3319,6 +3385,7 @@ doturn()
     nomul(-(5 - ((u.ulevel - 1) / 6))); /* -5 .. -1 */
     multi_reason = "trying to turn the monsters";
     nomovemsg = You_can_move_again;
+    nomovemsg_color = CLR_MSG_SUCCESS;
     return 1;
 }
 
@@ -3619,9 +3686,6 @@ int dx, dy;
 
     return FALSE;
 }
-
-
-
 
 int
 wiz_crown()
