@@ -54,7 +54,7 @@ MAXPLAYERS=0
 
 # If not null, added to string "To get local support, " in the support
 # information help.
-SUPPORT=Contact K2 or Tangles on Libera irc channel #hardfought
+SUPPORT=Contact @janne-hmp or @Tommi on Libera irc channel ##nethack-variants
 
 # If not null, displayed at the end of a panic-save sequence.
 #RECOVER=Run the recover program.

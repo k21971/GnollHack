@@ -18,9 +18,9 @@ COMPRESSBIN="/bin/gzip"
 NH_GIT="/home/build/GnollHack"
 NH_BRANCH="master"
 # HACKDIR from include/config.h; aka nethack subdir inside chroot
-NHSUBDIR="gnollhack-4.1.1.0"
+NHSUBDIR="gnollhack-4.1.2.3"
 # VAR_PLAYGROUND from include/unixconf.h
-NH_VAR_PLAYGROUND="/gnollhack-4.1.1.0"
+NH_VAR_PLAYGROUND="/gnollhack-4.1.2.3"
 # END OF CONFIG
 ##############################################################################
 
@@ -45,8 +45,8 @@ set -e
 umask 022
 
 echo "Creating inprogress and extrainfo directories"
-mkdir -p "$NAO_CHROOT/dgldir/inprogress-gnoll411"
-chown "$USRGRP" "$NAO_CHROOT/dgldir/inprogress-gnoll411"
+mkdir -p "$NAO_CHROOT/dgldir/inprogress-gnoll4123"
+chown "$USRGRP" "$NAO_CHROOT/dgldir/inprogress-gnoll4123"
 mkdir -p "$NAO_CHROOT/dgldir/extrainfo-gnoll"
 chown "$USRGRP" "$NAO_CHROOT/dgldir/extrainfo-gnoll"
 
@@ -73,6 +73,8 @@ cp "$NETHACK_GIT/dat/nhdat" "$NAO_CHROOT/$NHSUBDIR"
 chmod 644 "$NAO_CHROOT/$NHSUBDIR/nhdat"
 cp "$NETHACK_GIT/dat/symbols" "$NAO_CHROOT/$NHSUBDIR"
 chmod 644 "$NAO_CHROOT/$NHSUBDIR/symbols"
+cp "$NETHACK_GIT/dat/NHdump.css" "$NAO_CHROOT/$NHSUBDIR"
+chmod 644 "$NAO_CHROOT/$NHSUBDIR/NHdump.css"
 
 echo "Copying sysconf file"
 SYSCF="$NAO_CHROOT/$NHSUBDIR/sysconf"
@@ -86,6 +88,8 @@ mkdir -p "$NAO_CHROOT/$NHSUBDIR/var/save"
 chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/save"
 mkdir -p "$NAO_CHROOT/$NHSUBDIR/var/save/backup"
 chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/save/backup"
+mkdir -p "$NAO_CHROOT/$NHSUBDIR/var/whereis"
+chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/whereis"
 
 touch "$NAO_CHROOT/$NHSUBDIR/var/logfile"
 chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/logfile"
@@ -95,6 +99,10 @@ touch "$NAO_CHROOT/$NHSUBDIR/var/record"
 chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/record"
 touch "$NAO_CHROOT/$NHSUBDIR/var/xlogfile"
 chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/xlogfile"
+touch "$NAO_CHROOT/$NHSUBDIR/var/livelog"
+chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/livelog"
+touch "$NAO_CHROOT/$NHSUBDIR/var/wishtracker"
+chown -R "$USRGRP" "$NAO_CHROOT/$NHSUBDIR/var/wishtracker"
 
 RECOVER="$NETHACK_GIT/util/recover"
 
