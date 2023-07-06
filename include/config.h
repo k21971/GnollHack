@@ -587,7 +587,7 @@ typedef unsigned char uchar;
 #ifdef LIVELOGFILE
 /* LL_flags defined in global.h. Value below is ignored if SYSCF is enabled */
 /* #define LIVELOG_DETAIL (LL_WISH | LL_ACHIEVE | LL_UMONST) */
-#define LIVELOG_DETAIL 0xFF
+/* #define LIVELOG_DETAIL 0xFF */ /* handled in sysconf */
 #endif
 #endif /* LIVELOG_ENABLE */
 
