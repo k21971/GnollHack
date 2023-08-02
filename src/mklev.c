@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    mklev.c    $NHDT-Date: 1550800390 2019/02/22 01:53:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2742,8 +2742,8 @@ mkinvokearea()
     register xchar i;
 
     play_sfx_sound(SFX_RUMBLING_EARTH);
-    pline_The("floor shakes violently under you!");
-    pline_The("walls around you begin to bend and crumble!");
+    pline_The_ex1(ATR_NONE, CLR_MSG_WARNING, "floor shakes violently under you!");
+    pline_The_ex1(ATR_NONE, CLR_MSG_WARNING, "walls around you begin to bend and crumble!");
     display_nhwindow(WIN_MESSAGE, TRUE);
 
     /* any trap hero is stuck in will be going away now */
@@ -2778,7 +2778,7 @@ mkinvokearea()
         adjusted_delay_output();
     }
 
-    You("are standing at the top of a stairwell leading down!");
+    You_ex(ATR_NONE, CLR_MSG_SUCCESS, "are standing at the top of a stairwell leading down!");
     mkstairs(u.ux, u.uy, 0, (struct mkroom *) 0, STAIRCASE_TO_DEEPER); /* down */
     newsym(u.ux, u.uy);
     vision_full_recalc = 1; /* everything changed */

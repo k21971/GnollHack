@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    quest.h    $NHDT-Date: 1432512779 2015/05/25 00:12:59 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright (c) Mike Stephenson 1991.                  */
@@ -47,7 +47,7 @@ struct q_score {              /* Quest "scorecard" */
 #define MIN_QUEST_LEVEL 14 /* at least this u.ulevel to start */
 /* note: exp.lev. 14 is threshold level for 5th rank (class title, role.c) */
 
-#define ModeAllowsPostToForum (!wizard && !CasualMode && !ModernMode && !discover)
+#define ModeAllowsPostToForum (!wizard && !CasualMode && !discover)
 #if !defined(DEBUG)
 #define IfModeAllowsPostToForum if (ModeAllowsPostToForum)
 #else

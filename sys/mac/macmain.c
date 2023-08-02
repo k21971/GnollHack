@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0	macmain.c	$NHDT-Date: 1432512796 2015/05/25 00:13:16 $  $NHDT-Branch: master $:$NHDT-Revision: 1.21 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -39,7 +39,8 @@ main(void)
 {
     register int fd = -1;
     int argc = 1;
-    boolean resuming = FALSE; /* assume new game */
+    uchar resuming = FALSE; /* assume new game */
+    boolean is_backup = FALSE;
 
     sys_early_init();
     windowprocs = mac_procs;
@@ -86,17 +87,17 @@ main(void)
  * We'll return here if new game player_selection() renames the hero.
  */
 attempt_restore:
-    if ((fd = open_and_validate_saved_game()) >= 0) {
+    if ((fd = open_and_validate_saved_game(TRUE, &is_backup)) >= 0) {
 #ifdef NEWS
         if (iflags.news) {
             display_file(NEWS, FALSE);
-            iflags.news = FALSE; /* in case dorecover() fails */
+            iflags.news = FALSE; /* in case dorestore() fails */
         }
 #endif
         pline("Restoring save file...");
         mark_synch(); /* flush output */
         game_active = 1;
-        if (dorecover(fd)) {
+        if (dorestore(fd, is_backup)) {
             resuming = TRUE; /* not starting new game */
             if (discover)
                 You("are in non-scoring discovery mode.");

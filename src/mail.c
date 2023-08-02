@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    mail.c    $NHDT-Date: 1545597424 2018/12/23 20:37:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.39 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -473,7 +473,7 @@ struct obj *otmp UNUSED;
         "**FR33 P0T10N 0F FULL H34L1NG**",
         "Please return to sender (Asmodeus)",
      "Buy a potion of gain level for only $19.99!  Guaranteed to be blessed!",
-        "Invitation: Visit the GnollHack web site at http://www.GnollHack.org!"
+        "Invitation: Visit the GnollHack web site at http://www.gnollhack.com!"
     };
 
     /* XXX replace with more general substitution code and add local

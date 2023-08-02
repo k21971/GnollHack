@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    eat.c    $NHDT-Date: 1542765357 2018/11/21 01:55:57 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.197 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -229,6 +229,8 @@ eatmupdate()
         nomovemsg = strcpy(eatmbuf, altmsg);
         /* update current image */
         youmonst.mappearance = altapp;
+        if (has_mobj(&youmonst))
+            free_mobj(&youmonst);
         newsym(u.ux, u.uy);
     }
 }
@@ -1418,8 +1420,9 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
             nomovemsg = eatmbuf;
             afternmv = eatmdone;
             /* ??? what if this was set before? */
-            youmonst.m_ap_type = M_AP_OBJECT;
-            youmonst.mappearance = Hallucination ? ORANGE : GOLD_PIECE;
+            //youmonst.m_ap_type = M_AP_OBJECT;
+            //youmonst.mappearance = Hallucination ? ORANGE : GOLD_PIECE;
+            set_mimic_new_mobj(&youmonst, Hallucination ? ORANGE : GOLD_PIECE);
             newsym(u.ux, u.uy);
             curs_on_u();
             /* make gold symbol show up now */

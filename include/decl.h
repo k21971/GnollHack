@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0  decl.h  $NHDT-Date: 1547025154 2019/01/09 09:12:34 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.147 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -209,6 +209,8 @@ E NEARDATA struct sinfo {
 #endif
     int wizkit_wishing;
 } program_state;
+
+E int exit_hack_code;
 
 E boolean restoring;
 E boolean saving;
@@ -516,6 +518,7 @@ E NEARDATA winid WIN_MAP, WIN_INVEN, WIN_HERE;
 #define panic1(cstr) panic("%s", cstr)
 
 #define pline_ex1(a, b, cstr) pline_ex(a, b, "%s", cstr)
+#define pline_The_ex1(a, b, cstr) pline_The_ex(a, b, "%s", cstr)
 #define Your_ex1(a, b, cstr) Your_ex(a, b, "%s", cstr)
 #define You_ex1(a, b, cstr) You_ex(a, b, "%s", cstr)
 #define You_hear_ex1(a, b, cstr) You_hear_ex(a, b, "%s", cstr)
@@ -536,6 +539,8 @@ E int multicolor_orange1[1];
 E int multicolor_orange2[2];
 E int multicolor_orange3[3];
 E int multicolor_orange4[4];
+E int multicolor_text1[1];
+E int multicolor_text2[2];
 
 E char toplines[TBUFSZ];
 E char toplineattrs[TBUFSZ];

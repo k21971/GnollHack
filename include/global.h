@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    global.h    $NHDT-Date: 1557254325 2019/05/07 18:38:45 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.71 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -286,6 +286,7 @@ typedef xchar boolean; /* 0 or 1 */
 #define Sprintf (void) sprintf
 #define Strcat (void) strcat
 #define Strcpy (void) strcpy
+#define Strncpy (void) strncpy
 #ifdef NEED_VARARGS
 #define Vprintf (void) vprintf
 #define Vfprintf (void) vfprintf
@@ -325,7 +326,7 @@ struct version_info {
     unsigned char int_size;
     unsigned char long_size;
     unsigned char ptr_size;
-    unsigned long version_compatibility; /* used in cases where an older version of GnollHack tries to load a compatible but newer saved game; tells what is the oldest compatible old version */
+    unsigned long version_compatibility; /* used in cases where an older version of GnollHack tries to load a compatible but newer saved game; tells what is the oldest compatible version */
 };
 
 struct savefile_info {
@@ -435,6 +436,10 @@ struct savefile_info {
      | LL_ARTIFACT | LL_GENOCIDE | LL_DUMP) /* explicitly for dumplog */
 #define majorevent(m) (((m)->flags & LL_majors) != 0)
 #define spoilerevent(m) (((m)->flags & LL_SPOILER) != 0)
+
+#define LL_postables                                                        \
+    (LL_WISH | LL_ACHIEVE | LL_UMONST | LL_DIVINEGIFT | LL_LIFESAVE \
+     | LL_ARTIFACT | LL_GENOCIDE) /* explicitly for forum posting */
 
 
 /* Supply GnollHack_enter macro if not supplied by port */

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0	gnbind.c	$NHDT-Date: 1450453305 2015/12/18 15:41:45 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.33 $ */
 /* Copyright (C) 1998 by Erik Andersen <andersee@debian.org> */
@@ -1097,7 +1097,7 @@ gnome_yn_function_ex(int style, int attr, int color, int glyph, const char* titl
             /* anything beyond <esc> is hidden */
             *cb = '\0';
         }
-        (void) strncpy(message, question, QBUFSZ - 1);
+        Strncpy(message, question, QBUFSZ - 1);
         message[QBUFSZ - 1] = '\0';
         sprintf(eos(message), " [%s]", choicebuf);
         if (def)

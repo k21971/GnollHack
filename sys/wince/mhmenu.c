@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0  mhmenu.c       $NHDT-Date: 1524689398 2018/04/25 20:49:58 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.28 $ */
 /*      Copyright (c) 2009 by Michael Allison              */
@@ -646,7 +646,7 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
             char buf[QBUFSZ * 2 + 3] = "";
             Sprintf(buf, "%s%s%s", msg_data->text ? msg_data->text : "", msg_data->text && msg_data->subtitle && strcmp(msg_data->text, "") && strcmp(msg_data->subtitle, "") ? " - " : "", msg_data->subtitle ? msg_data->subtitle : "");
 
-            strncpy(data->menu.prompt, buf,
+            (void)strncpy(data->menu.prompt, buf,
                     sizeof(data->menu.prompt) - 1);
         } else {
             ZeroMemory(data->menu.prompt, sizeof(data->menu.prompt));
@@ -1604,7 +1604,7 @@ parse_menu_str(char *dest, const char *src, size_t size)
     if (!dest || size == 0)
         return NULL;
 
-    strncpy(dest, src, size);
+    (void)strncpy(dest, src, size);
     dest[size - 1] = '\x0';
 
     /* replace "[ ]*\[" with "\t\[" */

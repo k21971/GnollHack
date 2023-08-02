@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    do_wear.c    $NHDT-Date: 1551138255 2019/02/25 23:44:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.108 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -12,7 +12,7 @@ STATIC_VAR NEARDATA const char c_armor[] = "armor", c_suit[] = "suit",
                            c_bracers[] = "bracers", c_cloak[] = "cloak",
                            c_gloves[] = "gloves", c_boots[] = "boots",
                            c_shield[] = "shield",
-                           c_weapon[] = "weapon", c_sword[] = "sword",
+                           c_weapon[] = "weapon", c_sword[] = "sword", c_belt[] = "belt",
                            c_axe[] = "axe", c_that_[] = "that";
 
 STATIC_VAR NEARDATA const long takeoff_order[] = {
@@ -1634,10 +1634,10 @@ activate_take_off(VOID_ARGS)
 
         /* default activity for armor and/or accessories,
            possibly combined with weapons */
-        (void)strncpy(context.takeoff.disrobing, "disrobing", CONTEXTVERBSZ);
+        Strncpy(context.takeoff.disrobing, "disrobing", CONTEXTVERBSZ);
         /* specific activity when handling weapons only */
         if (!(context.takeoff.mask & ~W_WEAPON))
-            (void)strncpy(context.takeoff.disrobing, "disarming",
+            Strncpy(context.takeoff.disrobing, "disarming",
                 CONTEXTVERBSZ);
         (void)take_off();
     }
@@ -1738,10 +1738,10 @@ long mask;
     if (context.takeoff.mask && context.wear.mask) {
         /* default activity for armor and/or accessories,
            possibly combined with weapons */
-        (void)strncpy(context.takeoff.disrobing, "adjusting your equipment", CONTEXTVERBSZ);
+        Strncpy(context.takeoff.disrobing, "adjusting your equipment", CONTEXTVERBSZ);
         /* specific activity when handling weapons only */
         if (!(context.takeoff.mask & ~W_WEAPON))
-            (void)strncpy(context.takeoff.disrobing, "rearming",
+            Strncpy(context.takeoff.disrobing, "rearming",
                 CONTEXTVERBSZ);
         (void)take_off();
     }
@@ -1820,6 +1820,8 @@ boolean constructing_letters;
                         ? c_robe
                         : is_suit(otmp)
                             ? c_suit
+                            : is_belt(otmp)
+                                ? c_belt
                             : 0;
     if (which && cantweararm(youmonst.data)
         /* same exception for cloaks as used in m_dowear() */
@@ -1924,11 +1926,11 @@ boolean constructing_letters;
 
             err++;
         } 
-        else if (Upolyd && slithy(youmonst.data)) 
+        else if (Upolyd && (slithy(youmonst.data) || nolimbs(youmonst.data)))
         {
             if (noisy)
             {
-                play_sfx_sound(SFX_GENERAL_CANNOT);
+                play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
                 You_ex(ATR_NONE, CLR_MSG_FAIL, "have no feet..."); /* not body_part(FOOT) */
             }
             err++;
@@ -1939,10 +1941,28 @@ boolean constructing_letters;
                so don't let dowear() put them back on... */
             if (noisy)
             {
-                play_sfx_sound(SFX_GENERAL_CANNOT);
+                play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
                 pline_ex(ATR_NONE, CLR_MSG_FAIL, "You have too many hooves to wear %s.",
                     c_boots); /* makeplural(body_part(FOOT)) yields
                                  "rear hooves" which sounds odd */
+            }
+            err++;
+        }
+        else if (Upolyd && is_whirly(youmonst.data))
+        {
+            if (noisy)
+            {
+                play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "have no solid feet to wear %s.", c_boots);
+            }
+            err++;
+        }
+        else if (Upolyd && !feet_fit_boots(youmonst.data))
+        {
+            if (noisy)
+            {
+                play_sfx_sound(SFX_GENERAL_CURRENT_FORM_DOES_NOT_ALLOW);
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "Your %s are not of the shape that allow you to wear %s.", makeplural(body_part(FOOT)), c_boots);
             }
             err++;
         }

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0	winstr.c	$NHDT-Date: 1432512795 2015/05/25 00:13:15 $  $NHDT-Branch: master $:$NHDT-Revision: 1.7 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993. */
@@ -78,7 +78,7 @@ const char *str;
 
         while (isspace(*str))
             str++;
-        strncpy(toplines, str, TBUFSZ);
+        (void)strncpy(toplines, str, TBUFSZ);
         toplines[TBUFSZ - 1] = 0;
 
         /* For initial message to be visible, we need to explicitly position
@@ -197,7 +197,7 @@ const char *str;
         if (cw->cols > strlen(str))
             TextSpaces(w->RPort, cw->cols - strlen(str));
 
-        (void) strncpy(cw->data[cw->cury], str, cw->cols);
+        Strncpy(cw->data[cw->cury], str, cw->cols);
         cw->data[cw->cury][cw->cols - 1] = '\0'; /* null terminate */
         cw->cury = (cw->cury + 1) % 2;
         cw->curx = 0;

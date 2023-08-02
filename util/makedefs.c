@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0  makedefs.c  $NHDT-Date: 1557254354 2019/05/07 18:39:14 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -486,7 +486,7 @@ do_ext_makedefs(int argc, char **argv)
         }
         IS_OPTION("svs") {
             /* short version string for packaging - note no \n */
-            char buf[100];
+            char buf[BUFSZ];
             char delim[10];
 
             argv++; /* not CONSUME */
@@ -1265,7 +1265,7 @@ version_id_string(outbuf, build_date)
 char *outbuf;
 const char *build_date;
 {
-    char subbuf[64], versbuf[64];
+    char subbuf[BUFSZ], versbuf[BUFSZ];
     subbuf[0] = '\0';
 #ifdef PORT_SUB_ID
     subbuf[0] = ' ';
@@ -1282,7 +1282,7 @@ bannerc_string(outbuf, build_date)
 char *outbuf;
 const char *build_date;
 {
-    char subbuf[64], versbuf[64], elbuf[64] = "";
+    char subbuf[BUFSZ], versbuf[BUFSZ], elbuf[BUFSZ] = "";
     subbuf[0] = '\0';
 #ifdef PORT_SUB_ID
     subbuf[0] = ' ';
@@ -2570,7 +2570,7 @@ char *code;
         return FALSE;
     }
 
-    strncpy(&qt_hdr.id[qt_hdr.n_hdr][0], code, LEN_HDR);
+    (void)strncpy(&qt_hdr.id[qt_hdr.n_hdr][0], code, LEN_HDR);
     msg_hdr[qt_hdr.n_hdr].n_msg = 0;
     qt_hdr.offset[qt_hdr.n_hdr++] = 0L;
     return TRUE;
@@ -2871,7 +2871,7 @@ static char *limit(name, pref) /* limit a name to 40 characters length */
 char *name;
 int pref;
 {
-    (void) strncpy(temp, name, pref ? 36 : 40);
+    Strncpy(temp, name, pref ? 36 : 40);
     temp[pref ? 36 : 40] = 0;
     return temp;
 }
@@ -3116,7 +3116,7 @@ const char *str;
 
     if (!str)
         return (char *) 0;
-    (void) strncpy(buf, str, 127);
+    Strncpy(buf, str, 127);
     return buf;
 }
 

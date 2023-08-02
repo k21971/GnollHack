@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    sys.c    $NHDT-Date: 1547118632 2019/01/10 11:10:32 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) Kenneth Lorber, Kensington, Maryland, 2008. */
@@ -104,6 +104,7 @@ sys_early_init()
     sysopt.check_save_uid = 1;
     sysopt.check_plname = 0;
     sysopt.select_pet_details = 0;
+    sysopt.make_backup_savefiles = 0;
     sysopt.seduce = 1; /* if it's compiled in, default to on */
     sysopt_seduce_set(sysopt.seduce);
     return;
@@ -219,6 +220,8 @@ reset_global_variables(VOID_ARGS)
     WIN_MAP = WIN_ERR;
     WIN_INVEN = WIN_ERR;
     WIN_HERE = WIN_ERR;
+
+    exit_hack_code = 0;
 
     saving = FALSE;
     check_pointing = FALSE;

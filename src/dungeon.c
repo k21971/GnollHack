@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    dungeon.c    $NHDT-Date: 1554341477 2019/04/04 01:31:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2214,7 +2214,7 @@ donamelevel()
     nbuf[0] = '\0';
 #ifdef EDIT_GETLIN
     if (mptr->custom) {
-        (void) strncpy(nbuf, mptr->custom, BUFSZ);
+        Strncpy(nbuf, mptr->custom, BUFSZ);
         nbuf[BUFSZ - 1] = '\0';
     }
 #else
@@ -3200,22 +3200,36 @@ boolean printdun;
     else
         Sprintf(buf, "%sLevel %d:", TAB, i);
 
+    putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, NO_COLOR, 1);
+
     /* wizmode prints out proto dungeon names for clarity */
     if (wizard) {
         s_level *slev;
 
         if ((slev = Is_special(&mptr->lev)) != 0 && !mptr->flags.special_level_true_nature_known)
-            Sprintf(eos(buf), " [%s]", slev->name);
+        {
+            Sprintf(buf, " [%s]", slev->name);
+            putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_MSG_GOD, 1);
+        }
     }
+
     /* [perhaps print custom annotation on its own line when it's long] */
     if (mptr->custom)
-        Sprintf(eos(buf), " \"%s\"", mptr->custom);
+    {
+        Sprintf(buf, " \"%s\"", mptr->custom);
+        putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_MSG_HINT, 1);
+    }
     if (on_level(&u.uz, &mptr->lev))
-        Sprintf(eos(buf), " <- You %s here.",
-                (!final || (final == 1 && how == ASCENDED)) ? "are"
-                  : (final == 1 && how == ESCAPED) ? "left from"
-                    : "were");
-    putstr(win, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, buf);
+    {
+        Sprintf(buf, " <- You %s here.",
+            (!final || (final == 1 && how == ASCENDED)) ? "are"
+            : (final == 1 && how == ESCAPED) ? "left from"
+            : "were");
+
+        putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_RED, 1);
+    }
+    putstr(win, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, "");
+    //putstr(win, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, buf);
 
     if (mptr->flags.forgot)
         return;
@@ -3364,9 +3378,11 @@ boolean printdun;
         for (bp = mptr->final_resting_place; bp; bp = bp->next)
             if (bp->bonesknown || wizard || final)
                 ++kncnt;
+        
+        int totalkncnt = kncnt;
         if (kncnt) {
             Sprintf(buf, "%s%s", PREFIX, "Final resting place for");
-            putstr(win, ATR_INDENT_AT_SPACE, buf);
+            putstr_ex(win, buf, ATR_INDENT_AT_SPACE, NO_COLOR, final && totalkncnt == 1);
             if (died_here) {
                 /* disclosure occurs before bones creation, so listing dead
                    hero here doesn't give away whether bones are produced */
@@ -3376,15 +3392,15 @@ boolean printdun;
                 (void) strsubst(tmpbuf, " herself", " yourself");
                 (void) strsubst(tmpbuf, " his ", " your ");
                 (void) strsubst(tmpbuf, " her ", " your ");
-                Sprintf(buf, "%s%syou, %s%c", PREFIX, TAB, tmpbuf,
+                Sprintf(buf, "%s%syou, %s%c", final && totalkncnt == 1 ? " " : PREFIX, final && totalkncnt == 1 ? "" : TAB, tmpbuf,
                         --kncnt ? ',' : '.');
-                putstr(win, ATR_INDENT_AT_SPACE, buf);
+                putstr_ex(win, buf, ATR_INDENT_AT_SPACE, NO_COLOR, final && totalkncnt == 1 && kncnt);
             }
             for (bp = mptr->final_resting_place; bp; bp = bp->next) {
                 if (bp->bonesknown || wizard || final) {
-                    Sprintf(buf, "%s%s%s, %s%c", PREFIX, TAB, bp->who,
+                    Sprintf(buf, "%s%s%s, %s%c", final && totalkncnt == 1 ? " " : PREFIX, final && totalkncnt == 1 ? "" : TAB, bp->who,
                             bp->how, --kncnt ? ',' : '.');
-                    putstr(win, ATR_INDENT_AT_SPACE, buf);
+                    putstr_ex(win, buf, ATR_INDENT_AT_SPACE, NO_COLOR, final && totalkncnt == 1 && kncnt);
                 }
             }
         }

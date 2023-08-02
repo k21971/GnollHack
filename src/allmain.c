@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    allmain.c    $NHDT-Date: 1555552624 2019/04/18 01:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.100 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -31,7 +31,7 @@ static long prev_dgl_extrainfo = 0;
 
 void
 moveloop(resuming)
-boolean resuming;
+uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing after saving (restart) */
 {
 #if defined(MICRO) || defined(WIN32)
     char ch;
@@ -58,23 +58,26 @@ boolean resuming;
     if (resuming && iflags.deferred_X)
         (void) enter_explore_mode();
 
-    /* side-effects from the real world */
-    flags.moonphase = phase_of_the_moon();
-    if (flags.moonphase == FULL_MOON)
+    if (resuming < 2)
     {
-        You_ex(ATR_NONE, CLR_MSG_POSITIVE, "are lucky!  Full moon tonight.");
-        change_luck(1, FALSE);
-    }
-    else if (flags.moonphase == NEW_MOON) 
-    {
-        pline_ex(ATR_NONE, CLR_MSG_WARNING, "Be careful!  New moon tonight.");
-    }
+        /* side-effects from the real world */
+        flags.moonphase = phase_of_the_moon();
+        if (flags.moonphase == FULL_MOON)
+        {
+            You_ex(ATR_NONE, CLR_MSG_POSITIVE, "are lucky!  Full moon tonight.");
+            change_luck(1, FALSE);
+        }
+        else if (flags.moonphase == NEW_MOON)
+        {
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Be careful!  New moon tonight.");
+        }
 
-    flags.friday13 = friday_13th();
-    if (flags.friday13) 
-    {
-        pline_ex(ATR_NONE, CLR_MSG_WARNING, "Watch out!  Bad things can happen on Friday the 13th.");
-        change_luck(-1, FALSE);
+        flags.friday13 = friday_13th();
+        if (flags.friday13)
+        {
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "Watch out!  Bad things can happen on Friday the 13th.");
+            change_luck(-1, FALSE);
+        }
     }
 
     if (!resuming)
@@ -86,10 +89,11 @@ boolean resuming;
         (void) pickup(1);      /* autopickup at initial location */
         flags.verbose = oldverbose;
     }
+
     context.botlx = TRUE; /* for STATUS_HILITES */
     update_inventory(); /* for perm_invent */
 
-    if (resuming) 
+    if (resuming == 1) 
     { /* restoring old game */
         read_engr_at(u.ux, u.uy); /* subset of pickup() */
     }
@@ -321,6 +325,7 @@ boolean resuming;
                         {
                             You("smell something buried underground.");
                             (void)unearth_objs(&youmonst, u.ux, u.uy, TRUE, TRUE);
+                            (void)pickup(1);
                             nomul(0);
                         }
                     }
@@ -1449,6 +1454,13 @@ newgame()
 #endif
     program_state.something_worth_saving++; /* useful data now exists */
 
+    /* Delete existing save files and backup save files from previous characters of the same name, if any; this may happen if save file has been corrupted */
+    set_savefile_name(TRUE);
+    (void)delete_savefile_if_exists();
+    (void)delete_tmp_backup_savefile();
+    (void)delete_backup_savefile();
+    delete_excess_levelfiles();
+
     /* Change to the main music */
     update_game_music();
     play_level_ambient_sounds();
@@ -1515,12 +1527,14 @@ boolean new_game; /* false => restoring an old game */
     if (new_game)
     {
         char postbuf[BUFSZ * 2];
-        Sprintf(postbuf, "%s the%s %s %s has entered the dungeon on %s difficulty", plname, buf, urace.adj,
-            (currentgend&& urole.name.f) ? urole.name.f : urole.name.m, get_game_difficulty_text(context.game_difficulty));
+        Sprintf(postbuf, "%s the%s %s %s has entered the dungeon on %s difficulty in %s mode", plname, buf, urace.adj,
+            (currentgend&& urole.name.f) ? urole.name.f : urole.name.m, get_game_difficulty_text(context.game_difficulty), get_game_mode_text(FALSE));
+#ifdef DEBUG
         //IfModeAllowsPostToForum
         //{
-        //    issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_START, postbuf);
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_START, postbuf);
         //}
+#endif
         livelog_printf(LL_DUMP, "%s", postbuf);
     }
 }

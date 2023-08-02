@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    dokick.c    $NHDT-Date: 1551920353 2019/03/07 00:59:13 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.131 $ */
 /* Copyright (c) Izchak Miller, Mike Stephenson, Steve Linhart, 1989. */
@@ -2120,7 +2120,7 @@ xchar dlev;          /* if !0 send to dlev near player */
             You("removed %ld %s worth of goods!", price, currency(price));
             if (cansee(shkp->mx, shkp->my)) {
                 if (ESHK(shkp)->customer[0] == 0)
-                    (void) strncpy(ESHK(shkp)->customer, plname, PL_NSIZ);
+                    Strncpy(ESHK(shkp)->customer, plname, PL_NSIZ);
                 if (angry)
                     pline("%s is infuriated!", Monnam(shkp));
                 else

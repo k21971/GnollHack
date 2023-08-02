@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    restore.c    $NHDT-Date: 1555201698 2019/04/14 00:28:18 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -902,7 +902,7 @@ xchar ltmp;
             /* Rewind save file and try again */
             (void) lseek(fd, (off_t) 0, 0);
             (void) validate(fd, (char *) 0); /* skip version etc */
-            return dorecover(fd);            /* 0 or 1 */
+            return dorestore(fd, FALSE);            /* 0 or 1 */
         }
 #endif /* ?AMIGA */
         pline("Be seeing you...");
@@ -916,13 +916,32 @@ xchar ltmp;
 }
 
 int
-dorecover(fd)
+dorestore(fd, is_backup)
 register int fd;
+boolean is_backup;
 {
-    int loadres = dorecover_saved_game(fd);
+    int loadres = dorestore0(fd);
+    if (!loadres && !is_backup)
+    {
+        if (!restore_backup_savefile(TRUE))
+        {
+            pline("Restoring save file failed.  Replaced save file with back-up save file.");
+            mark_synch(); /* flush output */
+            fd = open_and_validate_saved_game(FALSE, (boolean*)0);
+            if (fd >= 0)
+            {
+                pline("Restoring back-up save file...");
+                mark_synch(); /* flush output */
+                loadres = dorestore0(fd);
+            }
+        }
+    }
     if (loadres)
     {
         /* Success! */
+        delete_excess_levelfiles();
+
+        /* Welcome */
         welcome(FALSE);
         check_special_room(FALSE);
         return 1;
@@ -931,7 +950,7 @@ register int fd;
 }
 
 int
-dorecover_saved_game(fd)
+dorestore0(fd)
 register int fd;
 {
     unsigned int stuckid = 0, steedid = 0; /* not a register */
@@ -939,7 +958,8 @@ register int fd;
     int rtmp;
     struct obj *otmp;
     struct save_game_stats dummy_stats = { 0 };
-    Strcpy(debug_buf_4, "dorecover_saved_game");
+    Strcpy(debug_buf_4, "dorestore0");
+    boolean was_corrupted = FALSE;
 
     restoring = TRUE;
     get_plname_from_file(fd, plname);
@@ -959,7 +979,7 @@ register int fd;
 #endif
     rtmp = restlevelfile(fd, ledger_no(&u.uz));
     if (rtmp < 2)
-        return rtmp; /* dorecover called recursively */
+        return rtmp; /* dorestore called recursively */
 
     /* these pointers won't be valid while we're processing the
      * other levels, but they'll be reset again by restlevelstate()
@@ -992,12 +1012,15 @@ register int fd;
     if (!WINDOWPORT("X11"))
         putstr(WIN_MAP, 0, "Restoring:");
 #endif
-    restoreprocs.mread_flags = 1; /* return despite error */
     while (1) {
+        restoreprocs.mread_flags = 1; /* return despite error */
         mread(fd, (genericptr_t) &ltmp, sizeof ltmp);
         if (restoreprocs.mread_flags == -1)
             break;
+        restoreprocs.mread_flags = 2; /* return despite error */
         getlev(fd, 0, ltmp, FALSE);
+        if (restoreprocs.mread_flags == -2)
+            break;
 #ifdef MICRO
         curs(WIN_MAP, 1 + dotcnt++, dotrow);
         if (dotcnt >= (COLNO - 1)) {
@@ -1011,7 +1034,20 @@ register int fd;
 #endif
         rtmp = restlevelfile(fd, ltmp);
         if (rtmp < 2)
-            return rtmp; /* dorecover called recursively */
+            return rtmp; /* dorestore called recursively */
+        if (restoreprocs.mread_flags == -2)
+            break;
+    }
+    if (restoreprocs.mread_flags == -2)
+    {
+        was_corrupted = TRUE;
+        if (query_about_corrupted_savefile())
+        {
+            (void)nhclose(fd);
+            (void)delete_savefile();
+            restoring = FALSE;
+            return 0;
+        }
     }
     restoreprocs.mread_flags = 0;
 
@@ -1077,7 +1113,10 @@ register int fd;
     /* Play ambient sounds for the dungeon; check_special_room will play music */
     play_level_ambient_sounds();
     play_environment_ambient_sounds();
-
+    if (!was_corrupted)
+        (void)move_tmp_backup_savefile_to_actual_backup_savefile(); /* Restore was successful, update backup savefile */
+    else
+        (void)delete_tmp_backup_savefile();
     return 1;
 }
 
@@ -1200,7 +1239,9 @@ boolean ghostly;
             Sprintf(trickbuf, "This is level %d, not %d!", dlvl, lev);
         if (wizard)
             pline1(trickbuf);
+        nhclose(fd);
         trickery(trickbuf);
+        return;
     }
     restcemetery(fd, &level.bonesinfo);
     rest_levl(fd,
@@ -1760,7 +1801,7 @@ struct save_game_data* saved;
             char* timestr = ctime(&saved[k].gamestats.time_stamp);
             if (timestr && *timestr)
             {
-                strncpy(timebuf, timestr, strlen(timestr) - 1);
+                Strncpy(timebuf, timestr, strlen(timestr) - 1);
                 timebuf[strlen(timestr) - 1] = 0;
             }
             else
@@ -1840,6 +1881,8 @@ struct save_game_data* saved;
             if (ans == 'y')
             {
                 set_savefile_name(TRUE);
+                delete_tmp_backup_savefile();
+                delete_backup_savefile();
                 delete_savefile();
             }
             else
@@ -2119,14 +2162,18 @@ register size_t len;
 
     rlen = (int)read(fd, buf, (readLenType) len);
     if ((readLenType) rlen != (readLenType) len) {
-        if (restoreprocs.mread_flags == 1) { /* means "return anyway" */
+        if (restoreprocs.mread_flags == 1) { /* means "return anyway", no corruption */
             restoreprocs.mread_flags = -1;
+            return;
+        } else if (restoreprocs.mread_flags == 2) { /* means "return anyway", apparent corruption */
+            restoreprocs.mread_flags = -2;
             return;
         } else {
             pline("Read %d instead of %zu bytes.", rlen, len);
             if (restoring) {
                 (void) nhclose(fd);
-                (void) delete_savefile();
+                (void) delete_tmp_backup_savefile();
+                (void) ask_delete_invalid_savefile("corrupted", TRUE);
                 error("Error restoring old game.");
             }
             panic("Error reading level file.");
@@ -2134,8 +2181,5 @@ register size_t len;
         }
     }
 }
-
-
-
 
 /*restore.c*/

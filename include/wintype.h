@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0  wintype.h       $NHDT-Date: 1549327486 2019/02/05 00:44:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.19 $ */
 /* Copyright (c) David Cohrs, 1991                                */
@@ -121,21 +121,29 @@ typedef struct mi {
 #define ATR_SUB             0x0400
 #define ATR_SUBTITLE        (ATR_SUB | ATR_TITLE)
 #define ATR_SUBHEADING      (ATR_SUB | ATR_HEADING)
-#define ATR_INDENT_AT_DASH  0x0800 /* With automatic wrap, indents at the first dash (-) + spaces after it */
-#define ATR_INDENT_AT_COLON 0x1000 /* With automatic wrap, indents at the first colon (:) + spaces after it */
-#define ATR_INDENT_AT_ASTR  0x2000 /* With automatic wrap, indents at the first asterisk (*) + spaces after it */
-#define ATR_INDENT_AT_SPACE 0x4000 /* With automatic wrap, indents at the first space ( ) + spaces after it */
-#define ATR_INDENT_AT_BRACKET 0x8000 /* With automatic wrap, indents at the first closing bracket (]) + spaces after it */
+#define ATR_INDENT_AT_DASH      0x00000800 /* With automatic wrap, indents at the first dash (-) + spaces after it */
+#define ATR_INDENT_AT_COLON     0x00001000 /* With automatic wrap, indents at the first colon (:) + spaces after it */
+#define ATR_INDENT_AT_ASTR      0x00002000 /* With automatic wrap, indents at the first asterisk (*) + spaces after it */
+#define ATR_INDENT_AT_SPACE     0x00004000 /* With automatic wrap, indents at the first space ( ) + spaces after it */
+#define ATR_INDENT_AT_BRACKET   0x00008000 /* With automatic wrap, indents at the first closing bracket (]) + spaces after it */
 #define ATR_INDENT_AT_PERIOD (ATR_INDENT_AT_DASH | ATR_INDENT_AT_COLON) /* With automatic wrap, indents at the first space (.) + spaces after it */
 #define ATR_INDENT_AT_DOUBLE_SPACE (ATR_INDENT_AT_DASH | ATR_INDENT_AT_SPACE) /* With automatic wrap, indents at the first double space (  ) + spaces after it */
 #define ATR_INDENT_AT_BRACKET_OR_DOUBLE_SPACE (ATR_INDENT_AT_BRACKET | ATR_INDENT_AT_DASH | ATR_INDENT_AT_SPACE) /* With automatic wrap, indents at the first double space (  ) + spaces after it */
-#define ATR_ALIGN_CENTER    0x00010000
-#define ATR_ALIGN_RIGHT     0x00020000
-#define ATR_INACTIVE        0x00040000
-#define ATR_HALF_SIZE       0x00080000
-#define ATR_ALT_COLORS      0x00100000
-#define ATR_PREFORM         0x00200000
-#define ATR_LINE_MSG_MASK   0xFFFFFFF0
+#define ATR_ALIGN_CENTER        0x00010000
+#define ATR_ALIGN_RIGHT         0x00020000
+#define ATR_INACTIVE            0x00040000
+#define ATR_HALF_SIZE           0x00080000
+#define ATR_ALT_COLORS          0x00100000
+#define ATR_ALT_DIVISORS        0x00200000
+#define ATR_ORDERED_LIST        0x00400000
+#define ATR_START_TABLE         0x00800000
+#define ATR_END_TABLE           0x01000000
+#define ATR_TABLE_ROW           0x02000000
+#define ATR_TABLE_HEADER        0x04000000
+#define ATR_START_TABLE_BODY    0x08000000
+#define ATR_END_TABLE_BODY      0x10000000
+#define ATR_PARAGRAPH_LINE      0x20000000
+#define ATR_LINE_ATTR_MASK      0x7FFFFFF0 /* because this is signed integer */
 
 /* nh_poskey() modifier types */
 #define CLICK_1 1

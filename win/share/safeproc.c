@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    safeproc.c   */    
 /* Copyright (c) Michael Allison, 2018                            */
@@ -475,6 +475,10 @@ struct special_view_info info;
     {
     case SPECIAL_VIEW_CHAT_MESSAGE:
         break;
+    case SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N:
+        return 'n';
+    case SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y:
+        return 'y';
     default:
         break;
     }

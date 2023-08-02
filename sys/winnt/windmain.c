@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    windmain.c    $NHDT-Date: 1543465755 2018/11/29 04:29:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.101 $ */
 /* Copyright (c) Derek S. Ray, 2015. */
@@ -88,7 +88,8 @@ mingw_main(argc, argv)
 int argc;
 char *argv[];
 {
-    boolean resuming = FALSE; /* assume new game */
+    uchar resuming = FALSE; /* assume new game */
+    boolean is_backup = FALSE;
     int fd;
     char *windowtype = NULL;
     char *envp = NULL;
@@ -180,7 +181,7 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
         int fd;
         boolean have_syscf = FALSE;
 
-        (void) strncpy(hackdir, dir, PATHLEN - 1);
+        Strncpy(hackdir, dir, PATHLEN - 1);
         hackdir[PATHLEN - 1] = '\0';
         fqn_prefix[0] = (char *) alloc(strlen(hackdir) + 2);
         Strcpy(fqn_prefix[0], hackdir);
@@ -277,7 +278,7 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
      * It seems you really want to play.
      */
 
-#if defined(DUMPLOG) && defined(DUMPLOG_DIR)
+#if (defined(DUMPLOG) || defined(DUMPHTML)) && defined(DUMPLOG_DIR)
      /* Make DUMPLOG_DIR if defined */
     struct stat st = { 0 };
 
@@ -380,7 +381,7 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
      * We'll return here if new game player_selection() renames the hero.
      */
 attempt_restore:
-    if ((fd = open_and_validate_saved_game()) >= 0)
+    if ((fd = open_and_validate_saved_game(TRUE, &is_backup)) >= 0)
     {
 #ifdef NEWS
         if (iflags.news)
@@ -391,7 +392,7 @@ attempt_restore:
 #endif
         pline("Restoring save file...");
         mark_synch(); /* flush output */
-        if (dorecover(fd))
+        if (dorestore(fd, is_backup))
         {
             resuming = TRUE; /* not starting new game */
             boolean savefilekept = FALSE;
@@ -412,7 +413,7 @@ attempt_restore:
                 }
             }
 
-            /* This must be added to main if the GnollHack port is using dorecover without load_saved_game */
+            /* This must be added to main if the GnollHack port is using dorestore without load_saved_game */
             reset_save_file_name(savefilekept);
         }
     }
@@ -561,11 +562,11 @@ char *argv[];
 #endif
         case 'u':
             if (argv[0][2])
-                (void) strncpy(plname, argv[0] + 2, sizeof(plname) - 1);
+                Strncpy(plname, argv[0] + 2, sizeof(plname) - 1);
             else if (argc > 1) {
                 argc--;
                 argv++;
-                (void) strncpy(plname, argv[0], sizeof(plname) - 1);
+                Strncpy(plname, argv[0], sizeof(plname) - 1);
             } else
                 raw_print("Player name expected after -u");
             break;
@@ -992,6 +993,7 @@ getlock()
             chdirx(orgdir, 0);
 #endif
             raw_print("Couldn't recover old game.");
+            (void)restore_backup_savefile(FALSE);
         }
 #endif /*SELF_RECOVER*/
     else {

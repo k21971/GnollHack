@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    winprocs.h    $NHDT-Date: 1553204011 2019/03/21 21:33:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.47 $ */
 /* Copyright (c) David Cohrs, 1992                  */
@@ -153,6 +153,7 @@ extern
 #define start_menu_ex (*windowprocs.win_start_menu_ex)
 #define start_menu(x) start_menu_ex(x, 0)
 #define add_menu (*windowprocs.win_add_menu)
+#define add_active_menu(a, b, c, d, e, f, g, h, i) add_extended_menu(a, b, c, d, e, f, g, h, i, active_menu_info())
 #define add_extended_menu (*windowprocs.win_add_extended_menu)
 #define end_menu_ex (*windowprocs.win_end_menu_ex)
 #define end_menu(a, b) end_menu_ex(a, b, (const char*)0)

@@ -6,6 +6,7 @@
 #include "action.h"
 #include "layer.h"
 #include "config.h"
+#include "tiledata.h"
 
 #ifndef ANIMATION_H
 #define ANIMATION_H
@@ -2093,6 +2094,9 @@ enum enlargement_types
     SADDLED_WARG_ENLARGEMENT,
     SADDLED_WARG_STATUE_ENLARGEMENT,
 
+    DWARF_ZOMBIE_MALE_ATTACK_ENLARGEMENT,
+    DWARF_ZOMBIE_FEMALE_ATTACK_ENLARGEMENT,
+
     MAX_ENLARGEMENTS
 };
 
@@ -2858,36 +2862,6 @@ struct special_effect_definition {
 };
 
 extern NEARDATA const struct special_effect_definition special_effects[MAX_SPECIAL_EFFECTS];
-
-
-struct game_cursor_definition {
-    const char* name;
-    short /*enum replacement_types*/ replacement;
-    short /*enum animation_types*/ animation;
-    short /*enum enlargement_types*/ enlargement;
-};
-
-
-extern NEARDATA const struct game_cursor_definition game_cursors[MAX_CURSORS];
-
-struct hit_tile_definition {
-    const char* name;
-    short /*enum replacement_types*/ replacement;
-    short /*enum animation_types*/ animation;
-    short /*enum enlargement_types*/ enlargement;
-};
-
-extern NEARDATA const struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES];
-
-
-struct general_tile_definition {
-    const char* name;
-    short /*enum replacement_types*/ replacement;
-    short /*enum animation_types*/ animation;
-    short /*enum enlargement_types*/ enlargement;
-};
-
-extern NEARDATA const struct general_tile_definition general_tile_definitions[MAX_GENERAL_TILES];
 
 #define MAX_PLAYED_SPECIAL_EFFECTS 12  // Must be greater than or equal to MAXNASTIES
 #define MAX_PLAYED_ZAP_ANIMATIONS 16

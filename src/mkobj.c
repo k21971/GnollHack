@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    mkobj.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.142 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1727,7 +1727,7 @@ unsigned long mkflags;
                     {
                         if (!rn2(2))
                             cnm = NON_PM;
-                        else if (Inhell && !context.amonket_generated && rn2(100) < leveldiff * 2 - 23)
+                        else if (Inhell && !context.amonket_generated && (Is_sanctum(&u.uz) || rn2(100) < leveldiff * 2 - 23))
                         {
                             context.amonket_generated = TRUE;
                             cnm = PM_AMONKET;
@@ -3391,6 +3391,27 @@ int x, y;
     return mksobj_at(treefruits[rn2(SIZE(treefruits))], x, y, TRUE, FALSE);
 }
 
+long
+get_random_gold_amount(VOID_ARGS)
+{
+    long mul = rnd(30 / max(12 - depth(&u.uz), 2));
+    long amount = (long)(1 + rnd(level_difficulty() + 2) * mul);
+    return amount;
+}
+
+void
+set_random_gold_amount(otmp)
+struct obj* otmp;
+{
+    if (!otmp || otmp->otyp != GOLD_PIECE)
+        return;
+
+    long amount = get_random_gold_amount();
+    otmp->quan = amount;
+    otmp->owt = weight(otmp);
+}
+
+
 struct obj *
 mkgold(amount, x, y)
 long amount;
@@ -3399,8 +3420,7 @@ int x, y;
     register struct obj *gold = g_at(x, y);
 
     if (amount <= 0L) {
-        long mul = rnd(30 / max(12-depth(&u.uz), 2));
-        amount = (long) (1 + rnd(level_difficulty() + 2) * mul);
+        amount = get_random_gold_amount();
     }
     if (gold) {
         gold->quan += amount;

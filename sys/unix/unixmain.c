@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 3.6	unixmain.c	$NHDT-Date: 1432512788 2015/05/25 00:13:08 $  $NHDT-Branch: master $:$NHDT-Revision: 1.52 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -58,7 +58,8 @@ char *argv[];
     register char *dir;
 #endif
     boolean exact_username;
-    boolean resuming = FALSE; /* assume new game */
+    uchar resuming = FALSE; /* assume new game */
+    boolean is_backup = FALSE;
     boolean plsel_once = FALSE;
 
     sys_early_init();
@@ -85,7 +86,7 @@ char *argv[];
                         (arg0_len - mac_tmp_len) + strlen(mac_exe) + 5;
                     if (mac_lhs_len > mac_tmp_len - 1)
                         mac_tmp = realloc(mac_tmp, mac_lhs_len);
-                    strncpy(mac_tmp, argv[0], mac_lhs_len);
+                    Strncpy(mac_tmp, argv[0], mac_lhs_len);
                     mac_tmp[mac_lhs_len] = '\0';
                     chdir(mac_tmp);
                 }
@@ -285,7 +286,7 @@ attempt_restore:
         program_state.preserve_locks = 0; /* after getlock() */
     }
 
-    if (*plname && (fd = open_and_validate_saved_game()) >= 0) {
+    if (*plname && (fd = open_and_validate_saved_game(TRUE, &is_backup)) >= 0) {
         const char *fq_save = fqname(SAVEF, SAVEPREFIX, 1);
 
         (void) chmod(fq_save, 0); /* disallow parallel restores */
@@ -295,12 +296,12 @@ attempt_restore:
 #ifdef NEWS
         if (iflags.news) {
             display_file(NEWS, FALSE);
-            iflags.news = FALSE; /* in case dorecover() fails */
+            iflags.news = FALSE; /* in case dorestore() fails */
         }
 #endif
         pline("Restoring save file...");
         mark_synch(); /* flush output */
-        if (dorecover(fd)) {
+        if (dorestore(fd, is_backup)) {
             resuming = TRUE; /* not starting new game */
             wd_message();
             if (discover || wizard) {
@@ -407,11 +408,11 @@ char *argv[];
 #endif
         case 'u':
             if (argv[0][2]) {
-                (void) strncpy(plname, argv[0] + 2, sizeof plname - 1);
+                Strncpy(plname, argv[0] + 2, sizeof plname - 1);
             } else if (argc > 1) {
                 argc--;
                 argv++;
-                (void) strncpy(plname, argv[0], sizeof plname - 1);
+                Strncpy(plname, argv[0], sizeof plname - 1);
             } else {
                 raw_print("Player name expected after -u");
             }
@@ -569,7 +570,7 @@ whoami()
             s = getlogin();
 
         if (s && *s) {
-            (void) strncpy(plname, s, sizeof plname - 1);
+            Strncpy(plname, s, sizeof plname - 1);
             if (index(plname, '-'))
                 return TRUE;
         }

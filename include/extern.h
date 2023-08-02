@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    extern.h    $NHDT-Date: 1557088399 2019/05/05 20:33:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.703 $ */
 /* Copyright (c) Steve Creps, 1988.                  */
@@ -10,6 +10,7 @@
 #include "soundset.h"
 #include "lev.h"
 #include "general.h"
+#include "tiledata.h"
 
 #define E extern
 
@@ -26,7 +27,7 @@ E char *FDECL(fmt_ptr, (const genericptr));
 
 /* ### allmain.c ### */
 
-E void FDECL(moveloop, (BOOLEAN_P));
+E void FDECL(moveloop, (UCHAR_P));
 E void NDECL(stop_occupation);
 E void NDECL(display_gamewindows);
 E void NDECL(newgame);
@@ -301,6 +302,7 @@ E char* NDECL(botl_realtime);
 E long NDECL(get_current_game_duration);
 E size_t FDECL(print_conditions, (char*));
 E void FDECL(compose_partystatline, (char*, char*, char*, char*, char*));
+E char* FDECL(format_duration_with_units, (long));
 
 
 /* ### cmd.c ### */
@@ -410,9 +412,9 @@ E int FDECL(is_drawbridge_wall, (int, int));
 E boolean FDECL(is_db_wall, (int, int));
 E boolean FDECL(find_drawbridge, (int *, int *));
 E boolean FDECL(create_drawbridge, (int, int, int, BOOLEAN_P));
-E void FDECL(open_drawbridge, (int, int));
-E void FDECL(maybe_close_drawbridge, (int, int));
-E void FDECL(close_drawbridge, (int, int));
+E void FDECL(open_drawbridge, (int, int, BOOLEAN_P));
+E void FDECL(maybe_close_drawbridge, (int, int, BOOLEAN_P));
+E void FDECL(close_drawbridge, (int, int, BOOLEAN_P));
 E void FDECL(destroy_drawbridge, (int, int, BOOLEAN_P));
 E void NDECL(reset_drawbridge);
 
@@ -470,6 +472,7 @@ E int FDECL(use_pick_axe2, (struct obj *));
 E boolean FDECL(mdig_tunnel, (struct monst *));
 E void FDECL(draft_message, (BOOLEAN_P));
 E void FDECL(watch_dig, (struct monst *, XCHAR_P, XCHAR_P, BOOLEAN_P));
+E void FDECL(zap_try_destroy_tree, (int, int));
 E void FDECL(zap_dig, (struct obj*));
 E void FDECL(zap_evaporation, (struct obj*));
 E struct obj *FDECL(bury_an_obj, (struct obj *, boolean *));
@@ -648,6 +651,7 @@ E void FDECL(set_wounded_legs, (long, int));
 E void FDECL(heal_legs, (int));
 E boolean NDECL(floorexamine);
 E int FDECL(itemdescription, (struct obj*));
+E int FDECL(itemdescription_core, (struct obj*, int));
 E int FDECL(corpsedescription, (struct obj*));
 E void FDECL(printweight, (char*, int, BOOLEAN_P, BOOLEAN_P));
 E int FDECL(monsterdescription, (struct monst*));
@@ -688,6 +692,7 @@ E void NDECL(heal_ailments_upon_revival);
 #if !defined (GNH_MOBILE) && defined (DEBUG)
 E void NDECL(write_spells);
 E void NDECL(write_monsters);
+E void NDECL(write_items);
 #endif
 
 /* ### do_name.c ### */
@@ -900,7 +905,7 @@ E boolean FDECL(walk_path, (coord *, coord *,
 E boolean FDECL(hurtle_jump, (genericptr_t, int, int));
 E boolean FDECL(hurtle_step, (genericptr_t, int, int));
 
-E struct multishot_result FDECL(get_multishot_stats, (struct monst*, struct obj*, struct obj*, BOOLEAN_P));
+E struct multishot_result FDECL(get_multishot_stats, (struct monst*, struct obj*, struct obj*, UCHAR_P));
 E void FDECL(check_shop_obj, (struct obj*, XCHAR_P, XCHAR_P, BOOLEAN_P, BOOLEAN_P));
 E void NDECL(reset_throw);
 
@@ -1171,6 +1176,7 @@ E void FDECL(set_levelfile_name, (char *, int));
 E int FDECL(create_levelfile, (int, char *));
 E int FDECL(open_levelfile, (int, char *));
 E void FDECL(delete_levelfile, (int));
+E void NDECL(delete_excess_levelfiles);
 E void NDECL(clearlocks);
 E int FDECL(create_bonesfile, (d_level *, char **, char *));
 #ifdef MFLOPPY
@@ -1191,7 +1197,9 @@ E void NDECL(set_imported_savefile);
 E int NDECL(create_savefile);
 E int NDECL(open_savefile);
 E int NDECL(delete_savefile);
-E int NDECL(open_and_validate_saved_game);
+E int FDECL(ask_delete_invalid_savefile, (const char*, BOOLEAN_P));
+E int NDECL(query_about_corrupted_savefile);
+E int FDECL(open_and_validate_saved_game, (BOOLEAN_P, boolean*));
 E void NDECL(mode_message);
 E void NDECL(create_gamestate_levelfile);
 E int FDECL(load_saved_game, (int));
@@ -1220,6 +1228,13 @@ E struct save_game_data FDECL(newsavegamedata, (char*, char*, struct save_game_s
 E struct save_game_data *NDECL(get_saved_games);
 E void FDECL(free_saved_games, (struct save_game_data *));
 E boolean NDECL(check_saved_game_exists);
+E int FDECL(make_tmp_backup_savefile_from_uncompressed_savefile, (const char*));
+E int NDECL(move_tmp_backup_savefile_to_actual_backup_savefile);
+E int FDECL(restore_backup_savefile, (BOOLEAN_P));
+E int NDECL(delete_backup_savefile);
+E int NDECL(delete_tmp_backup_savefile);
+E boolean NDECL(check_has_backup_savefile);
+E int NDECL(delete_savefile_if_exists);
 
 #ifdef SELF_RECOVER
 E boolean NDECL(recover_savefile);
@@ -1346,6 +1361,7 @@ E int FDECL(inv_cnt_ex, (BOOLEAN_P, BOOLEAN_P));
 E long FDECL(money_cnt, (struct obj *));
 E struct extended_menu_info FDECL(obj_to_extended_menu_info, (struct obj*));
 E struct extended_menu_info NDECL(menu_heading_info);
+E struct extended_menu_info NDECL(active_menu_info);
 E struct extended_menu_info FDECL(menu_group_heading_info, (CHAR_P));
 E struct extended_menu_info FDECL(menu_special_mark_info, (CHAR_P));
 E const char* FDECL(get_cmap_or_cmap_variation_glyph_explanation, (int));
@@ -1738,6 +1754,8 @@ E struct monst* FDECL(get_mmonst, (struct monst*, BOOLEAN_P));
 E void FDECL(save_mmonst, (struct monst*, struct monst*));
 E struct obj* FDECL(get_mobj, (struct monst*, BOOLEAN_P));
 E void FDECL(save_mobj, (struct monst*, struct obj*));
+E void FDECL(set_mimic_new_mobj, (struct monst*, int));
+E void FDECL(set_mimic_existing_mobj, (struct monst*, struct obj*));
 
 /* ### mapglyph.c ### */
 
@@ -1916,6 +1934,8 @@ E struct obj* FDECL(mksobj_ex, (int, BOOLEAN_P, BOOLEAN_P, int, struct monst*, U
 E struct obj* FDECL(mksobj_with_flags, (int, BOOLEAN_P, BOOLEAN_P, int, struct monst*, UCHAR_P, long, long, unsigned long));
 E int FDECL(bcsign, (struct obj *));
 E int FDECL(weight, (struct obj *));
+E long NDECL(get_random_gold_amount);
+E void FDECL(set_random_gold_amount, (struct obj*));
 E struct obj *FDECL(mkgold, (long, int, int));
 E struct obj *FDECL(mkcorpstat, (int, struct monst *, struct permonst *, int,
                                  int, unsigned));
@@ -2207,9 +2227,9 @@ E int FDECL(findfirst_file, (char *));
 E int NDECL(findnext_file);
 E long FDECL(filesize_nh, (char *));
 #else
-E int FDECL(findfirst, (char *));
+E int FDECL(findfirst, (const char *));
 E int NDECL(findnext);
-E long FDECL(filesize, (char *));
+E long FDECL(filesize, (const char *));
 #endif /* MSDOS */
 E char *NDECL(foundfile_buffer);
 #endif /* __GO32__ */
@@ -2448,6 +2468,7 @@ E const char* FDECL(robe_simple_name, (struct obj*));
 E const char* FDECL(miscitem_simple_name, (struct obj*));
 E const char *FDECL(helm_simple_name, (struct obj *));
 E const char* FDECL(armor_class_simple_name, (struct obj*));
+E const char* FDECL(otyp_armor_class_simple_name, (int));
 E const char *FDECL(mimic_obj_name, (struct monst *));
 E char *FDECL(safe_qbuf, (char *, const char *, const char *, struct obj *,
                           char *(*)(OBJ_P), char *(*)(OBJ_P), const char *));
@@ -2925,9 +2946,9 @@ E void FDECL(do_light_regions, (char**));
 
 /* ### restore.c ### */
 
+E int FDECL(dorestore, (int, BOOLEAN_P));
+E int FDECL(dorestore0, (int));
 E void FDECL(inven_inuse, (BOOLEAN_P));
-E int FDECL(dorecover_saved_game, (int));
-E int FDECL(dorecover, (int));
 E void FDECL(restcemetery, (int, struct cemetery **));
 E void FDECL(trickery, (char *));
 E void FDECL(getlev, (int, int, XCHAR_P, BOOLEAN_P));
@@ -3089,7 +3110,7 @@ E void NDECL(rumor_check);
 
 E int NDECL(dosave);
 E int FDECL(dosave0, (BOOLEAN_P));
-E int NDECL(check_existing_save_file);
+E boolean NDECL(check_existing_save_file);
 E boolean FDECL(tricked_fileremoved, (int, char *));
 #ifdef INSURANCE
 E void NDECL(savestateinlock);
@@ -3974,6 +3995,7 @@ E int FDECL(vms_get_saved_games, (const char *, char ***));
 E int FDECL(practice_needed_to_advance, (int, int));
 E const char *FDECL(weapon_descr, (struct obj *));
 E const char* FDECL(weapon_skill_name, (struct obj*));
+E const char* FDECL(otyp_weapon_skill_name, (int));
 E const char* FDECL(get_skill_name, (int));
 E const char* FDECL(get_skill_plural_name, (int));
 E int FDECL(m_weapon_range, (struct monst*, struct obj*, struct obj*));
@@ -4157,7 +4179,7 @@ E void FDECL(genl_exit_hack, (int));
 
 E void FDECL(dump_open_log, (time_t));
 E void NDECL(dump_close_log);
-E void FDECL(dump_forward_putstr, (winid, int, const char*, int));
+E void FDECL(dump_forward_putstr, (winid, int, const char*, int, int));
 #if defined (DUMPLOG) || defined (DUMPHTML)
 E void FDECL(dump_redirect, (BOOLEAN_P));
 E void NDECL(dump_start_screendump); /* defined in windows.c */
@@ -4176,6 +4198,8 @@ E void FDECL(html_dump_glyph, (int, int, int, nhsym, int, unsigned long));
 #if defined(ANDROID) && defined(DUMPLOG)
 E void FDECL(and_get_dumplog_dir, (char*));
 #endif
+E void NDECL(reset_windows);
+
 
 /* ### winnt.c ### */
 #ifdef WIN32
@@ -4270,6 +4294,7 @@ E int FDECL(count_unworn_items, (struct obj*));
 
 E int FDECL(dowrite, (struct obj *));
 E int FDECL(ink_cost, (struct obj*));
+E int FDECL(otyp_ink_cost, (int));
 
 /* ### zap.c ### */
 

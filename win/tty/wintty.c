@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    wintty.c    $NHDT-Date: 1557088734 2019/05/05 20:38:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.203 $ */
 /* Copyright (c) David Cohrs, 1991                                */
@@ -2849,7 +2849,7 @@ const char *str, *attrs, *colors;
 
         /* in case we ever support display attributes for topline
            messages, clear flag mask leaving only display attr */
-        /*attr &= ~(ATR_LINE_MSG_MASK);*/
+        /*attr &= ~(ATR_LINE_ATTR_MASK);*/
 
         /* really do this later */
 #if defined(USER_SOUNDS) && defined(WIN32CON)
@@ -2894,7 +2894,7 @@ const char *str, *attrs, *colors;
                 ob++;
         }
 
-        (void) strncpy(&cw->data[cw->cury][j], str, cw->cols - j - 1);
+        Strncpy(&cw->data[cw->cury][j], str, cw->cols - j - 1);
         cw->data[cw->cury][cw->cols - 1] = '\0'; /* null terminate */
         cw->cury = (cw->cury + 1) % cw->maxrow;
         cw->curx = 0;
@@ -3222,7 +3222,7 @@ struct extended_menu_info info UNUSED;
             len = BUFSZ - 1;
         }
         Sprintf(buf, "%c - ", ch ? ch : '?');
-        (void)strncpy(buf + 4, str, len);
+        Strncpy(buf + 4, str, len);
         buf[4 + len] = '\0';
         newstr = buf;
     }
@@ -3988,10 +3988,10 @@ struct special_view_info info;
     case SPECIAL_VIEW_CHAT_MESSAGE:
         genl_chat_message();
         break;
-    case SPECIAL_VIEW_GUI_YN_CONFIRMATION:
-        /* Implementation needed */
-        //return (int)tty_yn_function_ex(0, info.attr, info.color, 0, info.title, info.text, ynchars, "n", "Yes\nNo", (char*)0, 0UL);
-        break;
+    case SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N:
+        return 'n';
+    case SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y:
+        return 'y';
     default:
         break;
     }

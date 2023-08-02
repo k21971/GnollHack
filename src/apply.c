@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    apply.c    $NHDT-Date: 1553363415 2019/03/23 17:50:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.272 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1781,9 +1781,9 @@ struct obj **optr;
             && !(mvitals[PM_MOUNTAIN_NYMPH].mvflags & MV_GONE)
             && (mtmp = makemon(mkclass(S_NYMPH, 0), u.ux, u.uy, MM_NO_MONSTER_INVENTORY))
                    != 0) {
-            You("summon %s!", a_monnam(mtmp));
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "summon %s!", a_monnam(mtmp));
             if (!obj_resists(obj, 93, 100)) {
-                pline("%s shattered!", Tobjnam(obj, "have"));
+                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s shattered!", Tobjnam(obj, "have"));
                 useup(obj);
                 *optr = 0;
             } else
@@ -1837,7 +1837,7 @@ struct obj **optr;
 #else
             play_sfx_sound(SFX_BELL_OF_OPENING_UNSETTLING_SHRILL_SOUND);
 #endif
-            pline("%s an unsettling shrill sound...", Tobjnam(obj, "issue"));
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s an unsettling shrill sound...", Tobjnam(obj, "issue"));
             obj->age = moves;
             learno = TRUE;
             wakem = TRUE;
@@ -1869,11 +1869,11 @@ struct obj **optr;
                 pline1(nothing_happens);
                 break;
             case 1:
-                pline("%s opens...", Something);
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s opens...", Something);
                 learno = TRUE;
                 break;
             default:
-                pline("Things open around you...");
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Things open around you...");
                 learno = TRUE;
                 break;
             }
@@ -1971,9 +1971,9 @@ register struct obj *obj;
         if (obj->special_quality == max_candles) 
         {
             if (Blind)
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s a strange warmth!", Tobjnam(obj, "radiate"));
+                pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s a strange warmth!", Tobjnam(obj, "radiate"));
             else
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s with a strange light!", Tobjnam(obj, "glow"));
+                pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s with a strange light!", Tobjnam(obj, "glow"));
         }
         obj->known = 1;
     }

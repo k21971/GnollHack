@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    winnt.c    $NHDT-Date: 1524321419 2018/04/21 14:36:59 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.30 $ */
 /* Copyright (c) GnollHack PC Development Team 1993, 1994 */
@@ -99,7 +99,7 @@ char *path;
  */
 int
 findfirst(path)
-char *path;
+const char *path;
 {
     if (ffhandle) {
         FindClose(ffhandle);
@@ -123,7 +123,7 @@ foundfile_buffer()
 
 long
 filesize(file)
-char *file;
+const char *file;
 {
     if (findfirst(file)) {
         return ((long) ffd.nFileSizeLow);
@@ -315,7 +315,7 @@ genericptr_t ptr2;
             if (!strncmpi(datadir, "C:\\WINDOWS\\TEMP", 15)
                 || strstri(datadir, "TEMP")
                 || (tempdir && strstri(datadir, tempdir))) {
-                (void) strncpy(
+                Strncpy(
                     interjection_buf[INTERJECT_PANIC],
                     "\nOne common cause of this error is attempting to "
                     "execute\n"

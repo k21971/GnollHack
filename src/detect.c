@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    detect.c    $NHDT-Date: 1544437284 2018/12/10 10:21:24 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.91 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -783,13 +783,19 @@ int class;            /* an object class, 0 for all */
         if (is_cursed && M_AP_TYPE(mtmp) == M_AP_OBJECT
             && (!class || class == objects[mtmp->mappearance].oc_class)) {
             struct obj temp;
-
-            temp = zeroobj;
-            temp.otyp = mtmp->mappearance; /* needed for obj_to_glyph() */
-            temp.quan = 1L;
+            if (has_mobj(mtmp))
+            {
+                temp = *MOBJ(mtmp);
+            }
+            else
+            {
+                temp = zeroobj;
+                temp.otyp = mtmp->mappearance; /* needed for obj_to_glyph() */
+                temp.corpsenm = PM_TENGU; /* if mimicing a corpse */
+                temp.quan = 1L;
+            }
             temp.ox = mtmp->mx;
             temp.oy = mtmp->my;
-            temp.corpsenm = PM_TENGU; /* if mimicing a corpse */
             map_object_for_detection(&temp, 1);
         } else if (findgold(mtmp->minvent)
                    && (!class || class == COIN_CLASS)) {
@@ -1825,7 +1831,7 @@ genericptr_t num;
             (*num_p)++;
     } else if (find_drawbridge(&zx, &zy)) {
         /* make sure it isn't an open drawbridge */
-        open_drawbridge(zx, zy);
+        open_drawbridge(zx, zy, FALSE);
         (*num_p)++;
     }
 }
@@ -2005,8 +2011,11 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
             fund = -10;
 
         int itemsfound = unearth_objs(&youmonst, u.ux, u.uy, TRUE, TRUE);
-
-        if (!itemsfound)
+        if (itemsfound)
+        {
+            (void)pickup(1);
+        }
+        else
         {
             if (!aflag && (context.first_time_cmd || !occupation))
             {
@@ -2037,7 +2046,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                         nomul(0);
                         feel_location(x, y); /* make sure it shows up */
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
-                        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find a hidden door.");
+                        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden door.");
                     } 
                     else if (levl[x][y].typ == SCORR) 
                     {
@@ -2049,7 +2058,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                         nomul(0);
                         feel_newsym(x, y); /* make sure it shows up */
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
-                        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "find a hidden passage.");
+                        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden passage.");
                     }
                     else
                     {

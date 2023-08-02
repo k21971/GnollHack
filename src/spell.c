@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    spell.c    $NHDT-Date: 1546565814 2019/01/04 01:36:54 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.88 $ */
 /*      Copyright (c) M. Stephenson 1988                          */
@@ -65,7 +65,7 @@ STATIC_DCL uchar FDECL(is_obj_acceptable_component, (struct materialcomponent*, 
 STATIC_DCL int FDECL(count_matcomp_alternatives, (struct materialcomponent*));
 STATIC_DCL struct extended_create_window_info FDECL(extended_create_window_info_for_spell, (BOOLEAN_P));
 STATIC_DCL const char* FDECL(get_spell_attribute_description, (int));
-STATIC_DCL const char* FDECL(get_targeting_description, (unsigned int));
+STATIC_DCL const char* FDECL(get_targeting_description, (int));
 
 /* since the spellbook itself doesn't blow up, don't say just "explodes" */
 STATIC_VAR const char explodes[] = "radiates explosive energy";
@@ -1267,15 +1267,13 @@ int* spell_no;
             add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                 "", MENU_UNSELECTED);
             any.a_int = -1;
-            int glyph = MAXSPELL + GLYPH_SPELL_TILE_OFF;
-            struct extended_menu_info info = zeroextendedmenuinfo;
-            info.menu_flags |= MENU_FLAGS_ACTIVE;
-            add_extended_menu(tmpwin, glyph, &any, '?', 0, ATR_NONE, NO_COLOR,
-                "View Spells", MENU_UNSELECTED, info);
+            int glyph = VIEW_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
+            add_active_menu(tmpwin, glyph, &any, '?', 0, ATR_NONE, NO_COLOR,
+                "View Spells", MENU_UNSELECTED);
             any.a_int = -2;
-            glyph = MAXSPELL + 1 + GLYPH_SPELL_TILE_OFF;
-            add_extended_menu(tmpwin, glyph, &any, '!', 0, ATR_NONE, NO_COLOR,
-                "Mix Spells", MENU_UNSELECTED, info);
+            glyph = MIX_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
+            add_active_menu(tmpwin, glyph, &any, '!', 0, ATR_NONE, NO_COLOR,
+                "Mix Spells", MENU_UNSELECTED);
         }
     }
 
@@ -1676,9 +1674,10 @@ int otyp;
 }
 
 STATIC_OVL const char*
-get_spell_attribute_description(attrno)
-int attrno;
+get_spell_attribute_description(booktype)
+int booktype;
 {
+    long attrno = objects[booktype].oc_spell_attribute;
     if (attrno >= 0)
     {
         switch (attrno)
@@ -1695,7 +1694,6 @@ int attrno;
             return "Wisdom";
         case A_CHA:
             return "Charisma";
-            break;
         case A_MAX_INT_WIS:
             return "Higher of intelligence and wisdom";
         case A_MAX_INT_CHA:
@@ -1720,19 +1718,20 @@ int attrno;
 }
 
 STATIC_OVL const char*
-get_targeting_description(skill)
-unsigned int skill;
+get_targeting_description(booktype)
+int booktype;
 {
-    if (skill > 0)
+    unsigned int dirtype = objects[booktype].oc_dir;
+    if (dirtype > 0)
     {
-        switch (skill)
+        switch (dirtype)
         {
         case NODIR:
             return "None";
         case IMMEDIATE:
             return "One target in selected direction";
         case RAY:
-            if (skill & S1_SPELL_EXPLOSION_EFFECT)                  // TODO: S1_SPELL_EXPLOSION_EFFECT necessary? Bitwise and?
+            if (objects[booktype].oc_aflags & S1_SPELL_EXPLOSION_EFFECT)
                 return "Ray that explodes on hit";
             else
                 return "Ray in selected direction";
@@ -1781,7 +1780,7 @@ int spell, booktype;
     char buf3[BUFSZ];
 
     winid datawin = WIN_ERR;
-    int glyph = booktype + FIRST_SPELL + GLYPH_SPELL_TILE_OFF;
+    int glyph = booktype - FIRST_SPELL + GLYPH_SPELL_TILE_OFF;
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_SPELL_DESCRIPTION_SCREEN, glyph, extended_create_window_info_for_spell(TRUE));
 
     /* Name */
@@ -1801,7 +1800,7 @@ int spell, booktype;
     if (objects[booktype].oc_spell_attribute >= 0)
     {
         char statbuf[BUFSZ];
-        Strcpy(statbuf, get_spell_attribute_description(objects[booktype].oc_spell_attribute));
+        Strcpy(statbuf, get_spell_attribute_description(booktype));
         Sprintf(buf, "Attributes:       %s", statbuf);        
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
@@ -1819,7 +1818,7 @@ int spell, booktype;
     }
 
     /* Mana cost*/
-    double manacost = get_spellbook_adjusted_mana_cost(booktype);
+    double manacost = spell >= 0 ? get_spellbook_adjusted_mana_cost(booktype) : (double)objects[booktype].oc_spell_mana_cost;
     if (manacost > 0)
     {
         double displayed_manacost = ceil(10 * manacost) / 10;
@@ -1857,7 +1856,7 @@ int spell, booktype;
     /* DirType */
     if (objects[booktype].oc_dir > 0)
     {
-        Strcpy(buf2, get_targeting_description(objects[booktype].oc_dir));
+        Strcpy(buf2, get_targeting_description(booktype));
         Sprintf(buf, "Targeting:        %s", buf2);
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
@@ -1881,7 +1880,7 @@ int spell, booktype;
     double baseavg = 0;
     double perlevelavg = 0;
     int used_level = 0;
-    int used_bonuses = 1;
+    int used_bonuses = 0;
 
     if (objects[booktype].oc_spell_dmg_dice > 0 || objects[booktype].oc_spell_dmg_diesize > 0 || objects[booktype].oc_spell_dmg_plus > 0)
     {
@@ -1949,22 +1948,27 @@ int spell, booktype;
             
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-            int max_level = get_maximum_applicable_spell_damage_level(booktype, &youmonst);
-            used_level = min(max_level, u.ulevel);
-            used_bonuses = used_level / (max(1, objects[booktype].oc_spell_per_level_step));
-
-            if(max_level < MAXULEV)
+            if (spell >= 0)
             {
-                int skill_type = objects[booktype].oc_skill;
-                char skillnamebuf[BUFSZ];
-                char skilllevelnamebuf[BUFSZ];
+                int max_level = get_maximum_applicable_spell_damage_level(booktype, &youmonst);
+                used_level = min(max_level, u.ulevel);
+                used_bonuses = used_level / (max(1, objects[booktype].oc_spell_per_level_step));
+                if (max_level < MAXULEV)
+                {
+                    Sprintf(buf, "Level limit:      %d", max_level);
 
-                (void)skill_level_name(skill_type, skilllevelnamebuf, FALSE);
-                Strcpy(skillnamebuf, skill_name(skill_type, TRUE));
-                //*skilllevelnamebuf = lowc(*skilllevelnamebuf);
+                    if (spell >= 0)
+                    {
+                        int skill_type = objects[booktype].oc_skill;
+                        char skillnamebuf[BUFSZ];
+                        char skilllevelnamebuf[BUFSZ];
 
-                Sprintf(buf, "Level limit:      %d (%s at %s)", max_level, skilllevelnamebuf, skillnamebuf);                
-                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                        (void)skill_level_name(skill_type, skilllevelnamebuf, FALSE);
+                        Strcpy(skillnamebuf, skill_name(skill_type, TRUE));
+                        Sprintf(eos(buf), " (%s at %s)", skilllevelnamebuf, skillnamebuf);
+                    }
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                }
             }
         }
     }
@@ -2103,21 +2107,29 @@ int spell, booktype;
         int baseadj = objects[booktype].oc_spell_saving_throw_adjustment;
         Sprintf(baseadjbuf, "%s%d", baseadj >= 0 ? "+" : "", baseadj);
 
-        int skill_level = P_SKILL_LEVEL(objects[booktype].oc_skill);
-        int skilladj = get_spell_skill_level_saving_throw_adjustment(skill_level);
-        char skill_level_namebuf[BUFSZ] = "";
-        (void)skill_level_name(objects[booktype].oc_skill, skill_level_namebuf, FALSE);
-        *skill_level_namebuf = lowc(*skill_level_namebuf);
+        if (spell >= 0)
+        {
+            int skill_level = P_SKILL_LEVEL(objects[booktype].oc_skill);
+            int skilladj = get_spell_skill_level_saving_throw_adjustment(skill_level);
+            char skill_level_namebuf[BUFSZ] = "";
+            (void)skill_level_name(objects[booktype].oc_skill, skill_level_namebuf, FALSE);
+            *skill_level_namebuf = lowc(*skill_level_namebuf);
 
-        char skilladjbuf[BUFSZ];
-        Sprintf(skilladjbuf, "%s%d", skilladj >= 0 ? "+" : "", skilladj);
+            char skilladjbuf[BUFSZ];
+            Sprintf(skilladjbuf, "%s%d", skilladj >= 0 ? "+" : "", skilladj);
 
-        int totaladj = baseadj + skilladj;
-        char totaladjbuf[BUFSZ];
-        Sprintf(totaladjbuf, "%s%d", totaladj >= 0 ? "+" : "", totaladj);
+            int totaladj = baseadj + skilladj;
+            char totaladjbuf[BUFSZ];
+            Sprintf(totaladjbuf, "%s%d", totaladj >= 0 ? "+" : "", totaladj);
 
-        Sprintf(buf, "Save adjustment:  %s (%s base, %s %s skill)", totaladjbuf, baseadjbuf, skilladjbuf, skill_level_namebuf);        
-        putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            Sprintf(buf, "Save adjustment:  %s (%s base, %s %s skill)", totaladjbuf, baseadjbuf, skilladjbuf, skill_level_namebuf);
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        }
+        else
+        {
+            Sprintf(buf, "Save adjustment:  %s", baseadjbuf);
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        }
     }
 
     /* Magic resistance */
@@ -2188,7 +2200,7 @@ int spell, booktype;
             Sprintf(buf, " %2d - %s%s", (j + 1), domatcompname(&matlists[objects[booktype].oc_material_components].matcomp[j]),
                 ((matlists[objects[booktype].oc_material_components].matcomp[j].flags & MATCOMP_NOT_SPENT) ? " as a catalyst": ""));
             
-            putstr(datawin, ATR_INDENT_AT_DASH, buf);
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
         }
     }
 
@@ -2203,7 +2215,7 @@ int spell, booktype;
         {
             double avg = baseavg + perlevelavg * ((double)used_bonuses);
             Sprintf(buf, "  %d - Average damage is %.1f", cnt, avg);            
-            putstr(datawin, ATR_INDENT_AT_DASH, buf);
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             cnt++;
         }
     }
@@ -3815,16 +3827,16 @@ int *spell_no;
                 Sprintf(fmt, "%%-%ds  %%c  %%s", namelength);
             }
             else {
-                strcpy(fmt, "%s\t%c\t%s");
+                Strcpy(fmt, "%s\t%c\t%s");
             }
 
             Sprintf(fullname, "%s", spellname(splnum));
 
             //Spell name
             if (strlen(fullname) > (size_t)(namelength))
-                strncpy(shortenedname, fullname, (size_t)(namelength));
+                Strncpy(shortenedname, fullname, (size_t)(namelength));
             else
-                strcpy(shortenedname, fullname);
+                Strcpy(shortenedname, fullname);
 
 
             //Shorten description, if needed
@@ -3833,17 +3845,17 @@ int *spell_no;
 
             if(OBJ_ITEM_DESC(spellid(splnum)))
             {
-                strcpy(fulldesc, OBJ_ITEM_DESC(spellid(splnum)));
+                Strcpy(fulldesc, OBJ_ITEM_DESC(spellid(splnum)));
 
                 if (strlen(fulldesc) > 57)
-                    strncpy(shorteneddesc, fulldesc, 57);
+                    Strncpy(shorteneddesc, fulldesc, 57);
                 else
-                    strcpy(shorteneddesc, fulldesc);
+                    Strcpy(shorteneddesc, fulldesc);
 
-                strcpy(descbuf, shorteneddesc);
+                Strcpy(descbuf, shorteneddesc);
             }
             else
-                strcpy(descbuf, nodesc);
+                Strcpy(descbuf, nodesc);
 
             char hotkeychar = ' ';
             if (spellhotkey(i) == 10)
@@ -4072,9 +4084,9 @@ boolean usehotkey;
     else
     {
         if (spellknow(splnum) <= 0)
-            strcpy(fmt, "%s\t%s");
+            Strcpy(fmt, "%s\t%s");
         else
-            strcpy(fmt, "%s\t%s\t%s\t%s");
+            Strcpy(fmt, "%s\t%s\t%s\t%s");
         //        fmt = "%s\t%-d\t%s\t%-d\t%-d%%\t%s";
     }
 
@@ -4083,20 +4095,20 @@ boolean usehotkey;
     char fullname[BUFSZ];
     char addsbuf[BUFSZ];
 
-    strcpy(fullname, spellname(splnum));
+    Strcpy(fullname, spellname(splnum));
 
     if (strlen(fullname) > (size_t)namelength)
-        strncpy(shortenedname, fullname, namelength);
+        Strncpy(shortenedname, fullname, namelength);
     else
-        strcpy(shortenedname, fullname);
+        Strcpy(shortenedname, fullname);
 
     //Print spell level
     if (spellev(splnum) < -1)
-        strcpy(levelbuf, " *");
+        Strcpy(levelbuf, " *");
     else if (spellev(splnum) == -1)
-        strcpy(levelbuf, " c");
+        Strcpy(levelbuf, " c");
     else if (spellev(splnum) == 0)
-        strcpy(levelbuf, " C");
+        Strcpy(levelbuf, " C");
     else
         Sprintf(levelbuf, "%2d", spellev(splnum));
 
@@ -4104,35 +4116,35 @@ boolean usehotkey;
     if (spellamount(splnum) >= 0)
         Sprintf(availablebuf, "%d", spellamount(splnum));
     else
-        strcpy(availablebuf, "Inf.");
+        Strcpy(availablebuf, "Inf.");
 
     //Print spells gained
     if (spellmatcomp(splnum) > 0)
         Sprintf(addsbuf, "%d", matlists[spellmatcomp(splnum)].spellsgained);
     else
-        strcpy(addsbuf, "N/A");
+        Strcpy(addsbuf, "N/A");
 
     //Shorten matcomp description, if needed
     char shortenedmatcompdesc[BUFSZ];
     char fullmatcompdesc[BUFSZ];
 
-    strcpy(shortenedmatcompdesc, "");
-    strcpy(fullmatcompdesc, "");
+    Strcpy(shortenedmatcompdesc, "");
+    Strcpy(fullmatcompdesc, "");
 
-    strcpy(fullmatcompdesc, matlists[spellmatcomp(splnum)].description_short);
+    Strcpy(fullmatcompdesc, matlists[spellmatcomp(splnum)].description_short);
 
     if (strlen(fullmatcompdesc) > 39)
     {
-        strncpy(shortenedmatcompdesc, fullmatcompdesc, 39);
+        Strncpy(shortenedmatcompdesc, fullmatcompdesc, 39);
         shortenedmatcompdesc[39] = '\0';
     }
     else
-        strcpy(shortenedmatcompdesc, fullmatcompdesc);
+        Strcpy(shortenedmatcompdesc, fullmatcompdesc);
 
     if (spellmatcomp(splnum))
-        strcpy(matcompbuf, shortenedmatcompdesc);
+        Strcpy(matcompbuf, shortenedmatcompdesc);
     else
-        strcpy(matcompbuf, "(Not required)");
+        Strcpy(matcompbuf, "(Not required)");
 
     //Finally print everything to buf
     if (spellknow(splnum) <= 0)
@@ -4222,12 +4234,12 @@ int splaction;
         Sprintf(descbuf, " (%s)", OBJ_ITEM_DESC(spellid(splnum)));
     }
     else
-        strcpy(descbuf, "");
+        Strcpy(descbuf, "");
 
     if (spellamount(splnum) >= 0)
         Sprintf(availablebuf, "%d", spellamount(splnum));
     else
-        strcpy(availablebuf, "Inf.");
+        Strcpy(availablebuf, "Inf.");
 
     double spellmanacost = get_spell_mana_cost(splnum);
     double displayed_manacost = ceil(10 * spellmanacost) / 10;
@@ -4293,21 +4305,21 @@ int splaction;
     if (spellamount(splnum) >= 0)
         Sprintf(availablebuf, "%d", spellamount(splnum));
     else
-        strcpy(availablebuf, "Inf.");
+        Strcpy(availablebuf, "Inf.");
 
     //Print spells gained
     if (spellmatcomp(splnum) > 0)
         Sprintf(addsbuf, "%d", matlists[spellmatcomp(splnum)].spellsgained);
     else
-        strcpy(addsbuf, "N/A");
+        Strcpy(addsbuf, "N/A");
 
     char fullmatcompdesc[BUFSZ];
-    strcpy(fullmatcompdesc, matlists[spellmatcomp(splnum)].description_short);
+    Strcpy(fullmatcompdesc, matlists[spellmatcomp(splnum)].description_short);
 
     if (spellmatcomp(splnum))
-        strcpy(matcompbuf, fullmatcompdesc);
+        Strcpy(matcompbuf, fullmatcompdesc);
     else
-        strcpy(matcompbuf, "No components");
+        Strcpy(matcompbuf, "No components");
 
     boolean inactive = FALSE;
     struct extended_menu_info info = zeroextendedmenuinfo;
@@ -4366,9 +4378,9 @@ boolean usehotkey;
             Sprintf(fmt, "%%-%ds\t%%s\t%%-13s\t%%4.*f\t%%s\t%%3d%%%%\t%%4d\t%%4s", namelength);
 #if 0
         if (spellknow(splnum) <= 0)
-            strcpy(fmt, "%s\t%s");
+            Strcpy(fmt, "%s\t%s");
         else
-            strcpy(fmt, "%s\t%s\t%s\t%.*f\t%-d%%\t%-d\t%s");
+            Strcpy(fmt, "%s\t%s\t%s\t%.*f\t%-d%%\t%-d\t%s");
         //        fmt = "%s\t%-d\t%s\t%-d\t%-d%%\t%s";
 #endif
     }
@@ -4378,77 +4390,77 @@ boolean usehotkey;
 
     //Spell name
     if (strlen(fullname) > (size_t)(spellcooldownleft(splnum) > 0 ? namelength - 1 : namelength))
-        strncpy(shortenedname, fullname, (size_t)(spellcooldownleft(splnum) > 0 ? namelength - 1 : namelength));
+        Strncpy(shortenedname, fullname, (size_t)(spellcooldownleft(splnum) > 0 ? namelength - 1 : namelength));
     else
-        strcpy(shortenedname, fullname);
+        Strcpy(shortenedname, fullname);
 
     if (spellcooldownleft(splnum) > 0)
         Strcat(shortenedname, "]");
 
     //Spell level
     if (spellev(splnum) < -1)
-        strcpy(levelbuf, " *");
+        Strcpy(levelbuf, " *");
     else if (spellev(splnum) == -1)
-        strcpy(levelbuf, " c");
+        Strcpy(levelbuf, " c");
     else if (spellev(splnum) == 0)
-        strcpy(levelbuf, " C");
+        Strcpy(levelbuf, " C");
     else
         Sprintf(levelbuf, "%2d", spellev(splnum));
 
-    strcpy(categorybuf, spelltypemnemonic(spell_skilltype(spellid(splnum))));
+    Strcpy(categorybuf, spelltypemnemonic(spell_skilltype(spellid(splnum))));
 
 
     if (spellamount(splnum) >= 0)
         Sprintf(availablebuf, "%d", spellamount(splnum));
     else
-        strcpy(availablebuf, "Inf.");
+        Strcpy(availablebuf, "Inf.");
 
     switch (objects[spellid(splnum)].oc_spell_attribute)
     {
     case A_STR:
-        strcpy(statbuf, "Str");
+        Strcpy(statbuf, "Str");
         break;
     case A_DEX:
-        strcpy(statbuf, "Dex");
+        Strcpy(statbuf, "Dex");
         break;
     case A_CON:
-        strcpy(statbuf, "Con");
+        Strcpy(statbuf, "Con");
         break;
     case A_INT:
-        strcpy(statbuf, "Int");
+        Strcpy(statbuf, "Int");
         break;
     case A_WIS:
-        strcpy(statbuf, "Wis");
+        Strcpy(statbuf, "Wis");
         break;
     case A_CHA:
-        strcpy(statbuf, "Cha");
+        Strcpy(statbuf, "Cha");
         break;
     case A_MAX_INT_WIS:
-        strcpy(statbuf, "I/W");
+        Strcpy(statbuf, "I/W");
         break;
     case A_MAX_INT_CHA:
-        strcpy(statbuf, "I/C");
+        Strcpy(statbuf, "I/C");
         break;
     case A_MAX_WIS_CHA:
-        strcpy(statbuf, "W/C");
+        Strcpy(statbuf, "W/C");
         break;
     case A_MAX_INT_WIS_CHA:
-        strcpy(statbuf, "Any");
+        Strcpy(statbuf, "Any");
         break;
     case A_AVG_INT_WIS:
-        strcpy(statbuf, "I+W");
+        Strcpy(statbuf, "I+W");
         break;
     case A_AVG_INT_CHA:
-        strcpy(statbuf, "I+C");
+        Strcpy(statbuf, "I+C");
         break;
     case A_AVG_WIS_CHA:
-        strcpy(statbuf, "W+C");
+        Strcpy(statbuf, "W+C");
         break;
     case A_AVG_INT_WIS_CHA:
-        strcpy(statbuf, "All");
+        Strcpy(statbuf, "All");
         break;
     default:
-        strcpy(statbuf, "N/A");
+        Strcpy(statbuf, "N/A");
         break;
     }
 
@@ -5541,6 +5553,10 @@ dump_spells()
         char castingsbuf[BUFSZ] = "";
         char successbuf[BUFSZ] = "";
         putstr(0, ATR_HEADING, "Spells in your repertoire:");
+        int spell_cnt = 0;
+        for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
+            spell_cnt++;
+
         for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
         {
             int pct_lim = percent_success(i, TRUE);
@@ -5554,8 +5570,8 @@ dump_spells()
             *spellnamebuf = highc(*spellnamebuf);
             Sprintf(successbuf, "%d%% success", pct_lim);
 
-            Sprintf(buf, " %-34s %-13s%s", spellnamebuf, successbuf, castingsbuf);
-            putstr(0, ATR_PREFORM, buf);
+            Sprintf(buf, "  %-34s  %-13s%s", spellnamebuf, successbuf, castingsbuf);
+            putstr(0, ATR_TABLE_ROW | (i == 0 ? ATR_START_TABLE : 0) | (i == spell_cnt - 1 ? ATR_END_TABLE : 0), buf);
         }
     }
 }

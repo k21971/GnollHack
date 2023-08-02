@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    rip.c    $NHDT-Date: 1488788514 2017/03/06 08:21:54 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -145,7 +145,7 @@ time_t when;
 
 #if defined (DUMPLOG) || defined (DUMPHTML)
     if (tmpwin == 0)
-        dump_forward_putstr(0, ATR_HEADING, "Game over:", TRUE);
+        dump_forward_putstr(0, ATR_HEADING, "Game over:", TRUE, 0);
     else
 #endif
         putstr(tmpwin, 0, "");

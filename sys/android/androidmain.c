@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* androidmain.c
  * based on unixmain.c
@@ -76,7 +76,8 @@ int GnollHackMain(int argc, char** argv)
 	boolean exact_username;
 	FILE* fp;
 
-    boolean resuming = FALSE; /* assume new game */
+    uchar resuming = FALSE; /* assume new game */
+	boolean is_backup = FALSE;
 
     sys_early_init();
 
@@ -160,7 +161,7 @@ int GnollHackMain(int argc, char** argv)
 	 */
 	vision_init();
 
-	if((fd = open_and_validate_saved_game()) >= 0)
+	if((fd = open_and_validate_saved_game(TRUE, &is_backup)) >= 0)
 	{
 #ifdef WIZARD
 		/* Since wizard is actually flags.debug, restoring might
@@ -174,12 +175,12 @@ int GnollHackMain(int argc, char** argv)
 		if(iflags.news)
 		{
 			display_file(NEWS, FALSE);
-			iflags.news = FALSE; /* in case dorecover() fails */
+			iflags.news = FALSE; /* in case dorestore() fails */
 		}
 #endif
 		pline("Restoring save file...");
 		mark_synch(); /* flush output */
-		if(!dorecover(fd))
+		if(!dorestore(fd, is_backup))
 			goto not_recovered;
 		resuming = TRUE;
 #ifdef WIZARD
@@ -265,12 +266,12 @@ static void process_command_line_arguments(argc, argv)
 			if(!*plname)
 			{
 				if(argv[0][2])
-					(void)strncpy(plname, argv[0] + 2, sizeof(plname) - 1);
+					Strncpy(plname, argv[0] + 2, sizeof(plname) - 1);
 				else if(argc > 1)
 				{
 					argc--;
 					argv++;
-					(void)strncpy(plname, argv[0], sizeof(plname) - 1);
+					Strncpy(plname, argv[0], sizeof(plname) - 1);
 				}
 				else
 					raw_print("Player name expected after -u");
@@ -335,7 +336,7 @@ static boolean whoami()
 	if(*plname)
 		return FALSE;
 	if((s = getlogin()))
-		(void)strncpy(plname, s, sizeof(plname) - 1);
+		Strncpy(plname, s, sizeof(plname) - 1);
 	return TRUE;
 }
 

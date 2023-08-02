@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    zap.c    $NHDT-Date: 1551395521 2019/02/28 23:12:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.307 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1707,7 +1707,7 @@ struct permonst* ptr;
 
             abilcnt++;
             Sprintf(buf, " %2d - %s%s", abilcnt, namebuf, endbuf2);            
-            putstr(datawin, ATR_INDENT_AT_DASH, buf);
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
         }
     }
 
@@ -1744,7 +1744,7 @@ struct permonst* ptr;
                     *descbuf = highc(*descbuf);
                     abilcnt++;
                     Sprintf(buf, " %2d - %s", abilcnt, descbuf);                    
-                    putstr(datawin, ATR_INDENT_AT_DASH, buf);
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                 }
             }
         }
@@ -1778,7 +1778,7 @@ struct permonst* ptr;
 
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, headbuf);        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (!abilcnt)
@@ -1797,67 +1797,67 @@ struct permonst* ptr;
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to silver weapons");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (mtmp ? mon_hates_blessed(mtmp) : hates_blessed(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to blessed weapons");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (mtmp ? mon_hates_cursed(mtmp) : hates_cursed(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to cursed weapons");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (mtmp ? mon_hates_light(mtmp) : hates_light(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Vulnerable to lit weapons");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     abilcnt++;
     Sprintf(buf, " %2d - %s", abilcnt, (mtmp ? mon_eschews_cursed(mtmp) : eschews_cursed(ptr) || hates_cursed(ptr)) ? "Eschews cursed items" : "Does not eschew cursed items");    
-    putstr(datawin, ATR_INDENT_AT_DASH, buf);
+    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
 
     if (mtmp ? mon_eschews_silver(mtmp) : eschews_silver(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Eschews silver items");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (mtmp ? mon_eschews_blessed(mtmp) : eschews_blessed(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Eschews blessed items");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (mtmp ? mon_eschews_light(mtmp) : hates_light(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Eschews lit items");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (is_hell_hound(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Loves cursed food");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (is_non_eater(ptr))
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Does not eat");        
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
 
@@ -1871,7 +1871,7 @@ struct permonst* ptr;
             zombietype > NON_PM && mummytype > NON_PM ? "Zombifiable and mummifiable corpse" : 
             zombietype > NON_PM ? "Zombifiable corpse" : "Mummifiable corpse");
         
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (!abilcnt)
@@ -1922,7 +1922,7 @@ struct monst* mtmp;
                     *sbuf = 0;
 
                 Sprintf(buf, " %2d - %s%s", condition_count, statusname, sbuf);
-                putstr(datawin, ATR_INDENT_AT_DASH, buf);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
         }
     }
@@ -1942,7 +1942,7 @@ struct monst* mtmp;
                 else
                     *sbuf = 0;
                 Sprintf(buf, " %2d - %s%s", condition_count, condition_names[cond], sbuf);
-                putstr(datawin, ATR_INDENT_AT_DASH, buf);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
         }
     }
@@ -1967,7 +1967,7 @@ struct monst* mtmp;
         Strcpy(pbuf, get_property_name(propidx));
         *pbuf = highc(*pbuf);
         Sprintf(buf, " %2d - %s%s", condition_count, pbuf, sbuf);
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
     if (!condition_count)
@@ -7211,7 +7211,7 @@ struct obj *obj; /* wand or spell */
     case SPE_KNOCK:
         /* up or down, but at closed portcullis only */
         if (is_db_wall(x, y) && find_drawbridge(&xx, &yy)) {
-            open_drawbridge(xx, yy);
+            open_drawbridge(xx, yy, TRUE);
             disclose = TRUE;
         } else if (u.dz > 0 && (x == xdnstair && y == ydnstair)
                    /* can't use the stairs down to quest level 2 until
@@ -7242,7 +7242,7 @@ struct obj *obj; /* wand or spell */
             && find_drawbridge(&xx, &yy)) 
         {
             if (!striking)
-                maybe_close_drawbridge(xx, yy);
+                maybe_close_drawbridge(xx, yy, TRUE);
             else
                 destroy_drawbridge(xx, yy, FALSE);
             disclose = TRUE;
@@ -7881,12 +7881,12 @@ boolean stop_at_first_hit_object;
         }
     }
 
-
     if(obj)
         start_ambient_ray_sound_at_location(object_soundsets[objects[obj->otyp].oc_soundset].ray_soundset, bhitpos.x, bhitpos.y);
 
     boolean beam_cleared_off = FALSE;
     boolean drawbridge_hit = FALSE;
+    boolean tree_hit = FALSE;
 
     while (range-- > 0)
     {
@@ -7946,7 +7946,7 @@ boolean stop_at_first_hit_object;
                 {
                     if (cansee(x, y) || cansee(bhitpos.x, bhitpos.y))
                         learn_it = TRUE;
-                    open_drawbridge(x, y);
+                    open_drawbridge(x, y, TRUE);
                     drawbridge_hit = TRUE;
                 }
                 break;
@@ -7955,7 +7955,7 @@ boolean stop_at_first_hit_object;
                 if ((cansee(x, y) || cansee(bhitpos.x, bhitpos.y))
                     && levl[x][y].typ == DRAWBRIDGE_DOWN)
                     learn_it = TRUE;
-                maybe_close_drawbridge(x, y);
+                maybe_close_drawbridge(x, y, TRUE);
                 drawbridge_hit = TRUE;
                 break;
             case WAN_STRIKING:
@@ -7973,6 +7973,25 @@ boolean stop_at_first_hit_object;
             if (learn_it)
                 learnwand(obj);
 
+        }
+
+        if (weapon == ZAPPED_WAND && !tree_hit && IS_TREE(typ))
+        {
+            boolean learn_it = FALSE;
+            switch (obj->otyp)
+            {
+            case WAN_STRIKING:
+            case SPE_FORCE_BOLT:
+            case SPE_FORCE_STRIKE:
+                zap_try_destroy_tree(x, y);
+                tree_hit = TRUE;
+                learn_it = TRUE;
+                break;
+            default:
+                break;
+            }
+            if (learn_it)
+                learnwand(obj);
         }
 
         mtmp = m_at(bhitpos.x, bhitpos.y);

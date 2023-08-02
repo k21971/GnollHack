@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    sp_lev.c    $NHDT-Date: 1553787633 2019/03/28 15:40:33 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.111 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
@@ -1907,6 +1907,30 @@ struct mkroom *croom;
                 {
                     mtmp->m_ap_type = M_AP_OBJECT;
                     mtmp->mappearance = i;
+                    struct obj* otmp = mksobj(i, TRUE, FALSE, 0);
+                    if (otmp)
+                    {
+                        if (has_mobj(mtmp))
+                            free_mobj(mtmp);
+                        if (!has_mobj(mtmp))
+                            newmobj(mtmp);
+                        if (has_mobj(mtmp))
+                        {
+                            *MOBJ(mtmp) = *otmp;
+                            MOBJ(mtmp)->oextra = 0;
+                            MOBJ(mtmp)->nobj = 0;
+                            MOBJ(mtmp)->nexthere = 0;
+                            MOBJ(mtmp)->cobj = 0;
+                            MOBJ(mtmp)->o_id = context.ident++;
+                            if (!MOBJ(mtmp)->o_id) /* ident overflowed */
+                                MOBJ(mtmp)->o_id = context.ident++;
+                            if (otmp->oextra)
+                                copy_oextra(MOBJ(mtmp), otmp);
+                        }
+                        /* make sure container contents are free'ed */
+                        obfree(otmp, (struct obj*)0);
+                    }
+
                     /* try to avoid placing mimic boulder on a trap */
                     if (i == BOULDER && m->x < 0
                         && m_bad_boulder_spot(x, y))

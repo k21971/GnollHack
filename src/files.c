@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    files.c    $NHDT-Date: 1546144856 2018/12/30 04:40:56 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.249 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -117,6 +117,20 @@ char lock[PL_NSIZ + 27]; /* long enough for username+-+name+.99 */
 #endif
 #endif
 
+#define ERROR_EXTENSION "e"          /* extension for error save files */
+#define IMPORTED_EXTENSION "i"       /* extension for imported save files */
+#define BACKUP_EXTENSION "bup"       /* extension for backup save files */
+#define ALT_BACKUP_EXTENSION "bak"   /* extension for backup save files (alternative) */
+#define TEMP_BACKUP_EXTENSION "tmp"  /* extension for temp backup save files */
+
+#ifdef WIN32
+#include <io.h>
+#define F_OK 0
+#define access _access
+#else
+#include <unistd.h>
+#endif
+
 char SAVEF[SAVESIZE]; /* holds relative path of save file from playground */
 #ifdef MICRO
 char SAVEP[SAVESIZE]; /* holds path of directory for save file */
@@ -233,6 +247,8 @@ STATIC_DCL int FDECL(open_levelfile_exclusively, (const char *, int, int));
 #endif
 
 STATIC_DCL void FDECL(livelog_write_string, (unsigned int, const char*));
+STATIC_DCL void FDECL(livelog_post_to_forum, (unsigned int, const char*));
+STATIC_DCL int FDECL(copy_savefile, (const char*, const char*));
 
 #define INBUF_SIZ 4 * BUFSIZ
 
@@ -300,10 +316,12 @@ int bufsz;
     return callerbuf;
 }
 
-
 int is_imported_error_savefile_name(savefilename)
-char* savefilename;
+const char* savefilename;
 {
+    if (!savefilename || !*savefilename)
+        return FALSE;
+
     size_t dlen = strlen(savefilename);
     char ebuf[BUFSZ] = "";
     print_error_savefile_extension(ebuf);
@@ -318,6 +336,40 @@ char* savefilename;
             return FALSE;
 
     return TRUE;
+}
+
+int is_backup_savefile_name(savefilename)
+const char* savefilename;
+{
+    if (!savefilename || !*savefilename)
+        return FALSE;
+
+    size_t dlen = strlen(savefilename);
+    char ebuf[BUFSZ] = "";
+    const char* extensions[] = { BACKUP_EXTENSION, ALT_BACKUP_EXTENSION, TEMP_BACKUP_EXTENSION, 0 };
+    int j;
+    for (j = 0; extensions[j] != 0; j++)
+    {
+        print_special_savefile_extension(ebuf, extensions[j]);
+        size_t elen = strlen(ebuf);
+        if (dlen <= elen)
+            continue;
+
+        size_t i;
+        boolean docontinue = FALSE;
+        for (i = 0; i < elen; i++)
+            if (savefilename[dlen - 1 - i] != ebuf[elen - 1 - i])
+            {
+                docontinue = TRUE;
+                break;
+            }
+
+        if (docontinue)
+            continue;
+
+        return TRUE;
+    }
+    return FALSE;
 }
 
 /*
@@ -620,6 +672,25 @@ int lev;
 #endif
         (void) unlink(fqname(lock, LEVELPREFIX, 0));
         level_info[lev].flags &= ~LFILE_EXISTS;
+    }
+}
+
+void
+delete_excess_levelfiles(VOID_ARGS)
+{
+    /* These might happen if a backup save file is restored after crash */
+    xchar ltmp;
+    xchar maxnoofledgers = maxledgerno();
+    for (ltmp = (xchar)1; ltmp <= maxnoofledgers; ltmp++) 
+    {
+        if ((level_info[ltmp].flags & LFILE_EXISTS))
+            continue;
+
+        int lev = (int)ltmp;
+        set_levelfile_name(lock, lev);
+        const char* fq_name = fqname(lock, LEVELPREFIX, 0);
+        if (!access(fq_name, F_OK))
+            (void)unlink(fq_name);
     }
 }
 
@@ -1064,29 +1135,14 @@ STATIC_OVL void
 print_error_savefile_extension(printbuf)
 char* printbuf;
 {
-    print_special_savefile_extension(printbuf, "e");
-//#ifdef VMS
-//    {
-//        char* semi_colon = rindex(printbuf, ';');
-//
-//        if (semi_colon)
-//            *semi_colon = '\0';
-//    }
-//    Strcat(printbuf, ".e;1");
-//#else
-//#ifdef MAC
-//    Strcat(printbuf, "-e");
-//#else
-//    Strcat(printbuf, ".e");
-//#endif
-//#endif
+    print_special_savefile_extension(printbuf, ERROR_EXTENSION);
 }
 
 STATIC_OVL void
 print_imported_savefile_extension(printbuf)
 char* printbuf;
 {
-    print_special_savefile_extension(printbuf, "i");
+    print_special_savefile_extension(printbuf, IMPORTED_EXTENSION);
 }
 
 /* change pre-existing savefile name to indicate an error savefile */
@@ -1152,18 +1208,288 @@ open_savefile()
 
 /* delete savefile */
 int
-delete_savefile()
+delete_savefile(VOID_ARGS)
 {
     (void) unlink(fqname(SAVEF, SAVEPREFIX, 0));
-    return 0; /* for open_and_validate_saved_game() (ex-xxxmain.c) test */
+    return 0; /* for open_and_validate_saved_game(TRUE, (boolean*)0) (ex-xxxmain.c) test */
+}
+
+int
+ask_delete_invalid_savefile(adjective, allow_replace_backup)
+const char* adjective;
+boolean allow_replace_backup;
+{
+    struct special_view_info info = { 0 };
+    char txtbuf[BUFSZ * 4] = "";
+    char titlebuf[BUFSZ * 4] = "";
+    int res;
+    if (!adjective)
+        adjective = "invalid";
+    if (allow_replace_backup && check_has_backup_savefile())
+    {
+        info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N;
+        Sprintf(titlebuf, "Replace %s Save File", str_upper_start(adjective));
+        info.title = titlebuf;
+        Sprintf(txtbuf, "Save file \"%s\" is %s. Replace it with its backup?", SAVEF, adjective);
+        info.text = txtbuf;
+        res = open_special_view(info);
+        if (res == 'y')
+        {
+            pline("Replacing %s save file \"%s\".", an(adjective), SAVEF);
+            (void)delete_tmp_backup_savefile();
+            if (!restore_backup_savefile(TRUE))
+                return -2;
+            else
+                pline("Replacing \"%s\" failed.", SAVEF);
+        }
+    }
+    info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y;
+    Sprintf(titlebuf, "Delete %s Save File", str_upper_start(adjective));
+    info.title = titlebuf;
+    Sprintf(txtbuf, "Save file \"%s\" is %s. Delete it?", SAVEF, adjective);
+    info.text = txtbuf;
+    res = open_special_view(info);
+    if (res == 'y')
+    {
+        pline("Deleting %s save file \"%s\".", an(adjective), SAVEF);
+        (void) delete_tmp_backup_savefile();
+        (void) delete_backup_savefile();
+        return delete_savefile();
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int
+query_about_corrupted_savefile(VOID_ARGS)
+{
+    if (check_has_backup_savefile())
+    {
+        struct special_view_info info = { 0 };
+        char txtbuf[BUFSZ * 4] = "";
+        int res;
+        info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N;
+        info.title = "Corrupted Save File";
+        Sprintf(txtbuf, "Save file \"%s\" is corrupted, but you have a backup save file.  Continue loading the corrupted save file anyway?", SAVEF);
+        info.text = txtbuf;
+        res = open_special_view(info);
+        if (res == 'y')
+            return 1;
+    }
+    return 0;
+}
+
+STATIC_VAR char fq_tmp_backup[4096];
+
+int
+make_tmp_backup_savefile_from_uncompressed_savefile(filename)
+const char* filename; /* Filename must have already been uncompressed */
+{
+    Strcpy(fq_tmp_backup, "");
+    if (sysopt.make_backup_savefiles && filename && *filename)
+    {
+        if (access(filename, F_OK) != 0) 
+        {
+            return -3; /* given savefile does not exist, cannot copy it */
+        }
+        char tobuf[4096];
+        size_t len = strlen(filename);
+        char extbuf[BUFSZ];
+        Strcpy(extbuf, "");
+        print_special_savefile_extension(extbuf, BACKUP_EXTENSION);
+        size_t bupextlen = strlen(extbuf);
+        Strcpy(extbuf, "");
+        print_special_savefile_extension(extbuf, TEMP_BACKUP_EXTENSION);
+        size_t tmpextlen = strlen(extbuf);
+        if (len + bupextlen + tmpextlen + 1 > sizeof(tobuf))
+            return -2;
+        size_t copy_len = min(sizeof(tobuf) - 1, len);
+        Strncpy(tobuf, filename, copy_len);
+        tobuf[copy_len] = 0;
+        print_special_savefile_extension(tobuf, BACKUP_EXTENSION);
+        print_special_savefile_extension(tobuf, TEMP_BACKUP_EXTENSION);
+        nh_uncompress(tobuf);
+        if (access(tobuf, F_OK) == 0)
+        {
+            (void)unlink(tobuf);
+        }
+        int res = copy_savefile(tobuf, filename);
+        if (!res)
+        {
+            nh_compress(tobuf);
+            Strcpy(fq_tmp_backup, tobuf);
+        }
+
+        return res < 0 ? -4 : res;
+    }
+    return -1;
+}
+
+int
+move_tmp_backup_savefile_to_actual_backup_savefile(VOID_ARGS)
+{
+    /* fq_tmp_backup is compressed */
+    if (sysopt.make_backup_savefiles && *fq_tmp_backup)
+    {
+        size_t len = strlen(fq_tmp_backup);
+        char extbuf[BUFSZ];
+        Strcpy(extbuf, "");
+        print_special_savefile_extension(extbuf, BACKUP_EXTENSION);
+        size_t bupextlen = strlen(extbuf);
+        Strcpy(extbuf, "");
+        print_special_savefile_extension(extbuf, TEMP_BACKUP_EXTENSION);
+        size_t tmpextlen = strlen(extbuf);
+        if (len <= bupextlen + tmpextlen)
+        {
+            Strcpy(fq_tmp_backup, "");
+            return -2;
+        }
+
+        char fq_act_backup[4096];
+        Strcpy(fq_act_backup, fq_tmp_backup);
+        fq_act_backup[len - tmpextlen] = 0;
+        nh_uncompress(fq_act_backup);
+        if (access(fq_act_backup, F_OK) == 0) 
+        {
+            (void)unlink(fq_act_backup);
+        }
+        nh_uncompress(fq_tmp_backup); /* Uncompress at original location */
+        int res = rename(fq_tmp_backup, fq_act_backup);
+        if (!res)
+        {
+            nh_compress(fq_act_backup); /* Finally compress at new location */
+            Strcpy(fq_tmp_backup, "");
+        }
+        return res;
+    }
+    return -1;
+}
+
+int
+restore_backup_savefile(dodelete_existing)
+boolean dodelete_existing;
+{
+    if (sysopt.make_backup_savefiles && *SAVEF)
+    {
+        char bakbuf[4096];
+        const char* fq_save = fqname(SAVEF, SAVEPREFIX, 0);
+        Strcpy(bakbuf, fq_save);
+        print_special_savefile_extension(bakbuf, BACKUP_EXTENSION);
+        nh_uncompress(bakbuf);
+        if (access(bakbuf, F_OK) != 0)
+            return -2; /* Backup does not exist */
+
+        nh_uncompress(fq_save);
+        if (access(fq_save, F_OK) == 0)
+        {
+            if (dodelete_existing)
+                (void)unlink(fq_save);
+            else
+            {
+                nh_compress(fq_save);
+                return -3; /* Save file exists and dodelete_existing is off, aborting restoring backup */
+            }
+        }
+        int res = copy_savefile(fq_save, bakbuf);
+        nh_compress(bakbuf);
+        if (!res)
+            nh_compress(fq_save);
+
+        return res < 0 ? -4 : res;
+    }
+    return -1; /* Making backups is not on */
+}
+
+int
+delete_backup_savefile(VOID_ARGS)
+{
+    if (sysopt.make_backup_savefiles && *SAVEF)
+    {
+        char bakbuf[4096];
+        Strcpy(bakbuf, fqname(SAVEF, SAVEPREFIX, 0));
+        print_special_savefile_extension(bakbuf, BACKUP_EXTENSION);
+        nh_uncompress(bakbuf);
+        if (access(bakbuf, F_OK) != 0)
+            return -2; /* Backup file does not exist */
+        return unlink(bakbuf);
+    }
+    return -1; /* Making backups is not on */
+}
+
+int
+delete_tmp_backup_savefile(VOID_ARGS)
+{
+    if (sysopt.make_backup_savefiles && *SAVEF)
+    {
+        char bakbuf[4096];
+        Strcpy(bakbuf, fqname(SAVEF, SAVEPREFIX, 0));
+        print_special_savefile_extension(bakbuf, BACKUP_EXTENSION);
+        print_special_savefile_extension(bakbuf, TEMP_BACKUP_EXTENSION);
+        nh_uncompress(bakbuf);
+        if (access(bakbuf, F_OK) != 0)
+            return -2; /* Backup temp file does not exist */
+        return unlink(bakbuf);
+    }
+    return -1; /* Making backups is not on */
+}
+
+boolean check_has_backup_savefile(VOID_ARGS)
+{
+    if (sysopt.make_backup_savefiles && *SAVEF)
+    {
+        char bakbuf[4096];
+        Strcpy(bakbuf, fqname(SAVEF, SAVEPREFIX, 0));
+        print_special_savefile_extension(bakbuf, BACKUP_EXTENSION);
+        nh_uncompress(bakbuf);
+        int accres = access(bakbuf, F_OK);
+        int valres = -2;
+        if (!accres)
+        {
+            int fd;
+#ifdef MAC
+            fd = macopen(bakbuf, O_RDONLY | O_BINARY, SAVE_TYPE);
+#else
+            fd = open(bakbuf, O_RDONLY | O_BINARY, 0);
+#endif
+            if (fd >= 0)
+            {
+                valres = validate(fd, (char*)0);
+                (void)nhclose(fd), fd = -1;
+            }
+            nh_compress(bakbuf);
+        }
+        return (boolean)(!accres && !valres);
+    }
+    return FALSE;
+}
+
+int
+delete_savefile_if_exists(VOID_ARGS)
+{
+    if (*SAVEF)
+    {
+        const char* fq_save = fqname(SAVEF, SAVEPREFIX, 0);
+        nh_uncompress(fq_save);
+        if (access(fq_save, F_OK) == 0)
+            return delete_savefile();
+        return -2; /* fq_save does not exist */
+    }
+    return -1; /* SAVEF is empty */
 }
 
 /* try to open up a save file and prepare to restore it */
 int
-open_and_validate_saved_game()
+open_and_validate_saved_game(allow_replace_backup, is_backup_ptr)
+boolean allow_replace_backup;
+boolean* is_backup_ptr;
 {
     const char *fq_save;
     int fd;
+    boolean backup_replaced = FALSE;
+    if (is_backup_ptr)
+        *is_backup_ptr = FALSE;
 
     reset_restpref();
     set_savefile_name(TRUE);
@@ -1172,15 +1498,33 @@ open_and_validate_saved_game()
         return -1;
 #endif /* MFLOPPY */
     fq_save = fqname(SAVEF, SAVEPREFIX, 0);
-
+#ifdef COMPRESS
+    if (allow_replace_backup)
+    {
+        /* Uncompress might fail due to corruption; if so, restore backup file */
+        if (!restore_backup_savefile(FALSE))
+        {
+            allow_replace_backup = FALSE;
+            backup_replaced = TRUE;
+        }
+    }
+#endif
     nh_uncompress(fq_save);
+    (void) make_tmp_backup_savefile_from_uncompressed_savefile(fq_save);
     if ((fd = open_savefile()) < 0)
         return fd;
 
-    if (validate(fd, fq_save) != 0) {
+    if ((validate(fd, fq_save)) != 0) {
         (void) nhclose(fd), fd = -1;
-        (void) delete_savefile();
+        (void) delete_tmp_backup_savefile();
+        if (ask_delete_invalid_savefile("invalid", allow_replace_backup) == -2)
+        {
+            backup_replaced = TRUE;
+            fd = open_and_validate_saved_game(FALSE, (boolean*)0);
+        }
     }
+    if (is_backup_ptr)
+        *is_backup_ptr = backup_replaced;
     return fd;
 }
 
@@ -1204,28 +1548,18 @@ create_gamestate_levelfile(VOID_ARGS)
     else
     {
         hackpid = 1;
-        write(fd, (genericptr_t)&hackpid, sizeof(hackpid));
+        (void)write(fd, (genericptr_t)&hackpid, sizeof(hackpid));
         close(fd);
     }
 }
 
 int
 load_saved_game(load_type)
-int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after saving quietly
+int load_type; // 0 = at start normally, 1 = load after saving, corresponds to exit_hack_code at start
 {
     reseting = TRUE;
-    if (load_type > 0)
-    {
-        /* Reset game state */
-        dmonsfree();
-        reset_gamestate_ex();
-        reset_item_global_variables();
-
-        /* Functions that would have been run at start */
-        create_gamestate_levelfile();
-    }
-
-    int fd = open_and_validate_saved_game();
+    boolean is_backup = FALSE;
+    int fd = open_and_validate_saved_game(TRUE, &is_backup);
     if (fd >= 0)
     {
         /* Since wizard is actually flags.debug, restoring might
@@ -1240,14 +1574,32 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
             if (iflags.news)
             {
                 display_file(NEWS, FALSE);
-                iflags.news = FALSE; /* in case dorecover() fails */
+                iflags.news = FALSE; /* in case dorestore() fails */
             }
 #endif
             pline("Restoring save file...");
             mark_synch(); /* flush output */
         }
-        int loadres = dorecover_saved_game(fd);
-        if (!loadres) //This deletes the save file in normal modes
+        int loadres = dorestore0(fd);
+        if (!loadres && !is_backup) //This deletes the save file in normal modes
+        {
+            if (!restore_backup_savefile(TRUE))
+            {
+                pline("Restoring save file failed.  Replaced save file with back-up save file.");
+                mark_synch(); /* flush output */
+                fd = open_and_validate_saved_game(FALSE, (boolean*)0);
+                if (fd >= 0)
+                {
+                    if (load_type == 0)
+                    {
+                        pline("Restoring back-up save file...");
+                        mark_synch(); /* flush output */
+                    }
+                    loadres = dorestore0(fd);
+                }
+            }
+        }
+        if (!loadres)
         {
             reseting = FALSE;
             return 0;
@@ -1257,23 +1609,24 @@ int load_type; // 0 = at start normally, 1 = load after saving, 2 = load after s
 
         reseting = FALSE;
         
-        if (load_type > 0)
-            flush_screen(1);
+        /* Success! */
+        encounter_init();
+        delete_excess_levelfiles();
 
-        if (load_type == 0)
+        switch (load_type)
         {
-            encounter_init();
+        case 0:
+            /* Welcome */
             welcome(FALSE);
-        }
-        else if (load_type == 1)
-        {
-            pline("Save successful. Continuing the game.");
-        }
-
-        if (load_type == 0)
-        {
             check_special_room(FALSE);
             mode_message();
+            break;
+        case 1:
+            flush_screen(1);
+            update_game_music();
+            play_level_ambient_sounds();
+            play_environment_ambient_sounds();
+            break;
         }
 
         boolean savefilekept = FALSE;
@@ -1383,19 +1736,8 @@ struct save_game_stats* stats_ptr;
     //Delete mismatching save files, so they do not hang around for nothing
     if (dodeletefile)
     {
-        //Confirmation
-        struct special_view_info info = { 0 };
-        char txtbuf[BUFSZ * 4] = "";
-        info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION;
-        info.title = "Delete Invalid Save File";
-        Sprintf(txtbuf, "Save file \"%s\" is invalid. Delete it?", filename);
-        info.text = txtbuf;
-        int res = open_special_view(info);
-        if (res == 'y')
-        {
-            pline("Deleting an invalid save file \"%s\".", filename);
-            delete_savefile();
-        }
+        (void)delete_tmp_backup_savefile();
+        (void)ask_delete_invalid_savefile("invalid", TRUE);
     }
     return result;
 #if 0
@@ -1431,8 +1773,11 @@ struct save_game_stats* stats_ptr;
 
 #if defined(ANDROID) || defined(GNH_MOBILE)
 int is_error_savefile_name(savefilename)
-char* savefilename;
+const char* savefilename;
 {
+    if (!savefilename || !*savefilename)
+        return FALSE;
+
     size_t dlen = strlen(savefilename);
     char ebuf[BUFSZ] = "";
     print_error_savefile_extension(ebuf);
@@ -1449,8 +1794,11 @@ char* savefilename;
 }
 
 int is_imported_savefile_name(savefilename)
-char* savefilename;
+const char* savefilename;
 {
+    if (!savefilename || !*savefilename)
+        return FALSE;
+
     size_t dlen = strlen(savefilename);
     char ebuf[BUFSZ] = "";
     print_imported_savefile_extension(ebuf);
@@ -1475,19 +1823,25 @@ const struct dirent* entry;
 int filter_error(entry)
 const struct dirent* entry;
 {
-    return is_error_savefile_name((char *)entry->d_name);
+    return is_error_savefile_name(entry->d_name);
 }
 
 int filter_imported(entry)
 const struct dirent* entry;
 {
-    return is_imported_savefile_name((char*)entry->d_name);
+    return is_imported_savefile_name(entry->d_name);
 }
 
 int filter_imported_error(entry)
 const struct dirent* entry;
 {
-    return is_imported_error_savefile_name((char*)entry->d_name);
+    return is_imported_error_savefile_name(entry->d_name);
+}
+
+int filter_backup(entry)
+const struct dirent* entry;
+{
+    return is_backup_savefile_name(entry->d_name);
 }
 
 char*
@@ -1563,18 +1917,18 @@ get_saved_games()
         int n2 = 0;
         int n3 = 0;
         foundfile = foundfile_buffer();
-        if (findfirst((char *) fq_save)) {
+        if (findfirst(fq_save)) {
             do {
                 ++n;
             } while (findnext());
         }
 #ifndef MICRO
-        if (findfirst((char*)fq_save_ebuf)) {
+        if (findfirst(fq_save_ebuf)) {
             do {
                 ++n2;
             } while (findnext());
         }
-        if (findfirst((char*)fq_save_ibuf)) {
+        if (findfirst(fq_save_ibuf)) {
             do {
                 ++n3;
             } while (findnext());
@@ -1585,9 +1939,11 @@ get_saved_games()
             (void) memset((genericptr_t) result, 0, ((size_t)n + (size_t)n2 + (size_t)n3 + 1) * sizeof(struct save_game_data));
             if (n > 0)
             {
-                if (findfirst((char*)fq_save)) {
+                if (findfirst(fq_save)) {
                     j = n = 0;
                     do {
+                        if (is_backup_savefile_name(foundfile))
+                            continue;
                         char* r;
                         r = plname_from_file(foundfile, &gamestats);
                         if (r)
@@ -1598,7 +1954,7 @@ get_saved_games()
             }
             if (n2 > 0)
             {
-                if (findfirst((char*)fq_save_ebuf)) {
+                if (findfirst(fq_save_ebuf)) {
                     n2 = 0;
                     do {
                         char* r;
@@ -1611,7 +1967,7 @@ get_saved_games()
             }
             if (n3 > 0)
             {
-                if (findfirst((char*)fq_save_ibuf)) {
+                if (findfirst(fq_save_ibuf)) {
                     n3 = 0;
                     do {
                         char* r;
@@ -1653,9 +2009,11 @@ get_saved_games()
                     break;
                 if (sscanf(entry->d_name, "%d%63s", &uid, name) == 2) {
                     if (uid == myuid) {
+                        boolean isbackupfile = !!filter_backup(namelist[i]);
+                        if (isbackupfile)
+                            continue;
                         char filename[BUFSZ];
                         char *r;
-
                         Sprintf(filename, "save/%d%s", uid, name);
                         r = plname_from_file(filename, &gamestats);
                         if (r)
@@ -1674,6 +2032,7 @@ get_saved_games()
     int n2 = scandir(".", &namelist2, filter_running, 0);
     if (n1 < 0) n1 = 0;
     if (n2 < 0) n2 = 0;
+
     int i, uid;
     char name[64]; /* more than PL_NSIZ */
     if (n1 > 0 || n2 > 0) {
@@ -1683,6 +2042,9 @@ get_saved_games()
     for (i = 0; i < n1; i++) {
         if (sscanf(namelist[i]->d_name, "%d%63s", &uid, name) == 2) {
             if (uid == myuid) {
+                boolean isbackupfile = !!filter_backup(namelist[i]);
+                if (isbackupfile)
+                    continue;
                 char filename[BUFSZ];
                 char* r;
                 Sprintf(filename, "save/%d%s", uid, name);
@@ -1783,7 +2145,7 @@ boolean uncomp;
     boolean istty = WINDOWPORT("tty");
 #endif
 
-    strncpy(cfn, filename, MAX_FILE_NAME_BUFFER_SIZE - 5);
+    Strncpy(cfn, filename, MAX_FILE_NAME_BUFFER_SIZE - 5);
     cfn[MAX_FILE_NAME_BUFFER_SIZE - 5] = 0;
 #ifdef COMPRESS_EXTENSION
     Strcat(cfn, COMPRESS_EXTENSION);
@@ -2411,7 +2773,7 @@ STATIC_OVL void
 set_configfile_name(fname)
 const char *fname;
 {
-    (void) strncpy(configfile, fname, sizeof configfile - 1);
+    Strncpy(configfile, fname, sizeof configfile - 1);
     configfile[sizeof configfile - 1] = '\0';
 }
 
@@ -2777,7 +3139,7 @@ char *origbuf;
 
     while (*origbuf == ' ' || *origbuf == '\t') /* skip leading whitespace */
         ++origbuf;                   /* (caller probably already did this) */
-    (void)strncpy(buf, origbuf, sizeof buf - 1);
+    Strncpy(buf, origbuf, sizeof buf - 1);
     buf[sizeof buf - 1] = '\0'; /* strncpy not guaranteed to NULL terminate */
 
     /* convert any tab to space, condense consecutive spaces into one,
@@ -2873,7 +3235,7 @@ char *origbuf;
     } 
     else if (match_varname(buf, "HACKDIR", 4)) 
     {
-        (void) strncpy(hackdir, bufp, PATHLEN - 1);
+        Strncpy(hackdir, bufp, PATHLEN - 1);
 #ifdef MFLOPPY
     }
     else if (match_varname(buf, "RAMDISK", 3)) 
@@ -2920,7 +3282,7 @@ char *origbuf;
             saveprompt = sysflags.asksavedisk;
 #endif
 
-        (void) strncpy(SAVEP, bufp, SAVESIZE - 1);
+        Strncpy(SAVEP, bufp, SAVESIZE - 1);
         append_slash(SAVEP);
 #endif /* MICRO */
 #endif /*NOCWD_ASSUMPTIONS*/
@@ -2928,7 +3290,7 @@ char *origbuf;
     }
     else if (match_varname(buf, "NAME", 4))
     {
-        (void) strncpy(plname, bufp, PL_NSIZ - 1);
+        Strncpy(plname, bufp, PL_NSIZ - 1);
     }
     else if (match_varname(buf, "ROLE", 4)
                || match_varname(buf, "CHARACTER", 4)) 
@@ -2938,11 +3300,11 @@ char *origbuf;
     }
     else if (match_varname(buf, "DOGNAME", 3)) 
     {
-        (void) strncpy(dogname, bufp, PL_PSIZ - 1);
+        Strncpy(dogname, bufp, PL_PSIZ - 1);
     }
     else if (match_varname(buf, "CATNAME", 3)) 
     {
-        (void) strncpy(catname, bufp, PL_PSIZ - 1);
+        Strncpy(catname, bufp, PL_PSIZ - 1);
 
 #ifdef SYSCF
     }
@@ -3097,6 +3459,12 @@ char *origbuf;
     {
         n = atoi(bufp);
         sysopt.select_pet_details = n;
+    }
+    else if (src == SET_IN_SYS
+        && match_varname(buf, "MAKE_BACKUP_SAVEFILES", 21))
+    {
+            n = atoi(bufp);
+            sysopt.make_backup_savefiles = n;
     }
     else if (match_varname(buf, "SEDUCE", 6))
     {
@@ -3278,7 +3646,7 @@ char *origbuf;
     }
     else if (match_varname(buf, "WIZKIT", 6)) 
     {
-        (void) strncpy(wizkit, bufp, WIZKIT_MAX - 1);
+        Strncpy(wizkit, bufp, WIZKIT_MAX - 1);
 #ifdef AMIGA
     } 
     else if (match_varname(buf, "FONT", 4))
@@ -3294,7 +3662,7 @@ char *origbuf;
     }
     else if (match_varname(buf, "PATH", 4))
     {
-        (void) strncpy(PATH, bufp, PATHLEN - 1);
+        Strncpy(PATH, bufp, PATHLEN - 1);
     }
     else if (match_varname(buf, "DEPTH", 5)) 
     {
@@ -3518,7 +3886,7 @@ boolean secure;
     tmp->secure = secure;
     tmp->origline[0] = '\0';
     if (sourcename && sourcename[0]) {
-        (void) strncpy(tmp->source, sourcename, sizeof (tmp->source) - 1);
+        Strncpy(tmp->source, sourcename, sizeof (tmp->source) - 1);
         tmp->source[sizeof (tmp->source) - 1] = '\0';
     } else
         tmp->source[0] = '\0';
@@ -3543,7 +3911,7 @@ const char *line;
     ced->origline_shown = FALSE;
     if (line && line[0])
     {
-        (void) strncpy(ced->origline, line, sizeof (ced->origline) - 1);
+        Strncpy(ced->origline, line, sizeof (ced->origline) - 1);
         ced->origline[sizeof (ced->origline) - 1] = '\0';
     } 
     else
@@ -3638,7 +4006,7 @@ fopen_wizkit_file()
 
     envp = nh_getenv("WIZKIT");
     if (envp && *envp)
-        (void) strncpy(wizkit, envp, WIZKIT_MAX - 1);
+        Strncpy(wizkit, envp, WIZKIT_MAX - 1);
     if (!wizkit[0])
         return (FILE *) 0;
 
@@ -4265,7 +4633,7 @@ const char *dir UNUSED_if_not_OS2_CODEVIEW;
 #ifdef OS2_CODEVIEW /* explicit path on opening for OS/2 */
     /* how does this work when there isn't an explicit path or fopenp
      * for later access to the file via fopen_datafile? ? */
-    (void) strncpy(tmp, dir, PATHLEN - 1);
+    Strncpy(tmp, dir, PATHLEN - 1);
     tmp[PATHLEN - 1] = '\0';
     if ((strlen(tmp) + 1 + strlen(RECORD)) < (PATHLEN - 1)) {
         append_slash(tmp);
@@ -4541,6 +4909,7 @@ recover_savefile()
         return FALSE;
     }
 
+    /* copy current level */
     if (!copy_bytes(lfd, sfd)) {
         (void) nhclose(gfd);
         (void) nhclose(sfd);
@@ -4551,6 +4920,7 @@ recover_savefile()
     (void) nhclose(lfd);
     processed[savelev] = 1;
 
+    /* copy game state */
     if (!copy_bytes(gfd, sfd)) {
         (void) nhclose(gfd);
         (void) nhclose(sfd);
@@ -4603,7 +4973,7 @@ recover_savefile()
 #ifdef ANDROID
     /* if the new savefile isn't compressed
      * it will be overwritten when the old
-     * savefile is restored in open_and_validate_saved_game()
+     * savefile is restored in open_and_validate_saved_game(TRUE, (boolean*)0)
      */
     nh_compress(fqname(SAVEF, SAVEPREFIX, 0));
 #endif
@@ -5030,6 +5400,7 @@ reset_files(VOID_ARGS)
 #endif
     *config_section_chosen = 0;
     *config_section_current = 0;
+    *fq_tmp_backup = 0;
 }
 
 
@@ -5059,7 +5430,7 @@ const char* buffer;
             char tmpbuf[1024 + 1];
             char msgbuf[512 + 1];
             char* c1 = msgbuf;
-            strncpy(msgbuf, buffer, 512);
+            Strncpy(msgbuf, buffer, 512);
             msgbuf[512] = '\0';
             while (*c1 != '\0') {
                 if (*c1 == LLOG_SEP) *c1 = '_';
@@ -5143,6 +5514,33 @@ reset_gamelog(VOID_ARGS)
     }
 }
 
+STATIC_OVL void
+livelog_post_to_forum(ll_type, str)
+unsigned int ll_type;
+const char* str;
+{
+    if (!str)
+        return;
+
+    if (ll_type & LL_postables)
+    {
+        IfModeAllowsPostToForum
+        {
+            char postbuf[BUFSZ * 2];
+            char mbuf[BUFSZ] = "";
+            char cbuf[BUFSZ];
+            (void)describe_mode(mbuf);
+            Sprintf(cbuf, "%.3s %.3s %.3s %.3s XL:%d", urole.filecode,
+                urace.filecode, genders[flags.female].filecode,
+                aligns[1 - u.ualign.type].filecode, u.ulevel);
+            long currenttime = get_current_game_duration();
+            char* duration = format_duration_with_units(currenttime);
+            Sprintf(postbuf, "%s (%s) %s, on T:%ld (%s) [%s]", plname, cbuf, str, moves, duration, mbuf);
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_ACHIEVEMENT, postbuf);
+        }
+    }
+}
+
 /* #chronicle details */
 void
 show_gamelog(final)
@@ -5152,6 +5550,7 @@ int final;
     winid win;
     char buf[BUFSZ];
     int eventcnt = 0;
+    int eventidx = 0;
 
     win = create_nhwindow(NHW_TEXT);
     Sprintf(buf, "%s events:", final ? "Major" : "Logged");
@@ -5161,15 +5560,23 @@ int final;
             continue;
         if (!final && !wizard && spoilerevent(llmsg))
             continue;
-        if (!eventcnt++)
-            putstr(win, ATR_PREFORM, " Turn");
+
+        eventcnt++;
+    }
+    for (llmsg = gamelog; llmsg; llmsg = llmsg->next) {
+        if (final && !majorevent(llmsg))
+            continue;
+        if (!final && !wizard && spoilerevent(llmsg))
+            continue;
+        if (!eventidx++)
+            putstr(win, ATR_START_TABLE | ATR_TABLE_HEADER, " Turn  ");
         Sprintf(buf, "%5ld: %s", llmsg->turn, llmsg->text);
-        putstr(win, ATR_PREFORM, buf);
+        putstr(win, ATR_INDENT_AT_COLON | ATR_TABLE_ROW | (eventidx == 1 ? ATR_START_TABLE_BODY : 0) | (eventidx == eventcnt ? (ATR_END_TABLE_BODY | ATR_END_TABLE) : 0), buf);
     }
     /* since start of game is logged as a major event, 'eventcnt' should
        never end up as 0; for 'final', end of game is a major event too */
     if (!eventcnt)
-        putstr(win, ATR_PREFORM, " none");
+        putstr(win, ATR_NONE, " none");
 
     display_nhwindow(win, TRUE);
     destroy_nhwindow(win);
@@ -5184,8 +5591,9 @@ VA_DECL2(unsigned int, ll_type, const char*, fmt)
     VA_START(fmt);
     VA_INIT(fmt, char*);
     vsnprintf(ll_msgbuf, 512, fmt, VA_ARGS);
-    gamelog_add(ll_type, moves, ll_msgbuf);
+    gamelog_add((long)ll_type, moves, ll_msgbuf);
     livelog_write_string(ll_type, ll_msgbuf);
+    livelog_post_to_forum(ll_type, ll_msgbuf);
     VA_END();
 }
 
@@ -5404,14 +5812,14 @@ set_whereisfile()
         char* new_whereis_fn = (char*)alloc((unsigned)(new_whereis_len + 1));
         char* q = new_whereis_fn;
 
-        strncpy(q, whereis_file, p - whereis_file);
+        Strncpy(q, whereis_file, p - whereis_file);
         q += p - whereis_file;
-        strncpy(q, plname, strlen(plname) + 1);
+        Strncpy(q, plname, strlen(plname) + 1);
         regularize(q);
         q[strlen(plname)] = '\0';
         q += strlen(q);
         p += 2;   /* skip "%n" */
-        strncpy(q, p, strlen(p));
+        Strncpy(q, p, strlen(p));
         new_whereis_fn[new_whereis_len] = '\0';
         Sprintf(whereis_file, "%s", new_whereis_fn);
         free(new_whereis_fn); /* clean up the pointer */
@@ -5483,6 +5891,78 @@ delete_whereis()
 }
 #endif /* WHEREIS_FILE */
 
+STATIC_OVL
+int copy_savefile(to, from)
+const char* to, *from;
+{
+    int fd_to, fd_from;
+    char buf[4096];
+    int nread;
+    int saved_errno;
 
+#ifdef MAC
+    fd_from = macopen(from, O_RDONLY | O_BINARY, SAVE_TYPE);
+#else
+    fd_from = open(from, O_RDONLY | O_BINARY, 0);
+#endif
+    if (fd_from < 0)
+        return -1;
+
+#if defined(MICRO) || defined(WIN32)
+    fd_to = open(to, O_WRONLY | O_BINARY | O_CREAT | O_TRUNC, FCMASK);
+#else
+#ifdef MAC
+    fd_to = maccreat(to, SAVE_TYPE);
+#else
+    fd_to = creat(to, FCMASK);
+#endif
+#endif /* MICRO */
+
+    if (fd_to < 0)
+        goto out_error;
+
+    while (nread = (int)read(fd_from, buf, (readLenType)(sizeof buf)), nread > 0)
+    {
+        char* out_ptr = buf;
+        int nwritten;
+
+        do {
+            nwritten = (int)write(fd_to, out_ptr, (unsigned)nread);
+
+            if (nwritten >= 0)
+            {
+                nread -= nwritten;
+                out_ptr += nwritten;
+            }
+            else if (errno != EINTR)
+            {
+                goto out_error;
+            }
+        } while (nread > 0);
+    }
+
+    if (nread == 0)
+    {
+        if (close(fd_to) < 0)
+        {
+            fd_to = -1;
+            goto out_error;
+        }
+        (void)close(fd_from);
+
+        /* Success! */
+        return 0;
+    }
+
+out_error:
+    saved_errno = errno;
+
+    (void)close(fd_from);
+    if (fd_to >= 0)
+        (void)close(fd_to);
+
+    errno = saved_errno;
+    return -1;
+}
 
 /*files.c*/

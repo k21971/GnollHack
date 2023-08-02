@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0	vmsmain.c	$NHDT-Date: 1449801742 2015/12/11 02:42:22 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.32 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -38,7 +38,8 @@ char *argv[];
 #ifdef CHDIR
     register char *dir;
 #endif
-    boolean resuming = FALSE; /* assume new game */
+    uchar resuming = FALSE; /* assume new game */
+    boolean is_backup = FALSE;
 
 #ifdef SECURE /* this should be the very first code executed */
     privoff();
@@ -177,7 +178,7 @@ char *argv[];
  * We'll return here if new game player_selection() renames the hero.
  */
 attempt_restore:
-    if ((fd = open_and_validate_saved_game()) >= 0) {
+    if ((fd = open_and_validate_saved_game(TRUE, &is_backup)) >= 0) {
         const char *fq_save = fqname(SAVEF, SAVEPREFIX, 1);
 
         (void) chmod(fq_save, 0); /* disallow parallel restores */
@@ -185,12 +186,12 @@ attempt_restore:
 #ifdef NEWS
         if (iflags.news) {
             display_file(NEWS, FALSE);
-            iflags.news = FALSE; /* in case dorecover() fails */
+            iflags.news = FALSE; /* in case dorestore() fails */
         }
 #endif
         pline("Restoring save file...");
         mark_synch(); /* flush output */
-        if (dorecover(fd)) {
+        if (dorestore(fd, is_backup)) {
             resuming = TRUE; /* not starting new game */
             wd_message();
             if (discover || wizard) {
@@ -267,11 +268,11 @@ char *argv[];
 #endif
         case 'u':
             if (argv[0][2])
-                (void) strncpy(plname, argv[0] + 2, sizeof(plname) - 1);
+                Strncpy(plname, argv[0] + 2, sizeof(plname) - 1);
             else if (argc > 1) {
                 argc--;
                 argv++;
-                (void) strncpy(plname, argv[0], sizeof(plname) - 1);
+                Strncpy(plname, argv[0], sizeof(plname) - 1);
             } else
                 raw_print("Player name expected after -u");
             break;

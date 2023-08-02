@@ -29,6 +29,61 @@ NEARDATA struct tileset_definition default_tileset_definition =
     3
 };
 
+
+/* Game Cursors */
+NEARDATA const struct game_cursor_definition game_cursors[MAX_CURSORS] =
+{
+    {"generic", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"look", NO_REPLACEMENT, LOOK_CURSOR_ANIMATION, NO_ENLARGEMENT },
+    {"travel", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"name", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"teleport", NO_REPLACEMENT, TELEPORT_CURSOR_ANIMATION, NO_ENLARGEMENT},
+    {"jump", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"polearm", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"grapple", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"spell", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"pay", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"invisible", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+};
+
+/* Hit tile */
+NEARDATA const struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES] =
+{
+    {"hit", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"poisoned", NO_REPLACEMENT, LOOK_CURSOR_ANIMATION, NO_ENLARGEMENT },
+    {"disintegrated", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"crushed", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"splashed-acid", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"on-fire", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"frozen", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"electrocuted", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"death", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"sleep", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"petrified", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"critical", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"flashed-light", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"paralyzed", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"slimed", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"sick", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"famine", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"heal", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"were", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"drain-level", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"slow", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"hallucinated", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+};
+
+/* General tile */
+NEARDATA const struct general_tile_definition general_tile_definitions[MAX_GENERAL_TILES] =
+{
+    {"death", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"chain-up", CHAIN_UP_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"chain-right", CHAIN_RIGHT_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"chain-down", CHAIN_DOWN_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"chain-left", CHAIN_LEFT_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"chain-main", CHAIN_MAIN_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+};
+
 NEARDATA struct ui_component_definition ui_tile_component_array[MAX_UI_TILES] = {
     {"general-ui",              NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 3, 16, 16, {"checkbox-unchecked", "checkbox-checked", "checkbox-count", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"status",                  NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, MAX_STATUS_MARKS, 16, 16, {"petmark", "peacemark", "detectmark", "pilemark", "satiated", "hungry", "weak", "faint", "burdened",  "stressed", "strained", "overtaxed", "overloaded",  "two-weapon", "skill", "saddled", "low-hp",  "critical-hp", "spec-used", "trapped", "ustuck",  "inventory", "townguard-peaceful", "townguard-hostile", "",  "", "", "", "",  "", "", ""} },
@@ -42,6 +97,33 @@ NEARDATA struct ui_component_definition ui_tile_component_array[MAX_UI_TILES] = 
     {"jar-foreground",          NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"transparent", "opaque", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"jar2-graphics",           NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"background", "contents", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"jar3-graphics",           NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"background", "contents", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
+};
+
+NEARDATA struct command_tile_definition command_tile_definitions[MAX_COMMAND_TILES] = {
+    { "no-command" },
+    { "view-spell" },
+    { "mix-spell" },
+    { "you" },
+    { "attributes" },
+    { "skill" },
+    { "ride" },
+    { "untrap" },
+    { "conduct" },
+    { "overview" },
+    { "chronicle" },
+    { "killed" },
+    { "genocided" },
+    { "discoveries" },
+    { "monster" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
+    { "no-command" },
 };
 
 boolean
@@ -1924,17 +2006,12 @@ uchar* tilemapflags;
 
     const char* spellskill_subtile_names[2] = { "active" , "inactive" };
     set_name = "spell-tile";
-    for (i = 0; i < MAXSPELL + 2; i++)
+    for (i = 0; i < MAXSPELL; i++)
     {
         if (process_style == 0)
         {
             char namebuf[BUFSZ] = "";
-            if(i < MAXSPELL)
-                Strcpy(namebuf, OBJ_NAME(objects[FIRST_SPELL + i]));
-            else if (i == MAXSPELL)
-                Strcpy(namebuf, "view-spell");
-            else if (i == MAXSPELL + 1)
-                Strcpy(namebuf, "mix-spell");
+            Strcpy(namebuf, OBJ_NAME(objects[FIRST_SPELL + i]));
             replace_char(namebuf, ' ', '-');
             Sprintf(buf, "%s,%s,%s,%d,%d,%d", tile_section_name, set_name, namebuf, 2, 64, 48);
             for (j = 0; j < 2; j++)
@@ -1974,6 +2051,31 @@ uchar* tilemapflags;
             glyph_offset = GLYPH_SKILL_TILE_OFF;
             tilemaparray[i + GLYPH_SKILL_TILE_OFF] = tile_count;
             tilemapflags[i + GLYPH_SKILL_TILE_OFF] |= GLYPH_TILE_FLAG_HALF_SIZED_TILE;
+        }
+        tile_count++;
+    }
+
+    set_name = "command-tile";
+    for (i = 0; i < MAX_COMMAND_TILES; i++)
+    {
+        if (process_style == 0)
+        {
+            char namebuf[BUFSZ] = "";
+            Strcpy(namebuf, command_tile_definitions[i].name);
+            replace_char(namebuf, ' ', '-');
+            Sprintf(buf, "%s,%s,%s,%d,%d,%d", tile_section_name, set_name, namebuf, 2, 64, 48);
+            for (j = 0; j < 2; j++)
+            {
+                Sprintf(eos(buf), ",%s", spellskill_subtile_names[j]);
+            }
+            Sprintf(eos(buf), "\n");
+            (void)write(fd, buf, strlen(buf));
+        }
+        else if (process_style == 1)
+        {
+            glyph_offset = GLYPH_COMMAND_TILE_OFF;
+            tilemaparray[i + GLYPH_COMMAND_TILE_OFF] = tile_count;
+            tilemapflags[i + GLYPH_COMMAND_TILE_OFF] |= GLYPH_TILE_FLAG_HALF_SIZED_TILE;
         }
         tile_count++;
     }

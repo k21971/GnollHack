@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursmisc.c */
@@ -353,7 +353,7 @@ curses_num_lines(const char *str, int width)
     char substr[BUFSZ];
     char tmpstr[BUFSZ];
 
-    strncpy(substr, str, BUFSZ-1);
+    (void)strncpy(substr, str, BUFSZ-1);
     substr[BUFSZ-1] = '\0';
 
     while (strlen(substr) > (size_t) width) {
@@ -405,7 +405,7 @@ curses_break_str(const char *str, int width, int line_num)
 
     if (strsize > (BUFSZ * 2) - 1) {
         paniclog("curses", "curses_break_str() string too long.");
-        strncpy(substr, str, (BUFSZ * 2) - 2);
+        (void)strncpy(substr, str, (BUFSZ * 2) - 2);
         substr[(BUFSZ * 2) - 1] = '\0';
     } else
         strcpy(substr, str);
@@ -477,7 +477,7 @@ curses_str_remainder(const char *str, int width, int line_num)
 
     if (strsize > (BUFSZ * 2) - 1) {
         paniclog("curses", "curses_str_remainder() string too long.");
-        strncpy(substr, str, (BUFSZ * 2) - 2);
+        (void)strncpy(substr, str, (BUFSZ * 2) - 2);
         substr[(BUFSZ * 2) - 1] = '\0';
     } else
         strcpy(substr, str);
@@ -785,7 +785,7 @@ curses_convert_attr(int attr)
 
     /* first, strip off control flags masked onto the display attributes
        (caller should have already done this...) */
-    attr &= ~(ATR_LINE_MSG_MASK);
+    attr &= ~(ATR_LINE_ATTR_MASK);
 
     switch (attr) {
     case ATR_NONE:

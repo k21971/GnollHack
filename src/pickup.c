@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    pickup.c    $NHDT-Date: 1545785547 2018/12/26 00:52:27 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.222 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2418,8 +2418,8 @@ doloot()
                         }
 
                         /* Now generate the menu */
-                        int pick_count = 0;
-                        if ((pick_count = select_menu(win, PICK_ANY, &pick_list)) > 0)
+                        int pick_count = select_menu(win, PICK_ANY, &pick_list);
+                        if (pick_count > 0)
                         {
                             int i;
                             for (i = 0; i < pick_count; i++)
@@ -2433,6 +2433,12 @@ doloot()
                             }
                             free((genericptr_t)pick_list);
                             destroy_nhwindow(win);
+                        }
+                        else
+                        {
+                            pline1(Never_mind);
+                            destroy_nhwindow(win);
+                            return timepassed;
                         }
                     }
 
@@ -2654,7 +2660,6 @@ boolean *prev_loot;
     if (u.uswallow) 
     {
         int count = passed_info ? *passed_info : 0;
-
         timepassed = pickup(count);
     }
     return timepassed;

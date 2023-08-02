@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    quest.c    $NHDT-Date: 1505170343 2017/09/11 22:52:23 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.21 $ */
 /*      Copyright 1991, M. Stephenson             */
@@ -563,13 +563,6 @@ const char* achievement_name;
 {
     play_sfx_sound(SFX_ACHIEVEMENT);
     custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "ACHIEVEMENT", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0U, "%s", achievement_name);
-
-    IfModeAllowsPostToForum
-    {
-        char postbuf[BUFSZ * 2];
-        Sprintf(postbuf, "%s has gained an achievement: %s", plname, achievement_name);
-        issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_ACHIEVEMENT, postbuf);
-    }
 }
 
 /*quest.c*/

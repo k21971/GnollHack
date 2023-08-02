@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    cmd.c    $NHDT-Date: 1557088405 2019/05/05 20:33:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.333 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -232,7 +232,7 @@ STATIC_DCL void FDECL(show_direction_keys, (winid, CHAR_P, BOOLEAN_P));
 STATIC_DCL boolean FDECL(help_dir, (CHAR_P, int, const char *));
 STATIC_DCL void FDECL(add_command_menu_items, (winid, int));
 STATIC_DCL void NDECL(check_gui_special_effect);
-STATIC_DCL void FDECL(print_monster_abilities, (winid, int*, BOOLEAN_P));
+STATIC_DCL int FDECL(print_monster_abilities, (winid));
 STATIC_DCL void FDECL(print_weapon_skill_line_core, (enum p_skills, BOOLEAN_P, int));
 STATIC_DCL void FDECL(print_weapon_skill_line, (struct obj*, BOOLEAN_P, int));
 
@@ -768,7 +768,7 @@ STATIC_VAR struct available_ability available_ability_list[MAXABILITYNUM] = { {"
 int
 doability(VOID_ARGS)
 {
-    int i = '\0';
+    int i;
 
     menu_item* pick_list = (menu_item*)0;
     winid win;
@@ -788,38 +788,38 @@ doability(VOID_ARGS)
         0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
         "Character Abilities                   ", MENU_UNSELECTED, menu_heading_info());
 
-    strcpy(available_ability_list[abilitynum].name, "Statistics");
+    Strcpy(available_ability_list[abilitynum].name, "Statistics");
     available_ability_list[abilitynum].function_ptr = &docharacterstatistics;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_active_menu(win, YOU_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
 
 
-    strcpy(available_ability_list[abilitynum].name, "Attributes");
+    Strcpy(available_ability_list[abilitynum].name, "Attributes");
     available_ability_list[abilitynum].function_ptr = &doattributes;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_active_menu(win, ATTRIBUTES_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
 
-    strcpy(available_ability_list[abilitynum].name, "Skills");
+    Strcpy(available_ability_list[abilitynum].name, "Skills");
     available_ability_list[abilitynum].function_ptr = &doskill;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_active_menu(win, SKILLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
@@ -827,7 +827,7 @@ doability(VOID_ARGS)
 
     if (Upolyd)
     {
-        strcpy(available_ability_list[abilitynum].name, "Polymorphed form");
+        Strcpy(available_ability_list[abilitynum].name, "Polymorphed form");
         available_ability_list[abilitynum].function_ptr = &dopolyformstatistics;
         available_ability_list[abilitynum].target_mtmp = 0;
 
@@ -843,18 +843,17 @@ doability(VOID_ARGS)
         abilitynum++;
 
         /* Monster abilities */
-        //print_monster_abilities(win, &abilitynum, TRUE);
-
-        strcpy(available_ability_list[abilitynum].name, "Monster abilities");
+        Strcpy(available_ability_list[abilitynum].name, "Monster abilities");
         available_ability_list[abilitynum].function_ptr = &domonsterability;
         available_ability_list[abilitynum].target_mtmp = 0;
 
         any = zeroany;
         any.a_int = abilitynum + 1;
 
-        add_menu(win, NO_GLYPH, &any,
+        int monabilitynum = print_monster_abilities(WIN_ERR);
+        add_extended_menu(win, MONSTER_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
             0, 0, ATR_NONE, NO_COLOR,
-            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+            available_ability_list[abilitynum].name, MENU_UNSELECTED, monabilitynum > 0 ? active_menu_info() : zeroextendedmenuinfo);
 
         abilitynum++;
     }
@@ -867,30 +866,30 @@ doability(VOID_ARGS)
         "Use Skill-Based Abilities             ", MENU_UNSELECTED, menu_heading_info());
 
     /* Ride */
-    strcpy(available_ability_list[abilitynum].name, "Ride");
+    Strcpy(available_ability_list[abilitynum].name, "Ride");
     available_ability_list[abilitynum].function_ptr = &doride;
     available_ability_list[abilitynum].target_mtmp = 0;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_extended_menu(win, RIDE_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+        available_ability_list[abilitynum].name, MENU_UNSELECTED, !P_RESTRICTED(P_RIDING) ? active_menu_info() : zeroextendedmenuinfo);
 
     abilitynum++;
 
     /* Untrap */
-    strcpy(available_ability_list[abilitynum].name, "Untrap");
+    Strcpy(available_ability_list[abilitynum].name, "Untrap");
     available_ability_list[abilitynum].function_ptr = &dountrap;
     available_ability_list[abilitynum].target_mtmp = 0;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_extended_menu(win, UNTRAP_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+        available_ability_list[abilitynum].name, MENU_UNSELECTED, !P_RESTRICTED(P_DISARM_TRAP) ? active_menu_info() : zeroextendedmenuinfo);
 
     abilitynum++;
 
@@ -916,61 +915,77 @@ doability(VOID_ARGS)
     abilitynum++;
     */
 
-    strcpy(available_ability_list[abilitynum].name, "Goals and achievements");
+    Strcpy(available_ability_list[abilitynum].name, "Goals and achievements");
     available_ability_list[abilitynum].function_ptr = &doconduct;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_active_menu(win, CONDUCT_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
 
-    strcpy(available_ability_list[abilitynum].name, "Dungeon overview");
+    Strcpy(available_ability_list[abilitynum].name, "Dungeon overview");
     available_ability_list[abilitynum].function_ptr = &dooverview;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_active_menu(win, OVERVIEW_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
     abilitynum++;
 
-    strcpy(available_ability_list[abilitynum].name, "Killed monsters");
+    Strcpy(available_ability_list[abilitynum].name, "Game events");
+    available_ability_list[abilitynum].function_ptr = &do_gamelog;
+
+    any = zeroany;
+    any.a_int = abilitynum + 1;
+
+    add_active_menu(win, CHRONICLE_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+        0, 0, ATR_NONE, NO_COLOR,
+        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+    abilitynum++;
+
+    Strcpy(available_ability_list[abilitynum].name, "Killed monsters");
     available_ability_list[abilitynum].function_ptr = &dokilledmonsters;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    int nkilled = 0;
+    for (i = LOW_PM; i < NUM_MONSTERS; i++)
+        nkilled += (int)mvitals[i].died;
+
+    add_extended_menu(win, KILLED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+        available_ability_list[abilitynum].name, MENU_UNSELECTED, nkilled ? active_menu_info() : zeroextendedmenuinfo);
 
     abilitynum++;
 
-    strcpy(available_ability_list[abilitynum].name, "Genocided monsters");
+    Strcpy(available_ability_list[abilitynum].name, "Genocided monsters");
     available_ability_list[abilitynum].function_ptr = &dogenocidedmonsters;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_extended_menu(win, GENOCIDED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+        available_ability_list[abilitynum].name, MENU_UNSELECTED, num_genocides() ? active_menu_info() : zeroextendedmenuinfo);
 
     abilitynum++;
 
-    strcpy(available_ability_list[abilitynum].name, "Discovered items");
+    Strcpy(available_ability_list[abilitynum].name, "Discovered items");
     available_ability_list[abilitynum].function_ptr = &dodiscovered;
 
     any = zeroany;
     any.a_int = abilitynum + 1;
 
-    add_menu(win, NO_GLYPH, &any,
+    add_active_menu(win, DISCOVERED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
         0, 0, ATR_NONE, NO_COLOR,
         available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
@@ -1005,14 +1020,14 @@ doability(VOID_ARGS)
                 {
                     char umnbuf[BUFSIZ];
                     Strcpy(umnbuf, UMNAME(mtmp));
-                    umnbuf[16] = '\0'; /* Limit the length of the name */
+                    umnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
                     Strcpy(namebuf, umnbuf);
                 }
                 else if (MNAME(mtmp) && mtmp->u_know_mname)
                 {
                     char mnbuf[BUFSIZ];
                     Strcpy(mnbuf, MNAME(mtmp));
-                    mnbuf[16] = '\0'; /* Limit the length of the name */
+                    mnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
                     Strcpy(namebuf, mnbuf);
                 }
                 else
@@ -1020,7 +1035,7 @@ doability(VOID_ARGS)
                     char buf[BUFSZ];
                     Strcpy(buf, mon_monster_name(mtmp));
                     *buf = highc(*buf);
-                    strncpy(namebuf, buf, MAXNAMELENGTH - 1);
+                    Strncpy(namebuf, buf, MAXNAMELENGTH - 1);
                     namebuf[MAXNAMELENGTH - 1] = '\0';
                 }
 
@@ -1056,6 +1071,7 @@ doability(VOID_ARGS)
         return 0;
     }
 
+    i = '\0';
     if (select_menu(win, PICK_ONE, &pick_list) > 0) 
     {
         i = pick_list->item.a_int;
@@ -1084,7 +1100,6 @@ domonsterability(VOID_ARGS)
 
     menu_item* pick_list = (menu_item*)0;
     winid win;
-    int abilitynum = 0;
     int glyph, gui_glyph;
     glyph = abs(u_to_glyph());
     gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
@@ -1092,7 +1107,7 @@ domonsterability(VOID_ARGS)
     struct extended_create_window_info createinfo = extended_create_window_info_from_mon(&youmonst);
     win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_COMMAND_MENU, gui_glyph, createinfo);
     start_menu_ex(win, GHMENU_STYLE_MONSTER_ABILITY);
-    print_monster_abilities(win, &abilitynum, FALSE);
+    int abilitynum = print_monster_abilities(win);
     end_menu(win, "Monster Abilities");
 
     if (abilitynum <= 0)
@@ -1124,17 +1139,12 @@ domonsterability(VOID_ARGS)
 }
 
 STATIC_OVL
-void
-print_monster_abilities(win, abilitiesnum_ptr, ischaractermenu)
+int
+print_monster_abilities(win)
 winid win;
-int* abilitiesnum_ptr;
-boolean ischaractermenu;
 {
-    if (!abilitiesnum_ptr)
-        return;
-
     anything any;
-    int abilitynum = *abilitiesnum_ptr;
+    int abilitynum = 0;
     int glyph = 0, gui_glyph = 0;
     const char* fmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
         "%s (&mana; %d)" : "%s (%d mana)";
@@ -1157,258 +1167,278 @@ boolean ischaractermenu;
         || lays_eggs(youmonst.data)
         )
     {
-        if(ischaractermenu)
-        {
-            any = zeroany;
+        any = zeroany;
+        if(win != WIN_ERR)
             add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
-                "Use Monster Abilities                 ", MENU_UNSELECTED, menu_heading_info());
-        }
-        else
-        {
-            any = zeroany;
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
-                "Your Abilities", MENU_UNSELECTED, menu_heading_info());
-        }
+            0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+            "Your Abilities", MENU_UNSELECTED, menu_heading_info());
 
         if (can_breathe(youmonst.data))
         {
-            Sprintf(available_ability_list[abilitynum].name, fmt, "Use breath weapon", BREATH_WEAPON_MANA_COST);
-            available_ability_list[abilitynum].function_ptr = &dobreathe;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Sprintf(available_ability_list[abilitynum].name, fmt, "Use breath weapon", BREATH_WEAPON_MANA_COST);
+                available_ability_list[abilitynum].function_ptr = &dobreathe;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (attacktype(youmonst.data, AT_SPIT))
         {
-            strcpy(available_ability_list[abilitynum].name, "Spit");
-            available_ability_list[abilitynum].function_ptr = &dospit;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Spit");
+                available_ability_list[abilitynum].function_ptr = &dospit;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (youmonst.data->mlet == S_NYMPH)
         {
-            strcpy(available_ability_list[abilitynum].name, "Remove chained items");
-            available_ability_list[abilitynum].function_ptr = &doremove;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Remove chained items");
+                available_ability_list[abilitynum].function_ptr = &doremove;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (attacktype(youmonst.data, AT_GAZE))
         {
-            int i, adtyp = 0;
-            for (i = 0; i < NATTK; i++) {
-                if (youmonst.data->mattk[i].aatyp == AT_GAZE) {
-                    adtyp = youmonst.data->mattk[i].adtyp;
-                    break;
+            if (win != WIN_ERR)
+            {
+                int i, adtyp = 0;
+                for (i = 0; i < NATTK; i++) {
+                    if (youmonst.data->mattk[i].aatyp == AT_GAZE) {
+                        adtyp = youmonst.data->mattk[i].adtyp;
+                        break;
+                    }
                 }
+                int gazemanacost = (adtyp == AD_CNCL ? CNCL_GAZE_MANA_COST : EYE_STALK_MANA_COST);
+                const char* gazefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
+                    "Gaze%s (&mana; %d)" : "Gaze%s (%d mana)";
+
+                char gazebuf[BUFSIZ];
+                Sprintf(gazebuf, gazefmt, youmonst.data->mlet == S_EYE ? " with central eye" : "", gazemanacost);
+                Strcpy(available_ability_list[abilitynum].name, gazebuf);
+                available_ability_list[abilitynum].function_ptr = &dogaze;
+                available_ability_list[abilitynum].target_mtmp = 0;
+
+                any = zeroany;
+                any.a_int = abilitynum + 1;
+
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
             }
-            int gazemanacost = (adtyp == AD_CNCL ? CNCL_GAZE_MANA_COST : EYE_STALK_MANA_COST);
-            const char* gazefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
-                "Gaze%s (&mana; %d)" : "Gaze%s (%d mana)";
-
-            char gazebuf[BUFSIZ];
-            Sprintf(gazebuf, gazefmt, youmonst.data->mlet == S_EYE ? " with central eye" : "", gazemanacost);
-            strcpy(available_ability_list[abilitynum].name, gazebuf);
-            available_ability_list[abilitynum].function_ptr = &dogaze;
-            available_ability_list[abilitynum].target_mtmp = 0;
-
-            any = zeroany;
-            any.a_int = abilitynum + 1;
-
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
             abilitynum++;
         }
 
         if (attacktype(youmonst.data, AT_EYES))
         {
-            Sprintf(available_ability_list[abilitynum].name, fmt, "Gaze with one or more eyestalks", EYE_STALK_MANA_COST);
-            available_ability_list[abilitynum].function_ptr = &doeyestalk;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Sprintf(available_ability_list[abilitynum].name, fmt, "Gaze with one or more eyestalks", EYE_STALK_MANA_COST);
+                available_ability_list[abilitynum].function_ptr = &doeyestalk;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (is_were(youmonst.data))
         {
-            Sprintf(available_ability_list[abilitynum].name, fmt, "Summon monsters", WERE_SUMMON_MANA_COST);
-            available_ability_list[abilitynum].function_ptr = &dosummon;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Sprintf(available_ability_list[abilitynum].name, fmt, "Summon monsters", WERE_SUMMON_MANA_COST);
+                available_ability_list[abilitynum].function_ptr = &dosummon;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (webmaker(youmonst.data))
         {
-            strcpy(available_ability_list[abilitynum].name, "Spin web");
-            available_ability_list[abilitynum].function_ptr = &dospinweb;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Spin web");
+                available_ability_list[abilitynum].function_ptr = &dospinweb;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (is_hider(youmonst.data))
         {
-            strcpy(available_ability_list[abilitynum].name, "Hide");
-            available_ability_list[abilitynum].function_ptr = &dohide;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Hide");
+                available_ability_list[abilitynum].function_ptr = &dohide;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (is_tentacled_one(youmonst.data))
         {
-            Sprintf(available_ability_list[abilitynum].name, fmt, "Project a mind blast", MIND_BLAST_MANA_COST);
-            available_ability_list[abilitynum].function_ptr = &domindblast;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Sprintf(available_ability_list[abilitynum].name, fmt, "Project a mind blast", MIND_BLAST_MANA_COST);
+                available_ability_list[abilitynum].function_ptr = &domindblast;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (u.umonnum == PM_GREMLIN)
         {
-            strcpy(available_ability_list[abilitynum].name, "Dry a fountain");
-            available_ability_list[abilitynum].function_ptr = &dodryfountain;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Dry a fountain");
+                available_ability_list[abilitynum].function_ptr = &dodryfountain;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (is_unicorn(youmonst.data))
         {
-            Sprintf(available_ability_list[abilitynum].name, fmt, "Use your horn", UNICORN_HORN_MANA_COST);
-            available_ability_list[abilitynum].function_ptr = &douseunicornhorn;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Sprintf(available_ability_list[abilitynum].name, fmt, "Use your horn", UNICORN_HORN_MANA_COST);
+                available_ability_list[abilitynum].function_ptr = &douseunicornhorn;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (youmonst.data->msound == MS_SHRIEK)
         {
-            strcpy(available_ability_list[abilitynum].name, "Shriek");
-            available_ability_list[abilitynum].function_ptr = &doshriek;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Shriek");
+                available_ability_list[abilitynum].function_ptr = &doshriek;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                if (win != WIN_ERR)
+                    add_extended_menu(win, NO_GLYPH, &any,
+                        0, 0, ATR_NONE, NO_COLOR,
+                        available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (youmonst.data->mlet == S_VAMPIRE)
         {
-            strcpy(available_ability_list[abilitynum].name, "Assume another form");
-            available_ability_list[abilitynum].function_ptr = &dopoly;
-            available_ability_list[abilitynum].target_mtmp = 0;
+            if (win != WIN_ERR)
+            {
+                Strcpy(available_ability_list[abilitynum].name, "Assume another form");
+                available_ability_list[abilitynum].function_ptr = &dopoly;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
 
         if (lays_eggs(youmonst.data) && flags.female)
         {
-            const char* layfmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
-                "%s an egg (&food; %d)" : "%s an egg (%d nutrition)";
+            if (win != WIN_ERR)
+            {
+                const char* layfmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
+                    "%s an egg (&food; %d)" : "%s an egg (%d nutrition)";
 
-            Sprintf(available_ability_list[abilitynum].name, layfmt, eggs_in_water(youmonst.data) ? "Spawn" : "Lay", (int)objects[EGG].oc_nutrition);
-            available_ability_list[abilitynum].function_ptr = &dolayegg;
-            available_ability_list[abilitynum].target_mtmp = 0;
+                Sprintf(available_ability_list[abilitynum].name, layfmt, eggs_in_water(youmonst.data) ? "Spawn" : "Lay", (int)objects[EGG].oc_nutrition);
+                available_ability_list[abilitynum].function_ptr = &dolayegg;
+                available_ability_list[abilitynum].target_mtmp = 0;
 
-            any = zeroany;
-            any.a_int = abilitynum + 1;
+                any = zeroany;
+                any.a_int = abilitynum + 1;
 
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
-
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, menuinfo);
+            }
             abilitynum++;
         }
     }
@@ -1422,44 +1452,47 @@ boolean ischaractermenu;
         any = zeroany;
         glyph = abs(any_mon_to_glyph(u.usteed, rn2_on_display_rng));
         gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL, 0UL, MAT_NONE, 0));
-        add_extended_menu(win, gui_glyph, &any,
+        if (win != WIN_ERR)
+            add_extended_menu(win, gui_glyph, &any,
             0, 0, iflags.menu_headings, NO_COLOR,
-            ischaractermenu ? "Use Your Steed's Abilities            " : "Your Steed's Abilities", MENU_UNSELECTED, menu_heading_info());
+            "Your Steed's Abilities", MENU_UNSELECTED, menu_heading_info());
 
         if (can_breathe(u.usteed->data))
         {
-            struct extended_menu_info steedmenuinfo = zeroextendedmenuinfo;
-            int mcolor = NO_COLOR;
-            steedmenuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
-            any = zeroany;
-            if (u.usteed->mspec_used > 0)
+            if (win != WIN_ERR)
             {
-                Strcpy(available_ability_list[abilitynum].name, "(Breath weapon cooling down)");
-                mcolor = CLR_GRAY;
+                struct extended_menu_info steedmenuinfo = zeroextendedmenuinfo;
+                int mcolor = NO_COLOR;
+                steedmenuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+                any = zeroany;
+                if (u.usteed->mspec_used > 0)
+                {
+                    Strcpy(available_ability_list[abilitynum].name, "(Breath weapon cooling down)");
+                    mcolor = CLR_GRAY;
+                }
+                else
+                {
+                    const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
+                        "%s (&cool; %s)" : "%s (%s round cooldown)";
+                    Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command steed to use breath weapon", "1d10+4");
+                    any.a_int = abilitynum + 1;
+                    mcolor = NO_COLOR;
+                }
+
+                available_ability_list[abilitynum].function_ptr = &dosteedbreathe;
+                available_ability_list[abilitynum].target_mtmp = 0;
+
+                any = zeroany;
+
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, mcolor,
+                    available_ability_list[abilitynum].name, MENU_UNSELECTED, steedmenuinfo);
             }
-            else
-            {
-                const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
-                    "%s (&cool; %s)" : "%s (%s round cooldown)";
-                Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command steed to use breath weapon", "1d10+4");
-                any.a_int = abilitynum + 1;
-                mcolor = NO_COLOR;
-            }
-
-            available_ability_list[abilitynum].function_ptr = &dosteedbreathe;
-            available_ability_list[abilitynum].target_mtmp = 0;
-
-            any = zeroany;
-
-            add_extended_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, mcolor,
-                available_ability_list[abilitynum].name, MENU_UNSELECTED, steedmenuinfo);
-
             abilitynum++;
         }
     }
 
-    *abilitiesnum_ptr = abilitynum;
+    return abilitynum;
 }
 
 
@@ -2493,6 +2526,9 @@ wiz_save_glyph2tiles(VOID_ARGS) /* Save a csv file for tile data */
             case GLYPH_SKILL_TILE_OFF:
                 header = "GENERAL_SKILL_TILE_OFF";
                 break;
+            case GLYPH_COMMAND_TILE_OFF:
+                header = "GENERAL_COMMAND_TILE_OFF";
+                break;
             case GLYPH_BUFF_OFF:
                 header = "BUFF_OFF";
                 break;
@@ -2573,14 +2609,28 @@ wiz_save_spells(VOID_ARGS)
 
 /* Save monsters into .md files */
 STATIC_PTR int
-wiz_save_monsters2(VOID_ARGS)
+wiz_save_monsters_md(VOID_ARGS)
 {
     if (wizard)
     {
         write_monsters();
     }
     else
-        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_save_monsters2)));
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_save_monsters_md)));
+
+    return 0;
+}
+
+/* Save items into .md files */
+STATIC_PTR int
+wiz_save_items_md(VOID_ARGS)
+{
+    if (wizard)
+    {
+        write_items();
+    }
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_save_items_md)));
 
     return 0;
 }
@@ -3156,15 +3206,19 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
     *tmpbuf = highc(*tmpbuf); /* same adjustment as bottom line */
     /* as in background_enlightenment, when poly'd we need to use the saved
        gender in u.mfemale rather than the current you-as-monster gender */
-#ifndef GNH_MOBILE
-    Sprintf(buf, "%s the %s's attributes:", tmpbuf,
-            ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
-                ? urole.name.f
-                : urole.name.m);
-
-    /* title */
-    enlght_out(buf, ATR_HEADING); /* "Conan the Archaeologist's attributes:" */
+#ifdef GNH_MOBILE
+    if (final)
 #endif
+    {
+        Sprintf(buf, "%s the %s's attributes:", tmpbuf,
+            ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
+            ? urole.name.f
+            : urole.name.m);
+
+        /* title */
+        enlght_out(buf, ATR_HEADING); /* "Conan the Archaeologist's attributes:" */
+    }
+
     /* background and characteristics; ^X or end-of-game disclosure */
     if (mode & BASICENLIGHTENMENT) {
         /* role, race, alignment, deities, dungeon level, time, experience */
@@ -3231,7 +3285,7 @@ int final;
     role_titl = (innategend && urole.name.f) ? urole.name.f : urole.name.m;
     rank_titl = rank_of(u.ulevel, Role_switch, innategend);
 #ifndef GNH_MOBILE
-    enlght_out("", ATR_NONE); /* separator after title */
+    enlght_out(" ", ATR_HALF_SIZE); /* separator after title */
 #endif
     enlght_out("Background:", ATR_SUBHEADING);
 
@@ -5278,6 +5332,8 @@ dodeletesavedgame(VOID_ARGS)
         {
             if (yn_query_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Delete Save File", "Are you sure to delete the save file?") == 'y')
             {
+                delete_tmp_backup_savefile();
+                delete_backup_savefile();
                 delete_savefile();
                 pline1("Save file has been deleted.");
             }
@@ -5654,7 +5710,7 @@ struct ext_func_tab extcmdlist[] = {
     { 'C', "chat", "talk to someone", dotalk, IFBURIED | AUTOCOMPLETE },
     { M(10), "chatsteed", "talk to steed", dotalksteed, IFBURIED },
     { M(11), "chatnearby", "talk to someone nearby", dotalknearby, IFBURIED },
-    { '\0',   "chronicle", "show journal of major events",
+    { M(13), "chronicle", "show journal of major events",
               do_gamelog, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { C('c'), "call", "call (name) something", docallcmd, IFBURIED | AUTOCOMPLETE, 0, getobj_callable, "call" },
     { M('c'), "commands", "list of additional actions",
@@ -5915,7 +5971,9 @@ struct ext_func_tab extcmdlist[] = {
     { '\0', "wizsavespells", "save spells into .md files",
             wiz_save_spells, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { '\0', "wizsavemonsters", "save monsters into .md files",
-            wiz_save_monsters2, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+            wiz_save_monsters_md, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "wizsaveitems", "save items into .md files",
+            wiz_save_items_md, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #endif
     { '\0', "wizcrown", "make the god crown you",
             wiz_crown, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
@@ -8233,7 +8291,7 @@ int x, y, mod;
 
             if (mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp))
             {
-                if (iflags.clickfire && uwep && (is_launcher(uwep) || is_thrown_weapon_only(uwep)) && dist2(u.ux, u.uy, target_x, target_y) > 2)
+                if (iflags.clickfire && ((uwep && is_launcher(uwep)) || (uquiver && throwing_weapon(uquiver))) && dist2(u.ux, u.uy, target_x, target_y) > 2)
                 {
                     if (!x || !y || abs(x) == abs(y)) /* straight line or diagonal */
                     {
@@ -8252,26 +8310,26 @@ int x, y, mod;
                         else if(!path_is_clear)
                         {
                             play_sfx_sound(SFX_GENERAL_CANNOT);
-                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; the path to it is not clear.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; the path to it is not clear.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
                             cmd[0] = '\0';
                         }
                         else if (mtmpinway)
                         {
                             play_sfx_sound(SFX_GENERAL_CANNOT);
-                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; %s is in the way.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp), mon_nam(mtmpinway));
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; %s is in the way.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp), mon_nam(mtmpinway));
                             cmd[0] = '\0';
                         }
                         else
                         {
                             play_sfx_sound(SFX_GENERAL_CANNOT);
-                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; there is something in the way.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; there is something in the way.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
                             cmd[0] = '\0';
                         }
                     }
                     else
                     {
                         play_sfx_sound(SFX_GENERAL_CANNOT);
-                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; it is not lined up.", is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; it is not lined up.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
                         cmd[0] = '\0';
                     }
                 }
@@ -8838,7 +8896,7 @@ unsigned long ynflags; /* 1 means use upper side for half-sized tile */
     if (strlen(query) >= QBUFSZ) {
         /* caller shouldn't have passed anything this long */
         paniclog("Query truncated: ", query);
-        (void) strncpy(qbuf, query, QBUFSZ - 1 - 3);
+        Strncpy(qbuf, query, QBUFSZ - 1 - 3);
         Strcpy(&qbuf[QBUFSZ - 1 - 3], "...");
         query = qbuf;
     }
@@ -9549,7 +9607,7 @@ do_gamelog(VOID_ARGS)
         show_gamelog(ENL_GAMEINPROGRESS);
     }
     else {
-        pline("No chronicled events.");
+        pline1("No chronicled events.");
     }
     return 0;
 }

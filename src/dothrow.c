@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    dothrow.c    $NHDT-Date: 1556201496 2019/04/25 14:11:36 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -184,7 +184,7 @@ get_multishot_stats(magr, otmp, weapon, thrown)
 struct monst* magr;
 struct obj* otmp;
 struct obj* weapon;
-boolean thrown;
+uchar thrown; /* 1 = obj is thrown, 2 = obj is launcher */
 {
     struct multishot_result res = { 1, 1, 1.0 };
     if (!magr)
@@ -235,6 +235,7 @@ boolean thrown;
     }
 
     boolean isammo = is_ammo(otmp);
+    boolean islauncher = is_launcher(otmp);
     boolean matching = FALSE;
     int skilllevel = 0;
     int used_multishotstyle = 0; 
@@ -272,9 +273,9 @@ boolean thrown;
 
 
     /* Choose multishot style */
-    if (matching && thrown)
+    if ((matching && thrown == 1) || (islauncher && thrown == 2))
         used_multishotstyle = 1; /* Launcher */
-    else if(!matching && thrown)
+    else if(!matching && thrown == 1)
         used_multishotstyle = 2; /* Thrown */
     else
         used_multishotstyle = 3; /* Melee */
@@ -1347,7 +1348,7 @@ boolean
 throwing_weapon(obj)
 struct obj *obj;
 {
-    return (boolean) (nonmelee_throwing_weapon(obj) || (objects[obj->otyp].oc_flags & O1_MELEE_AND_THROWN_WEAPON));
+    return (boolean)is_otyp_throwing_weapon(obj->otyp);
 }
 
 /* return true for weapon meant to be only thrown and cannot be used in melee */
@@ -1355,7 +1356,7 @@ boolean
 nonmelee_throwing_weapon(obj)
 struct obj* obj;
 {
-    return (boolean)(is_missile(obj) || (objects[obj->otyp].oc_flags & O1_THROWN_WEAPON_ONLY));
+    return (boolean)is_otyp_nonmelee_throwing_weapon(obj->otyp);
 }
 
 

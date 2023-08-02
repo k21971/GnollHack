@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    mon.c    $NHDT-Date: 1556139724 2019/04/24 21:02:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.284 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -4694,6 +4694,8 @@ register struct monst *mtmp;
 
     mtmp->m_ap_type = M_AP_NOTHING;
     mtmp->mappearance = 0;
+    if (has_mobj(mtmp))
+        free_mobj(mtmp);
 
     /*
      *  Discovered mimics don't block light.
@@ -6189,7 +6191,7 @@ uchar style; /* 0 = dwarf lords and dwarf ladies, 1 = dwarf lords and ladies,
             if (len >= flen)
                 break;
 
-            strncpy(buf, malename, len);
+            Strncpy(buf, malename, len);
             buf[len] = 0;
             if (!strncmp(femalename, buf, len))
             {

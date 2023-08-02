@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    shk.c    $NHDT-Date: 1555201699 2019/04/14 00:28:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.159 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -583,7 +583,7 @@ char *enterstring;
         /* You seem to be new here */
         eshkp->visitct = 0;
         eshkp->following = 0;
-        (void) strncpy(eshkp->customer, plname, PL_NSIZ);
+        Strncpy(eshkp->customer, plname, PL_NSIZ);
         pacify_shk(shkp);
     }
 
@@ -1267,7 +1267,7 @@ register struct monst *shkp;
         return;
 
     rile_shk(shkp);
-    (void) strncpy(ESHK(shkp)->customer, plname, PL_NSIZ);
+    Strncpy(ESHK(shkp)->customer, plname, PL_NSIZ);
     ESHK(shkp)->following = 1;
 }
 
@@ -3696,7 +3696,6 @@ register struct obj *obj;
 boolean shk_buying;
 {
     register long tmp = get_object_base_value(obj);
-
     if (obj->oartifact)
     {
         tmp = arti_cost(obj);
@@ -4565,7 +4564,7 @@ boolean cant_mollify;
     y = appear_here->place.y;
 
     /* not the best introduction to the shk... */
-    (void) strncpy(ESHK(shkp)->customer, plname, PL_NSIZ);
+    Strncpy(ESHK(shkp)->customer, plname, PL_NSIZ);
 
     /* if the shk is already on the war path, be sure it's all out */
     if (ANGRY(shkp) || ESHK(shkp)->following)

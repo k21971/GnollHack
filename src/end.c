@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    end.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.170 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -869,7 +869,7 @@ dump_plines()
             size_t len = strlen(&buf[1]);
             memcpy(&buf2[1], saved_pline_attrs[j], min(BUFSZ - 1, len));
             memcpy(&buf3[1], saved_pline_colors[j], min(BUFSZ - 1, len));
-            putstr_ex2(0, buf, buf2, buf3, ATR_PREFORM, NO_COLOR, 0);
+            putstr_ex2(0, buf, buf2, buf3, ATR_NONE, NO_COLOR, 0);
 #ifdef FREE_ALL_MEMORY
             free(*strp), *strp = 0;
             free((genericptr_t)saved_pline_attrs[j]), saved_pline_attrs[j] = 0;
@@ -1307,6 +1307,7 @@ int how;
             killer.name[0] = '\0';
             killer.hint_idx = 0;
         }
+        (void)restore_backup_savefile(TRUE);
         if (wizard) {
             You1("are a very tricky wizard, it seems.");
             killer.format = KILLED_BY_AN; /* reset to 0 */
@@ -1446,9 +1447,9 @@ int how;
     if (!survive && how <= GENOCIDED)
     {
         u.utruemortality++;
-        if ((wizard || discover) && !paranoid_query_ex(ATR_NONE, NO_COLOR, ParanoidDie, (char*)0, "Die?"))
+        if ((wizard || discover) && !paranoid_query_ex(ATR_NONE, CLR_MSG_GOD, ParanoidDie, (char*)0, "Die?"))
         {
-            pline("OK, so you don't %s.", (how == CHOKING) ? "choke" : "die");
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "OK, so you don't %s.", (how == CHOKING) ? "choke" : "die");
             savelife(how);
             survive = TRUE;
         }
@@ -1620,6 +1621,12 @@ int how;
     if(endtext)
         display_screen_text(endtext, (const char*)0, (const char*)0, screentextstyle, ATR_NONE, clr, 0UL);
 
+    if (how != PANICKED && how != TRICKED)
+    {
+        delete_tmp_backup_savefile();
+        delete_backup_savefile();
+    }
+
     /* might have been killed while using a disposable item, so make sure
        it's gone prior to inventory disclosure and creation of bones data */
     inven_inuse(TRUE);
@@ -1647,26 +1654,23 @@ int how;
     /* Write forum post and livelog */
     if (how < PANICKED || how == ASCENDED || how == ESCAPED)
     {
-        char basebuf[BUFSZ * 3] = "";
         if (how < PANICKED)
         {
             char killerbuf[BUFSZ * 2];
             formatkiller(killerbuf, sizeof killerbuf, how, TRUE);
             if (!*killerbuf)
                 Strcpy(killerbuf, deaths[how]);
-            Strcpy(basebuf, killerbuf);
-            Sprintf(postbuf, "%s died, %s", plname, basebuf);
+            Strcpy(postbuf, killerbuf);
         }
         else
         {
             if (how == ASCENDED)
-                Strcpy(basebuf, "ascended to demigodhood");
+                Strcpy(postbuf, "ascended to demigodhood");
             else if (how == ESCAPED)
-                Strcpy(basebuf, "escaped the dungeon");
-            Sprintf(postbuf, "%s %s", plname, basebuf);
+                Strcpy(postbuf, "escaped the dungeon");
         }
 
-        livelog_printf(LL_DUMP, "%s", basebuf);
+        livelog_printf(LL_DUMP, "%s", postbuf);
     }
 
     You("were playing on %s difficulty in %s mode.", get_game_difficulty_text(context.game_difficulty),
@@ -1963,8 +1967,8 @@ int how;
                 ? urole.name.f
                 : urole.name.m)
             : (const char*)(flags.female ? "Demigoddess" : "Demigod"));
-        dump_forward_putstr(endwin, ATR_HEADING, pbuf, done_stopprint);
-        dump_forward_putstr(dumpwin, 0, "", done_stopprint);
+        dump_forward_putstr(endwin, ATR_HEADING, pbuf, done_stopprint, 0);
+        dump_forward_putstr(dumpwin, 0, "", done_stopprint, 0);
 
         if (how == ESCAPED || how == ASCENDED)
         {
@@ -2019,18 +2023,18 @@ int how;
                     //nowrap_add(u.u_gamescore, mhp);
                     Strcat(eos(pbuf), " and Schroedinger's cat");
                 }
-                dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+                dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
                 pbuf[0] = '\0';
             }
             else
             {
                 Strcat(pbuf, " ");
             }
-            Sprintf(eos(pbuf), "%s with %ld point%s,",
+            Sprintf(eos(pbuf), "%s with %ld point%s, ",
                 how == ASCENDED ? "went to your reward"
                 : "escaped from the dungeon",
                 u.u_gamescore, plur(u.u_gamescore));
-            dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+            dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
 
 #if 0
             if (!done_stopprint)
@@ -2071,10 +2075,10 @@ int how;
                     }
                     else
                     {
-                        Sprintf(pbuf, "%8ld worthless piece%s of colored glass,",
+                        Sprintf(pbuf, "%8ld worthless piece%s of colored glass, ",
                             count, plur(count));
                     }
-                    dump_forward_putstr(endwin, ATR_PREFORM, pbuf, 0);
+                    dump_forward_putstr(endwin, ATR_NONE, pbuf, 0);
                 }
             }
 #endif
@@ -2103,29 +2107,29 @@ int how;
                         In_quest(&u.uz) ? dunlev(&u.uz) : depth(&u.uz));
             }
 
-            Sprintf(eos(pbuf), " with %ld point%s,", u.u_gamescore, plur(u.u_gamescore));
-            dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+            Sprintf(eos(pbuf), " with %ld point%s, ", u.u_gamescore, plur(u.u_gamescore));
+            dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
         }
 
         Sprintf(pbuf, "and %ld piece%s of gold, after %ld move%s.", umoney,
             plur(umoney), moves, plur(moves));
-        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
 
         char realtimebuf[BUFSZ] = "";
         print_realtime(realtimebuf, urealtime.realtime);
         Sprintf(pbuf, "You played on %s difficulty in %s mode for %s.", get_game_difficulty_text(context.game_difficulty),
             get_game_mode_text(TRUE), realtimebuf);
-        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
         if (!n_game_recoveries)
             Strcpy(pbuf, "The dungeon never collapsed on you.");
         else
             Sprintf(pbuf, "The dungeon collapsed on you %lu time%s.", n_game_recoveries, plur(n_game_recoveries));
-        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
+        dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
         Sprintf(pbuf,
             "You were level %d with a maximum of %d hit point%s when you %s.",
             u.ulevel, u.uhpmax, plur(u.uhpmax), ends[how]);
-        dump_forward_putstr(endwin, ATR_PREFORM, pbuf, done_stopprint);
-        dump_forward_putstr(endwin, ATR_PREFORM, "", done_stopprint);
+        dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
+        dump_forward_putstr(endwin, ATR_NONE, "", done_stopprint, 0);
 
         if (!done_stopprint)
             display_nhwindow(endwin, TRUE);
@@ -2152,7 +2156,17 @@ int how;
                 issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_HTML, dlfilename);
     #endif
     #endif
-            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT, postbuf);
+            char totalpostbuf[BUFSZ * 4];
+            char mbuf[BUFSZ] = "";
+            char cbuf[BUFSZ];
+            (void)describe_mode(mbuf);
+            Sprintf(cbuf, "%.3s %.3s %.3s %.3s XL:%d", urole.filecode,
+                urace.filecode, genders[flags.female].filecode,
+                aligns[1 - u.ualign.type].filecode, u.ulevel);
+            long currenttime = get_current_game_duration();
+            char* duration = format_duration_with_units(currenttime);
+            Sprintf(totalpostbuf, "%s (%s), %ld point%s, T:%ld (%s), %s [%s]", plname, cbuf, u.u_gamescore, plur(u.u_gamescore), moves, duration, postbuf, mbuf);
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT, totalpostbuf);
         }
     }
 
@@ -2197,22 +2211,26 @@ int show_weights;
 
     if (show_weights == 1) // Inventory
         loadstonecorrectly = TRUE;
-    else if (show_weights == 2) { // Pick up
+    else if (show_weights == 2) 
+    { // Pick up
         loadstonecorrectly = (boolean)objects[LOADSTONE].oc_name_known;
     }
     else if (show_weights == 3) // Drop
         loadstonecorrectly = TRUE;
 
-
-
-    for (box = list; box; box = box->nobj) {
-        if (Is_container(box) || box->otyp == STATUE) {
+    for (box = list; box; box = box->nobj) 
+    {
+        if (Is_container(box) || box->otyp == STATUE) 
+        {
             box->cknown = 1; /* we're looking at the contents now */
             if (identified)
                 box->lknown = 1;
-            if (Is_noncontainer(box) /*->otyp == BAG_OF_TRICKS*/) {
+            if (Is_noncontainer(box) /*->otyp == BAG_OF_TRICKS*/) 
+            {
                 continue; /* wrong type of container */
-            } else if (box->cobj) {
+            } 
+            else if (box->cobj) 
+            {
                 winid tmpwin = create_nhwindow(NHW_MENU);
                 Loot *sortedcobj, *srtc;
                 unsigned sortflags;
@@ -2231,7 +2249,8 @@ int show_weights;
                 if (!dumping)
                     putstr(tmpwin, ATR_HALF_SIZE, " ");
                 buf[0] = buf[1] = ' '; /* two leading spaces */
-                if (box->cobj && !cat) {
+                if (box->cobj && !cat) 
+                {
                     sortflags = (((flags.sortloot == 'l'
                                    || flags.sortloot == 'f')
                                      ? SORTLOOT_LOOT : 0)
@@ -2239,8 +2258,10 @@ int show_weights;
                     sortedcobj = sortloot(&box->cobj, sortflags, FALSE,
                                           (boolean FDECL((*), (OBJ_P))) 0);
                     totalweight = 0;
-                    for (srtc = sortedcobj; ((obj = srtc->obj) != 0); ++srtc) {
-                        if (identified) {
+                    for (srtc = sortedcobj; ((obj = srtc->obj) != 0); ++srtc) 
+                    {
+                        if (identified) 
+                        {
                             discover_object(obj->otyp, TRUE, FALSE);
                             obj->known = obj->bknown = obj->dknown
                                 = obj->rknown = obj->nknown = obj->aknown = obj->mknown = 1;
@@ -2257,7 +2278,7 @@ int show_weights;
     
                         Sprintf(&buf[2], "%2d - %s", count, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly) : doname_with_price_and_weight_first(obj, loadstonecorrectly)) : doname_with_price(obj));
                         //Strcpy(&buf[2], doname_with_price_and_weight_first(obj));
-                        putstr(tmpwin, ATR_INDENT_AT_DASH, buf);
+                        putstr(tmpwin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                     }
                     if (flags.show_weight_summary)
                     {
@@ -2267,18 +2288,22 @@ int show_weights;
                     }
 
                     unsortloot(&sortedcobj);
-                } else if (cat) {
+                } 
+                else if (cat) 
+                {
                     Strcpy(&buf[2], "Schroedinger's cat!");
                     putstr(tmpwin, 0, buf);
                 }
                 if (dumping)
-                    putstr(0, 0, "");
+                    putstr(0, ATR_HALF_SIZE, " ");
                 display_nhwindow(tmpwin, TRUE);
                 destroy_nhwindow(tmpwin);
                 if (all_containers)
                     container_contents(box->cobj, identified, TRUE,
                                        reportempty, show_weights);
-            } else if (reportempty) {
+            } 
+            else if (reportempty) 
+            {
                 pline("%s is empty.", upstart(thesimpleoname(box)));
                 display_nhwindow(WIN_MESSAGE, FALSE);
             }
@@ -2579,7 +2604,7 @@ boolean ask, isend;
             klwin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_NARROW_LIST, NO_GLYPH, zerocreatewindowinfo);
             putstr(klwin, ATR_TITLE, "Vanquished creatures:");
             if (!dumping)
-                putstr(klwin, 0, "");
+                putstr(klwin, ATR_NONE, "");
 
             qsort((genericptr_t) mindx, ntypes, sizeof *mindx, vanqsort_cmp);
             for (ni = 0; ni < ntypes; ni++) 
@@ -2593,7 +2618,7 @@ boolean ask, isend;
                 if (class_header && mlet != prev_mlet) 
                 {
                     Strcpy(buf, def_monsyms[(int) mlet].name);
-                    putstr(klwin, ask ? 0 : iflags.menu_headings,
+                    putstr(klwin, ask ? ATR_NONE : iflags.menu_headings,
                            upstart(buf));
                     prev_mlet = mlet;
                 }
@@ -2623,7 +2648,7 @@ boolean ask, isend;
                 {
                     if (uniq_header && was_uniq)
                     {
-                        putstr(klwin, 0, "");
+                        putstr(klwin, ATR_NONE, "");
                         was_uniq = FALSE;
                     }
                     /* trolls or undead might have come back,
@@ -2644,18 +2669,18 @@ boolean ask, isend;
                 if (class_header)
                     ++pfx;
                 Sprintf(buftoo, "%*s%s", pfx, "", buf);
-                putstr(klwin, 0, buftoo);
+                putstr(klwin, ATR_NONE, buftoo);
             }
             /*
              * if (Hallucination)
-             *     putstr(klwin, 0, "and a partridge in a pear tree");
+             *     putstr(klwin, ATR_NONE, "and a partridge in a pear tree");
              */
             if (ntypes > 1) 
             {
                 if (!dumping)
-                    putstr(klwin, 0, "");
+                    putstr(klwin, ATR_NONE, "");
                 Sprintf(buf, "%ld creatures vanquished.", total_killed);
-                putstr(klwin, 0, buf);
+                putstr(klwin, ATR_PARAGRAPH_LINE, buf);
             }
             display_nhwindow(klwin, TRUE);
             destroy_nhwindow(klwin);
@@ -2664,8 +2689,10 @@ boolean ask, isend;
     else if (defquery == 'a' || defquery == 'b') 
     {
         /* #dovanquished or #killed rather than final disclosure, so pline() is ok */
+        if (!isend)
+            play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
         const char* nomsg = "No creatures have been vanquished.";
-        pline1(nomsg);
+        pline_ex1(ATR_NONE, CLR_MSG_FAIL, nomsg);
         if (!isend)
             display_popup_text(nomsg, "No Vanquished Monsters", POPUP_TEXT_NO_MONSTERS_IN_LIST, ATR_NONE, NO_COLOR, NO_GLYPH, POPUP_FLAGS_NONE);
 #if defined (DUMPLOG) || defined (DUMPHTML)
@@ -2802,7 +2829,7 @@ boolean ask, isend;
                 (nextinct && ngenocided) ? " or extinct" : "");
             putstr(klwin, ATR_TITLE, buf);
             if (!dumping)
-                putstr(klwin, 0, "");
+                putstr(klwin, ATR_NONE, "");
 
             for (i = LOW_PM; i < NUM_MONSTERS; i++) 
             {
@@ -2823,7 +2850,7 @@ boolean ask, isend;
                     if ((mvitals[i].mvflags & MV_GONE) == MV_EXTINCT)
                         Strcat(buf, " (extinct)");
 
-                    putstr(klwin, 0, buf);
+                    putstr(klwin, ATR_NONE, buf);
                 }
             }
 
@@ -2833,13 +2860,13 @@ boolean ask, isend;
             if (ngenocided > 0) 
             {
                 Sprintf(buf, "%d species genocided.", ngenocided);
-                putstr(klwin, 0, buf);
+                putstr(klwin, ATR_PARAGRAPH_LINE, buf);
             }
 
             if (nextinct > 0) 
             {
                 Sprintf(buf, "%d species extinct.", nextinct);
-                putstr(klwin, 0, buf);
+                putstr(klwin, ATR_PARAGRAPH_LINE, buf);
             }
 
             display_nhwindow(klwin, TRUE);
@@ -2848,8 +2875,10 @@ boolean ask, isend;
     }
     else if (defquery == 'a')
     {
+        if (!isend)
+            play_sfx_sound(SFX_GENERAL_NOTHING_THERE);
         const char* nomsg = "No species have been genocided or become extinct.";
-        pline1(nomsg); /* Game is still ongoing, so pline is ok */
+        pline_ex1(ATR_NONE, CLR_MSG_FAIL, nomsg); /* Game is still ongoing, so pline is ok */
         if(!isend)
             display_popup_text(nomsg, "No Genocided Monsters", POPUP_TEXT_NO_MONSTERS_IN_LIST, ATR_NONE, NO_COLOR, NO_GLYPH, POPUP_FLAGS_NONE);
 #if defined (DUMPLOG) || defined (DUMPHTML)
@@ -3392,6 +3421,7 @@ reset_remaining_static_variables()
     reset_teleport();
     reest_track();
     reset_vision();
+    reset_windows();
     reset_urolerace();
     reset_zap();
 }
@@ -3448,7 +3478,7 @@ const char* title;
 const char* query;
 {
     struct special_view_info info = { 0 };
-    info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION;
+    info.viewtype = SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N;
     info.title = title;
     info.text = query;
     info.attr = ATR_NONE;

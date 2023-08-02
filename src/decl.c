@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    decl.c    $NHDT-Date: 1547025164 2019/01/09 09:12:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.141 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -28,6 +28,8 @@ const char *multi_reason = NULL;
 NEARDATA int nroom = 0;
 NEARDATA int nsubroom = 0;
 NEARDATA int occtime = 0;
+
+int exit_hack_code = 0;
 
 /* maze limits must be even; masking off lowest bit guarantees that */
 int x_maze_max = (COLNO - 1) & ~1, y_maze_max = (ROWNO - 1) & ~1;
@@ -552,7 +554,8 @@ int multicolor_orange1[1] = { CLR_ORANGE };
 int multicolor_orange2[2] = { NO_COLOR, CLR_ORANGE };
 int multicolor_orange3[3] = { NO_COLOR, NO_COLOR, CLR_ORANGE };
 int multicolor_orange4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_ORANGE };
-
+int multicolor_text1[1] = { CLR_MSG_TEXT };
+int multicolor_text2[2] = { NO_COLOR, CLR_MSG_TEXT };
 
 NEARDATA const char* Moloch = "Moloch";
 /* for rejecting attempts to use wizard mode commands */

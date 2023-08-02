@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    shknam.c    $NHDT-Date: 1454485432 2016/02/03 07:43:52 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.41 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -601,6 +601,8 @@ boolean deserted;
                 if (rn2(10) >= depth(&u.uz)) {
                     mtmp->m_ap_type = M_AP_OBJECT;
                     mtmp->mappearance = STRANGE_OBJECT;
+                    if (has_mobj(mtmp))
+                        free_mobj(mtmp);
                 }
                 (void)mongets(mtmp, WAN_IDENTIFY);
             }
@@ -617,6 +619,8 @@ boolean deserted;
                 if (rn2(10) >= depth(&u.uz)) {
                     mtmp->m_ap_type = M_AP_OBJECT;
                     mtmp->mappearance = STRANGE_OBJECT;
+                    if (has_mobj(mtmp))
+                        free_mobj(mtmp);
                 }
                 (void)mongets(mtmp, WAN_TOWN_PORTAL);
             }
@@ -648,6 +652,8 @@ boolean deserted;
         if (rn2(10) >= depth(&u.uz)) {
             mtmp->m_ap_type = M_AP_OBJECT;
             mtmp->mappearance = STRANGE_OBJECT;
+            if (has_mobj(mtmp))
+                free_mobj(mtmp);
         }
     } else if(!deserted || !rn2(2)) {
         atype = get_shop_item((int) (shp - shtypes));
@@ -733,7 +739,7 @@ const char *const *nlp;
                 break; /* new name */
         }
     }
-    (void) strncpy(ESHK(shk)->shknam, shname, PL_NSIZ);
+    Strncpy(ESHK(shk)->shknam, shname, PL_NSIZ);
     ESHK(shk)->shknam[PL_NSIZ - 1] = 0;
 }
 

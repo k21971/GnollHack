@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    weapon.c    $NHDT-Date: 1548209744 2019/01/23 02:15:44 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.69 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -136,6 +136,15 @@ int skill_id;
         return P_NAME_PLURAL(absid);
 }
 
+const char*
+otyp_weapon_skill_name(otyp)
+int otyp;
+{
+    schar type = objects[otyp].oc_skill;
+    enum p_skills skill = (enum p_skills)((type < 0) ? -type : type);
+    const char* descr = P_NAME(skill);
+    return descr;
+}
 
 const char*
 weapon_skill_name(obj)
@@ -4442,21 +4451,33 @@ dump_skills(VOID_ARGS)
     char skilllevelbuf[BUFSZ];
     char skillmaxbuf[BUFSZ];
     putstr(0, ATR_HEADING, "Final Skills:");
+
+    int skill_cnt = 0;
     for (i = 1; i < P_NUM_SKILLS; i++)
     {
         if (P_RESTRICTED(i))
             continue;
 
+        skill_cnt++;
+    }
+
+    int skill_idx = 0;
+    for (i = 1; i < P_NUM_SKILLS; i++)
+    {
+        if (P_RESTRICTED(i))
+            continue;
+
+        skill_idx++;
         Sprintf(skillnamebufC, "%s", P_NAME(i));
         *skillnamebufC = highc(*skillnamebufC);
         (void)skill_level_name(i, skilllevelbuf, FALSE);
         (void)skill_level_name(i, skillmaxbuf, TRUE);
 
-        Sprintf(buf, " %-34s %s / %s", skillnamebufC, skilllevelbuf, skillmaxbuf);
-        putstr(0, ATR_PREFORM, buf);
+        Sprintf(buf, "  %-34s  %s / %s", skillnamebufC, skilllevelbuf, skillmaxbuf);
+        putstr(0, ATR_TABLE_ROW | (skill_idx == 1 ? ATR_START_TABLE : 0) | (skill_idx == skill_cnt ? ATR_END_TABLE : 0), buf);
     }
     Sprintf(buf, "You had %d skill slot%s available", u.weapon_slots, plur(u.weapon_slots));
-    putstr(0, ATR_SUBHEADING, buf);
+    putstr(0, ATR_PARAGRAPH_LINE, buf);
 }
 
 short

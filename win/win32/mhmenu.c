@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    mhmenu.c    $NHDT-Date: 1432512811 2015/05/25 00:13:31 $  $NHDT-Branch: master $:$NHDT-Revision: 1.48 $ */
 /* Copyright (c) Alex Kompel, 2002                                */
@@ -41,6 +41,7 @@ typedef struct mswin_menu_item {
     int count;
     BOOL has_focus;
     boolean is_animated;
+    unsigned long miflags;
 } NHMenuItem, *PNHMenuItem;
 
 typedef struct mswin_gnollhack_menu_window {
@@ -722,10 +723,11 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         data->menu.items[new_item].group_accel = msg_data->group_accel;
         data->menu.items[new_item].attr = msg_data->attr;
         data->menu.items[new_item].color = msg_data->color;
+        data->menu.items[new_item].miflags = msg_data->miflags;
 
         char msgbuf[NHMENU_STR_SIZE] = "";
         write_CP437_to_buf_unicode(msgbuf, NHMENU_STR_SIZE, msg_data->str);
-        strncpy(data->menu.items[new_item].str, msgbuf,
+        (void)strncpy(data->menu.items[new_item].str, msgbuf,
                 NHMENU_STR_SIZE);
 
     /* prevent & being interpreted as a mnemonic start */
@@ -797,7 +799,7 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
             char buf[QBUFSZ * 2 + 3] = "";
             Sprintf(buf, "%s%s%s", msg_data->text ? msg_data->text : "", msg_data->text && msg_data->subtitle && strcmp(msg_data->text, "") && strcmp(msg_data->subtitle, "") ? " - " : "", msg_data->subtitle ? msg_data->subtitle : "");
 
-            strncpy(data->menu.prompt, buf,
+            (void)strncpy(data->menu.prompt, buf,
                     sizeof(data->menu.prompt) - 1);
 
             HDC hDC = GetDC(hWnd);
@@ -1420,7 +1422,10 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    source_top_added = tileHeight / 2;
+                    if(item->miflags & MENU_FLAGS_ACTIVE)
+                        source_top_added = 0;
+                    else
+                        source_top_added = tileHeight / 2;
                     source_height_deducted = tileHeight / 2;
                 }
 

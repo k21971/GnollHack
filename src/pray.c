@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    pray.c    $NHDT-Date: 1549074257 2019/02/02 02:24:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.110 $ */
 /* Copyright (c) Benson I. Margulies, Mike Stephenson, Steve Linhart, 1989. */
@@ -1859,7 +1859,7 @@ aligntyp g_align;
                 else if (u.uevent.uheard_tune < 2)
                 {
                     You_hear_ex(ATR_NONE, CLR_MSG_MYSTICAL, "a divine music...");
-                    pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "It sounds like:  \"%s\".", tune);
+                    pline_multi_ex(ATR_NONE, CLR_MSG_MYSTICAL, no_multiattrs, multicolor_text1, "It sounds like:  \"%s\".", tune);
                     u.uevent.uheard_tune++;
                     break;
                 }

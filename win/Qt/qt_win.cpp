@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 // NetHack 3.6	qt_win.cpp	$NHDT-Date: 1524684508 2018/04/25 19:28:28 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.77 $
 // Copyright (c) Warwick Allison, 1999.
@@ -1171,7 +1171,7 @@ NetHackQtPlayerSelector::NetHackQtPlayerSelector(NetHackQtKeyBuffer& ks) :
 
 void NetHackQtPlayerSelector::selectName(const QString& n)
 {
-    strncpy(plname,n.latin1(),sizeof(plname)-1);
+    (void)strncpy(plname,n.latin1(),sizeof(plname)-1);
 }
 
 void NetHackQtPlayerSelector::selectRole()
@@ -4984,7 +4984,7 @@ char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph,
 		// anything beyond <esc> is hidden
 		*cb = '\0';
 	    }
-	    (void)strncpy(message, question, QBUFSZ-1);
+	    Strncpy(message, question, QBUFSZ-1);
 	    message[QBUFSZ-1] = '\0';
 	    Sprintf(eos(message), " [%s]", choicebuf);
 	    if (def) Sprintf(eos(message), " (%c)", def);

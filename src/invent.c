@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    invent.c    $NHDT-Date: 1555196229 2019/04/13 22:57:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.253 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2523,7 +2523,7 @@ boolean (*validitemfunc)(struct obj*);
         size_t leftnum = 3;
         if (l >= leftnum)
         {
-            strncpy(leftbuf, word, leftnum);
+            Strncpy(leftbuf, word, leftnum);
             leftbuf[leftnum] = '\0';
         }
         else
@@ -2532,7 +2532,7 @@ boolean (*validitemfunc)(struct obj*);
         size_t rightnum = 4;
         if (l >= rightnum)
         {
-            strncpy(rightbuf, word + l - rightnum, rightnum);
+            Strncpy(rightbuf, word + l - rightnum, rightnum);
             rightbuf[rightnum] = '\0';
         }
         else
@@ -3020,7 +3020,7 @@ struct obj* otmp_only;
         size_t leftnum = 3;
         if (l >= leftnum)
         {
-            strncpy(leftbuf, word, leftnum);
+            Strncpy(leftbuf, word, leftnum);
             leftbuf[leftnum] = '\0';
         }
         else
@@ -3029,7 +3029,7 @@ struct obj* otmp_only;
         size_t rightnum = 4;
         if (l >= rightnum)
         {
-            strncpy(rightbuf, word + l - rightnum, rightnum);
+            Strncpy(rightbuf, word + l - rightnum, rightnum);
             rightbuf[rightnum] = '\0';
         }
         else
@@ -5222,15 +5222,10 @@ boolean FDECL((*filterfunc), (OBJ_P));
 boolean bynexthere;
 {
     int count = 0;
-
-    while (list) {
+    for (; list; list = (bynexthere ? list->nexthere : list->nobj)) {
         if (filterfunc && !(*filterfunc)(list))
             continue;
         count++;
-        if(bynexthere)
-            list = list->nexthere;
-        else
-            list = list->nobj;
     }
     return count;
 }
@@ -6264,7 +6259,7 @@ print_things_here_to_window(VOID_ARGS)
                 putstr_ex(tmpwin, ebuf, attr, CLR_MSG_FAIL, 1);
                 break;
             }
-            strncpy(buf, ep->engr_txt, BUFSZ - 5);
+            Strncpy(buf, ep->engr_txt, BUFSZ - 5);
             buf[BUFSZ - 5] = 0;
             Sprintf(ebuf, " \"%s\".", buf);
             putstr_ex(tmpwin, ebuf, attr, CLR_MSG_TEXT, 0);

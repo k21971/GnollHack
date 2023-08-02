@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    attrib.c    $NHDT-Date: 1553363417 2019/03/23 17:50:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.65 $ */
 /*      Copyright 1988, 1989, 1990, 1992, M. Stephenson           */
@@ -732,10 +732,9 @@ boolean
 object_uses_spellbook_wand_flags_and_properties(uitem)
 struct obj* uitem;
 {
-    return ((uitem->oclass == SPBOOK_CLASS)  /* && !(objects[uitem->otyp].oc_flags & O1_NON_SPELL_SPELLBOOK) */
-        || uitem->oclass == WAND_CLASS || (uitem->oclass == TOOL_CLASS && is_spelltool(uitem))
-        || uitem->oclass == POTION_CLASS || uitem->oclass == SCROLL_CLASS
-        );
+    if (!uitem)
+        return FALSE;
+    return otyp_uses_spellbook_wand_flags(uitem->otyp);
 }
 
 void

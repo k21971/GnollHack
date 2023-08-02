@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    save.c    $NHDT-Date: 1554591225 2019/04/06 22:53:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -85,35 +85,42 @@ dosave()
     if (iflags.debug_fuzzer)
         return 0;
     clear_nhwindow(WIN_MESSAGE);
-    if (yn_query("Really save?") == 'n')
+    boolean confirm_save = TRUE;
+
+#ifdef CONTINUE_PLAYING_AFTER_SAVING
+    if (CasualMode) 
+        confirm_save = FALSE; // 'q' in "Continue playing after saving?" cancels save instead
+#endif
+
+    if (confirm_save && yn_query("Really save?") == 'n')
     {
         clear_nhwindow(WIN_MESSAGE);
         if (multi > 0)
             nomul(0);
     } 
-    else 
+    else
     {
         boolean contplay = FALSE;
-        /* Not supported anymore */
-        //if (CasualMode)
-        //{
-        //    clear_nhwindow(WIN_MESSAGE);
-        //    char ans = ynq("Continue playing after saving?");
-        //    switch (ans)
-        //    {
-        //    case 'q':
-        //        clear_nhwindow(WIN_MESSAGE);
-        //        if (multi > 0)
-        //            nomul(0);
-        //        return 0;
-        //    case 'y':
-        //        contplay = TRUE;
-        //        break;
-        //    default:
-        //        break;
-        //    }
-        //}
-
+#ifdef CONTINUE_PLAYING_AFTER_SAVING
+        if (CasualMode)
+        {
+            clear_nhwindow(WIN_MESSAGE);
+            char ans = ynq("Continue playing after saving?");
+            switch (ans)
+            {
+            case 'q':
+                clear_nhwindow(WIN_MESSAGE);
+                if (multi > 0)
+                    nomul(0);
+                return 0;
+            case 'y':
+                contplay = TRUE;
+                break;
+            default:
+                break;
+            }
+        }
+#endif
         clear_nhwindow(WIN_MESSAGE);
         pline("Saving...");
 #if defined(UNIX) || defined(VMS) || defined(__EMX__)
@@ -122,16 +129,16 @@ dosave()
         int saveres = dosave0(FALSE);
         if (saveres)
         {
-            //if(contplay)
-            //    display_popup_text("Game was saved successfully.", "Game Saved", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, 0UL);
-            if (!contplay || !load_saved_game(1))
+            if (contplay)
             {
-                u.uhp = -1; /* universal game's over indicator */
-                /* make sure they see the Saving message */
-                display_nhwindow(WIN_MESSAGE, TRUE);
-                exit_nhwindows(contplay ? "Cannot continue the game..." : "Be seeing you...");
-                nh_terminate(EXIT_SUCCESS);
+                exit_hack_code = 1;
+                //    display_popup_text("Game was saved successfully.", "Game Saved", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, 0UL);
             }
+            u.uhp = -1; /* universal game's over indicator */
+            /* make sure they see the Saving message */
+            display_nhwindow(WIN_MESSAGE, TRUE);
+            exit_nhwindows(contplay ? (char*)0 : "Be seeing you...");
+            nh_terminate(EXIT_SUCCESS);
         }
         else
             (void) doredraw();
@@ -321,16 +328,23 @@ boolean quietly;
         (void) nhclose(ofd);
         bwrite(fd, (genericptr_t) &ltmp, sizeof ltmp); /* level number*/
         savelev(fd, ltmp, WRITE_SAVE | FREE_SAVE);     /* actual level*/
-        delete_levelfile(ltmp);
     }
     bclose(fd);
+    nh_compress(fq_save);
 
     u.uz = uz_save;
 
-    /* get rid of current level --jgm */
+    /* get rid of all the level files after all is done --jgm and JG */
+    for (ltmp = (xchar)1; ltmp <= maxnoofledgers; ltmp++) {
+        if (ltmp == ledger_no(&u.uz))
+            continue;
+        if (!(level_info[ltmp].flags & LFILE_EXISTS))
+            continue;
+        delete_levelfile(ltmp);
+    }
     delete_levelfile(ledger_no(&u.uz));
     delete_levelfile(0);
-    nh_compress(fq_save);
+
     /* this should probably come sooner... */
     program_state.something_worth_saving = 0;
     saving = FALSE;
@@ -446,7 +460,7 @@ register int fd, mode;
 }
 
 /* returns 1 if save file exists, otherwise 0 */
-int
+boolean
 check_existing_save_file()
 {
     const char* fq_save;
@@ -1426,7 +1440,7 @@ int fd;
     gamestats.gender = Upolyd ? u.mfemale : flags.female;
     gamestats.alignment = u.ualign.type;
     gamestats.ulevel = (short)u.ulevel;
-    strcpy(gamestats.dgn_name, dungeons[u.uz.dnum].dname);
+    Strcpy(gamestats.dgn_name, dungeons[u.uz.dnum].dname);
 
     s_level* slev = Is_special(&u.uz);
     mapseen* mptr = 0;

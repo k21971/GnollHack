@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    botl.c    $NHDT-Date: 1557094795 2019/05/05 22:19:55 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -67,7 +67,6 @@ STATIC_OVL NEARDATA size_t mrank_sz = 0; /* loaded by max_rank_sz (from u_init) 
 STATIC_DCL void NDECL(bot_via_windowport);
 STATIC_DCL void NDECL(stat_update_time);
 STATIC_DCL char* FDECL(conditionbitmask2str, (unsigned long));
-STATIC_DCL char* FDECL(format_duration_with_units, (long));
 
 STATIC_VAR struct _status_hilite_line_str* status_hilite_str = 0;
 STATIC_VAR int status_hilite_str_id = 0;
@@ -741,8 +740,8 @@ botl_score()
 }
 
 /* Returns a human readable formatted duration (e.g. 2h:03m:ss). */
-STATIC_OVL
-char* format_duration_with_units(seconds)
+char*
+format_duration_with_units(seconds)
 long seconds;
 {
     static char buf_fmt_duration[BUFSZ];
@@ -835,7 +834,7 @@ char* buf;
     char modebuf[BUFSZ];
     const char* difsym = get_game_difficulty_symbol(context.game_difficulty);
 
-    Sprintf(modebuf, "%s%s", wizard ? "W" : discover ? "X" : CasualMode ? (ModernMode ? "C" : "R") : ModernMode ? "M" : "", difsym);
+    Sprintf(modebuf, "%s%s%s", wizard ? "W" : discover ? "X" : "", CasualMode ? (ModernMode ? "C" : "R") : ModernMode ? "M" : "", difsym);
 
     Sprintf(buf, "%s", modebuf);
     return ret;
@@ -3261,7 +3260,7 @@ boolean from_configfile;
 
         if (hilite.behavior == BL_TH_TEXTMATCH && txt) 
         {
-            (void) strncpy(hilite.textmatch, txt, sizeof hilite.textmatch);
+            Strncpy(hilite.textmatch, txt, sizeof hilite.textmatch);
             hilite.textmatch[sizeof hilite.textmatch - 1] = '\0';
             (void) trimspaces(hilite.textmatch);
         }
@@ -4207,7 +4206,7 @@ choose_value:
             *inp = '\0'; /* strip '%' [this accepts trailing junk!] */
         } else if (*inp) {
             /* some random characters */
-            pline("\"%s\" is not a recognized number.", inp);
+            pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolor_text1, "\"%s\" is not a recognized number.", inp);
             goto choose_value;
         }
         if (!gotnum) {

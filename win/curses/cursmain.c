@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursmain.c */
@@ -362,6 +362,10 @@ curses_display_nhwindow(winid wid, BOOLEAN_P block)
     if (!iflags.window_inited && wid == MAP_WIN) {
         iflags.window_inited = TRUE;
     } else {
+        boolean border = curses_window_has_border(wid);
+        if (border) {
+            box(curses_get_nhwin(wid), 0, 0);
+        }
         /* actually display the window */
         wnoutrefresh(curses_get_nhwin(wid));
         /* flush pending writes from other windows too */
@@ -441,7 +445,7 @@ curses_putstr_ex(winid wid, const char *text, int attr, int color, int app)
     if (!text)
         return;
 
-    int mesgflags = attr & (ATR_LINE_MSG_MASK);
+    int mesgflags = attr & (ATR_LINE_ATTR_MASK);
     attr &= ~mesgflags;
 
     if (wid == WIN_MESSAGE && (mesgflags & ATR_NOHISTORY) != 0) 
@@ -462,7 +466,7 @@ curses_putstr_ex2(winid wid, const char* text, const char* attrs, const char* co
     if (!text)
         return;
 
-    int mesgflags = attr & (ATR_LINE_MSG_MASK);
+    int mesgflags = attr & (ATR_LINE_ATTR_MASK);
     attr &= ~mesgflags;
 
     if (wid == WIN_MESSAGE && (mesgflags & ATR_NOHISTORY) != 0)
@@ -536,7 +540,7 @@ curses_add_menu(winid wid, int glyph, const ANY_P * identifier,
                 CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
                 const char *str, BOOLEAN_P presel)
 {
-    attr &= ~(ATR_LINE_MSG_MASK);
+    attr &= ~(ATR_LINE_ATTR_MASK);
 
     if (inv_update) {
         int height = 0, width = 0;
@@ -572,7 +576,7 @@ curses_add_extended_menu(winid wid, int glyph, const ANY_P* identifier,
     CHAR_P accelerator, CHAR_P group_accel, int attr, int color,
     const char* str, BOOLEAN_P presel, struct extended_menu_info info)
 {
-    attr &= ~(ATR_LINE_MSG_MASK);
+    attr &= ~(ATR_LINE_ATTR_MASK);
 
     if (inv_update) {
         int height = 0, width = 0;
@@ -1066,10 +1070,10 @@ curses_open_special_view(struct special_view_info info)
     case SPECIAL_VIEW_CHAT_MESSAGE:
         genl_chat_message();
         break;
-    case SPECIAL_VIEW_GUI_YN_CONFIRMATION:
-        /* Implementation needed */
-        //return (int)curses_yn_function_ex(0, info.attr, info.color, 0, info.title, info.text, ynchars, "n", "Yes\nNo", (char*)0, 0UL);
-        break;
+    case SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N:
+        return 'n';
+    case SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y:
+        return 'y';
     default:
         break;
     }

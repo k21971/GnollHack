@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    dig.c    $NHDT-Date: 1547421446 2019/01/13 23:17:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1123,7 +1123,7 @@ coord *cc;
     }
 
     int itemsfound = unearth_objs(&youmonst, u.ux, u.uy, TRUE, FALSE);
-
+    boolean doautopickup = itemsfound > 0;
     if (!itemsfound)
     {
         switch (rn2(5)) {
@@ -1134,12 +1134,16 @@ coord *cc;
             (void)mksobj_at(BONE, dig_x, dig_y, TRUE, FALSE);
             if (!rn2(2))
                 (void)mksobj_at(HUMAN_SKULL, dig_x, dig_y, TRUE, FALSE);
+            doautopickup = TRUE;
             break;
         case 1:
             play_sfx_sound(SFX_UNEARTHED_OBJECT_FOUND);
             You("unearth a corpse.");
             if ((otmp = mk_tt_object(CORPSE, dig_x, dig_y)) != 0)
+            {
                 otmp->age -= 100; /* this is an *OLD* corpse */
+                doautopickup = TRUE;
+            }
             break;
         case 2:
             if (!Blind)
@@ -1179,6 +1183,8 @@ coord *cc;
     int subtyp = levl[dig_x][dig_y].floorsubtyp ? levl[dig_x][dig_y].floorsubtyp : get_initial_location_subtype(typ);
     int vartyp = levl[dig_x][dig_y].floorvartyp ? levl[dig_x][dig_y].floorvartyp : get_initial_location_vartype(typ, subtyp);
     create_simple_location(dig_x, dig_y, typ, subtyp, vartyp, 0, back_to_broken_glyph(dig_x, dig_y), 0, 0, 0, TRUE);
+    if (doautopickup)
+        (void)pickup(1);
     return;
 }
 
@@ -1950,6 +1956,30 @@ boolean unexpected;
     }
 }
 
+void
+zap_try_destroy_tree(x, y)
+int x, y;
+{
+    if (!isok(x, y) || !IS_TREE(levl[x][y].typ))
+        return;
+
+    if (!(levl[x][y].wall_info & W_NONDIGGABLE))
+    {
+        play_simple_location_sound((xchar)x, (xchar)y, LOCATION_SOUND_TYPE_BREAK);
+        uncatch_tree_objects(x, y);
+        create_current_floor_location((xchar)x, (xchar)y, 0, back_to_broken_glyph((xchar)x, (xchar)y), FALSE);
+        unblock_vision_and_hearing_at_point(x, y); /* vision */
+        newsym(x, y);
+        force_redraw_at(x, y);
+        pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "tree splinters into pieces!");
+    }
+    else if (!Blind)
+    {
+        play_sfx_sound(SFX_WALL_GLOWS_THEN_FADES);
+        pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "tree shudders but is unharmed.");
+    }
+}
+
 /* digging via wand zap or spell cast */
 void
 zap_dig(origobj)
@@ -2268,20 +2298,7 @@ struct obj* origobj;
             else if (IS_TREE(room->typ)) 
             { /* check trees before stone */
                 play_immediate_ray_sound_at_location(OBJECT_RAY_SOUNDSET_DIGBEAM, RAY_SOUND_TYPE_HIT_LOCATION, zx, zy);
-                if (!(room->wall_info & W_NONDIGGABLE))
-                {
-                    play_simple_location_sound(zx, zy, LOCATION_SOUND_TYPE_BREAK);
-                    uncatch_tree_objects(zx, zy);
-                    create_current_floor_location(zx, zy, 0, back_to_broken_glyph(zx, zy), FALSE);
-                    unblock_vision_and_hearing_at_point(zx, zy); /* vision */
-                    newsym(zx, zy);
-                    force_redraw_at(zx, zy);
-                }
-                else if (!Blind)
-                {
-                    play_sfx_sound(SFX_WALL_GLOWS_THEN_FADES);
-                    pline_The("tree shudders but is unharmed.");
-                }
+                zap_try_destroy_tree(zx, zy);
                 break;
             }
             else if (room->typ == STONE || room->typ == SCORR)
@@ -3053,7 +3070,7 @@ boolean verbose, buriedsearchableonly;
             if (verbose)
             {
                 play_sfx_sound_at_location(SFX_UNEARTHED_OBJECT_FOUND, x, y);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s %s%s.", is_you ? "You" : Monnam(mtmp), is_you ? "find" : "finds", doname(otmp), buriedsearchableonly ? " buried close to the surface of the ground" : "");
+                pline_ex(ATR_NONE, is_you || (mtmp && is_tame(mtmp)) ? CLR_MSG_SUCCESS : CLR_MSG_ATTENTION, "%s %s %s%s.", is_you ? "You" : Monnam(mtmp), is_you ? "find" : "finds", doname(otmp), buriedsearchableonly ? " buried close to the surface of the ground" : "");
             }
             if (bball && otmp == bball
                 && u.utrap && u.utraptype == TT_BURIEDBALL) 
@@ -3365,8 +3382,11 @@ dodig()
     You("dig the ground with %s.", digbuf);
 
     int itemsfound = unearth_objs(&youmonst, u.ux, u.uy, TRUE, FALSE);
-
-    if (!itemsfound)
+    if (itemsfound)
+    {
+        (void)pickup(1);
+    }
+    else
     {
         pline("However, you do not find anything.");
     }

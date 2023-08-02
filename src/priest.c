@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    priest.c    $NHDT-Date: 1545131519 2018/12/18 11:11:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.45 $ */
 /* Copyright (c) Izchak Miller, Steve Linhart, 1989.              */
@@ -841,6 +841,7 @@ int roomno;
             {
                 msg1 = "have a%s forbidding feeling...";
                 msg2 = (!shrined || !p_coaligned(priest)) ? "" : " strange";
+                msg1color = CLR_MSG_ATTENTION;
                 this_time = &epri_p->hostile_time;
                 other_time = &epri_p->peaceful_time;
             } 
@@ -848,6 +849,7 @@ int roomno;
             {
                 msg1 = "experience %s sense of peace.";
                 msg2 = (u.ualign.record >= ALGN_PIOUS) ? "a" : "an unusual";
+                msg1color = CLR_MSG_SUCCESS;
                 this_time = &epri_p->peaceful_time;
                 other_time = &epri_p->hostile_time;
             }
@@ -857,7 +859,7 @@ int roomno;
                forbidding to sense-of-peace or vice versa */
             if (moves >= *this_time || *other_time >= *this_time) 
             {
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, msg1, msg2);
+                You_ex(ATR_NONE, msg1color, msg1, msg2);
                 *this_time = moves + (long) d(10, 20); /* ~55 */
                 /* avoid being tricked by the RNG:  switch might have just
                    happened and previous random threshold could be larger */

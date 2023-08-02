@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
 
 /* GnollHack 4.0    do_name.c    $NHDT-Date: 1555627306 2019/04/18 22:41:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1821,7 +1821,7 @@ const char* introline;
     /* if there's an existing name, make it be the default answer */
     if (*str1)
     {
-        strncpy(buf, *str1, BUFSZ - 1);
+        Strncpy(buf, *str1, BUFSZ - 1);
         buf[BUFSZ - 1] = '\0';
     }
 #endif
@@ -4132,7 +4132,7 @@ struct obj* obj;
         if (artilist[sorted_citems[i]].aflags & AF_NO_WISH)
             nowishcnt++;
         Sprintf(buf, "%3d - %s%s", i + 1, objbuf, (artilist[sorted_citems[i]].aflags & AF_NO_WISH) ? "*" : "");
-        putstr(datawin, ATR_INDENT_AT_DASH, buf);
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
     if (nowishcnt > 0)
     {

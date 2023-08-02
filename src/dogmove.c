@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    dogmove.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.74 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -2312,7 +2312,6 @@ newdogpos:
                             pline("%s starts digging the ground.", Monnam(mtmp));
 
                         int itemsfound = unearth_objs(mtmp, nix, niy, canseemon(mtmp), TRUE);
-
                         if (!itemsfound && canseemon(mtmp))
                             pline("%s looks disappointed.", Monnam(mtmp));
                     }
@@ -2460,6 +2459,8 @@ struct monst *mtmp;
         /* was eating a mimic and now appearance needs resetting */
         mtmp->m_ap_type = 0;
         mtmp->mappearance = 0;
+        if (has_mobj(mtmp))
+            free_mobj(mtmp);
         newsym(mtmp->mx, mtmp->my);
     }
 }
@@ -2500,6 +2501,8 @@ struct monst *mtmp;
 
     mtmp->m_ap_type = qm[idx].m_ap_type;
     mtmp->mappearance = qm[idx].mappearance;
+    if (has_mobj(mtmp))
+        free_mobj(mtmp);
 
     if (spotted || cansee(mtmp->mx, mtmp->my) || canspotmon(mtmp)) {
         /* this isn't quite right; if sensing a monster without being

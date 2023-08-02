@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
 
 /* GnollHack 4.0    bones.c    $NHDT-Date: 1557092711 2019/05/05 21:45:11 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.75 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985,1993. */
@@ -712,6 +712,7 @@ getbones()
         if (!wizard)
             pline("Discarding unuseable bones; no need to panic...");
         ok = FALSE;
+        (void)nhclose(fd);
     } else {
         ok = TRUE;
         if (wizard) {
@@ -740,6 +741,7 @@ getbones()
                 pline1(errbuf);
                 ok = FALSE; /* won't die of trickery */
             }
+            (void)nhclose(fd);
             trickery(errbuf);
         } else {
             register struct monst *mtmp;
@@ -771,8 +773,8 @@ getbones()
             resetobjs(fobj, TRUE);
             resetobjs(level.buriedobjlist, TRUE);
         }
+        (void)nhclose(fd);
     }
-    (void) nhclose(fd);
     sanitize_engravings();
     u.uroleplay.numbones++;
 
