@@ -267,8 +267,8 @@ boolean verbose_and_update_stats;
             if (Blind)
                 pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s for a moment.", Tobjnam(obj, "vibrate"));
             else
-                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s for a moment.", Tobjnam(obj, "glow"),
-                    hcolor(NH_BLACK));
+                pline_multi_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, "%s %s for a moment.", Tobjnam(obj, "glow"),
+                    hcolor_multi_buf1(NH_BLACK));
         }
     }
 
@@ -678,10 +678,10 @@ boolean silently;
 
     /* works for fast, very fast, and slowed */
     char savedname[BUFSIZ] = "";
-    strcpy(savedname, mon_nam(mtmp));
+    Strcpy(savedname, mon_nam(mtmp));
 
     char SavedName[BUFSIZ] = "";
-    strcpy(SavedName, Monnam(mtmp));
+    Strcpy(SavedName, Monnam(mtmp));
 
     boolean could_spot_mon = canspotmon(mtmp);
     boolean was_invisible = is_invisible(mtmp);
@@ -1203,8 +1203,8 @@ boolean silently;
                     if (mythic_quality == 0)
                         continue;
 
-                    struct mythic_power_definition* mythic_powers = (isprefix ? mythic_prefix_powers : mythic_suffix_powers);
-                    struct mythic_definition* mythic_definitions = (isprefix ? mythic_prefix_qualities : mythic_suffix_qualities);
+                    const struct mythic_power_definition* mythic_powers = (isprefix ? mythic_prefix_powers : mythic_suffix_powers);
+                    const struct mythic_definition* mythic_definitions = (isprefix ? mythic_prefix_qualities : mythic_suffix_qualities);
                     uchar max_mythic_powers = (isprefix ? MAX_MYTHIC_PREFIX_POWERS : MAX_MYTHIC_SUFFIX_POWERS);
 
                     for (uchar k = 0; k < max_mythic_powers; k++)
@@ -1387,7 +1387,7 @@ boolean creation;
      * except for the additional restriction on intelligence.  (Players
      * are always intelligent, even if polymorphed).
      */
-    if (!can_operate_objects(mon->data) || is_animal(mon->data))
+    if (!can_wear_objects(mon->data))
         return;
 
     if (mon->mfrozen)
@@ -1396,8 +1396,7 @@ boolean creation;
     /* give mummies a chance to wear their wrappings
      * and let skeletons wear their initial armor */
     if (mindless(mon->data)
-        && (!creation || !(mon->data->mlet == S_GREATER_UNDEAD
-                          || mon->data->mlet == S_LESSER_UNDEAD)))
+        && (!creation || !(mon->data->mlet == S_GREATER_UNDEAD || mon->data->mlet == S_LESSER_UNDEAD)))
         return;
 
     boolean wears_shirt = FALSE;
@@ -1443,48 +1442,48 @@ boolean creation;
     int old_misc1_delay = old_misc1 ? objects[old_misc1->otyp].oc_delay : 0;
 
     /* Main armor */
-    if (!cantweararm(mon->data) && (cursed_items_are_positive_mon(mon) || !((old_cloak && old_cloak->cursed) || (old_robe && old_robe->cursed) || (old_suit && old_suit->cursed))) )
+    if (can_wear_shirt(mon->data) && (cursed_items_are_positive_mon(mon) || !((old_cloak && old_cloak->cursed) || (old_robe && old_robe->cursed) || (old_suit && old_suit->cursed))) )
     {
         wears_shirt = m_dowear_type(mon, W_ARMU, creation, FALSE);
     }
 
-    if (!cantweararm(mon->data) && (cursed_items_are_positive_mon(mon) || !((old_cloak && old_cloak->cursed) || (old_robe && old_robe->cursed))) )
+    if (can_wear_suit(mon->data) && (cursed_items_are_positive_mon(mon) || !((old_cloak && old_cloak->cursed) || (old_robe && old_robe->cursed))) )
         wears_suit = m_dowear_type(mon, W_ARM, creation, FALSE);
     else
         wears_suit = m_dowear_type(mon, W_ARM, creation, RACE_EXCEPTION);
 
-    if (!cantweararm(mon->data) && (cursed_items_are_positive_mon(mon) || !(old_cloak && old_cloak->cursed)))
+    if (can_wear_robe(mon->data) && (cursed_items_are_positive_mon(mon) || !(old_cloak && old_cloak->cursed)))
     {
         wears_robe = m_dowear_type(mon, W_ARMO, creation, FALSE);
     }
 
-    if (!cantweararm(mon->data) || mon->data->msize == MZ_SMALL)
+    if (can_wear_cloak(mon->data))
     {
-        wears_robe = m_dowear_type(mon, W_ARMC, creation, FALSE);
+        wears_cloak = m_dowear_type(mon, W_ARMC, creation, FALSE);
     }
 
     /* Other armor types */
-    if (has_place_to_put_helmet_on(mon->data))
+    if (can_wear_helmet(mon->data))
         wears_helmet = m_dowear_type(mon, W_ARMH, creation, FALSE);
-    if (!nohands(mon->data) && (!MON_WEP(mon) || !bimanual(MON_WEP(mon))))
+    if (can_wear_shield(mon->data) && (!MON_WEP(mon) || !bimanual(MON_WEP(mon))))
         wears_shield = m_dowear_type(mon, W_ARMS, creation, FALSE);
-    if (!nohands(mon->data) && !(MON_WEP(mon) && mwelded(MON_WEP(mon), mon)))
+    if (can_wear_gloves(mon->data) && !(MON_WEP(mon) && mwelded(MON_WEP(mon), mon)))
         wears_gloves = m_dowear_type(mon, W_ARMG, creation, FALSE);
-    if (!nolimbs(mon->data) && !slithy(mon->data) && mon->data->mlet != S_CENTAUR)
+    if (can_wear_boots(mon->data) && !slithy(mon->data) && mon->data->mlet != S_CENTAUR)
         wears_boots = m_dowear_type(mon, W_ARMF, creation, FALSE);
-    if (!nolimbs(mon->data))
+    if (can_wear_bracers(mon->data))
         wears_bracers = m_dowear_type(mon, W_ARMB, creation, FALSE);
 
-
     /* Accessories */
-    if (has_neck(mon->data))
+    if (can_wear_amulet(mon->data))
         wears_amulet = m_dowear_type(mon, W_AMUL, creation, FALSE);
-    if (!nohands(mon->data) && (cursed_items_are_positive_mon(mon) || (!(MON_WEP(mon) && mwelded(MON_WEP(mon), mon)) && !(old_gloves && old_gloves->cursed))))
+    if (can_wear_rings(mon->data) && (cursed_items_are_positive_mon(mon) || (!(MON_WEP(mon) && mwelded(MON_WEP(mon), mon)) && !(old_gloves && old_gloves->cursed))))
         wears_ringr = m_dowear_type(mon, W_RINGR, creation, FALSE);
-    if (!nohands(mon->data) && (cursed_items_are_positive_mon(mon) || (!(MON_WEP(mon) && mwelded(MON_WEP(mon), mon)) && !(old_gloves && old_gloves->cursed))))
+    if (can_wear_rings(mon->data) && (cursed_items_are_positive_mon(mon) || (!(MON_WEP(mon) && mwelded(MON_WEP(mon), mon)) && !(old_gloves && old_gloves->cursed))))
         wears_ringl = m_dowear_type(mon, W_RINGL, creation, FALSE);
-    if (!nolimbs(mon->data))
-        wears_misc1 = m_dowear_type(mon, W_MISC, creation, FALSE);
+
+    /* Always check miscellaneous */
+    wears_misc1 = m_dowear_type(mon, W_MISC, creation, FALSE);
 
     update_all_mon_statistics(mon, creation);
 
@@ -1594,6 +1593,8 @@ boolean racialexception;
             best = obj;
             goto outer_break; /* no such thing as better rings */
         case W_MISC:
+            if (!can_wear_miscellaneous(mon->data, obj->otyp))
+                continue;
             if (obj->oclass != MISCELLANEOUS_CLASS || (is_priest(mon->data) && obj->cursed) || is_cursed_magic_item(obj) || (obj->owornmask && obj->owornmask != flag))
                 continue;
             if (objects[obj->otyp].oc_subtyp != MISC_BELT && !likes_magic(mon->data) && !(mon->mnum == PM_MINOTAUR && objects[obj->otyp].oc_subtyp == MISC_NOSERING))
@@ -1690,9 +1691,9 @@ outer_break:
             pline("%s%s puts on %s.", Monnam(mon), buf,
                   distant_name(best, doname));
             if (autocurse)
-                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s %s %s for a moment.", s_suffix(Monnam(mon)),
+                pline_multi_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, "%s %s %s %s for a moment.", s_suffix(Monnam(mon)),
                       simpleonames(best), otense(best, "glow"),
-                      hcolor(NH_BLACK));
+                      hcolor_multi_buf2(NH_BLACK));
         } /* can see it */
     }
 

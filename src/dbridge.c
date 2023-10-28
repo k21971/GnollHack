@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    dbridge.c    $NHDT-Date: 1503355815 2017/08/21 22:50:15 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.39 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet              */
@@ -480,12 +480,9 @@ int xkill_flags, how;
         killer.name[0] = 0;
         killer.hint_idx = 0;
         /* fake "digested to death" damage-type suppresses corpse */
-#define mk_message(dest) (((dest & XKILL_NOMSG) != 0) ? (char *) 0 : "")
-#define mk_corpse(dest) (((dest & XKILL_NOCORPSE) != 0) ? AD_DGST : AD_PHYS)
         /* if monsters are moving, one of them caused the destruction */
         if (context.mon_moving)
-            monkilled(etmp->emon,
-                      mk_message(xkill_flags), mk_corpse(xkill_flags));
+            monkilled(etmp->emon, ((xkill_flags & XKILL_NOMSG) != 0) ? (char*)0 : "", AD_PHYS, xkill_flags);
         else /* you caused it */
             xkilled(etmp->emon, xkill_flags);
         etmp->edata = (struct permonst *) 0;
@@ -496,8 +493,6 @@ int xkill_flags, how;
                 && etmp->emon == occupants[entitycnt].emon)
                 occupants[entitycnt].edata = (struct permonst *) 0;
         }
-#undef mk_message
-#undef mk_corpse
     }
 }
 
@@ -524,7 +519,7 @@ int k_format;
                     (is_not_living(etmp->emon->data) || is_vampshifter(etmp->emon))
                     ? "destroyed" : "killed");
 
-            monkilled(etmp->emon, canspotmon(etmp->emon) ? knam : 0, adtyp);
+            monkilled(etmp->emon, canspotmon(etmp->emon) ? knam : 0, adtyp, 0);
         }
     }
 }

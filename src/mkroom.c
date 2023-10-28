@@ -70,6 +70,7 @@ STATIC_DCL struct permonst *NDECL(morguemon);
 STATIC_DCL struct permonst *FDECL(librarymon, (int));
 STATIC_DCL struct permonst *NDECL(squadmon);
 STATIC_DCL struct permonst* FDECL(armorymon, (BOOLEAN_P));
+STATIC_DCL struct permonst* NDECL(yeenaghumon);
 STATIC_DCL void FDECL(save_room, (int, struct mkroom *));
 STATIC_DCL void FDECL(rest_room, (int, struct mkroom *));
 STATIC_DCL void FDECL(reset_room, (struct mkroom*));
@@ -800,11 +801,11 @@ place_main_monst_here:
             else
             {
                 mon = makemon((type == COURT)
-                           ? courtmon()
+                           ? (Is_yeenaghu_level(&u.uz) ? yeenaghumon() : courtmon())
                            : (type == BARRACKS)
-                              ? squadmon()
+                              ? (Is_yeenaghu_level(&u.uz) ? yeenaghumon() : squadmon())
                            : (type == ARMORY)
-                              ? armorymon(sx == tx && sy == ty ? TRUE : FALSE)
+                              ? (Is_yeenaghu_level(&u.uz) ? yeenaghumon() : armorymon(sx == tx && sy == ty ? TRUE : FALSE))
                               : (type == MORGUE)
                                  ? morguemon()
                               : (type == LIBRARY)
@@ -1240,7 +1241,7 @@ morguemon()
                 return &mons[PM_SPECTRE];
             else
             {
-                int ndemon_res = ndemon(A_NONE);
+                int ndemon_res = ndemon(A_NONE, FALSE, FALSE);
                 if (ndemon_res != NON_PM)
                     return &mons[ndemon_res];
                 /* else do what? As is, it will drop to ghost/wraith/zombie */
@@ -1249,11 +1250,11 @@ morguemon()
     }
 
     if (hd > 8 && i > 85)
-        return mkclass_core(S_VAMPIRE, 0, A_NONE, -rn2(5));
+        return mkclass_core(S_VAMPIRE, 0, A_NONE, -rn2(5), 0UL);
 
     return ((i < 20) ? &mons[PM_GHOST]
                      : (i < 30) ? &mons[PM_WRAITH]
-                     : (i < 50) ? mkclass_core(S_GREATER_UNDEAD, 0, A_NONE, -rn2(5))
+                     : (i < 50) ? mkclass_core(S_GREATER_UNDEAD, 0, A_NONE, -rn2(5), 0UL)
                         : mkclass(S_LESSER_UNDEAD, -rn2(5)));
 }
 
@@ -2622,12 +2623,29 @@ STATIC_VAR const struct {
                          { PM_LIEUTENANT, 4 },
                          { PM_CAPTAIN, 1 } };
 
+
+STATIC_OVL struct permonst*
+yeenaghumon()
+{
+    int mndx;
+    if (!(mvitals[PM_FLIND_LORD].mvflags & MV_GONE) && rn2(3))
+        mndx = PM_FLIND_LORD;
+    else if (!(mvitals[PM_FLIND].mvflags & MV_GONE))
+        mndx = PM_FLIND;
+    else
+        mndx = PM_VROCK + rn2(PM_BALOR - PM_VROCK + 1);
+
+    if (!(mvitals[mndx].mvflags & MV_GONE))
+        return &mons[mndx];
+    else
+        return (struct permonst*)0;
+}
+
 /* return soldier types. */
 STATIC_OVL struct permonst *
 squadmon()
 {
     int sel_prob, i, cpro, mndx;
-
     sel_prob = rnd(80 + level_difficulty());
 
     cpro = 0;

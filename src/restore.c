@@ -145,12 +145,14 @@ find_memory_obj()
         memoryobjstmp = otmp;
     }
     /* memoryobjs should now be empty */
+    lastmemoryobj = 0;
 
     /* Set level.locations[x][y].hero_memory_layers.memory_objchn (as well as reversing the chain back again) */
     while ((otmp = memoryobjstmp) != 0) {
         memoryobjstmp = otmp->nobj;
         place_memory_object(otmp, otmp->ox, otmp->oy);
     }
+    update_last_memoryobj();
 }
 
 /* Things that were marked "in_use" when the game was saved (ex. via the
@@ -653,6 +655,7 @@ unsigned int *stuckid, *steedid;
     process_tiledata(1, (const char*)0, glyph2tile, glyphtileflags);
 #endif
 
+    lock_thread_lock();
     *newgamecontext = context; /* copy statically init'd context */
     mread(fd, (genericptr_t) &context, sizeof (struct context_info));
     context.warntype.species = (context.warntype.speciesidx >= LOW_PM)
@@ -709,6 +712,7 @@ unsigned int *stuckid, *steedid;
     ReadTimebuf(urealtime.start_timing); /** [not used] **/
     /* current time is the time to use for next urealtime.realtime update */
     urealtime.start_timing = getnow();
+    unlock_thread_lock();
 
     set_uasmon();
 #ifdef CLIPPING
@@ -1580,6 +1584,7 @@ winid bannerwin; /* if not WIN_ERR, clear window and show copyright in menu */
     int ch = 0, ret = 0; /* ch: 0 => new game */
     boolean repeat = TRUE;
     boolean firsttime = TRUE;
+    int k;
 
     do
     {
@@ -1605,18 +1610,54 @@ winid bannerwin; /* if not WIN_ERR, clear window and show copyright in menu */
 
 #ifndef GNH_MOBILE
         /* COPYRIGHT_BANNER_[ABCD] */
-        int k;
         for (k = 1; k <= 4; ++k)
             add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
                 copyright_banner_line(k), MENU_UNSELECTED);
         add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "",
             MENU_UNSELECTED);
 #endif
+        int ccg_saveno = -1;
+        if (*recovery_plname && saved)
+        {
+            char ccgbuf[BUFSZ] = "", rnbuf[BUFSZ] = "";
+            boolean found_rplname = FALSE;
+            for (k = 0; saved[k].playername && saved[k].playername[0]; k++)
+            {
+                if (!strcmp(recovery_plname, saved[k].playername) && !saved[k].is_error_save_file && !saved[k].is_imported_save_file)
+                {
+                    found_rplname = TRUE;
+                    ccg_saveno = k;
+                    if (saved[k].is_running)
+                        break; /* prefer crashed file */
+                }
+            }
+            if (found_rplname)
+            {
+#ifdef GNH_MOBILE
+                char rolebuf[BUFSZ], racebuf[BUFSZ];
+                strcpy_capitalized_for_title(racebuf, races[saved[ccg_saveno].gamestats.racenum].adj);
+                strcpy_capitalized_for_title(rolebuf, saved[ccg_saveno].gamestats.gender && roles[saved[ccg_saveno].gamestats.rolenum].name.f ? roles[saved[ccg_saveno].gamestats.rolenum].name.f : roles[saved[ccg_saveno].gamestats.rolenum].name.m);
+
+                size_t totlen = strlen(recovery_plname) + strlen(racebuf) + strlen(rolebuf);
+                if(totlen >= PL_NSIZ)
+                    Sprintf(rnbuf, " (%s)", recovery_plname);
+                else
+                    Sprintf(rnbuf, " (%s, %s %s)", recovery_plname, racebuf, rolebuf);
+#endif
+                Sprintf(ccgbuf, "Continue Current Game%s", rnbuf);
+                any.a_int = 3;
+                add_menu(tmpwin, NO_GLYPH, &any, 'c', 0, ATR_HEADING, 
+                    saved[ccg_saveno].is_running ? CLR_MAGENTA : saved[ccg_saveno].is_error_save_file ? CLR_BROWN : saved[ccg_saveno].is_imported_save_file ? CLR_BLUE : NO_COLOR,
+                    ccgbuf,
+                    MENU_UNSELECTED);
+            }
+        }
+
         char ngbuf[BUFSZ] = "", modebuf[BUFSZ] = "", descbuf[BUFSZ] = "";
         strcpy_capitalized_for_title(modebuf, get_game_mode_text(FALSE));
 #ifdef GNH_MOBILE
         char dtmpbuf[BUFSZ];
-        strcpy(dtmpbuf, get_game_mode_description());
+        Strcpy(dtmpbuf, get_game_mode_description());
         *dtmpbuf = highc(*dtmpbuf);
         Sprintf(descbuf, " (%s)", dtmpbuf);
 #endif
@@ -1627,7 +1668,6 @@ winid bannerwin; /* if not WIN_ERR, clear window and show copyright in menu */
 
         if (saved && saved[0].playername)
         {
-
             any.a_int = 1;
             add_menu(tmpwin, NO_GLYPH, &any, 'l', 0, ATR_HEADING, NO_COLOR, "Load Saved Game",
                 MENU_UNSELECTED);
@@ -1664,16 +1704,38 @@ winid bannerwin; /* if not WIN_ERR, clear window and show copyright in menu */
             clear_nhwindow(bannerwin);
         }
 
-        if (ret > 0)
+        switch (ret)
         {
+        case 1: /* Load Saved Game */
+        case 2: /* Delete Saved Game */
             ch = select_saved_game(bannerwin, ret - 1, saved);
-            if(ch > 0)
+            if (ch > 0)
                 repeat = FALSE;
-        }
-        else if (ret < 0)
-        {
-            ch = ret + 1; /* -1 -> 0 (new game), -2 -> -1 (quit) */
+            break;
+        case 3: /* Continue Current Game */
+            if (ccg_saveno >= 0 && saved[ccg_saveno].playername > 0)
+            {
+                ch = ccg_saveno + 1;
+                Strcpy(plname, saved[ccg_saveno].playername);
+                plname_from_error_savefile = saved[ccg_saveno].is_error_save_file;
+                plname_from_imported_savefile = saved[ccg_saveno].is_imported_save_file;
+                repeat = FALSE;
+            }
+            else /* Start new game; something's wrong */
+            {
+                ch = 0;
+                repeat = FALSE;
+            }
+            break;
+        case -1: /* New Game */
+            ch = 0;
             repeat = FALSE;
+            break;
+        case -2:
+        default: /* Quit */
+            ch = -1;
+            repeat = FALSE;
+            break;
         }
 
         if (bannerwin != WIN_ERR)
@@ -1733,7 +1795,7 @@ struct save_game_data* saved;
             strcpy_capitalized_for_title(racebuf, races[saved[k].gamestats.racenum].adj);
             if (roles[saved[k].gamestats.rolenum].name.f)
             {
-                strcpy(genderwithspacebuf, "");
+                Strcpy(genderwithspacebuf, "");
                 if (saved[k].gamestats.gender)
                 {
                     strcpy_capitalized_for_title(rolebuf, roles[saved[k].gamestats.rolenum].name.f);
@@ -1806,7 +1868,7 @@ struct save_game_data* saved;
             }
             else
             {
-                strcpy(timebuf, "unknown date");
+                Strcpy(timebuf, "unknown date");
             }
 
             Sprintf(savedbuf, "%sGame was saved on %s", prefix, timebuf);
@@ -1883,6 +1945,7 @@ struct save_game_data* saved;
                 set_savefile_name(TRUE);
                 delete_tmp_backup_savefile();
                 delete_backup_savefile();
+                delete_error_savefile();
                 delete_savefile();
             }
             else

@@ -406,7 +406,7 @@ genl_display_popup_text(const char* text UNUSED, const char* title UNUSED, int s
 }
 
 void
-genl_display_gui_effect(int x UNUSED, int y UNUSED, int style UNUSED, unsigned long tflags UNUSED)
+genl_display_gui_effect(int style UNUSED, int subtype UNUSED, int x UNUSED, int y UNUSED, int x2 UNUSED, int y2 UNUSED, unsigned long tflags UNUSED)
 {
     return;
 }
@@ -763,7 +763,7 @@ STATIC_DCL void FDECL(hup_end_menu_ex, (winid, const char *, const char*));
 STATIC_DCL void FDECL(hup_putstr_ex, (winid, const char *, int, int, int));
 STATIC_DCL void FDECL(hup_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 STATIC_DCL void FDECL(hup_print_glyph, (winid, XCHAR_P, XCHAR_P, struct layer_info));
-STATIC_DCL void FDECL(hup_issue_gui_command, (int, int, const char*));
+STATIC_DCL void FDECL(hup_issue_gui_command, (int, int, int, const char*));
 STATIC_DCL void FDECL(hup_outrip, (winid, int, time_t));
 STATIC_DCL void FDECL(hup_curs, (winid, int, int));
 STATIC_DCL void FDECL(hup_display_nhwindow, (winid, BOOLEAN_P));
@@ -1031,8 +1031,8 @@ struct layer_info layers UNUSED;
 
 /*ARGSUSED*/
 STATIC_OVL void
-hup_issue_gui_command(cmd_id, cmd_param, cmd_str)
-int cmd_id UNUSED, cmd_param UNUSED;
+hup_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str)
+int cmd_id UNUSED, cmd_param UNUSED, cmd_param2 UNUSED;
 const char* cmd_str UNUSED;
 {
     return;
@@ -1239,34 +1239,34 @@ unsigned long *colormasks UNUSED;
     enum statusfields idx1, idx2, *fieldlist;
     char *nb, *text = (char *) ptr;
 
-    static enum statusfields gsu_fieldorder[][23] = {
+    static enum statusfields gsu_fieldorder[][24] = {
         /* line one */
         { BL_TITLE, BL_STR, BL_DX, BL_CO, BL_IN, BL_WI, BL_CH, BL_GOLD, //BL_ALIGN,
           BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH,
-          BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH },
+          BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH },
         /* line two, default order */
         { BL_MODE, BL_LEVELDESC, // BL_GOLD,
           BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
-          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD,
+          BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD,
           BL_TIME, BL_REALTIME,
           BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
           BL_FLUSH },
         /* move time to the end */
         { BL_MODE, BL_LEVELDESC, //BL_GOLD,
           BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
-          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD,
+          BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD,
           BL_2WEP, BL_SKILL,BL_HUNGER, BL_CAP, BL_CONDITION,
           BL_TIME, BL_REALTIME, BL_FLUSH },
         /* move experience and time to the end */
         { BL_MODE, BL_LEVELDESC, // BL_GOLD,
           BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
           BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
-          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_FLUSH },
+          BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_FLUSH },
         /* move level description plus gold and experience and time to end */
         { BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT,
           BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
           BL_MODE, BL_LEVELDESC, //BL_GOLD,
-          BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_FLUSH },
+          BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_FLUSH },
     };
 
     /* in case interface is using genl_status_update() but has not
@@ -3162,7 +3162,7 @@ int no_forward, app;
     dump_putstr_ex(win == NHW_DUMPTXT || win == NHW_DUMPHTML ? win : 0, str, attr, NO_COLOR, app);
 #endif
     if (!no_forward)
-        putstr(win, attr, str);
+        putstr_ex(win, str, attr, NO_COLOR, app);
 }
 
 void

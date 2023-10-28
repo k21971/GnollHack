@@ -2235,6 +2235,9 @@ boolean in_takeoff_wear;
 {
     long mask = 0L;
     boolean armor, ring, eyewear;
+    int added_time = 0;
+    int delay = 0;
+
     Strcpy(debug_buf_4, "accessory_or_armor_on");
 
     if (obj->owornmask & (W_ACCESSORY | W_ARMOR)) 
@@ -2429,10 +2432,17 @@ boolean in_takeoff_wear;
                     char ans = yn_function_es(YN_STYLE_ITEM_EXCHANGE, ATR_NONE, CLR_MSG_ATTENTION, "Already Wearing 5 Miscellaneous Items", "Do you want to remove some of them?", ynchars, 'n', yndescs, (const char*)0);
                     if (ans == 'y')
                     {
-                        return doremring();
+                        int res = doremring();
+                        if (umisc && umisc2 && umisc3 && umisc4 && umisc5)
+                            return res;
+                        else
+                            added_time += res;
                     }
+                    else
+                        return 0;
                 }
-                return 0;
+                else
+                    return 0;
             }
         }
         else if (eyewear) 
@@ -2470,8 +2480,6 @@ boolean in_takeoff_wear;
 
     if (armor) 
     {
-        int delay;
-
         /* if the armor is wielded, release it for wearing (won't be
            welded even if cursed; that only happens for weapons/weptools) */
         if (obj->owornmask & W_WEAPON)
@@ -2513,10 +2521,11 @@ boolean in_takeoff_wear;
         }
 
         if (!in_takeoff_wear)
-            delay = -objects[obj->otyp].oc_delay;
+            delay = -objects[obj->otyp].oc_delay - added_time;
         else
             delay = 0;
 
+        added_time = 0;
         if (delay) 
         {
             nomul(delay);
@@ -2589,7 +2598,7 @@ boolean in_takeoff_wear;
         if (give_feedback && is_worn(obj))
             prinv((char *) 0, obj, 0L);
     }
-    return 1;
+    return 1 + added_time;
 }
 
 /* the 'W' command */
@@ -2793,12 +2802,12 @@ glibr()
         if (leftfall) {
             otmp = uleft;
             Ring_off(uleft);
-            dropx(otmp);
+            dropxf(otmp);
         }
         if (rightfall) {
             otmp = uright;
             Ring_off(uright);
-            dropx(otmp);
+            dropxf(otmp);
         }
     }
 
@@ -2820,7 +2829,7 @@ glibr()
         wastwoweap = TRUE;
         setuwep((struct obj *) 0, otmp->owornmask);
         if (canletgo(otmp, ""))
-            dropx(otmp);
+            dropxf(otmp);
     }
     otmp = uwep;
     if (otmp && !welded(otmp, &youmonst)) {
@@ -2855,7 +2864,7 @@ glibr()
         otmp->quan = savequan;
         setuwep((struct obj *) 0, W_WEP);
         if (canletgo(otmp, ""))
-            dropx(otmp);
+            dropxf(otmp);
     }
 }
 
@@ -3578,7 +3587,7 @@ int retry;
         all_worn_categories = FALSE;
         n = query_category("What type of things do you want to take off?",
                            invent, (WORN_TYPES | ALL_TYPES
-                                    | UNPAID_TYPES | UNIDENTIFIED_TYPES | BUCX_TYPES),
+                                    | UNPAID_TYPES | UNIDENTIFIED_TYPES | UNKNOWN_TYPES | BUCX_TYPES),
                            &pick_list, PICK_ANY);
         if (!n)
             return 0;

@@ -340,7 +340,7 @@
 #define M5_SEMI_TRANSPARENT         0x10000000UL   /* Tile drawn with some transparency (default: 50% constant) */
 #define M5_RADIAL_TRANSPARENCY      0x20000000UL   /* Tile drawn with radial transparency (0% at center and 96% at radius of 32 and 96% thereafter) */
 #define M5_GLASS_TRANSPARENT        0x40000000UL   /* Tile drawn with 35% transparency */
-/* Free bit */
+#define M5_FADES_UPON_DEATH         0x80000000UL   /* Tile fades upon death */
 
 #define M6_NONE                     0x00000000UL
 #define M6_NON_EATER                0x00000001UL   /* Living beings like elementals */
@@ -365,6 +365,12 @@
 #define M6_LITHOVORE                0x00080000UL   /* Eats rock */
 #define M6_USES_DOG_SUBTYPES        0x00100000UL   /* Can have dog breeds */
 #define M6_USES_CAT_SUBTYPES        0x00200000UL   /* Can have cat breeds */
+#define M6_BLOB_ANIMATION           0x00400000UL   /* GUI can add a blobby stand animation */
+#define M6_SHARK_ANIMATION          0x00800000UL   /* Special animation where the portion above the surface changes */
+#define M6_HUMAN_BREATHE_ANIMATION  0x01000000UL   /* GUI can add a human breathe (2 legs standing) animation */
+#define M6_ANIMAL_BREATHE_ANIMATION 0x02000000UL   /* GUI can add an animal breathe (4 legs standing) animation */
+#define M6_ABLE_TO_WEAR_OBJECTS     0x04000000UL   /* Override animal etc. flags preventing the use of items */
+#define M6_NONGLOVE_HANDS           0x08000000UL   /* Has hands but not of the kind that can fit into gloves */
 
 #define M7_NONE                     0x00000000UL
 #define M7_ARCHAEOLOGIST            0x00000001UL   /* monster can use archaeologist items */

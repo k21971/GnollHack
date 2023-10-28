@@ -13,6 +13,7 @@
 #define dig() dig_()
 #define doapply() doapply_()
 #define dostash() dostash_()
+#define dostashfloor() dostashfloor_()
 #define dojump() dojump_()
 #define dorub() dorub_()
 
@@ -289,7 +290,7 @@
 #define tty_update_positionbar(x) tty_update_positionbar_(x)
 #endif
 #define tty_print_glyph(a, b, c, d) tty_print_glyph_(a, b, c, d)
-#define tty_issue_gui_command(a, b, c) tty_issue_gui_command_(a, b, c)
+#define tty_issue_gui_command(a, b, c, d) tty_issue_gui_command_(a, b, c, d)
 #define tty_raw_print(x) tty_raw_print_(x)
 #define tty_raw_print_bold(x) tty_raw_print_bold_(x)
 #define tty_nhgetch() tty_nhgetch_()

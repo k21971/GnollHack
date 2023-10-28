@@ -143,7 +143,7 @@ boolean verbose;
 }
 
 void
-update_unweapon()
+update_unweapon(VOID_ARGS)
 {
     update_hand_unweapon(1);
     update_hand_unweapon(2);
@@ -164,10 +164,7 @@ int hand;
         
     if (wep)
     {
-        *unweapon_ptr = (wep->oclass == WEAPON_CLASS)
-            ? is_launcher(wep) || is_ammo(wep) || is_missile(wep)
-            || (is_appliable_pole_type_weapon(wep) && !is_spear(wep) && !u.usteed)
-            : !is_wieldable_weapon(wep) && !is_wet_towel(wep);
+        *unweapon_ptr = is_unweapon(wep);
     }
     else
     {
@@ -328,6 +325,8 @@ register struct obj *obj;
 {
     Sprintf(debug_buf_3, "setuqwep, hasobj=%d", obj != 0);
     setworncore(obj, W_QUIVER, TRUE);
+    context.botl = context.botlx = TRUE;
+    status_reassess();
     /* no extra handling needed; this used to include a call to
        update_inventory() but that's already performed by setworn() */
     return;
@@ -633,21 +632,43 @@ dounwield()
     }
 
     otmp = getobj(unwield_objs, "unwield", 0, "");
-    if (!otmp || !(otmp->owornmask & W_WIELDED_WEAPON))
+    if (!otmp || !(otmp->owornmask & W_WEAPON))
         return 0;
 
     long mask = 0L;
+    
     if (otmp == uwep)
         mask = W_WEP;
     else if (otmp == uwep2)
         mask = W_WEP2;
+    else if (otmp == uswapwep)
+        mask = W_SWAPWEP;
+    else if (otmp == uswapwep2)
+        mask = W_SWAPWEP2;
+    else if (otmp == uquiver)
+        mask = W_QUIVER;
     else
         return 0;
 
-    int result;
+    int result = 0;
     if (mask == W_WEP2 && otmp == uarms && is_shield(otmp))
     {
         result = armor_or_accessory_off(otmp);
+    }
+    else if (mask == W_SWAPWEP)
+    {
+        uswapwepgone();
+        result = 1;
+    }
+    else if (mask == W_SWAPWEP2)
+    {
+        uswapwep2gone();
+        result = 1;
+    }
+    else if (mask == W_QUIVER)
+    {
+        uqwepgone();
+        result = 1;
     }
     else
     {
@@ -661,7 +682,14 @@ dounwield()
         result = ready_weapon((struct obj*)0, mask);
     }
 
-    boolean unwield_succeeded = mask == W_WEP ? (uwep == (struct obj*)0) : (uwep2 == (struct obj*)0);
+    boolean unwield_succeeded = 
+        mask == W_WEP ? (uwep == (struct obj*)0) : 
+        mask == W_WEP2 ? (uwep2 == (struct obj*)0) :
+        mask == W_SWAPWEP ? (uswapwep == (struct obj*)0) :
+        mask == W_SWAPWEP2 ? (uswapwep2 == (struct obj*)0) :
+        mask == W_QUIVER ? (uquiver == (struct obj*)0) :
+        FALSE;
+
     if (unwield_succeeded) //Note: shield unwearing may take longer
     {
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_UNWIELD);
@@ -948,9 +976,14 @@ doswapweapon()
             weldmsg(uwep);
             return 0;
         }
-        if (uarms && uarms->cursed && (uswapwep2 || (uswapwep && bimanual(uswapwep)))) 
+        if (uarms && uarms->cursed && !cursed_items_are_positive(youmonst.data) /*&& (uswapwep2 || (uswapwep && bimanual(uswapwep))) */ )
         {
             weldmsg(uarms);
+            if (!flags.swap_rhand_only && yn_query("Do you want to swap weapons only in your right hand?") == 'y')
+            {
+                (void)doswaphandedness();
+                return doswapweapon_right_or_both();
+            }
             return 0;
         }
         if (!uwep && !uswapwep && !uarms && !uswapwep2)
@@ -1523,7 +1556,7 @@ const char *verb; /* "rub",&c */
         else 
         {
             char handbuf[BUFSZ];
-            strcpy(handbuf, "");
+            Strcpy(handbuf, "");
 
             if(u.twoweap)
                 Sprintf(handbuf, " in your %s %s", selected_hand_is_right ? "right" : "left", body_part(HAND));
@@ -1557,7 +1590,7 @@ drop_uswapwep()
     /* Avoid trashing makeplural's static buffer */
     Strcpy(str, makeplural(body_part(HAND)));
     pline("%s from your %s!", Yobjnam2(obj, "slip"), str);
-    dropx(obj);
+    dropxf(obj);
 }
 
 int
@@ -1660,6 +1693,7 @@ uqwepgone()
     if (uquiver) {
         setworn((struct obj *) 0, W_QUIVER);
         update_inventory();
+        status_reassess();
     }
 }
 
@@ -1682,7 +1716,7 @@ register struct obj* weapon;
 register int amount;
 boolean dopopup;
 {
-    const char *color = hcolor((amount < 0) ? NH_BLACK : NH_BLUE);
+    const char *color = (amount < 0) ? NH_BLACK : NH_BLUE;
     const char *xtime, *wepname = "";
     boolean multiple;
     int otyp = STRANGE_OBJECT;
@@ -1698,8 +1732,11 @@ boolean dopopup;
             play_sfx_sound(SFX_ENCHANT_ITEM_UNCURSE_AND_OTHER);
             if (!Blind)
             {
-                Sprintf(buf, "%s with %s aura.",
-                        Yobjnam2(weapon, "glow"), an(hcolor(NH_AMBER)));
+                Strcpy(buf, "");
+                const char* hclr = hcolor_multi_buf2(NH_AMBER);
+                pline_multi_ex_popup(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_POSITIVE, no_multiattrs, multicolor_buffer, "Strange Feeling", dopopup,
+                    "%s with %s%s aura.",
+                        Yobjnam2(weapon, "glow"), an_prefix(hclr), hclr);
                 weapon->bknown = !Hallucination;
             }
             else
@@ -1804,8 +1841,8 @@ boolean dopopup;
         play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
         if (!Blind)
         {
-            Sprintf(buf, "%s %s.", Yobjnam2(weapon, "faintly glow"), color);
-            pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, buf, enchwepknown ? "Enchant Weapon" : "Faint Glow", dopopup);
+            pline_multi_ex_popup(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, enchwepknown ? "Enchant Weapon" : "Faint Glow", dopopup,
+                "%s %s.", Yobjnam2(weapon, "faintly glow"), hcolor_multi_buf1(color));
         }
         return 1;
     }
@@ -1825,10 +1862,19 @@ boolean dopopup;
             play_sfx_sound(SFX_VANISHES_IN_PUFF_OF_SMOKE);
             special_effect_wait_until_action(0);
             if (!Blind)
-                Sprintf(buf, "%s %s for a while, and then suddenly %s out a puff of blue smoke.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "give"));
+            {
+                const char* icolor = hcolor_multi_buf1(color);
+                const char* bluecolor = hcolor_multi(NH_BLUE, multicolor_buffer, 3);
+                pline_multi_ex_popup(ATR_NONE, CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, Blind ? "Puff of Smoke" : "Puff of Blue Smoke", dopopup,
+                    "%s %s for a while, and then suddenly %s out a puff of %s smoke.", 
+                    Yobjnam2(weapon, "violently glow"), icolor, otense(weapon, "give"), bluecolor);
+            }
             else
+            {
                 Sprintf(buf, "%s for a while, and then suddenly %s out a puff of smoke.", Yobjnam2(weapon, "violently vibrate"), otense(weapon, "give"));
-            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, Blind ? "Puff of Smoke" : "Puff of Blue Smoke", dopopup);
+                pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, Blind ? "Puff of Smoke" : "Puff of Blue Smoke", dopopup);
+                otmp->enchantment = 0;
+            }
             otmp->enchantment = 0;
             otmp->speflags |= SPEFLAGS_GIVEN_OUT_BLUE_SMOKE;
             update_inventory();
@@ -1838,10 +1884,15 @@ boolean dopopup;
         {
             play_sfx_sound(SFX_ENCHANT_ITEM_VIBRATE_AND_DESTROY);
             if (!Blind)
-                Sprintf(buf, "%s %s for a while and then %s.", Yobjnam2(weapon, "violently glow"), color, otense(weapon, "evaporate"));
+            {
+                pline_multi_ex_popup(ATR_NONE, CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, "Evaporation", dopopup,
+                    "%s %s for a while and then %s.", Yobjnam2(weapon, "violently glow"), hcolor_multi_buf1(color), otense(weapon, "evaporate"));
+            }
             else
+            {
                 Sprintf(buf, "%s.", Yobjnam2(weapon, "evaporate"));
-            pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, "Evaporation", dopopup);
+                pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, "Evaporation", dopopup);
+            }
 
             useupall(weapon); /* let all of them disappear */
         }
@@ -1862,9 +1913,9 @@ boolean dopopup;
         }
 
         xtime = (amount * amount == 1) ? "moment" : "while";
-        Sprintf(buf, "%s %s for a %s.", Yobjnam2(weapon, amount == 0 ? "violently glow" : "glow"), color, xtime);
-        pline_ex1_popup(ATR_NONE, amount == 0 ? CLR_MSG_WARNING : amount > 0 ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, buf, 
-            enchwepknown ? "Enchant Weapon" : amount == 0 ? "Violent Glow" : "Magical Glow", dopopup);
+        pline_multi_ex_popup(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : amount == 0 ? CLR_MSG_WARNING : amount > 0 ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer,
+            enchwepknown ? "Enchant Weapon" : amount == 0 ? "Violent Glow" : "Magical Glow", dopopup,
+            "%s %s for a %s.", Yobjnam2(weapon, amount == 0 ? "violently glow" : "glow"), hcolor_multi_buf1(color), xtime);
     }
 
     if (amount < 0)

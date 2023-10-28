@@ -246,9 +246,7 @@ STATIC_VAR aligntyp ralign[3] = { AM_CHAOTIC, AM_NEUTRAL, AM_LAWFUL };
 STATIC_VAR NEARDATA xchar xstart, ystart;
 STATIC_VAR NEARDATA char xsize, ysize;
 
-char *lev_message = 0;
-int lev_message_color = NO_COLOR;
-int lev_message_attr = ATR_NONE;
+struct lev_msg *lev_message = 0;
 
 lev_region *lregions = 0;
 int num_lregions = 0;
@@ -1834,6 +1832,21 @@ struct mkroom *croom;
     unsigned long mmflags = 0UL;
     if (m->maxhp)
         mmflags |= MM_MAX_HP;
+    if (m->use_boss_hostility)
+    {
+        struct monst* lboss;
+        for (lboss = fmon; lboss; lboss = lboss->nmon)
+        {
+            if (lboss->mon_flags & MON_FLAGS_LEVEL_BOSS)
+            {
+                if(is_peaceful(lboss))
+                    mmflags |= MM_PEACEFUL;
+                else
+                    mmflags |= MM_ANGRY;
+                break;
+            }
+        }
+    }
 
     if (m->align != -(MAX_REGISTERS + 2))
         mtmp = mk_roamer(pm, Amask2align(amask), x, y, m->peaceful);
@@ -1854,6 +1867,10 @@ struct mkroom *croom;
         }
 
         mtmp->mon_flags |= MON_FLAGS_SPLEVEL_RESIDENT; /* Created specifically for the special level; don't remove in bones if staying on the level */
+        if (m->level_boss)
+            mtmp->mon_flags |= MON_FLAGS_LEVEL_BOSS;
+        if (m->use_boss_hostility)
+            mtmp->mon_flags |= MON_FLAGS_BOSS_HOSTILITY;
 
         /*
          * This doesn't complain if an attempt is made to give a
@@ -2671,7 +2688,10 @@ struct mkroom* croom;
         lvr->effect_flags = lever->effect_flags;
         lvr->tflags = lever->lever_flags;
 
-        if (lvr->lever_effect == LEVER_EFFECT_CREATE_UNCREATE_LOCATION_TYPE)
+        /* Special adjustments */
+        switch (lvr->lever_effect)
+        {
+        case LEVER_EFFECT_CREATE_UNCREATE_LOCATION_TYPE:
         {
             if (IS_FLOOR((int)lvr->effect_param1))
             {
@@ -2689,8 +2709,9 @@ struct mkroom* croom;
             {
                 lvr->effect_param3 = lever->effect_subtype;
             }
+            break;
         }
-        else if (lvr->lever_effect == LEVER_EFFECT_CREATE_LOCATION_TYPE)
+        case LEVER_EFFECT_CREATE_LOCATION_TYPE:
         {
             if (IS_FLOOR((int)lvr->effect_param1))
             {
@@ -2700,12 +2721,16 @@ struct mkroom* croom;
             {
                 lvr->effect_param2 = lever->effect_subtype;
             }
+            break;
         }
-        else if (lvr->lever_effect == LEVER_EFFECT_CREATE_TRAP)
+        case LEVER_EFFECT_CREATE_TRAP:
         {
             lvr->effect_param4 = lever->effect_subtype;
+            break;
         }
-
+        default:
+            break;
+        }
         coord tm2;
         tm2.x = t_x;
         tm2.y = t_y;
@@ -3091,7 +3116,7 @@ schar ftyp, btyp;
         crm = &levl[xx][yy];
         if (crm->typ == btyp) 
         {
-            int normalcorr = (context.game_difficulty < 0 && u.uz.dnum == main_dungeon_dnum && u.uz.dlevel <= 2) ? TRUE : rn2(100);
+            int normalcorr = (context.game_difficulty <= NO_SECRET_DOORS_DIFFICULTY_THRESHOLD && u.uz.dnum == main_dungeon_dnum && u.uz.dlevel <= NO_SECRET_DOORS_DUNGEON_LEVEL_THRESHOLD) ? TRUE : rn2(100);
             if (ftyp != CORR || normalcorr)
             {
                 crm->typ = ftyp;
@@ -3843,39 +3868,60 @@ spo_message(coder)
 struct sp_coder *coder;
 {
     static const char nhFunc[] = "spo_message";
-    struct opvar *op, *mtyp_opvar;
-    char *msg, *levmsg;
-    size_t old_n, n;
+    struct opvar *op, * mtype_opvar, * mattr_opvar, *mcolor_opvar, *soundtyp_opvar, *soundid_opvar, *soundparam_opvar, *msgflags_opvar;
+    char* msg; // , * levmsg;
+    size_t n; //old_n, 
+    struct lev_msg* levmsg;
+    struct lev_msg zeromsg = { 0 };
 
-    if (!OV_pop_i(mtyp_opvar) || !OV_pop_s(op))
+    if (!OV_pop_i(mtype_opvar) || !OV_pop_i(mattr_opvar) || !OV_pop_i(mcolor_opvar) || !OV_pop_i(soundtyp_opvar) || !OV_pop_i(soundid_opvar)
+        || !OV_pop_i(soundparam_opvar) || !OV_pop_i(msgflags_opvar) || !OV_pop_s(op))
         return;
     msg = OV_s(op);
     if (!msg)
         return;
 
-    int mtyp = (int)OV_i(mtyp_opvar);
-
-    old_n = lev_message ? (strlen(lev_message) + 1) : 0;
     n = strlen(msg);
+    int mtype = (int)OV_i(mtype_opvar);
+    int mattr = (int)OV_i(mattr_opvar);
+    int mcolor = (int)OV_i(mcolor_opvar);
+    int soundtyp = (int)OV_i(soundtyp_opvar);
+    int soundid = (int)OV_i(soundid_opvar);
+    int soundparam = (int)OV_i(soundparam_opvar);
+    unsigned long msgflags = (unsigned long)OV_i(msgflags_opvar);
 
-    levmsg = (char *) alloc(old_n + n + 1);
-
-    if (old_n)
-        levmsg[old_n - 1] = '\n';
-    
-    if (lev_message)
-        (void) memcpy((genericptr_t) levmsg, (genericptr_t) lev_message, old_n - 1);
-    
-    (void) memcpy((genericptr_t) &levmsg[old_n], msg, n);
-    levmsg[old_n + n] = '\0';
-    Free(lev_message);
-    
-    lev_message = levmsg;
-    lev_message_color = mtyp;
-    lev_message_attr = ATR_NONE;
+    levmsg = (struct lev_msg*)alloc(sizeof(struct lev_msg));
+    if (levmsg)
+    {
+        *levmsg = zeromsg;
+        levmsg->msg_type = mtype;
+        levmsg->attr = mattr;
+        levmsg->color = mcolor;
+        levmsg->sound_type = soundtyp;
+        levmsg->sound_id = soundid;
+        levmsg->sound_param = soundparam;
+        levmsg->msgflags = msgflags;
+        levmsg->message = (char*)alloc(n + 1);
+        Strcpy(levmsg->message, msg);
+        if(!lev_message)
+            lev_message = levmsg;
+        else
+        {
+            struct lev_msg* lm;
+            for (lm = lev_message; lm->next; lm = lm->next)
+                ;
+            lm->next = levmsg;
+        }
+    }
     
     opvar_free(op);
-    opvar_free(mtyp_opvar);
+    opvar_free(mtype_opvar);
+    opvar_free(mattr_opvar);
+    opvar_free(mcolor_opvar);
+    opvar_free(soundtyp_opvar);
+    opvar_free(soundid_opvar);
+    opvar_free(soundparam_opvar);
+    opvar_free(msgflags_opvar);
 }
 
 STATIC_VAR const monster emptymons; /* Initialized to zero automatically */
@@ -3908,6 +3954,8 @@ struct sp_coder *coder;
     tmpmons.confused = 0;
     tmpmons.waitforu = 0;
     tmpmons.keep_original_invent = 0;
+    tmpmons.level_boss = 0;
+    tmpmons.use_boss_hostility = 0;
     tmpmons.protector = 0;
     tmpmons.seentraps = 0;
     tmpmons.has_invent = 0;
@@ -3965,6 +4013,14 @@ struct sp_coder *coder;
         case SP_M_V_KEEP_ORIGINAL_INVENTORY:
             if (OV_typ(parm) == SPOVAR_INT)
                 tmpmons.keep_original_invent = OV_i(parm);
+            break;
+        case SP_M_V_LEVEL_BOSS:
+            if (OV_typ(parm) == SPOVAR_INT)
+                tmpmons.level_boss = OV_i(parm);
+            break;
+        case SP_M_V_BOSS_HOSTILITY:
+            if (OV_typ(parm) == SPOVAR_INT)
+                tmpmons.use_boss_hostility = OV_i(parm);
             break;
         case SP_M_V_PROTECTOR:
             if (OV_typ(parm) == SPOVAR_INT)
@@ -7055,7 +7111,7 @@ struct sp_coder* coder;
     mnum = (short)SP_MONST_PM(OV_i(montype_opvar));
     mclass = (xchar)SP_MONST_CLASS(OV_i(montype_opvar));
 
-    strcpy(level.flags.special_description, OV_s(name_opvar));
+    Strcpy(level.flags.special_description, OV_s(name_opvar));
 
     int typ;
     typ = (int)OV_i(typ_opvar);

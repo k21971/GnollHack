@@ -211,22 +211,22 @@ int x, y;
         if (x == xdnladder || x == xupladder)
         {
             if (verbose)
-                pline_The("ladder resists your effort.");
+                pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "ladder resists your effort.");
         } 
         else if (verbose)
-            pline_The("stairs are too hard to %s.", verb);
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "stairs are too hard to %s.", verb);
         return FALSE;
     } 
     else if (IS_THRONE(levl[x][y].typ) && madeby != BY_OBJECT) 
     {
         if (verbose)
-            pline_The("throne is too hard to break apart.");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "throne is too hard to break apart.");
         return FALSE;
     }
     else if (IS_ANVIL(levl[x][y].typ)) 
     {
         if (verbose)
-            pline_The("anvil is too hard to break apart.");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "anvil is too hard to break apart.");
         return FALSE;
     }
     else if (IS_ALTAR(levl[x][y].typ)
@@ -234,19 +234,22 @@ int x, y;
                    || Is_sanctum(&u.uz))) 
     {
         if (verbose)
-            pline_The("altar is too hard to break apart.");
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "altar is too hard to break apart.");
         return FALSE;
     }
     else if (Is_airlevel(&u.uz)) 
     {
         if (verbose)
-            You("cannot %s thin air.", verb);
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot %s thin air.", verb);
         return FALSE;
     } 
     else if (Is_waterlevel(&u.uz)) 
     {
         if (verbose)
-            pline_The("%s splashes and subsides.", hliquid("water"));
+        {
+            play_sfx_sound_at_location(SFX_SPLASH_HIT, x, y);
+            pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "%s splashes and subsides.", hliquid("water"));
+        }
         return FALSE;
     } 
     else if ((IS_ROCK(levl[x][y].typ) && levl[x][y].typ != SDOOR
@@ -434,7 +437,9 @@ dig(VOID_ARGS)
         return 0;
     }
 
-    if (context.digging.effort > 100) {
+    if (context.digging.effort > 100) 
+    {
+        boolean done_feelnewsym = FALSE;
         const char *digtxt, *dmgtxt = (const char *) 0;
         struct obj *obj;
         boolean shopedge = *in_rooms(dpx, dpy, SHOPBASE);
@@ -461,8 +466,7 @@ dig(VOID_ARGS)
             }
             digtxt = "The boulder falls apart.";
         } 
-        else if (lev->typ == STONE || lev->typ == SCORR
-                   || IS_TREE(lev->typ)) 
+        else if (lev->typ == STONE || lev->typ == SCORR || IS_TREE(lev->typ)) 
         {
             if (Is_earthlevel(&u.uz))
             {
@@ -485,34 +489,54 @@ dig(VOID_ARGS)
                 play_simple_location_sound(dpx, dpy, LOCATION_SOUND_TYPE_BREAK);
                 digtxt = "You cut down the tree.";
                 struct mkroom* r = which_room(dpx, dpy);
-
-                uncatch_tree_objects(dpx, dpy);
-
-                /* Wood */
-                struct obj* otmp_wood = mksobj_at(PIECE_OF_WOOD, dpx, dpy, FALSE, FALSE);
-                otmp_wood->quan = d(1, 3);
-                otmp_wood->owt = weight(otmp_wood);
-
-                /* Possibly some fruits */
-                if (lev->special_quality > 0 && tree_subtype_definitions[lev->subtyp].fruit_type > STRANGE_OBJECT)
-                {
-                    struct obj* otmp = mksobj_at(tree_subtype_definitions[lev->subtyp].fruit_type, dpx, dpy, TRUE, FALSE); //rnd_treefruit_at(dpx, dpy);
-                    otmp->quan = lev->special_quality;
-                    otmp->owt = weight(otmp);
-                    lev->special_quality = 0;
-                }
+                short special_quality = lev->special_quality;
+                int fruittype = tree_subtype_definitions[lev->subtyp].fruit_type;
+                int glyph = layers_at(dpx, dpy).layer_gui_glyphs[LAYER_COVER_FEATURE];
 
                 /* Change the location type */
                 int typ = lev->floortyp ? lev->floortyp : r && r->orig_rtype == GARDEN ? GRASS : ROOM;
                 int subtyp = lev->floorsubtyp ? lev->floorsubtyp : get_initial_location_subtype(typ);
                 int vartyp = lev->floorvartyp ? lev->floorvartyp : get_initial_location_vartype(typ, subtyp);
                 create_simple_location(dpx, dpy, typ, subtyp, vartyp, 0, back_to_broken_glyph(dpx, dpy), 0, 0, 0, FALSE);
+                uncatch_tree_objects(dpx, dpy);
+
+                /* Wood */
+                struct obj* otmp_wood = mksobj_found_at(PIECE_OF_WOOD, dpx, dpy, FALSE, FALSE);
+                otmp_wood->quan = d(1, 3);
+                otmp_wood->owt = weight(otmp_wood);
+
+                /* Possibly some fruits */
+                if (special_quality > 0 && fruittype > STRANGE_OBJECT)
+                {
+                    struct obj* otmp = mksobj_found_at(fruittype, dpx, dpy, TRUE, FALSE); //rnd_treefruit_at(dpx, dpy);
+                    otmp->quan = special_quality;
+                    otmp->owt = weight(otmp);
+                    lev->special_quality = 0;
+                }
+                if (windowprocs.wincap2 & WC2_FADING_ANIMATIONS)
+                {
+                    feel_newsym(dpx, dpy);
+                    done_feelnewsym = TRUE;
+                    play_special_effect_with_details_at(0, dpx, dpy, glyph, LAYER_GENERAL_EFFECT, -2, 20, 0, 0, TRUE);
+                    special_effect_wait_until_action(0);
+                    special_effect_wait_until_end(0);
+                    clear_found_this_turn_at(dpx, dpy);
+                }
             }
             else 
             {
-                play_simple_location_sound(dpx, dpy, LOCATION_SOUND_TYPE_BREAK);
                 digtxt = "You succeed in cutting away some rock.";
+                play_simple_location_sound(dpx, dpy, LOCATION_SOUND_TYPE_BREAK);
+                int glyph = layers_at(dpx, dpy).layer_gui_glyphs[LAYER_FLOOR];
                 create_basic_floor_location(dpx, dpy, levl[dpx][dpy].floortyp ? levl[dpx][dpy].floortyp : CORR, levl[dpx][dpy].floortyp ? levl[dpx][dpy].floorsubtyp : get_initial_location_subtype(levl[dpx][dpy].floortyp), 0, FALSE);
+                if (windowprocs.wincap2 & WC2_FADING_ANIMATIONS)
+                {
+                    feel_newsym(dpx, dpy);
+                    done_feelnewsym = TRUE;
+                    play_special_effect_with_details_at(0, dpx, dpy, glyph, LAYER_BACKGROUND_EFFECT, -2, 20, 0, 0, TRUE);
+                    special_effect_wait_until_action(0);
+                    special_effect_wait_until_end(0);
+                }
             }
         }
         else if (IS_WALL(lev->typ)) 
@@ -542,10 +566,18 @@ dig(VOID_ARGS)
             {
                 ltype = DOOR, lflags = D_NODOOR;
             }
-            play_simple_location_sound(dpx, dpy, LOCATION_SOUND_TYPE_BREAK);
-            create_simple_location(dpx, dpy, ltype, lsubtype, lvartype, lflags, back_to_broken_glyph(dpx, dpy), !IS_FLOOR(ltype)? lev->floortyp : 0, !IS_FLOOR(ltype) ? lev->floorsubtyp : 0, !IS_FLOOR(ltype) ? lev->floorvartyp : 0, FALSE);
-
             digtxt = "You make an opening in the wall.";
+            play_simple_location_sound(dpx, dpy, LOCATION_SOUND_TYPE_BREAK);
+            int glyph = layers_at(dpx, dpy).layer_gui_glyphs[lev->typ == STONE ? LAYER_FLOOR : LAYER_FEATURE];
+            create_simple_location(dpx, dpy, ltype, lsubtype, lvartype, lflags, back_to_broken_glyph(dpx, dpy), !IS_FLOOR(ltype)? lev->floortyp : 0, !IS_FLOOR(ltype) ? lev->floorsubtyp : 0, !IS_FLOOR(ltype) ? lev->floorvartyp : 0, FALSE);
+            if (windowprocs.wincap2 & WC2_FADING_ANIMATIONS)
+            {
+                feel_newsym(dpx, dpy);
+                done_feelnewsym = TRUE;
+                play_special_effect_with_details_at(0, dpx, dpy, glyph, LAYER_BACKGROUND_EFFECT, -2, 20, 0, 0, TRUE);
+                special_effect_wait_until_action(0);
+                special_effect_wait_until_end(0);
+            }
         } 
         else if (lev->typ == SDOOR) 
         {
@@ -577,7 +609,8 @@ dig(VOID_ARGS)
 
         if (!does_block(dpx, dpy, &levl[dpx][dpy]))
             unblock_vision_and_hearing_at_point(dpx, dpy); /* vision:  can see through */
-        feel_newsym(dpx, dpy);
+        if(!done_feelnewsym)
+            feel_newsym(dpx, dpy);
 
         if (digtxt && !context.digging.quiet)
             pline1(digtxt); /* after newsym */
@@ -800,7 +833,7 @@ int ttyp;
             } else
                 reset_utrap(TRUE);
             if (oldobjs != newobjs) /* something unearthed */
-                (void) pickup(1);   /* detects pit */
+                (void) pickup(1, FALSE);   /* detects pit */
         } else if (mtmp) {
             if (is_flying(mtmp) || is_levitating(mtmp)) {
                 if (canseemon(mtmp))
@@ -828,7 +861,7 @@ int ttyp;
 
             /* check for leashed pet that can't fall right now */
             if (!u.ustuck && !wont_fall && !next_to_u()) {
-                You("are jerked back by your pet!");
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are jerked back by your pet!");
                 wont_fall = TRUE;
             }
 
@@ -840,7 +873,7 @@ int ttyp;
                 if (newobjs)
                     impact_drop((struct obj *) 0, x, y, 0);
                 if (oldobjs != newobjs)
-                    (void) pickup(1);
+                    (void) pickup(1, FALSE);
                 if (shopdoor && madeby_u)
                     pay_for_damage("ruin", FALSE);
 
@@ -860,7 +893,7 @@ int ttyp;
                  */
                 newlevel.dnum = u.uz.dnum;
                 newlevel.dlevel = u.uz.dlevel + 1;
-                goto_level(&newlevel, FALSE, TRUE, FALSE);
+                goto_level(&newlevel, FALSE, TRUE, FALSE, FALSE);
                 /* messages for arriving in special rooms */
                 spoteffects(FALSE);
             }
@@ -964,7 +997,7 @@ coord *cc;
         pline_The_ex(ATR_NONE, CLR_MSG_FAIL, "%s %shere is too hard to dig in.", surface(dig_x, dig_y),
                   (dig_x != u.ux || dig_y != u.uy) ? "t" : "");
     } else if (is_pool_or_lava(dig_x, dig_y)) {
-        play_sfx_sound(SFX_SPLASH_HIT);
+        play_sfx_sound_at_location(SFX_SPLASH_HIT, dig_x, dig_y);
         pline_The("%s sloshes furiously for a moment, then subsides.",
                   hliquid(is_lava(dig_x, dig_y) ? "lava" : "water"));
         wake_nearby(); /* splashing */
@@ -1074,7 +1107,7 @@ coord *cc;
             int otyp = (ttmp->ttyp == LANDMINE) ? LAND_MINE : BEARTRAP;
 
             /* convert trap into buried object (deletes trap) */
-            cnv_trap_obj(otyp, 1, ttmp, TRUE);
+            cnv_trap_obj(otyp, 1, ttmp, TRUE, FALSE);
         }
 
         /* finally we get to make a hole */
@@ -1130,10 +1163,10 @@ coord *cc;
         case 0:
             play_sfx_sound(SFX_UNEARTHED_OBJECT_FOUND);
             You("unearth some bones.");
-            (void)mksobj_at(BONE, dig_x, dig_y, TRUE, FALSE);
-            (void)mksobj_at(BONE, dig_x, dig_y, TRUE, FALSE);
+            (void)mksobj_found_at(BONE, dig_x, dig_y, TRUE, FALSE);
+            (void)mksobj_found_at(BONE, dig_x, dig_y, TRUE, FALSE);
             if (!rn2(2))
-                (void)mksobj_at(HUMAN_SKULL, dig_x, dig_y, TRUE, FALSE);
+                (void)mksobj_found_at(HUMAN_SKULL, dig_x, dig_y, TRUE, FALSE);
             doautopickup = TRUE;
             break;
         case 1:
@@ -1142,6 +1175,7 @@ coord *cc;
             if ((otmp = mk_tt_object(CORPSE, dig_x, dig_y)) != 0)
             {
                 otmp->age -= 100; /* this is an *OLD* corpse */
+                obj_set_found(otmp);
                 doautopickup = TRUE;
             }
             break;
@@ -1184,7 +1218,7 @@ coord *cc;
     int vartyp = levl[dig_x][dig_y].floorvartyp ? levl[dig_x][dig_y].floorvartyp : get_initial_location_vartype(typ, subtyp);
     create_simple_location(dig_x, dig_y, typ, subtyp, vartyp, 0, back_to_broken_glyph(dig_x, dig_y), 0, 0, 0, TRUE);
     if (doautopickup)
-        (void)pickup(1);
+        (void)pickup(1, FALSE);
     return;
 }
 
@@ -2163,14 +2197,14 @@ struct obj* origobj;
             if (!use_old)
                 zap_tile_count++;
         }
-        remove_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE);
+        remove_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE, 0UL);
         if (!first_tile_found)
         {
-            add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE);
+            add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE, 0UL);
             first_tile_found = TRUE;
         }
-        remove_glyph_buffer_layer_flags(lzx, lzy, LFLAGS_ZAP_LEADING_EDGE);
-        add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_LEADING_EDGE);
+        remove_glyph_buffer_layer_flags(lzx, lzy, LFLAGS_ZAP_LEADING_EDGE, 0UL);
+        add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_LEADING_EDGE, 0UL);
         tmp_at(zx, zy);
         force_redraw_at(zx, zy);
         update_ambient_ray_sound_to_location(OBJECT_RAY_SOUNDSET_DIGBEAM, zx, zy);
@@ -2568,14 +2602,14 @@ struct obj* origobj;
             if (!use_old)
                 zap_tile_count++;
         }
-        remove_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE);
+        remove_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE, 0UL);
         if (!first_tile_found)
         {
-            add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE);
+            add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_TRAILING_EDGE, 0UL);
             first_tile_found = TRUE;
         }
-        remove_glyph_buffer_layer_flags(lzx, lzy, LFLAGS_ZAP_LEADING_EDGE);
-        add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_LEADING_EDGE);
+        remove_glyph_buffer_layer_flags(lzx, lzy, LFLAGS_ZAP_LEADING_EDGE, 0UL);
+        add_glyph_buffer_layer_flags(zx, zy, LFLAGS_ZAP_LEADING_EDGE, 0UL);
         tmp_at(zx, zy);
 
         /* wait a little bit */
@@ -3083,6 +3117,7 @@ boolean verbose, buriedsearchableonly;
                 if (otmp->timed)
                     (void) stop_timer(ROT_ORGANIC, obj_to_any(otmp));
 
+                obj_set_found(otmp);
                 place_object(otmp, x, y);
                 stackobj(otmp);
             }
@@ -3333,13 +3368,13 @@ dodig()
     enum object_soundset_types oss = 0;
     if (uwep)
     {
-        strcpy(digbuf, yname(uwep));
+        Strcpy(digbuf, yname(uwep));
         oss = objects[uwep->otyp].oc_soundset;
 
     }
     else if (u.twoweap && uarms)
     {
-        strcpy(digbuf, yname(uarms));
+        Strcpy(digbuf, yname(uarms));
         oss = objects[uarms->otyp].oc_soundset;
     }
     else
@@ -3384,7 +3419,7 @@ dodig()
     int itemsfound = unearth_objs(&youmonst, u.ux, u.uy, TRUE, FALSE);
     if (itemsfound)
     {
-        (void)pickup(1);
+        (void)pickup(1, FALSE);
     }
     else
     {
@@ -3406,6 +3441,7 @@ int x, y;
     for (otmp_caught = level.objects[x][y]; otmp_caught; otmp_caught = otmp_caught->nexthere)
     {
         otmp_caught->speflags &= ~SPEFLAGS_CAUGHT_IN_LEAVES; /* Not caught anymore */
+        otmp_caught->speflags |= SPEFLAGS_FOUND_THIS_TURN; /* But now found this turn */
     }
 }
 

@@ -258,6 +258,14 @@ boolean init, artif;
     return mksobj_at_with_flags(otyp, x, y, init, artif, 0, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
 }
 
+struct obj *
+mksobj_found_at(otyp, x, y, init, artif)
+int otyp, x, y;
+boolean init, artif;
+{
+    return mksobj_at_with_flags(otyp, x, y, init, artif, 0, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FOUND_THIS_TURN);
+}
+
 struct obj*
 mksobj_at_with_flags(otyp, x, y, init, artif, mkobj_type, mowner, material, param, param2, mkflags)
 int otyp, x, y, mkobj_type;
@@ -720,7 +728,9 @@ rndmonnum()
 {
     register struct permonst *ptr;
     register int i;
-    unsigned short excludeflags;
+    unsigned long excludeflags;
+    unsigned long requiredflags;
+    int trycnt = 0;
 
     /* Plan A: get a level-appropriate common monster */
     ptr = rndmonst();
@@ -729,12 +739,25 @@ rndmonnum()
 
     /* Plan B: get any common monster */
     excludeflags = G_UNIQ | G_NOGEN | (Inhell ? G_NOHELL : G_HELL) | (In_mines(&u.uz) ? G_NOMINES : 0);
+    requiredflags = In_modron_level(&u.uz) ? G_MODRON : In_bovine_level(&u.uz) ? G_YACC : 0UL;
     do {
-        i = rn1(SPECIAL_PM - LOW_PM, LOW_PM);
+        if(trycnt < 10 && In_modron_level(&u.uz))
+            i = rn1(PM_MODRON_PENTADRONE - PM_MODRON_MONODRONE + 1, PM_MODRON_MONODRONE);
+        else if (trycnt < 10 && In_bovine_level(&u.uz))
+            i = !rn2(3) ? PM_HELL_BOVINE : !rn2(2) ? PM_MINOTAUR : PM_BISON;
+        else
+            i = rn1(SPECIAL_PM - LOW_PM, LOW_PM);
         ptr = &mons[i];
-    } while ((ptr->geno & excludeflags &&
-        !((In_modron_level(&u.uz) && (ptr->geno & G_MODRON)) || (In_bovine_level(&u.uz)  && (ptr->geno & G_YACC)))
-        ) != 0);
+        trycnt++;
+        if (trycnt == 25)
+        {
+            excludeflags = G_UNIQ | G_NOGEN;
+            requiredflags = 0UL;
+        }
+    } while (trycnt < 50 &&
+        (ptr->geno & excludeflags) != 0UL &&
+        (requiredflags != 0UL && (ptr->geno & requiredflags) == 0UL)
+        );
 
     return i;
 }
@@ -996,6 +1019,7 @@ struct obj *otmp;
         obj->nexthere = otmp;
         extract_nobj(obj, &memoryobjs);
         extract_nexthere(obj, &level.locations[obj->ox][obj->oy].hero_memory_layers.memory_objchn);
+        update_last_memoryobj();
         obj->lamplit = 0;
         obj->makingsound = 0;
         break;
@@ -1102,6 +1126,7 @@ register struct obj* otmp;
     if (has_omid(dummy))
         free_omid(dummy); /* only one association with m_id*/
     dummy->owornmask = 0L; /* dummy object is not worn */
+    obj_clear_found(dummy);
 
     /* Add to memoryobjs chain */
     add_to_memoryobjs(dummy);
@@ -1192,8 +1217,20 @@ struct obj* obj;
     if (obj->timed)
         obj_stop_timers(obj);
 
-    obj->nobj = memoryobjs;
-    memoryobjs = obj;
+    /* These need to be added to the end of the chain */
+    if (!lastmemoryobj) /* Should mean that memoryobjs = 0 */
+    {
+        obj->nobj = memoryobjs; /* Just in case that an object is not lost */
+        memoryobjs = obj;
+    }
+    else
+    {
+        lastmemoryobj->nobj = obj;
+        lastmemoryobj = obj;
+        obj->nobj = 0;
+    }
+    //obj->nobj = memoryobjs;
+    //memoryobjs = obj;
     obj->where = OBJ_HEROMEMORY;
 }
 
@@ -1209,7 +1246,8 @@ clear_memoryobjs()
         //}
         obfree(obj, (struct obj*)0);
     }
-
+    memoryobjs = 0;
+    lastmemoryobj = 0;
 }
 
 void
@@ -1421,6 +1459,7 @@ unsigned long mkflags;
     boolean forcebasematerial = (mkflags & MKOBJ_FLAGS_FORCE_BASE_MATERIAL) != 0 || mkobj_type == 2;
     boolean param_is_spquality = (mkflags & MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY) != 0;
     boolean param_is_mnum = (mkflags & MKOBJ_FLAGS_PARAM_IS_MNUM) != 0;
+    boolean foundthisturn = (mkflags & MKOBJ_FLAGS_FOUND_THIS_TURN) != 0;
     unsigned long excludedtitles = 0UL, excludedtitles2 = 0UL;
     if (mkflags & MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS)
     {
@@ -1473,6 +1512,9 @@ unsigned long mkflags;
 
     if ((objects[otmp->otyp].oc_flags4 & O4_CONTAINER_HAS_LID) && (mkflags & MKOBJ_FLAGS_OPEN_COFFIN))
         otmp->speflags |= SPEFLAGS_LID_OPENED;
+
+    if(foundthisturn)
+        obj_set_found(otmp);
 
     int leveldiff = level_difficulty();
     /* Change type before init if need be*/
@@ -3315,29 +3357,13 @@ register struct obj *obj;
 
         for (contents = obj->cobj; contents; contents = contents->nobj)
         {
-            if (obj->otyp == BAG_OF_WIZARDRY
-                && (contents->oclass == REAGENT_CLASS || contents->oclass == SPBOOK_CLASS
-                    || contents->oclass == WAND_CLASS || contents->oclass == SCROLL_CLASS
-                    || objects[contents->otyp].oc_flags & O1_NONE
-                    ))
+            if (obj->otyp == BAG_OF_WIZARDRY && is_obj_weight_reduced_by_wizardry(contents))
                 cwt += obj->cursed ? (weight(contents) * 2) : obj->blessed ? ((weight(contents) + 15) / 16)
                 : ((weight(contents) + 7) / 8);
-            else if (obj->otyp == BAG_OF_TREASURE_HAULING
-                && (contents->oclass == COIN_CLASS || contents->oclass == GEM_CLASS
-                    || contents->oclass == RING_CLASS || contents->oclass == AMULET_CLASS
-                    || contents->oclass == MISCELLANEOUS_CLASS
-                    || contents->material == MAT_SILVER
-                    || contents->material == MAT_GOLD
-                    || contents->material == MAT_PLATINUM
-                    || contents->material == MAT_MITHRIL
-                    || contents->material == MAT_ADAMANTIUM
-                    || contents->material == MAT_GEMSTONE
-                    ))
+            else if (obj->otyp == BAG_OF_TREASURE_HAULING && is_obj_weight_reduced_by_treasure_hauling(contents))
                 cwt += obj->cursed ? (weight(contents) * 2) : obj->blessed ? ((weight(contents) + 63) / 64)
                 : ((weight(contents) + 31) / 32);
-            else if (obj->otyp == BAG_OF_THE_GLUTTON
-                && (contents->oclass == POTION_CLASS || is_obj_normally_edible(contents)
-                    ))
+            else if (obj->otyp == BAG_OF_THE_GLUTTON && is_obj_weight_reduced_by_the_glutton(contents))
                 cwt += obj->cursed ? (weight(contents) * 2) : obj->blessed ? ((weight(contents) + 19) / 20)
                 : ((weight(contents) + 9) / 10);
             else
@@ -3749,9 +3775,11 @@ int x, y;
 
     otmp->where = OBJ_HEROMEMORY;
 
-    /* add to floor chain */
+    /* add to memory chain */
+    if (!memoryobjs)
+        lastmemoryobj = otmp;
     otmp->nobj = memoryobjs;
-    memoryobjs = otmp;
+    memoryobjs = otmp; /* Last object stays the same */
 
     /* If there is a memory object, then it must be flagged as shown */
     if (!level.locations[x][y].hero_memory_layers.memory_objchn)
@@ -3772,10 +3800,24 @@ register struct obj* otmp;
     }
     extract_nexthere(otmp, &level.locations[x][y].hero_memory_layers.memory_objchn);
     extract_nobj(otmp, &memoryobjs);
+    update_last_memoryobj();
     otmp->lamplit = 0;
     otmp->makingsound = 0;
 }
 
+void
+update_last_memoryobj(VOID_ARGS)
+{
+    if (!memoryobjs)
+    {
+        lastmemoryobj = 0;
+        return;
+    }
+    struct obj* otmp;
+    for (otmp = memoryobjs; otmp->nobj; otmp = otmp->nobj)
+        ;
+    lastmemoryobj = otmp;
+}
 
 #define ROT_ICE_ADJUSTMENT 2 /* rotting on ice takes 2 times as long */
 
@@ -4295,7 +4337,7 @@ boolean tipping; /* caller emptying entire contents; affects shop handling */
                 else
                     pline("%s %s to the %s.", Doname2(obj),
                           otense(obj, "drop"), surface(u.ux, u.uy));
-                dropy(obj);
+                dropyf(obj);
             }
         }
         iflags.suppress_price--;

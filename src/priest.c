@@ -371,15 +371,24 @@ int mtype;
             (void) mongets(priest, AMULET_OF_YENDOR);
 
             otmp = mongets(priest, YELLOW_DRAGON_SCALE_MAIL);
-            otmp->enchantment = max(otmp->enchantment, rnd(3) + 2);
+            if(otmp)
+                otmp->enchantment = max(otmp->enchantment, rnd(3) + 2);
+            otmp = mongets(priest, ROBE_OF_STARRY_WISDOM);
+            if (otmp)
+                otmp->enchantment = max(otmp->enchantment, rnd(3) + 2);
             otmp = mongets(priest, BRACERS_OF_REFLECTION);
-            otmp->enchantment = max(otmp->enchantment, rnd(3) + 1);
+            if (otmp)
+                otmp->enchantment = max(otmp->enchantment, rnd(3) + 1);
             otmp = mongets(priest, CLOAK_OF_MAGIC_RESISTANCE);
-            otmp->enchantment = max(otmp->enchantment, rnd(2) + 1);
+            if (otmp)
+                otmp->enchantment = max(otmp->enchantment, rnd(2) + 1);
             otmp = mongets(priest, SPEED_BOOTS);
-            otmp->enchantment = max(otmp->enchantment, rnd(2) + 2);
+            if (otmp)
+                otmp->enchantment = max(otmp->enchantment, rnd(2) + 2);
             otmp = mongets(priest, IOUN_STONE_OF_CONSTITUTION);
-            otmp->enchantment = max(otmp->enchantment, rnd(2) + 2);
+            if (otmp)
+                otmp->enchantment = max(otmp->enchantment, rnd(2) + 2);
+            (void) mongets(priest, POT_FULL_HEALING);
 
             m_dowear(priest, TRUE);
         }
@@ -1675,7 +1684,7 @@ boolean showheads;
     /* and unlike a normal mon_nam, use "saddled" even if it has a name */
     char adjbuf[BUFSZ], alignbuf[BUFSZ];
     Sprintf(adjbuf, "level %d%s", mtmp->data->difficulty, is_tame(mtmp) ? (call_mon_tame(mtmp) ? " tame" : " allied") : is_peaceful(mtmp) ? " peaceful" : "");
-    strcpy(alignbuf, align_str(alignment));
+    Strcpy(alignbuf, align_str(alignment));
     *alignbuf = highc(*alignbuf);
 
     Strcpy(monnambuf, x_monnam(mtmp, monsternamearticle, adjbuf,

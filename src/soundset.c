@@ -1386,6 +1386,35 @@ NEARDATA const struct ghsound_eventmapping ghsound2event[MAX_GHSOUNDS] = {
     { SOUND_BANK_MASTER, "event:/Monster/Generic Undead/Female/Pray", 1.0f },
     { SOUND_BANK_MASTER, "event:/Monster/Generic Undead/Female/Who", 1.0f },
 
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Death", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Get Angry", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Mollified", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Advice", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Standard Dialogue", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Item Trading", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Cough", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Push Effort", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Happy", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Unhappy", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Search", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Cast", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Yell", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Chat", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Laughter", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Bugbear/Start Attack", 1.0f },
+
+    { SOUND_BANK_MASTER, "event:/Monster/Grid Bug/Death", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Grid Bug/Standard Dialogue", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Grid Bug/Chat", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Grid Bug/Attack", 1.0f },
+
+    { SOUND_BANK_MASTER, "event:/Monster/Snake/Death", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Snake/Standard Dialogue", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Snake/Chat", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Snake/Hiss", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Snake/Melee Attack", 1.0f },
+    { SOUND_BANK_MASTER, "event:/Monster/Snake/Spit Venom", 1.0f },
+
     { SOUND_BANK_MASTER, "event:/Monster/Angel/Male/Death", 1.0f },
     { SOUND_BANK_MASTER, "event:/Monster/Angel/Male/Special Dialogue", 1.0f },
     { SOUND_BANK_MASTER, "event:/Monster/Angel/Female/Death", 1.0f },
@@ -9404,6 +9433,230 @@ NEARDATA struct monster_soundset_definition monster_soundsets[MAX_MONSTER_SOUNDS
             OBJECT_SOUNDSET_GENERIC
         }
     },
+    {
+        "Bugbear",
+        MONSTER_SOUNDSET_GENERIC,
+        {
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SWALLOW_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION_WITH_GOD_NAME */
+            {GHSOUND_BUGBEAR_ITEM_TRADING, 1.0f}, /* MONSTER_SOUND_TYPE_ITEM_TRADING */
+            {GHSOUND_BUGBEAR_STANDARD_DIALOGUE, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CREATION */
+            {GHSOUND_BUGBEAR_GET_ANGRY, 1.0f}, /* MONSTER_SOUND_TYPE_GET_ANGRY */
+            {GHSOUND_BUGBEAR_MOLLIFIED, 1.0f}, /* MONSTER_SOUND_TYPE_MOLLIFIED */
+            {GHSOUND_BUGBEAR_ADVICE, 1.0f}, /* MONSTER_SOUND_TYPE_ADVICE */
+            {GHSOUND_BUGBEAR_COUGH, 1.0f}, /* MONSTER_SOUND_TYPE_COUGH */
+            {GHSOUND_BUGBEAR_PUSH_EFFORT, 1.0f}, /* MONSTER_SOUND_TYPE_PUSH_EFFORT */
+            {GHSOUND_BUGBEAR_UNHAPPY, 1.0f}, /* MONSTER_SOUND_TYPE_UNHAPPY */
+            {GHSOUND_BUGBEAR_LAUGHTER, 1.0f}, /* MONSTER_SOUND_TYPE_HOWL */
+            {GHSOUND_BUGBEAR_UNHAPPY, 1.0f}, /* MONSTER_SOUND_TYPE_PISSED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_WHO */
+            {GHSOUND_BUGBEAR_UNHAPPY, 1.0f}, /* MONSTER_SOUND_TYPE_OUCH */
+            {GHSOUND_BUGBEAR_UNHAPPY, 1.0f}, /* MONSTER_SOUND_TYPE_FLOUNDER */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_4 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_5 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_6 */
+            {GHSOUND_BUGBEAR_COUGH, 1.0f}, /* MONSTER_SOUND_TYPE_BUMP_INTO */
+            {GHSOUND_BUGBEAR_SEARCH, 1.0f}, /* MONSTER_SOUND_TYPE_SEARCH */
+            {GHSOUND_BUGBEAR_CAST, 1.0f}, /* MONSTER_SOUND_TYPE_CAST */
+            {GHSOUND_BUGBEAR_HAPPY, 1.0f}, /* MONSTER_SOUND_TYPE_HAPPY */
+            {GHSOUND_BUGBEAR_LAUGHTER, 1.0f}, /* MONSTER_SOUND_TYPE_LAUGHTER */
+            {GHSOUND_BUGBEAR_LAUGHTER, 1.0f}, /* MONSTER_SOUND_TYPE_RANDOM_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_7 */
+            {GHSOUND_BUGBEAR_CAST, 1.0f}, /* MONSTER_SOUND_TYPE_CURSE */
+            {GHSOUND_BUGBEAR_CAST, 1.0f}, /* MONSTER_SOUND_TYPE_MUMBLED_CURSE */
+            {GHSOUND_BUGBEAR_LAUGHTER, 1.0f}, /* MONSTER_SOUND_TYPE_YELL */
+            {GHSOUND_BUGBEAR_CHAT, 1.0f}, /* MONSTER_SOUND_TYPE_CHAT */
+            {GHSOUND_BUGBEAR_START_ATTACK, 1.0f}, /* MONSTER_SOUND_TYPE_START_ATTACK */
+            {GHSOUND_BUGBEAR_LAUGHTER, 1.0f}, /* MONSTER_SOUND_TYPE_SHUDDER */
+            {GHSOUND_BUGBEAR_DEATH, 1.0f} /* MONSTER_SOUND_TYPE_DEATH */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC
+        }
+    },
+    {
+        "Grid Bug",
+        MONSTER_SOUNDSET_GENERIC,
+        {
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SWALLOW_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION_WITH_GOD_NAME */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_ITEM_TRADING */
+            {GHSOUND_GRID_BUG_STANDARD_DIALOGUE, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CREATION */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_GET_ANGRY */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MOLLIFIED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_ADVICE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_COUGH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_PUSH_EFFORT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_UNHAPPY */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_HOWL */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_PISSED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_WHO */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_OUCH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_FLOUNDER */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_4 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_5 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_6 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_BUMP_INTO */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SEARCH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CAST */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_HAPPY */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_LAUGHTER */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RANDOM_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_7 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CURSE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MUMBLED_CURSE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_YELL */
+            {GHSOUND_GRID_BUG_CHAT, 1.0f}, /* MONSTER_SOUND_TYPE_CHAT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_START_ATTACK */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SHUDDER */
+            {GHSOUND_GRID_BUG_DEATH, 1.0f} /* MONSTER_SOUND_TYPE_DEATH */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OBJECT_SOUNDSET_GRID_BUG_ATTACK,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC
+        }
+    },
+    {
+        "Snake",
+        MONSTER_SOUNDSET_GENERIC,
+        {
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SWALLOW_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION_WITH_GOD_NAME */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_ITEM_TRADING */
+            {GHSOUND_SNAKE_STANDARD_DIALOGUE, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_SOUND */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_CREATION */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_GET_ANGRY */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_MOLLIFIED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_ADVICE */
+            {GHSOUND_SNAKE_MELEE_ATTACK, 1.0f}, /* MONSTER_SOUND_TYPE_COUGH */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_PUSH_EFFORT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_UNHAPPY */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_HOWL */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_PISSED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_WHO */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_OUCH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_FLOUNDER */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_4 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_5 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_6 */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_BUMP_INTO */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_SEARCH */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_CAST */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_HAPPY */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_LAUGHTER */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_RANDOM_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_7 */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_CURSE */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_MUMBLED_CURSE */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_YELL */
+            {GHSOUND_SNAKE_CHAT, 1.0f}, /* MONSTER_SOUND_TYPE_CHAT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_START_ATTACK */
+            {GHSOUND_SNAKE_HISS, 1.0f}, /* MONSTER_SOUND_TYPE_SHUDDER */
+            {GHSOUND_SNAKE_DEATH, 1.0f} /* MONSTER_SOUND_TYPE_DEATH */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC
+        }
+    },
+    {
+        "Spitting Snake",
+        MONSTER_SOUNDSET_SNAKE,
+        {
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SWALLOW_AMBIENT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MALEDICTION_WITH_GOD_NAME */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_ITEM_TRADING */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_DIALOGUE_LINE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_STANDARD_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SPECIAL_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CREATION */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_GET_ANGRY */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MOLLIFIED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_ADVICE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_COUGH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_PUSH_EFFORT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_UNHAPPY */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_HOWL */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_PISSED */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_WHO */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_OUCH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_FLOUNDER */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_4 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_5 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_6 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_BUMP_INTO */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SEARCH */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CAST */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_HAPPY */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_LAUGHTER */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RANDOM_SOUND */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_RESERVED_7 */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CURSE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_MUMBLED_CURSE */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_YELL */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_CHAT */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_START_ATTACK */
+            {MAX_GHSOUNDS, 1.0f}, /* MONSTER_SOUND_TYPE_SHUDDER */
+            {MAX_GHSOUNDS, 1.0f} /* MONSTER_SOUND_TYPE_DEATH */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_SNAKE_SPIT_VENOM,
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_SNAKE_MELEE_ATTACK,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC,
+            OBJECT_SOUNDSET_GENERIC
+        }
+    },
 };
 
 NEARDATA struct object_soundset_definition object_soundsets[MAX_OBJECT_SOUNDSETS] =
@@ -12278,6 +12531,217 @@ NEARDATA struct object_soundset_definition object_soundsets[MAX_OBJECT_SOUNDSETS
         OBJECT_INSTRUMENT_SOUNDSET_NONE,
         OBJECT_CONTAINER_SOUNDSET_GENERIC
     }, 
+    {
+        "grid bug attack",
+        OBJECT_SOUNDSET_GENERIC,
+        {
+            {MAX_GHSOUNDS, 0.0f}, /* Ambient */
+            {GHSOUND_GRID_BUG_ATTACK, 1.0f}, /* Melee Swing */
+            {MAX_GHSOUNDS, 0.0f}, /* Melee Hit */
+            {MAX_GHSOUNDS, 0.0f}, /* Throw */
+            {MAX_GHSOUNDS, 0.0f}, /* Fire */
+            {MAX_GHSOUNDS, 0.0f}, /* Ranged Hit */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Pick up */
+            {MAX_GHSOUNDS, 0.0f}, /* Drop */
+            {MAX_GHSOUNDS, 0.0f}, /* Drop after throw */
+            {MAX_GHSOUNDS, 0.0f}, /* Wear */
+            {MAX_GHSOUNDS, 0.0f}, /* Take off */
+            {MAX_GHSOUNDS, 0.0f}, /* Wield */
+            {MAX_GHSOUNDS, 0.0f}, /* Unwield */
+            {MAX_GHSOUNDS, 0.0f}, /* Quiver */
+            {MAX_GHSOUNDS, 0.0f}, /* Unquiver */
+            {MAX_GHSOUNDS, 0.0f}, /* Apply */
+            {MAX_GHSOUNDS, 0.0f}, /* Apply 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Invoke */
+            {MAX_GHSOUNDS, 0.0f}, /* Invoke 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Quaff */
+            {MAX_GHSOUNDS, 0.0f}, /* Read */
+            {MAX_GHSOUNDS, 0.0f}, /* Engrave */
+            {MAX_GHSOUNDS, 0.0f}, /* Zap */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Break */
+            {MAX_GHSOUNDS, 0.0f}, /* Burnt */
+            {MAX_GHSOUNDS, 0.0f}, /* Frozen */
+            {MAX_GHSOUNDS, 0.0f}, /* Electrocuted */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Rusts */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Burns */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Corrodes */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Rots */
+            {MAX_GHSOUNDS, 0.0f}, /* General effect */
+            {MAX_GHSOUNDS, 0.0f}, /* General effect 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Push */
+            {MAX_GHSOUNDS, 0.0f}, /* Bump into */
+            {MAX_GHSOUNDS, 0.0f}, /* Tumble downwards */
+            {MAX_GHSOUNDS, 0.0f}, /* Give */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Walk */
+            {MAX_GHSOUNDS, 0.0f}, /* Fly */
+            {MAX_GHSOUNDS, 0.0f}, /* Levitation */
+            {MAX_GHSOUNDS, 0.0f}  /* Swim */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OCCUPATION_SOUNDSET_NONE,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_SETTING_TRAP,
+            OCCUPATION_SOUNDSET_GENERIC_WIPING_OFF,
+            OCCUPATION_SOUNDSET_GENERIC_TAKING_OFF,
+            OCCUPATION_SOUNDSET_GENERIC_PICKING_LOCK,
+            OCCUPATION_SOUNDSET_GENERIC_FORCING_LOCK,
+            OCCUPATION_SOUNDSET_GENERIC_STUDYING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_SWINGING,
+            OCCUPATION_SOUNDSET_GENERIC_HITTING_DOOR,
+            OCCUPATION_SOUNDSET_GENERIC_EATING
+        },
+        OBJECT_RAY_SOUNDSET_NONE,
+        OBJECT_INSTRUMENT_SOUNDSET_NONE,
+        OBJECT_CONTAINER_SOUNDSET_GENERIC
+    },
+    {
+        "snake melee attack",
+        OBJECT_SOUNDSET_GENERIC,
+        {
+            {MAX_GHSOUNDS, 0.0f}, /* Ambient */
+            {GHSOUND_SNAKE_MELEE_ATTACK, 1.0f}, /* Melee Swing */
+            {MAX_GHSOUNDS, 0.0f}, /* Melee Hit */
+            {MAX_GHSOUNDS, 0.0f}, /* Throw */
+            {MAX_GHSOUNDS, 0.0f}, /* Fire */
+            {MAX_GHSOUNDS, 0.0f}, /* Ranged Hit */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Pick up */
+            {MAX_GHSOUNDS, 0.0f}, /* Drop */
+            {MAX_GHSOUNDS, 0.0f}, /* Drop after throw */
+            {MAX_GHSOUNDS, 0.0f}, /* Wear */
+            {MAX_GHSOUNDS, 0.0f}, /* Take off */
+            {MAX_GHSOUNDS, 0.0f}, /* Wield */
+            {MAX_GHSOUNDS, 0.0f}, /* Unwield */
+            {MAX_GHSOUNDS, 0.0f}, /* Quiver */
+            {MAX_GHSOUNDS, 0.0f}, /* Unquiver */
+            {MAX_GHSOUNDS, 0.0f}, /* Apply */
+            {MAX_GHSOUNDS, 0.0f}, /* Apply 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Invoke */
+            {MAX_GHSOUNDS, 0.0f}, /* Invoke 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Quaff */
+            {MAX_GHSOUNDS, 0.0f}, /* Read */
+            {MAX_GHSOUNDS, 0.0f}, /* Engrave */
+            {MAX_GHSOUNDS, 0.0f}, /* Zap */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Break */
+            {MAX_GHSOUNDS, 0.0f}, /* Burnt */
+            {MAX_GHSOUNDS, 0.0f}, /* Frozen */
+            {MAX_GHSOUNDS, 0.0f}, /* Electrocuted */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Rusts */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Burns */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Corrodes */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Rots */
+            {MAX_GHSOUNDS, 0.0f}, /* General effect */
+            {MAX_GHSOUNDS, 0.0f}, /* General effect 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Push */
+            {MAX_GHSOUNDS, 0.0f}, /* Bump into */
+            {MAX_GHSOUNDS, 0.0f}, /* Tumble downwards */
+            {MAX_GHSOUNDS, 0.0f}, /* Give */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Walk */
+            {MAX_GHSOUNDS, 0.0f}, /* Fly */
+            {MAX_GHSOUNDS, 0.0f}, /* Levitation */
+            {MAX_GHSOUNDS, 0.0f}  /* Swim */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OCCUPATION_SOUNDSET_NONE,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_SETTING_TRAP,
+            OCCUPATION_SOUNDSET_GENERIC_WIPING_OFF,
+            OCCUPATION_SOUNDSET_GENERIC_TAKING_OFF,
+            OCCUPATION_SOUNDSET_GENERIC_PICKING_LOCK,
+            OCCUPATION_SOUNDSET_GENERIC_FORCING_LOCK,
+            OCCUPATION_SOUNDSET_GENERIC_STUDYING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_SWINGING,
+            OCCUPATION_SOUNDSET_GENERIC_HITTING_DOOR,
+            OCCUPATION_SOUNDSET_GENERIC_EATING
+        },
+        OBJECT_RAY_SOUNDSET_NONE,
+        OBJECT_INSTRUMENT_SOUNDSET_NONE,
+        OBJECT_CONTAINER_SOUNDSET_GENERIC
+    },
+    {
+        "snake spit venom",
+        OBJECT_SOUNDSET_GENERIC,
+        {
+            {MAX_GHSOUNDS, 0.0f}, /* Ambient */
+            {GHSOUND_SNAKE_SPIT_VENOM, 1.0f}, /* Melee Swing */
+            {GHSOUND_SNAKE_SPIT_VENOM, 1.0f}, /* Melee Hit */
+            {GHSOUND_SNAKE_SPIT_VENOM, 1.0f}, /* Throw */
+            {GHSOUND_SNAKE_SPIT_VENOM, 1.0f}, /* Fire */
+            {MAX_GHSOUNDS, 0.0f}, /* Ranged Hit */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Pick up */
+            {MAX_GHSOUNDS, 0.0f}, /* Drop */
+            {MAX_GHSOUNDS, 0.0f}, /* Drop after throw */
+            {MAX_GHSOUNDS, 0.0f}, /* Wear */
+            {MAX_GHSOUNDS, 0.0f}, /* Take off */
+            {MAX_GHSOUNDS, 0.0f}, /* Wield */
+            {MAX_GHSOUNDS, 0.0f}, /* Unwield */
+            {MAX_GHSOUNDS, 0.0f}, /* Quiver */
+            {MAX_GHSOUNDS, 0.0f}, /* Unquiver */
+            {MAX_GHSOUNDS, 0.0f}, /* Apply */
+            {MAX_GHSOUNDS, 0.0f}, /* Apply 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Invoke */
+            {MAX_GHSOUNDS, 0.0f}, /* Invoke 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Quaff */
+            {MAX_GHSOUNDS, 0.0f}, /* Read */
+            {MAX_GHSOUNDS, 0.0f}, /* Engrave */
+            {MAX_GHSOUNDS, 0.0f}, /* Zap */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Break */
+            {MAX_GHSOUNDS, 0.0f}, /* Burnt */
+            {MAX_GHSOUNDS, 0.0f}, /* Frozen */
+            {MAX_GHSOUNDS, 0.0f}, /* Electrocuted */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Rusts */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Burns */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Corrodes */
+            {MAX_GHSOUNDS, 0.0f}, /* Erosion - Rots */
+            {MAX_GHSOUNDS, 0.0f}, /* General effect */
+            {MAX_GHSOUNDS, 0.0f}, /* General effect 2 */
+            {MAX_GHSOUNDS, 0.0f}, /* Push */
+            {MAX_GHSOUNDS, 0.0f}, /* Bump into */
+            {MAX_GHSOUNDS, 0.0f}, /* Tumble downwards */
+            {MAX_GHSOUNDS, 0.0f}, /* Give */
+
+            {MAX_GHSOUNDS, 0.0f}, /* Walk */
+            {MAX_GHSOUNDS, 0.0f}, /* Fly */
+            {MAX_GHSOUNDS, 0.0f}, /* Levitation */
+            {MAX_GHSOUNDS, 0.0f}  /* Swim */
+        },
+        SOUNDSOURCE_AMBIENT_GENERAL,
+        {
+            OCCUPATION_SOUNDSET_NONE,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_SETTING_TRAP,
+            OCCUPATION_SOUNDSET_GENERIC_WIPING_OFF,
+            OCCUPATION_SOUNDSET_GENERIC_TAKING_OFF,
+            OCCUPATION_SOUNDSET_GENERIC_PICKING_LOCK,
+            OCCUPATION_SOUNDSET_GENERIC_FORCING_LOCK,
+            OCCUPATION_SOUNDSET_GENERIC_STUDYING,
+            OCCUPATION_SOUNDSET_GENERIC_EATING,
+            OCCUPATION_SOUNDSET_GENERIC_SWINGING,
+            OCCUPATION_SOUNDSET_GENERIC_HITTING_DOOR,
+            OCCUPATION_SOUNDSET_GENERIC_EATING
+        },
+        OBJECT_RAY_SOUNDSET_NONE,
+        OBJECT_INSTRUMENT_SOUNDSET_NONE,
+        OBJECT_CONTAINER_SOUNDSET_GENERIC
+    },
+
 };
 
 NEARDATA struct occupation_soundset_definition occupation_soundset_definitions[MAX_OCCUPATION_SOUNDSETS] =
@@ -12942,267 +13406,267 @@ NEARDATA struct effect_sound_definition sfx_sounds[MAX_SFX_SOUND_TYPES] =
     {
         "desecrate altar",
         {GHSOUND_DESECRATE_ALTAR, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "summon demon",
         {GHSOUND_SUMMON_DEMON, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "sacrifice pet",
         {GHSOUND_SACRIFICE_PET, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "sacrifice coaligned unicorn",
         {GHSOUND_SACRIFICE_COALIGNED_UNICORN, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar add alignment",
         {GHSOUND_ALTAR_ADD_ALIGNMENT, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar thunderclap",
         {GHSOUND_ALTAR_THUNDERCLAP, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar charged air",
         {GHSOUND_ALTAR_CHARGED_AIR, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar accepts sacrifice",
         {GHSOUND_ALTAR_ANGRY_ACCEPTS_SACRIFICE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar rejects sacrifice",
         {GHSOUND_ALTAR_ANGRY_REJECTS_SACRIFICE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar power increase",
         {GHSOUND_ALTAR_POWER_INCREASE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar power decrease",
         {GHSOUND_ALTAR_POWER_DECREASE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar god mollified",
         {GHSOUND_ALTAR_GOD_MOLLIFIED, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar inadequacy",
         {GHSOUND_ALTAR_INADEQUACY, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar absolved",
         {GHSOUND_ALTAR_ABSOLVED, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar hopeful feeling",
         {GHSOUND_ALTAR_HOPEFUL_FEELING, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar reconciliation",
         {GHSOUND_ALTAR_RECONCILIATION, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar gift",
         {GHSOUND_ALTAR_GIFT, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar four-leaf clover",
         {GHSOUND_ALTAR_FOUR_LEAF_CLOVER, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "aura glow",
         {GHSOUND_AURA_GLOW, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar burst of flame",
         {GHSOUND_ALTAR_BURST_OF_FLAME, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "altar offering vanish",
         {GHSOUND_ALTAR_OFFERING_VANISH, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray fail",
         {GHSOUND_PRAY_FAIL, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray pleased",
         {GHSOUND_PRAY_PLEASED, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray fix all troubles",
         {GHSOUND_PRAY_FIX_ALL_TROUBLES, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray fix one trouble",
         {GHSOUND_PRAY_FIX_ONE_TROUBLE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray repair",
         {GHSOUND_PRAY_REPAIR, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray healing",
         {GHSOUND_PRAY_HEALING, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray uncurse",
         {GHSOUND_PRAY_UNCURSE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray gift",
         {GHSOUND_PRAY_GIFT, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray crowning",
         {GHSOUND_PRAY_CROWNING, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray spellbook",
         {GHSOUND_PRAY_SPELLBOOK, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray bless water",
         {GHSOUND_PRAY_BLESS_WATER, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray curse water",
         {GHSOUND_PRAY_CURSE_WATER, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "pray shimmering light",
         {GHSOUND_PRAY_SHIMMERING_LIGHT, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_SUCCESS",
         {GHSOUND_ENCHANT_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_BLESSED_SUCCESS",
         {GHSOUND_ENCHANT_ITEM_BLESSED_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_UNCURSE_AND_OTHER",
         {GHSOUND_ENCHANT_ITEM_UNCURSE_AND_OTHER, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_NEGATIVE",
         {GHSOUND_ENCHANT_ITEM_NEGATIVE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_VIOLENT_GLOW",
         {GHSOUND_ENCHANT_ITEM_VIOLENT_GLOW, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_VIBRATE_WARNING",
         {GHSOUND_ENCHANT_ITEM_VIBRATE_WARNING, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_VIBRATE_AND_DESTROY",
         {GHSOUND_ENCHANT_ITEM_VIBRATE_AND_DESTROY, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_SPECIAL_SUCCESS",
         {GHSOUND_ENCHANT_ITEM_SPECIAL_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_SPECIAL_NEGATIVE",
         {GHSOUND_ENCHANT_ITEM_SPECIAL_NEGATIVE, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_ENCHANT_ITEM_GENERAL_FAIL",
         {GHSOUND_ENCHANT_ITEM_GENERAL_FAIL, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_HANDS_ITCH",
         {GHSOUND_HANDS_ITCH, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_PROTECT_ITEM_SUCCESS",
         {GHSOUND_PROTECT_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_PROTECT_ITEM_FAIL",
         {GHSOUND_PROTECT_ITEM_FAIL, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_REPAIR_ITEM_SUCCESS",
         {GHSOUND_REPAIR_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_REPAIR_ITEM_FAIL",
         {GHSOUND_REPAIR_ITEM_FAIL, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_BLESS_ITEM_SUCCESS",
         {GHSOUND_BLESS_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_UNCURSE_ITEM_SUCCESS",
         {GHSOUND_UNCURSE_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_CURSE_ITEM_SUCCESS",
         {GHSOUND_CURSE_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_UNBLESS_ITEM_SUCCESS",
         {GHSOUND_UNBLESS_ITEM_SUCCESS, 1.0f},
-        FALSE, SOUND_PLAY_GROUP_NORMAL
+        FALSE, SOUND_PLAY_GROUP_LONG
     },
     {
         "GHSOUND_DISINTEGRATE",
@@ -16028,7 +16492,12 @@ update_game_music()
     musicinfo.volume = 1.0f;
     musicinfo.ghsound = GHSOUND_NONE;
 
-    if (context.game_started == FALSE)
+    boolean gamestarted;
+    lock_thread_lock();
+    gamestarted = context.game_started;
+    unlock_thread_lock();
+
+    if (!gamestarted)
     {
         musicinfo.ghsound = GHSOUND_MUSIC_INTRO;
     }
@@ -16060,8 +16529,12 @@ play_level_ambient_sounds()
     struct ghsound_level_ambient_info lainfo = { 0 };
     lainfo.volume = 1.0f;
     lainfo.ghsound = GHSOUND_NONE;
+    boolean gamestarted;
+    lock_thread_lock();
+    gamestarted = context.game_started;
+    unlock_thread_lock();
 
-    if (context.game_started == FALSE || program_state.gameover > 0)
+    if (!gamestarted || program_state.gameover > 0)
     {
         lainfo.ghsound = GHSOUND_NONE;
     }
@@ -16093,8 +16566,12 @@ play_environment_ambient_sounds()
     struct ghsound_environment_ambient_info eainfo = { 0 };
     eainfo.volume = 1.0f;
     eainfo.ghsound = GHSOUND_NONE;
+    boolean gamestarted;
+    lock_thread_lock();
+    gamestarted = context.game_started;
+    unlock_thread_lock();
 
-    if (context.game_started == FALSE || program_state.gameover > 0)
+    if (!gamestarted || program_state.gameover > 0)
     {
         eainfo.ghsound = GHSOUND_NONE;
     }
@@ -17232,6 +17709,15 @@ enum object_sound_types sound_type;
     if (soundid > GHSOUND_NONE && immediateinfo.volume > GENERAL_SOUND_CUTOFF_VOLUME)
         play_immediate_ghsound(immediateinfo);
 
+}
+
+void
+play_monster_attack_sound(mtmp, attack_number, sound_type)
+struct monst* mtmp;
+int attack_number;
+enum object_sound_types sound_type;
+{
+    play_monster_simple_weapon_sound(mtmp, attack_number, (struct obj*)0, sound_type);
 }
 
 void

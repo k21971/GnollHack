@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    artifact.c    $NHDT-Date: 1553363416 2019/03/23 17:50:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1537,7 +1537,7 @@ int dieroll; /* needed for Magicbane and vorpal blades */
     {
         if (artifact_has_flag(otmp, AF_BISECT) && dieroll == 1 && (!is_shade(mdef->data) || shade_glare(otmp)) && !(youdefend ? (Bisection_resistance || Invulnerable || is_incorporeal(mdef->data)) : resists_bisection(mdef)))
         {
-            strcpy(wepdesc, The(artifact_hit_desc));
+            Strcpy(wepdesc, The(artifact_hit_desc));
             /* not really beheading, but close */
             if (youattack && u.uswallow && mdef == u.ustuck) 
             {
@@ -1760,10 +1760,9 @@ int dieroll; /* needed for Magicbane and vorpal blades */
                     : "object",
                     life);
             else if (otmp->oartifact == ART_STORMBRINGER || otmp->oartifact == ART_MOURNBLADE)
-                pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s blade drains your %s!", hcolor(NH_BLACK), life);
+                pline_The_multi_ex(ATR_NONE, CLR_MSG_WARNING, no_multiattrs, multicolor_buffer, "%s blade drains your %s!", hcolor_multi_buf0(NH_BLACK), life);
             else
-                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s drains your %s!", The(distant_name(otmp, xname)),
-                    life);
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s drains your %s!", The(distant_name(otmp, xname)), life);
             losexp("life drainage");
             if(monwep_has_dual_runesword_bonus(magr, otmp))
                 losexp("life drainage"); /* Lose another level */
@@ -2698,7 +2697,7 @@ struct obj *obj;
                 u.uen += epboost;
                 int mana_after = u.uen;
                 int mana_gain = mana_after - mana_before;
-                if (mana_gain > 0)
+                if (mana_gain > 0 && isok(u.ux, u.uy))
                 {
                     char fbuf[BUFSZ];
                     Sprintf(fbuf, "+%d", mana_gain);
@@ -2734,7 +2733,7 @@ struct obj *obj;
             break;
         }
         case ARTINVOKE_LEVEL_TELEPORT:
-            level_tele(2, FALSE, zerodlevel);
+            level_tele(2, FALSE, zerodlevel, 0);
             break;
         case ARTINVOKE_CREATE_PORTAL:
         {
@@ -3187,7 +3186,7 @@ create_portal()
             You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "are surrounded by a shimmering sphere!");
         else
             You_feel_ex(ATR_NONE, CLR_MSG_MYSTICAL, "weightless for a moment.");
-        goto_level(&newlev, FALSE, FALSE, FALSE);
+        goto_level(&newlev, FALSE, FALSE, FALSE, FALSE);
     }
 
     return 1;
@@ -3566,8 +3565,10 @@ int arti_indx;
 {
     int colornum = artilist[arti_indx].acolor;
     const char *colorstr = clr2colorname(colornum);
-
-    return hcolor(colorstr);
+    if (!colorstr)
+        return NH_COLORLESS;
+    else
+        return colorstr; // hcolor(colorstr);
 }
 
 /* glow verb; [0] holds the value used when blind */
@@ -3645,26 +3646,24 @@ int orc_count; /* new count, new count is in the items; OBSOLETE: (warn_obj_cnt 
         int oldstr = glow_strength(otmp->detectioncount),
             newstr = glow_strength(orc_count);
 
-        char colorbuf[BUFSZ] = "red";
-
+        const char* colorptr = NH_RED;
         if (otmp->oartifact)
-            strcpy(colorbuf, glow_color(otmp->oartifact));
+            colorptr = glow_color(otmp->oartifact);
 
-        if (!otmp->oartifact || strcmp(colorbuf, "no color") == 0)
+        if (!otmp->oartifact || colorptr == NH_COLORLESS || strcmp(colorptr, "no color") == 0)
         {
             if ((objects[otyp].oc_flags2 & O2_FLICKER_COLOR_MASK) == O2_FLICKER_COLOR_BLACK)
-                strcpy(colorbuf, "black");
+                colorptr = NH_BLACK;
             else if ((objects[otyp].oc_flags2 & O2_FLICKER_COLOR_MASK) == O2_FLICKER_COLOR_WHITE)
-                strcpy(colorbuf, "white");
+                colorptr = NH_WHITE;
             else if ((objects[otyp].oc_flags2 & O2_FLICKER_COLOR_MASK) == O2_FLICKER_COLOR_BLUE)
-                strcpy(colorbuf, "blue");
+                colorptr = NH_BLUE;
             else
-                strcpy(colorbuf, "red");
+                colorptr = NH_RED;
         }
 
-
         char weapbuf[BUFSZ] = "";
-        strcpy(weapbuf, Yname2(otmp));
+        Strcpy(weapbuf, Yname2(otmp));
 
         if (orc_count == -1 && otmp->detectioncount > 0) {
             /* -1 means that blindness has just been toggled; give a
@@ -3674,9 +3673,9 @@ int orc_count; /* new count, new count is in the items; OBSOLETE: (warn_obj_cnt 
         } else if (newstr > 0 && newstr != oldstr) {
             /* 'start' message */
             if (!Blind)
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s %s%c", weapbuf,
+                pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s %s %s%c", weapbuf,
                       otense(otmp, glow_verb(orc_count, FALSE)),
-                      colorbuf,
+                      hcolor_multi_buf2(colorptr),
                       (newstr > oldstr) ? '!' : '.');
             else if (oldstr == 0) /* quivers */
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s slightly.", weapbuf,

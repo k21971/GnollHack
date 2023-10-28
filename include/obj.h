@@ -87,10 +87,12 @@ struct obj {
 #define SPEFLAGS_INSCRIPTION_REVEALED          0x00800000UL
 #define SPEFLAGS_ALTERNATIVE_APPEARANCE        0x01000000UL /* Alternative glyph is used for the object */
 #define SPEFLAGS_ROTTING_STATUS_KNOWN          0x02000000UL
-#define SPEFLAGS_AUTOSTASH                     0x04000000UL
+#define SPEFLAGS_FAVORITE                      0x04000000UL
 #define SPEFLAGS_EMPTY_NOTICED                 0x08000000UL
 #define SPEFLAGS_BEING_BROKEN                  0x10000000UL
 #define SPEFLAGS_GIVEN_OUT_BLUE_SMOKE          0x20000000UL
+#define SPEFLAGS_FOUND_THIS_TURN               0x40000000UL
+#define SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO    0x80000000UL
 
     char oclass;    /* object class */
     char invlet;    /* designation in inventory */
@@ -202,6 +204,8 @@ enum elemental_enchantments {
 #define ELEMENTAL_ENCHANTMENT_BAG_WEAR_OFF_ONE_PER_CHANCE 3
 
 #define newobj() (struct obj *) alloc(sizeof(struct obj))
+#define obj_set_found(o) ((o)->speflags |= SPEFLAGS_FOUND_THIS_TURN)
+#define obj_clear_found(o) ((o)->speflags &= ~SPEFLAGS_FOUND_THIS_TURN)
 
 /* property blocking */
 /* This only allows for one blocking item per property */
@@ -250,6 +254,11 @@ enum elemental_enchantments {
 #define is_otyp_indestructible(otyp) ((objects[(otyp)].oc_flags & O1_INDESTRUCTIBLE) != 0)
 #define is_obj_indestructible(o) ((get_obj_oc_flags(o) & O1_INDESTRUCTIBLE) != 0 || ((o)->speflags & SPEFLAGS_INDESTRUCTIBLE) != 0 \
                                   || ((o)->oartifact > 0 && (artilist[(o)->oartifact].aflags2 & AF2_INDESTRUCTIBLE) != 0))
+#define is_obj_unremovable_from_the_game(o) ((o)->otyp == AMULET_OF_YENDOR \
+    || (o)->otyp == SPE_BOOK_OF_THE_DEAD \
+    || (o)->otyp == CANDELABRUM_OF_INVOCATION \
+    || (o)->otyp == BELL_OF_OPENING \
+    || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && is_rider(&mons[(o)->corpsenm])))
 
 #define is_otyp_no_pickup(otyp) ((objects[(otyp)].oc_flags3 & O3_NO_PICKUP) != 0)
 #define is_obj_no_pickup(o) (is_otyp_no_pickup((o)->otyp) || ((o)->speflags & SPEFLAGS_NO_PICKUP) != 0)
@@ -327,11 +336,14 @@ enum elemental_enchantments {
 #define is_missile(o) is_otyp_missile((o)->otyp)
 #define is_otyp_nonmelee_throwing_weapon(otyp) (is_otyp_missile(otyp) || (objects[otyp].oc_flags & O1_THROWN_WEAPON_ONLY))
 #define is_otyp_throwing_weapon(otyp) (is_otyp_nonmelee_throwing_weapon(otyp) || (objects[otyp].oc_flags & O1_MELEE_AND_THROWN_WEAPON))
+#define throwing_weapon(o) is_otyp_throwing_weapon((o)->otyp)
+#define nonmelee_throwing_weapon(o) is_otyp_nonmelee_throwing_weapon((o)->otyp)
 
 #define is_otyp_armor(otyp) (objects[otyp].oc_class == ARMOR_CLASS)
 #define is_armor(o) ((o)->oclass == ARMOR_CLASS)
 #define is_otyp_amulet(otyp) (objects[otyp].oc_class == AMULET_CLASS)
 #define is_amulet(o) ((o)->oclass == AMULET_CLASS)
+#define is_blindfold(o) ((o)->otyp == BLINDFOLD || (o)->otyp == TOWEL)
 #define is_wet_towel(o) ((o)->otyp == TOWEL && (o)->special_quality > 0)
 #define is_otyp_bimanual(otyp)                                            \
     ((objects[otyp].oc_class == WEAPON_CLASS || objects[otyp].oc_class == TOOL_CLASS) \
@@ -348,6 +360,9 @@ enum elemental_enchantments {
 #define is_obj_tethered_weapon(o, wmask)  \
     ((objects[(o)->otyp].oc_flags4 & O4_TETHERED_WEAPON) != 0 && ((wmask) & W_WIELDED_WEAPON) != 0)
 
+#define is_unweapon(o) (((o)->oclass == WEAPON_CLASS) \
+    ? is_launcher(o) || is_ammo(o) || is_missile(o) || (is_appliable_pole_type_weapon(o) && !is_spear(o) && !u.usteed) \
+    : !is_wieldable_weapon(o) && !is_wet_towel(o))
 
 #define uslinging() (uwep && objects[uwep->otyp].oc_skill == P_SLING)
 /* 'is_quest_artifact()' only applies to the current role's artifact */
@@ -735,7 +750,32 @@ enum elemental_enchantments {
 #define can_obj_joust(obj) \
     (can_otyp_joust((obj)->otyp))
 
+#define is_obj_found_this_turn(obj) \
+    (((obj)->speflags & SPEFLAGS_FOUND_THIS_TURN) != 0)
 
+#define is_obj_weight_reduced_by_wizardry(o) \
+    ((o)->oclass == REAGENT_CLASS || (o)->oclass == SPBOOK_CLASS \
+    || (o)->oclass == WAND_CLASS || (o)->oclass == SCROLL_CLASS \
+    )
+
+#define is_obj_weight_reduced_by_treasure_hauling(o) \
+    ((o)->oclass == COIN_CLASS || (o)->oclass == GEM_CLASS \
+    || (o)->oclass == RING_CLASS || (o)->oclass == AMULET_CLASS \
+    || (o)->oclass == MISCELLANEOUS_CLASS \
+    || (o)->material == MAT_SILVER \
+    || (o)->material == MAT_GOLD \
+    || (o)->material == MAT_PLATINUM \
+    || (o)->material == MAT_MITHRIL \
+    || (o)->material == MAT_ADAMANTIUM \
+    || (o)->material == MAT_GEMSTONE \
+    )
+
+#define is_obj_weight_reduced_by_the_glutton(o) \
+    ((o)->oclass == POTION_CLASS || is_obj_normally_edible(o))
+
+#define unfit_for_container(o) \
+    ((o)->otyp == ICE_BOX || (o)->otyp == BOOKSHELF || Is_box(o) || (o)->otyp == BOULDER \
+    || ((o)->otyp == STATUE && (o)->corpsenm >= LOW_PM && bigmonst(&mons[(o)->corpsenm])))
 
 /* 'PRIZE' values override obj->corpsenm so prizes mustn't be object types
    which use that field for monster type (or other overloaded purpose) */
@@ -995,10 +1035,10 @@ enum mythic_suffix_power_types {
 #define MYTHIC_SUFFIX_POWER_RETURN_TO_HAND_AFTER_THROW  (1UL << MYTHIC_SUFFIX_POWER_INDEX_RETURN_TO_HAND_AFTER_THROW)
 
 
-extern NEARDATA struct mythic_definition mythic_prefix_qualities[MAX_MYTHIC_PREFIXES];
-extern NEARDATA struct mythic_definition mythic_suffix_qualities[MAX_MYTHIC_SUFFIXES];
-extern NEARDATA struct mythic_power_definition mythic_prefix_powers[MAX_MYTHIC_PREFIX_POWERS];
-extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_SUFFIX_POWERS];
+extern NEARDATA const struct mythic_definition mythic_prefix_qualities[MAX_MYTHIC_PREFIXES];
+extern NEARDATA const struct mythic_definition mythic_suffix_qualities[MAX_MYTHIC_SUFFIXES];
+extern NEARDATA const struct mythic_power_definition mythic_prefix_powers[MAX_MYTHIC_PREFIX_POWERS];
+extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_SUFFIX_POWERS];
 
 
 #define otyp_non_mythic(otyp) \
@@ -1067,6 +1107,9 @@ extern NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_S
 #define potion_maximum_burn_time(o) potion_starting_burn_time(o)
 #define obj_burns_infinitely(o) \
    ((objects[(o)->otyp].oc_flags5 & O5_BURNS_INFINITELY) != 0 || artifact_light(o) || obj_shines_magical_light(o) || has_obj_mythic_magical_light(o))
+#define is_light_source_empty(o) \
+        (((o)->oclass == TOOL_CLASS && (objects[(o)->otyp].oc_subtyp == TOOLTYPE_LANTERN || objects[(o)->otyp].oc_subtyp == TOOLTYPE_LAMP) && (o)->otyp != MAGIC_LAMP && (o)->age == 0L && !((o)->lamplit) && ((o)->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0) \
+        || ((o)->otyp == MAGIC_LAMP && (o)->special_quality == 0 && ((o)->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0))
 
 /* Manuals */
 enum manual_types

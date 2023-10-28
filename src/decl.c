@@ -86,15 +86,18 @@ const char ynaqchars[] = "ynaq";
 const char ynNaqchars[] = "yn#aq";
 const char dnqchars[] = "dnq";
 const char sdqchars[] = "sdq";
+const char sadqchars[] = "sadq";
 
 const char yndescs[] = "Yes\nNo";
 const char ynqdescs[] = "Yes\nNo\nCancel";
 const char ynq2descs[] = "Yes\nNo\nQuit";
 const char ynaqdescs[] = "Yes\nNo\nAll\nCancel";
 const char ynaq2descs[] = "Yes\nNo\nAll\nQuit";
+const char ynaq3descs[] = "Yes\nNo\nAuto\nCancel";
 const char ynNaqdescs[] = "Yes\nNo\nCount\nAll\nCancel";
 const char dnqdescs[] = "Disarm\nNeglect\nCancel";
 const char sdqdescs[] = "Stash\nDrop\nNothing";
+const char sadqdescs[] = "Stash\nAuto\nDrop\nNothing";
 
 NEARDATA long yn_number = 0L;
 
@@ -144,7 +147,6 @@ NEARDATA coord inv_pos = { 0, 0 };
 
 NEARDATA boolean defer_see_monsters = FALSE;
 NEARDATA boolean in_mklev = FALSE;
-NEARDATA boolean stoned = FALSE; /* done to monsters hit by 'c' */
 NEARDATA boolean unweapon1 = FALSE;
 NEARDATA boolean unweapon2 = FALSE;
 NEARDATA boolean mrg_to_wielded = FALSE;
@@ -271,6 +273,7 @@ NEARDATA struct obj *migrating_objs = (struct obj *) 0;
 NEARDATA struct obj *billobjs = (struct obj *) 0;
 /* objects in hero's memory */
 NEARDATA struct obj* memoryobjs = (struct obj*)0;
+NEARDATA struct obj* lastmemoryobj = (struct obj*)0;
 
 /* used to zero all elements of a struct obj and a struct monst */
 NEARDATA const struct obj zeroobj = DUMMY;
@@ -349,11 +352,15 @@ NEARDATA const char getobj_readable[] = { ALL_CLASSES, SCROLL_CLASS,
 NEARDATA const char getobj_cuddly[] = { TOOL_CLASS, GEM_CLASS, 0 };
 
 NEARDATA const char getobj_toss_objs[] = { ALLOW_COUNT, COIN_CLASS,
-                                           ALL_CLASSES, WEAPON_CLASS, 0 };
+                                           ALL_CLASSES, WEAPON_CLASS, GEM_CLASS, 0 };
 NEARDATA const char getobj_tippables[] = { ALL_CLASSES, TOOL_CLASS, 0 };
 NEARDATA const char getobj_zap_syms[] = { WAND_CLASS, 0 };
-NEARDATA const char getobj_mark_autostashs[] = { ALL_CLASSES,  TOOL_CLASS, 0 };
-NEARDATA const char getobj_unmark_autostashs[] = { ALL_CLASSES,  TOOL_CLASS, 0 };
+NEARDATA const char getobj_favorites[] = {
+    WEAPON_CLASS, ARMOR_CLASS,  POTION_CLASS,
+    SCROLL_CLASS, WAND_CLASS,   RING_CLASS,   AMULET_CLASS, MISCELLANEOUS_CLASS,
+    FOOD_CLASS,   REAGENT_CLASS,  TOOL_CLASS,   GEM_CLASS,   ART_CLASS,
+    ROCK_CLASS,      BALL_CLASS,   CHAIN_CLASS,  SPBOOK_CLASS, 0
+};
 
 /* originally from dog.c */
 NEARDATA char dogname[PL_PSIZ] = DUMMY;
@@ -421,7 +428,8 @@ NEARDATA long domove_succeeded = 0L;
 
 NEARDATA struct c_color_names c_color_names = {
     "black",  "amber", "golden", "light blue", "red",   "green",
-    "silver", "blue",  "purple", "white",      "orange"
+    "silver", "blue",  "purple", "white", "orange", 
+    "brown", "gray", "dark red", "colorless"
 };
 
 struct menucoloring *menu_colorings = NULL;
@@ -545,17 +553,18 @@ const char *ARGV0;
 unsigned nhUse_dummy = 0;
 unsigned long file_end_marker = 0xF23EE6D8;
 
-int no_multiattrs[32] = { 0 };
-int multicolor_red1[1] = { CLR_RED };
-int multicolor_red2[2] = { NO_COLOR, CLR_RED };
-int multicolor_red3[3] = { NO_COLOR, NO_COLOR, CLR_RED };
-int multicolor_red4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_RED };
-int multicolor_orange1[1] = { CLR_ORANGE };
-int multicolor_orange2[2] = { NO_COLOR, CLR_ORANGE };
-int multicolor_orange3[3] = { NO_COLOR, NO_COLOR, CLR_ORANGE };
-int multicolor_orange4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_ORANGE };
-int multicolor_text1[1] = { CLR_MSG_TEXT };
-int multicolor_text2[2] = { NO_COLOR, CLR_MSG_TEXT };
+const int no_multiattrs[32] = { 0 };
+const int multicolor_red1[1] = { CLR_RED };
+const int multicolor_red2[2] = { NO_COLOR, CLR_RED };
+const int multicolor_red3[3] = { NO_COLOR, NO_COLOR, CLR_RED };
+const int multicolor_red4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_RED };
+const int multicolor_orange1[1] = { CLR_ORANGE };
+const int multicolor_orange2[2] = { NO_COLOR, CLR_ORANGE };
+const int multicolor_orange3[3] = { NO_COLOR, NO_COLOR, CLR_ORANGE };
+const int multicolor_orange4[4] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_ORANGE };
+const int multicolor_text1[1] = { CLR_MSG_TEXT };
+const int multicolor_text2[2] = { NO_COLOR, CLR_MSG_TEXT };
+int multicolor_buffer[32] = { NO_COLOR };
 
 NEARDATA const char* Moloch = "Moloch";
 /* for rejecting attempts to use wizard mode commands */

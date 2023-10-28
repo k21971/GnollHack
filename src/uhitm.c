@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    uhitm.c    $NHDT-Date: 1555720104 2019/04/20 00:28:24 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.207 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -444,16 +444,14 @@ register struct monst *mtmp;
                 buf[0] = highc(buf[0]);
                 play_sfx_sound(SFX_SOMETHING_IN_WAY);
                 You("stop.  %s is in the way!", buf);
-                context.travel = context.travel1 = context.travel_mode = context.mv = context.run
-                    = 0;
+                clear_run_and_travel();
                 return TRUE;
             } 
             else if ((!mon_can_move(mtmp) || (mtmp->data->mmove == 0)) && rn2(6)) 
             {
                 play_sfx_sound(SFX_PET_DOES_NOT_MOVE);
                 pline("%s doesn't seem to move!", Monnam(mtmp));
-                context.travel = context.travel1 = context.travel_mode = context.mv = context.run
-                    = 0;
+                clear_run_and_travel();
                 return TRUE;
             }
             else
@@ -484,9 +482,21 @@ register struct monst *mtmp;
         || overexertion())
         goto atk_done;
 
+    if (iflags.autoswap_launchers && unweapon1 && uwep && is_launcher(uwep) && ((uswapwep && !is_unweapon(uswapwep)) || (!uswapwep && Role_if(PM_MONK))))
+    {
+        boolean cursed_weapon_blocks_swap = (uwep && objects[uwep->otyp].oc_bimanual) || (uwep && uarms && !flags.swap_rhand_only) ? ((uwep && welded(uwep, &youmonst)) || (uarms && welded(uarms, &youmonst))) : (uwep && welded(uwep, &youmonst));
+        if (!cursed_weapon_blocks_swap)
+        {
+            if (uwep && objects[uwep->otyp].oc_bimanual)
+                (void)doswapweapon();
+            else
+                (void)doswapweapon_right_or_both();
+            update_unweapon();
+        }
+    }
+
     char qbuf[BUFSIZ];
-    strcpy(qbuf, "");
-    
+    Strcpy(qbuf, "");
     if (unweapon1 && unweapon2)
     {
         if (flags.verbose) 
@@ -575,7 +585,9 @@ register struct monst *mtmp;
     if (context.forcefight && !DEADMONSTER(mtmp) && !canspotmon(mtmp)
         && !glyph_is_invisible(levl[u.ux + u.dx][u.uy + u.dy].hero_memory_layers.glyph)
         && !(u.uswallow && mtmp == u.ustuck))
+    {
         map_invisible(u.ux + u.dx, u.uy + u.dy);
+    }
 
     return TRUE;
 }
@@ -773,6 +785,9 @@ struct attack *uattk;
 
         for (strikeindex = 0; strikeindex < multistrike; strikeindex++)
         {
+            int mx = mon->mx, my = mon->my;
+            boolean was_invis_glyph = isok(mx, my) && glyph_is_invisible(levl[mx][my].hero_memory_layers.glyph);
+
             update_u_action(ACTION_TILE_ATTACK);
             play_monster_simple_weapon_sound(&youmonst, 0, wep, OBJECT_SOUND_TYPE_SWING_MELEE);
             u_wait_until_action();
@@ -806,7 +821,17 @@ struct attack *uattk;
                 (void)passive(mon, wep, mhit, malive, AT_WEAP, wep_was_destroyed);
             }
 
+            boolean play_fade_animation = (windowprocs.wincap2 & WC2_FADING_ANIMATIONS) != 0 && was_invis_glyph && !malive && !glyph_is_invisible(levl[mx][my].hero_memory_layers.glyph);
+            if (play_fade_animation)
+            {
+                play_special_effect_with_details_at(0, mx, my, GLYPH_INVISIBLE, LAYER_GENERAL_EFFECT, -2, 0, 0, 20, FALSE);
+            }
             update_u_action_revert(ACTION_TILE_NO_ACTION);
+            if (play_fade_animation)
+            {
+                special_effect_wait_until_action(0);
+                special_effect_wait_until_end(0);
+            }
 
             if (!malive || m_at(x, y) != mon || wep_was_destroyed)
             {
@@ -991,7 +1016,7 @@ boolean* obj_destroyed;
             damage = 0;
         else
         {
-            boolean martial_arts_applies = martial_bonus() && !(uarmg && is_metallic(uarmg));
+            boolean martial_arts_applies = martial_bonus(); // && !(uarmg&& is_metallic(uarmg));
             int tmp = 0;
             if (martial_arts_applies)
             {
@@ -1120,7 +1145,7 @@ boolean* obj_destroyed;
                 /* or strike with a missile in your hand... */
                 || (!thrown && (is_missile(obj) || is_ammo(obj)))
                 /* or use a pole at short range and not mounted... */
-                || (!thrown && !u.usteed && is_appliable_pole_type_weapon(obj))
+                || (!thrown && !u.usteed && is_appliable_pole_type_weapon(obj) && !is_spear(obj))
                 /* or throw a missile without the proper bow... */
                 || (is_ammo(obj) && !is_golf_swing_with_stone && (thrown != HMON_THROWN
                     || !ammo_and_launcher(obj, uwep)))) 
@@ -1635,7 +1660,7 @@ boolean* obj_destroyed;
                 damage += 0;
             else if (!obj || obj == uarmg)
             {
-                if(!martial_bonus() || (uarmg && is_metallic(uarmg)))
+                if(!martial_bonus()) // || (uarmg && is_metallic(uarmg))
                     damage += adjust_damage(u_str_dmg_bonus() / 2, &youmonst, mon, AD_PHYS, ADFLAGS_NONE);
                 else if(adjusted_skill_level(P_MARTIAL_ARTS) >= P_BASIC)
                     damage += adjust_damage(u_str_dmg_bonus(), &youmonst, mon, AD_PHYS, ADFLAGS_NONE);
@@ -1691,7 +1716,6 @@ boolean* obj_destroyed;
 
     if (valid_weapon_attack)
     {
-
         /* to be valid a projectile must have had the correct projector */
         damage += adjust_damage(weapon_skill_dmg_bonus(wep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, !is_golf_swing_with_stone, TRUE, 0, TRUE), &youmonst, mon, wep ? objects[wep->otyp].oc_damagetype : AD_PHYS, ADFLAGS_NONE);
         /* [this assumes that `!thrown' implies wielded...] */
@@ -2569,7 +2593,7 @@ demonpet()
     struct permonst *pm;
     struct monst *dtmp;
 
-    i = !rn2(6) ? ndemon(u.ualign.type) : NON_PM;
+    i = !rn2(6) ? ndemon(u.ualign.type, FALSE, TRUE) : NON_PM;
     pm = i != NON_PM ? &mons[i] : youmonst.data;
     if ((dtmp = makemon(pm, u.ux, u.uy, MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END)) != 0)
     {
@@ -2682,7 +2706,7 @@ struct attack *mattk;
 
             /* give monster a chance to wear other equipment on its next
                move instead of waiting until it picks something up */
-            mdef->worn_item_flags |= I_SPECIAL;
+            check_mon_wearable_items_next_turn(mdef);
 
             if (otmp == stealoid) /* special message for final item */
                 pline("%s finishes taking off %s suit.", Monnam(mdef),
@@ -2728,6 +2752,9 @@ int specialdmg; /* blessed and/or silver bonus against various things */
     enum p_skills wtype = P_BARE_HANDED_COMBAT;
     boolean incorrect_weapon_use = FALSE;
     enum hit_tile_types hit_tile = HIT_GENERAL;
+
+    int mx = mdef->mx, my = mdef->my;
+    boolean was_invis_glyph = isok(mx, my) && glyph_is_invisible(levl[mx][my].hero_memory_layers.glyph);
 
     /*  First determine the base damage done */
     struct obj* mweapon = omonwep;
@@ -2952,7 +2979,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
                 play_ui_sound(UI_SOUND_KNAPSACK_FULL);
                 You_ex(ATR_NONE, CLR_MSG_SUCCESS, "grab %s's gold, but find no room in your knapsack.",
                     mon_nam(mdef));
-                dropy(mongold);
+                dropyf(mongold);
             }
         }
         exercise(A_DEX, TRUE);
@@ -3266,6 +3293,12 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         else if (damage > 0)
             killed(mdef);
 
+        if ((windowprocs.wincap2 & WC2_FADING_ANIMATIONS) != 0 && was_invis_glyph && !glyph_is_invisible(levl[mx][my].hero_memory_layers.glyph))
+        {
+            play_special_effect_with_details_at(0, mx, my, GLYPH_INVISIBLE, LAYER_GENERAL_EFFECT, -2, 0, 0, 20, FALSE);
+            special_effect_wait_until_action(0);
+            special_effect_wait_until_end(0);
+        }
         return 2;
     } 
     else if (flags.verbose && damagedealt > 0)
@@ -3506,9 +3539,7 @@ register struct attack *mattk;
 
         /* engulfing a cockatrice or digesting a Rider or Medusa */
         fatal_gulp = (touch_petrifies(pd) && !Stone_resistance)
-                     || (mattk->adtyp == AD_DGST
-                         && (is_rider(pd) || (pd == &mons[PM_MEDUSA]
-                                              && !Stone_resistance)));
+                     || (mattk->adtyp == AD_DGST && (is_rider(pd) || (is_medusa(pd) && !Stone_resistance)));
 
         if ((mattk->adtyp == AD_DGST && !Slow_digestion) || fatal_gulp)
             eating_conducts(pd);
@@ -3750,7 +3781,7 @@ register struct monst *mon;
             ++multi_claw;
     }
     multi_claw = (multi_claw > 1); /* switch from count to yes/no */
-    int bite_butt_count = 0;
+    unsigned int bite_butt_count = 0;
 
     play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_START_ATTACK);
 
@@ -3759,7 +3790,7 @@ register struct monst *mon;
         /* sum[i] = 0; -- now done above */
         mattk = getmattk(&youmonst, mon, i, sum, &alt_attk);
 
-        if (mattk->aatyp == AT_BITE || mattk->aatyp == AT_BUTT)
+        if ((mattk->aatyp == AT_BITE || mattk->aatyp == AT_BUTT) && !(mattk->aflags & ATTKFLAGS_SAME_HEAD))
             bite_butt_count++;
         if (youmonst.data->heads > 1 && youmonst.heads_left < bite_butt_count)
             continue;
@@ -4239,9 +4270,12 @@ boolean wep_was_destroyed;
     damage += adjust_damage(basedmg, mon, &youmonst, ptr->mattk[i].adtyp, ADFLAGS_NONE);
 
     enum action_tile_types action_before = mon->action;
-    update_m_action(mon, ptr->mattk[i].action_tile ? ptr->mattk[i].action_tile : ACTION_TILE_PASSIVE_DEFENSE);
-    play_monster_simple_weapon_sound(mon, i, (struct obj*)0, OBJECT_SOUND_TYPE_SWING_MELEE);
-    m_wait_until_action();
+    if (malive)
+    {
+        update_m_action(mon, ptr->mattk[i].action_tile ? ptr->mattk[i].action_tile : ACTION_TILE_PASSIVE_DEFENSE);
+        play_monster_simple_weapon_sound(mon, i, (struct obj*)0, OBJECT_SOUND_TYPE_SWING_MELEE);
+        m_wait_until_action();
+    }
 
     /*  These affect you even if they just died.
      */
@@ -4310,7 +4344,8 @@ boolean wep_was_destroyed;
                          && polymon(PM_STONE_GOLEM))) {
                     display_u_being_hit(HIT_PETRIFIED, 0, 0UL);
                     done_in_by(mon, STONING); /* "You turn to stone..." */
-                    update_m_action_core(mon, action_before, 0, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
+                    if(malive)
+                        update_m_action_core(mon, action_before, 0, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
                     return 2;
                 }
             }
@@ -4487,7 +4522,8 @@ boolean wep_was_destroyed;
             break;
         }
     }
-    update_m_action_core(mon, action_before, 1, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
+    if(malive)
+        update_m_action_core(mon, action_before, 1, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
     return (malive | mhit);
 }
 
@@ -4630,12 +4666,12 @@ struct monst *mon;
         if (Blind)
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s stop tingling.", hands);
         else
-            Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s stop glowing %s.", hands, hcolor(NH_RED));
+            Your_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s stop glowing %s.", hands, hcolor_multi_buf1(NH_RED));
     } else {
         if (Blind)
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "tingling in your %s lessens.", hands);
         else
-            Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s no longer glow so brightly %s.", hands, hcolor(NH_RED));
+            Your_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s no longer glow so brightly %s.", hands, hcolor_multi_buf1(NH_RED));
     }
     u.umconf--;
 }
@@ -4697,12 +4733,12 @@ int dmg;
 {
     pline("%s %s!", Monnam(mon),
           (dmg > mon->mhp / 2) ? "wails in agony" : "cries out in pain");
-    deduct_monster_hp(mon, adjust_damage(dmg, (struct monst*)0, mon, AD_PHYS, ADFLAGS_NONE));
+    deduct_monster_hp(mon, adjust_damage(dmg, (struct monst*)0, mon, AD_BLND, ADFLAGS_NONE));
     wake_nearto(mon->mx, mon->my, 30);
     remove_monster_and_nearby_waitforu(mon);
     if (DEADMONSTER(mon)) {
         if (context.mon_moving)
-            monkilled(mon, (char *) 0, AD_BLND);
+            monkilled(mon, (char *) 0, AD_BLND, 0);
         else
             killed(mon);
     } else if (cansee(mon->mx, mon->my) && !canspotmon(mon)) {
@@ -5041,7 +5077,7 @@ double hp_d;
     int hp_after = *target_integer_part_ptr;
     int damage_dealt = hp_before - hp_after;
 
-    if (damage_dealt != 0)
+    if (damage_dealt != 0 && isok(u.ux, u.uy))
     {
         char buf[BUFSZ];
         if(damage_dealt > 0)
@@ -5125,7 +5161,7 @@ double hp_d;
     if (iflags.wc2_statuslines > 3 && is_tame(mtmp))
         context.botl = 1;
 
-    if (canspotmon(mtmp) && damage_dealt != 0)
+    if (canspotmon(mtmp) && damage_dealt != 0 && isok(mtmp->mx, mtmp->my))
     {
         char buf[BUFSZ];
         if(damage_dealt > 0)
@@ -5250,7 +5286,6 @@ unsigned long additional_newsym_flags;
                     context.u_intervals_to_wait_until_end = 0UL;
                 }
             }
-
         }
         else
         {
@@ -5282,10 +5317,12 @@ update_m_action_revert(mtmp, action)
 struct monst* mtmp;
 enum action_tile_types action;
 {
+    if (!mtmp)
+        return;
     update_m_action_core(mtmp, action, 0, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
     if(mtmp == &youmonst)
         u_wait_until_action();
-    else if(canspotmon(mtmp))
+    else if(action == ACTION_TILE_DEATH ? canspotmon(mtmp) : canseemon(mtmp))
         m_wait_until_action();
 }
 
@@ -5294,10 +5331,12 @@ update_m_action_and_wait(mtmp, action)
 struct monst* mtmp;
 enum action_tile_types action;
 {
+    if (!mtmp)
+        return;
     update_m_action_core(mtmp, action, 2, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
     if (mtmp == &youmonst)
         u_wait_until_action();
-    else if (canseemon(mtmp))
+    else if (action == ACTION_TILE_DEATH ? canspotmon(mtmp) : canseemon(mtmp))
         m_wait_until_action();
 }
 
@@ -5327,7 +5366,7 @@ unsigned long additional_newsym_flags;
     {
         if (context.m_intervals_to_wait_until_end > 0)
         {
-            if(canspotmon(mtmp))
+            if(canseemon(mtmp))
                 delay_output_intervals((int)context.m_intervals_to_wait_until_end);
             context.m_intervals_to_wait_until_end = 0UL;
         }
@@ -5343,7 +5382,7 @@ unsigned long additional_newsym_flags;
 
     mtmp->action = action;
 
-    if (iflags.using_gui_tiles && canseemon(mtmp) && action_before != mtmp->action)
+    if (iflags.using_gui_tiles && (action == ACTION_TILE_DEATH ? canspotmon(mtmp) : canseemon(mtmp)) && action_before != mtmp->action)
     {
         enum animation_types anim = mtmp->data->animation.actions[action];
         if (mtmp->action != ACTION_TILE_NO_ACTION && anim > 0
@@ -5382,7 +5421,7 @@ unsigned long additional_newsym_flags;
         {
             newsym_with_flags(mtmp->mx, mtmp->my, additional_newsym_flags);
             flush_screen(1);
-            if(canseemon(mtmp))
+            if(action == ACTION_TILE_DEATH ? canspotmon(mtmp) : canseemon(mtmp))
             {
                 context.m_intervals_to_wait_until_action = DELAY_OUTPUT_INTERVAL_IN_ANIMATION_INTERVALS;
                 if (mtmp->action != ACTION_TILE_NO_ACTION)
@@ -5436,54 +5475,44 @@ m_wait_until_end()
 
 
 void
-display_being_hit(mon, x, y, hit_symbol_shown, damage_shown, extra_flags)
+display_being_hit(mon, x, y, hit_symbol_shown, damage_shown, extra_mflags)
 struct monst* mon;
 int x, y;
 enum hit_tile_types hit_symbol_shown;
 int damage_shown;
-unsigned long extra_flags;
+unsigned long extra_mflags;
 {
     if (!iflags.using_gui_tiles || hit_symbol_shown >= MAX_HIT_TILES || hit_symbol_shown < 0)
         return;
 
-    //reset_monster_origin_coordinates(mon);
-
-    //boolean is_you = (x == u.ux && y == u.uy);
-    unsigned long hflags = (LFLAGS_M_BEING_HIT | extra_flags);
-
-    //enum action_tile_types action_before = is_you ? u.action : mon->action;
-    show_extra_info(x, y, hflags, (short)(hit_symbol_shown - HIT_GENERAL), damage_shown);
-    //update_m_action(mon, ACTION_TILE_SPECIAL_ATTACK_3);
+    unsigned long mhflags = (LMFLAGS_BEING_HIT | extra_mflags);
+    show_extra_info(x, y, 0UL, mhflags, (short)(hit_symbol_shown - HIT_GENERAL), damage_shown);
     if(mon == &youmonst)
         u_wait_until_action();
     else
         m_wait_until_action();
-    //newsym_with_extra_info_and_flags(x, y, hflags, damage_shown, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
-    //flush_screen(is_you);
     flush_screen(1);
-    //adjusted_delay_output();
     adjusted_delay_output();
     adjusted_delay_output();
-    //update_m_action_core(mon, action_before, 0);
     newsym_with_flags(x, y, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS);
     flush_screen(1);
 }
 
 void
-display_u_being_hit(hit_symbol_shown, damage_shown, extra_flags)
+display_u_being_hit(hit_symbol_shown, damage_shown, extra_mflags)
 enum hit_tile_types hit_symbol_shown;
 int damage_shown;
-unsigned long extra_flags;
+unsigned long extra_mflags;
 {
-    display_being_hit(&youmonst, u.ux, u.uy, hit_symbol_shown, damage_shown, extra_flags);
+    display_being_hit(&youmonst, u.ux, u.uy, hit_symbol_shown, damage_shown, extra_mflags);
 }
 
 void
-display_m_being_hit(mon, hit_symbol_shown, damage_shown, extra_flags, use_bhitpos)
+display_m_being_hit(mon, hit_symbol_shown, damage_shown, extra_mflags, use_bhitpos)
 struct monst* mon;
 enum hit_tile_types hit_symbol_shown;
 int damage_shown;
-unsigned long extra_flags;
+unsigned long extra_mflags;
 boolean use_bhitpos;
 {
     if (!mon)
@@ -5492,7 +5521,7 @@ boolean use_bhitpos;
     int x = use_bhitpos ? bhitpos.x : mon->mx;
     int y = use_bhitpos ? bhitpos.y : mon->my;
     if(!(u.uswallow && mon == u.ustuck) && isok(x, y) && cansee(x, y)) // Show hit to invisible, if you can see the location
-        display_being_hit(mon, x, y, hit_symbol_shown, damage_shown, extra_flags);
+        display_being_hit(mon, x, y, hit_symbol_shown, damage_shown, extra_mflags);
 }
 
 /*uhitm.c*/

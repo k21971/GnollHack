@@ -263,6 +263,7 @@ struct sortloot_item {
     xchar orderclass; /* order rather than object class; 0 => not yet init'd */
     xchar subclass; /* subclass for some classes */
     xchar disco; /* discovery status */
+    xchar favorite; /* favorite status */
 };
 typedef struct sortloot_item Loot;
 
@@ -393,6 +394,11 @@ extern short tile2enlargement[MAX_TILES];
 #define MM2_REVIVING                    0x00000020UL
 #define MM2_RANDOMIZE_SUBTYPE           0x00000040UL
 
+#define NO_MKCLASS_FLAGS                0x00000000UL /* use this rather than plain 0 */
+#define MKCLASS_FLAGS_IGNORE_DIFFICULTY 0x00000001UL /* ignore difficulty restrictions */
+#define MKCLASS_FLAGS_SUMMON            0x00000002UL /* is a summoning for mk_gen_ok */
+#define MKCLASS_FLAGS_POLYMORPH         0x00000004UL /* is a polymorph for mk_gen_ok */
+
 #define GOODPOS_IGNOREYOU               0x80000000UL
 
 /* flags for make_corpse() and mkcorpstat() */
@@ -458,6 +464,7 @@ extern short tile2enlargement[MAX_TILES];
 #define BUC_ALLBKNOWN (BUC_BLESSED | BUC_CURSED | BUC_UNCURSED)
 #define BUCX_TYPES (BUC_ALLBKNOWN | BUC_UNKNOWN)
 #define UNIDENTIFIED_TYPES 0x800
+#define UNKNOWN_TYPES 0x1000
 #define ALL_TYPES_SELECTED -2
 
 /* Flags to control find_mid() */
@@ -540,6 +547,10 @@ extern short tile2enlargement[MAX_TILES];
 #define XKILL_NOCORPSE  2
 #define XKILL_NOCONDUCT 4
 #define XKILL_DROPDEAD  8
+#define XKILL_DISINTEGRATED  16
+#define XKILL_STONED  32
+#define XKILL_DIGESTED  64
+
 
 /* pline_flags; mask values for custompline()'s first argument */
 /* #define PLINE_ORDINARY 0 */
@@ -634,12 +645,12 @@ enum bodypart_types {
 #define plur(x) (((x) == 1) ? "" : "s")
 
 #define ARM_AC_BONUS(obj, ptr) \
-    ((int)(((obj)->oclass == ARMOR_CLASS || (obj)->oclass == MISCELLANEOUS_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ? \
+    ((int)(((obj)->oclass == ARMOR_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ? \
     (objects[(obj)->otyp].oc_armor_class + get_obj_material_and_exceptionality_ac_bonus(obj) + (!(objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_AC) || has_obj_mythic_defense(obj) ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) : 0) \
      - ((objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_AC) ? 0 : min((int) greatest_erosion(obj), objects[(obj)->otyp].oc_armor_class))) : 0))
 
 #define ARM_MC_BONUS(obj, ptr) \
-    ((int)(((obj)->oclass == ARMOR_CLASS || (obj)->oclass == MISCELLANEOUS_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ? \
+    ((int)(((obj)->oclass == ARMOR_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ? \
     (objects[(obj)->otyp].oc_magic_cancellation + get_obj_material_and_exceptionality_mc_bonus(obj) + ((!(objects[(obj)->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_MC) || has_obj_mythic_defense(obj)) ? (!cursed_items_are_positive(ptr) ? (obj)->enchantment : abs((obj)->enchantment)) / 3 : 0) \
      - ((objects[(obj)->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_MC) ? 0 : min(greatest_erosion(obj) / 2, objects[(obj)->otyp].oc_magic_cancellation))) : 0))
 
@@ -727,7 +738,7 @@ static const char empty_string[] = "";
 #define MIN_PREF_SCREEN_SCALE 10
 #define MAX_PREF_SCREEN_SCALE 400
 #define SPECIAL_HEIGHT_IN_PIT -32
-#define SPECIAL_HEIGHT_LEVITATION 32
+#define SPECIAL_HEIGHT_LEVITATION 16
 #define PIT_BOTTOM_BORDER 2
 #define OBJECT_PILE_START_HEIGHT 2
 #define OBJECT_PILE_HEIGHT_DIFFERENCE 2

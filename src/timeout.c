@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    timeout.c    $NHDT-Date: 1545182148 2018/12/19 01:15:48 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.89 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -394,7 +394,7 @@ choke_dialogue()
             const char *str = choke_texts[SIZE(choke_texts) - i];
 
             if (index(str, '%'))
-                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, str, hcolor(NH_BLUE));
+                pline_multi_ex(ATR_NONE, CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, str, hcolor_multi_buf0(NH_BLUE));
             else
                 pline_ex1(ATR_NONE, CLR_MSG_NEGATIVE, str);
         }
@@ -464,7 +464,7 @@ slime_dialogue()
         if (index(buf, '%')) {
             if (i == 4L) {  /* "you are turning green" */
                 if (!Blind) /* [what if you're already green?] */
-                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, buf, hcolor(NH_GREEN));
+                    pline_multi_ex(ATR_NONE, CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, buf, hcolor_multi_buf0(NH_GREEN));
             } else
                 pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, buf,
                       an(Hallucination ? rndmonnam(NULL) : "green slime"));
@@ -1921,6 +1921,7 @@ long timeout;
     }
     need_newsym = need_invupdate = FALSE;
 
+    boolean warncolor = FALSE;
     /* obj->age is the age remaining at this point.  */
     switch (obj->otyp) {
     case POT_OIL:
@@ -1929,9 +1930,10 @@ long timeout;
             switch (obj->where) {
             case OBJ_INVENT:
                 need_invupdate = TRUE;
+                warncolor = TRUE;
                 /*FALLTHRU*/
             case OBJ_MINVENT:
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%spotion of oil has burnt away.", whose);
+                pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%spotion of oil has burnt away.", whose);
                 break;
             case OBJ_FLOOR:
                 You_see_ex(ATR_NONE, CLR_MSG_ATTENTION, "a burning potion of oil go out.");
@@ -1975,8 +1977,10 @@ long timeout;
                 else {
                     switch (obj->where) {
                     case OBJ_INVENT:
+                        warncolor = TRUE;
+                        /* FALLTHRU */
                     case OBJ_MINVENT:
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems about to go out.", Yname2(obj));
+                        pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s seems about to go out.", Yname2(obj));
                         break;
                     case OBJ_FLOOR:
                         You_see_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s about to go out.", an(xname(obj)));
@@ -1992,12 +1996,13 @@ long timeout;
                 switch (obj->where) {
                 case OBJ_INVENT:
                     need_invupdate = TRUE;
-                    /*FALLTHRU*/
+                    warncolor = TRUE;
+                    /* FALLTHRU */
                 case OBJ_MINVENT:
                     if (obj->otyp == BRASS_LANTERN)
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%slantern has run out of power.", whose);
+                        pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%slantern has run out of power.", whose);
                     else
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s has gone out.", Yname2(obj));
+                        pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s has gone out.", Yname2(obj));
                     break;
                 case OBJ_FLOOR:
                     if (obj->otyp == BRASS_LANTERN)
@@ -2029,8 +2034,10 @@ long timeout;
             if (canseeit)
                 switch (obj->where) {
                 case OBJ_INVENT:
+                    warncolor = TRUE;
+                    /* FALLTHRU */
                 case OBJ_MINVENT:
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%storch%s getting burnt out.", whose,
+                    pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%storch%s getting burnt out.", whose,
                         many ? "es are" : " is");
                     break;
                 case OBJ_FLOOR:
@@ -2046,8 +2053,10 @@ long timeout;
             if (canseeit)
                 switch (obj->where) {
                 case OBJ_INVENT:
+                    warncolor = TRUE;
+                    /* FALLTHRU */
                 case OBJ_MINVENT:
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%storch%s flame%s flicker%s low!", whose,
+                    pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%storch%s flame%s flicker%s low!", whose,
                         many ? "es'" : "'s",
                         many ? "s" : "", many ? "" : "s");
                     break;
@@ -2065,11 +2074,10 @@ long timeout;
             {
                 switch (obj->where) {
                 case OBJ_INVENT:
-                    /* no need_invupdate for update_inventory() necessary;
-                        useupall() -> freeinv() handles it */
-                        /*FALLTHRU*/
+                    warncolor = TRUE;
+                    /* FALLTHRU */
                 case OBJ_MINVENT:
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s consumed!", Yname2(obj),
+                    pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s %s consumed!", Yname2(obj),
                         many ? "are" : "is");
                     break;
                 case OBJ_FLOOR:
@@ -2084,7 +2092,8 @@ long timeout;
                 }
 
                 /* post message */
-                pline(Hallucination
+                pline_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, 
+                    Hallucination
                     ? (many ? "They shriek!" : "It shrieks!")
                     : Blind ? "" : (many ? "Their flames die."
                         : "Its flame dies."));
@@ -2130,8 +2139,10 @@ long timeout;
             if (canseeit)
                 switch (obj->where) {
                 case OBJ_INVENT:
+                    warncolor = TRUE;
+                    /* FALLTHRU */
                 case OBJ_MINVENT:
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s%scandle%s getting short.", whose,
+                    pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s%scandle%s getting short.", whose,
                         is_candelabrum ? "candelabrum's " : "",
                           many ? "s are" : " is");
                     break;
@@ -2148,8 +2159,10 @@ long timeout;
             if (canseeit)
                 switch (obj->where) {
                 case OBJ_INVENT:
+                    warncolor = TRUE;
+                    /* FALLTHRU */
                 case OBJ_MINVENT:
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s%scandle%s flame%s flicker%s low!", whose,
+                    pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s%scandle%s flame%s flicker%s low!", whose,
                         is_candelabrum ? "candelabrum's " : "", many ? "s'" : "'s",
                           many ? "s" : "", many ? "" : "s");
                     break;
@@ -2169,9 +2182,10 @@ long timeout;
                     switch (obj->where) {
                     case OBJ_INVENT:
                         need_invupdate = TRUE;
-                        /*FALLTHRU*/
+                        warncolor = TRUE;
+                        /* FALLTHRU */
                     case OBJ_MINVENT:
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%scandelabrum's flame%s.", whose,
+                        pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%scandelabrum's flame%s.", whose,
                               many ? "s die" : " dies");
                         break;
                     case OBJ_FLOOR:
@@ -2184,9 +2198,10 @@ long timeout;
                     case OBJ_INVENT:
                         /* no need_invupdate for update_inventory() necessary;
                            useupall() -> freeinv() handles it */
-                        /*FALLTHRU*/
+                        warncolor = TRUE;
+                        /* FALLTHRU */
                     case OBJ_MINVENT:
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s consumed!", Yname2(obj),
+                        pline_ex(ATR_NONE, warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s %s consumed!", Yname2(obj),
                               many ? "are" : "is");
                         break;
                     case OBJ_FLOOR:
@@ -2201,7 +2216,8 @@ long timeout;
                     }
 
                     /* post message */
-                    pline(Hallucination
+                    pline_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : warncolor ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, 
+                        Hallucination
                               ? (many ? "They shriek!" : "It shrieks!")
                               : Blind ? "" : (many ? "Their flames die."
                                                    : "Its flame dies."));
@@ -2310,7 +2326,6 @@ boolean already_lit;
     }
     else
     {
-
         switch (obj->otyp) {
         case MAGIC_LAMP:
             //obj->lamplit = 1;
@@ -2484,14 +2499,14 @@ long timeout;
         {
             canseeunsummon = TRUE;
             iswielded = FALSE;
-            strcpy(whosebuf, "The ");
+            Strcpy(whosebuf, "The ");
         }
     }
     else if (in_invent) {
         if (obj->owornmask)
             remove_worn_item(obj, TRUE);
 
-        strcpy(whosebuf, "Your ");
+        Strcpy(whosebuf, "Your ");
         canseeunsummon = TRUE;
     }
     else if (obj->where == OBJ_MINVENT && obj->owornmask) {
@@ -2506,8 +2521,8 @@ long timeout;
         if (obj->ocarry && canseemon(obj->ocarry))
         {
             canseeunsummon = TRUE;
-            strcpy(whosebuf, s_suffix(Monnam(obj->ocarry)));
-            strcat(whosebuf, " ");
+            Strcpy(whosebuf, s_suffix(Monnam(obj->ocarry)));
+            Strcat(whosebuf, " ");
             iswielded = FALSE; //Do not show this for monsters
         }
     }

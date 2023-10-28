@@ -69,7 +69,7 @@ void dll_mark_synch(void);
 void dll_wait_synch(void);
 void dll_cliparound(int x, int y, BOOLEAN_P force);
 void dll_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers);
-void dll_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str);
+void dll_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char* cmd_str);
 void dll_raw_print(const char *str);
 void dll_raw_print_bold(const char *str);
 void dll_raw_print_flush();
@@ -120,7 +120,7 @@ void dll_toggle_animation_timer(int timertype, int timerid, int state, int x, in
 void dll_display_floating_text(int x, int y, const char* text, int style, int attr, int color, unsigned long tflags);
 void dll_display_screen_text(const char* text, const char* supertext, const char* subtext, int style, int attr, int color, unsigned long tflags);
 void dll_display_popup_text(const char* text, const char* title, int style, int attr, int color, int glyph, unsigned long tflags);
-void dll_display_gui_effect(int x, int y,int style, unsigned long tflags);
+void dll_display_gui_effect(int style, int subtype, int x, int y, int x2, int y2, unsigned long tflags);
 void dll_update_cursor(int style, int force_paint, int show_on_you);
 int dll_ui_has_input(VOID_ARGS);
 void dll_exit_hack(int status);

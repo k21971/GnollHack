@@ -196,6 +196,8 @@ enum sp_mon_var_flags {
     SP_M_V_MAXHP,
     SP_M_V_LEVEL_ADJUSTMENT,
     SP_M_V_KEEP_ORIGINAL_INVENTORY,
+    SP_M_V_LEVEL_BOSS,
+    SP_M_V_BOSS_HOSTILITY,
 
     SP_M_V_END
 };
@@ -473,7 +475,8 @@ typedef struct {
     xchar x, y, class, appear;
     schar peaceful, asleep;
     long female, invis, cancelled, revived, avenge, fleeing, blinded,
-        paralyzed, stunned, confused, waitforu, protector, maxhp, level_adjustment, keep_original_invent;
+        paralyzed, stunned, confused, waitforu, protector, maxhp, level_adjustment, keep_original_invent,
+        level_boss, use_boss_hostility;
     long seentraps;
     long has_invent;
 } monster;
@@ -640,6 +643,24 @@ struct lc_breakdef {
     struct lc_breakdef *next;
     struct opvar *breakpoint;
     int break_depth;
+};
+
+struct lev_msg {
+    struct lev_msg* next;
+    char* message;
+    int msg_type;
+    int attr;
+    int color;
+    int sound_type;
+    int sound_id;
+    int sound_param;
+    unsigned long msgflags;
+};
+
+enum splev_message_types {
+    SPLEV_MESSAGE_TYPE_MESSAGE = 0,
+    SPLEV_MESSAGE_TYPE_UGOD,
+    SPLEV_MESSAGE_TYPE_PLANE_ARRIVAL,
 };
 
 enum object_special_create_types {

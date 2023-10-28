@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    pline.c    $NHDT-Date: 1549327495 2019/02/05 00:44:55 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.73 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -29,8 +29,10 @@ STATIC_VAR const char* pline_prefix_text = 0;
 STATIC_VAR int pline_separator_attr = 0;
 STATIC_VAR int pline_separator_color = NO_COLOR;
 STATIC_VAR const char* pline_separator_text = 0;
-STATIC_VAR int* pline_multiattrs = 0;
-STATIC_VAR int* pline_multicolors = 0;
+STATIC_VAR const int* pline_multiattrs = 0;
+STATIC_VAR const int* pline_multicolors = 0;
+STATIC_VAR const char* pline_title = 0;
+STATIC_VAR int pline_dopopup = 0;
 
 STATIC_VAR char prevmsg[BUFSZ];
 
@@ -492,6 +494,9 @@ VA_DECL(const char *, line)
     if (msgtyp == MSGTYP_STOP && iflags.window_inited)
         display_nhwindow(WIN_MESSAGE, TRUE); /* --more-- */
 
+    if (pline_dopopup && display_popup_text)
+        display_popup_text(used_line, pline_title, POPUP_TEXT_GENERAL, pline_attr, pline_color, NO_GLYPH, 0);
+
  pline_done:
     --in_pline;
     return;
@@ -580,7 +585,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
 }
 
 void pline_multi_ex
-VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*, line)
+VA_DECL5(int, attr, int, color, const int*, multiattrs, const int*, multicolors, const char*, line)
 {
     VA_START(line);
     VA_INIT(line, const char*);
@@ -597,6 +602,47 @@ VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*
     return;
 }
 
+void pline_multi_ex_popup
+VA_DECL7(int, attr, int, color, const int*, multiattrs, const int*, multicolors, const char*, title, int, dopopup, const char*, line)
+{
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    pline_attr = attr;
+    pline_color = color;
+    pline_dopopup = dopopup;
+    pline_title = title;
+    vpline(line, VA_ARGS);
+    pline_dopopup = 0;
+    pline_title = 0;
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    VA_END();
+    return;
+}
+
+void pline_multi_ex_flags
+VA_DECL6(int, attr, int, color, const int*, multiattrs, const int*, multicolors, unsigned, pflags, const char*, line)
+{
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    pline_attr = attr;
+    pline_color = color;
+    pline_flags = pflags;
+    vpline(line, VA_ARGS);
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    pline_flags = 0;
+    VA_END();
+    return;
+}
 
 /*VARARGS1*/
 void You_ex
@@ -615,7 +661,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
 }
 
 void You_multi_ex
-VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*, line)
+VA_DECL5(int, attr, int, color, const int*, multiattrs, const int*, multicolors, const char*, line)
 {
     char* tmp;
 
@@ -651,7 +697,7 @@ VA_DECL3(int, attr, int, color, const char*, line)
 
 /*VARARGS1*/
 void Your_multi_ex
-VA_DECL5(int, attr, int, color, int*, multiattrs, int*, multicolors, const char*, line)
+VA_DECL5(int, attr, int, color, const int*, multiattrs, const int*, multicolors, const char*, line)
 {
     char* tmp;
 
@@ -722,6 +768,27 @@ VA_DECL3(int, attr, int, color, const char*, line)
 }
 
 /*VARARGS1*/
+void pline_The_multi_ex
+VA_DECL5(int, attr, int, color, const int*, multiattrs, const int*, multicolors, const char*, line)
+{
+    char* tmp;
+
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_attr = attr;
+    pline_color = color;
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    vpline(YouMessage(tmp, "The ", line), VA_ARGS);
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    VA_END();
+}
+
+
+/*VARARGS1*/
 void There_ex
 VA_DECL3(int, attr, int, color, const char*, line)
 {
@@ -732,6 +799,25 @@ VA_DECL3(int, attr, int, color, const char*, line)
     pline_attr = attr;
     pline_color = color;
     vpline(YouMessage(tmp, "There ", line), VA_ARGS);
+    pline_attr = ATR_NONE;
+    pline_color = NO_COLOR;
+    VA_END();
+}
+
+void There_multi_ex
+VA_DECL5(int, attr, int, color, const int*, multiattrs, const int*, multicolors, const char*, line)
+{
+    char* tmp;
+
+    VA_START(line);
+    VA_INIT(line, const char*);
+    pline_attr = attr;
+    pline_color = color;
+    pline_multiattrs = multiattrs;
+    pline_multicolors = multicolors;
+    vpline(YouMessage(tmp, "There ", line), VA_ARGS);
+    pline_multiattrs = 0;
+    pline_multicolors = 0;
     pline_attr = ATR_NONE;
     pline_color = NO_COLOR;
     VA_END();
@@ -1075,7 +1161,7 @@ VA_DECL(const char *, s)
     }
     pline_ex(ATR_NONE, CLR_MSG_ERROR, "impossible: %s", VA_PASS1(pbuf));
     if (issue_gui_command)
-        issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_IMPOSSIBLE, pbuf);
+        issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_IMPOSSIBLE, 0, pbuf);
 
     /* reuse pbuf[] */
     Strcpy(pbuf, "Program in disorder!");
@@ -1189,12 +1275,25 @@ reset_pline(VOID_ARGS)
     pline_separator_text = 0;
     pline_multiattrs = 0;
     pline_multicolors = 0;
+    pline_title = 0;
+    pline_dopopup = 0;
 
     prevmsg[0] = 0;
 
 #if defined(MSGHANDLER) && (defined(POSIX_TYPES) || defined(__GNUC__))
     use_pline_handler = TRUE;
 #endif
+}
+
+int*
+get_colorless_multicolor_buffer(VOID_ARGS)
+{
+    int i;
+    int buflen = SIZE(multicolor_buffer);
+    for (i = 0; i < buflen; i++)
+        multicolor_buffer[i] = NO_COLOR;
+
+    return multicolor_buffer;
 }
 
 /*pline.c*/

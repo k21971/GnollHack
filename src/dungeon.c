@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    dungeon.c    $NHDT-Date: 1554341477 2019/04/04 01:31:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1248,14 +1248,14 @@ boolean at_stairs;
 {
     if (at_stairs && u.ux == sstairs.sx && u.uy == sstairs.sy) {
         /* Taking a down dungeon branch. */
-        goto_level(&sstairs.tolev, at_stairs, FALSE, FALSE);
+        goto_level(&sstairs.tolev, at_stairs, FALSE, FALSE, FALSE);
     } else {
         /* Going down a stairs or jump in a trap door. */
         d_level newlevel;
 
         newlevel.dnum = u.uz.dnum;
         newlevel.dlevel = u.uz.dlevel + 1;
-        goto_level(&newlevel, at_stairs, !at_stairs, FALSE);
+        goto_level(&newlevel, at_stairs, !at_stairs, FALSE, FALSE);
     }
 }
 
@@ -1271,13 +1271,13 @@ boolean at_stairs;
         if (!u.uz.dnum && u.uz.dlevel == 1 && !u.uhave.amulet)
             done(ESCAPED);
         else
-            goto_level(&sstairs.tolev, at_stairs, FALSE, FALSE);
+            goto_level(&sstairs.tolev, at_stairs, FALSE, FALSE, FALSE);
     } else {
         /* Going up a stairs or rising through the ceiling. */
         d_level newlevel;
         newlevel.dnum = u.uz.dnum;
         newlevel.dlevel = u.uz.dlevel - 1;
-        goto_level(&newlevel, at_stairs, FALSE, FALSE);
+        goto_level(&newlevel, at_stairs, FALSE, FALSE, FALSE);
     }
 }
 
@@ -1653,7 +1653,7 @@ boolean at_stairs, falling;
     d_level lev;
 
     find_hell(&lev);
-    goto_level(&lev, at_stairs, falling, FALSE);
+    goto_level(&lev, at_stairs, falling, FALSE, FALSE);
 }
 
 /* equivalent to dest = source */
@@ -2040,7 +2040,7 @@ xchar *rdgn;
         }
         if (bymenu) {
             any = zeroany;
-            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR, buf,
                      MENU_UNSELECTED, menu_heading_info());
         } else
             putstr(win, 0, buf);
@@ -3253,15 +3253,27 @@ boolean printdun;
 
         if (mptr->feat.naltar > 0) 
         {
+            aligntyp altaralign = Amask2align(Msa2amask(mptr->feat.msalign));
+            boolean isyouralign = altaralign == u.ualign.type;
+            boolean isaligned = altaralign != A_NONE;
+            char abuf[BUFSZ];
             /* Temples + non-temple altars get munged into just "altars" */
+            /* only print out altar's god if they are all to your god; alignment for other aligned altars */
             if (mptr->feat.ntemple != mptr->feat.naltar)
-                ADDNTOBUF("altar", mptr->feat.naltar);
+            {
+                Sprintf(abuf, "%s%saltar%s%s", !isyouralign && isaligned ? align_str(altaralign) : "", !isyouralign && isaligned ? " " : "",
+                    isyouralign ? " to " : "", isyouralign ? align_gname(altaralign) : "");
+                ADDNTOBUF(abuf, mptr->feat.naltar);
+            }
             else
-                ADDNTOBUF("temple", mptr->feat.ntemple);
+            {
+                Sprintf(abuf, "%s%stemple%s%s", !isyouralign && isaligned ? align_str(altaralign) : "", !isyouralign && isaligned ? " " : "",
+                    isyouralign ? " to " : "", isyouralign ? align_gname(altaralign) : "");
+                ADDNTOBUF(abuf, mptr->feat.ntemple);
+            }
 
-            /* only print out altar's god if they are all to your god */
-            if (Amask2align(Msa2amask(mptr->feat.msalign)) == u.ualign.type)
-                Sprintf(eos(buf), " to %s", align_gname(u.ualign.type));
+            //if (altaralign == u.ualign.type)
+            //    Sprintf(eos(buf), " to %s", align_gname(altaralign));
         }
         ADDNTOBUF("smithy", mptr->feat.nsmithy);
         if (mptr->feat.nnpcroom > 0)
@@ -3437,7 +3449,7 @@ boolean set_also_true_nature_known;
     if (Is_special(lvl))
     {
         mptr->flags.special_level = 1;
-        strcpy(mptr->flags.special_description, level.flags.special_description);
+        Strcpy(mptr->flags.special_description, level.flags.special_description);
         if (set_also_true_nature_known)
         {
             mptr->flags.special_level_true_nature_known = 1;

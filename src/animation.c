@@ -1425,11 +1425,11 @@ int roleidx, raceidx, genderidx, alignmentidx, levelidx;
 }
 
 struct replacement_info
-data_to_replacement_info(signed_glyph, layer, otmp, mtmp, layer_flags, missile_flags, missile_material, missile_special_quality)
+data_to_replacement_info(signed_glyph, layer, otmp, mtmp, layer_flags, monster_flags, missile_flags, missile_material, missile_special_quality)
 int signed_glyph, layer;
 struct obj* otmp;
 struct monst* mtmp;
-unsigned long layer_flags, missile_flags;
+unsigned long layer_flags, monster_flags, missile_flags;
 uchar missile_material;
 short missile_special_quality;
 {
@@ -1439,1210 +1439,13 @@ short missile_special_quality;
     info.object = otmp;
     info.monster = mtmp;
     info.layer_flags = layer_flags;
+    info.monster_flags = monster_flags;
     info.missile_flags = missile_flags;
     info.missile_material = missile_material;
     info.missile_special_quality = missile_special_quality;
 
     return info;
 }
-
-#if 0
-int
-maybe_get_replaced_tile(ntile, x, y, info, autodraw_ptr)
-int x, y;
-int ntile;
-struct replacement_info info;
-enum autodraw_types* autodraw_ptr;
-{
-#ifdef USE_TILES
-    struct obj* otmp = info.object;
-    struct monst* mtmp = info.monster;
-    unsigned long layer_flags = info.layer_flags;
-    uchar missile_material = info.missile_material;
-    short missile_special_quality = info.missile_special_quality;
-    boolean is_lit_missile = info.layer == LAYER_MISSILE && (info.missile_flags & MISSILE_FLAGS_LIT) != 0;
-    short replacement_idx = tile2replacement[ntile];
-    if (replacement_idx > 0)
-    {
-        switch (replacements[replacement_idx].replacement_action)
-        {
-        case REPLACEMENT_ACTION_BOTTOM_TILE:
-        {
-            int below_y = y + 1;
-            if (!isok(x, below_y) 
-                || (!cansee(x, below_y) && glyph_is_specific_cmap_or_its_variation(levl[x][below_y].hero_memory_layers.layer_glyphs[LAYER_FLOOR], S_unexplored))
-                || (IS_DOORJOIN(levl[x][below_y].typ) && !IS_TREE(levl[x][below_y].typ)) 
-                || levl[x][below_y].typ == DOOR 
-                || levl[x][below_y].typ == UNDEFINED_LOCATION 
-                || (!cansee(x, y) && glyph_is_specific_cmap_or_its_variation(levl[x][below_y].hero_memory_layers.layer_glyphs[LAYER_FLOOR], S_stone))
-                || (levl[x][y].seenv & (SV3 | SV4 | SV5 | SV6 | SV7)) == 0)
-            {
-                /* No action */
-            }
-            else
-            {
-                if(autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the tile based on stone's vartyp (i.e., take the right variation) */
-                int repl_idx = (int)min(replacements[replacement_idx].number_of_tiles - 1, levl[x][y].vartyp);
-
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[repl_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_SHORE_TILE:
-        {
-            int above_y = y - 1;
-            //int below_y = y + 1;
-            int floortype = IS_FLOOR(levl[x][y].typ) || IS_POOL(levl[x][y].typ) || levl[x][y].typ == LAVAPOOL || levl[x][y].typ == ICE ? levl[x][y].typ : levl[x][y].floortyp;
-            boolean is_water_or_air_level = (Is_airlevel(&u.uz) || Is_waterlevel(&u.uz));
-
-            if (!(is_water_or_air_level && info.layer == LAYER_FLOOR) && (Underwater || !isok(x, above_y)
-                || (levl[x][y].typ == levl[x][above_y].typ && levl[x][y].subtyp == levl[x][above_y].subtyp)
-                || (level.flags.hero_memory && glyph_is_specific_cmap_or_its_variation(levl[x][above_y].hero_memory_layers.layer_glyphs[LAYER_FLOOR], S_unexplored))
-                || levl[x][above_y].typ == UNDEFINED_LOCATION || (IS_SOLID_FLOOR(floortype) && (IS_DOORJOIN(levl[x][above_y].typ)))))
-            {
-                /* No action */
-            }
-            else
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                int tileidx = -1;
-                /* Kludge for water and air levels */
-                if (is_water_or_air_level && info.layer == LAYER_FLOOR)
-                {
-                    struct layer_info this_l = layers_at(x, y);
-                    struct layer_info above_l = layers_at(x, above_y);
-                    int this_g = this_l.layer_glyphs[info.layer];
-                    int above_g = above_l.layer_glyphs[info.layer];
-                    int this_cmap = generic_glyph_to_cmap(this_g);
-                    int above_cmap = generic_glyph_to_cmap(above_g);
-                    if (this_cmap == above_cmap)
-                        return ntile;
-
-                    if (above_cmap == S_water)
-                        tileidx = MAX_FLOOR_SUBTYPES + MAX_GRASS_SUBTYPES + MAX_GROUND_SUBTYPES + MAX_CORRIDOR_SUBTYPES + 6;
-                    else if (above_cmap == S_cloud)
-                        tileidx = MAX_FLOOR_SUBTYPES + MAX_GRASS_SUBTYPES + MAX_GROUND_SUBTYPES + MAX_CORRIDOR_SUBTYPES + 5;
-                    else if (above_cmap == S_air)
-                        tileidx = MAX_FLOOR_SUBTYPES + MAX_GRASS_SUBTYPES + MAX_GROUND_SUBTYPES + MAX_CORRIDOR_SUBTYPES + 4;
-                    else
-                        tileidx = get_shore_tile_index(&levl[x][y], &levl[x][above_y]);
-                }
-                else
-                    tileidx = get_shore_tile_index(&levl[x][y], &levl[x][above_y]);
-
-                if (tileidx < 0 || tileidx >= MAX_TILES_PER_REPLACEMENT || (replacements[replacement_idx].tile_flags[tileidx] & RTF_SKIP))
-                    return ntile;
-
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[tileidx];
-                return glyph2tile[tileidx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-
-            break;
-        }
-        case REPLACEMENT_ACTION_SHORE_ADJUSTED_TILE:
-        {
-            int above_y = y - 1;
-            if (Underwater || !isok(x, above_y) || glyph_is_specific_cmap_or_its_variation(levl[x][above_y].hero_memory_layers.layer_glyphs[LAYER_FLOOR], S_unexplored)
-                || levl[x][above_y].typ == UNDEFINED_LOCATION)
-            {
-                /* No action */
-            }
-            else if (levl[x][above_y].typ == DRAWBRIDGE_DOWN || levl[x][above_y].typ == LAVAPOOL || levl[x][above_y].typ == POOL || levl[x][above_y].typ == MOAT || levl[x][above_y].typ == WATER || levl[x][above_y].typ == DRAWBRIDGE_UP)
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                int tileidx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[tileidx];
-
-                return glyph2tile[tileidx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-
-            break;
-        }        
-        case REPLACEMENT_ACTION_FLOOR_ADJUSTED_TILE:
-        {
-            if (Underwater || glyph_is_specific_cmap_or_its_variation(levl[x][y].hero_memory_layers.layer_glyphs[LAYER_FLOOR], S_unexplored)
-                || !IS_SOLID_FLOOR(levl[x][y].floortyp))
-            {
-                /* No action */
-            }
-            else
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-                int tileidx = get_solid_floor_tile_index(&levl[x][y]);
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[tileidx];
-                return glyph2tile[tileidx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_SHORE_AND_FLOOR_ADJUSTED_TILE:
-        {
-            int above_y = y - 1;
-            int left_x = x - 1;
-            int right_x = x + 1;
-            if (Underwater || glyph_is_specific_cmap_or_its_variation(levl[x][y].hero_memory_layers.layer_glyphs[LAYER_FLOOR], S_unexplored)
-                || !IS_SOLID_FLOOR(levl[x][y].floortyp))
-            {
-                /* No action */
-            }
-            else
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-                int tileidx = get_shore_and_floor_adjusted_tile_index(&levl[x][y], isok(x, above_y) ? &levl[x][above_y] : 0, isok(left_x, y) ? &levl[left_x][y] : 0, isok(right_x, y) ? &levl[right_x][y] : 0);
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[tileidx];
-                return glyph2tile[tileidx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_OBJECT_LIT:
-        {
-            if (!otmp && !is_lit_missile)
-                return ntile;
-
-            if (is_lit_missile || is_obj_activated(otmp))
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the first tile with index 0 */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_LOCATION_LIT:
-        {
-            if (isok(x, y) && get_location_light_range(x, y) != 0 && levl[x][y].lamplit == TRUE)
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the first tile with index 0 */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_LOCATION_HORIZONTAL:
-        {
-            if (isok(x, y) && levl[x][y].horizontal == TRUE)
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the first tile with index 0 */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_LEVER_STATE:
-        {
-            struct trap* ttmp = 0;
-            unsigned long leverstate = 0UL;
-            if (isok(x, y) && (ttmp = t_at(x, y)) != 0 && ttmp->ttyp == LEVER && (leverstate = ttmp->tflags & TRAPFLAGS_STATE_MASK) > 0)
-            {
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                int glyph_idx = max(0, min((int)replacements[replacement_idx].number_of_tiles, (int)leverstate) - 1);
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }        
-        case REPLACEMENT_ACTION_COIN_QUANTITY:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (otmp->quan > 1)
-            {
-                int glyph_idx = (otmp->quan <= 8 ? (int)otmp->quan - 2 : otmp->quan <= 30 ? 7 : otmp->quan <= 100 ? 8 : otmp->quan <= 1000 ? 9 : 10);
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_PEBBLE_QUANTITY:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (otmp->quan > 1)
-            {
-                int glyph_idx = (otmp->quan <= 8 ? (int)otmp->quan - 2 : otmp->quan <= 20 ? 7 : otmp->quan <= 50 ? 8 : otmp->quan <= 100 ? 9 : 10);
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_CHEST:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (otmp->olocked)
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            else if (otmp->obroken)
-            {
-                int glyph_idx = 1;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_ALTERNATIVE_APPEARANCE:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (otmp->speflags & SPEFLAGS_ALTERNATIVE_APPEARANCE)
-            {
-                /* note: appearanceidx is -1 if not set separately */
-                int glyph_idx = otmp->appearanceidx > 0 && otmp->appearanceidx < replacements[replacement_idx].number_of_tiles ? otmp->appearanceidx : 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_GLOB:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1 || otmp->owt <= GLOB_SMALL_MAXIMUM_WEIGHT) /* Small */
-                return ntile;
-
-            if (otmp->globby)
-            {
-                /* note: appearanceidx is -1 if not set separately */
-                int glyph_idx = (otmp->owt > GLOB_LARGE_MAXIMUM_WEIGHT)
-                    ? 2 /* Very large */
-                    : (otmp->owt > GLOB_MEDIUM_MAXIMUM_WEIGHT)
-                    ? 1 /* Large */
-                    : 0; /* Medium */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_AUTODRAW:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-            break;
-        }
-        case REPLACEMENT_ACTION_AUTODRAW_AND_OBJECT_LIT:
-        {
-            if (!otmp && info.layer != LAYER_MISSILE)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if ((info.layer == LAYER_MISSILE && is_lit_missile) || (otmp && is_obj_activated(otmp)))
-            {
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the first tile with index 0 */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_AUTODRAW_AND_OBJECT_UCHAIN:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (otmp == uchain)
-            {
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the first tile with index 0 */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_AUTODRAW_AND_LONG_WORM:
-        {
-            if (!mtmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (count_wsegs(mtmp) > 0)
-            {
-                if (replacements[replacement_idx].number_of_tiles < 1)
-                    return ntile;
-
-                /* Return the first tile with index 0 */
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }  
-        case REPLACEMENT_ACTION_PIERCER:
-        {
-            if (!mtmp && !(layer_flags & LFLAGS_M_DROPPING_PIERCER))
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if ((layer_flags & LFLAGS_M_DROPPING_PIERCER) || (mtmp && mtmp->mundetected))
-            {
-                int glyph_idx = (layer_flags & LFLAGS_M_DROPPING_PIERCER) ? 1 : 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_BEAR_TRAP:
-        {
-            if (!(layer_flags & LFLAGS_T_TRAPPED))
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (layer_flags & LFLAGS_T_TRAPPED)
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_COFFIN:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (otmp->speflags & SPEFLAGS_LID_OPENED)
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_ALIGNED_PRIEST:
-        {
-            if (!mtmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            aligntyp algn = mon_aligntyp(mtmp);
-            switch (algn)
-            {
-            case A_NONE:
-                glyph_idx = 0;
-                break;
-            case A_CHAOTIC:
-            case A_NEUTRAL:
-            case A_LAWFUL:
-                glyph_idx = algn + 2;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-        }
-        case REPLACEMENT_ACTION_ALIGNED_PRIEST_STATUE:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            struct monst* mtmp2 = get_mtraits(otmp, FALSE);
-            if (mtmp2 && has_epri(mtmp2))
-            {
-                int glyph_idx = 0;
-                switch (EPRI(mtmp2)->shralign)
-                {
-                case A_NONE:
-                    glyph_idx = 0;
-                    break;
-                case A_CHAOTIC:
-                case A_NEUTRAL:
-                case A_LAWFUL:
-                    glyph_idx = EPRI(mtmp2)->shralign + 2;
-                    break;
-                default:
-                    return ntile;
-                }
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_ANGEL:
-        {
-            if (!mtmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            aligntyp algn = mon_aligntyp(mtmp);
-            switch (algn)
-            {
-            case A_NONE:
-                glyph_idx = 0;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-        }
-        case REPLACEMENT_ACTION_ANGEL_STATUE:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            struct monst* mtmp2 = get_mtraits(otmp, FALSE);
-            if (mtmp2 && has_epri(mtmp2))
-            {
-                int glyph_idx = 0;
-                switch (EPRI(mtmp2)->shralign)
-                {
-                case A_NONE:
-                    glyph_idx = 0;
-                    break;
-                default:
-                    return ntile;
-                }
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_PRISONER:
-        {
-            if (!mtmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (mtmp->mon_flags & MON_FLAGS_CHAINED)
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_PRISONER_STATUE:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            struct monst* mtmp2 = get_mtraits(otmp, FALSE);
-            if (mtmp2 && (mtmp2->mon_flags & MON_FLAGS_CHAINED))
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_ACOLYTE:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            aligntyp algn = u.ualignbase[A_ORIGINAL];
-            switch (algn)
-            {
-            case A_CHAOTIC:
-                glyph_idx = 0;
-                break;
-            case A_NEUTRAL:
-                glyph_idx = 1;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-        }
-        case REPLACEMENT_ACTION_TORCH_HOLDER:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (isok(x, y) && levl[x][y].decoration_typ > 0 && (levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0)
-            {
-                int glyph_idx = 0;
-                if (get_location_light_range(x, y) != 0 && levl[x][y].lamplit == TRUE)
-                    glyph_idx = 1;
-
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_FIREPLACE:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (isok(x, y) && levl[x][y].decoration_typ > 0 && get_location_light_range(x, y) != 0 && levl[x][y].lamplit == TRUE)
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_PLATE_MAIL_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_BRONZE:
-                glyph_idx = 0;
-                break;
-            case MAT_HARD_CRYSTAL:
-                glyph_idx = 1;
-                break;
-            case MAT_ORICHALCUM:
-                glyph_idx = 2;
-                break;
-            case MAT_MITHRIL:
-                glyph_idx = 3;
-                break;
-            case MAT_ADAMANTIUM:
-                glyph_idx = 4;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_SILVER_BONE_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_SILVER:
-                glyph_idx = 0;
-                break;
-            case MAT_BONE:
-                glyph_idx = 1;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_SILVER_LEAD_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_SILVER:
-                glyph_idx = 0;
-                break;
-            case MAT_LEAD:
-                glyph_idx = 1;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_SILVER_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_SILVER:
-                glyph_idx = 0;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_STEEL_MITHRIL_GEMSTONE_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_MITHRIL:
-                glyph_idx = 0;
-                break;
-            case MAT_STEEL:
-                glyph_idx = 1;
-                break;
-            case MAT_GEMSTONE:
-                glyph_idx = 2;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_SILVER_CRYSTAL_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-
-            case MAT_SILVER:
-                glyph_idx = 0;
-                break;
-            case MAT_GLASS:
-            case MAT_CRYSTAL:
-            case MAT_HARD_CRYSTAL:
-                glyph_idx = 1;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_ADAMANTIUM_MITHRIL_SILVER_BONE_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_ADAMANTIUM:
-                glyph_idx = 0;
-                break;
-            case MAT_MITHRIL:
-                glyph_idx = 1;
-                break;
-            case MAT_SILVER:
-                glyph_idx = 2;
-                break;
-            case MAT_BONE:
-                glyph_idx = 3;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }
-        case REPLACEMENT_ACTION_BONE_MATERIAL:
-        {
-            uchar material = MAT_NONE;
-            if (otmp)
-                material = otmp->material;
-            else if (info.layer == LAYER_MISSILE)
-                material = missile_material;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            switch (material)
-            {
-            case MAT_BONE:
-                glyph_idx = 0;
-                break;
-            default:
-                return ntile;
-            }
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            break;
-        }        
-        case REPLACEMENT_ACTION_PAINTING:
-        {
-            short special_quality = 0;
-            if (otmp)
-                special_quality = otmp->special_quality;
-            else if (info.layer == LAYER_MISSILE)
-                special_quality = missile_special_quality;
-            else
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (special_quality > 0 && special_quality <= replacements[replacement_idx].number_of_tiles)
-            {
-                int glyph_idx = special_quality - 1;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_PAINTING_HOLDER:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (isok(x, y) && levl[x][y].decoration_typ > 0 && (levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0)
-            {
-                int glyph_idx = levl[x][y].decoration_subtyp;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_WALL_SCULPTURE:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (isok(x, y) && levl[x][y].decoration_typ > 0 && levl[x][y].decoration_subtyp > 0)
-            {
-                int glyph_idx = levl[x][y].decoration_subtyp - 1;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_STATUE_NICHE:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (isok(x, y) && levl[x][y].decoration_typ > 0 && (levl[x][y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0)
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_EQUIPMENT_HOLDER:
-        {
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            if (isok(x, y) && levl[x][y].decoration_typ > 0 && (levl[x][y].decoration_flags & (DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM2_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER)) != 0)
-            {
-                int glyph_idx = 0;
-                switch ((levl[x][y].decoration_flags & (DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM2_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER)))
-                {
-                case DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM2_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER:
-                    glyph_idx = 0;
-                    break;
-                case DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM2_IN_HOLDER:
-                    glyph_idx = 1;
-                    break;
-                case DECORATION_FLAGS_ITEM_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER:
-                    glyph_idx = 2;
-                    break;
-                case DECORATION_FLAGS_ITEM_IN_HOLDER:
-                    glyph_idx = 3;
-                    break;
-                case DECORATION_FLAGS_ITEM2_IN_HOLDER | DECORATION_FLAGS_ITEM3_IN_HOLDER:
-                    glyph_idx = 4;
-                    break;
-                case DECORATION_FLAGS_ITEM2_IN_HOLDER:
-                    glyph_idx = 5;
-                    break;
-                case DECORATION_FLAGS_ITEM3_IN_HOLDER:
-                    glyph_idx = 6;
-                    break;
-                default:
-                    return ntile;
-                }
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[0];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_BREED:
-        {
-            if (!mtmp || !mtmp->subtype || mtmp->subtype > MAX_TILES_PER_REPLACEMENT || mtmp->subtype > replacements[replacement_idx].number_of_tiles)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = (int)mtmp->subtype - 1;
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-        }
-        case REPLACEMENT_ACTION_STATUE_BREED:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            struct monst* mtmp2 = get_mtraits(otmp, FALSE);
-            if (mtmp2 && mtmp2->subtype && mtmp2->subtype <= MAX_TILES_PER_REPLACEMENT)
-            {
-                int glyph_idx = (int)mtmp2->subtype - 1;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        case REPLACEMENT_ACTION_SADDLED:
-        {
-            if (!mtmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            struct obj* saddle = which_armor(mtmp, W_SADDLE);
-
-            if (!saddle)
-                return ntile;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            int glyph_idx = 0;
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-            return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-        }
-        case REPLACEMENT_ACTION_STATUE_SADDLED:
-        {
-            if (!otmp)
-                return ntile;
-
-            if (autodraw_ptr)
-                *autodraw_ptr = replacements[replacement_idx].general_autodraw;
-
-            if (replacements[replacement_idx].number_of_tiles < 1)
-                return ntile;
-
-            struct monst* mtmp2 = get_mtraits(otmp, FALSE);
-            if (mtmp2 && (which_armor(mtmp2, W_SADDLE) || contains_otyp(otmp, SADDLE)))
-            {
-                int glyph_idx = 0;
-                if (autodraw_ptr)
-                    *autodraw_ptr = replacements[replacement_idx].tile_autodraw[glyph_idx];
-                return glyph2tile[glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF];
-            }
-            break;
-        }
-        default:
-            break;
-        }
-    }
-#endif
-    return ntile;
-}
-#endif
 
 int
 maybe_get_replaced_glyph(glyph, x, y, info)
@@ -2656,6 +1459,7 @@ struct replacement_info info;
     struct obj* otmp = info.object;
     struct monst* mtmp = info.monster;
     unsigned long layer_flags = info.layer_flags;
+    unsigned long monster_flags = info.monster_flags;
     uchar missile_material = info.missile_material;
     short missile_special_quality = info.missile_special_quality;
     boolean is_lit_missile = info.layer == LAYER_MISSILE && (info.missile_flags & MISSILE_FLAGS_LIT) != 0;
@@ -2925,7 +1729,6 @@ struct replacement_info info;
         }
         case REPLACEMENT_ACTION_AUTODRAW_AND_OBJECT_UCHAIN:
         {
-#if 0 /* Temporarily disabled */
             if (!otmp)
                 return glyph;
 
@@ -2934,7 +1737,18 @@ struct replacement_info info;
                 /* Return the first tile with index 0 */
                 return sign * (0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
             }
-#endif
+            break;
+        }
+        case REPLACEMENT_ACTION_AUTODRAW_AND_OBJECT_UBALL:
+        {
+            if (!otmp)
+                return glyph;
+
+            if (otmp == uball)
+            {
+                /* Return the first tile with index 0 */
+                return sign * (0 + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
+            }
             break;
         }
         case REPLACEMENT_ACTION_AUTODRAW_AND_LONG_WORM:
@@ -2951,12 +1765,12 @@ struct replacement_info info;
         }
         case REPLACEMENT_ACTION_PIERCER:
         {
-            if (!mtmp && !(layer_flags & LFLAGS_M_DROPPING_PIERCER))
+            if (!mtmp && !(monster_flags & LMFLAGS_DROPPING_PIERCER))
                 return glyph;
 
-            if ((layer_flags & LFLAGS_M_DROPPING_PIERCER) || (mtmp && mtmp->mundetected))
+            if ((monster_flags & LMFLAGS_DROPPING_PIERCER) || (mtmp && mtmp->mundetected))
             {
-                int glyph_idx = (layer_flags & LFLAGS_M_DROPPING_PIERCER) ? 1 : 0;
+                int glyph_idx = (monster_flags & LMFLAGS_DROPPING_PIERCER) ? 1 : 0;
                 return sign * (glyph_idx + replacement_offsets[replacement_idx] /* replacements[replacement_idx].glyph_offset */ + GLYPH_REPLACEMENT_OFF);
             }
             break;
@@ -4427,25 +3241,61 @@ short replacement_idx;
     return -1;
 }
 
-
 void
 play_special_effect_at(sp_effect, spef_number, x, y, force_visibility)
 enum special_effect_types sp_effect;
 int spef_number, x, y;
 boolean force_visibility;
 {
+    enum layer_types layer = special_effects[sp_effect].layer;
+    short anim = special_effects[sp_effect].animation;
+    int frames_to_sound = special_effects[sp_effect].frames_to_sound;
+    int frames_from_sound_to_action = special_effects[sp_effect].frames_from_sound_to_action;
+    int frames_from_action_to_end = special_effects[sp_effect].frames_from_action_to_end;;
+    play_special_effect_with_details_at(spef_number, x, y, sp_effect + GLYPH_SPECIAL_EFFECT_OFF, layer, anim, frames_to_sound, frames_from_sound_to_action, frames_from_action_to_end, force_visibility);
+}
+
+void
+play_special_effect_with_details_at(spef_number, x, y, glyph, layer, anim, frames_to_sound, frames_from_sound_to_action, frames_from_action_to_end, force_visibility)
+enum layer_types layer;
+short anim; /* -1 = fade glyph in, -2: fade glyph out */
+int glyph, spef_number, frames_to_sound, frames_from_sound_to_action, frames_from_action_to_end, x, y;
+boolean force_visibility;
+{
     if (iflags.using_gui_tiles && isok(x, y) && spef_number >= 0 && spef_number < MAX_PLAYED_SPECIAL_EFFECTS && (force_visibility || cansee(x, y)))
     {
-        enum layer_types layer = special_effects[sp_effect].layer;
         context.spef_action_animation_layer[spef_number] = layer;
         context.spef_action_animation_x[spef_number] = x;
         context.spef_action_animation_y[spef_number] = y;
         context.spef_intervals_to_wait_until_action[spef_number] = 0;
         context.spef_intervals_to_wait_until_end[spef_number] = 0;
         context.force_allow_keyboard_commands = TRUE;
-        show_glyph_on_layer(x, y, sp_effect + GLYPH_SPECIAL_EFFECT_OFF, layer);
+        show_glyph_on_layer(x, y, glyph, layer);
+        if (anim < 0)
+        {
+            unsigned long blflag = 0UL;
+            switch (layer)
+            {
+            case LAYER_BACKGROUND_EFFECT:
+                blflag = anim == -1 ? LFLAGS_E_BKG_FADE_IN : LFLAGS_E_BKG_FADE_OUT;
+                break;
+            case LAYER_GENERAL_EFFECT:
+                blflag = anim == -1 ? 0UL : LFLAGS_E_GEN_FADE_OUT;
+                break;
+            default:
+                break;
 
-        enum animation_types anim = special_effects[sp_effect].animation;
+            }
+            add_glyph_buffer_layer_flags(x, y, blflag, 0UL);
+        }
+
+#ifdef USE_TILES
+        if (!anim)
+        {
+            int atile = glyph2tile[abs(glyph)];
+            anim = tile2animation[atile];
+        }
+#endif
         if (anim > 0 && animations[anim].play_type == ANIMATION_PLAY_TYPE_PLAYED_SEPARATELY)
         {
             //context.special_effect_animation_counter[spef_number] = 0L;
@@ -4483,12 +3333,11 @@ boolean force_visibility;
         {
             force_redraw_at(x, y);
             flush_screen(1);
-            if(special_effects[sp_effect].frames_to_sound > 0)
-                delay_output_intervals(special_effects[sp_effect].frames_to_sound);
-            context.spef_intervals_to_wait_until_action[spef_number] = special_effects[sp_effect].frames_from_sound_to_action;
-            context.spef_intervals_to_wait_until_end[spef_number] = special_effects[sp_effect].frames_from_action_to_end;
+            if(frames_to_sound > 0)
+                delay_output_intervals(frames_to_sound);
+            context.spef_intervals_to_wait_until_action[spef_number] = frames_from_sound_to_action;
+            context.spef_intervals_to_wait_until_end[spef_number] = frames_from_action_to_end;
         }
-
     }
 }
 

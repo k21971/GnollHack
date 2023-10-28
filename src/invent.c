@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    invent.c    $NHDT-Date: 1555196229 2019/04/13 22:57:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.253 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -41,6 +41,7 @@ STATIC_DCL char FDECL(display_used_invlets, (CHAR_P));
 STATIC_DCL boolean FDECL(this_type_only, (struct obj *));
 STATIC_DCL void NDECL(dounpaid);
 STATIC_DCL void NDECL(dounidentified);
+STATIC_DCL void NDECL(dounknown);
 STATIC_DCL struct obj *FDECL(find_unpaid, (struct obj *, struct obj **));
 STATIC_DCL int FDECL(menu_identify, (int));
 STATIC_DCL boolean FDECL(tool_in_use, (struct obj *));
@@ -225,6 +226,7 @@ struct obj *obj;
           : (objects[otyp].oc_uname) ? 3 /* named (partially discovered) */
             : 2; /* undiscovered */
     sort_item->disco = (xchar) k;
+    sort_item->favorite = (obj->speflags & SPEFLAGS_FAVORITE) != 0;
 }
 
 /* sortloot() formatting routine; for alphabetizing, not shown to user */
@@ -345,6 +347,12 @@ const genericptr vptr2;
             loot_classify(sli1, obj1);
         if (!sli2->orderclass)
             loot_classify(sli2, obj2);
+
+        /* Sort by favorite descending. */
+        val1 = sli1->favorite;
+        val2 = sli2->favorite;
+        if (val1 != val2)
+            return (int)(val2 - val1);
 
         /* Sort by class. */
         val1 = sli1->orderclass;
@@ -533,14 +541,14 @@ boolean FDECL((*filterfunc), (OBJ_P));
             continue;
         sliarray[i].obj = o, sliarray[i].indx = (int) i;
         sliarray[i].str = (char *) 0;
-        sliarray[i].orderclass = sliarray[i].subclass = sliarray[i].disco = 0;
+        sliarray[i].orderclass = sliarray[i].subclass = sliarray[i].disco = sliarray[i].favorite = 0;
         ++i;
     }
     n = i;
     /* add a terminator so that we don't have to pass 'n' back to caller */
     sliarray[n].obj = (struct obj *) 0, sliarray[n].indx = -1;
     sliarray[n].str = (char *) 0;
-    sliarray[n].orderclass = sliarray[n].subclass = sliarray[n].disco = 0;
+    sliarray[n].orderclass = sliarray[n].subclass = sliarray[n].disco = sliarray[i].favorite = 0;
 
     /* do the sort; if no sorting is requested, we'll just return
        a sortloot_item array reflecting the current ordering */
@@ -1086,7 +1094,7 @@ boolean verbose;
     struct monst* old_usteed = u.usteed;
     int old_ulycn = u.ulycn;
     int old_move = get_u_move_speed(TRUE);
-
+    boolean check_bosses = FALSE;
 
     unsigned long previous_warntype_obj = context.warntype.obj;
     int oldstr = ACURR(A_STR);
@@ -1220,7 +1228,7 @@ boolean verbose;
             /* can now see invisible monsters */
             set_mimic_blocking(); /* do special mimic handling */
             see_monsters();
-
+            check_bosses = TRUE;
             if (Invis)
             {
                 state_change_detected = TRUE;
@@ -1235,6 +1243,7 @@ boolean verbose;
                     self_invis_message();
                 }
             }
+            check_seen_bosses();
         }
         else if (!See_invisible && saw_invisible)
         {
@@ -1328,6 +1337,8 @@ boolean verbose;
     {
         vision_full_recalc = 1;
         see_monsters();
+        if (XRay_vision)
+            check_bosses = TRUE;
     }
 
     /* Magical breathing*/
@@ -1576,6 +1587,9 @@ boolean verbose;
         context.botl = context.botlx = TRUE;
         refresh_u_tile_gui_info(FALSE);
     }
+
+    if (check_bosses)    
+        check_seen_bosses();
 }
 
 /*
@@ -1621,7 +1635,6 @@ struct obj *obj;
     int oldac = u.uac;
     int oldmc = u.umc;
 
-
     if (obj->where != OBJ_FREE)
     {
         panic("addinv: obj not free");
@@ -1636,7 +1649,9 @@ struct obj *obj;
     obj->was_thrown = 0;       /* not meaningful for invent */
     obj->speflags &= ~SPEFLAGS_GRABBED_FROM_YOU; /* You got it back! */
     obj->speflags &= ~SPEFLAGS_CAUGHT_IN_LEAVES; /* Obviously not caught anymore! */
-    
+    obj_clear_found(obj); /* Not relevant in inventory */
+    obj->speflags |= SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO; /* Has been owned by the hero */
+
     addinv_core1(obj);
 
     /* merge with quiver in preference to any other inventory slot
@@ -1692,7 +1707,7 @@ struct obj *obj;
     {
         if (obj->oclass == COIN_CLASS)
         {
-            if (quan > 0)
+            if (quan > 0 && isok(u.ux, u.uy))
             {
                 char cbuf[BUFSZ];
                 Sprintf(cbuf, "+%ld %s", quan, "gold" /*currency(quan)*/);
@@ -1850,7 +1865,7 @@ const char *drop_fmt, *drop_arg, *hold_msg;
         pline(drop_fmt, drop_arg);
     obj->nomerge = 0;
     if (can_reach_floor(TRUE)) {
-        dropx(obj);
+        dropxf(obj);
     } else {
         freeinv(obj);
         hitfloor(obj, FALSE);
@@ -2527,7 +2542,7 @@ boolean (*validitemfunc)(struct obj*);
             leftbuf[leftnum] = '\0';
         }
         else
-            strcpy(leftbuf, "");
+            Strcpy(leftbuf, "");
 
         size_t rightnum = 4;
         if (l >= rightnum)
@@ -2536,15 +2551,15 @@ boolean (*validitemfunc)(struct obj*);
             rightbuf[rightnum] = '\0';
         }
         else
-            strcpy(rightbuf, "");
+            Strcpy(rightbuf, "");
 
         if(!strcmp(leftbuf, "dip") && !strcmp(rightbuf, "into"))
             is_dip_into = TRUE;
     }
     else
     {
-        strcpy(leftbuf, "");
-        strcpy(rightbuf, "");
+        Strcpy(leftbuf, "");
+        Strcpy(rightbuf, "");
         is_dip_into = FALSE;
     }
 
@@ -2765,19 +2780,19 @@ boolean (*validitemfunc)(struct obj*);
             {
                 if (blankscroll && blankbook)
                 {
-                    strcpy(unidbuf, "scrolls or spellbooks");
+                    Strcpy(unidbuf, "scrolls or spellbooks");
                 }
                 else if (blankscroll)
                 {
-                    strcpy(unidbuf, "scrolls");
+                    Strcpy(unidbuf, "scrolls");
                 }
                 else if (blankbook)
                 {
-                    strcpy(unidbuf, "spellbooks");
+                    Strcpy(unidbuf, "spellbooks");
                 }
                 else
                 {
-                    strcpy(unidbuf, "writable items");
+                    Strcpy(unidbuf, "writable items");
                 }
                 Sprintf(endbuf, ", but maybe you have unidentified blank %s with you?", unidbuf);
                 writeendremark = TRUE;
@@ -2840,7 +2855,7 @@ boolean (*validitemfunc)(struct obj*);
             if (!allownone) {
                 char *suf = (char *) 0;
 
-                strcpy(buf, word);
+                Strcpy(buf, word);
                 if ((bp = strstr(buf, " on the ")) != 0) {
                     /* rub on the stone[s] */
                     *bp = '\0';
@@ -3024,7 +3039,7 @@ struct obj* otmp_only;
             leftbuf[leftnum] = '\0';
         }
         else
-            strcpy(leftbuf, "");
+            Strcpy(leftbuf, "");
 
         size_t rightnum = 4;
         if (l >= rightnum)
@@ -3033,7 +3048,7 @@ struct obj* otmp_only;
             rightbuf[rightnum] = '\0';
         }
         else
-            strcpy(rightbuf, "");
+            Strcpy(rightbuf, "");
 
         if (!strcmp(leftbuf, "dip") && !strcmp(rightbuf, "into"))
             is_dip_into = TRUE;
@@ -3041,8 +3056,8 @@ struct obj* otmp_only;
     else
     {
         word = "";
-        strcpy(leftbuf, "");
-        strcpy(rightbuf, "");
+        Strcpy(leftbuf, "");
+        Strcpy(rightbuf, "");
         is_dip_into = FALSE;
     }
 
@@ -3111,10 +3126,12 @@ struct obj* otmp_only;
                     && !(otmp->owornmask & W_WIELDED_WEAPON))
                 || (!strcmp(word, "stash") /* exclude worn items and other containers */
                     && (otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS) || Is_container(otmp) || !can_stash_objs()))
-                || (!strcmp(word, "mark as auto-stash") /* exclude not a container or already auto-stash */
-                    && (!(Is_proper_container(otmp) || (Is_container(otmp) && !objects[otmp->otyp].oc_name_known)) || (otmp->speflags & SPEFLAGS_AUTOSTASH) != 0))
-                || (!strcmp(word, "unmark as auto-stash") /* exclude if not an auto-stash */
-                    && ((otmp->speflags & SPEFLAGS_AUTOSTASH) == 0))
+                || (!strcmp(word, "stash into a container on the floor") /* exclude worn items and other containers */
+                    && (otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS) || Is_container(otmp) || !can_floor_stash_objs()))
+                || (!strcmp(word, "mark as favorite") /* exclude already a favorite */
+                    && (otmp->speflags & SPEFLAGS_FAVORITE))
+                || (!strcmp(word, "unmark as favorite") /* exclude if not a favorite */
+                    && !(otmp->speflags & SPEFLAGS_FAVORITE))
                 || (putting_on(word) /* exclude if already worn */
                     && (otmp->owornmask & (W_ARMOR | W_ACCESSORY | W_MISCITEMS)))
                 || (trading_items(word) /* exclude if already worn and unpaid items */
@@ -3227,6 +3244,7 @@ struct obj* otmp_only;
                     && (!Is_astralevel(&u.uz) ^ (otmp->oclass != AMULET_CLASS)))
                 /* suppress container being stashed into */
                 || (!strcmp(word, "stash") && !ck_bag(otmp))
+                || (!strcmp(word, "stash into a container on the floor") && !ck_bag(otmp))
                 /* worn armor (shirt, suit) covered by worn armor (suit, cloak)
                    or accessory (ring) covered by cursed worn armor (gloves) */
                 || (taking_off(word)
@@ -3829,8 +3847,6 @@ struct obj *otmp;
     int color = NO_COLOR, attr = ATR_NONE;
     if(iflags.use_menu_color)
         (void)get_menu_coloring(text, &color, &attr);
-    //int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-    //int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
     display_popup_text(text, "Item Identified", POPUP_TEXT_IDENTIFY, attr, color, NO_GLYPH, POPUP_FLAGS_COLOR_TEXT);
 
     return 1;
@@ -3911,6 +3927,52 @@ boolean bynexthere;
     }
     return unid_cnt;
 }
+
+/* count the items in an object class */
+int
+count_objects_in_class(objchn, oclass, filterfunc, bynexthere)
+struct obj* objchn;
+char oclass;
+boolean FDECL((*filterfunc), (OBJ_P));
+boolean bynexthere;
+{
+    int cnt = 0;
+    struct obj* obj;
+    for (obj = objchn; obj; obj = (bynexthere ? obj->nexthere : obj->nobj))
+    {
+        if (filterfunc && !(*filterfunc)(obj))
+            continue;
+
+        if (obj->oclass != oclass)
+            continue;
+
+        ++cnt;
+    }
+    return cnt;
+}
+
+
+/* count the items whose name is not known */
+int
+count_unknown(objchn, filterfunc, bynexthere)
+struct obj* objchn;
+boolean FDECL((*filterfunc), (OBJ_P));
+boolean bynexthere;
+{
+    int unid_cnt = 0;
+    struct obj* obj;
+
+    for (obj = objchn; obj; obj = (bynexthere ? obj->nexthere : obj->nobj))
+    {
+        if (filterfunc && !(*filterfunc)(obj))
+            continue;
+
+        if (is_obj_unknown(obj))
+            ++unid_cnt;
+    }
+    return unid_cnt;
+}
+
 
 /* dialog with user to identify a given number of items; 0 means all */
 /* returns the number of items identified */
@@ -4156,27 +4218,36 @@ ddoinv()
     //(void) display_inventory((char *) 0, FALSE, 1);
 
     char invlet;
-    long pickcnt = 0;
+    long pickcnt;
+    boolean return_to_inv;
 
-    invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, 1, FALSE);
-    if (!invlet || invlet == '\033' || invlet == '\0')
-        return 0;
+    do
+    {
+        pickcnt = 0;
+        return_to_inv = FALSE;
+        invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, 1, FALSE);
+        if (!invlet || invlet == '\033' || invlet == '\0')
+            return 0;
 
-    if (flags.inventory_obj_cmd)
-    {
-        return display_item_command_menu_by_invlet(invlet, pickcnt);
-    }
-    else
-    {
-        struct obj* invobj;
-        for (invobj = invent; invobj; invobj = invobj->nobj)
-            if (invobj->invlet == invlet)
-            {
-                (void)itemdescription(invobj);
-                break;
-            }
-        return 0;
-    }
+        if (flags.inventory_obj_cmd)
+        {
+            int res = display_item_command_menu_by_invlet(invlet, pickcnt, &return_to_inv);
+            if (res || !return_to_inv)
+                return res;
+        }
+        else
+        {
+            struct obj* invobj;
+            for (invobj = invent; invobj; invobj = invobj->nobj)
+                if (invobj->invlet == invlet)
+                {
+                    (void)itemdescription(invobj);
+                    return_to_inv = TRUE;
+                    break;
+                }
+        }
+    } while (return_to_inv);
+    return 0;
 }
 
 /* the ']' command */
@@ -4184,34 +4255,44 @@ int
 doseeworn()
 {
     char invlet;
-    long pickcnt = 0;
+    long pickcnt;
+    boolean return_to_inv;
 
-    invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, 1, TRUE);
-    if (!invlet || invlet == '\033' || invlet == '\0')
-        return 0;
+    do
+    {
+        pickcnt = 0;
+        return_to_inv = FALSE;
+        invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, 1, TRUE);
+        if (!invlet || invlet == '\033' || invlet == '\0')
+            return 0;
 
-    if (flags.inventory_obj_cmd)
-    {
-        return display_item_command_menu_by_invlet(invlet, pickcnt);
-    }
-    else
-    {
-        struct obj* invobj;
-        for (invobj = invent; invobj; invobj = invobj->nobj)
-            if (invobj->invlet == invlet)
-            {
-                (void)itemdescription(invobj);
-                break;
-            }
-        return 0;
-    }
+        if (flags.inventory_obj_cmd)
+        {
+            int res = display_item_command_menu_by_invlet(invlet, pickcnt, &return_to_inv);
+            if (res || !return_to_inv)
+                return res;
+        }
+        else
+        {
+            struct obj* invobj;
+            for (invobj = invent; invobj; invobj = invobj->nobj)
+                if (invobj->invlet == invlet)
+                {
+                    (void)itemdescription(invobj);
+                    return_to_inv = TRUE;
+                    break;
+                }
+        }
+    } while (return_to_inv);
+    return 0;
 }
 
 
 int
-display_item_command_menu_by_invlet(invlet, pickcnt)
+display_item_command_menu_by_invlet(invlet, pickcnt, return_to_inv_ptr)
 char invlet;
 long pickcnt;
+boolean* return_to_inv_ptr;
 {
     struct obj* otmp = 0;
     struct obj* otmp2;
@@ -4222,245 +4303,265 @@ long pickcnt;
     if (!otmp)
         return 0;
     else
-        return display_item_command_menu(otmp, pickcnt);
+        return display_item_command_menu(otmp, pickcnt, return_to_inv_ptr);
 }
 
+#define NUM_CMD_SECTIONS 3
+
 int
-display_item_command_menu(otmp, pickcnt)
+display_item_command_menu(otmp, pickcnt, return_to_inv_ptr)
 struct obj* otmp;
 long pickcnt;
+boolean* return_to_inv_ptr; 
 {
     if (!otmp)
         return 0;
 
-    int cmd_idx = 0;
-    char invlet = otmp->invlet;
-
-    menu_item* pick_list = (menu_item*)0;
-    winid win;
-    anything any;
-
+    int res = 0;
+    boolean repeatmenu = FALSE, returntoinv = FALSE;
     xchar x = 0, y = 0;
     get_obj_location(otmp, &x, &y, CONTAINED_TOO | BURIED_TOO);
     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-
-    any = zeroany;
-    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_COMMAND_MENU, gui_glyph, extended_create_window_info_from_obj(otmp));
-    start_menu_ex(win, GHMENU_STYLE_ITEM_COMMAND);
-
-#define NUM_CMD_SECTIONS 3
-
-    const char* headings[NUM_CMD_SECTIONS] = { "Information", "General Commands", "Item-Specific Commands" };
-    unsigned long section_flags[NUM_CMD_SECTIONS] = { SINGLE_OBJ_CMD_INFO, SINGLE_OBJ_CMD_GENERAL, SINGLE_OBJ_CMD_SPECIFIC };
-    char buf[BUFSIZ] = "";
-    char cmdbuf[BUFSZ] = "";
-    char shortcutbuf[BUFSZ] = "";
-    char headerbuf[BUFSZ] = "";
-    register const struct ext_func_tab* efp;
-    int actioncount = 0;
-    char class_list[BUFSZ] = "";
-    int longest_len = 0;
-    int longest_len_header = 0;
-    int slen = 0;
-    unsigned long allflags = 0UL;
-    int i, j;
-    for (j = 0; j < NUM_CMD_SECTIONS; j++)
+    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
+    do
     {
-        allflags |= section_flags[j];
-
-        slen = (int)strlen(headings[j]);
-        if (slen > longest_len_header)
-            longest_len_header = slen;
-
-    }
-    for (i = 0; extcmdlist[i].ef_txt; i++)
-    {
-        if (!(extcmdlist[i].flags & allflags) || !extcmdlist[i].getobj_word)
-            continue;
-
-        slen = (int)strlen(extcmdlist[i].ef_txt_word ? extcmdlist[i].ef_txt_word : extcmdlist[i].ef_txt);
-        if (slen > longest_len)
-            longest_len = slen;
-    }
-
-    for (j = 0; j < NUM_CMD_SECTIONS; j++)
-    {
-        int cnt = 0;
-        for (i = 0; extcmdlist[i].ef_txt; i++)
-        {
-            if (!(extcmdlist[i].flags & section_flags[j]) || !extcmdlist[i].getobj_word)
-                continue;
-
-            strcpy(class_list, "");
-            if (extcmdlist[i].getobj_classes)
-                strcpy(class_list, extcmdlist[i].getobj_classes);
-            else if (!strcmp(extcmdlist[i].getobj_word, "break"))
-                setbreakclasses(class_list);
-            else if (!strcmp(extcmdlist[i].getobj_word, "use or apply"))
-                setapplyclasses(class_list);
-            else  if (!strcmp(extcmdlist[i].getobj_word, "ready"))
-            {
-                strcpy(class_list, (uslinging()
-                    || (uswapwep
-                        && objects[uswapwep->otyp].oc_skill == P_SLING))
-                    ? getobj_bullets
-                    : getobj_ready_objs);
-            }
-
-            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
-                set_current_container_to_dummyobj();
-            boolean acceptable = acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word);
-            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
-                set_current_container_to_null();
-            if (!acceptable)
-                continue;
-
-            cnt++;
-        }
-        if (!cnt)
-            continue;
-
-        char catbuf[BUFSZ];
-        strcpy(catbuf, "");
-        if (!iflags.menu_tab_sep)
-        {
-            slen = (int)strlen(headings[j]);
-            int k;
-            for (k = 0; k < max(longest_len_header, longest_len + 10) - slen; k++)
-                Sprintf(eos(catbuf), "%s", " ");
-        }
-
-        char hbuf[BUFSZ];
-        Sprintf(hbuf, "%s%s", headings[j], catbuf);
+        char invlet = otmp->invlet;
+        int cmd_idx = 0;
+        menu_item* pick_list = (menu_item*)0;
+        winid win;
+        anything any;
 
         any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any,
-            0, 0, iflags.menu_headings, NO_COLOR,
-            hbuf, MENU_UNSELECTED, menu_heading_info());
+        win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_COMMAND_MENU, gui_glyph, extended_create_window_info_from_obj(otmp));
+        start_menu_ex(win, GHMENU_STYLE_ITEM_COMMAND);
 
+        const char* headings[NUM_CMD_SECTIONS] = { "Information", "General Commands", "Item-Specific Commands" };
+        unsigned long section_flags[NUM_CMD_SECTIONS] = { SINGLE_OBJ_CMD_INFO, SINGLE_OBJ_CMD_GENERAL, SINGLE_OBJ_CMD_SPECIFIC };
+        char buf[BUFSIZ] = "";
+        char cmdbuf[BUFSZ] = "";
+        char shortcutbuf[BUFSZ] = "";
+        char headerbuf[BUFSZ] = "";
+        register const struct ext_func_tab* efp;
+        int actioncount = 0;
+        char class_list[BUFSZ] = "";
+        int longest_len = 0;
+        int longest_len_header = 0;
+        int slen = 0;
+        unsigned long allflags = 0UL;
+        int i, j;
+        for (j = 0; j < NUM_CMD_SECTIONS; j++)
+        {
+            allflags |= section_flags[j];
+
+            slen = (int)strlen(headings[j]);
+            if (slen > longest_len_header)
+                longest_len_header = slen;
+
+        }
         for (i = 0; extcmdlist[i].ef_txt; i++)
         {
-            if (!(extcmdlist[i].flags & section_flags[j]) || !extcmdlist[i].getobj_word)
+            if (!(extcmdlist[i].flags & allflags) || !extcmdlist[i].getobj_word)
                 continue;
 
-            strcpy(class_list, "");
-            if (extcmdlist[i].getobj_classes)
-                strcpy(class_list, extcmdlist[i].getobj_classes);
-            else if (!strcmp(extcmdlist[i].getobj_word, "break"))
-                setbreakclasses(class_list);
-            else if (!strcmp(extcmdlist[i].getobj_word, "use or apply"))
-                setapplyclasses(class_list);
-            else  if (!strcmp(extcmdlist[i].getobj_word, "ready"))
+            slen = (int)strlen(extcmdlist[i].ef_txt_word ? extcmdlist[i].ef_txt_word : extcmdlist[i].ef_txt);
+            if (slen > longest_len)
+                longest_len = slen;
+        }
+
+        for (j = 0; j < NUM_CMD_SECTIONS; j++)
+        {
+            int cnt = 0;
+            for (i = 0; extcmdlist[i].ef_txt; i++)
             {
-                strcpy(class_list, (uslinging()
-                    || (uswapwep
-                        && objects[uswapwep->otyp].oc_skill == P_SLING))
-                    ? getobj_bullets
-                    : getobj_ready_objs);
+                if (!(extcmdlist[i].flags & section_flags[j]) || !extcmdlist[i].getobj_word)
+                    continue;
+
+                Strcpy(class_list, "");
+                if (extcmdlist[i].getobj_classes)
+                    Strcpy(class_list, extcmdlist[i].getobj_classes);
+                else if (!strcmp(extcmdlist[i].getobj_word, "break"))
+                    setbreakclasses(class_list);
+                else if (!strcmp(extcmdlist[i].getobj_word, "use or apply"))
+                    setapplyclasses(class_list);
+                else  if (!strcmp(extcmdlist[i].getobj_word, "ready"))
+                {
+                    Strcpy(class_list, (uslinging()
+                        || (uswapwep
+                            && objects[uswapwep->otyp].oc_skill == P_SLING))
+                        ? getobj_bullets
+                        : getobj_ready_objs);
+                }
+
+                boolean isstashing = !strcmp(extcmdlist[i].getobj_word, "stash") || !strcmp(extcmdlist[i].getobj_word, "stash into a container on the floor");
+                if (isstashing)
+                    set_current_container_to_dummyobj();
+                boolean acceptable = acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word);
+                if (isstashing)
+                    set_current_container_to_null();
+                if (!acceptable)
+                    continue;
+
+                cnt++;
             }
-
-            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
-                set_current_container_to_dummyobj();
-            boolean acceptable = acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word);
-            if (!strcmp(extcmdlist[i].getobj_word, "stash"))
-                set_current_container_to_null();
-            if (!acceptable)
+            if (!cnt)
                 continue;
 
-            efp = &extcmdlist[i];
-            any = zeroany;
-            any.a_int = i + 1;
-            if (efp->ef_txt_word)
-                strcpy(cmdbuf, efp->ef_txt_word);
-            else
-                strcpy(cmdbuf, efp->ef_txt);
-
-            *cmdbuf = highc(*cmdbuf);
-
-            uchar altmask = 0x80;
-            uchar ctrlmask = 0x20 | 0x40;
-
-            char tabbuf[BUFSZ];
-            if (iflags.menu_tab_sep)
-                strcpy(tabbuf, "\t");
-            else
+            char catbuf[BUFSZ];
+            Strcpy(catbuf, "");
+            if (!iflags.menu_tab_sep)
             {
-                strcpy(tabbuf, "");
-                slen = (int)strlen(cmdbuf);
+                slen = (int)strlen(headings[j]);
                 int k;
-                for (k = 0; k < longest_len + 2 - slen; k++)
-                    Sprintf(eos(tabbuf), "%s", " ");
+                for (k = 0; k < max(longest_len_header, longest_len + 10) - slen; k++)
+                    Sprintf(eos(catbuf), "%s", " ");
             }
 
-            if (efp->bound_key != '\0' && !(efp->bound_key >= (uchar)M(0) && efp->bound_key <= (uchar)M(9)))
-                Sprintf(shortcutbuf, "%s(%s%c)", tabbuf,
-                    (efp->bound_key & ctrlmask) == 0 ? "Ctrl-" : (efp->bound_key & altmask) == altmask ? "Alt-" : "",
-                    (efp->bound_key & ctrlmask) == 0 ? efp->bound_key | ctrlmask : (efp->bound_key & altmask) == altmask ? efp->bound_key & ~altmask : efp->bound_key);
-            else
-                strcpy(shortcutbuf, "");
+            char hbuf[BUFSZ];
+            Sprintf(hbuf, "%s%s", headings[j], catbuf);
 
-            Sprintf(buf, "%s%s", cmdbuf, shortcutbuf);
+            any = zeroany;
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+                hbuf, MENU_UNSELECTED, menu_heading_info());
 
-            add_menu(win, NO_GLYPH, &any,
-                0, 0, ATR_NONE, NO_COLOR,
-                buf, MENU_UNSELECTED);
+            for (i = 0; extcmdlist[i].ef_txt; i++)
+            {
+                if (!(extcmdlist[i].flags & section_flags[j]) || !extcmdlist[i].getobj_word)
+                    continue;
 
-            actioncount++;
+                Strcpy(class_list, "");
+                if (extcmdlist[i].getobj_classes)
+                    Strcpy(class_list, extcmdlist[i].getobj_classes);
+                else if (!strcmp(extcmdlist[i].getobj_word, "break"))
+                    setbreakclasses(class_list);
+                else if (!strcmp(extcmdlist[i].getobj_word, "use or apply"))
+                    setapplyclasses(class_list);
+                else  if (!strcmp(extcmdlist[i].getobj_word, "ready"))
+                {
+                    Strcpy(class_list, (uslinging()
+                        || (uswapwep
+                            && objects[uswapwep->otyp].oc_skill == P_SLING))
+                        ? getobj_bullets
+                        : getobj_ready_objs);
+                }
+
+                boolean isstashing = !strcmp(extcmdlist[i].getobj_word, "stash") || !strcmp(extcmdlist[i].getobj_word, "stash into a container on the floor");
+                if (isstashing)
+                    set_current_container_to_dummyobj();
+                boolean acceptable = acceptable_getobj_obj(otmp, class_list, extcmdlist[i].getobj_word);
+                if (isstashing)
+                    set_current_container_to_null();
+                if (!acceptable)
+                    continue;
+
+                efp = &extcmdlist[i];
+                any = zeroany;
+                any.a_int = i + 1;
+                if (efp->ef_txt_word)
+                    Strcpy(cmdbuf, efp->ef_txt_word);
+                else
+                    Strcpy(cmdbuf, efp->ef_txt);
+
+                *cmdbuf = highc(*cmdbuf);
+
+                uchar altmask = 0x80;
+                uchar ctrlmask = 0x20 | 0x40;
+
+                char tabbuf[BUFSZ];
+                if (iflags.menu_tab_sep)
+                    Strcpy(tabbuf, "\t");
+                else
+                {
+                    Strcpy(tabbuf, "");
+                    slen = (int)strlen(cmdbuf);
+                    int k;
+                    for (k = 0; k < longest_len + 2 - slen; k++)
+                        Sprintf(eos(tabbuf), "%s", " ");
+                }
+
+                if (efp->bound_key != '\0' && !(efp->bound_key >= (uchar)M(0) && efp->bound_key <= (uchar)M(9)))
+                    Sprintf(shortcutbuf, "%s(%s%c)", tabbuf,
+                        (efp->bound_key & ctrlmask) == 0 ? "Ctrl-" : (efp->bound_key & altmask) == altmask ? "Alt-" : "",
+                        (efp->bound_key & ctrlmask) == 0 ? efp->bound_key | ctrlmask : (efp->bound_key & altmask) == altmask ? efp->bound_key & ~altmask : efp->bound_key);
+                else
+                    Strcpy(shortcutbuf, "");
+
+                Sprintf(buf, "%s%s", cmdbuf, shortcutbuf);
+
+                add_menu(win, NO_GLYPH, &any,
+                    0, 0, ATR_NONE, NO_COLOR,
+                    buf, MENU_UNSELECTED);
+
+                actioncount++;
+            }
         }
-    }
 
-    char obuf[BUFSZ];
-    struct obj otmp_cnt = *otmp;
-    if (pickcnt > 0 && pickcnt < otmp->quan)
-        otmp_cnt.quan = pickcnt;
-    Strcpy(obuf, short_oname(&otmp_cnt, doname, thesimpleoname, BUFSZ));
-    Sprintf(headerbuf, "What do you want to do with %s?", obuf);
+        char obuf[BUFSZ];
+        struct obj otmp_cnt = *otmp;
+        if (pickcnt > 0 && pickcnt < otmp->quan)
+            otmp_cnt.quan = pickcnt;
+        Strcpy(obuf, short_oname(&otmp_cnt, doname, thesimpleoname, BUFSZ));
+        Sprintf(headerbuf, "What do you want to do with %s?", obuf);
 
-    end_menu(win, headerbuf);
+        end_menu(win, headerbuf);
 
 
-    if (actioncount <= 0)
-    {
-        You("can't take any actions with the %s.", cxname(otmp));
+        if (actioncount <= 0)
+        {
+            You("can't take any actions with the %s.", cxname(otmp));
+            destroy_nhwindow(win);
+            return 0;
+        }
+
+        if (select_menu(win, PICK_ONE, &pick_list) > 0)
+        {
+            cmd_idx = pick_list->item.a_int;
+            free((genericptr_t)pick_list);
+        }
         destroy_nhwindow(win);
-        return 0;
-    }
 
-    if (select_menu(win, PICK_ONE, &pick_list) > 0)
-    {
-        cmd_idx = pick_list->item.a_int;
-        free((genericptr_t)pick_list);
-    }
-    destroy_nhwindow(win);
-
-    if (cmd_idx < 1)
-        return 0;
-
-    int res = 0;
-    int selected_action = cmd_idx - 1;
-    if (extcmdlist[selected_action].ef_funct && pickcnt != 0)
-    {
-        if (pickcnt <= -1 || pickcnt >= otmp->quan)
-            getobj_autoselect_obj = otmp;
-        else
+        if (cmd_idx < 1)
         {
-            struct obj* otmpsplit = splitobj(otmp, pickcnt);
-            getobj_autoselect_obj = otmpsplit;
+            if (return_to_inv_ptr)
+                *return_to_inv_ptr = TRUE;
+            return 0;
         }
 
-        /* Change the saved command string to action-item based equivalent to allow use in repeat */
-        if (extcmdlist[selected_action].bound_key && invlet)
+        res = 0;
+        repeatmenu = FALSE;
+        returntoinv = FALSE;
+        int selected_action = cmd_idx - 1;
+        if (extcmdlist[selected_action].ef_funct && pickcnt != 0)
         {
-            savech(0);
-            savech((char)extcmdlist[selected_action].bound_key);
-            savech(invlet);
+            struct obj* otmpsplit = 0;
+            if (pickcnt <= -1 || pickcnt >= otmp->quan)
+                getobj_autoselect_obj = otmp;
+            else
+            {
+                otmpsplit = splitobj(otmp, pickcnt);
+                getobj_autoselect_obj = otmpsplit;
+            }
+
+            /* Change the saved command string to action-item based equivalent to allow use in repeat */
+            if (extcmdlist[selected_action].bound_key && invlet)
+            {
+                savech(0);
+                savech((char)extcmdlist[selected_action].bound_key);
+                savech(invlet);
+            }
+
+            res = (extcmdlist[selected_action].ef_funct)();
+            getobj_autoselect_obj = (struct obj*)0;
+            repeatmenu = (boolean)((extcmdlist[selected_action].flags & ALLOW_RETURN_TO_CMD_MENU) != 0) && !res;
+            returntoinv = (boolean)((extcmdlist[selected_action].flags & ALLOW_RETURN_TO_INVENTORY) != 0) && !res;
+
+            if ((repeatmenu || returntoinv) && otmpsplit && otmpsplit != otmp)
+                (void)merged(&otmp, &otmpsplit); /* Merge the split object back to the original */
+
+            if (return_to_inv_ptr)
+                *return_to_inv_ptr = returntoinv;
         }
-
-        res = (extcmdlist[selected_action].ef_funct)();
-        getobj_autoselect_obj = (struct obj*)0;
-    }
-
+    } while (repeatmenu);
     return res;
 }
 
@@ -4483,7 +4584,7 @@ dolastpickeditem()
     }
     if (selobj)
     {
-        int ret = display_item_command_menu(selobj, -1);
+        int ret = display_item_command_menu(selobj, -1, (boolean*)0);
 //        if (ret)
             context.last_picked_obj_show_duration_left++;
         return ret;
@@ -4708,7 +4809,7 @@ boolean addinventoryheader, wornonly;
     {
         /* wizard override ID and xtra_choice are mutually exclusive */
         if (flags.sortpack)
-            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+            add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                      "Miscellaneous", MENU_UNSELECTED, menu_heading_info());
         any.a_char = HANDS_SYM; /* '-' */
         add_menu(win, NO_GLYPH, &any, HANDS_SYM, 0, ATR_NONE, NO_COLOR,
@@ -4724,6 +4825,54 @@ boolean addinventoryheader, wornonly;
            "", MENU_UNSELECTED);
    }
 #endif
+   /* Favorites */
+   boolean favorites_printed = FALSE;
+   classcount = 0;
+   for (srtinv = sortedinvent; (otmp = srtinv->obj) != 0; ++srtinv)
+   {
+       if (lets && !index(lets, otmp->invlet))
+           continue;
+       if (wornonly && !otmp->owornmask)
+           continue;
+       if (!(otmp->speflags & SPEFLAGS_FAVORITE))
+           continue;
+       if (wizid && !not_fully_identified(otmp))
+           continue;
+       any = zeroany; /* all bits zero */
+       ilet = otmp->invlet;
+       if (!classcount)
+       {
+           add_extended_menu(win, NO_GLYPH, &any,
+               0, 0, iflags.menu_headings, NO_COLOR,
+               "Favorites",
+               MENU_UNSELECTED,
+               menu_group_heading_info('\0'));
+           classcount++;
+           favorites_printed = TRUE;
+       }
+       if (wizid)
+           any.a_obj = otmp;
+       else
+           any.a_char = ilet;
+
+       /*calculate weight sum here*/
+       if (otmp->otyp == LOADSTONE && !loadstonecorrectly)
+           wtcount += objects[LUCKSTONE].oc_weight;
+       else
+           wtcount += otmp->owt;
+
+       char applied_class_accelerator = wizid ? def_oc_syms[(int)otmp->oclass].sym : 0;
+
+       int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
+       int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
+       add_extended_menu(win, gui_glyph, &any, ilet,
+           applied_class_accelerator, ATR_NONE, NO_COLOR,
+           show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply)
+               : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply))
+           : doname_with_flags(otmp, iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
+   }
+
+   /* Others by class */
 nextclass:
     classcount = 0;
     for (srtinv = sortedinvent; (otmp = srtinv->obj) != 0; ++srtinv) 
@@ -4732,7 +4881,9 @@ nextclass:
             continue;
         if (wornonly && !otmp->owornmask)
             continue;
-        if (!flags.sortpack || otmp->oclass == *invlet) 
+        if (otmp->speflags & SPEFLAGS_FAVORITE)
+            continue;
+        if (!flags.sortpack || otmp->oclass == *invlet)
         {
             if (wizid && !not_fully_identified(otmp))
                 continue;
@@ -4748,6 +4899,16 @@ nextclass:
                     menu_group_heading_info(*invlet > ILLOBJ_CLASS && *invlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*invlet)].sym : '\0'));
                 classcount++;
             }
+            else if (!flags.sortpack && !classcount && favorites_printed)
+            {
+                add_extended_menu(win, NO_GLYPH, &any,
+                    0, 0, iflags.menu_headings, NO_COLOR,
+                    "Items",
+                    MENU_UNSELECTED,
+                    menu_group_heading_info('\0'));
+                classcount++;
+            }
+
             if (wizid)
                 any.a_obj = otmp;
             else
@@ -4762,10 +4923,12 @@ nextclass:
             char applied_class_accelerator = wizid ? def_oc_syms[(int)otmp->oclass].sym : 0;
 
             int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-            int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+            int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
             add_extended_menu(win, gui_glyph, &any, ilet,
-                applied_class_accelerator,
-                     ATR_NONE, NO_COLOR, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly) : doname_with_weight_first(otmp, loadstonecorrectly)) : doname(otmp), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
+                applied_class_accelerator, ATR_NONE, NO_COLOR, 
+                show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply) 
+                    : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply)) 
+                    : doname_with_flags(otmp, iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
         }
     }
     if (flags.sortpack) 
@@ -4781,11 +4944,13 @@ nextclass:
     if (iflags.force_invmenu && lets && want_reply) 
     {
         any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                  "Special", MENU_UNSELECTED, menu_heading_info());
         any.a_char = '*';
-        add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR,
-                 "(list everything)", MENU_UNSELECTED);
+        struct extended_menu_info info = zeroextendedmenuinfo;
+        info.menu_flags |= MENU_FLAGS_AUTO_CLICK_OK;
+        add_extended_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR,
+                 "(list everything)", MENU_UNSELECTED, info);
     }
     unsortloot(&sortedinvent);
     /* for permanent inventory where we intend to show everything but
@@ -4817,9 +4982,9 @@ nextclass:
         printweight(maxbuf, maxwt, FALSE, FALSE);
 
         if(wornonly)
-            strcpy(qbuf, "Worn Items");
+            Strcpy(qbuf, "Worn Items");
         else
-            strcpy(qbuf, "Inventory");
+            Strcpy(qbuf, "Inventory");
 
         Sprintf(subtitlebuf, "%d/52 slots, %s/%s weight", icnt, weightbuf, maxbuf);
         end_menu_ex(win, qbuf, subtitlebuf);
@@ -4887,7 +5052,7 @@ int show_weights;
     if (show_weights > 0)
     {
         anything any = zeroany;
-        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
             "Weight Summary", MENU_UNSELECTED, menu_heading_info());
 
         char wtbuf[BUFSZ];
@@ -5159,17 +5324,18 @@ char avoidlet;
                     if (flags.sortpack && !classcount) {
                         any = zeroany; /* zero */
                         add_extended_menu(win, NO_GLYPH, &any, 0, 0,
-                                 iflags.menu_headings, NO_COLOR,
+                                 iflags.menu_headings | ATR_HEADING, NO_COLOR,
                                  let_to_name(*invlet, FALSE, FALSE),
                                  MENU_UNSELECTED, menu_heading_info());
                         classcount++;
                     }
                     any.a_char = ilet;
                     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-                    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
                     add_extended_menu(win, gui_glyph,
                              &any, ilet, 0, ATR_NONE, NO_COLOR,
-                             (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE) : doname_with_weight_first(otmp, TRUE)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
+                             (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE, FALSE) : 
+                                 doname_with_weight_first(otmp, TRUE, FALSE)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
                 }
             }
             if (flags.sortpack && *++invlet)
@@ -5491,6 +5657,51 @@ dounidentified()
     destroy_nhwindow(win);
 }
 
+STATIC_OVL void
+dounknown()
+{
+    winid win;
+    struct obj* otmp;
+    register char ilet;
+    char* invlet = flags.inv_order;
+    int classcount, count;
+
+    count = count_unknown(invent, 0, FALSE);
+    if (!count)
+    {
+        win = create_nhwindow(NHW_MENU);
+        putstr(win, 0, "You have no unknown items.");
+        display_nhwindow(win, FALSE);
+        destroy_nhwindow(win);
+        return;
+    }
+
+    win = create_nhwindow(NHW_MENU);
+    if (!flags.invlet_constant)
+        reassign();
+
+    do {
+        classcount = 0;
+        for (otmp = invent; otmp; otmp = otmp->nobj) {
+            ilet = otmp->invlet;
+            if (is_obj_unknown(otmp)) {
+                if (!flags.sortpack || otmp->oclass == *invlet) {
+                    if (flags.sortpack && !classcount) {
+                        putstr(win, 0, let_to_name(*invlet, 2, FALSE));
+                        classcount++;
+                    }
+
+                    putstr(win, 0, xprname(otmp, distant_name(otmp, doname),
+                        ilet, TRUE, 0L, 0L));
+                }
+            }
+        }
+    } while (flags.sortpack && (*++invlet));
+
+    display_nhwindow(win, FALSE);
+    destroy_nhwindow(win);
+}
+
 /* query objlist callback: return TRUE if obj type matches "this_type" */
 static int this_type;
 
@@ -5533,7 +5744,7 @@ dotypeinv()
     char c = '\0';
     int n, i = 0;
     char *extra_types, types[BUFSZ];
-    int class_count, oclass, unpaid_count, unidentified_count, itemcount;
+    int class_count, oclass, unpaid_count, unidentified_count, unknown_count, itemcount;
     int bcnt, ccnt, ucnt, xcnt, ocnt, tcnt;
     boolean billx = *u.ushops && doinvbill(0);
     menu_item *pick_list;
@@ -5546,6 +5757,7 @@ dotypeinv()
     }
     unpaid_count = count_unpaid(invent, 0, FALSE);
     unidentified_count = count_unidentified(invent, 0, FALSE);
+    unknown_count = count_unknown(invent, 0, FALSE);
     tally_BUCX(invent, FALSE, &bcnt, &ucnt, &ccnt, &xcnt, &ocnt, &tcnt);
 
     if (flags.menu_style != MENU_TRADITIONAL) {
@@ -5557,6 +5769,8 @@ dotypeinv()
                 i |= UNPAID_TYPES;
             if (unidentified_count)
                 i |= UNIDENTIFIED_TYPES;
+            if (unknown_count)
+                i |= UNKNOWN_TYPES;
             if (billx)
                 i |= BILLED_TYPES;
             if (bcnt)
@@ -5581,7 +5795,7 @@ dotypeinv()
         class_count = collect_obj_classes(types, invent, FALSE,
                                           (boolean FDECL((*), (OBJ_P))) 0,
                                           &itemcount);
-        if (unpaid_count || billx || unidentified_count || (bcnt + ccnt + ucnt + xcnt) != 0)
+        if (unpaid_count || billx || unidentified_count || unknown_count || (bcnt + ccnt + ucnt + xcnt) != 0)
             types[class_count++] = ' ';
         if (unpaid_count)
             types[class_count++] = 'u';
@@ -5589,6 +5803,8 @@ dotypeinv()
             types[class_count++] = 'x';
         if (unidentified_count)
             types[class_count++] = 'I';
+        if (unknown_count)
+            types[class_count++] = 'K';
         if (bcnt)
             types[class_count++] = 'B';
         if (ucnt)
@@ -5607,6 +5823,8 @@ dotypeinv()
             *extra_types++ = 'x';
         if (!unidentified_count)
             *extra_types++ = 'I';
+        if (!unknown_count)
+            *extra_types++ = 'K';
         if (!bcnt)
             *extra_types++ = 'B';
         if (!ucnt)
@@ -5637,6 +5855,8 @@ dotypeinv()
                 c = 'x';
             else if (unidentified_count)
                 c = 'I';
+            else if (unknown_count)
+                c = 'K';
             else
                 c = types[0];
         }
@@ -5661,6 +5881,13 @@ dotypeinv()
             dounidentified();
         else
             You1("are not carrying any unidentified objects.");
+        return 0;
+    }
+    if (c == 'K') {
+        if (unknown_count)
+            dounknown();
+        else
+            You1("are not carrying any unknown objects.");
         return 0;
     }
     if (traditional) {
@@ -5744,9 +5971,9 @@ int x, y;
         if (altcmap > -1)
         {
             if(lsubtyp > 0)
-                strcpy(altbuf, defsym_variations[lsubtyp - 1 + defsyms[altcmap].variation_offset].explanation);
+                Strcpy(altbuf, defsym_variations[lsubtyp - 1 + defsyms[altcmap].variation_offset].explanation);
             else
-                strcpy(altbuf, defsyms[altcmap].explanation);
+                Strcpy(altbuf, defsyms[altcmap].explanation);
 
             print_lock_with_buf(eos(altbuf), levl[x][y].key_otyp, levl[x][y].special_quality, is_door_normally_without_lock_at(x, y));
             dfeature = altbuf;
@@ -5944,7 +6171,7 @@ boolean picked_some, explicit_cmd;
     if (!skip_objects && (trap = t_at(u.ux, u.uy)) && trap->tseen)
     {
         char buf[BUFSZ];
-        strcpy(buf, "");
+        Strcpy(buf, "");
         if (trap && trap->ttyp == LEVER && (trap->tflags & TRAPFLAGS_SWITCHABLE_BETWEEN_STATES))
         {
             if ((trap->tflags & TRAPFLAGS_STATE_MASK) > 0UL)
@@ -5991,9 +6218,9 @@ boolean picked_some, explicit_cmd;
     if (IS_BRAZIER(lev->typ))
     {
         if(lev->lamplit)
-            strcpy(dfbuf, "lit ");
+            Strcpy(dfbuf, "lit ");
         else
-            strcpy(dfbuf, "unlit ");
+            Strcpy(dfbuf, "unlit ");
     }
 
     if (dfeature)
@@ -6042,7 +6269,7 @@ boolean picked_some, explicit_cmd;
                   picked_some ? " more" : "");
         for (; otmp; otmp = otmp->nexthere)
             if (otmp->otyp == CORPSE && will_feel_cockatrice(otmp, FALSE)) {
-                pline("%s %s%s.",
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s %s%s.",
                       (obj_cnt > 1)
                           ? "Including"
                           : (otmp->quan > 1L)
@@ -6055,7 +6282,6 @@ boolean picked_some, explicit_cmd;
                 feel_cockatrice(otmp, FALSE);
                 break;
             }
-
     } 
     else if (!otmp->nexthere) 
     {
@@ -6169,9 +6395,9 @@ print_things_here_to_window(VOID_ARGS)
     if (IS_BRAZIER(lev->typ))
     {
         if (lev->lamplit)
-            strcpy(dfbuf, "lit ");
+            Strcpy(dfbuf, "lit ");
         else
-            strcpy(dfbuf, "unlit ");
+            Strcpy(dfbuf, "unlit ");
     }
 
     char buf[BUFSZ];
@@ -6351,10 +6577,10 @@ boolean force_touch;
         Strcpy(kbuf, corpse_xname(otmp, (const char *) 0, CXN_PFX_THE));
 
         if (poly_when_stoned(youmonst.data))
-            You("touched %s with your bare %s.", kbuf,
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "touched %s with your bare %s.", kbuf,
                 makeplural(body_part(HAND)));
         else
-            pline("Touching %s is a fatal mistake...", kbuf);
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Touching %s is a fatal mistake...", kbuf);
         /* normalize body shape here; hand, not body_part(HAND) */
         Sprintf(kbuf, "touching %s bare-handed", killer_xname(otmp));
         /* will call polymon() for the poly_when_stoned() case */
@@ -6666,27 +6892,34 @@ doprinuse()
     {
         //(void)display_inventory(lets, FALSE, 0);
         char invlet;
-        long pickcnt = 0;
-
-        invlet = display_inventory_with_header(lets, TRUE, &pickcnt, 1, FALSE);
-        if (!invlet || invlet == '\033' || invlet == '\0')
-            return 0;
-
-        if (flags.inventory_obj_cmd)
+        long pickcnt;
+        boolean return_to_inv;
+        do
         {
-            return display_item_command_menu_by_invlet(invlet, pickcnt);
-        }
-        else
-        {
-            struct obj* invobj;
-            for (invobj = invent; invobj; invobj = invobj->nobj)
-                if (invobj->invlet == invlet)
-                {
-                    (void)itemdescription(invobj);
-                    break;
-                }
-            return 0;
-        }
+            pickcnt = 0;
+            return_to_inv = FALSE;
+            invlet = display_inventory_with_header(lets, TRUE, &pickcnt, 1, FALSE);
+            if (!invlet || invlet == '\033' || invlet == '\0')
+                return 0;
+
+            if (flags.inventory_obj_cmd)
+            {
+                int res = display_item_command_menu_by_invlet(invlet, pickcnt, & return_to_inv);
+                if (res || !return_to_inv)
+                    return res;
+            }
+            else
+            {
+                struct obj* invobj;
+                for (invobj = invent; invobj; invobj = invobj->nobj)
+                    if (invobj->invlet == invlet)
+                    {
+                        (void)itemdescription(invobj);
+                        return_to_inv = TRUE;
+                        break;
+                    }
+            }
+        } while (return_to_inv);
     }
     return 0;
 }

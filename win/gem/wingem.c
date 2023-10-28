@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0	wingem.c	$NHDT-Date: 1450453304 2015/12/18 15:41:44 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.26 $ */
 /* Copyright (c) Christian Bressler, 1999 */
@@ -927,8 +927,8 @@ extern int mar_set_rogue(int);
 extern void mar_add_pet_sign(winid, int, int);
 
 void
-Gem_issue_gui_command(cmd_id, cmd_param, cmd_str)
-int cmd_id, cmd_param;
+Gem_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str)
+int cmd_id, cmd_param, cmd_param2;
 const char* cmd_str;
 {
     return;

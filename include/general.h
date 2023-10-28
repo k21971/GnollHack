@@ -126,60 +126,16 @@ enum worm_tile_types
     MAX_WORM_TILES
 };
 
-
-
 struct replacement_info {
     int signed_glyph;
     int layer;
     struct obj* object;
     struct monst* monster;
     unsigned long layer_flags;
+    unsigned long monster_flags;
     unsigned long missile_flags;
     unsigned char missile_material;
     short missile_special_quality;
-};
-
-struct skill_menu_info
-{
-    char skillname[64];
-    unsigned char skill_id;
-    unsigned char skilltype;
-    unsigned char current_level;
-    unsigned char advance_flags;
-    unsigned char skill_points_needed_to_advance;
-    unsigned char max_level;
-    const char* curlevelname;
-    const char* nextlevelname;
-    const char* maxlevelname;
-    unsigned char bonus1_type;
-    float curbonus1;
-    float nextbonus1;
-    unsigned char bonus2_type;
-    float curbonus2;
-    float nextbonus2;
-    unsigned char bonus3_type;
-    float curbonus3;
-    float nextbonus3;
-    unsigned char bonus4_type;
-    float curbonus4;
-    float nextbonus4;
-};
-
-struct spell_menu_info
-{
-    char spellname[64];
-    char schoolname[64];
-    short spell_id;
-    unsigned char school_id;
-    short level;
-    float mana_cost;
-    char stats[8];
-    short fail_percentage;
-    short cooldown_rounds;
-    short casts;
-    short adds;
-    char description[64];
-    char hotkey;
 };
 
 struct extended_menu_info {
@@ -190,6 +146,7 @@ struct extended_menu_info {
     const char* colors;
     int style; /* Generic style or subtype; used in menu data */
     char special_mark;
+    int num_items; /* Number of items in e.g. category */
     unsigned long menu_flags;
 };
 
@@ -202,6 +159,7 @@ struct extended_create_window_info {
 #define WINDOW_CREATE_FLAGS_NONE                0x00000000
 #define WINDOW_CREATE_FLAGS_ACTIVE              0x00000001
 #define WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS 0x00000002 //For text window only; use menu flags for menu window
+#define WINDOW_CREATE_FLAGS_ASCENDED            0x00000004
 
 #define MENU_FLAGS_NONE                         0x00000000
 #define MENU_FLAGS_IS_HEADING                   0x00000001
@@ -213,6 +171,9 @@ struct extended_create_window_info {
 #define MENU_FLAGS_ACTIVE                       0x00000040
 #define MENU_FLAGS_USE_COLOR_FOR_SUFFIXES       0x00000080
 #define MENU_FLAGS_USE_SPECIAL_SYMBOLS          0x00000100
+#define MENU_FLAGS_USE_NUM_ITEMS                0x00000200
+#define MENU_FLAGS_BUTTON_STYLE                 0x00000400
+#define MENU_FLAGS_AUTO_CLICK_OK                0x00000800
 
 #define MENU_DATAFLAGS_HAS_OBJECT_DATA          0x01
 #define MENU_DATAFLAGS_HAS_MONSTER_DATA         0x02
@@ -386,6 +347,7 @@ enum ghmenu_styles
     GHMENU_STYLE_PERMANENT_INVENTORY,
     GHMENU_STYLE_OTHERS_INVENTORY,
     GHMENU_STYLE_PICK_ITEM_LIST,
+    GHMENU_STYLE_PICK_ITEM_LIST_AUTO_OK,
     GHMENU_STYLE_PICK_CATEGORY_LIST,
     GHMENU_STYLE_ITEM_COMMAND,
     GHMENU_STYLE_CHAT,
@@ -412,6 +374,9 @@ enum ghmenu_styles
     GHMENU_STYLE_START_GAME_MENU,
     GHMENU_STYLE_PREVIOUS_MESSAGES,
     GHMENU_STYLE_VIEW_FILE,
+    GHMENU_STYLE_ACCEPT_PLAYER,
+    GHMENU_STYLE_VIEW_SPELL,
+    GHMENU_STYLE_VIEW_SPELL_ALTERNATE,
     MAX_GHMENU_STYLES
 };
 
@@ -433,7 +398,6 @@ enum special_view_types
     SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y,
     MAX_SPECIAL_VIEW_TYPES
 };
-
 
 struct special_view_info {
     enum special_view_types viewtype;
@@ -534,6 +498,14 @@ enum popup_text_types {
 enum gui_effect_types {
     GUI_EFFECT_SEARCH = 0,
     GUI_EFFECT_WAIT,
+    GUI_EFFECT_POLEARM,
+};
+
+enum gui_polearm_types {
+    GUI_POLEARM_SPEAR = 0,
+    GUI_POLEARM_LANCE,
+    GUI_POLEARM_THRUSTED,
+    GUI_POLEARM_POLEAXE,
 };
 
 enum getline_types {
@@ -620,7 +592,10 @@ enum context_menu_styles {
 #define MAX_DIFFICULTY_LEVEL 2
 #define WAND_OF_PROBING_DIFFICULTY_THRESHOLD -1
 #define SCROLL_OF_REMOVE_CURSE_DIFFICULTY_THRESHOLD -3
+#define NO_SECRET_DOORS_DIFFICULTY_THRESHOLD -1
 #define DEFAULT_MAX_HINT_DIFFICULTY -1
+
+#define NO_SECRET_DOORS_DUNGEON_LEVEL_THRESHOLD 2
 
 /* Moved from spell.c */
 /* spell retention period, in turns; at 10% of this value, player becomes
@@ -665,9 +640,22 @@ enum context_menu_styles {
 #define MKOBJ_FLAGS_FORCE_BASE_MATERIAL                0x00004000
 #define MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY           0x00008000
 #define MKOBJ_FLAGS_PARAM_IS_MNUM                      0x00010000
+#define MKOBJ_FLAGS_FOUND_THIS_TURN                    0x00020000
 
-#define MONDIED_FLAGS_NONE                             0x00000000
-#define MONDIED_FLAGS_NO_DEATH_ACTION                  0x00000001
+#define MONDEAD_FLAGS_NONE                             0x00000000
+#define MONDEAD_FLAGS_NO_DEATH_ACTION                  0x00000001
+#define MONDEAD_FLAGS_DISINTEGRATED                    0x00000002
+#define MONDEAD_FLAGS_STONED                           0x00000004
+#define MONDEAD_FLAGS_DIGESTED                         0x00000008
+#define MONDEAD_FLAGS_GENERIC_NO_CORPSE                0x00000010
+
+#define DONAME_WITH_PRICE                   0x0001
+#define DONAME_VAGUE_QUAN                   0x0002
+#define DONAME_WITH_WEIGHT_FIRST            0x0004
+#define DONAME_WITH_WEIGHT_LAST             0x0008
+#define DONAME_LOADSTONE_CORRECTLY          0x0010
+#define DONAME_LIT_IN_FRONT                 0x0020
+#define DONAME_HIDE_REMAINING_LIT_TURNS     0x0040
 
 /* Moved from shk.c */
 #define NOTANGRY(mon) ((mon)->mpeaceful)
@@ -723,6 +711,8 @@ enum gui_command_types {
     GUI_CMD_REPORT_PLAY_TIME,
     GUI_CMD_POST_GAME_STATUS,
     GUI_CMD_POST_DIAGNOSTIC_DATA,
+    GUI_CMD_LIBRARY_MANUAL,
+    GUI_CMD_DEBUGLOG,
     GUI_CMD_GAME_START,
     GUI_CMD_GAME_ENDED,
 };
@@ -734,8 +724,13 @@ enum game_status_types
     GAME_STATUS_ACHIEVEMENT,
     GAME_STATUS_RESULT,
     GAME_STATUS_RESULT_ATTACHMENT,
-    GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_TEXT,
-    GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_HTML,
+};
+
+enum game_status_data_types
+{
+    GAME_STATUS_ATTACHMENT_GENERIC = 0,
+    GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT,
+    GAME_STATUS_ATTACHMENT_DUMPLOG_HTML,
 };
 
 enum diagnostic_data_types
@@ -743,7 +738,23 @@ enum diagnostic_data_types
     DIAGNOSTIC_DATA_GENERAL = 0,
     DIAGNOSTIC_DATA_IMPOSSIBLE,
     DIAGNOSTIC_DATA_PANIC,
+    DIAGNOSTIC_DATA_CRITICAL,
     DIAGNOSTIC_DATA_CRASH_REPORT,
+    DIAGNOSTIC_DATA_ATTACHMENT,
+    DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT,
+};
+
+enum diagnostic_data_attachment_types
+{
+    DIAGNOSTIC_DATA_ATTACHMENT_GENERIC = 0,
+    DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST,
+};
+
+enum debug_log_types
+{
+    DEBUGLOG_GENERAL = 0,
+    DEBUGLOG_DEBUG_ONLY,
+    DEBUGLOG_FILE_DESCRIPTOR,
 };
 
 
@@ -758,6 +769,7 @@ enum yn_function_styles {
     YN_STYLE_ITEM_EXCHANGE,
     YN_STYLE_KNAPSACK_FULL,
     YN_STYLE_MONSTER_QUESTION,
+    YN_STYLE_END,
 };
 
 /* Other */
@@ -793,6 +805,9 @@ enum yn_function_styles {
 #define OBJDATA_FLAGS_WRONG_AMMO_TYPE2  0x00001000UL
 #define OBJDATA_FLAGS_NOT_BEING_USED2   0x00002000UL
 #define OBJDATA_FLAGS_NOT_WEAPON2       0x00004000UL
+#define OBJDATA_FLAGS_FOUND_THIS_TURN   0x00008000UL
+#define OBJDATA_FLAGS_IS_AMMO           0x00010000UL /* is_ammo is TRUE */
+#define OBJDATA_FLAGS_THROWING_WEAPON   0x00020000UL /* throwing_weapon is TRUE */
 
 /* Monster abilities */
 #define BREATH_WEAPON_MANA_COST 15
@@ -853,6 +868,18 @@ struct multishot_result {
     double average;
 };
 
+struct item_description_stats {
+    unsigned char stats_set;
+    unsigned char weapon_stats_printed;
+    unsigned char armor_stats_printed;
+    unsigned char wep_ac50pct_set;
+    double avg_damage;
+    double extra_damage;
+    int ac50pct;
+    int ac_bonus;
+    int mc_bonus;
+};
+
 enum dog_breeds {
     DOG_BREED_GENERIC = 0,
     DOG_BREED_LABRADOR_BLACK,
@@ -904,6 +931,18 @@ enum cat_breeds {
 #define ZAP_TEMPLATE_WIDTH 5
 #define ZAP_TEMPLATE_HEIGHT 4
 #define NUM_ZAP_BASE_TILES 18
+
+#define UTOFLAGS_AT_STAIRS          0x0001
+#define UTOFLAGS_FALLING            0x0002
+#define UTOFLAGS_PORTAL_1           0x0004
+#define UTOFLAGS_PORTAL_2           0x0008
+#define UTOFLAGS_PORTAL_3           0x0010
+#define UTOFLAGS_PORTAL_4           0x0020
+#define UTOFLAGS_DEFERRED_GOTO      0x0040
+#define UTOFLAGS_REMOVE_PORTAL      0x0080
+#define UTOFLAGS_TELEPORT_EFFECT    0x0100
+#define UTOFLAGS_AT_ALTAR           0x0200
+#define UTOFLAGS_INSIDE_TOWER       0x0400
 
 
 #endif /* GENERAL_H */

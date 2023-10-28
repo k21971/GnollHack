@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    dokick.c    $NHDT-Date: 1551920353 2019/03/07 00:59:13 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.131 $ */
 /* Copyright (c) Izchak Miller, Mike Stephenson, Steve Linhart, 1989. */
@@ -8,7 +8,7 @@
 
 #define is_bigfoot(x) ((x) == &mons[PM_SASQUATCH])
 #define martial()                                 \
-    ((martial_bonus() && (Magical_kicking || !(uarmf && is_metallic(uarmf)))) || is_bigfoot(youmonst.data) \
+    ((martial_bonus()/* && (Magical_kicking || !(uarmf && is_metallic(uarmf))) */) || is_bigfoot(youmonst.data) \
      || Magical_kicking)
 
 STATIC_VAR NEARDATA struct rm* maploc;
@@ -40,7 +40,7 @@ boolean clumsy;
     int dmg = 0; // (ACURRSTR + ACURR(A_DEX) + ACURR(A_CON)) / 15;
     int specialdmg;
     boolean trapkilled = FALSE;
-    boolean martial_arts_applies = martial_bonus() && (Magical_kicking || !(uarmf && is_metallic(uarmf)));
+    boolean martial_arts_applies = martial(); // && (Magical_kicking || !(uarmf && is_metallic(uarmf)));
     boolean jumpkicking = !!Jumping;
     boolean effortlessly = FALSE;
 
@@ -133,67 +133,65 @@ boolean clumsy;
     {
         if (Magical_kicking)
         {
-            if (!rn2(2))
+            if (!bigmonst(mon->data) || !rn2(2))
                 kicksuccessful = TRUE;
         }
         else if (martial_bonus())
         {
             int skilllevel = adjusted_skill_level(P_MARTIAL_ARTS);
-            if (!rn2(7 - skilllevel))
+            if (skilllevel >= MAX_SKILL_LEVELS - 1 ? TRUE : !rn2(MAX_SKILL_LEVELS - skilllevel))
                 kicksuccessful = TRUE;
         }
     }
 
-
     if (kicksuccessful)
         dmg += basedmg / 2;
 
-
-    char kickstylebuf[BUFSIZ] = "";
+    char kickstylebuf[BUFSZ] = "";
     if (jumpkicking)
-        strcpy(kickstylebuf, !rn2(2) ? "jump-" : "fly-");
+        Strcpy(kickstylebuf, !rn2(2) ? "jump-" : "fly-");
     else if(martial_arts_applies)
     {
         switch (rn2(10))
         {
         case 0:
-            strcpy(kickstylebuf, "jump-");
+            Strcpy(kickstylebuf, "jump-");
             break;
         case 1:
-            strcpy(kickstylebuf, "fly-");
+            Strcpy(kickstylebuf, "fly-");
             break;
         case 2:
-            strcpy(kickstylebuf, "axe-");
+            Strcpy(kickstylebuf, "axe-");
             break;
         case 3:
-            strcpy(kickstylebuf, "hook-");
+            Strcpy(kickstylebuf, "hook-");
             break;
         case 4:
-            strcpy(kickstylebuf, "front-");
+            Strcpy(kickstylebuf, "front-");
             break;
         case 5:
-            strcpy(kickstylebuf, "back-");
+            Strcpy(kickstylebuf, "back-");
             break;
         case 6:
-            strcpy(kickstylebuf, "twist-");
+            Strcpy(kickstylebuf, "twist-");
             break;
         case 7:
-            strcpy(kickstylebuf, "spin-");
+            Strcpy(kickstylebuf, "spin-");
             break;
         case 8:
-            strcpy(kickstylebuf, "side-");
+            Strcpy(kickstylebuf, "side-");
             break;
         case 9:
-            strcpy(kickstylebuf, "");
+            Strcpy(kickstylebuf, "");
             break;
         default:
             break;
         }
     }
 
-    char effbuf[BUFSIZ] = "";
+    char effbuf[BUFSZ] = "";
     if(effortlessly)
-        strcpy(effbuf, "effortlessly ");
+        Strcpy(effbuf, "effortlessly ");
 
     if (dmg > 0)
     {
@@ -206,7 +204,7 @@ boolean clumsy;
     display_m_being_hit(mon, HIT_GENERAL, dmg, 0UL, TRUE);
 
     if (silverhit)
-        pline("Your silver boots sear %s flesh!", s_suffix(mon_nam(mon)));
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "Your silver boots sear %s flesh!", s_suffix(mon_nam(mon)));
 
     if (M_AP_TYPE(mon))
         seemimic(mon);
@@ -239,18 +237,18 @@ boolean clumsy;
             hurtles = TRUE;
         else if (!bigmonst(mon->data))
         {
-            if ((skilllevel == P_BASIC && (rn2(2) || Magical_kicking)) || skilllevel >= P_SKILLED)
+            if ((skilllevel == P_BASIC && rn2(2)) || skilllevel >= P_SKILLED || Magical_kicking)
                 hurtles = TRUE;
             else
                 reels = TRUE;
         }
         else if (!hugemonst(mon->data))
         {
-            if (skilllevel >= P_MASTER)
+            if (skilllevel >= P_MASTER || Magical_kicking)
                 hurtles = TRUE;
-            else if(skilllevel >= P_EXPERT && (rn2(2) || Magical_kicking))
+            else if(skilllevel >= P_EXPERT && !rn2(2))
                 hurtles = TRUE;
-            else if (skilllevel == P_SKILLED && Magical_kicking && rn2(2))
+            else if (skilllevel == P_SKILLED && !rn2(4))
                 hurtles = TRUE;
             else if (skilllevel >= P_SKILLED)
                 reels = TRUE;
@@ -259,7 +257,7 @@ boolean clumsy;
 
     if(hurtles)
     {
-        pline("%s hurtles backwards from the force of your kick!", Monnam(mon));
+        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s hurtles backwards from the force of your kick!", Monnam(mon));
         mhurtle(mon, u.dx, u.dy, 1);
     }
     else if (reels) 
@@ -269,7 +267,7 @@ boolean clumsy;
         mdy = mon->my + u.dy;
         if (goodpos(mdx, mdy, mon, 0)) 
         {
-            pline("%s reels from the blow.", Monnam(mon));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s reels from the blow.", Monnam(mon));
             if (m_in_out_region(mon, mdx, mdy)) {
                 remove_monster(mon->mx, mon->my);
                 newsym(mon->mx, mon->my);
@@ -462,7 +460,7 @@ xchar x, y;
                     if (mon->mx != x || mon->my != y)
                     {
                         You("kick %s.", mon_nam(mon));
-                        (void)unmap_invisible(x, y);
+                        (void)unmap_invisible_with_animation(x, y, 0);
                         pline("%s %s, %s evading your %skick.", Monnam(mon),
                             (!level.flags.noteleport && has_teleportation(mon))
                             ? "teleports"
@@ -1429,7 +1427,7 @@ dokick() {
     play_monster_simple_weapon_sound(&youmonst, BAREFOOTED_ATTACK_NUMBER, uarmf, OBJECT_SOUND_TYPE_SWING_MELEE);
     u_wait_until_action();
 
-    (void) unmap_invisible(x, y);
+    (void) unmap_invisible_with_animation(x, y, 0);
     if (is_pool(x, y) ^ !!u.uinwater) {
         /* objects normally can't be removed from water by kicking */
         play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_LOCATION, xy_to_any(x, y), NATTK, (struct obj*)0, 1.0, HMON_MELEE);

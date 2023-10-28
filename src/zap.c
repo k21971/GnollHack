@@ -1175,7 +1175,7 @@ struct monst* origmonst;
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s falls off.", buf);
             }
             obj_extract_self(obj);
-            mdrop_obj(mtmp, obj, FALSE);
+            mdrop_obj(mtmp, obj, FALSE, TRUE);
         }
         break;
     case JAR_OF_MEDICINAL_SALVE:
@@ -1287,7 +1287,7 @@ cure_petrification_here:
             dmg = d(48, 6);
             context.bypasses = TRUE; /* for make_corpse() */
             int hp_before = mtmp->mhp;
-            deduct_monster_hp(mtmp, dmg);
+            deduct_monster_hp(mtmp, adjust_damage(dmg, &youmonst, mtmp, AD_CLRC, ADFLAGS_SPELL_DAMAGE));
             int hp_after = mtmp->mhp;
 
             int damagedealt = hp_before - hp_after;
@@ -1299,7 +1299,7 @@ cure_petrification_here:
             if (DEADMONSTER(mtmp))
             {
                 if (m_using)
-                    monkilled(mtmp, "", AD_RBRE);
+                    monkilled(mtmp, "", AD_CLRC, 0);
                 else
                     killed(mtmp);
             }
@@ -1702,7 +1702,7 @@ struct permonst* ptr;
             }
 
             char namebuf[BUFSZ] = "";
-            strcpy(namebuf, get_property_name(i));
+            Strcpy(namebuf, get_property_name(i));
             *namebuf = highc(*namebuf);
 
             abilcnt++;
@@ -1713,7 +1713,7 @@ struct permonst* ptr;
 
     if (!abilcnt)
     {
-        strcpy(buf, " (None)");        
+        Strcpy(buf, " (None)");        
         putstr(datawin, 0, buf);
     }
 
@@ -1738,7 +1738,7 @@ struct permonst* ptr;
             if (mflags & bit)
             {
                 char descbuf[BUFSZ] = "";
-                strcpy(descbuf, get_mflag_description(bit, FALSE, j));
+                Strcpy(descbuf, get_mflag_description(bit, FALSE, j));
                 if (strcmp(descbuf, ""))
                 {
                     *descbuf = highc(*descbuf);
@@ -1757,25 +1757,36 @@ struct permonst* ptr;
         switch (ptr->heads)
         {
         case 0:
-            strcpy(headbuf, "Headless");
+            Strcpy(headbuf, "Headless");
             break;
         case 1:
-            strcpy(headbuf, "Single-headed");
+            Strcpy(headbuf, "Single-headed");
             break;
         case 2:
-            strcpy(headbuf, "Two-headed");
+            Strcpy(headbuf, "Two-headed");
             break;
         case 3:
-            strcpy(headbuf, "Three-headed");
+            Strcpy(headbuf, "Three-headed");
             break;
         default:
             Sprintf(headbuf, "%d-headed", ptr->heads);
             break;
         }
 
-        if (mtmp && mtmp->heads_left != ptr->heads)
-            Sprintf(eos(headbuf), " (%d head%s left)", mtmp->heads_left, plur(mtmp->heads_left));
-
+        if (mtmp && (mtmp->heads_left != ptr->heads || mtmp->heads_tamed > 0))
+        {
+            Strcat(headbuf, " (");
+            if(mtmp->heads_left != ptr->heads)
+                Sprintf(eos(headbuf), "%d head%s left", mtmp->heads_left, plur(mtmp->heads_left));
+            if (mtmp->heads_tamed > 0)
+            {
+                if (mtmp->heads_left != ptr->heads)
+                    Sprintf(eos(headbuf), ", %d tamed", mtmp->heads_tamed);
+                else
+                    Sprintf(eos(headbuf), "%d head%s tamed", mtmp->heads_tamed, plur(mtmp->heads_tamed));
+            }
+            Strcat(headbuf, ")");
+        }
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, headbuf);        
         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
@@ -1783,7 +1794,7 @@ struct permonst* ptr;
 
     if (!abilcnt)
     {
-        strcpy(buf, " (None)");        
+        Strcpy(buf, " (None)");        
         putstr(datawin, 0, buf);
     }
 
@@ -1876,10 +1887,152 @@ struct permonst* ptr;
 
     if (!abilcnt)
     {
-        strcpy(buf, " (None)");        
+        Strcpy(buf, " (None)");        
         putstr(datawin, 0, buf);
     }
+}
 
+void print_monster_wearables(datawin, mtmp, ptr)
+winid datawin;
+struct monst* mtmp UNUSED;
+struct permonst* ptr;
+{
+    if (!ptr)
+        return;
+
+    if (datawin == WIN_ERR)
+        return;
+
+    int type_count = 0;
+    char buf[BUFSZ];
+    Strcpy(buf, "Wearable item types:");
+    putstr(datawin, ATR_HEADING, buf);
+
+    boolean wears_objects = can_wear_objects(ptr);
+    if (!wears_objects)
+    {
+        type_count++;
+        Sprintf(buf, " %2d - %s", type_count, can_wear_saddle(ptr) ? "Saddles" : "None");
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+    }
+    else
+    {
+        boolean wears_suit = can_wear_suit(ptr);
+        boolean wears_robe = can_wear_robe(ptr);
+        boolean wears_cloak = can_wear_cloak(ptr);
+        boolean wears_shirt = can_wear_shirt(ptr);
+        boolean wears_helmet = can_wear_helmet(ptr);
+        boolean wears_gloves = can_wear_gloves(ptr);
+        boolean wears_bracers = can_wear_bracers(ptr);
+        boolean wears_boots = can_wear_boots(ptr);
+        boolean wears_amulet = can_wear_amulet(ptr);
+        boolean wears_rings = can_wear_rings(ptr);
+        boolean wears_blindfold = can_wear_blindfold(ptr);
+        boolean wears_shield = can_wear_shield(ptr);
+        boolean wields_weapons = can_wield_weapons(ptr);
+
+        boolean all_types = wears_suit && wears_robe && wears_cloak && wears_shirt && wears_helmet && wears_gloves && wears_bracers && wears_boots && wears_amulet && wears_rings 
+            && wears_blindfold && wears_shield && wields_weapons;
+
+        if (all_types)
+        {
+            type_count++;
+            Sprintf(buf, " %2d - %s", type_count, can_wear_saddle(ptr) ? "All types including saddles" : "All types");
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        }
+        else
+        {
+            if (wields_weapons)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Weapons", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_shield)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Shields", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_suit)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Suits of armor", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_robe)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Robes", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_cloak)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Cloaks", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_shirt)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Shirts", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_helmet)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - %s", type_count, has_horns(ptr) ? "Flimsy helmets suitable with horns" : "Helmets");
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST,  buf);
+            }
+            if (wears_gloves)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Gloves", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_bracers)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Bracers", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_boots)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Boots", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_amulet)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Amulets", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_rings)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Rings", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (wears_blindfold)
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Blindfolds", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            type_count++;
+            Sprintf(buf, " %2d - Some miscellaneous magic items", type_count);
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+
+            /* Additional ones */
+            if (can_wear_saddle(ptr))
+            {
+                type_count++;
+                Sprintf(buf, " %2d - Saddles", type_count);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+        }
+    }
 }
 
 void print_monster_status(datawin, mtmp)
@@ -1892,11 +2045,12 @@ struct monst* mtmp;
     xchar sx = mtmp == &youmonst ? u.ux : mtmp->mx;
     xchar sy = mtmp == &youmonst ? u.uy : mtmp->my;
     struct layer_info li = isok(sx, sy) ? layers_at(sx, sy) : zerolayerinfo;
-    unsigned long layerflags = li.layer_flags;
-    boolean loc_is_you = mtmp == &youmonst; // (layerflags& LFLAGS_UXUY) != 0; //So you can separately see your steed stats properly
-    boolean ispeaceful = is_peaceful(mtmp) && !is_tame(mtmp); // (layerflags& LFLAGS_M_PEACEFUL) != 0;
-    boolean ispet = is_tame(mtmp); //  (layerflags& LFLAGS_M_PET) != 0;
-    boolean isdetected = (layerflags & LFLAGS_M_DETECTED) != 0;
+    //unsigned long layerflags = li.layer_flags;
+    unsigned long layermflags = li.monster_flags;
+    boolean loc_is_you = mtmp == &youmonst; // (layerflags & LFLAGS_UXUY) != 0; //So you can separately see your steed stats properly
+    boolean ispeaceful = is_peaceful(mtmp) && !is_tame(mtmp);
+    boolean ispet = is_tame(mtmp);
+    boolean isdetected = (layermflags & LMFLAGS_DETECTED) != 0;
     int condition_count = 0;
 
     char buf[BUFSZ];
@@ -2790,8 +2944,8 @@ int montype;
             if (mythic_quality == 0)
                 continue;
 
-            struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
-            struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
+            const struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
+            const struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
             uchar max_mythic_powers = (j == 0 ? MAX_MYTHIC_PREFIX_POWERS : MAX_MYTHIC_SUFFIX_POWERS);
 
             for (uchar i = 0; i < max_mythic_powers; i++)
@@ -3094,12 +3248,8 @@ obj_resists(obj, ochance, achance)
 struct obj *obj;
 int ochance, achance; /* percent chance for ordinary objects, artifacts */
 {
-    if (obj->otyp == AMULET_OF_YENDOR
-        || obj->otyp == SPE_BOOK_OF_THE_DEAD
-        || obj->otyp == CANDELABRUM_OF_INVOCATION
-        || obj->otyp == BELL_OF_OPENING
-        || is_obj_indestructible(obj)
-        || (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM && is_rider(&mons[obj->corpsenm])))
+    if (is_obj_unremovable_from_the_game(obj)
+        || is_obj_indestructible(obj))
     {
         return TRUE;
     }
@@ -4803,23 +4953,23 @@ register struct obj *obj;
         if (archoncount > 0 || angelcount > 0 || aleaxcount > 0)
         {
             if (archoncount == 0)
-                strcpy(archonbuf, "");
+                Strcpy(archonbuf, "");
             else if (archoncount == 1)
-                strcpy(archonbuf, "an Archon");
+                Strcpy(archonbuf, "an Archon");
             else
                 Sprintf(archonbuf, "%d Archons", archoncount);
 
             if (angelcount == 0)
-                strcpy(angelbuf, "");
+                Strcpy(angelbuf, "");
             else if (angelcount == 1)
-                strcpy(angelbuf, "an Angel");
+                Strcpy(angelbuf, "an Angel");
             else
                 Sprintf(angelbuf, "%d Angels", angelcount);
 
             if (aleaxcount == 0)
-                strcpy(aleaxbuf, "");
+                Strcpy(aleaxbuf, "");
             else if (aleaxcount == 1)
-                strcpy(aleaxbuf, "an Aleax");
+                Strcpy(aleaxbuf, "an Aleax");
             else
                 Sprintf(aleaxbuf, "%d Aleaxes", aleaxcount);
 
@@ -5437,11 +5587,11 @@ register struct obj *obj;
             {
                 if (context.town_portal_return_level_set && !(obj->cursed && !rn2(3)))
                 {
-                    level_tele(0, 2, context.town_portal_return_level);
+                    level_tele(0, 2, context.town_portal_return_level, context.town_portal_return_flags);
                 }
                 else
                 {
-                    level_tele(0, 0, zerodlevel);
+                    level_tele(0, 0, zerodlevel, 0);
                 }
             }
             else
@@ -5488,16 +5638,16 @@ register struct obj *obj;
                 {
                     int selidx = selected->item.a_int;
                     if (selidx > 0 && selidx <= NUM_WAYPOINTS)
-                        level_tele(0, 2, *waypointlist[selidx - 1]);
+                        level_tele(0, 2, *waypointlist[selidx - 1], 0);
                     else if (selidx > NUM_WAYPOINTS)
                     {
                         if (context.town_portal_return_level_set && !(obj->cursed && !rn2(3)))
                         {
-                            level_tele(0, 2, context.town_portal_return_level);
+                            level_tele(0, 2, context.town_portal_return_level, context.town_portal_return_flags);
                         }
                         else
                         {
-                            level_tele(0, 0, zerodlevel);
+                            level_tele(0, 0, zerodlevel, 0);
                         }
                     }
                     free((genericptr_t)selected);
@@ -5514,16 +5664,17 @@ register struct obj *obj;
         {
             if(obj->cursed && !rn2(3))
             {
-                level_tele(0, 0, zerodlevel);
+                level_tele(0, 0, zerodlevel, 0);
             }
             else
             {
                 context.town_portal_return_level = u.uz;
                 context.town_portal_return_level_set = TRUE;
+                context.town_portal_return_flags = In_W_tower(u.ux, u.uy, &u.uz);
 
                 if (wpcnt <= 1)
                 {
-                    level_tele(0, 2, last_wp ? *last_wp : minetown_level);
+                    level_tele(0, 2, last_wp ? *last_wp : minetown_level, 0);
                 }
                 else
                 {
@@ -5565,7 +5716,7 @@ register struct obj *obj;
                     {
                         int selidx = selected->item.a_int;
                         if(selidx > 0)
-                            level_tele(0, 2, *waypointlist[selidx - 1]);
+                            level_tele(0, 2, *waypointlist[selidx - 1], 0);
                         free((genericptr_t)selected);
                     }
                     else
@@ -5613,10 +5764,10 @@ register struct obj *obj;
         controlled_teleportation();
         break;
     case SPE_LEVEL_TELEPORT:
-        level_tele(2, FALSE, zerodlevel);
+        level_tele(2, FALSE, zerodlevel, 0);
         break;
     case SPE_CONTROLLED_LEVEL_TELEPORT:
-        level_tele(2, TRUE, zerodlevel);
+        level_tele(2, TRUE, zerodlevel, 0);
         break;
     case SPE_PORTAL:
         create_portal();
@@ -7092,7 +7243,7 @@ int duration;
                 if (youattack)
                     killed(mdef);
                 else
-                    monkilled(mdef, "", AD_SPEL);
+                    monkilled(mdef, "", AD_SPEL, 0);
             }
         }
     }
@@ -8418,7 +8569,7 @@ uchar* out_flags_ptr;
 {
     double damage = 0;
     int dmg = 0;
-    register int abstype = abs(type) % 10;
+    register int abstype = abs(type) % NUM_ZAP;
     boolean sho_shieldeff = FALSE;
     boolean sho_hit_eff = TRUE;
     boolean sleep_eff = FALSE;
@@ -8872,7 +9023,7 @@ const char *fltxt;
             (void) destroy_arm(uarmu);
         killer.hint_idx = HINT_KILLED_DISINTEGRATION_RAY;
         killer.format = KILLED_BY_AN;
-        strcpy(killer.name, killername);
+        Strcpy(killer.name, killername);
         /* when killed by disintegration attack, don't leave corpse */
         u.ugrave_arise = (abstyp % 10 == ZT_DISINTEGRATION) ? -3 : NON_PM;
         display_u_being_hit(HIT_DISINTEGRATED, 0, 0UL);
@@ -9188,7 +9339,7 @@ const char* fltxt;
 void //STATIC_OVL 
 disintegrate_mon(mon, type, fltxt)
 struct monst *mon;
-int type; /* hero vs other */ /* 100 == disintegrate just items and caller takes care of the killing and messaging*/
+int type; /* hero vs other */ /* 100 == disintegrate just items and caller takes care of the killing and messaging */
 const char *fltxt;
 {
     if (!mon)
@@ -9233,9 +9384,9 @@ const char *fltxt;
     }
 
     if (type < 0)
-        monkilled(mon, (char*)0, -AD_RBRE);
+        monkilled(mon, (char*)0, abs(type) + 1, XKILL_NOCORPSE | XKILL_DISINTEGRATED);
     else
-        xkilled(mon, XKILL_NOMSG | XKILL_NOCORPSE);
+        xkilled(mon, XKILL_NOMSG | XKILL_NOCORPSE | XKILL_DISINTEGRATED);
 }
 
 void
@@ -9442,14 +9593,14 @@ boolean say; /* Announce out of sight hit/miss events if true */
                     if(!use_old)
                         zap_tile_count++;
                 }
-                remove_glyph_buffer_layer_flags(sx, sy, LFLAGS_ZAP_TRAILING_EDGE);
+                remove_glyph_buffer_layer_flags(sx, sy, LFLAGS_ZAP_TRAILING_EDGE, 0UL);
                 if (!first_tile_found)
                 {
-                    add_glyph_buffer_layer_flags(sx, sy, LFLAGS_ZAP_TRAILING_EDGE);
+                    add_glyph_buffer_layer_flags(sx, sy, LFLAGS_ZAP_TRAILING_EDGE, 0UL);
                     first_tile_found = TRUE;
                 }
-                remove_glyph_buffer_layer_flags(lsx, lsy, LFLAGS_ZAP_LEADING_EDGE);
-                add_glyph_buffer_layer_flags(sx, sy, LFLAGS_ZAP_LEADING_EDGE);
+                remove_glyph_buffer_layer_flags(lsx, lsy, LFLAGS_ZAP_LEADING_EDGE, 0UL);
+                add_glyph_buffer_layer_flags(sx, sy, LFLAGS_ZAP_LEADING_EDGE, 0UL);
                 tmp_at(sx, sy);
                 force_redraw_at(sx, sy);
                 if (animations[anim].sound_play_frame > 0)
@@ -9590,7 +9741,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
                         if (type < 0)
                         {
                             /* mon has just been killed by another monster */
-                            monkilled(mon, fltxt, AD_RBRE);
+                            monkilled(mon, fltxt, abstype + 1, 0);
                         } 
                         else 
                         {
@@ -10521,6 +10672,7 @@ boolean verbose;
     if (obj->where == OBJ_FLOOR) 
     {
         obj_extract_self(obj); /* move rocks back on top */
+        obj_set_found(obj);
         place_object(obj, obj->ox, obj->oy);
         if (!does_block(obj->ox, obj->oy, &levl[obj->ox][obj->oy]))
             unblock_vision_and_hearing_at_point(obj->ox, obj->oy);
@@ -10545,6 +10697,7 @@ register struct obj* obj;
     /* drop any objects contained inside the statue */
     while ((item = obj->cobj) != 0) {
         obj_extract_self(item);
+        obj_set_found(item);
         place_object(item, obj->ox, obj->oy);
     }
     if (by_you && Role_if(PM_ARCHAEOLOGIST) && (obj->speflags & SPEFLAGS_STATUE_HISTORIC))
@@ -10633,8 +10786,12 @@ boolean forcedestroy;
         {
             skip++;
             if (!Blind)
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s glows a strange %s, but remains intact.",
-                      The(xname(obj)), hcolor("dark red"));
+            {
+                const char* hclr = hcolor_multi_buf2(NH_DARK_RED);
+                multicolor_buffer[1] = multicolor_buffer[3] = multicolor_buffer[2];
+                pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s glows a %s%s%s, but remains intact.",
+                    The(xname(obj)), "strange ", hclr, " light");
+            }
         }
         else if (oresist_fire(obj) || is_obj_protected_by_property(obj, &youmonst, dmgtyp))
             skip++;
@@ -10917,8 +11074,12 @@ int osym, dmgtyp;
             {
                 skip++;
                 if (vis)
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s glows a strange %s, but remains intact.",
-                          The(distant_name(obj, xname)), hcolor("dark red"));
+                {
+                    const char* hclr = hcolor_multi_buf2(NH_DARK_RED);
+                    multicolor_buffer[1] = multicolor_buffer[3] = multicolor_buffer[2];
+                    pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s glows a %s%s%s, but remains intact.",
+                        The(distant_name(obj, xname)), "strange ", hclr, " light");
+                }
             }
             if (oresist_fire(obj) || is_obj_protected_by_property(obj, mtmp, dmgtyp))
             {
@@ -11232,7 +11393,7 @@ int dmg, adtyp, tell;
             if (DEADMONSTER(mtmp))
             {
                 if (m_using)
-                    monkilled(mtmp, "", AD_RBRE);
+                    monkilled(mtmp, "", adtyp, 0);
                 else
                     killed(mtmp);
             }
@@ -11288,7 +11449,7 @@ int dmg, adtyp, tell;
             if (DEADMONSTER(mtmp))
             {
                 if (m_using)
-                    monkilled(mtmp, "", AD_RBRE);
+                    monkilled(mtmp, "", adtyp, 0);
                 else
                     killed(mtmp);
             }
@@ -11563,9 +11724,9 @@ int spl_otyp;
     struct monst* mon = (struct monst*) 0;
     int monindex = 0;
     
-    monindex = ndemon(A_NONE);
+    monindex = ndemon(A_NONE, TRUE, TRUE);
     
-    if(monindex)
+    if(monindex >= LOW_PM)
         mon = makemon(&mons[monindex], u.ux, u.uy, MM_NO_MONSTER_INVENTORY | MM_PLAY_SUMMON_ANIMATION | MM_CHAOTIC_SUMMON_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
 
     if (mon)
@@ -11575,11 +11736,16 @@ int spl_otyp;
         mon->disregards_own_health = FALSE;
         mon->hasbloodlust = TRUE;
         (void)tamedog(mon, (struct obj*) 0, TAMEDOG_FORCE_NON_UNIQUE, FALSE, 0, FALSE, FALSE);
-        mon->summonduration = d(objects[spl_otyp].oc_spell_dur_dice, objects[spl_otyp].oc_spell_dur_diesize) + objects[spl_otyp].oc_spell_dur_plus;
-        begin_summontimer(mon);
+        if ((objects[spl_otyp].oc_spell_dur_dice > 0 && objects[spl_otyp].oc_spell_dur_diesize > 0) || objects[spl_otyp].oc_spell_dur_plus > 0)
+        {
+            mon->summonduration = d(objects[spl_otyp].oc_spell_dur_dice, objects[spl_otyp].oc_spell_dur_diesize) + objects[spl_otyp].oc_spell_dur_plus;
+            begin_summontimer(mon);
+        }
         //play_sfx_sound_at_location(SFX_SUMMON_DEMON, mon->mx, mon->my);
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s appears before you in a puff of smoke!", Amonnam(mon));
     }
+    else
+        pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, "However, nothing seems to happen.");
 
 }
 

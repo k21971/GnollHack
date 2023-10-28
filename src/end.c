@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    end.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.170 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -276,7 +276,7 @@ NH_panictrace_gdb()
     if (greppath == NULL || greppath[0] == 0)
         return FALSE;
 
-    sprintf(buf, "%s -n -q %s %d 2>&1 | %s '^#'", gdbpath, ARGV0, getpid(),
+    Sprintf(buf, "%s -n -q %s %d 2>&1 | %s '^#'", gdbpath, ARGV0, getpid(),
             greppath);
     gdb = popen(buf, "w");
     if (gdb) {
@@ -779,7 +779,7 @@ VA_DECL(const char *, str)
         paniclog("panic", buf);
 #ifdef GNOLLHACK_MAIN_PROGRAM
         if (issue_gui_command)
-            issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, buf);
+            issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, 0, buf);
         if (open_special_view)
         {
             struct special_view_info info = { 0 };
@@ -934,11 +934,11 @@ time_t when; /* date+time at end of game */
     }
     if (iflags.wc2_statuslines > 3)
     {
-        char partybuf[BUFSIZ];
-        char partybuf2[BUFSIZ];
-        char partybuf3[BUFSIZ];
-        char partybuf4[BUFSIZ];
-        char partybuf5[BUFSIZ];
+        char partybuf[BUFSZ * 2];
+        char partybuf2[BUFSZ * 2];
+        char partybuf3[BUFSZ * 2];
+        char partybuf4[BUFSZ * 2];
+        char partybuf5[BUFSZ * 2];
         compose_partystatline(partybuf, partybuf2, partybuf3, partybuf4, partybuf5);
         char* partylines[5] = { partybuf, partybuf2, partybuf3, partybuf4, partybuf5 };
         int i;
@@ -1033,10 +1033,11 @@ boolean taken;
             Strcpy(qbuf, "Do you want your possessions identified?");
 
         ask = should_query_disclose_option('i', &defquery);
-        c = ask ? yn_function(qbuf, ynqchars, defquery, ynq2descs) : defquery;
+        c = ask ? yn_function_end(qbuf, ynqchars, defquery, ynq2descs) : defquery;
+        
         if (c == 'y') {
             /* caller has already ID'd everything */
-            (void) display_inventory((char *) 0, TRUE, 0);
+            (void) display_inventory((char *) 0, FALSE, 0);
             container_contents(invent, TRUE, TRUE, FALSE, 0);
         }
         if (c == 'q')
@@ -1045,7 +1046,7 @@ boolean taken;
 
     if (!done_stopprint) {
         ask = should_query_disclose_option('a', &defquery);
-        c = ask ? yn_function("Do you want to see your attributes?", ynqchars,
+        c = ask ? yn_function_end("Do you want to see your attributes?", ynqchars,
                               defquery, ynq2descs)
                 : defquery;
         if (c == 'y')
@@ -1068,7 +1069,7 @@ boolean taken;
 
     if (!done_stopprint) {
         ask = should_query_disclose_option('c', &defquery);
-        c = ask ? yn_function("Do you want to see your conduct?", ynqchars,
+        c = ask ? yn_function_end("Do you want to see your conduct?", ynqchars,
                               defquery, ynq2descs)
                 : defquery;
         if (c == 'y')
@@ -1079,7 +1080,7 @@ boolean taken;
 
     if (!done_stopprint) {
         ask = should_query_disclose_option('o', &defquery);
-        c = ask ? yn_function("Do you want to see the dungeon overview?",
+        c = ask ? yn_function_end("Do you want to see the dungeon overview?",
                               ynqchars, defquery, ynq2descs)
                 : defquery;
         if (c == 'y')
@@ -1362,7 +1363,7 @@ int how;
 
     if (how < PANICKED)
     {
-        add_glyph_buffer_layer_flags(u.ux, u.uy, LFLAGS_M_KILLED);
+        add_glyph_buffer_layer_flags(u.ux, u.uy, 0UL, LMFLAGS_KILLED | (how == STONING ? LMFLAGS_STONED : 0UL));
         update_u_action(ACTION_TILE_DEATH);
         if(how != STONING && how != DISINTEGRATION)
             play_simple_monster_sound(&youmonst, MONSTER_SOUND_TYPE_DEATH);
@@ -1475,7 +1476,7 @@ int how;
                 if (on_level(&u.uz, &dl))
                     teleinstead = TRUE;
                 else
-                    schedule_goto(&dl, 2, FALSE, FALSE, 0, (char*)0, (char*)0);
+                    schedule_goto(&dl, 2, FALSE, FALSE, FALSE, 0, (char*)0, (char*)0);
             }
             else
             {
@@ -1484,10 +1485,20 @@ int how;
 
             if (teleinstead)
             {
-                tele();
-                if (!Confusion)
-                    play_sfx_sound(SFX_ACQUIRE_CONFUSION);
-                make_confused(itimeout_incr(HConfusion, d(2, 3)), FALSE);
+                char wakeupbuf[BUFSZ] = "";
+                context.reviving = TRUE;
+                revival_at_altar(wakeupbuf);
+                char* ptr;
+                for (ptr = &u.urooms[0]; *ptr; ptr++) {
+                    int roomno = *ptr - ROOMOFFSET, rt = rooms[roomno].rtype;
+                    if (rt == NPCROOM)
+                    {
+                        in_npc_room(roomno + ROOMOFFSET, TRUE);
+                        break;
+                    }
+                }
+                revival_popup_message(wakeupbuf);
+                context.reviving = FALSE;
             }
             death_hint();
         }
@@ -1500,14 +1511,14 @@ int how;
         killer.hint_idx = 0;
         if (how < PANICKED)
         {
-            remove_glyph_buffer_layer_flags(u.ux, u.uy, LFLAGS_M_KILLED);
+            remove_glyph_buffer_layer_flags(u.ux, u.uy, 0UL, LMFLAGS_KILLED | LMFLAGS_STONED);
             update_u_action_revert(ACTION_TILE_NO_ACTION);
         }
         return;
     }
 
     /* Just in case revert to normal without updating screen */
-    remove_glyph_buffer_layer_flags(u.ux, u.uy, LFLAGS_M_KILLED);
+    remove_glyph_buffer_layer_flags(u.ux, u.uy, 0UL, LMFLAGS_KILLED | LMFLAGS_STONED);
     u.action = ACTION_TILE_NO_ACTION;
 
     really_done(how);
@@ -1600,7 +1611,7 @@ int how;
         clr = CLR_YELLOW;
         break;
     case ASCENDED:
-        endtext = "You have ascended!";
+        endtext = "Ascended!";
         screentextstyle = SCREEN_TEXT_ASCENDED;
         clr = CLR_MAGENTA;
         break;
@@ -1625,6 +1636,7 @@ int how;
     {
         delete_tmp_backup_savefile();
         delete_backup_savefile();
+        delete_error_savefile(); /* Normal end from a loaded game, so do´not leave any error save files behind, either */
     }
 
     /* might have been killed while using a disposable item, so make sure
@@ -1640,9 +1652,15 @@ int how;
     /* remember time of death here instead of having bones, rip, and
        topten figure it out separately and possibly getting different
        time or even day if player is slow responding to --More-- */
+    long realtime;
+    lock_thread_lock();
     urealtime.finish_time = endtime = getnow();
     urealtime.realtime += (long) (endtime - urealtime.start_timing);
+    realtime = urealtime.realtime;
+    unlock_thread_lock();
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+
+    fixup_death(how); /* actually, fixup multi_reason */
 
     /* Write dumplog */
     if (disclose_and_dumplog_ok)
@@ -1733,8 +1751,6 @@ int how;
 
     if (how == ESCAPED || how == PANICKED)
         killer.format = NO_KILLER_PREFIX;
-
-    fixup_death(how); /* actually, fixup multi_reason */
 
     if (how != PANICKED) 
     {
@@ -1925,7 +1941,10 @@ int how;
 
         if (!done_stopprint || flags.tombstone)
         {
-            endwin = create_nhwindow_ex(NHW_TEXT, GHWINDOW_STYLE_OUTRIP, u_to_glyph(), extended_create_window_info_from_mon(&youmonst));
+            struct extended_create_window_info info = extended_create_window_info_from_mon(&youmonst);
+            if(how == ASCENDED)
+                info.create_flags |= WINDOW_CREATE_FLAGS_ASCENDED;
+            endwin = create_nhwindow_ex(NHW_TEXT, GHWINDOW_STYLE_OUTRIP, u_to_glyph(), info);
         }
         if (how < GENOCIDED && flags.tombstone && endwin != WIN_ERR)
             outrip(endwin, how, endtime);
@@ -2002,27 +2021,38 @@ int how;
 #endif
 
             viz_array[0][0] |= IN_SIGHT; /* need visibility for naming */
+
+            mtmp = mydogs;
+            int petcount = 0;
+            while (mtmp)
+            {
+                petcount++;
+                mtmp = mtmp->nmon;
+            }
+            if (Schroedingers_cat)
+                petcount++;
+
             mtmp = mydogs;
             Strcpy(pbuf, "You");
             if (mtmp || Schroedingers_cat)
             {
+                int petindex = 0;
                 while (mtmp)
                 {
-                    Sprintf(eos(pbuf), " and %s", mon_nam(mtmp));
-                    //if (is_tame(mtmp))
-                    //    nowrap_add(u.u_gamescore, mtmp->mhp);
+                    Sprintf(eos(pbuf), "%s %s",
+                        petcount == 1 ? " and" : petindex < petcount - 1 ? "," : ", and",
+                       mon_nam(mtmp));
                     mtmp = mtmp->nmon;
+                    petindex++;
                 }
 
                 /* [it might be more robust to create a housecat and add it to
                    mydogs; it doesn't have to be placed on the map for that] */
                 if (Schroedingers_cat)
                 {
-                    //int mhp, m_lev = adj_lev(&mons[PM_HOUSECAT]);
-                    //mhp = d(m_lev, 8);
-                    //nowrap_add(u.u_gamescore, mhp);
-                    Strcat(eos(pbuf), " and Schroedinger's cat");
+                    Sprintf(eos(pbuf), "%s Schroedinger's cat", petcount == 1 ? " and" : ", and");
                 }
+                Strcat(pbuf, " ");
                 dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
                 pbuf[0] = '\0';
             }
@@ -2116,7 +2146,7 @@ int how;
         dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
 
         char realtimebuf[BUFSZ] = "";
-        print_realtime(realtimebuf, urealtime.realtime);
+        print_realtime(realtimebuf, realtime);
         Sprintf(pbuf, "You played on %s difficulty in %s mode for %s.", get_game_difficulty_text(context.game_difficulty),
             get_game_mode_text(TRUE), realtimebuf);
         dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
@@ -2148,12 +2178,12 @@ int how;
             char dlbuf[BUFSZ * 4];
             char* dlfilename = print_dumplog_filename_to_buffer(dlbuf);
             if (dlfilename)
-                issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_TEXT, dlfilename);
+                issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT, GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT, dlfilename);
 
     #if defined(DUMPHTML)
             dlfilename = print_dumphtml_filename_to_buffer(dlbuf);
             if (dlfilename)
-                issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT_DUMPLOG_HTML, dlfilename);
+                issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT, GAME_STATUS_ATTACHMENT_DUMPLOG_HTML, dlfilename);
     #endif
     #endif
             char totalpostbuf[BUFSZ * 4];
@@ -2163,10 +2193,9 @@ int how;
             Sprintf(cbuf, "%.3s %.3s %.3s %.3s XL:%d", urole.filecode,
                 urace.filecode, genders[flags.female].filecode,
                 aligns[1 - u.ualign.type].filecode, u.ulevel);
-            long currenttime = get_current_game_duration();
-            char* duration = format_duration_with_units(currenttime);
+            char* duration = format_duration_with_units(realtime);
             Sprintf(totalpostbuf, "%s (%s), %ld point%s, T:%ld (%s), %s [%s]", plname, cbuf, u.u_gamescore, plur(u.u_gamescore), moves, duration, postbuf, mbuf);
-            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT, totalpostbuf);
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT, how, totalpostbuf);
         }
     }
 
@@ -2176,7 +2205,8 @@ int how;
         exit_nhwindows((char*)0), have_windows = FALSE;
 
     //Should exclude games from imported files?
-    if(((!discover && !CasualMode) || (CasualMode && how == ASCENDED)) && (!wizard || special_yn_query("Write Top Scores", "Write a top score entry?") == 'y'))
+    if(((!discover && !CasualMode) || (CasualMode && how == ASCENDED)) && !program_state.panicking &&
+        (!wizard || special_yn_query("Write Top Scores", "Write a top score entry?") == 'y'))
         topten(how, endtime);
 
     if (CasualMode && how == ASCENDED && has_existing_save_file)
@@ -2582,8 +2612,7 @@ boolean ask, isend;
         char mlet, prev_mlet = 0; /* used as small integer, not character */
         boolean class_header, uniq_header, was_uniq = FALSE;
 
-        c = ask ? yn_function(
-                            "Do you want an account of creatures vanquished?",
+        c = ask ? yn_function_end("Do you want an account of creatures vanquished?",
                               ynaqchars, defquery, ynaq2descs)
                 : defquery;
         if (c == 'q')
@@ -2816,7 +2845,7 @@ boolean ask, isend;
             (ngenocided) ? " genocided" : "",
             (nextinct && ngenocided) ? " and extinct" : "");
         
-        c = ask ? yn_function(buf, ynqchars, defquery, ynq2descs) : defquery;
+        c = ask ? yn_function_end(buf, ynqchars, defquery, ynq2descs) : defquery;
         
         if (c == 'q')
             done_stopprint++;
@@ -3293,6 +3322,7 @@ reset_lev(VOID_ARGS)
     level.buriedobjlist = 0;
     billobjs = 0;
     memoryobjs = 0;
+    lastmemoryobj = 0;
 
     /* level.bonesinfo = 0; -- handled by savecemetery() */
     reset_engravings();
@@ -3331,7 +3361,11 @@ reset_msghistory(VOID_ARGS)
 STATIC_OVL void
 reset_gamestate(VOID_ARGS)
 {
+    lock_thread_lock();
     memset((genericptr_t)&context, 0, sizeof(struct context_info));
+    memset((genericptr_t)&urealtime.realtime, 0, sizeof urealtime.realtime);
+    unlock_thread_lock();
+
     memset((genericptr_t)&flags, 0, sizeof(struct flag));
 #ifdef SYSFLAGS
     memset((genericptr_t)&sysflags, 0, sizeof(struct sysflag));
@@ -3339,7 +3373,6 @@ reset_gamestate(VOID_ARGS)
     memset((genericptr_t)&spl_orderindx, 0, sizeof(spl_orderindx));
     memset((genericptr_t)&u, 0, sizeof(struct you));
     ubirthday = 0;
-    memset((genericptr_t)&urealtime.realtime, 0, sizeof urealtime.realtime);
     reset_killers();
 
     /* must come before migrating_objs and migrating_mons are freed */
@@ -3465,10 +3498,19 @@ reset_gamestate_ex(VOID_ARGS)
 void
 tally_realtime(VOID_ARGS)
 {
+    lock_thread_lock();
+    if (!context.game_started)
+    {
+        unlock_thread_lock();
+        return;
+    }
     urealtime.finish_time = getnow();
     urealtime.realtime += (long)(urealtime.finish_time - urealtime.start_timing);
+    unlock_thread_lock();
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
+    lock_thread_lock();
     urealtime.start_timing = urealtime.finish_time;
+    unlock_thread_lock();
 }
 
 /* yes/no question via GUI when the game windows may already have been closed */

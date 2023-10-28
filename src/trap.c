@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    trap.c    $NHDT-Date: 1545259936 2018/12/19 22:52:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.313 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -22,7 +22,7 @@ STATIC_DCL boolean FDECL(isclearpath, (coord *, int, SCHAR_P, SCHAR_P));
 STATIC_DCL void FDECL(dofiretrap, (struct obj *, int));
 STATIC_DCL void NDECL(domagictrap);
 STATIC_DCL boolean FDECL(emergency_disrobe, (boolean *));
-STATIC_DCL boolean FDECL(succeed_untrap, (struct trap *));
+STATIC_DCL int FDECL(succeed_untrap, (struct trap *));
 STATIC_DCL void FDECL(move_into_trap, (struct trap *));
 STATIC_DCL int FDECL(try_disarm, (struct trap *, BOOLEAN_P));
 STATIC_DCL void FDECL(reward_untrap, (struct trap *, struct monst *));
@@ -467,7 +467,6 @@ unsigned long mkflags;
         struct obj *otmp, *statue;
         struct permonst *mptr;
         int trycount = 10;
-        boolean has_hat = FALSE;
         int mnum = NON_PM;
 
         if(permonstid <= NON_PM)
@@ -485,27 +484,19 @@ unsigned long mkflags;
             mnum = permonstid;
             mptr = &mons[mnum];
         }
-        mtmp = makemon(mptr, 0, 0, MM_NOCOUNTBIRTH);
+        mtmp = makemon(mptr, 0, 0, MM_NOCOUNTBIRTH | MM_NO_MONSTER_INVENTORY);
         if (!mtmp)
             break; /* should never happen */
 
         statue = mkcorpstat(STATUE, mtmp, mptr, x, y, CORPSTAT_NONE);
-
-        while (mtmp->minvent)
-        {
-            otmp = mtmp->minvent;
-            otmp->owornmask = 0;
-            obj_extract_self(otmp);
-            (void) add_to_container(statue, otmp);
-            if (is_helmet(otmp))
-                has_hat = TRUE;
-        }
-        if (!has_hat && (mkflags & MKTRAPFLAG_GARDEN_GNOME_ITEMS))
+        /* Note if the statue would have items from mtmp, all light sources and sound sources would need to be switched off first */
+        if (mkflags & MKTRAPFLAG_GARDEN_GNOME_ITEMS)
         {
             if(!rn2(2))
             {
                 otmp = mksobj((!rn2(20) ? (!rn2(2) ? CORNUTHAUM : DUNCE_CAP) : GNOMISH_FELT_HAT), TRUE, FALSE, FALSE);
-                (void)add_to_container(statue, otmp);
+                if(otmp)
+                    (void)add_to_container(statue, otmp);
             }
         }
         statue->owt = weight(statue);
@@ -620,7 +611,7 @@ boolean td; /* td == TRUE : trap door or hole */
         impact_drop((struct obj *) 0, u.ux, u.uy, 0);
         if (!td) {
             display_nhwindow(WIN_MESSAGE, FALSE);
-            pline_The("opening under you closes up.");
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "opening under you closes up.");
         }
         return;
     }
@@ -641,7 +632,7 @@ boolean td; /* td == TRUE : trap door or hole */
         Sprintf(msgbuf, "The hole in the %s above you closes up.",
                 ceiling(u.ux, u.uy));
 
-    schedule_goto(&dtmp, FALSE, TRUE, FALSE, 0, (char*)0,
+    schedule_goto(&dtmp, FALSE, TRUE, FALSE, FALSE, 0, (char*)0,
                   !td ? msgbuf : (char *) 0);
 }
 
@@ -3413,11 +3404,7 @@ register struct monst *mtmp;
                 deduct_monster_hp(mtmp, adjust_damage(dmgval2, (struct monst*)0, mtmp, AD_MAGM, ADFLAGS_NONE));
 
                 if (DEADMONSTER(mtmp))
-                    monkilled(mtmp,
-                              in_sight
-                                  ? "compression from an anti-magic field"
-                                  : (const char *) 0,
-                              -AD_MAGM);
+                    monkilled(mtmp, in_sight ? "compression from an anti-magic field" : (const char *) 0, AD_MAGM, 0);
                 if (DEADMONSTER(mtmp))
                     trapkilled = TRUE;
                 if (see_it)
@@ -3649,8 +3636,7 @@ boolean byplayer;
     if (cansee(mon->mx, mon->my))
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns to stone.", Monnam(mon));
     if (byplayer) {
-        stoned = TRUE;
-        xkilled(mon, XKILL_NOMSG);
+        xkilled(mon, XKILL_NOMSG | XKILL_STONED);
     } else
         monstone(mon);
 }
@@ -3976,7 +3962,7 @@ long hmask, emask; /* might cancel timeout */
         /* falling through trap door calls goto_level,
            and goto_level does its own pickup() call */
         && on_level(&u.uz, &current_dungeon_level))
-        (void) pickup(1);
+        (void) pickup(1, FALSE);
 
     newsym(u.ux, u.uy);
 
@@ -5066,13 +5052,12 @@ int n;
 
     int mana_after = u.uen;
     int mana_loss = mana_before - mana_after;
-    if (mana_loss > 0)
+    if (mana_loss > 0 && isok(u.ux, u.uy))
     {
         char fbuf[BUFSZ];
         Sprintf(fbuf, "%d", -mana_loss);
         display_floating_text(u.ux, u.uy, fbuf, FLOATING_TEXT_MANA_LOSS, ATR_NONE, NO_COLOR, 0UL);
     }
-
 }
 
 /* disarm a trap */
@@ -5103,222 +5088,318 @@ dountrap()
 }
 
 /* Did the untrap succeed? */
-STATIC_OVL boolean
+STATIC_OVL int
 succeed_untrap(ttmp)
 struct trap *ttmp;
 {
     if (!ttmp)
         return FALSE;
 
-    boolean res = FALSE;
-    int probability = 0;
+    //boolean res = FALSE;
+    //int probability = 0;
     int usedskilllevel = max(P_UNSKILLED, min(P_EXPERT, P_SKILL_LEVEL(P_DISARM_TRAP) + (Enhanced_untrap ? 1 : 0))); /* (Role_if(PM_ROGUE) && u.uhave.questart) */
 
-    probability = untrap_probability(ttmp->ttyp, usedskilllevel);
+    //probability = untrap_probability(ttmp->ttyp, usedskilllevel, &youmonst);
+    if (Fumbling & !rn2(2))
+        return -1;
+
+    int trap_dif = trap_difficulty(ttmp->ttyp, &youmonst);
+    int skill_lvl = max(0, usedskilllevel - 1);
+    int checkdiff = skill_lvl - trap_dif;
+    if (Confusion || Hallucination)
+        checkdiff -= 2;
+    if (Stunned)
+        checkdiff -= 2;
+    if (Blind)
+        checkdiff -= 1;
+    if (Fumbling)
+        checkdiff -= 1;
+
+    switch (checkdiff)
+    {
+    case -1:
+        return !rn2(2) ? -1 : 0;
+    case 0:
+        return !rn2(3) ? -1 : !!rn2(2);
+    case 1:
+        return !rn2(6) ? -1 : !!rn2(5);
+    default:
+        if (checkdiff <= -2)
+        {
+            return -1;
+        }
+        else
+        {
+            return 1;
+        }
+    }
 
     /* Only spiders know how to deal with webs reliably */
-    if (ttmp->ttyp == WEB && !webmaker(youmonst.data))
-        probability = 3;
-    if (Confusion || Hallucination)
-        probability = probability / 2;
-    if (Blind)
-        probability = (probability * 2) / 3;
-    if (Stunned)
-        probability = probability / 2;
-    if (Fumbling)
-        probability = probability / 2;
-    
-    /* Your own traps are better known than others. */
-    if (ttmp && ttmp->madeby_u)
-        probability = probability * 2;
+    //if (ttmp->ttyp == WEB && !webmaker(youmonst.data))
+    //    probability = 3;
+    //if (Confusion || Hallucination)
+    //    probability = probability / 2;
+    //if (Blind)
+    //    probability = (probability * 2) / 3;
+    //if (Stunned)
+    //    probability = probability / 2;
+    //
+    ///* Your own traps are better known than others. */
+    //if (ttmp && ttmp->madeby_u)
+    //    probability = probability * 2;
 
-    res = (rn2(100) < probability);
-    return res;
+    //res = (rn2(100) < probability);
+    //return res;
 }
 
 int
-untrap_probability(trap_type, skill_level)
+trap_difficulty(trap_type, mon)
+int trap_type;
+struct monst* mon;
+{
+    int diflevel;
+    switch (trap_type)
+    {
+    case WEB:
+        diflevel = webmaker(mon->data) ? 0 : 3;
+        break;
+    case ARROW_TRAP:
+    case DART_TRAP:        
+    case SQKY_BOARD:
+    case BEAR_TRAP:
+        diflevel = 0;
+        break;
+    case LANDMINE:
+    case RUST_TRAP:
+    case SLP_GAS_TRAP:
+    case ROCKTRAP:
+    case ROLLING_BOULDER_TRAP:
+        diflevel = 1;
+        break;
+    case ANTI_MAGIC_TRAP:
+    case TELEP_TRAP:
+    case LEVEL_TELEP:
+    case STATUE_TRAP:
+        diflevel = 2;
+        break;
+    case MAGIC_TRAP:
+    case POLY_TRAP:
+    case FIRE_TRAP:
+        diflevel = 3;
+        break;
+    default:
+        diflevel = 0;
+        break;
+    }
+    return diflevel;
+}
+
+int
+untrap_probability(trap_type, skill_level, mon)
 int trap_type;
 int skill_level;
+struct monst* mon;
 {
-    int probability = 0;
-    switch (skill_level)
-    {
-    case P_UNSKILLED:
-    {
-        switch (trap_type)
-        {
-        case WEB:
-            probability = webmaker(youmonst.data) ? 50 : 1;
-            break;
-        case ANTI_MAGIC_TRAP:
-        case POLY_TRAP:
-        case TELEP_TRAP:
-        case LEVEL_TELEP:
-        case RUST_TRAP:
-        case FIRE_TRAP:
-        case SLP_GAS_TRAP:
-        case MAGIC_TRAP:
-            probability = 0;
-            break;
-        case ROCKTRAP:
-        case ROLLING_BOULDER_TRAP:
-            probability = 10;
-            break;
-        default:
-            probability = 33;
-            break;
-        }
-        break;
-    }
-    case P_BASIC:
-    {
-        switch (trap_type)
-        {
-        case WEB:
-            probability = webmaker(youmonst.data) ? 100 : 3;
-            break;
-        case ANTI_MAGIC_TRAP:
-        case POLY_TRAP:
-        case TELEP_TRAP:
-        case LEVEL_TELEP:
-        case RUST_TRAP:
-        case FIRE_TRAP:
-        case SLP_GAS_TRAP:
-        case MAGIC_TRAP:
-            probability = 33;
-            break;
-        case ROCKTRAP:
-        case ROLLING_BOULDER_TRAP:
-            probability = 50;
-        break;        default:
-            probability = 66;
-            break;
-        }
-        break;
-    }
-    case P_SKILLED:
-    {
-        switch (trap_type)
-        {
-        case WEB:
-            probability = webmaker(youmonst.data) ? 200 : 10;
-            break;
-        case ANTI_MAGIC_TRAP:
-        case POLY_TRAP:
-        case TELEP_TRAP:
-        case LEVEL_TELEP:
-        case RUST_TRAP:
-        case FIRE_TRAP:
-        case SLP_GAS_TRAP:
-        case MAGIC_TRAP:
-            probability = 66;
-            break;
-        case ROCKTRAP:
-        case ROLLING_BOULDER_TRAP:
-            probability = 75;
-            break;
-        default:
-            probability = 83;
-            break;
-        }
-        break;
-    }
-    case P_EXPERT:
-    {
-        switch (trap_type)
-        {
-        case WEB:
-            probability = webmaker(youmonst.data) ? 400 : 33;
-            break;
-        case ANTI_MAGIC_TRAP:
-        case POLY_TRAP:
-        case TELEP_TRAP:
-        case LEVEL_TELEP:
-        case RUST_TRAP:
-        case FIRE_TRAP:
-        case SLP_GAS_TRAP:
-        case MAGIC_TRAP:
-            probability = 83;
-            break;
-        case ROCKTRAP:
-        case ROLLING_BOULDER_TRAP:
-            probability = 88;
-            break;
-        default:
-            probability = 92;
-            break;
-        }
-        break;
-    }
-    case P_MASTER:
-    {
-        switch (trap_type)
-        {
-        case WEB:
-            probability = webmaker(youmonst.data) ? 800 : 66;
-            break;
-        case ANTI_MAGIC_TRAP:
-        case POLY_TRAP:
-        case TELEP_TRAP:
-        case LEVEL_TELEP:
-        case RUST_TRAP:
-        case FIRE_TRAP:
-        case SLP_GAS_TRAP:
-        case MAGIC_TRAP:
-            probability = 90;
-            break;
-        case ROCKTRAP:
-        case ROLLING_BOULDER_TRAP:
-            probability = 95;
-            break;
-        default:
-            probability = 97;
-            break;
-        }
-        break;
-    }
-    case P_GRAND_MASTER:
-    {
-        switch (trap_type)
-        {
-        case WEB:
-            probability = webmaker(youmonst.data) ? 1600 : 90;
-            break;
-        case ANTI_MAGIC_TRAP:
-        case POLY_TRAP:
-        case TELEP_TRAP:
-        case LEVEL_TELEP:
-        case RUST_TRAP:
-        case FIRE_TRAP:
-        case SLP_GAS_TRAP:
-        case MAGIC_TRAP:
-            probability = 95;
-            break;
-        case ROCKTRAP:
-        case ROLLING_BOULDER_TRAP:
-            probability = 100;
-            break;
-        default:
-            probability = 100;
-            break;
-        }
-        break;
-    }
-    default:
-        break;
-    }
+    //int probability = 0;
+    //switch (skill_level)
+    //{
+    //case P_UNSKILLED:
+    //{
+    //    switch (trap_type)
+    //    {
+    //    case WEB:
+    //        probability = webmaker(youmonst.data) ? 50 : 1;
+    //        break;
+    //    case ANTI_MAGIC_TRAP:
+    //    case POLY_TRAP:
+    //    case TELEP_TRAP:
+    //    case LEVEL_TELEP:
+    //    case RUST_TRAP:
+    //    case FIRE_TRAP:
+    //    case SLP_GAS_TRAP:
+    //    case MAGIC_TRAP:
+    //        probability = 0;
+    //        break;
+    //    case ROCKTRAP:
+    //    case ROLLING_BOULDER_TRAP:
+    //        probability = 10;
+    //        break;
+    //    default:
+    //        probability = 33;
+    //        break;
+    //    }
+    //    break;
+    //}
+    //case P_BASIC:
+    //{
+    //    switch (trap_type)
+    //    {
+    //    case WEB:
+    //        probability = webmaker(youmonst.data) ? 100 : 3;
+    //        break;
+    //    case ANTI_MAGIC_TRAP:
+    //    case POLY_TRAP:
+    //    case TELEP_TRAP:
+    //    case LEVEL_TELEP:
+    //    case RUST_TRAP:
+    //    case FIRE_TRAP:
+    //    case SLP_GAS_TRAP:
+    //    case MAGIC_TRAP:
+    //        probability = 33;
+    //        break;
+    //    case ROCKTRAP:
+    //    case ROLLING_BOULDER_TRAP:
+    //        probability = 50;
+    //        break;        
+    //    default:
+    //        probability = 66;
+    //        break;
+    //    }
+    //    break;
+    //}
+    //case P_SKILLED:
+    //{
+    //    switch (trap_type)
+    //    {
+    //    case WEB:
+    //        probability = webmaker(youmonst.data) ? 200 : 10;
+    //        break;
+    //    case ANTI_MAGIC_TRAP:
+    //    case POLY_TRAP:
+    //    case TELEP_TRAP:
+    //    case LEVEL_TELEP:
+    //    case RUST_TRAP:
+    //    case FIRE_TRAP:
+    //    case SLP_GAS_TRAP:
+    //    case MAGIC_TRAP:
+    //        probability = 66;
+    //        break;
+    //    case ROCKTRAP:
+    //    case ROLLING_BOULDER_TRAP:
+    //        probability = 75;
+    //        break;
+    //    default:
+    //        probability = 83;
+    //        break;
+    //    }
+    //    break;
+    //}
+    //case P_EXPERT:
+    //{
+    //    switch (trap_type)
+    //    {
+    //    case WEB:
+    //        probability = webmaker(youmonst.data) ? 400 : 33;
+    //        break;
+    //    case ANTI_MAGIC_TRAP:
+    //    case POLY_TRAP:
+    //    case TELEP_TRAP:
+    //    case LEVEL_TELEP:
+    //    case RUST_TRAP:
+    //    case FIRE_TRAP:
+    //    case SLP_GAS_TRAP:
+    //    case MAGIC_TRAP:
+    //        probability = 83;
+    //        break;
+    //    case ROCKTRAP:
+    //    case ROLLING_BOULDER_TRAP:
+    //        probability = 88;
+    //        break;
+    //    default:
+    //        probability = 92;
+    //        break;
+    //    }
+    //    break;
+    //}
+    //case P_MASTER:
+    //{
+    //    switch (trap_type)
+    //    {
+    //    case WEB:
+    //        probability = webmaker(youmonst.data) ? 800 : 66;
+    //        break;
+    //    case ANTI_MAGIC_TRAP:
+    //    case POLY_TRAP:
+    //    case TELEP_TRAP:
+    //    case LEVEL_TELEP:
+    //    case RUST_TRAP:
+    //    case FIRE_TRAP:
+    //    case SLP_GAS_TRAP:
+    //    case MAGIC_TRAP:
+    //        probability = 90;
+    //        break;
+    //    case ROCKTRAP:
+    //    case ROLLING_BOULDER_TRAP:
+    //        probability = 95;
+    //        break;
+    //    default:
+    //        probability = 97;
+    //        break;
+    //    }
+    //    break;
+    //}
+    //case P_GRAND_MASTER:
+    //{
+    //    switch (trap_type)
+    //    {
+    //    case WEB:
+    //        probability = webmaker(youmonst.data) ? 1600 : 90;
+    //        break;
+    //    case ANTI_MAGIC_TRAP:
+    //    case POLY_TRAP:
+    //    case TELEP_TRAP:
+    //    case LEVEL_TELEP:
+    //    case RUST_TRAP:
+    //    case FIRE_TRAP:
+    //    case SLP_GAS_TRAP:
+    //    case MAGIC_TRAP:
+    //        probability = 95;
+    //        break;
+    //    case ROCKTRAP:
+    //    case ROLLING_BOULDER_TRAP:
+    //        probability = 100;
+    //        break;
+    //    default:
+    //        probability = 100;
+    //        break;
+    //    }
+    //    break;
+    //}
+    //default:
+    //    break;
+    //}
 
-    return probability;
+    int trap_dif = trap_difficulty(trap_type, mon);
+    int skill_lvl = max(0, skill_level - 1);
+    int checkdiff = skill_lvl - trap_dif;
+
+    switch (checkdiff)
+    {
+    case -1:
+        return 0;
+    case 0:
+        return 33;
+    case 1:
+        return 66;
+    default:
+        if (checkdiff <= -2)
+        {
+            return 0;
+        }
+        else
+        {
+            return 100;
+        }
+    }    
 }
 
 /* Replace trap with object(s).  Helge Hafting */
 void
-cnv_trap_obj(otyp, cnt, ttmp, bury_it)
+cnv_trap_obj(otyp, cnt, ttmp, bury_it, set_found)
 int otyp;
 int cnt;
 struct trap *ttmp;
-boolean bury_it;
+boolean bury_it, set_found;
 {
     struct obj *otmp = mksobj(otyp, TRUE, FALSE, FALSE);
 
@@ -5327,6 +5408,8 @@ boolean bury_it;
     /* Only dart traps are capable of being poisonous */
     if (otyp != DART)
         otmp->opoisoned = 0;
+    if(set_found)
+        obj_set_found(otmp);
     place_object(otmp, ttmp->tx, ttmp->ty);
 
     if (bury_it)
@@ -5448,10 +5531,11 @@ boolean force_failure;
     }
 
     /* Will our hero succeed? */
-    if (force_failure || !succeed_untrap(ttmp))
+    int success = succeed_untrap(ttmp);
+    if (force_failure || success <= 0)
     {
         play_sfx_sound(SFX_DISARM_TRAP_FAIL);
-        if (rnl(5))
+        if (success == -1) //rnl(5))
         {
             pline("Whoops...");
             if (mtmp) 
@@ -5567,7 +5651,7 @@ struct trap *ttmp;
         if (ttmp->ttyp == BEAR_TRAP)
         {
             You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s bear trap.", the_your[ttmp->madeby_u ? 1 : 0]);
-            cnv_trap_obj(BEARTRAP, 1, ttmp, FALSE);
+            cnv_trap_obj(BEARTRAP, 1, ttmp, FALSE, FALSE);
         }
         else /* if (ttmp->ttyp == WEB) */
         {
@@ -5694,7 +5778,7 @@ struct trap* ttmp;
     }
 
     if (genotyp > STRANGE_OBJECT)
-        cnv_trap_obj(genotyp, 1, ttmp, FALSE);
+        cnv_trap_obj(genotyp, 1, ttmp, FALSE, TRUE);
     else
     {
         deltrap(ttmp);
@@ -5734,7 +5818,7 @@ struct trap *ttmp;
 
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
     You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s land mine.", the_your[ttmp->madeby_u]);
-    cnv_trap_obj(LAND_MINE, 1, ttmp, FALSE);
+    cnv_trap_obj(LAND_MINE, 1, ttmp, FALSE, FALSE);
 
     /* gain skill for untrap */
     use_skill(P_DISARM_TRAP, madebyu ? 0 : 14);
@@ -5824,7 +5908,7 @@ int otyp;
         skill_level == P_SKILLED ? rn2(6) : rn2(12));
 
     if (getitem)
-        cnv_trap_obj(otyp, 50 - rnl(50), ttmp, FALSE);
+        cnv_trap_obj(otyp, 50 - rnl(50), ttmp, FALSE, TRUE);
     else
     {
         deltrap(ttmp);
@@ -5875,7 +5959,7 @@ struct trap *ttmp;
 {
     int wt;
     struct obj *otmp;
-    boolean untrap_ok;
+    int untrap_result;
 
     /*
      * This works when levitating too -- consistent with the ability
@@ -5897,8 +5981,8 @@ struct trap *ttmp;
         return 1;
 
     /* Will our hero succeed? */
-    untrap_ok = succeed_untrap(ttmp);
-    if (untrap_ok && mon_can_move(mtmp) && !is_tame(mtmp) && !is_peaceful(mtmp) && rn2(3))
+    untrap_result = succeed_untrap(ttmp);
+    if (untrap_result > 0 && mon_can_move(mtmp) && !is_tame(mtmp) && !is_peaceful(mtmp) && rn2(3))
     {
         play_sfx_sound(SFX_MONSTER_DOES_NOT_ALLOW);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "try to reach out your %s, but %s backs away skeptically.",
@@ -5929,7 +6013,7 @@ struct trap *ttmp;
     }
 
     /* need to do cockatrice check first if sleeping or paralyzed */
-    if (!untrap_ok)
+    if (untrap_result <= 0)
     {
         play_sfx_sound(SFX_DISARM_TRAP_FAIL);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "try to grab %s, but cannot get a firm grasp.", mon_nam(mtmp));
@@ -7277,7 +7361,7 @@ boolean nocorpse;
         {
             int xx = mon->mx, yy = mon->my;
 
-            monkilled(mon, "", nocorpse ? -AD_RBRE : AD_PHYS);
+            monkilled(mon, "", obj ? objects[obj->otyp].oc_damagetype : AD_PHYS, nocorpse ? XKILL_NOCORPSE : 0);
             if (DEADMONSTER(mon)) 
             {
                 newsym(xx, yy);
@@ -7388,8 +7472,12 @@ lava_effects()
             if (obj->otyp == SPE_BOOK_OF_THE_DEAD && !Blind) 
             {
                 if (usurvive)
-                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s glows a strange %s, but remains intact.",
-                          The(xname(obj)), hcolor("dark red"));
+                {
+                    const char* hclr = hcolor_multi_buf2(NH_DARK_RED);
+                    multicolor_buffer[1] = multicolor_buffer[3] = multicolor_buffer[2];
+                    pline_multi_ex(ATR_NONE, CLR_MSG_WARNING, no_multiattrs, multicolor_buffer, "%s glows a %s%s%s, but remains intact.",
+                        The(xname(obj)), "strange ", hclr, " light");
+                }
             }
             else if (obj->oartifact == ART_RULING_RING_OF_YENDOR)
             {

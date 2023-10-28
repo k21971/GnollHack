@@ -390,6 +390,7 @@ register int fd, mode;
 #ifdef MFLOPPY
     count_only = (mode & COUNT_SAVE);
 #endif
+    lock_thread_lock();
     uid = (unsigned long) getuid();
     bwrite(fd, (genericptr_t) &uid, sizeof uid);
     bwrite(fd, (genericptr_t) &context, sizeof(struct context_info));
@@ -405,6 +406,8 @@ register int fd, mode;
     bwrite(fd, yyyymmddhhmmss(ubirthday), 14);
     bwrite(fd, (genericptr_t) &urealtime.realtime, sizeof urealtime.realtime);
     bwrite(fd, yyyymmddhhmmss(urealtime.start_timing), 14);  /** Why? **/
+    unlock_thread_lock();
+
     save_killers(fd, mode);
 
     /* must come before migrating_objs and migrating_mons are freed */
@@ -456,7 +459,9 @@ register int fd, mode;
 
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
     /* this is the value to use for the next update of urealtime.realtime */
+    lock_thread_lock();
     urealtime.start_timing = urealtime.finish_time;
+    unlock_thread_lock();
 }
 
 /* returns 1 if save file exists, otherwise 0 */
@@ -688,6 +693,7 @@ skip_lots:
         level.buriedobjlist = 0;
         billobjs = 0;
         memoryobjs = 0;
+        lastmemoryobj = 0;
         /* level.bonesinfo = 0; -- handled by savecemetery() */
     }
     save_engravings(fd, mode);
@@ -1434,7 +1440,7 @@ int fd;
 {
     struct save_game_stats gamestats = { 0 };
     gamestats.glyph = abs(u_to_glyph());
-    gamestats.gui_glyph = maybe_get_replaced_glyph(gamestats.glyph, u.ux, u.uy, data_to_replacement_info(gamestats.glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
+    gamestats.gui_glyph = maybe_get_replaced_glyph(gamestats.glyph, u.ux, u.uy, data_to_replacement_info(gamestats.glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
     gamestats.rolenum = urole.rolenum;
     gamestats.racenum = urace.racenum;
     gamestats.gender = Upolyd ? u.mfemale : flags.female;
@@ -1476,7 +1482,7 @@ save_msghistory(fd, mode)
 int fd, mode;
 {
     char *msg, *attrs, *colors;
-    int msgcount = 0;
+    //int msgcount = 0;
     int msglen = 0;
     int minusone = -1;
     boolean init = TRUE;
@@ -1496,11 +1502,11 @@ int fd, mode;
             bwrite(fd, (genericptr_t) msg, msglen);
             bwrite(fd, (genericptr_t) attrs, msglen);
             bwrite(fd, (genericptr_t) colors, msglen);
-            ++msgcount;
+            //++msgcount;
         }
         bwrite(fd, (genericptr_t) &minusone, sizeof(int));
     }
-    debugpline1("Stored %d messages into savefile.", msgcount);
+    //debugpline1("Stored %d messages into savefile.", msgcount);
     /* note: we don't attempt to handle release_data() here */
 }
 
@@ -1666,6 +1672,8 @@ freedynamicdata(VOID_ARGS)
     freeobjchn(level.buriedobjlist);
     freeobjchn(billobjs);
     freeobjchn(memoryobjs);
+    memoryobjs = 0;
+    lastmemoryobj = 0;
     free_engravings();
     freedamage();
 

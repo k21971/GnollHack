@@ -55,7 +55,7 @@ struct window_procs {
     void FDECL((*win_update_positionbar), (char *));
 #endif
     void FDECL((*win_print_glyph), (winid, XCHAR_P, XCHAR_P, struct layer_info));
-    void FDECL((*win_issue_gui_command), (int, int, const char*));
+    void FDECL((*win_issue_gui_command), (int, int, int, const char*));
     void FDECL((*win_raw_print), (const char *));
     void FDECL((*win_raw_print_bold), (const char *));
     int NDECL((*win_nhgetch));
@@ -114,7 +114,7 @@ struct window_procs {
     void FDECL((*win_display_floating_text), (int, int, const char*, int, int, int, unsigned long));
     void FDECL((*win_display_screen_text), (const char*, const char*, const char*, int, int, int, unsigned long));
     void FDECL((*win_display_popup_text), (const char*, const char*, int, int, int, int, unsigned long));
-    void FDECL((*win_display_gui_effect), (int, int, int, unsigned long));
+    void FDECL((*win_display_gui_effect), (int, int, int, int, int, int, unsigned long));
     void FDECL((*win_update_cursor), (int, int, int));
     int NDECL((*win_ui_has_input));
     void FDECL((*win_exit_hack), (int));
@@ -170,7 +170,10 @@ extern
 #endif
 #define print_glyph (*windowprocs.win_print_glyph)
 #define issue_gui_command (*windowprocs.win_issue_gui_command)
-#define issue_simple_gui_command(x) (*windowprocs.win_issue_gui_command)(x, 0, (char*)0)
+#define issue_simple_gui_command(x) (*windowprocs.win_issue_gui_command)(x, 0, 0, (char*)0)
+#define issue_parametered_gui_command(x, y) (*windowprocs.win_issue_gui_command)(x, y, 0, (char*)0)
+#define issue_debuglog(i, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_GENERAL, i, s)
+#define issue_debuglog_fd(f, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_FILE_DESCRIPTOR, f, s)
 #define raw_print (*windowprocs.win_raw_print)
 #define raw_print_bold (*windowprocs.win_raw_print_bold)
 #define nhgetch (*windowprocs.win_nhgetch)
@@ -308,17 +311,19 @@ extern
                                                   *    via non-display attribute flag  */
 #define WC2_SUPPRESS_HIST           0x00008000UL /* 16 putstr(WIN_MESSAGE) supports history
                                                   *    suppression via non-disp attr   */
-#define WC2_AUTOSTATUSLINES         0x00010000UL /* 17 automatically adjust number of status lines */
-#define WC2_PREFERRED_SCREEN_SCALE  0x00020000UL /* 18 preferred screen scale */
-#define WC2_HEREWINDOW              0x00040000UL /* 19 show the here window */
+#define WC2_AUTOSTATUSLINES         0x00010000UL /* 17 windowing system can automatically adjust number of status lines */
+#define WC2_PREFERRED_SCREEN_SCALE  0x00020000UL /* 18 preferred screen scale is shown in options */
+#define WC2_HEREWINDOW              0x00040000UL /* 19 supports here window */
 #define WC2_SCREEN_TEXT             0x00080000UL /* 20 windowing system can show screen texts */
-#define WC2_PLAY_GHSOUNDS           0x00100000UL /* 21 windowing system can play ghsounds */
+#define WC2_ANIMATIONS              0x00100000UL /* 21 supports displaying some sort of animations with tiles; animation options are shown in options */
 #define WC2_VOLUME_CONTROLS         0x00200000UL /* 22 volume controls are shown in options */
-#define WC2_PREPROCESS_REPLACEMENTS 0x00400000UL /* 23 graphical user interface that requires preprocessed gui_glyphs; does not do replacements */
+/* free bit */
 #define WC2_SPECIAL_SYMBOLS         0x00800000UL /* 24 handles special symbols in text of the type &symbol_name; */
 #define WC2_MENU_SUFFIXES           0x01000000UL /* 25 supports placing text in parentheses on a different line in menus */
+#define WC2_FADING_ANIMATIONS       0x02000000UL /* 26 supports fading animations */
+#define WC2_MENU_SHOWS_OK_CANCEL    0x04000000UL /* 27 menus always show OK and Cancel buttons (so you can then potentially omit e.g. a quit choice in the menu) */
 
-/* 8 free bits */
+/* 5 free bits */
 
 #define ALIGN_LEFT   1
 #define ALIGN_RIGHT  2
@@ -438,7 +443,7 @@ struct chain_procs {
     void FDECL((*win_update_positionbar), (CARGS, char *));
 #endif
     void FDECL((*win_print_glyph), (CARGS, winid, XCHAR_P, XCHAR_P, struct layer_info));
-    void FDECL((*win_issue_gui_command), (int, int, const char*));
+    void FDECL((*win_issue_gui_command), (int, int, int, const char*));
     void FDECL((*win_raw_print), (CARGS, const char *));
     void FDECL((*win_raw_print_bold), (CARGS, const char *));
     int FDECL((*win_nhgetch), (CARGS));
@@ -498,7 +503,7 @@ struct chain_procs {
     void FDECL((*win_display_floating_text), (CARGS, int, int, const char*, int, int, int, unsigned long));
     void FDECL((*win_display_screen_text), (CARGS, const char*, const char*, const char*, int, int, int, unsigned long));
     void FDECL((*win_display_popup_text), (CARGS, const char*, const char*, int, int, int, int, unsigned long));
-    void FDECL((*win_display_gui_effect), (CARGS, int, int, int, unsigned long));
+    void FDECL((*win_display_gui_effect), (CARGS, int, int, int, int, int, int, unsigned long));
     void FDECL((*win_update_cursor), (CARGS, int, int, int));
     int FDECL((*win_ui_has_input), (CARGS));
     void FDECL((*win_exit_hack), (CARGS, int));
@@ -544,7 +549,7 @@ extern void FDECL(safe_cliparound, (int, int, BOOLEAN_P));
 extern void FDECL(safe_update_positionbar, (char *));
 #endif
 extern void FDECL(safe_print_glyph, (winid, XCHAR_P, XCHAR_P, struct layer_info));
-extern void FDECL(safe_issue_gui_command, (int, int, const char*));
+extern void FDECL(safe_issue_gui_command, (int, int, int, const char*));
 extern void FDECL(safe_raw_print, (const char *));
 extern void FDECL(safe_raw_print_bold, (const char *));
 extern int NDECL(safe_nhgetch);
@@ -600,7 +605,7 @@ extern void FDECL(safe_toggle_animation_timer, (int, int, int, int, int, int, un
 extern void FDECL(safe_display_floating_text, (int, int, const char*, int, int, int, unsigned long));
 extern void FDECL(safe_display_screen_text, (const char*, const char*, const char*, int, int, int, unsigned long));
 extern void FDECL(safe_display_popup_text, (const char*, const char*, int, int, int, int, unsigned long));
-extern void FDECL(safe_display_gui_effect, (int, int, int, unsigned long));
+extern void FDECL(safe_display_gui_effect, (int, int, int, int, int, int, unsigned long));
 extern void FDECL(safe_update_cursor, (int, int, int));
 extern int NDECL(safe_ui_has_input);
 extern void FDECL(safe_exit_hack, (int));

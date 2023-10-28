@@ -159,7 +159,7 @@ moverock()
     sx = u.ux + u.dx, sy = u.uy + u.dy; /* boulder starting position */
     while ((otmp = sobj_at(BOULDER, sx, sy)) != 0) 
     {
-        strcpy(pushbuf, "");
+        Strcpy(pushbuf, "");
         pushcolor = NO_COLOR;
 
         /* make sure that this boulder is visible as the top object */
@@ -1271,8 +1271,6 @@ int mode;
             }
             return TRUE;
         }
-        //if (mode == TRAVP_TRAVEL)
-        //    context.run = 8;
     }
     if (u.tx != u.ux || u.ty != u.uy) {
         xchar travel[COLNO][ROWNO];
@@ -1388,7 +1386,6 @@ int mode;
                                     && x == u.tx && y == u.ty) {
                                     nomul(0);
                                     /* reset run so domove run checks work */
-                                    //context.run = 8;
                                     iflags.travelcc.x = iflags.travelcc.y = 0;
                                 }
                                 return TRUE;
@@ -1673,10 +1670,10 @@ struct trap *desttrap; /* nonnull if another trap at <x,y> */
  wriggle_free:
             play_sfx_sound(SFX_WRIGGLE_FREE);
             if (u.usteed)
-                pline("%s finally %s free.", upstart(steedname),
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s finally %s free.", upstart(steedname),
                       !anchored ? "lurches" : "wrenches the ball");
             else
-                You("finally %s free.",
+                You_ex(ATR_NONE, CLR_MSG_SUCCESS, "finally %s free.",
                     !anchored ? "wriggle" : "wrench the ball");
             if (anchored)
                 buried_ball_to_punishment();
@@ -1884,6 +1881,27 @@ domove_core()
             nomul(0);
             return;
         }
+
+        if (context.run)
+        {
+            /* Check if new monsters have come to vision */
+            struct monst* mtmp2;
+            for (mtmp2 = fmon; mtmp2; mtmp2 = mtmp2->nmon)
+            {
+                if (!DEADMONSTER(mtmp2) && !(mtmp2->mon_flags & MON_FLAGS_SPOTTED_IN_RUN) 
+                    && canspotmon(mtmp2) && !is_peaceful(mtmp2)
+                    && M_AP_TYPE(mtmp2) != M_AP_FURNITURE && M_AP_TYPE(mtmp2) != M_AP_OBJECT 
+                    && isok(mtmp2->mx, mtmp2->my) && couldsee(mtmp2->mx, mtmp2->my) 
+                    )
+                {
+                    You("spot %s.  You stop %s.", a_monnam(mtmp2), context.travel ? "travelling" : "running");
+                    nomul(0);
+                    context.move = 0;
+                    return;
+                }
+            }
+        }
+
         if (((trap = t_at(x, y)) && trap->tseen)
             || (Blind && !Levitation && !Flying && !is_clinger(youmonst.data)
                 /* && is_pool_or_lava(x, y) */ 
@@ -1891,7 +1909,6 @@ domove_core()
         {
             if (context.run) 
             {
-
                 if (iflags.mention_walls) 
                 {
                     if (trap && trap->tseen)
@@ -2123,7 +2140,7 @@ domove_core()
                 solid = !accessible(x, y);
         int glyph = glyph_at(x, y); /* might be monster */
         char buf[BUFSZ];
-
+        boolean was_invis_glyph = glyph_is_invisible(levl[x][y].hero_memory_layers.glyph);
         if (!Underwater) 
         {
             boulder = sobj_at(BOULDER, x, y);
@@ -2187,6 +2204,12 @@ domove_core()
             Strcpy(buf, "thin air");
         }
 
+        boolean play_invisble_fade = (windowprocs.wincap2 & WC2_FADING_ANIMATIONS) != 0 && was_invis_glyph && !glyph_is_invisible(levl[x][y].hero_memory_layers.glyph);
+        if (play_invisble_fade)
+        {
+            play_special_effect_with_details_at(0, x, y, GLYPH_INVISIBLE, LAYER_GENERAL_EFFECT, -2, 0, 0, 20, FALSE);
+        }
+
         update_u_action(ACTION_TILE_ATTACK);
         play_monster_simple_weapon_sound(&youmonst, 0, uwep, OBJECT_SOUND_TYPE_SWING_MELEE);
         u_wait_until_action();
@@ -2194,6 +2217,12 @@ domove_core()
         You("%s%s %s.",
             !(boulder || solid) ? "" : !explo ? "harmlessly " : "futilely ",
             explo ? "explode at" : "attack", buf);
+
+        if (play_invisble_fade)
+        {
+            special_effect_wait_until_action(0);
+            special_effect_wait_until_end(0);
+        }
 
         update_u_action_revert(ACTION_TILE_NO_ACTION);
 
@@ -2240,8 +2269,10 @@ domove_core()
 
     /* Move ball and chain.  */
     if (Punished)
+    {
         if (!drag_ball(x, y, &bc_control, &ballx, &bally, &chainx, &chainy, &cause_delay, TRUE))
             return;
+    }
 
     /* Check regions entering/leaving */
     if (!in_out_region(x, y))
@@ -2287,7 +2318,7 @@ domove_core()
                 mtmp->mtame = mtmp->mpeaceful = mtmp->msleeping = 0;
                 if (mtmp->mleashed)
                     m_unleash(mtmp, TRUE);
-                refresh_m_tile_gui_info(mtmp, TRUE);
+                newsym(mtmp->mx, mtmp->my);
                 growl(mtmp);
             } 
             else 
@@ -2440,7 +2471,9 @@ domove_core()
     }
 
     if (Punished) /* put back ball and chain */
+    {
         move_bc(0, bc_control, ballx, bally, chainx, chainy);
+    }
 
     if (u.umoved)
         spoteffects(TRUE);
@@ -2723,7 +2756,7 @@ boolean pick;
          */
         pit = (trap && is_pit(trap->ttyp));
         if (pick && !pit)
-            (void) pickup(1);
+            (void) pickup(1, FALSE);
 
         if (trap) 
         {
@@ -2745,7 +2778,7 @@ boolean pick;
             }
         }
         if (pick && pit)
-            (void) pickup(1);
+            (void) pickup(1, FALSE);
     }
 
     /* Warning alerts you to ice danger */
@@ -3135,7 +3168,7 @@ register boolean newlev;
             rt = 0;
             break;
         case NPCROOM:
-            in_npc_room(roomno + ROOMOFFSET);
+            in_npc_room(roomno + ROOMOFFSET, FALSE);
             msg_given = TRUE;
             rt = 0;
             break;
@@ -3364,10 +3397,31 @@ dopickup(VOID_ARGS)
         return ret;
     else if (ret == -2) {
         tmpcount = -count;
-        return loot_mon(u.ustuck, &tmpcount, (boolean *) 0);
+        return loot_mon(u.ustuck, &tmpcount, (boolean *) 0, FALSE);
     } /* else ret == -1 */
 
-    return pickup(-count);
+    return pickup(-count, FALSE);
+}
+
+/* the pick up and stash command */
+int
+doput2bag(VOID_ARGS)
+{
+    int count, tmpcount, ret;
+
+    /* awful kludge to work around parse()'s pre-decrement */
+    count = (multi || (save_cm && *save_cm == cmd_from_func(dopickup)))
+        ? multi + 1 : 0;
+    multi = 0; /* always reset */
+
+    if ((ret = pickup_checks() >= 0))
+        return ret;
+    else if (ret == -2) {
+        tmpcount = -count;
+        return loot_mon(u.ustuck, &tmpcount, (boolean*)0, TRUE);
+    } /* else ret == -1 */
+
+    return pickup(-count, TRUE);
 }
 
 /* stop running if we see something interesting */
@@ -3627,7 +3681,7 @@ register int nval;
     multi = nval;
     if (nval == 0)
         multi_reason = NULL;
-    context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+    clear_run_and_travel();
 }
 
 /* called when a non-movement, multi-turn action has completed */
@@ -3714,7 +3768,7 @@ kill_player(knam, k_format)
 register const char* knam;
 int k_format;
 {
-    context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+    clear_run_and_travel();
     if (Upolyd)
     {
         u.mh = 0;
@@ -3748,7 +3802,7 @@ int k_format;
     deduct_player_hp(n);
 
     if(n > 0)
-        context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+        clear_run_and_travel();
 
     if (u.uhp < 1) 
     {
@@ -4031,6 +4085,31 @@ adjusted_delay_output()
     else
     {
         delay_output();
+    }
+}
+
+void
+clear_run_and_travel(VOID_ARGS)
+{
+    if (context.run)
+    {
+        struct monst* mtmp;
+        for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
+            mtmp->mon_flags &= ~MON_FLAGS_SPOTTED_IN_RUN;
+    }
+    context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+}
+
+void
+mark_spotted_monsters_in_run(VOID_ARGS)
+{
+    struct monst* mtmp;
+    for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
+    {
+        if (!DEADMONSTER(mtmp) && canspotmon(mtmp) && isok(mtmp->mx, mtmp->my) && couldsee(mtmp->mx, mtmp->my))
+            mtmp->mon_flags |= MON_FLAGS_SPOTTED_IN_RUN;
+        else
+            mtmp->mon_flags &= ~MON_FLAGS_SPOTTED_IN_RUN;
     }
 }
 

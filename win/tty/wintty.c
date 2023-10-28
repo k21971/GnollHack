@@ -434,7 +434,7 @@ char **argv UNUSED;
 {
     int wid, hgt, i;
 
-    tty_issue_gui_command(1, 0, 0);
+    tty_issue_gui_command(1, 0, 0, 0);
 
     /* options aren't processed yet so wc2_statuslines might be 0;
        make sure that it has a reasonable value during tty setup */
@@ -1041,6 +1041,7 @@ tty_player_selection()
             plnamesuffix(); /* calls askname() when plname[] is empty */
             ROLE = saveROLE, RACE = saveRACE, GEND = saveGEND,
                 ALGN = saveALGN;
+            iflags.renameinprogress = FALSE;
             break; /* getconfirmation is still True */
         }
         case 2:    /* 'n' */
@@ -3711,8 +3712,8 @@ boolean force UNUSED;
 #endif /* CLIPPING */
 
 void
-tty_issue_gui_command(cmd_id, cmd_param, cmd_str)
-int cmd_id, cmd_param UNUSED;
+tty_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str)
+int cmd_id, cmd_param UNUSED, cmd_param2 UNUSED;
 const char* cmd_str UNUSED;
 {
     if (use_utf8_encoding())
@@ -4922,7 +4923,7 @@ render_status(VOID_ARGS)
                 else if((idx == BL_PARTYSTATS || idx == BL_PARTYSTATS2 || idx == BL_PARTYSTATS3 || idx == BL_PARTYSTATS4 || idx == BL_PARTYSTATS5) && flags.partylinecolor)
                 {
                      char printbuf[BUFSZ];
-                     strcpy(printbuf, text);
+                     (void) strcpy(printbuf, text);
                      char* bp = 0, *bp2 = 0, *bp3 = 0, *startbp = printbuf;
                      do
                      {
@@ -4935,25 +4936,25 @@ render_status(VOID_ARGS)
                          if (bp && bp2 && bp3)
                          {
                              char restbuf[BUFSZ];
-                             strcpy(restbuf, bp2);
+                             (void) strcpy(restbuf, bp2);
                              restbuf[1] = '\0'; /* Print just one character */
                              *bp2 = '\0';
 
                              *bp3 = '\0';
                              char maxbuf[BUFSZ];
-                             strcpy(maxbuf, bp2 + 1);
+                             (void) strcpy(maxbuf, bp2 + 1);
                              int hpmax = atoi(maxbuf);
                              *bp3 = ')';
 
                              char hpbuf[BUFSZ];
-                             strcpy(hpbuf, bp + 3);
+                             (void) strcpy(hpbuf, bp + 3);
                              char hpbuf2[BUFSZ];
-                             strcpy(hpbuf2, bp);
+                             (void) strcpy(hpbuf2, bp);
                              *bp = '\0';
                              int hp = atoi(hpbuf);
 
                              char startbuf[BUFSZ];
-                             strcpy(startbuf, startbp);
+                             (void) strcpy(startbuf, startbp);
 
                              print_rest_partyline(startbuf, &x, &y);
                              //tty_putstatusfield(startbuf, x, y);

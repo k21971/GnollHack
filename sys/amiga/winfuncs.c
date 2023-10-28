@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0	winfuncs.c	$NHDT-Date: 1553895320 2019/03/29 21:35:20 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.16 $ */
 /* Copyright (c) Gregg Wonderly, Naperville, Illinois,  1991,1992,1993,1996.
@@ -1940,8 +1940,8 @@ port_help()
  */
 
 void
-amii_issue_gui_command(cmd_id, cmd_param, cmd_str)
-int cmd_id, cmd_param;
+amii_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str)
+int cmd_id, cmd_param, cmd_param2;
 const char* cmd_str;
 {
     return;

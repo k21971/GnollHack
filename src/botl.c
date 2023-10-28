@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    botl.c    $NHDT-Date: 1557094795 2019/05/05 22:19:55 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -17,12 +17,12 @@ const char *const enc_stat[] = { "",         "Burdened",  "Stressed",
                                  "Strained", "Overtaxed", "Overloaded" };
 
 const enum statusfields fieldorder1[MAX_STATUS_LINE_ITEMS] = { BL_TITLE, BL_STR, BL_DX,    BL_CO,    BL_IN,   BL_WI,    BL_CH, BL_GOLD,  /*BL_ALIGN,*/ BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
-const enum statusfields fieldorder2[MAX_STATUS_LINE_ITEMS] = { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_SCORE, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
-const enum statusfields fieldorder2_2statuslines[MAX_STATUS_LINE_ITEMS] = { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX,  BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, BL_FLUSH };
+const enum statusfields fieldorder2[MAX_STATUS_LINE_ITEMS] = { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_SCORE, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
+const enum statusfields fieldorder2_2statuslines[MAX_STATUS_LINE_ITEMS] = { BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX,  BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH };
 const enum statusfields fieldorder3[MAX_STATUS_LINE_ITEMS] = { BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
 
 const enum statusfields fieldorder1_alt[MAX_STATUS_LINE_ITEMS] = { BL_TITLE, BL_STR, BL_DX,    BL_CO,    BL_IN,  BL_WI,    BL_CH, BL_ALIGN, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
-const enum statusfields fieldorder2_alt[MAX_STATUS_LINE_ITEMS] = { BL_LEVELDESC, BL_HP,   BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
+const enum statusfields fieldorder2_alt[MAX_STATUS_LINE_ITEMS] = { BL_LEVELDESC, BL_HP,   BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
 const enum statusfields fieldorder3_alt[MAX_STATUS_LINE_ITEMS] = { BL_MODE, BL_GOLD, BL_TIME, BL_REALTIME, BL_SCORE, BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
 
 const enum statusfields fieldorder4[MAX_STATUS_LINE_ITEMS] = { BL_PARTYSTATS, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH, BL_FLUSH };
@@ -312,7 +312,7 @@ do_statusline2()
         print_weapon_style_string(buf1, FALSE);
         print_weapon_style_string(buf2, TRUE);
         if (strcmp(buf2, ""))
-            strcpy(bufplus, "/");
+            Strcpy(bufplus, "/");
         Sprintf(weaponstyle, "W:%s%s%s", buf1, bufplus, buf2);
     }
     else
@@ -768,7 +768,11 @@ long seconds;
 long
 get_current_game_duration(VOID_ARGS)
 {
-    return !context.game_started ? 0 : iflags.in_dumplog ? urealtime.realtime : urealtime.realtime + ((long)getnow() - (long)urealtime.start_timing);
+    long res = 0L;
+    lock_thread_lock();
+    res = !context.game_started ? 0 : iflags.in_dumplog ? urealtime.realtime : urealtime.realtime + ((long)getnow() - (long)urealtime.start_timing);
+    unlock_thread_lock();
+    return res;
 }
 
 char*
@@ -966,6 +970,7 @@ STATIC_VAR const struct istat_s initblstats[MAXBLSTATS] = {
     INIT_BLSTAT("move", " MS:%s", ANY_LONG, 10, BL_MOVE),
     INIT_BLSTAT("primary-weapon", " W:%s", ANY_STR, 20, BL_UWEP),
     INIT_BLSTAT("secondary-weapon", "/%s", ANY_STR, 20, BL_UWEP2),
+    INIT_BLSTAT("quivered-weapon", "|%s", ANY_STR, 20, BL_UQUIVER),
     INIT_BLSTAT("HD", " HD:%s", ANY_INT, 10, BL_HD),
     INIT_BLSTAT("time", " T:%s", ANY_LONG, 20, BL_TIME),
     INIT_BLSTAT("realtime", " %s", ANY_STR, MAXVALWIDTH, BL_REALTIME),
@@ -1163,6 +1168,10 @@ bot_via_windowport()
     print_weapon_style_string(blstats[idx][BL_UWEP2].val, TRUE);
     valset[BL_UWEP2] = TRUE;
 
+    /* Quivered weapon style */
+    print_quivered_weapon_style_string(blstats[idx][BL_UQUIVER].val);
+    valset[BL_UQUIVER] = TRUE;
+
     /* Time (moves) */
     blstats[idx][BL_TIME].a.a_long = moves;
 
@@ -1192,11 +1201,11 @@ bot_via_windowport()
     valset[BL_CONDITION] = TRUE;
 
     /* Partyline */
-    char partybuf[BUFSIZ];
-    char partybuf2[BUFSIZ];
-    char partybuf3[BUFSIZ];
-    char partybuf4[BUFSIZ];
-    char partybuf5[BUFSIZ];
+    char partybuf[BUFSZ + MAXVALWIDTH];
+    char partybuf2[BUFSZ + MAXVALWIDTH];
+    char partybuf3[BUFSZ + MAXVALWIDTH];
+    char partybuf4[BUFSZ + MAXVALWIDTH];
+    char partybuf5[BUFSZ + MAXVALWIDTH];
     compose_partystatline(partybuf, partybuf2, partybuf3, partybuf4, partybuf5);
     blstats[idx][BL_PARTYSTATS].a.a_int = strcmp(partybuf, "") ? 1 : 0;
     blstats[idx][BL_PARTYSTATS2].a.a_int = strcmp(partybuf2, "") ? 1 : 0;
@@ -1553,7 +1562,7 @@ char* outbuf5;
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
     {
         char* targetbuf = outbufs[line_idx - 1];
-        char tempbuf[BUFSIZ];
+        char tempbuf[BUFSZ + MAXVALWIDTH];
         Strcpy(tempbuf, "");
 
         if (!DEADMONSTER(mtmp) && is_tame(mtmp))
@@ -1582,21 +1591,21 @@ char* outbuf5;
 
             if (has_umname(mtmp))
             {
-                char umnbuf[BUFSIZ];
+                char umnbuf[PL_PSIZ + BUFSZ];
                 Strcpy(umnbuf, UMNAME(mtmp));
                 umnbuf[16] = '\0'; /* Limit the length of the name */
                 Strcat(tempbuf, umnbuf);
             }
             else if (has_mname(mtmp) && mtmp->u_know_mname)
             {
-                char mnbuf[BUFSIZ];
+                char mnbuf[PL_PSIZ + BUFSZ];
                 Strcpy(mnbuf, MNAME(mtmp));
                 mnbuf[16] = '\0'; /* Limit the length of the name */
                 Strcat(tempbuf, mnbuf);
             }
             else
             {
-                char buf[BUFSZ];
+                char buf[PL_PSIZ + BUFSZ];
                 Strcpy(buf, mon_monster_name(mtmp));
                 *buf = highc(*buf);
                 Strcat(tempbuf, buf);
@@ -1605,7 +1614,7 @@ char* outbuf5;
             Sprintf(eos(tempbuf), "%d(%d)", mtmp->mhp, mtmp->mhpmax);
 
 #define changepartyline() \
-            if (!flags.partymultiline && line_idx < maxlines && !first_in_line && strlen(tempbuf) + strlen(targetbuf) >= MAXVALWIDTH) \
+            if (!flags.partymultiline && line_idx < maxlines && !first_in_line && strlen(tempbuf) + strlen(targetbuf) >= MAXVALWIDTH - 1) \
             { \
                 line_idx++;\
                 targetbuf = outbufs[line_idx - 1]; \
@@ -1630,8 +1639,6 @@ char* outbuf5;
                 else if (EDOG(mtmp)->hungrytime <= monstermoves)
                     Strcat(tempbuf, " Hungry");
             }
-//            changepartyline();
-//            strcat(targetbuf, tempbuf);
 
             if (is_sick(mtmp))
                 Strcat(tempbuf, " TermIll");
@@ -1675,11 +1682,11 @@ char* outbuf5;
             changepartyline();
             Strcat(targetbuf, tempbuf);
 
-            if (!flags.partymultiline && line_idx == maxlines && strlen(outbuf) >= MAXVALWIDTH)
+            if (!flags.partymultiline && line_idx == maxlines && strlen(outbuf) >= MAXVALWIDTH - 1)
                 break;
         }
     }
-    outbuf[MAXVALWIDTH] = '\0';
+    outbuf[MAXVALWIDTH - 1] = '\0';
 }
 
 /* update just the status lines' 'time' field */
@@ -1837,8 +1844,10 @@ boolean *valsetlist;
             || ((i == BL_MOVE) && !flags.showmove)
             || ((i == BL_UWEP) && !flags.show_weapon_style)
             || ((i == BL_UWEP2) && (!flags.show_weapon_style || (uwep && is_wieldable_weapon(uwep) && objects[uwep->otyp].oc_bimanual) || (!u.twoweap && !uarms)))
+            || ((i == BL_UQUIVER) && (!uquiver || !throwing_weapon(uquiver) || is_ammo(uquiver)))
             || ((i == BL_HD) && !Upolyd)
-            || ((i == BL_XP || i == BL_EXP) && Upolyd)) {
+            || ((i == BL_XP || i == BL_EXP) && Upolyd)) 
+        {
             //notpresent++;
             continue;
         }
@@ -1911,6 +1920,7 @@ boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
                        : (fld == BL_MOVE) ? flags.showmove
                         : (fld == BL_UWEP) ? flags.show_weapon_style
                         : (fld == BL_UWEP2) ? flags.show_weapon_style && !(uwep && is_wieldable_weapon(uwep) && objects[uwep->otyp].oc_bimanual) && (u.twoweap || uarms)
+                        : (fld == BL_UQUIVER) ? uquiver && throwing_weapon(uquiver) && !is_ammo(uquiver)
                         : (fld == BL_XP) ? (boolean) !Upolyd
                          : (fld == BL_HD) ? (boolean) Upolyd
                            : TRUE;

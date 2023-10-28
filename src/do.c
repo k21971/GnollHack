@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    do.c    $NHDT-Date: 1548978604 2019/01/31 23:50:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.189 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -19,6 +19,7 @@ STATIC_DCL boolean NDECL(teleport_sink);
 STATIC_DCL void FDECL(dosinkring, (struct obj *));
 STATIC_PTR int NDECL(wipeoff);
 STATIC_DCL int FDECL(menu_drop, (int));
+STATIC_DCL int FDECL(menu_autostash, (int));
 STATIC_DCL int NDECL(currentlevel_rewrite);
 STATIC_DCL void NDECL(final_level);
 STATIC_DCL void FDECL(print_corpse_properties, (winid, int));
@@ -51,7 +52,7 @@ int
 docharacterstatistics()
 {
     int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
-    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     winid datawin = WIN_ERR;
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_SCREEN, gui_glyph, extended_create_window_info_from_mon_with_flags(&youmonst, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
@@ -229,7 +230,7 @@ docharacterstatistics()
     if (u.ualign.type == A_CHAOTIC)
     {
         trait_count++;
-        Sprintf(buf, " %2d - Can sacrifice own race (Alignment)", trait_count);
+        Sprintf(buf, " %2d - Sacrificing own race is less dangerous (Alignment)", trait_count);
         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
@@ -341,12 +342,12 @@ docharacterstatistics()
         {
             while (intrinsic_ability[table_index].ulevel > 0)
             {
-                if (intrinsic_ability[table_index].ulevel > u.ulevel&& intrinsic_ability[table_index].propid > 0)
+                if (intrinsic_ability[table_index].ulevel > u.ulevel && intrinsic_ability[table_index].propid > 0)
                 {
                     abil_count++;
 
                     char dbuf2[BUFSIZ] = "";
-                    strcpy(dbuf2, get_property_name(intrinsic_ability[table_index].propid));
+                    Strcpy(dbuf2, get_property_name(intrinsic_ability[table_index].propid));
                     *dbuf2 = highc(*dbuf2);
 
                     Sprintf(buf, " Level %2d - %s", intrinsic_ability[table_index].ulevel, dbuf2);
@@ -373,7 +374,7 @@ docharacterstatistics()
 
 STATIC_VAR NEARDATA const char item_description_objects[] = { ALL_CLASSES, ALLOW_NONE, 0 };
 
-/* the M('x') command - Item descriptions*/
+/* the M('x') command - Item descriptions */
 int
 doitemdescriptions()
 {
@@ -749,20 +750,31 @@ register struct obj* obj;
     if (!obj || obj == &zeroobj)
         return 0;
 
-    return itemdescription_core(obj, obj->otyp);
+    return itemdescription_core(obj, obj->otyp, (struct item_description_stats*)0);
 }
 
 int
-itemdescription_core(obj, otyp)
+itemdescription_core(obj, otyp, stats_ptr)
 struct obj* obj;
 int otyp;
+struct item_description_stats* stats_ptr; /* If non-null, only returns item stats without printing anything */
 {
     if (otyp <= STRANGE_OBJECT || otyp >= NUM_OBJECTS)
         return 0;
+    
+    struct window_procs saved_procs = windowprocs;
+    if (stats_ptr)
+    {
+#ifdef SAFEPROCS
+        windowprocs = *get_safe_procs(0);
+#else
+        return 0;
+#endif
+    }
 
     winid datawin = WIN_ERR;
     int glyph = obj ? obj_to_glyph(obj, rn2_on_display_rng) : otyp + GLYPH_OBJ_OFF;
-    int gui_glyph = obj ? maybe_get_replaced_glyph(glyph, obj->ox, obj->oy, data_to_replacement_info(glyph, LAYER_OBJECT, obj, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0)) : glyph;
+    int gui_glyph = obj ? maybe_get_replaced_glyph(glyph, obj->ox, obj->oy, data_to_replacement_info(glyph, LAYER_OBJECT, obj, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0)) : glyph;
 
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_OBJECT_DESCRIPTION_SCREEN, gui_glyph, extended_create_window_info_from_obj(obj));
 
@@ -774,6 +786,8 @@ int otyp;
     }
     
     boolean uses_spell_flags = otyp_uses_spellbook_wand_flags(otyp); // object_uses_spellbook_wand_flags_and_properties(obj);
+    boolean name_known = (!obj || objects[otyp].oc_name_known);
+    boolean desc_known = (!obj || obj->dknown);
     boolean has_conferred_powers = FALSE;
     boolean has_extra_damage = FALSE;
     boolean has_slaying = FALSE;
@@ -881,15 +895,15 @@ int otyp;
         /*
         if (is_graystone(obj))
         {
-            strcpy(buf3, "Gray stone");
+            Strcpy(buf3, "Gray stone");
         }
         if (is_rock(obj))
         {
-            strcpy(buf3, "Rock");
+            Strcpy(buf3, "Rock");
         }
         if (is_ore(obj))
         {
-            strcpy(buf3, "Ore");
+            Strcpy(buf3, "Ore");
         }
         */
     }
@@ -897,7 +911,7 @@ int otyp;
     if (strcmp(buf2, "") != 0)
     {
         char buf4[BUFSIZ] = "";
-        strcpy(buf4, buf);
+        Strcpy(buf4, buf);
         //Sprintf(buf, "Category:               %s", buf2);
         if (hidemainclass)
             Sprintf(buf, "%s", buf2);
@@ -1113,7 +1127,7 @@ int otyp;
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
-    if (objects[otyp].oc_name_known && (!obj || obj->oartifact == 0) && !objects[otyp].oc_unique && (objects[otyp].oc_class == SPBOOK_CLASS || objects[otyp].oc_class == SCROLL_CLASS)
+    if (name_known && (!obj || obj->oartifact == 0) && !objects[otyp].oc_unique && (objects[otyp].oc_class == SPBOOK_CLASS || objects[otyp].oc_class == SCROLL_CLASS)
         && otyp != SCR_BLANK_PAPER && otyp != SPE_BLANK_PAPER && otyp != SCR_SUPREME_DIABOLISM)
     {
         int ink = otyp_ink_cost(otyp);
@@ -1136,19 +1150,51 @@ int otyp;
     }
 
     /* Skill */
-    if (stats_known && objects[otyp].oc_skill != P_NONE)
+    if (objects[otyp].oc_skill != P_NONE)
     {
         Strcpy(buf2, obj ? weapon_skill_name(obj) : otyp_weapon_skill_name(otyp));
         if (objects[otyp].oc_skill < 0 && objects[otyp].oc_skill != -P_THROWN_WEAPON)
         {
             Sprintf(buf, "Ammunition for:         Weapons using %s skill", buf2);
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
         else
         {
             *buf2 = highc(*buf2);
             Sprintf(buf, "Skill:                  %s", buf2);
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            if (obj)
+            {
+                boolean bonusesprinted = FALSE;
+                if (objects[otyp].oc_skill == P_SHIELD && is_shield(obj))
+                {
+                    int shieldacbonus = shield_skill_ac_bonus(P_SKILL_LEVEL(P_SHIELD));
+                    int shieldmcbonus = shield_skill_mc_bonus(P_SKILL_LEVEL(P_SHIELD));
+                    if (-shieldacbonus == shieldmcbonus)
+                        Sprintf(buf, "Skill bonuses:          %s%d to AC and MC",
+                            shieldmcbonus >= 0 ? "+" : "",
+                            shieldmcbonus);
+                    else
+                        Sprintf(buf, "Skill bonuses:          %s%d to AC and %s%d to MC",
+                        shieldacbonus <= 0 ? "+" : "",
+                        -shieldacbonus,
+                        shieldmcbonus >= 0 ? "+" : "",
+                        shieldmcbonus);
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                    bonusesprinted = TRUE;
+                }
+                if (((objects[otyp].oc_skill >= P_FIRST_WEAPON && objects[otyp].oc_skill <= P_LAST_WEAPON) || objects[otyp].oc_skill == -P_THROWN_WEAPON || objects[otyp].oc_skill == P_SHIELD) && is_weapon(obj))
+                {
+                    int skilltohitbonus = weapon_skill_hit_bonus(obj, P_NONE, FALSE, FALSE, FALSE, 0, FALSE);
+                    int skilldmgbonus = weapon_skill_dmg_bonus(obj, P_NONE, FALSE, FALSE, FALSE, 0, FALSE);
+                    if (skilltohitbonus == skilldmgbonus)
+                        Sprintf(buf, "%s          %s%d to hit and damage", bonusesprinted ? "              " : "Skill bonuses:", skilltohitbonus >= 0 ? "+" : "", skilltohitbonus);
+                    else
+                        Sprintf(buf, "%s          %s%d to hit and %s%d to damage", bonusesprinted ? "              " : "Skill bonuses:", skilltohitbonus >= 0 ? "+" : "", skilltohitbonus, skilldmgbonus >= 0 ? "+" : "", skilldmgbonus);
+                    putstr(datawin, bonusesprinted ? ATR_INDENT_AT_DOUBLE_SPACE : ATR_INDENT_AT_COLON, buf);
+                }
+            }
         }        
-        putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
     if (stats_known && objects[otyp].oc_class == SPBOOK_CLASS && !(objects[otyp].oc_flags & O1_NON_SPELL_SPELLBOOK))
@@ -1159,7 +1205,7 @@ int otyp;
     }
 
     boolean weapon_stats_shown = FALSE;
-    if (!uses_spell_flags && objects[otyp].oc_name_known && (is_otyp_weapon(otyp) || ((is_otyp_gloves(otyp) || is_otyp_boots(otyp) || objects[otyp].oc_class == GEM_CLASS) && stats_known)))
+    if (!uses_spell_flags && desc_known &&(is_otyp_weapon(otyp) || ((is_otyp_gloves(otyp) || is_otyp_boots(otyp) || objects[otyp].oc_class == GEM_CLASS))))
     {
         weapon_stats_shown = TRUE;
         boolean maindiceprinted = FALSE;
@@ -1180,7 +1226,7 @@ int otyp;
                 /* Single or two-handed */
                 if (obj ? is_appliable_pole_type_weapon(obj) : is_otyp_appliable_pole_type_weapon(otyp))
                 {
-                    if (obj)
+                    if (obj && name_known && stats_known)
                     {
                         int polemin = 1, polemax = 2;
                         get_pole_type_weapon_min_max_distances(obj, &youmonst, &polemin, &polemax);
@@ -1213,7 +1259,7 @@ int otyp;
                 Sprintf(buf, "Appliable:              %s", buf2);                
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-                if (obj && obj->exceptionality > 0)
+                if (obj && obj->exceptionality > 0 && name_known && stats_known)
                 {
                     if (is_pick(obj) || is_axe(obj) || is_saw(obj))
                     {
@@ -1252,7 +1298,7 @@ int otyp;
         int baserange = 0;
 
         /* Ammunition range */
-        if (objects[otyp].oc_multishot_style > 0) {
+        if (objects[otyp].oc_multishot_style > 0 || is_otyp_launcher(otyp) || is_otyp_nonmelee_throwing_weapon(otyp)) {
 
             Sprintf(buf, "%s  %s", 
                 is_otyp_launcher(otyp) ? "Shots per round:      " : 
@@ -1274,11 +1320,19 @@ int otyp;
         }
 
         /* Jousting */
-        if (obj && can_obj_joust(obj)) {
-
-            int chance = spear_skill_jousting_bonus(P_SKILL_LEVEL(weapon_skill_type(obj))) + riding_skill_jousting_bonus(P_SKILL_LEVEL(P_RIDING));
-            Sprintf(buf, "Jousting:               Yes, at %d%% chance when riding", chance);
-            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        if (can_otyp_joust(otyp))
+        {
+            if (obj) 
+            {
+                int chance = spear_skill_jousting_bonus(P_SKILL_LEVEL(weapon_skill_type(obj))) + riding_skill_jousting_bonus(P_SKILL_LEVEL(P_RIDING));
+                Sprintf(buf, "Jousting:               Yes, at %d%% chance when riding", chance);
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+            else
+            {
+                Strcpy(buf, "Jousting:               Yes");
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
         }
 
         /* Range and throw distance */
@@ -1303,7 +1357,6 @@ int otyp;
                 Sprintf(buf, "Range when fired:       %s'", buf2);
             
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
-
         }
 
 
@@ -1622,7 +1675,6 @@ int otyp;
         /* Fixed damage bonus */
         if (is_otyp_launcher(otyp) && (objects[otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH)) 
         {
-
             Sprintf(buf, "Fixed damage bonus:     %s%d (instead of strength)", 
                 objects[otyp].oc_fixed_damage_bonus >= 0 ? "+" : "", objects[otyp].oc_fixed_damage_bonus);
             
@@ -1634,12 +1686,12 @@ int otyp;
             if (wep_avg_dmg < 0)
                 wep_avg_dmg = 0;
         }
-        else
+        else if (obj)
         {
             double dmg_bonus = 0;
-            if (obj && is_ammo(obj) && uwep && is_launcher(uwep) && (objects[uwep->otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH))
+            if (is_ammo(obj) && uwep && is_launcher(uwep) && (objects[uwep->otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH))
                 dmg_bonus += (double)objects[uwep->otyp].oc_fixed_damage_bonus;
-            else if (obj && is_ammo(obj) && uswapwep && is_launcher(uswapwep) && (objects[uswapwep->otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH))
+            else if (is_ammo(obj) && uswapwep && is_launcher(uswapwep) && (objects[uswapwep->otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH))
                 dmg_bonus += (double)objects[uswapwep->otyp].oc_fixed_damage_bonus;
             else if(is_otyp_nonmelee_throwing_weapon(otyp) || objects[otyp].oc_skill == P_NONE)
                 dmg_bonus += (double)((int)strength_damage_bonus(ACURR(A_STR)) / 2);
@@ -1683,13 +1735,13 @@ int otyp;
     }
 
 
-    boolean affectsac = ((objects[otyp].oc_class == ARMOR_CLASS && objects[otyp].oc_name_known)
+    boolean affectsac = ((objects[otyp].oc_class == ARMOR_CLASS && desc_known)
             || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
             || (obj && has_obj_mythic_defense(obj) && obj->mknown)
             || (stats_known && objects[otyp].oc_class == MISCELLANEOUS_CLASS && objects[otyp].oc_armor_class != 0)
             );
 
-    boolean affectsmc = ((objects[otyp].oc_class == ARMOR_CLASS && objects[otyp].oc_name_known)
+    boolean affectsmc = ((objects[otyp].oc_class == ARMOR_CLASS && desc_known)
             || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
             || (obj && has_obj_mythic_defense(obj) && obj->mknown)
             || (stats_known && objects[otyp].oc_class == MISCELLANEOUS_CLASS && objects[otyp].oc_magic_cancellation != 0)
@@ -1699,10 +1751,10 @@ int otyp;
     if (obj)
     {
         boolean nonexpeptionalarmor = nonexceptionality_armor(obj);
-        if ((((objects[otyp].oc_class == ARMOR_CLASS && objects[otyp].oc_name_known)
+        if ((((objects[otyp].oc_class == ARMOR_CLASS && desc_known)
             || (stats_known && (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
             || (obj && has_obj_mythic_defense(obj) && obj->mknown))
-            && obj->exceptionality) || (nonexpeptionalarmor && objects[otyp].oc_name_known))
+            && obj->exceptionality) || (nonexpeptionalarmor && name_known))
         {
             const char* excep = nonexpeptionalarmor ? "Cannot have quality" :
                 obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL ? "Exceptional" :
@@ -1735,6 +1787,15 @@ int otyp;
                     Strcat(buf, ")");
                 }
             }
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        }
+    }
+    else
+    {
+        boolean nonexpeptionalarmor = is_otyp_nonexceptionality_armor(otyp);
+        if (nonexpeptionalarmor)
+        {
+            Sprintf(buf, "Armor quality:          %s", "Cannot have quality");
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
     }
@@ -2202,11 +2263,11 @@ int otyp;
             }
         }
 
-        long splpenalty = obj ? get_object_spell_casting_penalty(obj) : objects[otyp].oc_spell_casting_penalty;
+        long splpenalty = obj ? get_object_spell_casting_penalty(obj) : objects[otyp].oc_spell_casting_penalty * ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER;
         if (objects[otyp].oc_class != SPBOOK_CLASS && objects[otyp].oc_class != WAND_CLASS &&
             (objects[otyp].oc_class == ARMOR_CLASS || (objects[otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || splpenalty != 0))
         {
-            Sprintf(buf2, "%s%ld%%", splpenalty <= 0 ? "+" : "", -splpenalty * ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER);
+            Sprintf(buf2, "%s%ld%%", splpenalty <= 0 ? "+" : "", -splpenalty);
             if (splpenalty < 0)
                 Sprintf(buf, "Spell casting bonus:    %s (somatic spells only)", buf2);
             else
@@ -2238,16 +2299,16 @@ int otyp;
             }
 
             char rechargebuf[BUFSZ];
-            strcpy(rechargebuf, get_recharge_text(objects[otyp].oc_recharging));
+            Strcpy(rechargebuf, get_recharge_text(objects[otyp].oc_recharging));
             *rechargebuf = highc(*rechargebuf);
 
             Sprintf(buf, "Recharging type:        %s", rechargebuf);
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
 
-        if (obj && objects[otyp].oc_enchantable)
+        if (objects[otyp].oc_enchantable)
         {
-            if (obj->known)
+            if (obj && obj->known)
             {
                 Strcpy(buf, "");
 
@@ -2288,12 +2349,15 @@ int otyp;
 
                 if (display_ac && display_mc)
                 {
-                    Sprintf(eos(bonusbuf), "%s%d to AC and %s%d to MC",
-                        obj->enchantment <= 0 ? "+" : "",
-                        -obj->enchantment,
-                        obj->enchantment / 3 >= 0 ? "+" : "",
-                        obj->enchantment / 3
-                    );
+                    if(obj->enchantment == 0)
+                        Strcat(bonusbuf, "+0 to AC and MC");
+                    else
+                        Sprintf(eos(bonusbuf), "%s%d to AC and %s%d to MC",
+                            obj->enchantment <= 0 ? "+" : "",
+                            -obj->enchantment,
+                            obj->enchantment / 3 >= 0 ? "+" : "",
+                            obj->enchantment / 3
+                        );
                     knownacbonus += obj->enchantment;
                     knownmcbonus += obj->enchantment / 3;
                 }
@@ -2326,7 +2390,7 @@ int otyp;
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
             }
 
-            int max_ench = get_obj_max_enchantment(obj);
+            int max_ench = obj ? get_obj_max_enchantment(obj) : get_max_enchantment(objects[otyp].oc_enchantable);
             Sprintf(buf, "Safe enchantable level: %s%d or below", max_ench >= 0 ? "+" : "", max_ench);
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
@@ -2370,7 +2434,7 @@ int otyp;
         /* Mythic status */
         boolean nonmythic = (is_weapon(obj) || is_armor(obj)) && otyp_non_mythic(otyp)
             && !obj->oartifact && !objects[otyp].oc_unique && !(objects[otyp].oc_flags3 & O3_UNIQUE);
-        if (obj->dknown && objects[otyp].oc_name_known && (obj->mythic_prefix || obj->mythic_suffix || nonmythic))
+        if (obj->dknown && name_known && (obj->mythic_prefix || obj->mythic_suffix || nonmythic))
         {
             Sprintf(buf, "Mythic status:          %s", nonmythic ? "Cannot be mythic" : (obj->mythic_prefix && obj->mythic_suffix) ? "Legendary" : "Mythic");
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -2419,7 +2483,7 @@ int otyp;
                     Strcpy(buf, "Maximum burning time:   Infinite");
                     putstr(datawin, ATR_INDENT_AT_COLON, buf);
                 }
-                else
+                else if ((obj->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0) /* Need to weigh the item */
                 {
                     long burnleft = obj_light_burn_time_left(obj);
                     Sprintf(buf, "Burning time left:      %ld turn%s", burnleft, plur(burnleft));
@@ -2428,6 +2492,23 @@ int otyp;
                     putstr(datawin, ATR_INDENT_AT_COLON, buf);
                 }
             }
+            else
+            {
+                if (is_light_source_empty(obj))
+                {
+                    Strcpy(buf, "Burning time left:      Empty");
+                    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+                }
+            }
+        }
+    }
+    else
+    {
+        boolean nonmythic = (is_otyp_weapon(otyp) || is_otyp_armor(otyp)) && otyp_non_mythic(otyp) && !objects[otyp].oc_unique && !(objects[otyp].oc_flags3 & O3_UNIQUE);
+        if (nonmythic)
+        {
+            Sprintf(buf, "Mythic status:          %s", "Cannot be mythic");
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
     }
 
@@ -3173,7 +3254,7 @@ int otyp;
                             if (flagname && strcmp(flagname, ""))
                             {
                                 char flagbuf[BUFSZ];
-                                strcpy(flagbuf, flagname);
+                                Strcpy(flagbuf, flagname);
                                 *flagbuf = highc(*flagbuf);
                                 powercnt++;
                                 Sprintf(buf, " %2d - %s", powercnt, flagbuf);
@@ -3242,6 +3323,7 @@ int otyp;
             putstr(datawin, ATR_HEADING, buf);
 
             int powercnt = 0;
+            char mbuf[BUFSZ];
             if (obj->mythic_prefix)
             {
                 for (i = 0; i < MAX_MYTHIC_PREFIX_POWERS; i++)
@@ -3250,11 +3332,17 @@ int otyp;
                     if (mythic_prefix_powers[i].description && (mythic_prefix_qualities[obj->mythic_prefix].mythic_powers & bit) && mythic_power_applies_to_obj(obj, mythic_prefix_powers[i].power_flags) && strcmp(mythic_prefix_powers[i].description, ""))
                     {
                         powercnt++;
-                        Sprintf(buf, " %2d - %s", powercnt, mythic_prefix_powers[i].description);
+                        Strcpy(mbuf, mythic_prefix_powers[i].description);
+                        if (mythic_prefix_powers[i].power_type == MYTHIC_POWER_TYPE_SLAYING)
+                        {
+                            has_slaying = TRUE;
+                            if (index(mythic_prefix_powers[i].description, '%'))
+                                Sprintf(mbuf, mythic_prefix_powers[i].description, mythic_prefix_powers[i].parameter2 * (is_ammo(obj) || is_missile(obj) ? 2.0 : 1.0));
+                        }
+
+                        Sprintf(buf, " %2d - %s", powercnt, mbuf);
                         
                         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-                        if (mythic_prefix_powers[i].power_type == MYTHIC_POWER_TYPE_SLAYING)
-                            has_slaying = TRUE;
                     }
                     if (!mythic_prefix_powers[i].description)
                         break;
@@ -3268,7 +3356,15 @@ int otyp;
                     if (mythic_suffix_powers[i].description && (mythic_suffix_qualities[obj->mythic_suffix].mythic_powers & bit) && mythic_power_applies_to_obj(obj, mythic_suffix_powers[i].power_flags) && strcmp(mythic_suffix_powers[i].description, ""))
                     {
                         powercnt++;
-                        Sprintf(buf, " %2d - %s", powercnt, mythic_suffix_powers[i].description);
+                        Strcpy(mbuf, mythic_suffix_powers[i].description);
+                        if (mythic_suffix_powers[i].power_type == MYTHIC_POWER_TYPE_SLAYING)
+                        {
+                            has_slaying = TRUE;
+                            if (index(mythic_suffix_powers[i].description, '%'))
+                                Sprintf(mbuf, mythic_suffix_powers[i].description, mythic_suffix_powers[i].parameter2 * (is_ammo(obj) || is_missile(obj) ? 2.0 : 1.0));
+                        }
+
+                        Sprintf(buf, " %2d - %s", powercnt, mbuf);
                         
                         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                         if (mythic_suffix_powers[i].power_type == MYTHIC_POWER_TYPE_SLAYING)
@@ -3547,7 +3643,7 @@ int otyp;
 
             double art_avg_dmg = 0;
             if (artilist[obj->oartifact].attk.damn < 0)
-                art_avg_dmg *= (1.0 - ((double)artilist[obj->oartifact].attk.damn) / 20.0);
+                art_avg_dmg += wep_avg_dmg * (-((double)artilist[obj->oartifact].attk.damn) / 20.0);
             else
                 art_avg_dmg += (double)artilist[obj->oartifact].attk.damn * (1.0 + (double)artilist[obj->oartifact].attk.damd) / 2.0 + (double)artilist[obj->oartifact].attk.damp;
 
@@ -4013,18 +4109,28 @@ int otyp;
     }
 
     /* Notable */
-    if (obj && otyp == EGG && obj->corpsenm >= LOW_PM && obj->known && (mvitals[obj->corpsenm].mvflags & MV_KNOWS_EGG) != 0 && (obj->speflags & SPEFLAGS_YOURS) != 0)
+    boolean note_your_egg = obj && otyp == EGG && obj->corpsenm >= LOW_PM && obj->known && (mvitals[obj->corpsenm].mvflags & MV_KNOWS_EGG) != 0 && (obj->speflags & SPEFLAGS_YOURS) != 0;
+    boolean note_launcher_str_bonus = is_otyp_launcher(otyp) && !(objects[otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH);
+    if (note_your_egg || note_launcher_str_bonus)
     {
         int powercnt = 0;
 
         Sprintf(buf, "Notable:");
         putstr(datawin, ATR_HEADING, buf);
 
-        powercnt++;
-        Sprintf(buf, " %2d - %s", powercnt, "Laid by you");
-        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        if (note_your_egg)
+        {
+            powercnt++;
+            Sprintf(buf, " %2d - %s", powercnt, "Laid by you");
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        }
+        if (note_launcher_str_bonus)
+        {
+            powercnt++;
+            Sprintf(buf, " %2d - %s", powercnt, "Adds the user's strength bonus to damage.");
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        }
     }
-
 
     /* Description */
     if (stats_known && OBJ_ITEM_DESC(otyp) /* && !(obj->oartifact && obj->nknown) */)
@@ -4057,22 +4163,23 @@ int otyp;
         free((genericptr_t)descbuf);
     }
 
-    /* Weapon statistics */
+    boolean weapon_stats_printed = FALSE;
+    boolean armor_stats_printed = FALSE;
+    boolean wep_ac50pct_stat_set = FALSE;
     if (obj)
     {
+        int wep_ac50pct_stat = 0;
+
+        /* Weapon statistics */
         struct obj* applicable_launcher = is_launcher(obj) ? obj : uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : obj;
         if ((is_weapon(obj)
             || (uwep && obj == uwep) || (uswapwep && obj == uswapwep)
             || (u.twoweap && ((uarms && obj == uarms) || (uswapwep2 && obj == uswapwep2)))
             || weapon_stats_shown
             )
-            && /* !is_launcher(obj) && */ stats_known && obj->known
-            && (obj == applicable_launcher || !ammo_and_launcher(obj, applicable_launcher)
-                || (ammo_and_launcher(obj, applicable_launcher) && object_stats_known(applicable_launcher) && applicable_launcher->known))
             )
         {
             int powercnt = 0;
-
             if (is_boots(obj))
                 Sprintf(buf, "Statistics in kicking:");
             else if (is_gloves(obj))
@@ -4082,143 +4189,206 @@ int otyp;
 
             putstr(datawin, ATR_HEADING, buf);
 
-            if (!is_launcher(obj))
+            if (is_ammo(obj) && !ammo_and_launcher(obj, applicable_launcher))
             {
-                /* we use youmonst as a proxy */
-                /* You hit if rnd(20) < roll_to_hit */
-                int attknum = 1, armorpenalty = 0;
-                int roll_to_hit = 0;
-                if (throwing_weapon(obj) || is_ammo(obj))
+                if (!applicable_launcher || obj == applicable_launcher)
                 {
-                    roll_to_hit = -1 + Luck + u_ranged_strdex_to_hit_bonus() + find_mac(&youmonst) + u.ubasehitinc + u.uhitinc
-                        + maybe_polyd(youmonst.data->mlevel, u.ulevel);
-
-                    roll_to_hit += omon_adj(&youmonst, obj, FALSE);
-
-                    if (is_ammo(obj))
+                    powercnt++;
+                    Sprintf(buf, " %2d - You have not readied a compatible launcher", powercnt);
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                }
+                else
+                {
+                    powercnt++;
+                    Sprintf(buf, " %2d - Not compatible with %s", powercnt, yname(applicable_launcher));
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                }
+            }
+            else
+            {
+                weapon_stats_printed = TRUE;
+                if (!is_launcher(obj) && stats_known && obj->known
+                    && (obj == applicable_launcher || !ammo_and_launcher(obj, applicable_launcher)
+                        || (ammo_and_launcher(obj, applicable_launcher) && object_stats_known(applicable_launcher) && applicable_launcher->known))
+                    )
+                {
+                    /* we use youmonst as a proxy */
+                    /* You hit if rnd(20) < roll_to_hit */
+                    int attknum = 1, armorpenalty = 0;
+                    int roll_to_hit = 0;
+                    if ((is_thrown_weapon_only(obj) || is_ammo(obj)) && !(obj == uwep || obj == uwep2 || obj == uswapwep || obj == uswapwep2))
                     {
-                        if (!ammo_and_launcher(obj, applicable_launcher))
-                        {
-                            roll_to_hit -= 4;
-                        }
-                        else if (applicable_launcher)
-                        {
-                            roll_to_hit += weapon_to_hit_value(applicable_launcher, &youmonst, &youmonst, 2);
-                            roll_to_hit += weapon_skill_hit_bonus(applicable_launcher, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
+                        roll_to_hit = -1 + Luck + u_ranged_strdex_to_hit_bonus() + find_mac(&youmonst) + u.ubasehitinc + u.uhitinc
+                            + maybe_polyd(youmonst.data->mlevel, u.ulevel);
 
-                            if ((Race_if(PM_ELF) || Role_if(PM_SAMURAI))
-                                && (!Upolyd || your_race(youmonst.data))
-                                && objects[applicable_launcher->otyp].oc_skill == P_BOW)
+                        roll_to_hit += omon_adj(&youmonst, obj, FALSE);
+
+                        if (is_ammo(obj))
+                        {
+                            if (!ammo_and_launcher(obj, applicable_launcher))
                             {
-                                roll_to_hit++;
-                                if (Race_if(PM_ELF) && applicable_launcher->otyp == ELVEN_LONG_BOW)
-                                    roll_to_hit++;
-                                else if (Role_if(PM_SAMURAI) && applicable_launcher->otyp == YUMI)
-                                    roll_to_hit++;
+                                roll_to_hit -= 4;
                             }
+                            else if (applicable_launcher)
+                            {
+                                roll_to_hit += weapon_to_hit_value(applicable_launcher, &youmonst, &youmonst, 2);
+                                roll_to_hit += weapon_skill_hit_bonus(applicable_launcher, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
 
-                            roll_to_hit += u.uarcherybonus;
-                            double archery_avg_dmg = (double)u.uarcherybonus;
-                            wep_avg_dmg += archery_avg_dmg;
-                            wep_multipliable_avg_dmg += archery_avg_dmg;
-                            if (wep_avg_dmg < 0)
-                                wep_avg_dmg = 0;
+                                if ((Race_if(PM_ELF) || Role_if(PM_SAMURAI))
+                                    && (!Upolyd || your_race(youmonst.data))
+                                    && objects[applicable_launcher->otyp].oc_skill == P_BOW)
+                                {
+                                    roll_to_hit++;
+                                    if (Race_if(PM_ELF) && applicable_launcher->otyp == ELVEN_LONG_BOW)
+                                        roll_to_hit++;
+                                    else if (Role_if(PM_SAMURAI) && applicable_launcher->otyp == YUMI)
+                                        roll_to_hit++;
+                                }
+
+                                roll_to_hit += u.uarcherybonus;
+                                double archery_avg_dmg = (double)u.uarcherybonus;
+                                wep_avg_dmg += archery_avg_dmg;
+                                wep_multipliable_avg_dmg += archery_avg_dmg;
+                                if (wep_avg_dmg < 0)
+                                    wep_avg_dmg = 0;
+                            }
+                        }
+                        else
+                        {
+                            if (is_thrown_weapon_only(obj)) /* meant to be thrown */
+                                roll_to_hit += 2;
+
+                            roll_to_hit += weapon_skill_hit_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
                         }
                     }
                     else
                     {
-                        if (throwing_weapon(obj)) /* meant to be thrown */
-                            roll_to_hit += 2;
+                        roll_to_hit = find_roll_to_hit(&youmonst, AT_WEAP, obj, &attknum, &armorpenalty);
+                    }
 
-                        roll_to_hit += weapon_skill_hit_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
+                    /* This is not accurate for fired weapons since it does not account for launcher properly; also thrown weapons plusses are a bit inaccurate */
+                    int youmonstac = find_mac(&youmonst);
+                    int chance_to_hit_youmonst = (roll_to_hit - 1) * 5;
+                    int chance_to_hit_ac0 = chance_to_hit_youmonst - youmonstac * 5;
+                    int diff_to_50_from_ac0 = 50 - chance_to_hit_ac0;
+                    int ac_with_50_chance = diff_to_50_from_ac0 / 5;
+                    int diff_to_5_from_ac0 = 5 - chance_to_hit_ac0;
+                    int ac_with_5_chance = diff_to_5_from_ac0 / 5;
+                    wep_ac50pct_stat_set = TRUE;
+                    wep_ac50pct_stat = ac_with_50_chance;
+                    if (stats_ptr)
+                    {
+                        stats_ptr->wep_ac50pct_set = TRUE;
+                        stats_ptr->ac50pct = ac_with_50_chance;
+                    }
+                    powercnt++;
+                    Sprintf(buf, " %2d - You have ", powercnt);
+                    putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, NO_COLOR, 1);
+                    putstr_ex(datawin, "50%", ATR_INDENT_AT_DASH | ATR_BOLD, CLR_WHITE, 1);
+                    putstr_ex(datawin, " chance to hit AC ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+                    Sprintf(buf, "%d", ac_with_50_chance);
+                    putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_BOLD, CLR_WHITE, 1);
+                    putstr_ex(datawin, " and ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+                    putstr_ex(datawin, "5%", ATR_INDENT_AT_DASH | ATR_BOLD, CLR_WHITE, 1);
+                    putstr_ex(datawin, " AC ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+                    Sprintf(buf, "%d", ac_with_5_chance);
+                    putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_BOLD, CLR_WHITE, 0);
+                }
+
+                struct multishot_result msres = get_multishot_stats(&youmonst, obj, is_launcher(obj) ? obj : uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : obj, is_launcher(obj) ? 2 : (is_ammo(obj) || throwing_weapon(obj)));
+                double average_multi_shot_times = msres.average;
+
+                powercnt++;
+                const char* applicable_verb = is_thrown_weapon_only(obj) ? "throw" : is_launcher(obj) || ammo_and_launcher(obj, applicable_launcher) ? "fire" : "strike";
+                if (average_multi_shot_times == 1.0)
+                    Sprintf(buf, " %2d - You %s once per round", powercnt, applicable_verb);
+                else if (average_multi_shot_times == 2.0)
+                    Sprintf(buf, " %2d - You %s twice per round", powercnt, applicable_verb);
+                else if (average_multi_shot_times == 3.0)
+                    Sprintf(buf, " %2d - You %s three times per round", powercnt, applicable_verb);
+                else
+                    Sprintf(buf, " %2d - You %s an average of %.1f time%s per round", powercnt, applicable_verb, average_multi_shot_times, plur(average_multi_shot_times));
+
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+
+                double skill_dmg_bonus = (double)weapon_skill_dmg_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
+                wep_avg_dmg += skill_dmg_bonus;
+                wep_multipliable_avg_dmg += skill_dmg_bonus;
+                if (wep_avg_dmg < 0)
+                    wep_avg_dmg = 0;
+
+                wep_avg_dmg *= average_multi_shot_times;
+                wep_multipliable_avg_dmg *= average_multi_shot_times;
+
+                if (has_slaying)
+                    wep_all_extra_avg_dmg += wep_multipliable_avg_dmg * 1;
+
+                if (stats_ptr)
+                {
+                    stats_ptr->avg_damage = wep_avg_dmg;
+                    stats_ptr->extra_damage = wep_all_extra_avg_dmg;
+                }
+
+                powercnt++;
+                Sprintf(buf, " %2d - Your basic average damage is %.1f per round", powercnt, wep_avg_dmg);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                if (wep_all_extra_avg_dmg != 0)
+                {
+                    powercnt++;
+                    Sprintf(buf, " %2d - Your average damage with extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg);
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                }
+
+                if (is_launcher(obj) && ammo_and_launcher(uquiver, obj) && !stats_ptr)
+                {
+                    struct item_description_stats ammo_stats = { 0 };
+                    (void)itemdescription_core(uquiver, uquiver->otyp, &ammo_stats);
+                    char dmgbuf[BUFSZ];
+                    if (ammo_stats.stats_set && ammo_stats.weapon_stats_printed)
+                        Sprintf(dmgbuf, "%.1f", ammo_stats.avg_damage);
+                    else
+                        Strcpy(dmgbuf, "further");
+                    powercnt++;
+                    Sprintf(buf, " %2d - %s will cause %s damage per round", powercnt, uquiver ? Yname2(uquiver) : "Your ammo", dmgbuf);
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                    if (ammo_stats.stats_set && ammo_stats.weapon_stats_printed)
+                    {
+                        powercnt++;
+                        Sprintf(buf, " %2d - Your average damage with ammo is %.1f per round", powercnt, wep_avg_dmg + ammo_stats.avg_damage);
+                        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                        if (wep_all_extra_avg_dmg != 0)
+                        {
+                            powercnt++;
+                            Sprintf(buf, " %2d - Your average damage with ammo and extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg + ammo_stats.avg_damage);
+                            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                        }
                     }
                 }
-                else
+                else if (is_ammo(obj) && ammo_and_launcher(obj, applicable_launcher) && !stats_ptr)
                 {
-                    roll_to_hit = find_roll_to_hit(&youmonst, AT_WEAP, obj, &attknum, &armorpenalty);
+                    struct item_description_stats launcher_stats = { 0 };
+                    (void)itemdescription_core(applicable_launcher, applicable_launcher->otyp, &launcher_stats);
+                    char dmgbuf[BUFSZ];
+                    if (launcher_stats.stats_set && launcher_stats.weapon_stats_printed)
+                        Sprintf(dmgbuf, "%.1f", launcher_stats.avg_damage);
+                    else
+                        Strcpy(dmgbuf, "further");
+                    powercnt++;
+                    Sprintf(buf, " %2d - %s will cause %s damage per round", powercnt, applicable_launcher ? Yname2(applicable_launcher) : "Your launcher", dmgbuf);
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                    if (launcher_stats.stats_set && launcher_stats.weapon_stats_printed)
+                    {
+                        powercnt++;
+                        Sprintf(buf, " %2d - Your average damage with launcher is %.1f per round", powercnt, wep_avg_dmg + launcher_stats.avg_damage);
+                        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                        if (wep_all_extra_avg_dmg != 0)
+                        {
+                            powercnt++;
+                            Sprintf(buf, " %2d - Your average damage with launcher and extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg + launcher_stats.avg_damage);
+                            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                        }
+                    }
                 }
-
-                /* This is not accurate for fired weapons since it does not account for launcher properly; also thrown weapons plusses are a bit inaccurate */
-
-                int youmonstac = find_mac(&youmonst);
-                int chance_to_hit_youmonst = (roll_to_hit - 1) * 5;
-                int chance_to_hit_ac0 = chance_to_hit_youmonst - youmonstac * 5;
-                int diff_to_50_from_ac0 = 50 - chance_to_hit_ac0;
-                int ac_with_50_chance = diff_to_50_from_ac0 / 5;
-                int diff_to_5_from_ac0 = 5 - chance_to_hit_ac0;
-                int ac_with_5_chance = diff_to_5_from_ac0 / 5;
-
-                powercnt++;
-                //#if defined(GNH_MOBILE) || defined (WIN32)
-                Sprintf(buf, " %2d - You have ", powercnt);
-                putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, NO_COLOR, 1);
-                putstr_ex(datawin, "50%", ATR_INDENT_AT_DASH, CLR_BROWN, 1);
-                putstr_ex(datawin, " chance to hit AC ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
-                Sprintf(buf, "%d", ac_with_50_chance);
-                putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, CLR_BROWN, 1);
-                putstr_ex(datawin, " and ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
-                putstr_ex(datawin, "5%", ATR_INDENT_AT_DASH, CLR_RED, 1);
-                putstr_ex(datawin, " AC ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
-                Sprintf(buf, "%d", ac_with_5_chance);
-                putstr_ex(datawin, buf, ATR_INDENT_AT_DASH, CLR_RED, 0);
-                //#else
-                //        Sprintf(buf, " %2d - You have 50%% chance to hit AC %d and 5%% AC %d", powercnt, ac_with_50_chance, ac_with_5_chance);
-                //        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-                //#endif
-            }
-
-            struct multishot_result msres = get_multishot_stats(&youmonst, obj, is_launcher(obj) ? obj : uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : obj, is_launcher(obj) ? 2 : (is_ammo(obj) || throwing_weapon(obj)));
-            double average_multi_shot_times = msres.average;
-
-            powercnt++;
-            const char* applicable_verb = throwing_weapon(obj) ? "throw" : is_launcher(obj) || ammo_and_launcher(obj, applicable_launcher) ? "fire" : "strike";
-            if (average_multi_shot_times == 1.0)
-                Sprintf(buf, " %2d - You %s once per round", powercnt, applicable_verb);
-            else if (average_multi_shot_times == 2.0)
-                Sprintf(buf, " %2d - You %s twice per round", powercnt, applicable_verb);
-            else if (average_multi_shot_times == 3.0)
-                Sprintf(buf, " %2d - You %s three times per round", powercnt, applicable_verb);
-            else
-                Sprintf(buf, " %2d - You %s an average of %.1f time%s per round", powercnt, applicable_verb, average_multi_shot_times, plur(average_multi_shot_times));
-
-            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-
-            double skill_dmg_bonus = (double)weapon_skill_dmg_bonus(obj, P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
-            wep_avg_dmg += skill_dmg_bonus;
-            wep_multipliable_avg_dmg += skill_dmg_bonus;
-            if (wep_avg_dmg < 0)
-                wep_avg_dmg = 0;
-
-            wep_avg_dmg *= average_multi_shot_times;
-            wep_multipliable_avg_dmg *= average_multi_shot_times;
-
-            if (has_slaying)
-                wep_all_extra_avg_dmg += wep_multipliable_avg_dmg * 2;
-
-            powercnt++;
-            Sprintf(buf, " %2d - Your basic average damage is %.1f per round", powercnt, wep_avg_dmg);
-            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-
-            if (wep_all_extra_avg_dmg != 0)
-            {
-                powercnt++;
-                Sprintf(buf, " %2d - Your average damage with extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg);
-                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-            }
-
-            if (is_launcher(obj) && ammo_and_launcher(uquiver, obj))
-            {
-                powercnt++;
-                Sprintf(buf, " %2d - %s will cause further damage", powercnt, uquiver ? Yname2(uquiver) : "Your ammo");
-                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-
-            }
-            else if (is_ammo(obj) && ammo_and_launcher(obj, uwep))
-            {
-                powercnt++;
-                Sprintf(buf, " %2d - %s will cause further damage", powercnt, uwep ? Yname2(uwep) : "Your launcher");
-                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-
             }
         }
 
@@ -4235,9 +4405,21 @@ int otyp;
             totalacbonus = -ARM_AC_BONUS(obj, youmonst.data);
             totalmcbonus = ARM_MC_BONUS(obj, youmonst.data);
         }
+        if (is_shield(obj))
+        {
+            totalacbonus -= shield_skill_ac_bonus(P_SKILL_LEVEL(P_SHIELD));
+            totalmcbonus += shield_skill_mc_bonus(P_SKILL_LEVEL(P_SHIELD));
+        }
+        if (stats_ptr)
+        {
+            stats_ptr->ac_bonus = totalacbonus;
+            stats_ptr->mc_bonus = totalmcbonus;
+        }
+
         if ((stats_known && (is_armor(obj) || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)))
             || totalacbonus != 0 || totalmcbonus != 0 || (has_obj_mythic_defense(obj) && obj->mknown))
         {
+            armor_stats_printed = TRUE;
             int powercnt = 0;
             Sprintf(buf, "Armor statistics:");
             putstr(datawin, ATR_HEADING, buf);
@@ -4249,7 +4431,91 @@ int otyp;
             powercnt++;
             Sprintf(buf, " %2d - %s MC %s %s%d", powercnt, totalprefix, totalmcbonus < 0 ? "penalty" : "bonus", totalmcbonus >= 0 ? "+" : "", totalmcbonus);
             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        }
 
+        /* Comparison to current item */
+        if (!stats_ptr)
+        {
+            struct obj* launcher = uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : 0;
+            struct obj* cwep = is_ammo(obj) ? (uquiver && launcher && ammo_and_launcher(uquiver, launcher) && ammo_and_launcher(obj, launcher) ? uquiver : 0) :
+                is_thrown_weapon_only(obj) ? (uquiver && is_thrown_weapon_only(uquiver) ? uquiver : 0) :
+                (is_wieldable_weapon(obj) && uwep && is_launcher(obj) == is_launcher(uwep)) ? uwep :
+                (is_wieldable_weapon(obj) && uswapwep && is_launcher(obj) == is_launcher(uswapwep)) ? uswapwep : 0;
+            if (cwep && cwep != obj && uwep2 != obj && uswapwep2 != obj && weapon_stats_printed)
+            {
+                struct item_description_stats cwep_stats = { 0 };
+                (void)itemdescription_core(cwep, cwep->otyp, &cwep_stats);
+                if (cwep_stats.stats_set && cwep_stats.weapon_stats_printed)
+                {
+                    int powercnt = 0;
+                    Sprintf(buf, "Comparison to current %s:", cwep == uwep ? "weapon" : cwep == uswapwep ? "alternative weapon" : 
+                        cwep == uquiver ? (is_ammo(obj) ? "quivered ammo" : "readied thrown weapon") : "readied item");
+                    putstr(datawin, ATR_HEADING, buf);
+                    powercnt++;
+                    Sprintf(buf, " %2d - Change in average damage is ", powercnt);
+                    putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, NO_COLOR, 1);
+                    double dmgdiff = wep_avg_dmg - cwep_stats.avg_damage;
+                    Sprintf(buf, "%s%.1f", dmgdiff >= 0 ? "+" : "", dmgdiff);
+                    putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, dmgdiff > 0 ? CLR_BRIGHT_GREEN : dmgdiff < 0 ? CLR_RED : NO_COLOR, 0);
+                    if (wep_ac50pct_stat_set && cwep_stats.wep_ac50pct_set)
+                    {
+                        powercnt++;
+                        Sprintf(buf, " %2d - Change in AC hit at 50%% chance is ", powercnt);
+                        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, NO_COLOR, 1);
+                        int ac50pcthitdiff = wep_ac50pct_stat - cwep_stats.ac50pct;
+                        Sprintf(buf, "%s%d", ac50pcthitdiff >= 0 ? "+" : "", ac50pcthitdiff);
+                        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, ac50pcthitdiff < 0 ? CLR_BRIGHT_GREEN : ac50pcthitdiff > 0 ? CLR_RED : NO_COLOR, 0);
+                    }
+                }
+            }
+            if (is_armor(obj) && armor_stats_printed)
+            {
+                struct obj* current_armor = 0;
+                if (is_suit(obj))
+                    current_armor = uarm;
+                else if (is_cloak(obj))
+                    current_armor = uarmc;
+                else if (is_robe(obj))
+                    current_armor = uarmo;
+                else if (is_shirt(obj))
+                    current_armor = uarmu;
+                else if (is_helmet(obj))
+                    current_armor = uarmh;
+                else if (is_gloves(obj))
+                    current_armor = uarmg;
+                else if (is_boots(obj))
+                    current_armor = uarmf;
+                else if (is_bracers(obj))
+                    current_armor = uarmb;
+                else if (is_shield(obj))
+                    current_armor = uarms;
+
+                if (current_armor && obj != current_armor && is_armor(current_armor))
+                {
+                    struct item_description_stats armor_stats = { 0 };
+                    (void)itemdescription_core(current_armor, current_armor->otyp, &armor_stats);
+                    if (armor_stats.stats_set && armor_stats.armor_stats_printed)
+                    {
+                        int armor_type = objects[current_armor->otyp].oc_subtyp;
+                        const char* atypename = armor_type_names[armor_type];
+                        int powercnt = 0;
+                        Sprintf(buf, "Comparison to current %s", atypename);
+                        putstr(datawin, ATR_HEADING, buf);
+                        powercnt++;
+                        Sprintf(buf, " %2d - Change in AC is ", powercnt);
+                        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, NO_COLOR, 1);
+                        int acdiff = totalacbonus - armor_stats.ac_bonus;
+                        Sprintf(buf, "%s%d", acdiff >= 0 ? "+" : "", acdiff);
+                        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, acdiff < 0 ? CLR_BRIGHT_GREEN : acdiff > 0 ? CLR_RED : NO_COLOR, 0);
+                        powercnt++;
+                        Sprintf(buf, " %2d - Change in MC is ", powercnt);
+                        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, NO_COLOR, 1);
+                        int mcdiff = totalmcbonus - armor_stats.mc_bonus;
+                        Sprintf(buf, "%s%d", mcdiff >= 0 ? "+" : "", mcdiff);
+                        putstr_ex(datawin, buf, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, mcdiff > 0 ? CLR_BRIGHT_GREEN : mcdiff < 0 ? CLR_RED : NO_COLOR, 0);
+                    }
+                }
+            }
         }
 
         /* Hints */
@@ -4282,7 +4548,14 @@ int otyp;
     }
     display_nhwindow(datawin, FALSE);
     destroy_nhwindow(datawin), datawin = WIN_ERR;
-
+    if (stats_ptr)
+    {
+        stats_ptr->stats_set = TRUE;
+        stats_ptr->weapon_stats_printed = weapon_stats_printed;
+        stats_ptr->armor_stats_printed = armor_stats_printed;
+        stats_ptr->wep_ac50pct_set = wep_ac50pct_stat_set;
+        windowprocs = saved_procs;
+    }
     return 0;
 }
 
@@ -4358,7 +4631,7 @@ struct permonst* ptr;
 
     winid datawin = WIN_ERR;
     int glyph = mon ? any_mon_to_glyph(mon, rn2_on_display_rng) : (int)(ptr - &mons[0]) + GLYPH_MON_OFF;
-    int gui_glyph = mon ? maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL, 0UL, MAT_NONE, 0)) : glyph;
+    int gui_glyph = mon ? maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL, 0UL, 0UL, MAT_NONE, 0)) : glyph;
 
     datawin = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_DESCRIPTION_SCREEN, gui_glyph, extended_create_window_info_from_mon_with_flags(mon, WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS));
 
@@ -4369,28 +4642,36 @@ struct permonst* ptr;
     char buf[BUFSZ];
     char buf2[BUFSZ];
     char buf3[BUFSZ];
+    char buf4[BUFSZ];
 
-    strcpy(buf, "");
-    strcpy(buf2, "");
-    strcpy(buf3, "");
+    Strcpy(buf, "");
+    Strcpy(buf2, "");
+    Strcpy(buf3, "");
 
     const char* monster_name = mon ? x_monnam(mon, ARTICLE_NONE, (char*)0, (has_mname(mon)) ? (SUPPRESS_SADDLE | SUPPRESS_IT) : SUPPRESS_IT, FALSE) : ptr->mname;
     const char* monster_type_name = mon ? mon_monster_name(mon) : ptr->mname;
     boolean contains_type_name = TRUE;
 
-    strcpy(buf2, "");
-    strcpy(buf3, "");
+    Strcpy(buf2, "");
+    Strcpy(buf3, "");
     if (strcmp(monster_name, monster_type_name) && !strstr(monster_name, monster_type_name))
     {
         contains_type_name = FALSE;
-        strcpy(buf2, monster_type_name);
+        Strcpy(buf2, monster_type_name);
         *buf2 = highc(*buf2);
         Sprintf(buf3, " - %s", buf2);
     }
 
+    Strcpy(buf4, "");
+    if (mon && has_umname(mon) && has_mname(mon) && mon->u_know_mname && !strcmp(monster_name, UMNAME(mon)) && strcmp(UMNAME(mon), MNAME(mon)))
+    {
+        Sprintf(buf4, " a.k.a. %s", MNAME(mon));
+    }
+
     /* Name */
-    Sprintf(buf, "%s%s", 
+    Sprintf(buf, "%s%s%s", 
         mon ? x_monnam(mon, ARTICLE_NONE, (char*)0, (has_mname(mon)) ? (SUPPRESS_SADDLE | SUPPRESS_IT) : SUPPRESS_IT, FALSE) : ptr->mname,
+           buf4,
            !contains_type_name ? buf3 : "");
     *buf = highc(*buf);
     if (ptr->mtitle && strcmp(ptr->mtitle, ""))
@@ -4540,21 +4821,21 @@ struct permonst* ptr;
         char specialbuf1[BUFSZ];
         char specialbuf2[BUFSZ];
 
-        strcpy(attypebuf, get_attack_type_text(ptr->mattk[i].aatyp));
+        Strcpy(attypebuf, get_attack_type_text(ptr->mattk[i].aatyp));
         *attypebuf = highc(*attypebuf);
 
-        strcpy(adtypebuf, "");
+        Strcpy(adtypebuf, "");
         const char* adtxt = get_damage_type_text((short)ptr->mattk[i].adtyp);
         if (adtxt && strcmp(adtxt, ""))
         {
             Sprintf(adtypebuf, ", %s", adtxt);
         }
 
-        strcpy(damagebuf, "");
+        Strcpy(damagebuf, "");
         if ((ptr->mattk[i].damn > 0 && ptr->mattk[i].damd > 0) || ptr->mattk[i].damp != 0)
         {
             boolean dpart = FALSE;
-            strcpy(damagebuf, " ");
+            Strcpy(damagebuf, " ");
 
             if ((ptr->mattk[i].damn > 0 && ptr->mattk[i].damd > 0))
             {
@@ -4605,6 +4886,7 @@ struct permonst* ptr;
 
     print_monster_statistics(datawin, mon, ptr);
     print_monster_intrinsics(datawin, mon, ptr);
+    print_monster_wearables(datawin, mon, ptr);
     print_monster_status(datawin, mon);
 
     display_nhwindow(datawin, FALSE);
@@ -4979,8 +5261,11 @@ register struct obj *obj;
     }
 
     if (obj->blessed || obj->cursed) {
-        There_ex(ATR_NONE, obj->blessed ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, "is %s flash as %s %s the altar.",
-              an(hcolor(obj->blessed ? NH_AMBER : NH_BLACK)), doname(obj),
+        const char* hclr = hcolor_multi_buf1(obj->blessed ? NH_AMBER : NH_BLACK);
+        //multicolor_buffer[2] = multicolor_buffer[1];
+        There_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : obj->blessed ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, // no_multiattrs, multicolor_buffer, 
+            "is %s%s%s as %s %s the altar.",
+            an_prefix(hclr), hclr, " flash", doname(obj),
               otense(obj, "hit"));
         if (!Hallucination)
             obj->bknown = 1;
@@ -5102,10 +5387,10 @@ register struct obj *obj;
         You_ex(ATR_NONE, CLR_MSG_ATTENTION, "thought %s got lost in the sink, but there it is!", yname(obj));
         goto giveback;
     case RIN_SLOW_DIGESTION:
-        pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "ring is regurgitated!");
+        pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "ring is regurgitated!");
  giveback:
         obj->in_use = FALSE;
-        dropx(obj);
+        dropxf(obj);
         trycall(obj);
         return;
     case RIN_LEVITATION:
@@ -5209,13 +5494,13 @@ register struct obj *obj;
         ideed = TRUE;
         switch (obj->otyp) { /* effects that need eyes */
         case RIN_ADORNMENT:
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "faucets flash brightly for a moment.");
+            pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "faucets flash brightly for a moment.");
             break;
         case RIN_REGENERATION:
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink looks as good as new.");
+            pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "sink looks as good as new.");
             break;
         case RIN_REPLENISHMENT:
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink shines with a blue aura for a while.");
+            pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "sink shines with a blue aura for a while.");
             break;
         case RIN_INVISIBILITY:
             You("don't see anything happen to the sink.");
@@ -5242,11 +5527,15 @@ register struct obj *obj;
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink looks nothing like a fountain.");
             break;
         case RIN_PROTECTION:
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink glows %s for a moment.",
-                      hcolor((obj->enchantment < 0) ? NH_BLACK : NH_SILVER));
+        {
+            pline_The_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "sink glows %s for a moment.",
+                hcolor_multi_buf0((obj->enchantment < 0) ? NH_BLACK : NH_SILVER));
+            //pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink glows %s for a moment.",
+            //    hcolor((obj->enchantment < 0) ? NH_BLACK : NH_SILVER));
             break;
+        }
         case RIN_WARNING:
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink glows %s for a moment.", hcolor(NH_WHITE));
+            pline_The_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "sink glows %s for a moment.", hcolor_multi_buf0(NH_WHITE));
             break;
         case RIN_TELEPORT_CONTROL:
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "sink looks like it is being beamed aboard somewhere.");
@@ -5267,7 +5556,7 @@ register struct obj *obj;
     if (!rn2(20) && !nosink) {
         pline_The("sink backs up, leaving %s.", doname(obj));
         obj->in_use = FALSE;
-        dropx(obj);
+        dropxf(obj);
     } else if (!rn2(5)) {
         freeinv(obj);
         obj->in_use = FALSE;
@@ -5406,6 +5695,13 @@ register struct obj *obj;
     return 1;
 }
 
+int
+autobag(obj) /* To inventory */
+register struct obj* obj;
+{
+    return auto_bag_in(invent, obj, FALSE);
+}
+
 /* dropx - take dropped item out of inventory;
    called in several places - may produce output
    (eg ship_object() and dropy() -> sellobj() both produce output) */
@@ -5426,11 +5722,41 @@ register struct obj *obj;
     dropy(obj);
 }
 
+/* dropxf - take dropped item out of inventory;
+   called in several places - may produce output
+   (eg ship_object() and dropy() -> sellobj() both produce output) */
+void
+dropxf(obj)
+register struct obj* obj;
+{
+    /* Ensure update when we drop gold objects */
+    if (obj->oclass == COIN_CLASS)
+        context.botl = 1;
+    freeinv(obj);
+    obj_set_found(obj);
+    if (!u.uswallow) {
+        if (ship_object(obj, u.ux, u.uy, FALSE))
+            return;
+        if (IS_ALTAR(levl[u.ux][u.uy].typ))
+            doaltarobj(obj); /* set bknown */
+    }
+    dropy(obj);
+}
+
 /* dropy - put dropped object at destination; called from lots of places */
 void
 dropy(obj)
 struct obj *obj;
 {
+    dropz(obj, FALSE);
+}
+
+/* dropyf - put dropped object at destination; called from lots of places */
+void
+dropyf(obj)
+struct obj* obj;
+{
+    obj_set_found(obj);
     dropz(obj, FALSE);
 }
 
@@ -5697,7 +6023,7 @@ int retry;
     {
         all_categories = FALSE;
         n = query_category("Drop what type of items?", invent,
-                           UNPAID_TYPES | UNIDENTIFIED_TYPES | ALL_TYPES | CHOOSE_ALL | BUC_BLESSED
+                           UNPAID_TYPES | UNIDENTIFIED_TYPES | UNKNOWN_TYPES | ALL_TYPES | CHOOSE_ALL | BUC_BLESSED
                                | BUC_CURSED | BUC_UNCURSED | BUC_UNKNOWN,
                            &pick_list, PICK_ANY);
         if (!n)
@@ -5820,6 +6146,178 @@ int retry;
  drop_done:
     return n_dropped;
 }
+
+
+/* autostash command: stash several things automatically */
+int
+doautostash()
+{
+    int result = 0;
+
+    if (!invent) 
+    {
+        You("have nothing to stash.");
+        return 0;
+    }
+    if (!count_bags_for_stashing(invent, invent, FALSE, FALSE))
+    {
+        You("have no appropriate containers to stash your items into.");
+        return 0;
+    }
+    add_valid_menu_class(0); /* clear any classes already there */
+    if (flags.menu_style != MENU_TRADITIONAL
+        || (result = ggetobj("put in bag", autobag, 0, FALSE, (unsigned*)0, 3)) < -1)
+        result = menu_autostash(result);
+    if (result)
+        reset_occupations();
+
+    return result;
+}
+
+/* Drop things from the hero's inventory, using a menu. */
+STATIC_OVL int
+menu_autostash(retry)
+int retry;
+{
+    int n, i, n_autobagged = 0;
+    long cnt;
+    struct obj* otmp, * otmp2;
+    menu_item* pick_list = (menu_item*)0;
+    boolean all_categories = TRUE;
+    boolean autobag_everything = FALSE;
+
+    if (retry)
+    {
+        all_categories = (retry == -2);
+    }
+    else if (flags.menu_style == MENU_FULL)
+    {
+        all_categories = FALSE;
+        n = query_category("Put what type of items into bag?", invent,
+            UNPAID_TYPES | UNIDENTIFIED_TYPES | UNKNOWN_TYPES | ALL_TYPES | CHOOSE_ALL | BUC_BLESSED
+            | BUC_CURSED | BUC_UNCURSED | BUC_UNKNOWN,
+            &pick_list, PICK_ANY);
+        if (!n)
+            goto autobag_done;
+        for (i = 0; i < n; i++)
+        {
+            if (pick_list[i].item.a_int == ALL_TYPES_SELECTED)
+                all_categories = TRUE;
+            else if (pick_list[i].item.a_int == 'A')
+            {
+                if (ParanoidAutoSelectAll)
+                {
+                    if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "All Items Selected", "Are you sure to put all items into bag?") != 'y')
+                    {
+                        free((genericptr_t)pick_list);
+                        return 0;
+                    }
+                }
+
+                autobag_everything = TRUE;
+            }
+            else
+                add_valid_menu_class(pick_list[i].item.a_int);
+        }
+        free((genericptr_t)pick_list);
+    }
+    else if (flags.menu_style == MENU_COMBINATION)
+    {
+        unsigned ggoresults = 0;
+
+        all_categories = FALSE;
+        /* Gather valid classes via traditional GnollHack method */
+        i = ggetobj("put in bag", autobag, 0, TRUE, &ggoresults, 3);
+        if (i == -2)
+            all_categories = TRUE;
+        if (ggoresults & ALL_FINISHED)
+        {
+            n_autobagged = i;
+            goto autobag_done;
+        }
+    }
+
+    if (autobag_everything)
+    {
+        /*
+         * Dropping a burning potion of oil while levitating can cause
+         * an explosion which might destroy some of hero's inventory,
+         * so the old code
+         *      for (otmp = invent; otmp; otmp = otmp2) {
+         *          otmp2 = otmp->nobj;
+         *          n_autobagged += drop(otmp);
+         *      }
+         * was unreliable and could lead to an "object lost" panic.
+         *
+         * Use the bypass bit to mark items already processed (hence
+         * not autobaggable) and rescan inventory until no unbypassed
+         * items remain.
+         */
+        bypass_objlist(invent, FALSE); /* clear bypass bit for invent */
+        while ((otmp = nxt_unbypassed_obj(invent)) != 0)
+            n_autobagged += auto_bag_in(invent, otmp, FALSE);
+        /* we might not have autobagged everything (worn armor, welded weapon,
+           cursed loadstones), so reset any remaining inventory to normal */
+        bypass_objlist(invent, FALSE);
+    }
+    else
+    {
+        /* should coordinate with perm invent, maybe not show worn items */
+        n = query_objlist("What would you like to put in bag?", &invent,
+            (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ANY,
+            all_categories ? allow_all : allow_category, 3);
+        if (n > 0 && pick_list)
+        {
+            /*
+             * picklist[] contains a set of pointers into inventory, but
+             * as soon as something gets autobagged, they might become stale
+             * (see the autobag_everything code above for an explanation).
+             * Just checking to see whether one is still in the invent
+             * chain is not sufficient validation since destroyed items
+             * will be freed and items we've split here might have already
+             * reused that memory and put the same pointer value back into
+             * invent.  Ditto for using invlet to validate.  So we start
+             * by setting bypass on all of invent, then check each pointer
+             * to verify that it is in invent and has that bit set.
+             */
+            bypass_objlist(invent, TRUE);
+            for (i = 0; i < n; i++)
+            {
+                otmp = pick_list[i].item.a_obj;
+                for (otmp2 = invent; otmp2; otmp2 = otmp2->nobj)
+                    if (otmp2 == otmp)
+                        break;
+                if (!otmp2 || !otmp2->bypass)
+                    continue;
+                /* found next selected invent item */
+                cnt = pick_list[i].count;
+                if (cnt < otmp->quan)
+                {
+                    if (welded(otmp, &youmonst))
+                    {
+                        ; /* don't split */
+                    }
+                    else if ((objects[otmp->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED) && otmp->cursed)
+                    {
+                        /* same kludge as getobj(), for canletgo()'s use */
+                        otmp->corpsenm = (int)cnt; /* don't split */
+                    }
+                    else
+                    {
+                        otmp = splitobj(otmp, cnt);
+                    }
+                }
+                n_autobagged += auto_bag_in(invent, otmp, FALSE);
+            }
+            bypass_objlist(invent, FALSE); /* reset invent to normal */
+            free((genericptr_t)pick_list);
+        }
+    }
+
+autobag_done:
+    return n_autobagged;
+}
+
 
 /* on a ladder, used in goto_level */
 STATIC_VAR NEARDATA boolean at_ladder = FALSE;
@@ -6168,10 +6666,10 @@ struct monst *mtmp;
 }
 
 void
-goto_level(newlevel, at_location, falling, portal)
+goto_level(newlevel, at_location, falling, inside_tower, portal)
 d_level *newlevel;
-boolean at_location; /* 1 = at stairs, 2 = at altar */
-boolean falling;
+uchar at_location; /* 1 = at stairs, 2 = at altar */
+boolean falling, inside_tower;
 xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = Modron portal up (find portal down), 4 = Modron portal (random destination) */
 {
     int fd, l_idx;
@@ -6179,13 +6677,13 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     boolean cant_go_back, great_effort,
             up = (depth(newlevel) < depth(&u.uz)),
             newdungeon = (u.uz.dnum != newlevel->dnum),
-            was_in_W_tower = In_W_tower(u.ux, u.uy, &u.uz),
+            was_in_W_tower = In_W_tower(u.ux, u.uy, &u.uz) || inside_tower,
             familiar = FALSE,
             isnew = FALSE; /* made a new level? */
     struct monst *mtmp;
     char whynot[BUFSZ];
     char *annotation;
-    boolean play_arrival_teleport_effect = !!(u.utotype & 0x0100);
+    boolean play_arrival_teleport_effect = !!(u.utotype & UTOFLAGS_TELEPORT_EFFECT);
     d_level fromlevel = u.uz;
 
     if(at_location & 2)
@@ -6425,7 +6923,6 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     vision_full_recalc = 0; /* don't let that reenable vision yet */
     flush_screen(-1);       /* ensure all map flushes are postponed */
     char wakeupbuf[BUFSZ] = "";
-    boolean displaywakeup = FALSE;
 
     if (portal == 1 && !In_endgame(&u.uz))
     {
@@ -6535,41 +7032,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     }
     else if ((at_location & 2) && !In_endgame(&u.uz))
     {
-        int altar_x = 0, altar_y = 0;
-        int x, y;
-        boolean dobreak = FALSE;
-        for (x = 1; x < COLNO; x++)
-        {
-            for (y = 0; y < ROWNO; y++)
-            {
-                if (IS_ALTAR(levl[x][y].typ))
-                {
-                    altar_x = x;
-                    altar_y = y;
-                    if (a_align(x, y) == u.ualign.type)
-                    {
-                        dobreak = TRUE;
-                        break;
-                    }
-                }
-            }
-            if (dobreak)
-                break;
-        }
-
-        set_itimeout(&HInvulnerable, 0L);
-        heal_ailments_upon_revival();
-        displaywakeup = TRUE;
-        if (isok(altar_x, altar_y))
-        {
-            u_on_newpos(altar_x, altar_y);
-            Sprintf(wakeupbuf, "After being dead for a while, you suddenly feel the saving grace of %s, and wake up at %s altar.", u_gname(), u_ghisher());
-        }
-        else
-        {
-            u_on_rndspot(FALSE);
-            Sprintf(wakeupbuf, "After being dead for a while, you suddenly feel the saving grace of %s, and wake up.", u_gname());
-        }
+        revival_at_altar(wakeupbuf);
     }
     else 
     { /* trap door or level_tele or In_endgame */
@@ -6649,12 +7112,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         set_special_level_seen(&u.uz, TRUE);
     }
 
-    if (displaywakeup)
-    {
-        play_sfx_sound(SFX_REVIVAL);
-        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, wakeupbuf);
-        display_popup_text(wakeupbuf, "Revival", POPUP_TEXT_REVIVAL, ATR_NONE, CLR_MSG_SUCCESS, NO_GLYPH, POPUP_FLAGS_NONE);
-    }
+    revival_popup_message(wakeupbuf);
 
     /* special levels can have a custom arrival message */
     deliver_splev_message();
@@ -6820,7 +7278,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         else if (newdungeon && u.uhave.amulet)
             resurrect(); /* force confrontation with Wizard */
 
-#ifdef GNH_MOBILE
+#if FALSE
         if (Is_waterlevel(&u.uz))
         {
             issue_simple_gui_command(GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE_ON_LEVEL);
@@ -6900,11 +7358,17 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "For a moment, you feel as if the fabric of reality stretches back and forth a bit, but then the sensation passes.");
         }
 
-        if (context.game_difficulty < 0 && level_difficulty() >= MINIMUM_DGN_LEVEL_POLY_TRAP && !u.uevent.polymorph_trap_warning)
+        if ((flags.force_hint || context.game_difficulty <= flags.max_hint_difficulty) && level_difficulty() >= MINIMUM_DGN_LEVEL_POLY_TRAP && !u.uevent.polymorph_trap_warning)
         {
             u.uevent.polymorph_trap_warning = 1;
             play_sfx_sound(SFX_WARNING);
             custompline_ex_prefix(ATR_NONE, CLR_MSG_WARNING, "WARNING", ATR_NONE, NO_COLOR, " - ", ATR_NONE, CLR_MSG_WARNING, 0U, "Polymorph traps can be present on dungeon level %d and below.", MINIMUM_DGN_LEVEL_POLY_TRAP);
+        }
+
+        if (!u.uhint.secret_doors_and_corridors && u.uz.dnum == main_dungeon_dnum &&
+            u.uz.dlevel > (context.game_difficulty <= NO_SECRET_DOORS_DIFFICULTY_THRESHOLD ? NO_SECRET_DOORS_DUNGEON_LEVEL_THRESHOLD : 1))
+        {
+            standard_hint("There may be secret doors and corridors. If you are stuck, try searching for hidden passages.", &u.uhint.secret_doors_and_corridors);
         }
     }
 
@@ -6939,7 +7403,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         if(!In_endgame(&u.uz) && (curdepth != (int)u.uz.dlevel || special_lvl))
             Sprintf(lvlbuf2, "Dungeon Level %d", curdepth);
         else
-            strcpy(lvlbuf2, "");
+            Strcpy(lvlbuf2, "");
 
         display_screen_text(lvlbuf, dngbuf, lvlbuf2, SCREEN_TEXT_ENTER_DUNGEON_LEVEL, 0, 0, 0UL);
     }
@@ -6954,7 +7418,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
 
     /* assume this will always return TRUE when changing level */
     (void) in_out_region(u.ux, u.uy);
-    (void) pickup(1);
+    (void) pickup(1, FALSE);
 
 #ifdef WHEREIS_FILE
     touch_whereis();
@@ -6963,6 +7427,69 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     context.reviving = FALSE;
 }
 
+
+void
+revival_at_altar(wakeupbuf)
+char* wakeupbuf;
+{
+    int altar_x = 0, altar_y = 0;
+    int x, y;
+    boolean dobreak = FALSE;
+    for (x = 1; x < COLNO; x++)
+    {
+        for (y = 0; y < ROWNO; y++)
+        {
+            if (IS_ALTAR(levl[x][y].typ))
+            {
+                altar_x = x;
+                altar_y = y;
+                if (a_align(x, y) == u.ualign.type)
+                {
+                    dobreak = TRUE;
+                    break;
+                }
+            }
+        }
+        if (dobreak)
+            break;
+    }
+
+    set_itimeout(&HInvulnerable, 0L);
+    heal_ailments_upon_revival();
+    if (wakeupbuf)
+    {
+        int ux = u.ux, uy = u.uy;
+        if (isok(altar_x, altar_y))
+        {
+            if (MON_AT(altar_x, altar_y))
+                mnexto(m_at(altar_x, altar_y));
+            u_on_newpos(altar_x, altar_y);
+            if (MON_AT(u.ux, u.uy))
+                mnexto(m_at(u.ux, u.uy));
+            Sprintf(wakeupbuf, "After being dead for a while, you suddenly feel the saving grace of %s, and wake up at %s altar.", u_gname(), u_ghisher());
+        }
+        else
+        {
+            u_on_rndspot(FALSE);
+            if (MON_AT(u.ux, u.uy))
+                mnexto(m_at(u.ux, u.uy));
+            Sprintf(wakeupbuf, "After being dead for a while, you suddenly feel the saving grace of %s, and wake up.", u_gname());
+        }
+        newsym(ux, uy);
+    }
+}
+
+void
+revival_popup_message(wakeupbuf)
+char* wakeupbuf;
+{
+    if (wakeupbuf && *wakeupbuf)
+    {
+        play_sfx_sound(SFX_REVIVAL);
+        pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, wakeupbuf);
+        display_popup_text(wakeupbuf, "Revival", POPUP_TEXT_REVIVAL, ATR_NONE, CLR_MSG_SUCCESS, NO_GLYPH, POPUP_FLAGS_NONE);
+    }
+}
 
 STATIC_OVL void
 final_level()
@@ -6989,40 +7516,43 @@ STATIC_VAR char *dfr_pre_msg = 0,  /* pline() before level change */
 
 /* change levels at the end of this turn, after monsters finish moving */
 void
-schedule_goto(tolev, at_location, falling, teleport, portal_flag, pre_msg, post_msg)
+schedule_goto(tolev, at_location, falling, teleport, inside_tower, portal_flag, pre_msg, post_msg)
 d_level *tolev;
 uchar at_location; /* 1 = at stairs, 2 = at altar */
-boolean falling, teleport;
+boolean falling, teleport, inside_tower;
 long portal_flag;
 const char *pre_msg, *post_msg;
 {
-    short typmask = 0x0040; /* non-zero triggers `deferred_goto' */
+    short typmask = UTOFLAGS_DEFERRED_GOTO; /* non-zero triggers `deferred_goto' */
 
     /* destination flags (`goto_level' args) */
     if (at_location == 1)
-        typmask |= 0x0001;
+        typmask |= UTOFLAGS_AT_STAIRS;
     else if (at_location == 2)
-        typmask |= 0x0200;
+        typmask |= UTOFLAGS_AT_ALTAR;
 
     if (falling)
-        typmask |= 0x0002;
+        typmask |= UTOFLAGS_FALLING;
     if (portal_flag == 1)
-        typmask |= 0x0004;
+        typmask |= UTOFLAGS_PORTAL_1;
     else if (portal_flag == 2)
-        typmask |= 0x0008;
+        typmask |= UTOFLAGS_PORTAL_2;
     else if (portal_flag == 3)
-        typmask |= 0x0010;
+        typmask |= UTOFLAGS_PORTAL_3;
     else if (portal_flag == 4)
-        typmask |= 0x0020;
+        typmask |= UTOFLAGS_PORTAL_4;
 
     if (portal_flag < 0)
     {
-        typmask |= 0x0004; /* The same otherwise as 1 */
-        typmask |= 0x0080; /* flag for portal removal */
+        typmask |= UTOFLAGS_PORTAL_1; /* The same otherwise as 1 */
+        typmask |= UTOFLAGS_REMOVE_PORTAL; /* flag for portal removal */
     }
 
     if (teleport)
-        typmask |= 0x0100; /* flag for teleport in effect on new level */
+        typmask |= UTOFLAGS_TELEPORT_EFFECT; /* flag for teleport in effect on new level */
+
+    if (inside_tower)
+        typmask |= UTOFLAGS_INSIDE_TOWER; /* flag for going inside rather than outside Wizard's tower */
 
     u.utotype = typmask;
     /* destination level */
@@ -7046,17 +7576,23 @@ deferred_goto()
         assign_level(&dest, &u.utolev);
         if (dfr_pre_msg)
             pline1(dfr_pre_msg);
-        xchar portal_flag = (typmask & 4) ? 1 : (typmask & 8) ? 2 : (typmask & 16) ? 3 : (typmask & 32) ? 4 : 0;
-        goto_level(&dest, (!!(typmask & 1)) | (2 * !!(typmask & 0x0200)), !!(typmask & 2), portal_flag);
-        if (typmask & 0x0080) { /* remove portal */
-            struct trap *t = t_at(u.ux, u.uy);
+        xchar portal_flag = (typmask & UTOFLAGS_PORTAL_1) ? 1 : (typmask & UTOFLAGS_PORTAL_2) ? 2 : (typmask & UTOFLAGS_PORTAL_3) ? 3 : (typmask & UTOFLAGS_PORTAL_4) ? 4 : 0;
+        uchar at_location = (!!(typmask & UTOFLAGS_AT_STAIRS)) | (2 * (!!(typmask & UTOFLAGS_AT_ALTAR)));
+        boolean falling = !!(typmask & UTOFLAGS_FALLING);
+        boolean inside_tower = !!(typmask & UTOFLAGS_INSIDE_TOWER);
+        goto_level(&dest, at_location, falling, inside_tower, portal_flag);
 
+        /* Remove portal */
+        if (typmask & UTOFLAGS_REMOVE_PORTAL) 
+        {
+            struct trap *t = t_at(u.ux, u.uy);
             if (t)
             {
                 deltrap(t);
                 newsym(u.ux, u.uy);
             }
         }
+
         if (dfr_post_msg)
             pline1(dfr_post_msg);
     }
@@ -7330,7 +7866,7 @@ donull()
 {
     if (context.first_time_cmd || !occupation)
     {
-        display_gui_effect(u.ux, u.uy, GUI_EFFECT_WAIT, 0UL);
+        display_gui_effect(GUI_EFFECT_WAIT, 0, u.ux, u.uy, 0, 0, 0UL);
     }
 
     return 1; /* Do nothing, but let other things happen */
@@ -8057,7 +8593,7 @@ struct monst* mtmp;
     if ((flags.force_hint || context.game_difficulty <= flags.max_hint_difficulty) && !u.uhint.brain_got_eaten)
     {
         u.uhint.brain_got_eaten = TRUE;
-        hint_via_pline("To protect yourself agains brain-eating attacks, you can wear a nose-ring of cerebral safeguarding or wear a helmet, which gives you a high chance of blocking the attacks.");
+        hint_via_pline("To protect yourself agains brain-eating attacks, you can wear a nose ring of cerebral safeguarding or wear a helmet, which gives you a high chance of blocking the attacks.");
         if(!Race_if(PM_DWARF) && is_tentacled_one(mtmp->data))
             hint_via_pline("You can also class-genocide all tentacled ones (and all dwarves) by reading a blessed scroll of genocide when you are not a dwarf yourself.");
     }
@@ -8892,7 +9428,7 @@ write_items()
         if (write_fd < 0)
             continue;
 
-        itemdescription_core((struct obj*)0, i);
+        itemdescription_core((struct obj*)0, i, (struct item_description_stats*)0);
 
         (void)close(write_fd);
         cnt_objs++;

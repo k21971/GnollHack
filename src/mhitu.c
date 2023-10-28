@@ -726,23 +726,28 @@ register struct monst *mtmp;
 
     int tmp2 = tmp;
     int weaponattackcount = 0;
-    int bite_butt_count = 0;
+    unsigned int bite_butt_count = 0;
 
     boolean first_attack = TRUE;
+    boolean orig_mpeaceful = mtmp->mpeaceful;
 
     for (i = 0; i < NATTK; i++) 
     {
         tmp = tmp2; // Revert hit bonus to original value
         sum[i] = 0;
         mon_currwep = (struct obj *)0;
+         
+        if (!orig_mpeaceful && mtmp->mpeaceful && !Conflict && !is_crazed(mtmp)) /* The monster has become peaceful in the middle of attacks, so it stops attacking */
+            break;
+
         mattk = getmattk(mtmp, &youmonst, i, sum, &alt_attk);
         if ((u.uswallow && mattk->aatyp != AT_ENGL)
             || (skipnonmagc && mattk->aatyp != AT_MAGC && mattk->aatyp != AT_SMMN))
             continue;
 
-        if (mattk->aatyp == AT_BITE || mattk->aatyp == AT_BUTT)
+        if ((mattk->aatyp == AT_BITE || mattk->aatyp == AT_BUTT) && !(mattk->aflags & ATTKFLAGS_SAME_HEAD))
             bite_butt_count++;
-        if (mtmp->data->heads > 1 && mtmp->heads_left < bite_butt_count)
+        if (mtmp->data->heads > 1 && mtmp->heads_left < bite_butt_count + (!is_peaceful(mtmp) ? mtmp->heads_tamed : 0))
             continue;
 
         switch (mattk->aatyp) {
@@ -765,7 +770,7 @@ register struct monst *mtmp;
                     first_attack = FALSE;
                 }
                 update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : mattk->aatyp == AT_KICK ? ACTION_TILE_KICK : ACTION_TILE_ATTACK);
-                play_monster_simple_weapon_sound(mtmp, i, MON_WEP(mtmp), OBJECT_SOUND_TYPE_SWING_MELEE);
+                play_monster_attack_sound(mtmp, i, OBJECT_SOUND_TYPE_SWING_MELEE);
                 m_wait_until_action();
                 if (foundyou)
                 {
@@ -799,7 +804,7 @@ register struct monst *mtmp;
                 }
 
                 update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_SPECIAL_ATTACK);
-                play_monster_simple_weapon_sound(mtmp, i, MON_WEP(mtmp), OBJECT_SOUND_TYPE_SWING_MELEE);
+                play_monster_attack_sound(mtmp, i, OBJECT_SOUND_TYPE_SWING_MELEE);
                 m_wait_until_action();
                 sum[i] = hitmu(mtmp, mattk, (struct obj*)0);
                 update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
@@ -809,7 +814,7 @@ register struct monst *mtmp;
         case AT_GAZE: /* can affect you either ranged or not */
             /* Medusa gaze already operated through m_respond in
                dochug(); don't gaze more than once per round. */
-            if (mdat != &mons[PM_MEDUSA])
+            if (is_medusa(mdat))
             {
                 if (first_attack)
                 {
@@ -818,7 +823,7 @@ register struct monst *mtmp;
                 }
 
                 update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_SPECIAL_ATTACK);
-                play_monster_simple_weapon_sound(mtmp, i, MON_WEP(mtmp), OBJECT_SOUND_TYPE_SWING_MELEE);
+                play_monster_attack_sound(mtmp, i, OBJECT_SOUND_TYPE_FIRE);
                 m_wait_until_action();
                 sum[i] = gazemu(mtmp, mattk);
                 update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
@@ -835,7 +840,7 @@ register struct monst *mtmp;
                 }
 
                 update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_SPECIAL_ATTACK);
-                play_monster_simple_weapon_sound(mtmp, i, MON_WEP(mtmp), OBJECT_SOUND_TYPE_SWING_MELEE);
+                play_monster_attack_sound(mtmp, i, OBJECT_SOUND_TYPE_FIRE);
                 m_wait_until_action();
                 sum[i] = explmu(mtmp, mattk, foundyou);
                 update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
@@ -853,7 +858,7 @@ register struct monst *mtmp;
                 if (foundyou)
                 {
                     update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_SPECIAL_ATTACK);
-                    play_monster_simple_weapon_sound(mtmp, i, MON_WEP(mtmp), OBJECT_SOUND_TYPE_SWING_MELEE);
+                    play_monster_attack_sound(mtmp, i, OBJECT_SOUND_TYPE_SWING_MELEE);
                     m_wait_until_action();
                     if (u.uswallow
                         || (!mtmp->mspec_used && tmp > (j = rnd(20 + i)))) {
@@ -1160,7 +1165,7 @@ register struct monst *mtmp;
                             else if (!Deaf)
                             {
                                 play_monster_special_dialogue_line(mtmp, YEENAGHU_LINE_GROWLS);
-                                pline("%s growls menacingly.", Monnam(mtmp));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s growls menacingly.", Monnam(mtmp));
                             }
                         }
                     }
@@ -1241,7 +1246,7 @@ register struct monst *mtmp;
                                 pline("%s laughs at you!", Monnam(mtmp));
                             }
                             else if(canseemon(mtmp) && (m_carrying(mtmp, MACE_OF_THE_UNDERWORLD) || m_carrying(mtmp, WAN_DEATH)))
-                                pline("%s swings his wand menacingly.", Monnam(mtmp));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s swings his wand menacingly.", Monnam(mtmp));
                         }
                     }
                 }
@@ -1265,12 +1270,12 @@ register struct monst *mtmp;
                             if (!rn2(2))
                             {
                                 play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_CURSE);
-                                pline("%s curses at you!", Monnam(mtmp));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s curses at you!", Monnam(mtmp));
                             }
                             else
                             {
                                 play_simple_monster_sound(mtmp, MONSTER_SOUND_TYPE_LAUGHTER);
-                                pline("%s laughs menacingly.", Monnam(mtmp));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s laughs menacingly.", Monnam(mtmp));
                             }
                         }
                     }
@@ -1295,9 +1300,9 @@ register struct monst *mtmp;
                         else if (!is_silenced(mtmp) && canseemon(mtmp))
                         {
                             if (!rn2(2))
-                                pline("Fumes raise out of %s nostrils!", s_suffix(mon_nam(mtmp)));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "Fumes raise out of %s nostrils!", s_suffix(mon_nam(mtmp)));
                             else
-                                pline("%s bellows menacingly.", Monnam(mtmp));
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s bellows menacingly.", Monnam(mtmp));
                         }
                     }
                 }
@@ -1535,12 +1540,13 @@ struct monst *mon;
         {
             /* MC always from worn */
             int basemc = get_object_base_mc(o);
+            basemc += get_obj_exceptionality_mc_bonus(o);
             if (objects[o->otyp].oc_flags & O1_EROSION_DOES_NOT_AFFECT_MC)
                 item_mc_bonus += basemc;
             else
                 item_mc_bonus += max(0, basemc - greatest_erosion(o) / 3);
 
-            if (((o->oclass == ARMOR_CLASS || o->oclass == MISCELLANEOUS_CLASS || (objects[o->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)) && !(objects[o->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_MC))
+            if (((o->oclass == ARMOR_CLASS || (objects[o->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)) && !(objects[o->otyp].oc_flags & O1_ENCHANTMENT_DOES_NOT_AFFECT_MC))
                 || has_obj_mythic_defense(o))
                 item_mc_bonus += o->enchantment / 3;
 
@@ -3727,7 +3733,7 @@ boolean ufound;
                 if (!Hallucination)
                     You_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "are caught in a blast of kaleidoscopic light!");
                 /* avoid hallucinating the black light as it dies */
-                mondead_with_flags(mtmp, MONDIED_FLAGS_NO_DEATH_ACTION);    /* remove it from map now */
+                mondead_with_flags(mtmp, MONDEAD_FLAGS_NO_DEATH_ACTION);    /* remove it from map now */
                 kill_agr = FALSE; /* already killed (maybe lifesaved) */
                 chg =
                     make_hallucinated(HHallucination + (long)basedmg, FALSE, 0L);
@@ -3751,7 +3757,7 @@ boolean ufound;
         }
     }
     if (kill_agr)
-        mondead_with_flags(mtmp, MONDIED_FLAGS_NO_DEATH_ACTION);
+        mondead_with_flags(mtmp, MONDEAD_FLAGS_NO_DEATH_ACTION);
     wake_nearto(mtmp->mx, mtmp->my, 7 * 7);
     
     if (spef_idx < MAX_SPECIAL_EFFECTS)
@@ -3812,17 +3818,15 @@ struct attack *mattk;
             if (!canseemon(mtmp))
                 break; /* silently */
             pline("%s %s.", Monnam(mtmp),
-                  (mtmp->data == &mons[PM_MEDUSA] && is_cancelled(mtmp))
+                  (is_medusa(mtmp->data) && is_cancelled(mtmp))
                       ? "doesn't look all that ugly"
                       : "gazes ineffectually");
             break;
         }
-        if (Reflecting && couldsee(mtmp->mx, mtmp->my)
-            && mtmp->data == &mons[PM_MEDUSA]) 
+        if (Reflecting && couldsee(mtmp->mx, mtmp->my) && is_medusa(mtmp->data))
         {
             /* hero has line of sight to Medusa and she's not blind */
             boolean useeit = canseemon(mtmp);
-
             if (useeit)
             {
                 play_sfx_sound(SFX_GENERAL_REFLECTS);
@@ -3851,8 +3855,7 @@ struct attack *mattk;
                 display_m_being_hit(mtmp, HIT_PETRIFIED, 0, 0UL, FALSE);
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is turned to stone!", Monnam(mtmp));
             }
-            stoned = TRUE;
-            killed(mtmp);
+            killed_by_stoning(mtmp);
 
             if (!DEADMONSTER(mtmp))
                 break;
@@ -4649,8 +4652,7 @@ struct attack *mattk;
             play_sfx_sound_at_location(SFX_PETRIFY, mtmp->mx, mtmp->my);
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s turns to stone!", Monnam(mtmp));
             display_m_being_hit(mtmp, HIT_PETRIFIED, 0, 0UL, FALSE);
-            stoned = 1;
-            xkilled(mtmp, XKILL_NOMSG);
+            xkilled(mtmp, XKILL_NOMSG | XKILL_STONED);
             update_u_action_core(action_before, 1, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
             if (!DEADMONSTER(mtmp))
                 return 1;

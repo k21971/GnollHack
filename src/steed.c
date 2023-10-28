@@ -27,7 +27,7 @@ struct monst *mtmp;
     if (!mtmp)
         return FALSE;
 
-    return is_steed(mtmp->data);
+    return can_wear_saddle(mtmp->data);
 }
 
 int
@@ -844,9 +844,8 @@ int reason; /* Player was thrown off etc. */
                 killed(mtmp);
                 adjalign(-1);
             } else {
-                /* other dismount: kill former steed with no penalty;
-                   damage type is just "neither AD_DGST nor -AD_RBRE" */
-                monkilled(mtmp, "", -AD_PHYS);
+                /* other dismount: kill former steed with no penalty */
+                monkilled(mtmp, "", AD_PHYS, 0);
             }
         }
     } /* !DEADMONST(mtmp) */

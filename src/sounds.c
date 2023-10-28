@@ -2280,8 +2280,6 @@ int
 dochatmon(mtmp)
 struct monst* mtmp;
 {
-    boolean elbereth_was_known = (boolean)u.uevent.elbereth_known;
-
     if (!mtmp || 
         ((!canspotmon(mtmp) || mtmp->mundetected || M_AP_TYPE(mtmp) == M_AP_FURNITURE || M_AP_TYPE(mtmp) == M_AP_OBJECT) && !is_tame(mtmp)))
     {
@@ -2289,6 +2287,9 @@ struct monst* mtmp;
         pline_ex1(ATR_NONE, CLR_MSG_FAIL, Blind ? "You cannot see there anyone to talk to." : "There is no-one to talk to.");
         return 0;
     }
+
+    unsigned was_ritual_known = u.uevent.invocation_ritual_known;
+    unsigned was_elbereth_known = u.uevent.elbereth_known;
 
     if (!canspotmon(mtmp) && is_tame(mtmp))
         pline("You cannot see anyone but then you feel %s's familiar presence there.", noit_mon_nam(mtmp));
@@ -4281,7 +4282,7 @@ struct monst* mtmp;
                 {
                     stopsdialogue = available_chat_list[j].stops_dialogue;
                     res = (available_chat_list[j].function_ptr)(mtmp);
-
+                    bot();
                     if (res == 2) /* Changed level or the like and mtmp does not exist anymore */
                     {
                         result = 1;
@@ -4303,9 +4304,18 @@ struct monst* mtmp;
     } while (i > 0 && !stopsdialogue && !stop_chat);
     
 end_of_chat_here:
-    if (!elbereth_was_known && u.uevent.elbereth_known)
+    if (!was_elbereth_known && u.uevent.elbereth_known)
+    {
         standard_hint("You can engrave \'Elbereth\' on the ground to protect yourself against attacking monsters.", &u.uhint.elbereth);
-
+    }
+    
+    if (!was_ritual_known && u.uevent.invocation_ritual_known && !u.uevent.invoked && !(u.uachieve.bell && u.uachieve.book && u.uachieve.menorah))
+    {
+        if (!was_elbereth_known && u.uevent.elbereth_known)
+            delay_output_milliseconds(500);
+        play_sfx_sound(SFX_HINT);
+        custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Candelabrum of Invocation, Silver Bell, and the Book of the Dead");
+    }
     return result;
 }
 
@@ -4846,10 +4856,10 @@ struct monst* mtmp;
         {
             char kbuf[BUFSZ];
             if (poly_when_stoned(youmonst.data))
-                You("touch %s %s without wearing gloves.", s_suffix(mon_nam(mtmp)), body_part(HAND));
+                You_ex(ATR_NONE, CLR_MSG_WARNING, "touch %s %s without wearing gloves.", s_suffix(mon_nam(mtmp)), body_part(HAND));
             else
             {
-                pline("Touching %s %s without wearing gloves is a fatal mistake...", s_suffix(mon_nam(mtmp)), body_part(HAND));
+                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Touching %s %s without wearing gloves is a fatal mistake...", s_suffix(mon_nam(mtmp)), body_part(HAND));
                 Sprintf(kbuf, "touching %s %s without gloves", s_suffix(mon_nam(mtmp)), body_part(HAND));
             }
             killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
@@ -4934,10 +4944,10 @@ struct monst* mtmp;
     {
         char kbuf[BUFSZ];
         if (poly_when_stoned(youmonst.data))
-            You("touch %s without wearing gloves.", mon_nam(mtmp));
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "touch %s without wearing gloves.", mon_nam(mtmp));
         else 
         {
-            pline("Touching %s without wearing gloves is a fatal mistake...", mon_nam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Touching %s without wearing gloves is a fatal mistake...", mon_nam(mtmp));
             Sprintf(kbuf, "trying to pet %s without gloves", mon_nam(mtmp));
         }
         killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE;
@@ -5661,7 +5671,7 @@ struct monst* mtmp;
         any = zeroany;
         any.a_int = 4;
         Sprintf(nbuf, "Ask %s to bless %s item", mon_nam(priest), s_suffix(mon_nam(mtmp)));
-        add_menu(win, mon_to_glyph(priest, rn2_on_display_rng), &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
+        add_menu(win, any_mon_to_glyph(priest, rn2_on_display_rng), &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
         cnt++;
     }
 
@@ -6372,7 +6382,7 @@ struct monst* mtmp;
 //                char accel = def_oc_syms[(int)otmp->oclass].sym;
 
                 int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-                int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
                 add_extended_menu(win, gui_glyph, & any, 
                     0, 0, ATR_NONE, NO_COLOR,
                     itembuf, MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
@@ -7250,24 +7260,24 @@ struct monst* mtmp;
 
     u.uconduct.gnostic++;
 
+    char talkbuf[BUFSZ];
     play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_IS_LIKE);
-    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Very well, then. Let's see what your fortune is like.");
+    popup_talk_line(mtmp, "Very well, then. Let's see what your fortune is like.");
 
     if (can_pray(FALSE))
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_CAN_SAFELY_PRAY);
-        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "First, I see that you can safely pray.");
-
+        popup_talk_line(mtmp, "First, I see that you can safely pray.");
     }
     else
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_CANNOT_SAFELY_PRAY);
-        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "First, you should know that you cannot safely pray.");
-
+        popup_talk_line(mtmp, "First, you should know that you cannot safely pray.");
         if (u.ugangr)
         {
             play_monster_special_dialogue_line(mtmp, u.ugangr > 6 ? PRIEST_SPECIAL_DIALOGUE_GOD_EXTREMELY_ANGRY : u.ugangr > 3 ? PRIEST_SPECIAL_DIALOGUE_GOD_VERY_ANGRY : PRIEST_SPECIAL_DIALOGUE_GOD_ANGRY );
-            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "I see that %s is %sangry with you.", iflags.using_gui_sounds ? "your god" : u_gname(), u.ugangr > 6 ? "extremely " : u.ugangr > 3 ? "very " : "");
+            Sprintf(talkbuf, "I see that %s is %sangry with you.", iflags.using_gui_sounds ? "your god" : u_gname(), u.ugangr > 6 ? "extremely " : u.ugangr > 3 ? "very " : "");
+            popup_talk_line(mtmp, talkbuf);
         }
 
         if (u.uprayer_timeout > 0)
@@ -7275,15 +7285,20 @@ struct monst* mtmp;
             if (iflags.using_gui_sounds)
             {
                 play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_PRAYER_CONDUCT_NUMBER);
-                verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your prayer conduct, a number appears before me. (The number appears to be %d.)", u.uprayer_timeout / 10 + 1);
+                Sprintf(talkbuf, "For your prayer conduct, a number appears before me. (The number appears to be %d.)", u.uprayer_timeout / 10 + 1);
+                popup_talk_line(mtmp, talkbuf);
             }
             else
-                verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your prayer conduct, the number %d appears before me.", u.uprayer_timeout / 10 + 1);
+            {
+                Sprintf(talkbuf, "For your prayer conduct, the number %d appears before me.", u.uprayer_timeout / 10 + 1);
+                popup_talk_line(mtmp, talkbuf);
+            }
 
             if (u.uprayer_timeout > 300)
             {
                 play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_GOD_TIRED_OF_WHINING);
-                verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "I can see that %s is quite tired of your constant whining.", iflags.using_gui_sounds ? "your god" : u_gname());
+                Sprintf(talkbuf, "I can see that %s is quite tired of your constant whining.", iflags.using_gui_sounds ? "your god" : u_gname());
+                popup_talk_line(mtmp, talkbuf);
             }
 
             if(u.uprayer_timeout >= 50)
@@ -7291,10 +7306,11 @@ struct monst* mtmp;
             else
                 play_monster_special_dialogue_line(mtmp, u.uprayer_timeout < 50 ? PRIEST_SPECIAL_DIALOGUE_MUST_WAIT_LITTLE_LONGER : u.uprayer_timeout > 200 ? PRIEST_SPECIAL_DIALOGUE_MUST_WAIT_LONG_TIME : PRIEST_SPECIAL_DIALOGUE_MUST_WAIT);
 
-            verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "Thus, %s wait %sbefore bothering %s again.",
+            Sprintf(talkbuf, "Thus, %s wait %sbefore bothering %s again.",
                 u.uprayer_timeout >= 50 ? "it would be wise to" : "you must",
                 u.uprayer_timeout < 50 ? "a little longer " : u.uprayer_timeout > 200 ? "a long time " : "",
                 iflags.using_gui_sounds ? "your god" : u_gname());
+            popup_talk_line(mtmp, talkbuf);
         }
     }
 
@@ -7310,8 +7326,9 @@ struct monst* mtmp;
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_NUMBER);
         play_monster_special_dialogue_line(mtmp, abs(Luck) >= 10 ? PRIEST_SPECIAL_DIALOGUE_EXTREMELY_UNLUCKY_NUMBER : abs(Luck) >= 5 ? PRIEST_SPECIAL_DIALOGUE_VERY_UNLUCKY_NUMBER : PRIEST_SPECIAL_DIALOGUE_UNLUCKY_NUMBER);
 
-        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your fortune, I see a number%s. That is not good, for it is %s unlucky number.%s",
+        Sprintf(talkbuf, "For your fortune, I see a number%s. That is not good, for it is %s unlucky number.%s",
             buf1, abs(Luck) >= 10 ? "an extremely" : abs(Luck) >= 5 ? "a very" : "an", buf2);
+        popup_talk_line(mtmp, talkbuf);
     }
     else if (Luck > 0)
     {
@@ -7319,23 +7336,21 @@ struct monst* mtmp;
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_NUMBER);
         play_monster_special_dialogue_line(mtmp, abs(Luck) >= 10 ? PRIEST_SPECIAL_DIALOGUE_EXTREMELY_LUCKY_NUMBER : abs(Luck) >= 5 ? PRIEST_SPECIAL_DIALOGUE_VERY_LUCKY_NUMBER : PRIEST_SPECIAL_DIALOGUE_LUCKY_NUMBER);
 
-        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your fortune, I see a number%s. That is good, for it is %s lucky number.%s",
+        Sprintf(talkbuf, "For your fortune, I see a number%s. That is good, for it is %s lucky number.%s",
             buf1, abs(Luck) >= 10 ? "an extremely" : abs(Luck) >= 5 ? "a very" : "an", buf2);
+        popup_talk_line(mtmp, talkbuf);
     }
     else
     {
         play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_FORTUNE_NEUTRAL);
-        verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "For your fortune, my vision is neutral.");
+        popup_talk_line(mtmp, "For your fortune, my vision is neutral.");
     }
 
     play_monster_special_dialogue_line(mtmp, PRIEST_SPECIAL_DIALOGUE_THANK_YOU_FOR_YOUR_INTEREST);
-    verbalize_ex(ATR_NONE, CLR_MSG_TALK_NORMAL, "That's all for now. Thank you for your interest in divine matters.");
+    popup_talk_line(mtmp, "That's all for now. Thank you for your interest in divine matters.");
 
     return 1;
 }
-
-
-
 
 STATIC_OVL int
 do_chat_shk_payitems(mtmp)
@@ -10849,7 +10864,7 @@ int* spell_otyps;
         any.a_int = i;
         char let = 'a' + spell_count;
         int glyph = obj_to_glyph(&pseudo, rn2_on_display_rng);
-        int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, &pseudo, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+        int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_OBJECT, &pseudo, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
         add_menu(win, gui_glyph, &any,
             let, 0, ATR_NONE, NO_COLOR,
@@ -11074,7 +11089,7 @@ struct monst* mtmp;
                 Strcpy(nbuf, Monnam(nearbymon[i]));
             else
                 continue;
-            add_menu(win, isyou ? u_to_glyph() : mon_to_glyph(nearbymon[i], rn2_on_display_rng), &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
+            add_menu(win, any_mon_to_glyph(nearbymon[i], rn2_on_display_rng), &any, 0, 0, ATR_NONE, NO_COLOR, nbuf, MENU_UNSELECTED);
         }
 
         /* Finish the menu */

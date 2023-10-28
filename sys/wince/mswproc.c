@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0	mswproc.c	$NHDT-Date: 1433806606 2015/06/08 23:36:46 $  $NHDT-Branch: master $:$NHDT-Revision: 1.60 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -1220,7 +1220,7 @@ mswin_cliparound(int x, int y, BOOLEAN_P force)
 }
 
 void
-mswin_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str)
+mswin_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char* cmd_str)
 {
     return;
 }

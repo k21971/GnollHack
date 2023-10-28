@@ -98,6 +98,7 @@ static struct Bool_Opt {
     { "autopickup", "automatically pick up objects", &flags.pickup, FALSE, SET_IN_GAME },
     { "autoquiver", "fill empty quiver automatically when firing", &flags.autoquiver, FALSE, SET_IN_GAME },
     { "autostatuslines", "adjust the number of status lines automatically", &iflags.wc2_autostatuslines, FALSE, SET_IN_FILE },
+    { "autoswap_launchers", "automatically swap launchers on for ranged attacks and off for melee attacks", &iflags.autoswap_launchers, TRUE, SET_IN_GAME },
     { "autounlock", "automatically unlock a locked door or chest", &flags.autounlock, TRUE, SET_IN_GAME },
     { "baseacasbonus", "display base armor class as a bonus rather than a number starting at 10", &flags.baseacasbonus, TRUE, SET_IN_GAME },
 #if defined(MICRO) && !defined(AMIGA)
@@ -333,7 +334,7 @@ static struct Comp_Opt {
                * a different format */
     int optflags;
 } compopt[] = {
-    { "animation_interval", "animation frame interval in milliseconds", 3, SET_IN_GAME },
+    { "animation_interval", "animation frame interval in milliseconds", 3, SET_IN_GAME },  /*WC2*/
     { "align", "your starting alignment (lawful, neutral, or chaotic)", 8,
       DISP_IN_GAME },
     { "align_message", "message window alignment", 20, DISP_IN_GAME }, /*WC*/
@@ -475,17 +476,17 @@ static struct Comp_Opt {
     { "sortloot", "sort object selection lists by description", 4,
       SET_IN_GAME },
     { "sound_volume_ambient", "ambient volume", 3,
-      SET_IN_GAME },
+      SET_IN_GAME }, /*WC2*/
     { "sound_volume_dialogue", "dialogue volume", 3,
-      SET_IN_GAME },
+      SET_IN_GAME }, /*WC2*/
     { "sound_volume_effects", "sound effect volume", 3,
-      SET_IN_GAME },
+      SET_IN_GAME }, /*WC2*/
     { "sound_volume_general", "general game volume", 3,
-      SET_IN_GAME },
+      SET_IN_GAME }, /*WC2*/
     { "sound_volume_music", "music volume", 3,
-      SET_IN_GAME },
+      SET_IN_GAME }, /*WC2*/
     { "sound_volume_ui", "user interface sound volume", 3,
-      SET_IN_GAME },
+      SET_IN_GAME }, /*WC2*/
     { "spellorder", "default spell sorting", 3,
       SET_IN_GAME },
 #ifdef MSDOS
@@ -952,13 +953,13 @@ init_options()
     flags.sound_volume_ui = 50;
 
     flags.spellorder = SORTBY_NONE;
+    flags.auto_bag_in_style = 0;
     flags.force_hint = (CasualMode || ModernMode);
     flags.max_hint_difficulty = DEFAULT_MAX_HINT_DIFFICULTY;
 
     /* since this is done before init_objects(), do partial init here */
     objects[SLIME_MOLD].oc_name_idx = SLIME_MOLD;
     nmcpy(pl_fruit, OBJ_NAME(objects[SLIME_MOLD]), PL_FSIZ);
-
 }
 
 void
@@ -1507,6 +1508,8 @@ STATIC_VAR const struct paranoia_opts {
       "yes vs y to enter into a trap" },
     { PARANOID_AUTOALL, "Autoall", 1, (const char*)0, 0,
       "y to select all items" },
+    { PARANOID_TIP, "tip", 2, (const char*)0, 0,
+      "yes vs y to tip a container" },
       /* for config file parsing; interactive menu skips these */
     { 0, "none", 4, 0, 0, 0 }, /* require full word match */
     { ~0, "all", 3, 0, 0, 0 }, /* ditto */
@@ -1573,6 +1576,19 @@ int clr;
         if (colornames[i].name && colornames[i].color == clr)
             return colornames[i].name;
     return (char *) 0;
+}
+
+/* Note: compares only the const pointers, not the actual strings */
+int
+clrnameptr2color(clrnameptr)
+const char* clrnameptr;
+{
+    int i;
+
+    for (i = 0; i < SIZE(colornames); i++)
+        if (colornames[i].name && colornames[i].name == clrnameptr)
+            return colornames[i].color;
+    return NO_COLOR;
 }
 
 int
@@ -2178,9 +2194,11 @@ int style;
     case GHMENU_STYLE_PERMANENT_INVENTORY:
     case GHMENU_STYLE_OTHERS_INVENTORY:
     case GHMENU_STYLE_PICK_ITEM_LIST:
+    case GHMENU_STYLE_PICK_ITEM_LIST_AUTO_OK:
     case GHMENU_STYLE_CHAT_CHOOSE_ITEM:
     case GHMENU_STYLE_SKILLS:
     case GHMENU_STYLE_SPELLS:
+    case GHMENU_STYLE_VIEW_SPELL:
         return TRUE;
     case GHMENU_STYLE_GENERAL:
     case GHMENU_STYLE_PICK_CATEGORY_LIST:
@@ -2190,11 +2208,13 @@ int style;
     case GHMENU_STYLE_CHOOSE_COMMAND:
     case GHMENU_STYLE_CHOOSE_SAVED_GAME:
     case GHMENU_STYLE_CHOOSE_PLAYER:
+    case GHMENU_STYLE_ACCEPT_PLAYER:
     case GHMENU_STYLE_CHOOSE_DIFFICULTY:
     case GHMENU_STYLE_CHARACTER:
     case GHMENU_STYLE_ATTRIBUTES:
     case GHMENU_STYLE_SKILLS_ALTERNATE:
     case GHMENU_STYLE_SPELLS_ALTERNATE:
+    case GHMENU_STYLE_VIEW_SPELL_ALTERNATE:
     case GHMENU_STYLE_DUNGEON_OVERVIEW:
     case GHMENU_STYLE_OPTIONS:
     case GHMENU_STYLE_HELP:
@@ -4815,9 +4835,9 @@ boolean tinitial, tfrom_file;
             itmp = atoi(op);
         }
 
-        if (itmp < SORTBY_NONE || itmp >= SORTBY_CURRENT)
+        if (itmp < SORTBY_NONE || itmp > SORTBY_CURRENT)
         {
-            config_error_add("'%s' requires a value between %d and %d", fullname, SORTBY_NONE, SORTBY_CURRENT - 1);
+            config_error_add("'%s' requires a value between %d and %d", fullname, SORTBY_NONE, SORTBY_CURRENT);
             retval = FALSE;
         }
         else
@@ -5713,7 +5733,7 @@ doset() /* changing options via menu by Per Liboriussen */
     }
 
     any = zeroany;
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS | ATR_HEADING, NO_COLOR,
              "Booleans (selecting will toggle value):", MENU_UNSELECTED, menu_heading_info());
     any.a_int = 0;
     /* first list any other non-modifiable booleans, then modifiable ones */
@@ -5760,7 +5780,7 @@ doset() /* changing options via menu by Per Liboriussen */
     indexoffset = boolcount;
     any = zeroany;
     add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", MENU_UNSELECTED);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS | ATR_HEADING, NO_COLOR,
              "Compounds (selecting will prompt for new value):",
              MENU_UNSELECTED, menu_heading_info());
 
@@ -5788,7 +5808,7 @@ doset() /* changing options via menu by Per Liboriussen */
 
     any = zeroany;
     add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", MENU_UNSELECTED);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS | ATR_HEADING, NO_COLOR,
              "Other settings:", MENU_UNSELECTED, menu_heading_info());
 
     for (i = 0; (name = othropt[i].name) != 0; i++) {
@@ -5802,7 +5822,7 @@ doset() /* changing options via menu by Per Liboriussen */
 #ifdef PREFIXES_IN_USE
     any = zeroany;
     add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", MENU_UNSELECTED);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_NOTABS | ATR_HEADING, NO_COLOR,
              "Variable playground locations:", MENU_UNSELECTED, menu_heading_info());
     for (i = 0; i < PREFIX_COUNT; i++)
         doset_add_menu(tmpwin, fqn_prefix_names[i], -1, 0, 1);
@@ -6667,7 +6687,7 @@ boolean setinitial, setfromfile;
                     continue;
                 ape = iflags.autopickup_exceptions[pass];
                 any = zeroany;
-                add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                          (pass == 0) ? "Never pickup" : "Always pickup",
                          MENU_UNSELECTED, menu_heading_info());
                 for (i = 0; i < numapes[pass] && ape; i++) {
@@ -8102,14 +8122,13 @@ static const struct wc_Opt wc2_options[] = {
     { "windowborders", WC2_WINDOWBORDERS },
     { "autostatuslines", WC2_AUTOSTATUSLINES },
     { "preferred_screen_scale", WC2_PREFERRED_SCREEN_SCALE },
-#if 0 /* currently non-existent options for WC2 */
-    { "screen_text", WC2_SCREEN_TEXT },
-    { "play_ghsounds", WC2_PLAY_GHSOUNDS },
-    { "volume_controls", WC2_VOLUME_CONTROLS },
-    { "preprocess_replacements", WC2_PREPROCESS_REPLACEMENTS },
-    { "special_symbols", WC2_SPECIAL_SYMBOLS },
-    { "menu_suffixes", WC2_MENU_SUFFIXES },
-#endif
+    { "sound_volume_ambient", WC2_VOLUME_CONTROLS },
+    { "sound_volume_dialogue", WC2_VOLUME_CONTROLS },
+    { "sound_volume_effects", WC2_VOLUME_CONTROLS },
+    { "sound_volume_general", WC2_VOLUME_CONTROLS },
+    { "sound_volume_music", WC2_VOLUME_CONTROLS },
+    { "sound_volume_ui", WC2_VOLUME_CONTROLS },
+    { "animation_interval", WC2_ANIMATIONS },
     { (char *) 0, 0L }
 };
 

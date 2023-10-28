@@ -63,8 +63,6 @@ enum gender_types
     GENDER_NEUTER
 };
 
-
-
 /*** Substructures ***/
 
 struct RoleName {
@@ -117,6 +115,7 @@ struct u_event {
     Bitfield(role_achievement_2, 1);  /* passed the second requirement of the role achievement */
 
     Bitfield(elbereth_known, 1);      /* has learned of Elbereth */
+    Bitfield(invocation_ritual_known, 1); /* has learned of the invocation ritual */
 
     unsigned short ranks_attained;
 };
@@ -263,7 +262,7 @@ struct u_hint {
     boolean pet_got_mummy_rot;
 
     boolean elbereth;
-    boolean reserved2;
+    boolean secret_doors_and_corridors;
     boolean reserved3;
     boolean reserved4;
 };
@@ -623,5 +622,6 @@ struct you {
 }; /* end of `struct you' */
 
 #define Upolyd (u.umonnum != u.umonster)
+#define SUM_INIT_ATTRIBUTES 75
 
 #endif /* YOU_H */

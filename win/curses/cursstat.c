@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursstat.c */
@@ -456,6 +456,7 @@ boolean border;
             case BL_MOVE:
             case BL_UWEP:
             case BL_UWEP2:
+            case BL_UQUIVER:
             case BL_TIME:
             case BL_REALTIME:
                 spacing[fld] = 0; // status_activefields[fld] ? 1 : 0;
@@ -948,7 +949,7 @@ boolean border;
         BL_LEVELDESC,
 		BL_GOLD,
 		//BL_ALIGN,
-        BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP, BL_EXP, BL_HD,
+        BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP, BL_EXP, BL_HD,
         /* 2:blank (but only if time or score or both enabled) */
         BL_TIME,
         BL_REALTIME,

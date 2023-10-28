@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    shk.c    $NHDT-Date: 1555201699 2019/04/14 00:28:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.159 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -109,10 +109,12 @@ long amount;
     freeinv(ygold);
     add_to_minv(mon, ygold);
 
-    char ftbuf[BUFSZ];
-    Sprintf(ftbuf, "-%ld gold", amount);
-    display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_REDUCED, ATR_NONE, NO_COLOR, 0UL);
-
+    if (isok(u.ux, u.uy))
+    {
+        char ftbuf[BUFSZ];
+        Sprintf(ftbuf, "-%ld gold", amount);
+        display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_REDUCED, ATR_NONE, NO_COLOR, 0UL);
+    }
     context.botl = 1;
     return amount;
 }
@@ -145,7 +147,7 @@ long amount;
 
     if (!merge_choice(invent, mongold) && inv_cnt(FALSE) >= 52) {
         You("have no room for the money!");
-        dropy(mongold);
+        dropyf(mongold);
     } else {
         addinv(mongold);
         context.botl = 1;
@@ -5519,7 +5521,7 @@ boolean eating;
         char shopkeeper_name[BUFSZ] = "";
         if (shkp)
         {
-            strcpy(shopkeeper_name, shkname(shkp));
+            Strcpy(shopkeeper_name, shkname(shkp));
             if (!edog->chastised)
             {
                 edog->chastised = 20 + rn2(1000);

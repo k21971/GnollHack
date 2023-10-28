@@ -892,7 +892,9 @@ u_init()
     (void) memset((genericptr_t) &u, 0, sizeof(u));
     u.ustuck = (struct monst *) 0;
     (void) memset((genericptr_t) &ubirthday, 0, sizeof(ubirthday));
+    lock_thread_lock();
     (void) memset((genericptr_t) &urealtime, 0, sizeof(urealtime));
+    unlock_thread_lock();
 
     u.uroleplay = tmpuroleplay; /* restore options set via rcfile */
 
@@ -954,7 +956,7 @@ u_init()
     adjabil(0, 1);
     u.ulevel = u.ulevelmax = 1;
 
-    init_attr(75); /* init attribute values */
+    init_attr(SUM_INIT_ATTRIBUTES); /* init attribute values */
     max_rank_sz(); /* set max str size for class ranks */
 
     //With level and attributes known, calculate hp and maxhp, en, and maxen

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    fountain.c    $NHDT-Date: 1544442711 2018/12/10 11:51:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright Scott R. Turner, srt@ucla, 10/27/86 */
@@ -254,13 +254,11 @@ drinkfountain()
         int added_max = 0;
 
         if ((Upolyd ? u.mhmax == u.mh : u.uhpmax == u.uhp))
-            added_max += d(1, 3);
+            added_max += fountain_blessed ? d(1, 3) : d(1, 2);
 
         if (fountain_blessed)
-        {
             added_hp *= 2;
-            added_max += d(1, 3);
-        }
+
         healup(added_hp, added_max,
             !!fountain_blessed, !fountain_blessed, FALSE, FALSE, FALSE);
 
@@ -286,13 +284,11 @@ drinkfountain()
         int max_mana_before = u.uenmax;
 
         if(u.uen == u.uenmax)
-            added_max_mana += d(1, 3);
+            added_max_mana += fountain_blessed ? d(1, 3) : d(1, 2);
 
         if (fountain_blessed)
-        {
             added_mana *= 2;
-            added_max_mana += d(1, 3);
-        }
+
         if (u.ubaseendrain < 0)
         {
             u.ubaseendrain += added_max_mana;
@@ -320,20 +316,18 @@ drinkfountain()
         int mana_gain = mana_after - mana_before;
         int max_mana_after = u.uenmax;
         int max_mana_gain = max_mana_after - max_mana_before;
-        if (max_mana_gain > 0)
+        if (max_mana_gain > 0 && isok(u.ux, u.uy))
         {
             char fbuf[BUFSZ];
             Sprintf(fbuf, "+%d max mana", max_mana_gain);
             display_floating_text(u.ux, u.uy, fbuf, FLOATING_TEXT_ATTRIBUTE_GAIN, ATR_NONE, NO_COLOR, 0UL);
         }
-        if (mana_gain > 0)
+        if (mana_gain > 0 && isok(u.ux, u.uy))
         {
             char fbuf[BUFSZ];
             Sprintf(fbuf, "+%d", mana_gain);
             display_floating_text(u.ux, u.uy, fbuf, FLOATING_TEXT_MANA_GAIN, ATR_NONE, NO_COLOR, 0UL);
         }
-
-        context.botl = 1;
 
         context.botl = 1;
 
@@ -705,9 +699,9 @@ register struct obj *obj;
         {
             int oldotyp = obj->otyp;
             char oldnameturns[BUFSZ];
-            strcpy(oldnameturns, Tobjnam(obj, "turn"));
+            Strcpy(oldnameturns, Tobjnam(obj, "turn"));
             char oldnameare[BUFSZ];
-            strcpy(oldnameare, Tobjnam(obj, "are"));
+            Strcpy(oldnameare, Tobjnam(obj, "are"));
             unsigned int olddiluted = obj->odiluted;
 
             switch (obj->otyp)
@@ -788,9 +782,9 @@ register struct obj *obj;
         {
             int oldotyp = obj->otyp;
             char oldnameturns[BUFSZ];
-            strcpy(oldnameturns, Tobjnam(obj, "turn"));
+            Strcpy(oldnameturns, Tobjnam(obj, "turn"));
             char oldnameare[BUFSZ];
-            strcpy(oldnameare, Tobjnam(obj, "are"));
+            Strcpy(oldnameare, Tobjnam(obj, "are"));
             unsigned int olddiluted = obj->odiluted;
 
             switch (obj->otyp)
@@ -870,9 +864,9 @@ register struct obj *obj;
         {
             int oldotyp = obj->otyp;
             char oldnameturns[BUFSZ];
-            strcpy(oldnameturns, Tobjnam(obj, "turn"));
+            Strcpy(oldnameturns, Tobjnam(obj, "turn"));
             char oldnameare[BUFSZ];
-            strcpy(oldnameare, Tobjnam(obj, "are"));
+            Strcpy(oldnameare, Tobjnam(obj, "are"));
             unsigned int olddiluted = obj->odiluted;
 
             switch (obj->otyp)
@@ -984,9 +978,9 @@ register struct obj *obj;
     {
         int oldotyp = obj->otyp;
         char oldnameturns[BUFSZ];
-        strcpy(oldnameturns, Tobjnam(obj, "turn"));
+        Strcpy(oldnameturns, Tobjnam(obj, "turn"));
         char oldnamestart[BUFSZ];
-        strcpy(oldnamestart, Tobjnam(obj, "start"));
+        Strcpy(oldnamestart, Tobjnam(obj, "start"));
         unsigned int olddiluted = obj->odiluted;
 
         nowaterdamage = TRUE;
@@ -1051,7 +1045,7 @@ register struct obj *obj;
             {
                 curse(obj);
                 if (!Blind)
-                    pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s %s for a moment.", Tobjnam(obj, "glow"), hcolor(NH_BLACK));
+                    pline_multi_ex(ATR_NONE, CLR_MSG_SPELL, no_multiattrs, multicolor_buffer, "%s %s for a moment.", Tobjnam(obj, "glow"), hcolor_multi_buf1(NH_BLACK));
                 else
                 {
                     identified = FALSE;

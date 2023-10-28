@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    mhitm.c    $NHDT-Date: 1555720096 2019/04/20 00:28:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -396,7 +396,7 @@ register struct monst *magr, *mdef;
     int weaponattackcount = 0;
 
     int tmp2 = tmp;
-    int bite_butt_count = 0;
+    unsigned int bite_butt_count = 0;
     boolean first_attack = TRUE;
     enum action_tile_types action = 0;
 
@@ -407,9 +407,9 @@ register struct monst *magr, *mdef;
         res[i] = MM_MISS;
         mattk = getmattk(magr, mdef, i, res, &alt_attk);
 
-        if (mattk->aatyp == AT_BITE || mattk->aatyp == AT_BUTT)
+        if ((mattk->aatyp == AT_BITE || mattk->aatyp == AT_BUTT) && !(mattk->aflags & ATTKFLAGS_SAME_HEAD))
             bite_butt_count++;
-        if (magr->data->heads > 1 && magr->heads_left < bite_butt_count)
+        if (magr->data->heads > 1 && magr->heads_left < bite_butt_count + (!is_peaceful(magr) ? magr->heads_tamed : 0))
             continue;
 
         otmp = (struct obj *) 0;
@@ -962,7 +962,7 @@ struct attack *mattk;
         return MM_MISS;
     }
     /* call mon_reflects 2x, first test, then, if visible, print message */
-    if (magr->data == &mons[PM_MEDUSA] && mon_reflects(mdef, (char *) 0))
+    if (is_medusa(magr->data) && mon_reflects(mdef, (char *) 0))
     {
         if (canseemon(mdef))
         {
@@ -1210,7 +1210,7 @@ struct attack *mattk;
     {
         boolean was_leashed = (magr->mleashed != 0);
 
-        mondead_with_flags(magr, MONDIED_FLAGS_NO_DEATH_ACTION);
+        mondead_with_flags(magr, MONDEAD_FLAGS_NO_DEATH_ACTION);
         if (!DEADMONSTER(magr))
             return result; /* life saved */
         result |= MM_AGR_DIED;
@@ -1308,7 +1308,7 @@ register struct obj* omonwep;
     damage += adjust_damage(magr->mdaminc, magr, mdef, increase_damage_adtyp, ADFLAGS_NONE);
 
     if ((touch_petrifies(pd) /* or flesh_petrifies() */
-         || (mattk->adtyp == AD_DGST && pd == &mons[PM_MEDUSA]))
+         || (mattk->adtyp == AD_DGST && is_medusa(pd)))
         && !resists_ston(magr)) 
     {
         /* Note: no cancellation applies because the mon touches the petrifying creature by attacking bare handed */
@@ -1913,7 +1913,7 @@ register struct obj* omonwep;
                 update_all_mon_statistics(mdef, FALSE);
                 /* give monster a chance to wear other equipment on its next
                    move instead of waiting until it picks something up */
-                mdef->worn_item_flags |= I_SPECIAL;
+                check_mon_wearable_items_next_turn(mdef);
             }
             /* add_to_minv() might free otmp [if it merges] */
             if (vis)
@@ -2230,7 +2230,7 @@ register struct obj* omonwep;
         if (isdisintegrated)
             disintegrate_mon(mdef, -1, mweapon ? xname(mweapon) : mon_nam(magr));
         else
-            monkilled(mdef, "", (int) mattk->adtyp);
+            monkilled(mdef, "", (int) mattk->adtyp, 0);
 
         if (!DEADMONSTER(mdef))
             return res; /* mdef lifesaved */
@@ -2684,7 +2684,7 @@ assess_dmg:
 
         if (magr->mhp <= 0)
         {
-            monkilled(magr, "", (int) mddat->mattk[i].adtyp);
+            monkilled(magr, "", (int) mddat->mattk[i].adtyp, 0);
             update_m_action_core(mdef, action_before, 1, NEWSYM_FLAGS_KEEP_OLD_EFFECT_MISSILE_ZAP_GLYPHS | NEWSYM_FLAGS_KEEP_OLD_FLAGS);
             return (mdead | mhit | MM_AGR_DIED);
         }

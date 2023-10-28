@@ -19,171 +19,171 @@ NEARDATA struct objclass saved_objects[NUM_OBJECTS];
 
 /* NOTE: the order of these exactly corresponds to the
    order of oc_material values #define'd in objclass.h. */
-struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
+const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
                                                                                                            /* Flamm  Rustp  Corro  Rotta    Melts  Death  Flims  Metal  Miner    Gemst  Organ  Edibl  Slurp    Fragi  Dlava  Wisha  Scrat */
-{"none",        "mysterious",  "mysterious",  PHASE_VOID,     HIT_SURFACE_NONE,       FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "meal",          "strange",            NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"liquid",      "liquid",      "liquid",      PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, TRUE,  FALSE, FALSE,       "liquid",        "watery",             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"oil",         "oil",         "oily",        PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  FALSE, TRUE,        "wax",           "waxy",               NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"wax",         "wax",         "waxy",        PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  FALSE, FALSE,       "food",          "oily",               NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"vegetable",   "vegetable",   "veggy",       PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_GRASS,    TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,  FALSE, FALSE,       "meat",          (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"flesh",       "flesh",       "fleshy",      PHASE_SOLID,    HIT_SURFACE_FLESH,      FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,  FALSE, FALSE,       "food",          (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"organic",     "organic",     "organic",     PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  FALSE, FALSE,       "food",          (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"paper",       "paper",       "paper",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "paper",         (char*)0,             CLR_WHITE,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"cloth",       "cloth",       "cloth",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "cloth",         (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"cotton",      "cotton",      "cotton",      PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "cotton",        (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"silk",        "silk" ,       "silky" ,      PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "silk",          (char*)0,             CLR_GRAY,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"leather",     "leather",     "leather",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "leather",       (char*)0,             CLR_BROWN,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"none",        "mysterious",  "mysterious",  PHASE_VOID,     HIT_SURFACE_NONE,       FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "meal",          "strange",            NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"liquid",      "liquid",      "liquid",      PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE,    FALSE, TRUE,  FALSE, FALSE,       "liquid",        "watery",             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"oil",         "oil",         "oily",        PHASE_LIQUID,   HIT_SURFACE_LIQUID,     FLOOR_SURFACE_LIQUID,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  FALSE, TRUE,        "wax",           "waxy",               NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"wax",         "wax",         "waxy",        PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  FALSE, FALSE,       "food",          "oily",               NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"vegetable",   "vegetable",   "veggy",       PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_GRASS,    TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,  FALSE, FALSE,       "meat",          (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"flesh",       "flesh",       "fleshy",      PHASE_SOLID,    HIT_SURFACE_FLESH,      FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  TRUE,    FALSE, TRUE,  FALSE, FALSE,       "food",          (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"organic",     "organic",     "organic",     PHASE_SOLID,    HIT_SURFACE_ORGANIC,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  FALSE, FALSE,       "food",          (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"paper",       "paper",       "paper",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "paper",         (char*)0,             CLR_WHITE,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"cloth",       "cloth",       "cloth",       PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "cloth",         (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"cotton",      "cotton",      "cotton",      PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "cotton",        (char*)0,             NO_COLOR,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"silk",        "silk" ,       "silky" ,      PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "silk",          (char*)0,             CLR_GRAY,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"leather",     "leather",     "leather",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "leather",       (char*)0,             CLR_BROWN,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"wood",        "wooden",      "wooden",      PHASE_SOLID,    HIT_SURFACE_WOOD,       FLOOR_SURFACE_WOOD,     TRUE,  FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,       "wood",          "wooden",             CLR_BROWN,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, -1, 0, NO_POWER, NO_POWER, 1, 1, -15,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"bone",        "bone",        "bony",        PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,        "bone",          (char*)0,         CLR_WHITE,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, -1, 0, NO_POWER, NO_POWER, 1, 1, -10,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"chitin",      "chitin",      "chitinous",   PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, TRUE,  TRUE,  FALSE,        "chitin",        (char*)0,         CLR_WHITE,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, -1, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"tooth",       "tooth",       "ivory",       PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, TRUE,    FALSE, TRUE,  TRUE,  FALSE,        "ivory",         (char*)0,        CLR_WHITE,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, -1, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"dragonhide",  "dragonhide",  "dragonhide",  PHASE_SOLID,    HIT_SURFACE_BONE,       FLOOR_SURFACE_CARPET,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, TRUE,  FALSE,        "scale",         (char*)0,          CLR_MAGENTA,
-    {2, 1, 1, 1, 1, 1, 1, 1, 2}, {1, 1, 1, 1, 1, 1, 1, 1, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {2, 1, 1, 1, 1, 1, 1, 1, 2}, {1, 1, 1, 1, 1, 1, 1, 1, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 4, 3, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"iron",        "iron",        "iron",        PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,         "metal",         "metallic",          HI_METAL,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"steel",       "steel",       "steel",       PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, TRUE,  FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "metallic",           HI_METAL,
-    {1, 1, 1, 1, 1, 0, 0, 0 ,1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {1, 1, 1, 1, 1, 0, 0, 0 ,1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 1, 0, 1, 0, 0, NO_POWER, NO_POWER, 1, 1, 5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"metal",       "metallic",    "metallic",    PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "metallic",           HI_METAL,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"lead",        "leaden",      "leaden",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "metallic",           CLR_GRAY,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, -1, 0, NO_POWER, NO_POWER, 3, 4, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"copper",      "copper",      "copper",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "copper",        "copper-hued",        HI_COPPER,
-    {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, 0, 0, NO_POWER, NO_POWER, 4, 3, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"brass",       "brass",       "brass",       PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "brass",        "copper-hued",         HI_COPPER,
-    {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {2, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {2, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, 0, 0, NO_POWER, NO_POWER, 4, 3, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"bronze",      "bronze",      "bronze",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, TRUE,  FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "bronze",       "copper-hued",         HI_COPPER,
-    {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {3, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {3, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, -1, 0, 0, 0, 0, NO_POWER, NO_POWER, 4, 3, -5,
     0UL, 0UL, 0UL, O4_DOUBLE_MYTHIC_CHANCE, O5_DOUBLE_EXCEPTIONALITY_CHANCE, 0UL },
 {"silver",      "silver",      "silvery",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "silver",        "silvery",            HI_SILVER,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 2.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"gold",        "gold",        "golden",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "gold",          "golden",             HI_GOLD,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 2.5, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.5, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"platinum",    "platinum",    "platinum",    PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "platinum",      "silvery",            HI_SILVER,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 2.5, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.5, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"orichalcum",  "orichalcum",  "orichalcum",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "golden",             HI_GOLD,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {7, 2, 2, 2, 2 ,0 ,0 ,0 ,2}, {5, 4, 2, 0, 0 ,0 ,0 ,0 ,0}, 0.75, 2.5, 100.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {7, 2, 2, 2, 2 ,0 ,0 ,0 ,2}, {0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 2.0, 0.75, 2.5, 100.0,
     { ANTIMAGIC, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 2, 0,
     0UL, 0UL, 0UL, O4_VERY_RARE,O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"adamantium",  "adamantium",  "adamantium",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "silvery",            HI_SILVER,
-    {5, 4, 4, 4, 4, 0, 0, 0, 4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 1.0, 2.0, 100.0, 
+    {5, 4, 4, 4, 4, 0, 0, 0, 4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 1.0, 1.0, 2.0, 100.0,
     { DISINTEGRATION_RESISTANCE, DISINTEGRATION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { BISECTION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 6, 0, 0, 6, 0, NO_POWER, NO_POWER, 5, 4, 20,
     O1_INDESTRUCTIBLE | O1_DISINTEGRATION_RESISTANT, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"mithril",     "mithril",     "mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "silvery",            HI_SILVER,
-    {3, 2, 2, 2, 2, 0, 0, 0, 2}, {3, 1, 1, 1, 1 ,0 ,0 ,0 ,1}, {-1, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.5, 2.0, 100.0, 
+    {3, 2, 2, 2, 2, 0, 0, 0, 2}, {3, 1, 1, 1, 1 ,0 ,0 ,0 ,1}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.9, 0.5, 2.0, 100.0,
     { BISECTION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 3, 0, 0, 3, 0, NO_POWER, NO_POWER, 4, 3, 15,
     0UL, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"plastic",     "plastic",     "plastic",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  TRUE,  FALSE,        "plastic",       (char*)0,       CLR_WHITE,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"glass",       "glass",       "glass",       PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE,  TRUE,  TRUE,        "glass",         (char*)0,             HI_GLASS,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"brittle crystal", "crystal", "crystalline", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   TRUE,  TRUE,  FALSE, TRUE,        "crystal",       (char*)0,              HI_GLASS,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"hard crystal",    "crystal", "crystalline", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  FALSE,       "crystal",       (char*)0,              HI_GLASS,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {-5, -1, -1, -1, -1 ,0 ,0 ,0 ,0}, 1.0, 1.0, 100.0, 
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.2, 1.0, 1.0, 100.0,
     { REFLECTING, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 3, 0, 0, 2, 0, NO_POWER, NO_POWER, 4, 3, 5,
     0UL, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"gemstone",    "gemstone",    "gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  FALSE,       "gemstone",      (char*)0,         CLR_BRIGHT_GREEN,
-    {4, 3, 3, 3, 3, 0, 0, 0, 3}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, 
+    {4, 3, 3, 3, 3, 0, 0, 0, 3}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 2, 2, 0, 2, 2, NO_POWER, NO_POWER, 4, 3, 10,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"stone",       "stone",       "stony",       PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "rock",          "stony",              CLR_GRAY,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -10, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"modronite",   "modronite",   "modronite",   PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,       "alien food",    (char*)0,              CLR_WHITE,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, {NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER}, {NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER}, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL},
-{"planar rift", "planar rift", "planar rift", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "nothingness",   (char*)0,            CLR_BLACK,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"force field", "force field", "force field", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "force field",   (char*)0,            HI_ZAP,      {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"air",         "airy",        "airy",        PHASE_GAS,      HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "air",           (char*)0,               CLR_CYAN,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"fire",        "fiery",       "fiery",       PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "flames",        (char*)0,              CLR_RED,     {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"energy",      "energy",      "energetic",   PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "energy",        (char*)0,          HI_ZAP,      {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"incorporeal", "incorporeal", "incorporeal", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "incorporeal foodstuff", (char*)0,    CLR_BLACK, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"ice",         "ice",         "icy",         PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,       "ice",           (char*)0,                CLR_CYAN,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
-{"soil",        "soil",        "soil",        PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_GROUND,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "soil",          (char*)0,              CLR_BROWN,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"stone",       "stone",       "stony",       PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "rock",          "stony",              CLR_GRAY,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -10, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"modronite",   "modronite",   "modronite",   PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,       "alien food",    (char*)0,              CLR_WHITE,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, {NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER}, {NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER}, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL},
+{"planar rift", "planar rift", "planar rift", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "nothingness",   (char*)0,            CLR_BLACK,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"force field", "force field", "force field", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "force field",   (char*)0,            HI_ZAP,      {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"air",         "airy",        "airy",        PHASE_GAS,      HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "air",           (char*)0,               CLR_CYAN,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"fire",        "fiery",       "fiery",       PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "flames",        (char*)0,              CLR_RED,     {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"energy",      "energy",      "energetic",   PHASE_ENERGY,   HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "energy",        (char*)0,          HI_ZAP,      {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"incorporeal", "incorporeal", "incorporeal", PHASE_VOID,     HIT_SURFACE_IMMATERIAL, FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "incorporeal foodstuff", (char*)0,    CLR_BLACK, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"ice",         "ice",         "icy",         PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_NONE,     FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE,       "ice",           (char*)0,                CLR_CYAN,    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
+{"soil",        "soil",        "soil",        PHASE_SOLID,    HIT_SURFACE_STONE,      FLOOR_SURFACE_GROUND,   FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, TRUE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,       "soil",          (char*)0,              CLR_BROWN,   {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 };
 
-struct material_wishing_definition material_wishing_definitions[MAX_MATINIT_TYPES] = {
+const struct material_wishing_definition material_wishing_definitions[MAX_MATINIT_TYPES] = {
     { {0,0,0,0,0,0,0,0,0,0}, {0,0,0,0,0,0,0,0,0,0} },
     { {MAT_SILVER,0,0,0,0,0,0,0,0,0}, {100,0,0,0,0,0,0,0,0,0} },
     { {MAT_SILVER,MAT_BONE,0,0,0,0,0,0,0,0}, {100,100,0,0,0,0,0,0,0,0} },
@@ -202,7 +202,7 @@ struct material_wishing_definition material_wishing_definitions[MAX_MATINIT_TYPE
     { {MAT_DRAGON_HIDE,0,0,0,0,0,0,0,0,0}, {100,0,0,0,0,0,0,0,0,0} },
 };
 
-NEARDATA struct mythic_definition mythic_prefix_qualities[MAX_MYTHIC_PREFIXES] =
+NEARDATA const struct mythic_definition mythic_prefix_qualities[MAX_MYTHIC_PREFIXES] =
 {
     { "", "", "", 0, 1.0, 0L, 0UL, 0UL },
     { 
@@ -281,7 +281,7 @@ NEARDATA struct mythic_definition mythic_prefix_qualities[MAX_MYTHIC_PREFIXES] =
 #define MYTHIC_MANA_GAIN_DESC "Increases maximum mana by " MYTHIC_DESC_XSTR(MYTHIC_MANA_GAIN_PERCENTAGE) "%"
 #define MYTHIC_HP_GAIN_DESC "Increases maximum hit points by " MYTHIC_DESC_XSTR(MYTHIC_HP_GAIN_PERCENTAGE) "%"
 
-NEARDATA struct mythic_power_definition mythic_prefix_powers[MAX_MYTHIC_PREFIX_POWERS] =
+NEARDATA const struct mythic_power_definition mythic_prefix_powers[MAX_MYTHIC_PREFIX_POWERS] =
 {
     { "Level drain", "Causes level drain", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Mana gain", MYTHIC_MANA_GAIN_DESC, MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
@@ -301,7 +301,7 @@ NEARDATA struct mythic_power_definition mythic_prefix_powers[MAX_MYTHIC_PREFIX_P
 };
 
 
-NEARDATA struct mythic_definition mythic_suffix_qualities[MAX_MYTHIC_SUFFIXES] =
+NEARDATA const struct mythic_definition mythic_suffix_qualities[MAX_MYTHIC_SUFFIXES] =
 {
     { "", "", "", 0, 1.0, 0L, 0UL, 0UL },
     { 
@@ -444,33 +444,33 @@ NEARDATA struct mythic_definition mythic_suffix_qualities[MAX_MYTHIC_SUFFIXES] =
 #define SHARPNESS_DESC "Has " MYTHIC_DESC_XSTR(SHARPNESS_PERCENTAGE_CHANCE) "% chance of dealing damage equal to " MYTHIC_DESC_XSTR(SHARPNESS_MAX_HP_PERCENTAGE_DAMAGE) "% of max HP"
 #define WOUNDING_DESC "Causes permanent damage equal to " MYTHIC_DESC_XSTR(MYTHIC_WOUNDING_DICE) "d" MYTHIC_DESC_XSTR(MYTHIC_WOUNDING_DIESIZE) " + enchantment"
 
-NEARDATA struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_SUFFIX_POWERS] =
+NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MYTHIC_SUFFIX_POWERS] =
 {
     { "Lightness", "Weighs one-eight of normal", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Sorcery", "Incurs no spellcasting penalty", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
-    { "Troll slaying", "Triple damage to trolls", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_TROLL, 0UL , MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Troll slaying", "%.0fx base damage and enchantment to trolls", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_TROLL, 0UL , MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Troll revival prevention", "Prevents revival of trolls", MYTHIC_POWER_TYPE_PREVENTS_REVIVAL, 0L, 0.0, S_TROLL, 0UL , MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
-    { "Were slaying", "Triple damage to lycanthropes", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_WERE, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
+    { "Were slaying", "%.0fx base damage and enchantment to lycanthropes", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_WERE, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
     { "Lycanthropy resistance", "Lycanthropy resistance", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, LYCANTHROPY_RESISTANCE, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
-    { "Giant slaying", "Triple damage to giants", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_GIANT, MYTHIC_POWER_FLAG_WEAPON_ONLY },
-    { "Demon slaying", "Triple damage to demons", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_DEMON, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
-    { "Angel slaying", "Triple damage to angels", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_ANGEL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
-    { "Ogre slaying", "Triple damage to ogres", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_OGRE, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
-    { "Orc slaying", "Triple damage to orcs", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_ORC, M2_ORC, MYTHIC_POWER_FLAG_WEAPON_ONLY },
-    { "Elf slaying", "Triple damage to elves", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_ELF, MYTHIC_POWER_FLAG_WEAPON_ONLY },
-    { "Dragon slaying", "Triple damage to dragons", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_DRAGON, 0UL , MYTHIC_POWER_FLAG_WEAPON_ONLY },
-    { "Undead destruction", "Triple damage to undead", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_UNDEAD, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
+    { "Giant slaying", "%.0fx base damage and enchantment to giants", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_GIANT, MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Demon slaying", "%.0fx base damage and enchantment to demons", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_DEMON, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
+    { "Angel slaying", "%.0fx base damage and enchantment to angels", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_ANGEL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
+    { "Ogre slaying", "%.0fx base damage and enchantment to ogres", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_OGRE, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Orc slaying", "%.0fx base damage and enchantment to orcs", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_ORC, M2_ORC, MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Elf slaying", "%.0fx base damage and enchantment to elves", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_ELF, MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Dragon slaying", "%.0fx base damage and enchantment to dragons", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, S_DRAGON, 0UL , MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Undead destruction", "%.0fx base damage and enchantment to undead", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_UNDEAD, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS },
     { "Speed", "Increases speed to very fast", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, VERY_FAST, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Wounding", WOUNDING_DESC, MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Defense", "Enchantment and quality provide AC and MC", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Sharpness", SHARPNESS_DESC, MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Reach", "Has extended range", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_WEAPON_ONLY | MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Luck", "Confers luck", MYTHIC_POWER_TYPE_GENERAL, 0L, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
-    { "Free action", "Free action", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, FREE_ACTION, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
+    { "Free action", "Paralysis resistance", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, FREE_ACTION, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Fire resistance", "Fire immunity", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, FIRE_IMMUNITY, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Cold resistance", "Cold immunity", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, COLD_IMMUNITY, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Shock resistance", "Shock immunity", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, SHOCK_IMMUNITY, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
-    { "Cockatrice slaying", "Triple damage to cockatrices", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_COCKATRICE, MYTHIC_POWER_FLAG_WEAPON_ONLY },
+    { "Cockatrice slaying", "%.0fx base damage and enchantment to cockatrices", MYTHIC_POWER_TYPE_SLAYING, 0L, 3.0, 0, M2_COCKATRICE, MYTHIC_POWER_FLAG_WEAPON_ONLY },
     { "Stone resistance", "Petrification resistance", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, STONE_RESISTANCE, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "Searching", "Searching", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, SEARCHING, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
     { "See invisible", "See invisible", MYTHIC_POWER_TYPE_CONFERS_PROPERTY, SEE_INVISIBLE, 0.0, 0, 0UL, MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO },
@@ -1310,7 +1310,7 @@ rename_disco()
 
             if (oclass != prev_class) {
                 any.a_int = 0;
-                add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                          let_to_name(oclass, FALSE, FALSE),
                          MENU_UNSELECTED, menu_heading_info());
                 prev_class = oclass;
@@ -1429,7 +1429,7 @@ uchar *prefix_ptr, *suffix_ptr;
 
     for (uchar j = start; j <= end; j++)
     {
-        struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
+        const struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
         uchar* eligible = (j == 0 ? eligible_prefix : eligible_suffix);
         uchar max_mythic = (j == 0 ? MAX_MYTHIC_PREFIXES : MAX_MYTHIC_SUFFIXES);
         uchar* affix_ptr = (j == 0 ? prefix_ptr : suffix_ptr);
@@ -1476,7 +1476,7 @@ uchar affix_idx;
 struct obj* obj;
 uchar is_wish; /* 1 = mythic wishing, 2 = legendary wishing */
 {
-    struct mythic_definition* mythic_definitions = (affix_type == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
+    const struct mythic_definition* mythic_definitions = (affix_type == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
 
     if (!obj)
         return FALSE;
@@ -1521,7 +1521,7 @@ uchar is_wish; /* 1 = mythic wishing, 2 = legendary wishing */
         return FALSE;
     if ((mythic_definitions[affix_idx].mythic_flags & MYTHIC_FLAG_NO_RETURNING_WEAPONS) && ((objects[(obj)->otyp].oc_flags4 & O4_TETHERED_WEAPON) != 0 || (objects[(obj)->otyp].oc_flags & O1_RETURNS_TO_HAND_AFTER_THROWING) != 0))
         return FALSE;
-    if ((mythic_definitions[affix_idx].mythic_flags & MYTHIC_FLAG_NO_LOW_SPELLCASTING_PENALTY_ITEMS) && get_object_spell_casting_penalty(obj) < 1)
+    if ((mythic_definitions[affix_idx].mythic_flags & MYTHIC_FLAG_NO_LOW_SPELLCASTING_PENALTY_ITEMS) && get_object_spell_casting_penalty(obj) <= 0)
         return FALSE;
     if ((mythic_definitions[affix_idx].mythic_flags & MYTHIC_FLAG_NO_ORCISH_ITEMS) && is_orcish_obj(obj))
         return FALSE;
@@ -1551,8 +1551,8 @@ struct monst* mattacker UNUSED;
         if (mythic_quality == 0)
             continue;
 
-        struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
-        struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
+        const struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
+        const struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
         uchar max_mythic_powers = (j == 0 ? MAX_MYTHIC_PREFIX_POWERS : MAX_MYTHIC_SUFFIX_POWERS);
 
         for (uchar i = 0; i < max_mythic_powers; i++)
@@ -1571,7 +1571,7 @@ struct monst* mattacker UNUSED;
                     )
                    )
                 {
-                    double pmult = mythic_powers[i].parameter2;
+                    double pmult = mythic_powers[i].parameter2 * (is_ammo(otmp) || is_missile(otmp) ? 2.0 : 1.0);
                     if (pmult > 1.0)
                     {
                         multiplier += pmult - 1.0;
@@ -1624,7 +1624,6 @@ struct obj* obj;
         return 0;
 
     int res = 0;
-
     if (obj->exceptionality > 0 && (is_armor(obj) || (objects[obj->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)))
     {
         int multiplier = is_suit(obj) ? 4 : has_obj_mythic_defense(obj) ? 3 : is_shield(obj) ? 3 : 2;
@@ -1644,8 +1643,7 @@ struct obj* obj;
     if (!obj)
         return 0;
 
-    int res = get_obj_exceptionality_ac_bonus(obj);;
-
+    int res = get_obj_exceptionality_ac_bonus(obj);
     if (obj->material != objects[obj->otyp].oc_material && is_armor(obj))
     {
         res += material_definitions[obj->material].acbonus_armor[objects[obj->otyp].oc_armor_category];
@@ -1671,8 +1669,7 @@ struct obj* obj;
     if (!obj)
         return 0;
 
-    int res = get_obj_exceptionality_mc_bonus(obj);;
-
+    int res = get_obj_exceptionality_mc_bonus(obj);
     if (obj->material != objects[obj->otyp].oc_material && is_armor(obj))
     {
         res += material_definitions[obj->material].mcbonus_armor[objects[obj->otyp].oc_armor_category];
@@ -1770,6 +1767,42 @@ struct obj* obj;
     return ocflags;
 }
 
+boolean
+can_wear_miscellaneous(ptr, otyp)
+struct permonst* ptr;
+int otyp;
+{
+    switch (objects[otyp].oc_subtyp)
+    {
+        default:
+        case MISC_MULTIPLE_PERMITTED:
+        case MISC_WINGS:
+        case MISC_IOUN_STONE:
+        case MISC_EXTRA_ARMS:
+        case MISC_BROOCH:
+            return TRUE;
+        case MISC_PANTS:
+        case MISC_SKIRT:
+        case MISC_BELT:
+            return !nolimbs(ptr);
+        case MISC_WRIST_WATCH:
+        case MISC_BRACELET:
+        case MISC_BRACERS:
+            return !nohands(ptr);
+        case MISC_NOSERING:
+        case MISC_HEADBAND:
+        case MISC_EARRINGS:
+        case MISC_MASK:
+            return has_head(ptr);
+        case MISC_EYEGLASSES:
+        case MISC_BLINDFOLD:
+            return haseyes(ptr) && has_head(ptr);
+        case MISC_SCARF:
+        case MISC_NECKTIE:
+            return has_neck(ptr);
+    }
+}
+
 
 STATIC_VAR boolean object_init_values_saved = FALSE;
 
@@ -1786,9 +1819,5 @@ save_initial_objects_values(VOID_ARGS)
     }
 
 }
-
-
-
-
 
 /*o_init.c*/

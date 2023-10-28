@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    monst.h    $NHDT-Date: 1550524559 2019/02/18 21:15:59 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -8,17 +8,9 @@
 #ifndef MONST_H
 #define MONST_H
 
-#ifndef MEXTRA_H
 #include "mextra.h"
-#endif
-
-#ifndef PROP_H
 #include "prop.h"
-#endif
-
-#ifndef ATTRIB_H
 #include "attrib.h"
-#endif
 
 /* The weapon_strategy flag is used two ways:
  * 1) When calling mon_wield_item, is 2-6 depending on what is desired.
@@ -217,6 +209,9 @@ struct monst {
 #define MON_FLAGS_SUMMONED_AT_ALTAR 0x00000008UL
 #define MON_FLAGS_SPLEVEL_RESIDENT  0x00000010UL
 #define MON_FLAGS_YOUR_CHILD        0x00000020UL
+#define MON_FLAGS_SPOTTED_IN_RUN    0x00000040UL /* Spotted for purposes of determining whether to stop travel, run and similar commands */
+#define MON_FLAGS_LEVEL_BOSS        0x00000080UL
+#define MON_FLAGS_BOSS_HOSTILITY    0x00000100UL
 
     unsigned long mstrategy; /* for monsters with mflag3: current strategy */
 
@@ -292,5 +287,7 @@ struct monst {
                                   || (mon)->mappearance == S_vcdoor))
 #define is_obj_mappear(mon,otyp) (M_AP_TYPE(mon) == M_AP_OBJECT \
                                   && (mon)->mappearance == (otyp))
+
+#define check_mon_wearable_items_next_turn(mon) (mon)->worn_item_flags |= I_SPECIAL
 
 #endif /* MONST_H */

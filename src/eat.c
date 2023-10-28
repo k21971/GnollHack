@@ -436,7 +436,7 @@ struct obj *otmp;
         freeinv(otmp);
         if (inv_cnt(FALSE) >= 52) {
             sellobj_state(SELL_DONTSELL);
-            dropy(otmp);
+            dropyf(otmp);
             sellobj_state(SELL_NORMAL);
         } else {
             otmp->nomerge = 1; /* used to prevent merge */
@@ -1313,6 +1313,7 @@ uchar gender UNUSED; /* 0 = male, 1 = female, 2 = unknown */
         set_mimic_blocking(); /* do special mimic handling */
         see_monsters();       /* see invisible monsters */
         newsym(u.ux, u.uy);   /* see yourself! */
+        check_seen_bosses();
         donotcheckfurther = TRUE;
     }
 
@@ -1920,7 +1921,7 @@ const char *mesg;
         }
         else 
         {
-            strcpy(containsbuf, "It contains spinach.");
+            Strcpy(containsbuf, "It contains spinach.");
             tin->dknown = tin->known = 1;
         }
 
@@ -2068,7 +2069,7 @@ struct obj *otmp;
                 otmp = splitobj(otmp, 1L);
             }
             if (carried(otmp))
-                dropx(otmp);
+                dropxf(otmp);
             else
                 stackobj(otmp);
             return;
@@ -2656,6 +2657,7 @@ struct obj *otmp;
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Suddenly you can see yourself.");
                     makeknown(typ);
                 }
+                check_seen_bosses();
                 if (typ != RIN_SUPREME_POWER)
                     break;
 
@@ -3509,7 +3511,7 @@ doeat()
                 if (otmp->owornmask)
                     remove_worn_item(otmp, FALSE);
                 freeinv(otmp);
-                dropy(otmp);
+                dropyf(otmp);
             }
             stackobj(otmp);
         }
@@ -4295,7 +4297,7 @@ boolean incr;
             if (incr && occupation
                 && (occupation != eatfood && occupation != opentin))
                 stop_occupation();
-            context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+            clear_run_and_travel();
             pray_hint("recover from hunger", "eating food", & u.uhint.got_hungry);
             break;
         case WEAK:
@@ -4316,7 +4318,7 @@ boolean incr;
             if (incr && occupation
                 && (occupation != eatfood && occupation != opentin))
                 stop_occupation();
-            context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+            clear_run_and_travel();
             pray_hint("recover from weakness due to hunger", "eating food", &u.uhint.got_weak);
             break;
         }

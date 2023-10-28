@@ -70,7 +70,8 @@ struct window_procs dll_procs = {
 #ifdef STATUS_HILITES
     WC2_HITPOINTBAR | WC2_FLUSH_STATUS | WC2_RESET_STATUS | WC2_HILITE_STATUS |
 #endif
-    WC2_PREFERRED_SCREEN_SCALE, dll_init_nhwindows, dll_player_selection, dll_askname,
+    0UL, 
+    dll_init_nhwindows, dll_player_selection, dll_askname,
     dll_get_nh_event, dll_exit_nhwindows, dll_suspend_nhwindows,
     dll_resume_nhwindows, dll_create_nhwindow_ex, dll_clear_nhwindow,
     dll_display_nhwindow, dll_destroy_nhwindow, dll_curs, dll_putstr_ex, dll_putstr_ex2,
@@ -1078,7 +1079,7 @@ dll_putstr_ex(winid wid, const char *text, int attr, int color, int app)
         GetNHApp()->saved_text =
             realloc(GetNHApp()->saved_text,
                     strlen(text) + strlen(GetNHApp()->saved_text) + 1);
-        strcat(GetNHApp()->saved_text, text);
+        Strcat(GetNHApp()->saved_text, text);
     }
 #endif
 }
@@ -1210,7 +1211,7 @@ dll_add_extended_menu(winid wid, int glyph, const ANY_P *identifier,
 
     struct objclassdata ocdata = get_objclassdata(info.object);
     dll_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color,
-        str, presel, info.object ? info.object->quan : 0, info.object ? info.object->o_id : 0, 
+        str, presel, info.object ? info.object->quan : info.num_items, info.object ? info.object->o_id : 0,
         info.monster ? info.monster->m_id : 0, info.heading_for_group_accelerator, info.special_mark, info.menu_flags, 1, info.style, 
         info.object, &ocdata);
 }
@@ -1370,7 +1371,7 @@ dll_cliparound(int x, int y, BOOLEAN_P force)
 }
 
 void
-dll_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str)
+dll_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char* cmd_str)
 {
     return;
 }
@@ -2582,7 +2583,7 @@ dll_display_popup_text(const char* text, const char* title, int style, int attr,
 }
 
 void
-dll_display_gui_effect(int x, int y, int style, unsigned long tflags)
+dll_display_gui_effect(int style, int subtype, int x, int y, int x2, int y2, unsigned long tflags)
 {
     return;
 }

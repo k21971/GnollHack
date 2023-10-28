@@ -124,8 +124,6 @@ struct monst *mon;
     return (struct obj *) 0; /* don't drop anything */
 }
 
-
-
 struct obj*
 m_has_wearable_armor_or_accessory(mon)
 struct monst* mon;
@@ -136,15 +134,31 @@ struct monst* mon;
         {
             if ((obj->owornmask & (W_ARMOR | W_ACCESSORY)) == 0)
             {
-                if ((is_suit(obj) || is_robe(obj) || is_shirt(obj)) && cantweararm(mon->data))
+                if (is_suit(obj) && !can_wear_suit(mon->data))
                     continue;
-                if ((is_cloak(obj)) && (cantweararm(mon->data) && mon->data->msize != MZ_SMALL))
+                if (is_robe(obj) && !can_wear_robe(mon->data))
                     continue;
-                if ((obj->oclass == AMULET_CLASS || is_helmet(obj)) && !has_place_to_put_helmet_on(mon->data))
+                if (is_shirt(obj) && !can_wear_shirt(mon->data))
                     continue;
-                if ((obj->oclass == RING_CLASS || is_gloves(obj) || is_bracers(obj)) && nohands(mon->data))
+                if (is_cloak(obj) && !can_wear_cloak(mon->data))
                     continue;
-                if ((is_boots(obj)) && nolimbs(mon->data))
+                if (is_helmet(obj) && !can_wear_helmet(mon->data))
+                    continue;
+                if (is_gloves(obj) && !can_wear_gloves(mon->data))
+                    continue;
+                if (is_bracers(obj) && !can_wear_bracers(mon->data))
+                    continue;
+                if (is_boots(obj) && !can_wear_boots(mon->data))
+                    continue;
+                if (is_shield(obj) && !can_wear_shield(mon->data))
+                    continue;
+                if (is_amulet(obj) && !can_wear_amulet(mon->data))
+                    continue;
+                if (is_blindfold(obj) && !can_wear_blindfold(mon->data))
+                    continue;
+                if (obj->oclass == RING_CLASS && !can_wear_rings(mon->data))
+                    continue;
+                if (obj->oclass == MISCELLANEOUS_CLASS && !can_wear_miscellaneous(mon->data, obj->otyp))
                     continue;
                 return obj;
             }
@@ -363,15 +377,15 @@ boolean devour;
             //    pline("%s digs in.", noit_Monnam(mtmp));
             //else
             {
-                pline("%s %s %s.", noit_Monnam(mtmp),
+                pline_ex(ATR_NONE, devour ? CLR_MSG_ATTENTION : NO_COLOR, "%s %s %s.", noit_Monnam(mtmp),
                     devour ? "devours" : "eats", distant_name(obj, doname));
 
                 if (catavenged)
-                    You_feel("Schroedinger's cat has been avenged.");
+                    You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "Schroedinger's cat has been avenged.");
             }
         } 
         else if (seeobj)
-            pline("It %s %s.", devour ? "devours" : "eats",
+            pline_ex(ATR_NONE, devour ? CLR_MSG_ATTENTION : NO_COLOR, "It %s %s.", devour ? "devours" : "eats",
                   distant_name(obj, doname));
     }
 
@@ -401,7 +415,7 @@ boolean devour;
         increase_mon_property(mtmp, STUNNED, 5 + rnd(10));
         if (canseemon(mtmp) && flags.verbose) 
         {
-            pline("%s spits %s out in disgust!", Monnam(mtmp),
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s spits %s out in disgust!", Monnam(mtmp),
                   distant_name(obj, doname));
         }
     } 
@@ -427,7 +441,7 @@ boolean devour;
             /* edible item owned by shop has been thrown or kicked
                by hero and caught by tame or food-tameable monst */
             oprice = unpaid_cost(obj, TRUE);
-            pline("That %s will cost you %ld %s.", objnambuf, oprice,
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "That %s will cost you %ld %s.", objnambuf, oprice,
                   currency(oprice));
             /* delobj->obfree will handle actual shop billing update */
         }
@@ -455,7 +469,7 @@ boolean devour;
         {
             (void)set_mon_property_b(mtmp, STONED, 0, canseemon(mtmp));
             if (canseemon(mtmp))
-                pline("%s looks limber!", Monnam(mtmp));
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s looks limber!", Monnam(mtmp));
         }
 
         increase_mon_property(mtmp, STONE_RESISTANCE, 13);
@@ -2273,9 +2287,8 @@ newdogpos:
                                    ? vobj_at(nix, niy) : 0;
 #endif
                 const char *what = cursedobj[chi] ? distant_name(cursedobj[chi], doname) : something;
-
                 play_monster_unhappy_sound(mtmp, MONSTER_UNHAPPY_SOUND_WARN_CURSED);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s reluctantly over %s.", noit_Monnam(mtmp),
+                pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, what != something ? multicolor_orange3 : get_colorless_multicolor_buffer(), "%s %s reluctantly over %s.", noit_Monnam(mtmp),
                       vtense((char *) 0, locomotion(mtmp->data, "step")), what);
             }
             for (j = MTSZ - 1; j > 0; j--)
@@ -2455,7 +2468,8 @@ finish_meating(mtmp)
 struct monst *mtmp;
 {
     mtmp->meating = 0;
-    if (M_AP_TYPE(mtmp) && mtmp->mappearance && mtmp->cham == NON_PM) {
+    if (!is_mimic(mtmp->data) && M_AP_TYPE(mtmp) && mtmp->mappearance && mtmp->cham == NON_PM) 
+    {
         /* was eating a mimic and now appearance needs resetting */
         mtmp->m_ap_type = 0;
         mtmp->mappearance = 0;

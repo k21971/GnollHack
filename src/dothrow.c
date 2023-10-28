@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    dothrow.c    $NHDT-Date: 1556201496 2019/04/25 14:11:36 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -21,7 +21,7 @@ STATIC_DCL void FDECL(sho_obj_return_to_u, (struct obj * obj));
 STATIC_DCL boolean FDECL(mhurtle_step, (genericptr_t, int, int));
 
 STATIC_VAR NEARDATA const char toss_objs[] = { ALLOW_COUNT, COIN_CLASS,
-                                           ALL_CLASSES, WEAPON_CLASS, 0 };
+                                           ALL_CLASSES, WEAPON_CLASS, GEM_CLASS, 0 };
 /* different default choices when wielding a sling (gold must be included) */
 STATIC_VAR NEARDATA const char bullets[] = { ALLOW_COUNT, COIN_CLASS, ALL_CLASSES,
                                          GEM_CLASS, WEAPON_CLASS, 0 };
@@ -108,6 +108,7 @@ boolean firing;
         weldmsg(obj);
         return 1;
     }
+
     if (is_wet_towel(obj))
         dry_a_towel(obj, -1, FALSE);
 
@@ -146,8 +147,8 @@ boolean firing;
     m_shot.n = multishot;
     for (m_shot.i = 1; m_shot.i <= m_shot.n; m_shot.i++) 
     {
-        update_u_action(obj && uwep && ammo_and_launcher(obj, uwep) ? ACTION_TILE_FIRE : ACTION_TILE_THROW);
-        if (firing && uwep && obj && ammo_and_launcher(obj, uwep))
+        update_u_action(ammo_and_launcher(obj, uwep) ? ACTION_TILE_FIRE : ACTION_TILE_THROW);
+        if (firing && ammo_and_launcher(obj, uwep))
             play_monster_simple_weapon_sound(&youmonst, 0, uwep, OBJECT_SOUND_TYPE_FIRE);
         else
             play_monster_simple_weapon_sound(&youmonst, 0, obj, OBJECT_SOUND_TYPE_THROW);
@@ -175,7 +176,6 @@ boolean firing;
     m_shot.n = m_shot.i = 0;
     m_shot.o = STRANGE_OBJECT;
     m_shot.s = FALSE;
-
     return 1;
 }
 
@@ -1069,11 +1069,11 @@ boolean verbose;
      * for diagonal movement, give the player a message and return.
      */
     if (Punished && !carried(uball)) {
-        You_feel("a tug from the iron ball.");
+        You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "a tug from the iron ball.");
         nomul(0);
         return;
     } else if (u.utrap) {
-        You("are anchored by the %s.",
+        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are anchored by the %s.",
             u.utraptype == TT_WEB
                 ? "web"
                 : u.utraptype == TT_LAVA
@@ -1097,7 +1097,7 @@ boolean verbose;
     multi_reason = "moving through the air";
     nomovemsg = ""; /* it just happens */
     if (verbose)
-        You("%s in the opposite direction.", range > 1 ? "hurtle" : "float");
+        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in the opposite direction.", range > 1 ? "hurtle" : "float");
     /* if we're in the midst of shooting multiple projectiles, stop */
     endmultishot(TRUE);
     sokoban_guilt();
@@ -1342,23 +1342,6 @@ boolean hitsroof;
     }
     return TRUE;
 }
-
-/* return true for weapon meant to be thrown; excludes ammo */
-boolean
-throwing_weapon(obj)
-struct obj *obj;
-{
-    return (boolean)is_otyp_throwing_weapon(obj->otyp);
-}
-
-/* return true for weapon meant to be only thrown and cannot be used in melee */
-boolean
-nonmelee_throwing_weapon(obj)
-struct obj* obj;
-{
-    return (boolean)is_otyp_nonmelee_throwing_weapon(obj->otyp);
-}
-
 
 /* the currently thrown object is returning to you (not for boomerangs) */
 STATIC_OVL void

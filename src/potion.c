@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    potion.c    $NHDT-Date: 1549074254 2019/02/02 02:24:14 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -580,9 +580,13 @@ toggle_blindness()
         }
     }
 
-    /* update dknown flag for inventory picked up while blind */
     if (!Blind)
+    {
+        /* update dknown flag for inventory picked up while blind */
         learn_unseen_invent();
+        /* check if a boss monster has appeared into view */
+        check_seen_bosses();
+    }
 }
 
 boolean
@@ -1251,6 +1255,7 @@ struct obj *otmp;
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "can see through yourself, but you are visible!");
             unkn--;
         }
+        check_seen_bosses();
         break;
     }
     case POT_DWARVEN_MUSHROOM_BREW:
@@ -1674,7 +1679,7 @@ struct obj *otmp;
                 if (ledger_no(&u.uz) == 1) 
                 {
                     You(riseup, ceiling(u.ux, u.uy));
-                    goto_level(&earth_level, FALSE, FALSE, FALSE);
+                    goto_level(&earth_level, FALSE, FALSE, FALSE, FALSE);
                 } 
                 else
                 {
@@ -1688,7 +1693,7 @@ struct obj *otmp;
                         break;
                     } else
                         You(riseup, ceiling(u.ux, u.uy));
-                    goto_level(&newlevel, FALSE, FALSE, FALSE);
+                    goto_level(&newlevel, FALSE, FALSE, FALSE, FALSE);
                 }
             } 
             else
@@ -1885,7 +1890,7 @@ struct obj *otmp;
         updatemaxen();
         int mana_after = u.uen;
         int mana_gain = mana_after - mana_before;
-        if (mana_gain > 0)
+        if (mana_gain > 0 && isok(u.ux, u.uy))
         {
             char fbuf[BUFSZ];
             Sprintf(fbuf, "+%d", mana_gain);
@@ -1930,7 +1935,7 @@ struct obj *otmp;
         } else {
             int dmg;
 
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "This burns%s!",
+            pline_ex(ATR_NONE, otmp->blessed ? CLR_MSG_WARNING : CLR_MSG_NEGATIVE, "This burns%s!",
                   otmp->blessed ? " a little" : otmp->cursed ? " a lot"
                                                              : " like acid");
             dmg = duration;
@@ -2000,7 +2005,7 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
         updatemaxhp();
         int max_hp_after = (Upolyd ? u.mhmax : u.uhpmax);
         int max_hp_gain = max_hp_after - max_hp_before;
-        if (max_hp_gain > 0)
+        if (max_hp_gain > 0 && isok(u.ux, u.uy))
         {
             char fbuf[BUFSZ];
             Sprintf(fbuf, "+%d max HP", max_hp_gain);
@@ -2064,7 +2069,8 @@ boolean dopopup;
     else
         Strcpy(buf, txt);
 
-    pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, buf, "Strange Feeling", dopopup);
+    if(*buf)
+        pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, buf, "Strange Feeling", dopopup);
 
     if (!obj) /* e.g., crystal ball finds no traps */
         return;
@@ -2107,7 +2113,7 @@ boolean useeit;
 const char *objphrase; /* "Your widget glows" or "Steed's saddle glows" */
 {
     void FDECL((*func), (OBJ_P)) = 0;
-    const char *glowcolor = 0;
+    const char *glowcolortext = 0;
 #define COST_alter (-2)
 #define COST_none (-1)
     int costchange = COST_none;
@@ -2123,16 +2129,16 @@ const char *objphrase; /* "Your widget glows" or "Steed's saddle glows" */
         if (targobj->cursed) 
         {
             func = uncurse;
-            textcolor = CLR_MSG_POSITIVE;
-            glowcolor = NH_AMBER;
+            textcolor = Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_POSITIVE;
+            glowcolortext = NH_AMBER;
             costchange = COST_UNCURS;
             sfxsound = SFX_UNCURSE_ITEM_SUCCESS;
         } 
         else if (!targobj->blessed)
         {
             func = bless;
-            textcolor = CLR_MSG_POSITIVE;
-            glowcolor = NH_LIGHT_BLUE;
+            textcolor = Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_POSITIVE;
+            glowcolortext = NH_LIGHT_BLUE;
             costchange = COST_alter;
             altfmt = TRUE; /* "with a <color> aura" */
             sfxsound = SFX_BLESS_ITEM_SUCCESS;
@@ -2143,16 +2149,16 @@ const char *objphrase; /* "Your widget glows" or "Steed's saddle glows" */
         if (targobj->blessed)
         {
             func = unbless;
-            textcolor = CLR_MSG_WARNING;
-            glowcolor = "brown";
+            textcolor = Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_WARNING;
+            glowcolortext = NH_BROWN;
             costchange = COST_UNBLSS;
             sfxsound = SFX_UNBLESS_ITEM_SUCCESS;
         } 
         else if (!targobj->cursed) 
         {
             func = curse;
-            textcolor = CLR_MSG_NEGATIVE;
-            glowcolor = NH_BLACK;
+            textcolor = Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_NEGATIVE;
+            glowcolortext = NH_BLACK;
             costchange = COST_alter;
             altfmt = TRUE;
             sfxsound = SFX_CURSE_ITEM_SUCCESS;
@@ -2179,12 +2185,13 @@ const char *objphrase; /* "Your widget glows" or "Steed's saddle glows" */
             if(sfxsound > 0)
                 play_sfx_sound(sfxsound);
 
-            glowcolor = hcolor(glowcolor);
-
             if (altfmt)
-                pline_ex(ATR_NONE, textcolor, "%s with %s aura.", objphrase, an(glowcolor));
+            {
+                const char* hclr = hcolor_multi_buf2(glowcolortext);
+                pline_multi_ex(ATR_NONE, textcolor, no_multiattrs, multicolor_buffer, "%s with %s%s aura.", objphrase, an_prefix(hclr), hclr);
+            }
             else
-                pline_ex(ATR_NONE, textcolor, "%s %s.", objphrase, glowcolor);
+                pline_multi_ex(ATR_NONE, textcolor, no_multiattrs, multicolor_buffer, "%s %s.", objphrase, hcolor_multi_buf1(glowcolortext));
 
             iflags.last_msg = PLNMSG_OBJ_GLOWS;
             targobj->bknown = !Hallucination;
@@ -2271,7 +2278,7 @@ int how;
         if (!cansee(tx, ty)) 
         {
             play_simple_object_sound_at_location(obj, tx, ty, OBJECT_SOUND_TYPE_BREAK);
-            pline("Crash!");
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Crash!");
         }
         else
         {
@@ -2295,7 +2302,7 @@ int how;
                 Strcpy(buf, mnam);
             }
             play_simple_object_sound_at_location(obj, tx, ty, OBJECT_SOUND_TYPE_BREAK);
-            pline_The("%s crashes on %s and breaks into shards.", botlnam,
+            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s crashes on %s and breaks into shards.", botlnam,
                       buf);
         }
         if (rn2(5) && mon->mhp > 1 && !hit_saddle)
@@ -2304,7 +2311,7 @@ int how;
 
     /* oil doesn't instantly evaporate; Neither does a saddle hit */
     if (obj->otyp != POT_OIL && !hit_saddle && cansee(tx, ty))
-        pline("%s.", Tobjnam(obj, "evaporate"));
+        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s.", Tobjnam(obj, "evaporate"));
 
     if (isyou) 
     {
@@ -2316,7 +2323,7 @@ int how;
             break;
         case POT_POLYMORPH:
             Sprintf(dcbuf, "You feel a little %s.", Hallucination ? "normal" : "strange");
-            pline1(dcbuf);
+            pline_ex1(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_MYSTICAL, dcbuf);
             if (!Unchanging && !Antimagic)
                 polyself(0);
             break;
@@ -2328,7 +2335,7 @@ int how;
                 Sprintf(dcbuf, "This burns%s!",
                       obj->blessed ? " a little"
                                    : obj->cursed ? " a lot" : "");
-                pline1(dcbuf);
+                pline_ex1(ATR_NONE, obj->blessed ? CLR_MSG_WARNING : CLR_MSG_NEGATIVE, dcbuf);
                 dmg = duration;
                 losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_ACID, FALSE), "potion of acid", KILLED_BY_AN);
             }
@@ -2358,7 +2365,7 @@ int how;
         if (useeit && !affected)
         {
             Sprintf(dcbuf, "%s %s wet.", buf, aobjnam(saddle, "get"));
-            pline1(dcbuf);
+            pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
         }
     } 
     else 
@@ -2391,7 +2398,7 @@ int how;
                 if (canseemon(mon))
                 {
                     Sprintf(dcbuf, "%s looks sound and hale again.", Monnam(mon));
-                    pline1(dcbuf);
+                    pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                 }
             }
             if (cureblind)
@@ -2408,7 +2415,7 @@ int how;
                 || resists_sickness(mon))
             {
                 if (canseemon(mon))
-                    pline("%s looks unharmed.", Monnam(mon));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks unharmed.", Monnam(mon));
                 break;
             }
 
@@ -2420,14 +2427,14 @@ int how;
             else
             {
                 if (canseemon(mon))
-                    pline("%s looks unharmed.", Monnam(mon));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks unharmed.", Monnam(mon));
             }
             break;
         case POT_POISON:
             if (resists_poison(mon))
             {
                 if (canseemon(mon))
-                    pline("%s looks unharmed.", Monnam(mon));
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks unharmed.", Monnam(mon));
                 break;
             }
 
@@ -2444,7 +2451,7 @@ do_illness: /* Pestilence's potion of healing effect */
             if (canseemon(mon))
             {
                 Sprintf(dcbuf, "%s looks rather ill.", Monnam(mon));
-                pline1(dcbuf);
+                pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
             }
             break;
         case POT_CONFUSION:
@@ -2454,12 +2461,12 @@ do_illness: /* Pestilence's potion of healing effect */
             if (canseemon(mon) && !is_incorporeal(mon->data))
             {
                 Sprintf(dcbuf, "%s looks concerened of %s body odor.", Monnam(mon), mhis(mon));
-                pline1(dcbuf);
+                pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
             }
             break;
         case POT_DWARVEN_MUSHROOM_BREW:
             if (canseemon(mon))
-                pline("%s looks unharmed.", Monnam(mon));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s looks unharmed.", Monnam(mon));
             break;
         case POT_ELVEN_HERBAL_BREW:
             if (!check_ability_resistance_success(mon, A_CON, objects[obj->otyp].oc_mc_adjustment))
@@ -2480,7 +2487,7 @@ do_illness: /* Pestilence's potion of healing effect */
             if (sleep_monst(mon, obj, (struct monst*)0, duration, 0, FALSE)) 
             {
                 Sprintf(dcbuf, "%s falls asleep.", Monnam(mon));
-                pline1(dcbuf);
+                pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                 slept_monst(mon);
             }
             break;
@@ -2528,7 +2535,7 @@ do_illness: /* Pestilence's potion of healing effect */
                 {
                     Sprintf(dcbuf, "%s %s in pain!", Monnam(mon),
                           is_silent(mon->data) ? "writhes" : "shrieks");
-                    pline1(dcbuf);
+                    pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                     if (!is_silent(mon->data))
                         wake_nearto(tx, ty, mon->data->mlevel * 10);
                     deduct_monster_hp(mon, adjust_damage(duration, &youmonst, mon, AD_CLRC, ADFLAGS_NONE));
@@ -2544,7 +2551,7 @@ do_illness: /* Pestilence's potion of healing effect */
                     if (canseemon(mon))
                     {
                         Sprintf(dcbuf, "%s looks healthier.", Monnam(mon));
-                        pline1(dcbuf);
+                        pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                     }
                     deduct_monster_hp(mon, adjust_damage(-duration, &youmonst, mon, AD_CLRC, ADFLAGS_NONE));
                     if (is_were(mon->data) && is_human(mon->data)
@@ -2562,7 +2569,7 @@ do_illness: /* Pestilence's potion of healing effect */
                 if (canseemon(mon))
                 {
                     Sprintf(dcbuf, "%s rusts.", Monnam(mon));
-                    pline1(dcbuf);
+                    pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                 }
                 deduct_monster_hp(mon, adjust_damage(duration / 2, &youmonst, mon, AD_PHYS, ADFLAGS_NONE));
                 /* should only be by you */
@@ -2578,7 +2585,7 @@ do_illness: /* Pestilence's potion of healing effect */
             if (!is_mon_immune_to_acid(mon) && !check_ability_resistance_success(mon, A_DEX, objects[obj->otyp].oc_mc_adjustment)) {
                 Sprintf(dcbuf, "%s %s in pain!", Monnam(mon),
                       is_silent(mon->data) ? "writhes" : "shrieks");
-                pline1(dcbuf);
+                pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
                 if (!is_silent(mon->data))
                     wake_nearto(tx, ty, mon->data->mlevel * 10);
                 deduct_monster_hp(mon, adjust_damage(d(obj->cursed ? 4 : 3, obj->blessed ? 6 : 8), &youmonst, mon, AD_ACID, ADFLAGS_NONE));
@@ -2586,7 +2593,7 @@ do_illness: /* Pestilence's potion of healing effect */
                     if (your_fault)
                         killed(mon);
                     else
-                        monkilled(mon, "", AD_ACID);
+                        monkilled(mon, "", AD_ACID, 0);
                 }
             }
             break;
@@ -3956,9 +3963,9 @@ dodip()
     if (potion->otyp == POT_ACID && obj->otyp == CORPSE
         && (obj->corpsenm == PM_LICHEN || obj->corpsenm == PM_WHITE_LICHEN || obj->corpsenm == PM_BLACK_LICHEN) && !Blind) 
     {
-        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s %s around the edges.", The(cxname(obj)),
+        pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s %s %s around the edges.", The(cxname(obj)),
               otense(obj, "turn"),
-              potion->odiluted ? hcolor(NH_ORANGE) : hcolor(NH_RED));
+              hcolor_multi_buf2(potion->odiluted ? NH_ORANGE : NH_RED));
         potion->in_use = FALSE; /* didn't go poof */
         return 1;
     }

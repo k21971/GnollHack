@@ -185,6 +185,8 @@
 #define is_semi_transparent(ptr) (((ptr)->mflags5 & M5_SEMI_TRANSPARENT) != 0)
 #define is_radially_transparent(ptr) (((ptr)->mflags5 & M5_RADIAL_TRANSPARENCY) != 0)
 #define is_glass_transparent(ptr) (((ptr)->mflags5 & M5_GLASS_TRANSPARENT) != 0)
+#define fades_upon_death(ptr) (((ptr)->mflags5 & M5_FADES_UPON_DEATH) != 0L)
+#define mon_fades_upon_death(m) fades_upon_death((m)->data)
 
 #define has_mflag_is_non_eater(ptr) (((ptr)->mflags6 & M6_NON_EATER) != 0L)
 #define is_corpse_eater(ptr) (((ptr)->mflags6 & M6_CORPSE_EATER) != 0L)
@@ -198,6 +200,12 @@
 #define has_monster_type_nonedible_corpse(ptr) (((ptr)->mflags6 & M6_NON_EDIBLE) != 0)
 #define revives_upon_meddling(ptr) (((ptr)->mflags6 & M6_REVIVES_UPON_MEDDLING) != 0)
 #define lithovore(ptr) (((ptr)->mflags6 & M6_LITHOVORE) != 0L)
+#define has_blobby_animation(ptr) (((ptr)->mflags6 & M6_BLOB_ANIMATION) != 0L)
+#define has_shark_animation(ptr) (((ptr)->mflags6 & M6_SHARK_ANIMATION) != 0L)
+#define has_human_breathe_animation(ptr) (((ptr)->mflags6 & M6_HUMAN_BREATHE_ANIMATION) != 0L)
+#define has_animal_breathe_animation(ptr) (((ptr)->mflags6 & M6_ANIMAL_BREATHE_ANIMATION) != 0L)
+#define able_to_wear_objects(ptr) (((ptr)->mflags6 & M6_ABLE_TO_WEAR_OBJECTS) != 0L)
+#define nonglovehands(ptr) (((ptr)->mflags6 & M6_NONGLOVE_HANDS) != 0L)
 
 #define is_archaeologist(ptr) (((ptr)->mflags7 & M7_ARCHAEOLOGIST) != 0L)
 #define is_barbarian(ptr) (((ptr)->mflags7 & M7_BARBARIAN) != 0L)
@@ -213,7 +221,7 @@
 #define is_valkyrie(ptr) (((ptr)->mflags7 & M7_VALKYRIE) != 0L)
 #define is_wizard(ptr) (((ptr)->mflags7 & M7_WIZARD) != 0L)
 
-/* combinations */
+/* combinations and others */
 #define is_not_living(ptr) \
     (is_undead(ptr) || has_mflag_is_nonliving(ptr))
 #define is_living(ptr) !is_not_living(ptr)
@@ -225,6 +233,9 @@
 
 #define mon_is_literate(m) (is_speaking((m)->data) && !mindless((m)->data) && haseyes((m)->data))
 #define feet_fit_boots(ptr) (!nonbootfeet(ptr) && !is_animal(ptr) && !slithy(ptr) && !nolimbs(ptr) && !is_whirly(ptr))
+#define is_cloned_wizard(m) (((m)->mon_flags & MON_FLAGS_CLONED_WIZ) != 0L)
+#define is_level_boss(m) (((m)->mon_flags & MON_FLAGS_LEVEL_BOSS) != 0L)
+#define uses_level_boss_hostility(m) (((m)->mon_flags & MON_FLAGS_BOSS_HOSTILITY) != 0L)
 
 /* Resistances and properties */
 #define has_innate(ptr, bit) \
@@ -866,7 +877,8 @@
 
 #define emitted_light_range(ptr) ((ptr)->lightrange)
 #define touch_petrifies(ptr) (((ptr)->mflags1 & M1_TOUCH_PETRIFIES) != 0)
-#define flesh_petrifies(ptr) (touch_petrifies(ptr) || (ptr) == &mons[PM_MEDUSA])
+#define is_medusa(ptr) ((ptr) == &mons[PM_MEDUSA])
+#define flesh_petrifies(ptr) (touch_petrifies(ptr) || is_medusa(ptr))
 #define is_vampire(ptr) ((ptr)->mlet == S_VAMPIRE)
 
 #define mon_ambient_sound(ptr) get_monster_ambient_sound_id((ptr)->soundset)//((ptr)->soundset <= MONSTER_SOUNDSET_NONE ? GHSOUND_NONE : monster_soundsets[(ptr)->soundset].sounds[MONSTER_SOUND_TYPE_AMBIENT].ghsound < MAX_GHSOUNDS ? monster_soundsets[(ptr)->soundset].sounds[MONSTER_SOUND_TYPE_AMBIENT].ghsound : GHSOUND_NONE)
@@ -905,6 +917,23 @@
     (is_rider(ptr) || is_not_living(ptr))
 #define resists_life_leech(mon) \
     (is_immune_to_life_leech((mon)->data) || is_vampshifter(mon))
+
+/* Able to wear armor types */
+#define can_wear_helmet(ptr) (has_place_to_put_helmet_on(ptr) && !is_animal(ptr)) /* Horns are dealt separately; animal-shaped heads won't do */
+#define can_wear_suit(ptr) (!cantweararm(ptr))
+#define can_wear_robe(ptr) (!cantweararm(ptr))
+#define can_wear_cloak(ptr) (!cantweararm(ptr) || (ptr)->msize == MZ_SMALL)
+#define can_wear_shirt(ptr) (!cantweararm(ptr))
+#define can_wear_gloves(ptr) (!nohands(ptr) && !nonglovehands(ptr))
+#define can_wear_bracers(ptr) (!nohands(ptr))
+#define can_wear_boots(ptr) (!nolimbs(ptr) && !slithy(ptr) && !nonbootfeet(ptr))
+#define can_wear_amulet(ptr) (has_neck(ptr))
+#define can_wear_rings(ptr) (!nohands(ptr))
+#define can_wear_shield(ptr) (!nohands(ptr))
+#define can_wear_blindfold(ptr) (haseyes(ptr) && has_head(ptr))
+#define can_wield_weapons(ptr) (!nohands(ptr))
+#define can_wear_objects(ptr) (can_operate_objects(ptr) && !(is_animal(ptr) && !able_to_wear_objects(ptr)))
+#define can_wear_saddle(ptr) is_steed(ptr)
 
 /* Other */
 #define is_mon_talkative(mon) (is_speaking((mon)->data) && (is_peaceful(mon) || is_chatty((mon)->data)))

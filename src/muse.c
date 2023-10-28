@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    muse.c    $NHDT-Date: 1547025167 2019/01/09 09:12:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /*      Copyright (C) 1990 by Ken Arromdee                         */
@@ -121,9 +121,16 @@ struct obj *obj;
                 if (vis)
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "In a cloud of smoke, %s emerges!", a_monnam(mtmp));
                 pline("%s speaks.", vis ? Monnam(mtmp) : Something);
-                /* I suspect few players will be upset that monsters */
-                /* can't wish for wands of death here.... */
                 if (rn2(2)) {
+                    play_monster_special_dialogue_line(mtmp, DJINN_LINE_THANK_YOU_FOR_FREEING);
+                    verbalize_happy1("Thank you for freeing me!");
+                    play_monster_special_dialogue_line(mtmp, DJINN_LINE_GRANT_ONE_WISH);
+                    verbalize_happy1("I am in your debt.  I will grant one wish!");
+                    mmake_wish(mon);
+                    if (vis)
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s vanishes.", Monnam(mtmp));
+                    mongone(mtmp);
+                } else if (rn2(2)) {
                     play_monster_special_dialogue_line(mtmp, DJINN_LINE_YOU_FREED_ME);
                     verbalize_talk1("You freed me!");
                     mtmp->mpeaceful = 1;
@@ -175,7 +182,7 @@ struct obj *obj;
         //mon->mhp -= dam;
         if (DEADMONSTER(mon))
         {
-            monkilled(mon, "", AD_RBRE);
+            monkilled(mon, "", AD_MAGM, 0);
             return 1;
         }
         m.has_defense = m.has_offense = m.has_misc = 0;
@@ -1648,7 +1655,19 @@ register struct monst* origmonst;
                 else
                     pline_The("The wand hits you!");
 
-                losehp(damage, "wand", KILLED_BY_AN);
+                char kbuf[BUFSZ * 2], knam[BUFSZ] = "";
+                int kprefix = KILLED_BY;
+                if (origmonst)
+                {
+                    int mkprefix = KILLED_BY_AN;
+                    get_killer_name_and_format(origmonst, knam, &mkprefix);
+                    Sprintf(kbuf, "%s zapped by %s", killer_xname(otmp), mkprefix == KILLED_BY_AN ? an(knam) : knam);
+                }
+                else
+                {
+                    Sprintf(kbuf, "%s", killer_xname(otmp));
+                }
+                losehp(damage, kbuf, kprefix);
             }
             else
                 pline_The("wand misses you.");
@@ -2119,6 +2138,7 @@ struct monst *mtmp;
 #define MUSE_POT_COLD_IMMUNITY 30
 #define MUSE_POT_SHOCK_IMMUNITY 31
 #define MUSE_POT_MAGIC_RESISTANCE 32
+#define MUSE_WAN_WISHING 33
 
 boolean
 set_misc_potion(mtmp, obj)
@@ -2298,6 +2318,11 @@ struct monst *mtmp;
                 || (!mtmp->isgd && !mtmp->isshk && !mtmp->ispriest && !mtmp->issmith && !mtmp->isnpc))) {
             m.misc = obj;
             m.has_misc = MUSE_POT_GAIN_LEVEL;
+        }
+        nomore(MUSE_WAN_WISHING);
+        if (obj->otyp == WAN_WISHING && obj->charges > 0) {
+            m.misc = obj;
+            m.has_misc = MUSE_WAN_WISHING;
         }
         nomore(MUSE_BULLWHIP);
         if (obj->otyp == BULLWHIP && !is_peaceful(mtmp)
@@ -2828,6 +2853,19 @@ struct monst *mtmp;
             play_sfx_sound_at_location(SFX_POLYMORPH_SUCCESS, mtmp->mx, mtmp->my);
 
         return 2;
+    case MUSE_WAN_WISHING: {
+        /* wear any armor items previously wished for before
+         * using another wish */
+        m_dowear(mtmp, FALSE);
+        mzapmsg(mtmp, otmp, FALSE);
+        otmp->charges--;
+        if (!vismon && !Deaf)
+            You_hear_ex(ATR_NONE, CLR_MSG_WARNING, "something making a wish!");
+        if (oseen)
+            makeknown(WAN_WISHING);
+        mmake_wish(mtmp);
+        return 2;
+    }
     case MUSE_BULLWHIP:
         /* attempt to disarm hero */
         {
@@ -2914,7 +2952,7 @@ struct monst *mtmp;
 #ifdef CLIPPING
     cliparound(mtmp->mx, mtmp->my, FALSE);
 #endif
-    show_monster_glyph_with_extra_info(mtmp->mx, mtmp->my, any_mon_to_glyph(mtmp, rn2), mtmp, 0UL, 0, 0);
+    show_monster_glyph_with_extra_info(mtmp->mx, mtmp->my, any_mon_to_glyph(mtmp, rn2), mtmp, 0UL, 0UL, 0, 0);
     display_self();
     You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "aggravated at %s.", noit_mon_nam(mtmp));
     create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
@@ -3675,8 +3713,11 @@ boolean by_you; /* true: if mon kills itself, hero gets credit/blame */
         return FALSE;
     
     if (vis)
-        pline("%s starts turning %s.", Monnam(mon),
-              green_mon(mon) ? "into ooze" : hcolor(NH_GREEN));
+    {
+        (void)get_colorless_multicolor_buffer();
+        pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolor_buffer, "%s starts turning %s.", Monnam(mon),
+            green_mon(mon) ? "into ooze" : hcolor_multi_buf1(NH_GREEN));
+    }
     /* -4 => sliming, causes quiet loss of enhanced speed */
     (void)increase_mon_property_verbosely(mon, SLIMED, 10);
 
@@ -3769,7 +3810,7 @@ boolean by_you; /* true: if mon kills itself, hero gets credit/blame */
                           is_not_living(mon->data) ? "destroyed" : "killed");
                 xkilled(mon, XKILL_NOMSG | XKILL_NOCONDUCT);
             } else
-                monkilled(mon, "fire", AD_FIRE);
+                monkilled(mon, "fire", AD_FIRE, 0);
         } 
         else 
         {
@@ -3846,6 +3887,323 @@ struct monst *mon;
         break;
     }
     return FALSE;
+}
+
+void
+mmake_wish(mon)
+struct monst* mon;
+{
+    struct obj* otmp;
+    char* oname;
+    boolean wearable = FALSE;
+    otmp = NULL;
+
+    switch (rnd(18)) {
+    case 1:
+        otmp = mksobj(POT_GAIN_LEVEL, FALSE, FALSE, 2);
+        if (otmp)
+        {
+            bless(otmp);
+            otmp->quan = rnd(3);
+            otmp->owt = weight(otmp);
+        }
+        break;
+    case 2:
+        otmp = mksobj(WAN_CREATE_MONSTER, TRUE, FALSE, 2);
+        break;
+    case 3:
+        otmp = mksobj(AMULET_OF_LIFE_SAVING, FALSE, FALSE, 2);
+        if (otmp)
+        {
+            bless(otmp);
+            otmp->oerodeproof = 1;
+            wearable = TRUE;
+        }
+        break;
+    case 4:
+        if (!mon->mprops[DISPLACED] && !cantweararm(mon->data)) {
+            otmp = mksobj(CLOAK_OF_DISPLACEMENT, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(WAN_DIGGING, TRUE, FALSE, 2);
+        }
+        break;
+    case 5:
+        if (!nohands(mon->data)) {
+            otmp = mksobj(GAUNTLETS_OF_DEXTERITY, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(POT_FULL_HEALING, FALSE, FALSE, 2);
+            if(otmp)
+                bless(otmp);
+        }
+        break;
+    case 6:
+        if (!resists_magic(mon)) {
+            if (!cantweararm(mon->data))
+            {
+                otmp = mksobj(CLOAK_OF_MAGIC_RESISTANCE, FALSE, FALSE, 2);
+                if (otmp)
+                {
+                    otmp->oerodeproof = 1;
+                    otmp->enchantment = rn2(3) + 1;
+                }
+            }
+            else
+                otmp = mksobj(IOUN_STONE_OF_MAGIC_RESISTANCE, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(WAN_CREATE_MONSTER, TRUE, FALSE, 2);
+        }
+        break;
+    case 7:
+        if (!cantweararm(mon->data)) {
+            otmp = mksobj(PLATE_MAIL, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->material = MAT_CRYSTAL;
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                otmp->owt = weight(otmp);
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(BAG_OF_HOLDING, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+            }
+        }
+        break;
+    case 8:
+        otmp = mksobj(POT_PARALYSIS, FALSE, FALSE, 2);
+        if (otmp)
+        {
+            bless(otmp);
+            otmp->quan = rnd(3);
+            otmp->owt = weight(otmp);
+        }
+        break;
+    case 9:
+        if (!mon->mprops[WATER_WALKING] && !sliparm(mon->data)) {
+            otmp = mksobj(WATER_WALKING_BOOTS, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(RIN_SLOW_DIGESTION, FALSE, FALSE, 2);
+            if(otmp)
+                bless(otmp);
+        }
+        break;
+    case 10:
+        if (!mon_reflects(mon, (char*)0)) {
+            if (humanoid(mon->data))
+            {
+                otmp = mksobj(SHIELD_OF_REFLECTION, FALSE, FALSE, 2);
+                if (otmp)
+                {
+                    otmp->oerodeproof = 1;
+                    otmp->enchantment = rn2(3) + 1;
+                }
+            }
+            else
+                otmp = mksobj(AMULET_OF_REFLECTION, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(POT_EXTRA_HEALING, FALSE, FALSE, 2);
+            if(otmp)
+                bless(otmp);
+        }
+        break;
+    case 11:
+        if (!nohands(mon->data) && !strongmonst(mon->data)) {
+            otmp = mksobj(GAUNTLETS_OF_OGRE_POWER, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(POT_GAIN_LEVEL, FALSE, FALSE, 2);
+            if(otmp)
+                curse(otmp);
+        }
+        break;
+    case 12:
+        if (!is_fast(mon) && !is_very_fast(mon) && !is_ultra_fast(mon) && !is_super_fast(mon) && !is_lightning_fast(mon) && feet_fit_boots(mon->data)) {
+            otmp = mksobj(SPEED_BOOTS, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(POT_FULL_HEALING, FALSE, FALSE, 2);
+            if(otmp)
+                bless(otmp);
+        }
+        break;
+    case 13:
+        if (!has_telepathy(mon)
+            && !sliparm(mon->data) && !has_horns(mon->data) && has_head(mon->data)) {
+            otmp = mksobj(HELM_OF_TELEPATHY, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(POT_EXTRA_HEALING, FALSE, FALSE, 2);
+            if(otmp)
+                bless(otmp);
+        }
+        break;
+    case 14:
+        if (!sliparm(mon->data) && !has_horns(mon->data) && has_head(mon->data)) {
+            otmp = mksobj(HELM_OF_BRILLIANCE, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(UNICORN_HORN, TRUE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+            }
+        }
+        break;
+    case 15:
+        if (!cantweararm(mon->data)) {
+            otmp = mksobj(CLOAK_OF_PROTECTION, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+        }
+        else {
+            otmp = mksobj(RIN_PROTECTION, FALSE, FALSE, 2);
+            if (otmp)
+            {
+                bless(otmp);
+                otmp->enchantment = rn2(3) + 1;
+            }
+        }
+        break;
+    case 16: /* Monsters can wish for certain artifacts */
+        otmp = mk_artifact((struct obj*)0, mon_aligntyp(mon), 2);
+        if (otmp) {
+            bless(otmp);
+            if (is_weapon(otmp) || is_armor(otmp))
+            {
+                otmp->oerodeproof = 1;
+                otmp->enchantment = rn2(3) + 1;
+                wearable = TRUE;
+            }
+            else if (otmp->oclass == RING_CLASS)
+                wearable = TRUE;
+        }
+        break;
+    case 17:
+        switch (rnd(3)) {
+        case 1:
+            otmp = mksobj(WAN_PETRIFICATION, TRUE, FALSE, 2);
+            break;
+        case 2:
+            otmp = mksobj(WAN_DISINTEGRATION, TRUE, FALSE, 2);
+            break;
+        case 3:
+            otmp = mksobj(WAN_DEATH, TRUE, FALSE, 2);
+            break;
+        }
+        break;
+    case 18:
+        otmp = mksobj(EGG, FALSE, FALSE, 2);
+        if (otmp)
+        {
+            otmp->corpsenm = PM_COCKATRICE;
+            otmp->quan = rnd(3);
+            otmp->owt = weight(otmp);
+        }
+        break;
+    default:
+        otmp = mksobj(POT_GAIN_LEVEL, FALSE, FALSE, 2);
+        if(otmp)
+            curse(otmp);
+    }
+
+    if (otmp == NULL) {
+        if (canseemon(mon))
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "For a moment, %s had %s in its %s, but it disappears.",
+                mon_nam(mon), something, makeplural(mbodypart(mon, HAND)));
+        return;
+    }
+
+    oname = ansimpleoname(otmp);
+    if (canseemon(mon))
+    {
+        play_sfx_sound_at_location(SFX_WISH_FOR_OBJECT, mon->mx, mon->my);
+        int multicolors[3] = { NO_COLOR, CLR_BRIGHT_MAGENTA, CLR_BRIGHT_MAGENTA };
+        pline_multi_ex(ATR_NONE, CLR_MSG_SPELL, no_multiattrs, multicolors, "%s makes a wish for%s %s!",
+            Monnam(mon), (otmp->quan > 1) ? " some" : "", oname);
+    }
+
+    if (mpickobj(mon, otmp))
+        otmp = NULL;
+
+    if (wearable)
+        check_mon_wearable_items_next_turn(mon);
 }
 
 /*muse.c*/

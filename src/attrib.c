@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    attrib.c    $NHDT-Date: 1553363417 2019/03/23 17:50:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.65 $ */
 /*      Copyright 1988, 1989, 1990, 1992, M. Stephenson           */
@@ -223,7 +223,7 @@ int msgflg; /* positive => no message, zero => message, and */
         You_feel_ex(ATR_NONE, (incr > 0) ? CLR_MSG_POSITIVE : (incr < 0) ? CLR_MSG_NEGATIVE : NO_COLOR, "%s%s!", (incr > 1 || incr < -1) ? "very " : "", attrstr);
         
         int change = ACURR(ndx) - old_acurr;
-        if (change != 0)
+        if (change != 0 && isok(u.ux, u.uy))
         {
             char ftbuf[BUFSZ];
             Sprintf(ftbuf, "%s%d %s", change >= 0 ? "+" : "", change, attrname[ndx]);
@@ -303,7 +303,7 @@ boolean verbose;
     if (verbose && canspotmon(mon))
     {
         int change = M_ACURR(mon, ndx) - old_acurr;
-        if (change != 0)
+        if (change != 0 && isok(mon->mx, mon->my))
         {
             char ftbuf[BUFSZ];
             Sprintf(ftbuf, "%s%d %s", change >= 0 ? "+" : "", change, attrname[ndx]);
@@ -837,8 +837,8 @@ update_extrinsics()
                     if (mythic_quality == 0)
                         continue;
 
-                    struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
-                    struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
+                    const struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
+                    const struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
                     uchar max_mythic_powers = (j == 0 ? MAX_MYTHIC_PREFIX_POWERS : MAX_MYTHIC_SUFFIX_POWERS);
 
                     for (uchar i = 0; i < max_mythic_powers; i++)
@@ -1257,12 +1257,11 @@ restore_attrib()
 
 void
 exercise(i, inc_or_dec)
-int i;
-boolean inc_or_dec;
+int i UNUSED;
+boolean inc_or_dec UNUSED;
 {
     /* exercise system has been deactivated -- JG */
-    return;
-
+#if 0
     debugpline0("Exercise:");
     if (i == A_INT || i == A_CHA)
         return; /* can't exercise these */
@@ -1290,6 +1289,7 @@ boolean inc_or_dec;
     }
     if (moves > 0 && (i == A_STR || i == A_CON))
         (void) encumber_msg();
+#endif
 }
 
 STATIC_OVL void
@@ -1477,21 +1477,24 @@ register int np;
 {
     register int i, x, tryct;
 
-    for (i = 0; i < A_MAX; i++) {
+    for (i = 0; i < A_MAX; i++) 
+    {
         ABASE(i) = AMIN(i) = AMAX(i) = urole.attrbase[i];
         ATEMP(i) = ATIME(i) = 0;
         np -= urole.attrbase[i];
     }
 
     tryct = 0;
-    while (np > 0 && tryct < 100) {
+    while (np > 0 && tryct < 100) 
+    {
         x = rn2(100);
         for (i = 0; (i < A_MAX) && ((x -= urole.attrdist[i]) > 0); i++)
             ;
         if (i >= A_MAX)
             continue; /* impossible */
 
-        if (ABASE(i) >= ATTRMAX(i)) {
+        if (ABASE(i) >= ATTRMAX(i)) 
+        {
             tryct++;
             continue;
         }
@@ -1503,15 +1506,16 @@ register int np;
     }
 
     tryct = 0;
-    while (np < 0 && tryct < 100) { /* for redistribution */
-
+    while (np < 0 && tryct < 100) 
+    { /* for redistribution */
         x = rn2(100);
         for (i = 0; (i < A_MAX) && ((x -= urole.attrdist[i]) > 0); i++)
             ;
         if (i >= A_MAX)
             continue; /* impossible */
 
-        if (ABASE(i) <= ATTRMIN(i)) {
+        if (ABASE(i) <= ATTRMIN(i)) 
+        {
             tryct++;
             continue;
         }
@@ -1556,8 +1560,11 @@ int propid;
 {
     if (!propid)
         return;
-    if (propid == WARNING|| propid == SEE_INVISIBLE)
+    if (propid == WARNING || propid == SEE_INVISIBLE)
+    {
         see_monsters();
+        check_seen_bosses();
+    }
 }
 
 const struct innate *
@@ -1954,36 +1961,36 @@ newhp()
 {
     int hp; // , conplus;
 
-    if (u.ulevel == 0) {
+    if (u.ulevel == 0) 
+    {
         /* Initialize hit points */
         hp = urole.hpadv.infix + urace.hpadv.infix;
         if (urole.hpadv.inrnd > 0)
             hp += rnd(urole.hpadv.inrnd);
         if (urace.hpadv.inrnd > 0)
             hp += rnd(urace.hpadv.inrnd);
-        if (moves <= 1L) { /* initial hero; skip for polyself to new man */
+        if (moves <= 1L) 
+        { /* initial hero; skip for polyself to new man */
             /* Initialize alignment stuff */
             u.ualign.type = aligns[flags.initalign].value;
             u.ualign.record = urole.initrecord;
         }
         /* no Con adjustment for initial hit points */
-    } else {
-        if (u.ulevel < urole.xlev) {
+    }
+    else 
+    {
+        if (u.ulevel < urole.xlev) 
+        {
             hp = urole.hpadv.lofix + urace.hpadv.lofix;
-            if (urole.hpadv.lornd > 0)
-                hp += rnd(urole.hpadv.lornd);
-            if (urace.hpadv.lornd > 0)
-                hp += rnd(urace.hpadv.lornd);
-        } else {
+            if (urole.hpadv.lornd + urace.hpadv.lornd > 0)
+                hp += rn2(urole.hpadv.lornd + urace.hpadv.lornd + 1);
+        } 
+        else 
+        {
             hp = urole.hpadv.hifix + urace.hpadv.hifix;
-            if (urole.hpadv.hirnd > 0)
-                hp += rnd(urole.hpadv.hirnd);
-            if (urace.hpadv.hirnd > 0)
-                hp += rnd(urace.hpadv.hirnd);
+            if (urole.hpadv.hirnd + urace.hpadv.hirnd > 0)
+                hp += rn2(urole.hpadv.hirnd + urace.hpadv.hirnd + 1);
         }
-        //conplus = constitution_hp_bonus(ACURR(A_CON));
-
-        //hp += conplus;
     }
     if (hp <= 0)
         hp = 1;

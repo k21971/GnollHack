@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-01-06 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    steal.c    $NHDT-Date: 1554580626 2019/04/06 19:57:06 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.72 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -150,9 +150,12 @@ register struct monst *mtmp;
         freeinv(ygold);
         add_to_minv(mtmp, ygold);
 
-        char ftbuf[BUFSZ];
-        Sprintf(ftbuf, "-%ld gold", tmp);
-        display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_REDUCED, ATR_NONE, NO_COLOR, 0UL);
+        if (isok(u.ux, u.uy))
+        {
+            char ftbuf[BUFSZ];
+            Sprintf(ftbuf, "-%ld gold", tmp);
+            display_floating_text(u.ux, u.uy, ftbuf, FLOATING_TEXT_GOLD_REDUCED, ATR_NONE, NO_COLOR, 0UL);
+        }
 
         play_sfx_sound(SFX_STEAL_GOLD);
         Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "purse feels lighter.");
@@ -538,6 +541,9 @@ register struct obj *otmp;
         thrownobj = 0;
     else if (otmp == kickedobj)
         kickedobj = 0;
+
+    obj_clear_found(otmp);
+
     /* don't want hidden light source inside the monster; assumes that
        engulfers won't have external inventories; whirly monsters cause
        the light to be extinguished rather than letting it shine thru */
@@ -715,10 +721,10 @@ int ochance, achance; /* percent chance for ordinary item, artifact */
 
 /* drop one object taken from a (possibly dead) monster's inventory */
 void
-mdrop_obj(mon, obj, verbosely)
+mdrop_obj(mon, obj, verbosely, set_found)
 struct monst *mon;
 struct obj *obj;
-boolean verbosely;
+boolean verbosely, set_found;
 {
     int omx = mon->mx, omy = mon->my;
     boolean update_mon = FALSE;
@@ -757,6 +763,8 @@ boolean verbosely;
 
     if (!flooreffects(obj, omx, omy, "fall")) 
     {
+        if (set_found)
+            obj_set_found(obj);
         place_object(obj, omx, omy);
         stackobj(obj);
     }
@@ -786,12 +794,12 @@ struct monst *mon;
            artifacts and ordinary objects are given 0% resistance chance;
            current role's quest artifact is rescued too--quest artifacts
            for the other roles are not */
-        if (obj_resists(obj, 0, 0) || is_quest_artifact(obj))
+        if (is_obj_unremovable_from_the_game(obj) || is_quest_artifact(obj))
         {
             obj_extract_self(obj);
             if (mon->mx) 
             {
-                mdrop_obj(mon, obj, FALSE);
+                mdrop_obj(mon, obj, FALSE, FALSE);
             }
             else 
             { /* migrating monster not on map */
@@ -890,7 +898,7 @@ boolean is_mon_dead;
             obfree(otmp, (struct obj*) 0); //Delete the item
         }
         else
-            mdrop_obj(mtmp, otmp, is_pet && flags.verbose);
+            mdrop_obj(mtmp, otmp, is_pet && flags.verbose, TRUE);
     }
 
     if (show && cansee(omx, omy))
@@ -909,7 +917,7 @@ struct monst* mtmp;
     while ((otmp = droppables(mtmp)) != 0)
     {
         obj_extract_self(otmp);
-        mdrop_obj(mtmp, otmp, flags.verbose);
+        mdrop_obj(mtmp, otmp, flags.verbose, FALSE);
     }
 
     if (cansee(omx, omy))

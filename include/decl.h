@@ -228,18 +228,21 @@ E const char ynaqchars[];
 E const char ynNaqchars[];
 E const char dnqchars[];
 E const char sdqchars[];
+E const char sadqchars[];
 
 E const char yndescs[];
 E const char ynqdescs[];
 E const char ynq2descs[];
 E const char ynaqdescs[];
 E const char ynaq2descs[];
+E const char ynaq3descs[];
 E const char ynNaqdescs[];
 E const char ciqdescs[];
 E const char bcqdescs[];
 E const char fnqdescs[];
 E const char dnqdescs[];
 E const char sdqdescs[];
+E const char sadqdescs[];
 
 E NEARDATA long yn_number;
 
@@ -284,8 +287,7 @@ E NEARDATA const char getobj_cuddly[];
 E NEARDATA const char getobj_toss_objs[];
 E NEARDATA const char getobj_tippables[];
 E NEARDATA const char getobj_zap_syms[];
-E NEARDATA const char getobj_mark_autostashs[];
-E NEARDATA const char getobj_unmark_autostashs[];
+E NEARDATA const char getobj_favorites[];
 
 E long done_money;
 E NEARDATA char plname[PL_NSIZ];
@@ -347,7 +349,6 @@ E NEARDATA long moves, monstermoves;
 E NEARDATA long wailmsg;
 
 E NEARDATA boolean in_mklev;
-E NEARDATA boolean stoned;
 E NEARDATA boolean unweapon1;
 E NEARDATA boolean unweapon2;
 E NEARDATA boolean mrg_to_wielded;
@@ -401,6 +402,7 @@ E NEARDATA struct obj *uball;
 E NEARDATA struct obj *migrating_objs;
 E NEARDATA struct obj *billobjs;
 E NEARDATA struct obj *memoryobjs;
+E NEARDATA struct obj *lastmemoryobj;
 E NEARDATA struct obj *current_wand, *thrownobj, *kickedobj;
 
 E NEARDATA const struct obj zeroobj; /* for init; also, &zeroobj is used
@@ -446,7 +448,8 @@ E NEARDATA long domove_succeeded;
 E NEARDATA struct c_color_names {
     const char *const c_black, *const c_amber, *const c_golden,
         *const c_light_blue, *const c_red, *const c_green, *const c_silver,
-        *const c_blue, *const c_purple, *const c_white, *const c_orange;
+        *const c_blue, *const c_purple, *const c_white, *const c_orange, 
+        *const c_brown, *const c_gray, *const c_dark_red, *const c_colorless;
 } c_color_names;
 #define NH_BLACK c_color_names.c_black
 #define NH_AMBER c_color_names.c_amber
@@ -459,6 +462,11 @@ E NEARDATA struct c_color_names {
 #define NH_PURPLE c_color_names.c_purple
 #define NH_WHITE c_color_names.c_white
 #define NH_ORANGE c_color_names.c_orange
+#define NH_BROWN c_color_names.c_brown
+#define NH_GRAY c_color_names.c_gray
+#define NH_DARK_RED c_color_names.c_dark_red
+#define NH_COLORLESS c_color_names.c_colorless
+
 
 /* The names of the colors used for gems, etc. */
 E const char *c_obj_colors[];
@@ -530,17 +538,18 @@ E NEARDATA winid WIN_MAP, WIN_INVEN, WIN_HERE;
 
 #define pline_ex1_popup(a, b, cstr, title, dopop) pline_ex1(a, b, cstr); if (dopop) display_popup_text(cstr, title, POPUP_TEXT_GENERAL, a, b, NO_GLYPH, 0)
 
-E int no_multiattrs[32];
-E int multicolor_red1[1];
-E int multicolor_red2[2];
-E int multicolor_red3[3];
-E int multicolor_red4[4];
-E int multicolor_orange1[1];
-E int multicolor_orange2[2];
-E int multicolor_orange3[3];
-E int multicolor_orange4[4];
-E int multicolor_text1[1];
-E int multicolor_text2[2];
+E const int no_multiattrs[32];
+E const int multicolor_red1[1];
+E const int multicolor_red2[2];
+E const int multicolor_red3[3];
+E const int multicolor_red4[4];
+E const int multicolor_orange1[1];
+E const int multicolor_orange2[2];
+E const int multicolor_orange3[3];
+E const int multicolor_orange4[4];
+E const int multicolor_text1[1];
+E const int multicolor_text2[2];
+E int multicolor_buffer[32];
 
 E char toplines[TBUFSZ];
 E char toplineattrs[TBUFSZ];

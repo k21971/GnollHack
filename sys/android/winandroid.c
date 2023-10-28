@@ -42,7 +42,7 @@ static void FDECL(and_cliparound, (int, int, BOOLEAN_P));
 static void FDECL(and_update_positionbar, (char *));
 #endif
 static void FDECL(and_print_glyph, (winid,XCHAR_P,XCHAR_P,struct layer_info));
-static void FDECL(and_issue_gui_command, (int, int, const char*));
+static void FDECL(and_issue_gui_command, (int, int, int, const char*));
 static void FDECL(and_raw_print, (const char *));
 static void FDECL(and_raw_print_bold, (const char *));
 static int NDECL(and_nhgetch);
@@ -1106,7 +1106,7 @@ void and_status_flush()
 	};
 
 	static enum statusfields fieldorder_line2[] = {
-		BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_XP,
+		BL_MODE, BL_LEVELDESC, BL_HP, BL_HPMAX, BL_ENE, BL_ENEMAX, BL_AC, BL_MC_LVL, BL_MC_PCT, BL_MOVE, BL_UWEP, BL_UWEP2, BL_UQUIVER, BL_XP,
 		BL_EXP, BL_HD, BL_TIME, BL_REALTIME, BL_2WEP, BL_SKILL, BL_HUNGER, BL_CAP, BL_CONDITION,
 		BL_FLUSH
 	};
@@ -1422,7 +1422,7 @@ void and_update_positionbar(char *features)
 //		   port wants (symbol, font, color, attributes, ...there's
 //		   a 1-1 map between glyphs and distinct things on the map).
 
-void and_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str)
+void and_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char* cmd_str)
 {
 	return;
 }

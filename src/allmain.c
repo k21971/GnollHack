@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    allmain.c    $NHDT-Date: 1555552624 2019/04/18 01:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.100 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -19,7 +19,7 @@ STATIC_DCL void NDECL(do_positionbar);
 #endif
 STATIC_DCL void NDECL(regenerate_hp);
 STATIC_DCL void NDECL(regenerate_mana);
-STATIC_DCL void FDECL(interrupt_multi, (const char *));
+STATIC_DCL void FDECL(interrupt_multi, (const char *, int, int));
 STATIC_DCL void FDECL(debug_fields, (const char *));
 STATIC_DCL void NDECL(create_monster_or_encounter);
 STATIC_DCL int NDECL(select_rwraith);
@@ -39,6 +39,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
 #endif
     int moveamt = 0, wtcap = 0, change = 0;
     boolean monscanmove = FALSE;
+    struct obj* otmp;
 
     /* Note:  these initializers don't do anything except guarantee that
             we're linked properly.
@@ -86,7 +87,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
         flags.verbose = FALSE;
         context.rndencode = rnd(9000);
         set_wear((struct obj *) 0); /* for side-effects of starting gear */
-        (void) pickup(1);      /* autopickup at initial location */
+        (void) pickup(1, FALSE);      /* autopickup at initial location */
         flags.verbose = oldverbose;
     }
 
@@ -311,7 +312,6 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
                     {
                         int buriedsearchablefound = FALSE;
                         struct obj* otmp2;
-                        struct obj* otmp;
                         for (otmp = level.buriedobjlist; otmp; otmp = otmp2)
                         {
                             otmp2 = otmp->nobj;
@@ -325,7 +325,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
                         {
                             You("smell something buried underground.");
                             (void)unearth_objs(&youmonst, u.ux, u.uy, TRUE, TRUE);
-                            (void)pickup(1);
+                            (void)pickup(1, FALSE);
                             nomul(0);
                         }
                     }
@@ -418,7 +418,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
         /* Clear context-dependent UI */
         clear_context_menu();
         if (ui_has_input())
-            context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+            clear_run_and_travel();
 
         /* Redraw screen */
         if (!context.mv || Blind)
@@ -458,9 +458,6 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
             timebot();
             curs_on_u();
         }
-
-        reset_monster_origin_coordinates(&youmonst);
-        reset_object_origin_coordinates(fobj);
 
         context.move = 1;
 
@@ -534,8 +531,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
                 if (context.mv) 
                 {
                     if (multi < COLNO && !--multi)
-                        context.travel = context.travel1 = context.travel_mode = context.mv =
-                        context.run = 0;
+                        clear_run_and_travel();
                     domove();
                 }
                 else 
@@ -620,6 +616,16 @@ struct obj* obj;
     obj->oy0 = obj->oy;
 
     reset_object_origin_coordinates(obj->cobj);
+}
+
+void
+reset_all_object_origin_coordinates()
+{
+    struct obj* obj;
+    for (obj = fobj; obj; obj = obj->nobj)
+    {
+        reset_object_origin_coordinates(obj);
+    }
 }
 
 void
@@ -847,7 +853,7 @@ regenerate_hp()
             if (u.mh != mh_before)
                 force_redraw_at(u.ux, u.uy);
             if (u.mh == relevant_hpmax)
-                interrupt_multi("You are in full health.");
+                interrupt_multi("You are in full health.", ATR_NONE, CLR_MSG_SUCCESS);
         }
     }
     else
@@ -873,7 +879,7 @@ regenerate_hp()
             if (u.uhp != uhp_before)
                 force_redraw_at(u.ux, u.uy);
             if (u.uhp == relevant_hpmax)
-                interrupt_multi("You are in full health.");
+                interrupt_multi("You are in full health.", ATR_NONE, CLR_MSG_SUCCESS);
         }
     }
 
@@ -1006,7 +1012,7 @@ regenerate_hp()
     }
 
     if (reached_full)
-        interrupt_multi("You are in full health.");
+        interrupt_multi("You are in full health.", ATR_NONE, CLR_MSG_SUCCESS);
 #endif
 }
 
@@ -1052,7 +1058,7 @@ regenerate_mana()
         }
         context.botl = TRUE;
         if (u.uen == u.uenmax)
-            interrupt_multi("You feel full of energy.");
+            interrupt_multi("You feel full of energy.", ATR_NONE, CLR_MSG_SUCCESS);
     }
 
 }
@@ -1321,7 +1327,7 @@ choose_game_difficulty()
         int combat_damage_percentage = (int)(m_dmg_mult * m_hp_mult * 100.0);
         
         leveltext = get_game_difficulty_text(i);
-        strcpy(buf, leveltext);
+        Strcpy(buf, leveltext);
         *buf = highc(*buf);
 
         if(iflags.menu_tab_sep)
@@ -1332,15 +1338,16 @@ choose_game_difficulty()
         add_menu(menuwin, NO_GLYPH, &any, diffchar, 0, ATR_NONE, NO_COLOR,
             buf2, MENU_UNSELECTED);
     }
+    if (!(windowprocs.wincap2 & WC2_MENU_SHOWS_OK_CANCEL))
+    {
+        any = zeroany;
+        add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR,
+            " ", MENU_UNSELECTED);
 
-    any = zeroany;
-    add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR,
-        " ", MENU_UNSELECTED);
-
-    any.a_int = QUIT_DUMMY;
-    add_menu(menuwin, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR,
-        "Quit", MENU_UNSELECTED);
-
+        any.a_int = QUIT_DUMMY;
+        add_menu(menuwin, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR,
+            "Quit", MENU_UNSELECTED);
+    }
     end_menu(menuwin, "Pick a level for game difficulty");
     n = select_menu(menuwin, PICK_ONE, &selected);
     destroy_nhwindow(menuwin);
@@ -1360,7 +1367,7 @@ choose_game_difficulty()
         nh_bail(EXIT_SUCCESS, "Until next time, then...", TRUE);
     }
 }
-
+#undef QUIT_DUMMY
 
 void
 newgame()
@@ -1378,7 +1385,7 @@ newgame()
     context.next_attrib_check = 600L; /* arbitrary first setting */
     context.tribute.enabled = TRUE;   /* turn on 3.6 tributes    */
     context.tribute.tributesz = sizeof(struct tribute_info);
-    strcpy(context.used_names, "|");
+    Strcpy(context.used_names, "|");
 
     init_rm();
     init_fountains();
@@ -1445,9 +1452,11 @@ newgame()
     }
 
     /* Game is starting now */
+    lock_thread_lock();
     context.game_started = TRUE;
     urealtime.realtime = 0L;
     urealtime.start_timing = getnow();
+    unlock_thread_lock();
 
 #ifdef INSURANCE
     save_currentstate();
@@ -1459,6 +1468,7 @@ newgame()
     (void)delete_savefile_if_exists();
     (void)delete_tmp_backup_savefile();
     (void)delete_backup_savefile();
+    (void)delete_error_savefile();
     delete_excess_levelfiles();
 
     /* Change to the main music */
@@ -1529,11 +1539,11 @@ boolean new_game; /* false => restoring an old game */
         char postbuf[BUFSZ * 2];
         Sprintf(postbuf, "%s the%s %s %s has entered the dungeon on %s difficulty in %s mode", plname, buf, urace.adj,
             (currentgend&& urole.name.f) ? urole.name.f : urole.name.m, get_game_difficulty_text(context.game_difficulty), get_game_mode_text(FALSE));
-#ifdef DEBUG
-        //IfModeAllowsPostToForum
-        //{
-            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_START, postbuf);
-        //}
+#if 0 //ifdef DEBUG
+        IfModeAllowsPostToForum
+        {
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_START, 0, postbuf);
+        }
 #endif
         livelog_printf(LL_DUMP, "%s", postbuf);
     }
@@ -1596,13 +1606,14 @@ do_positionbar()
 #endif
 
 STATIC_DCL void
-interrupt_multi(msg)
+interrupt_multi(msg, attr, color)
 const char *msg;
+int attr, color;
 {
     if (multi > 0 && !context.travel && !context.run) {
         nomul(0);
         if (flags.verbose && msg)
-            Norep("%s", msg);
+            Norep_ex(attr, color, "%s", msg);
     }
 }
 

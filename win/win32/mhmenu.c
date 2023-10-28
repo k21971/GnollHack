@@ -1038,7 +1038,7 @@ SetMenuListType(HWND hWnd, int how)
         char msgbuf[BUFSZ] = "";
         write_CP437_to_buf_unicode(msgbuf, BUFSZ, data->menu.items[i].str);
 
-        sprintf(buf, "%c - %s", max(data->menu.items[i].accelerator, ' '),
+        Sprintf(buf, "%c - %s", max(data->menu.items[i].accelerator, ' '),
             msgbuf);
 
         lvitem.mask = LVIF_PARAM | LVIF_STATE | LVIF_TEXT;
@@ -1293,11 +1293,6 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
             boolean is_full_size = !!(glyphtileflags[glyph] & GLYPH_TILE_FLAG_FULL_SIZED_ITEM) || !(glyphtileflags[glyph] & GLYPH_TILE_FLAG_HALF_SIZED_TILE);
             ntile = glyph2tile[glyph];
             enum autodraw_types autodraw = tile2autodraw[ntile];
-            //ntile = maybe_get_replaced_tile(ntile, -1, -1,
-            //    data_to_replacement_info(signed_glyph, -1, item->object_data.otyp > STRANGE_OBJECT ? &item->object_data : (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0),
-            //    &autodraw);
-            //int tile_animation_idx = get_tile_animation_index_from_glyph(glyph);
-            //ntile = maybe_get_animated_tile(ntile, tile_animation_idx, ANIMATION_PLAY_TYPE_ALWAYS, data->intervalCounter, &frame_idx, &main_tile_idx, &item->is_animated, &autodraw);
             int multiplier = flip_tile ? -1 : 1;
 
             int source_top_added = 0;
@@ -2418,7 +2413,7 @@ onListChar(HWND hWnd, HWND hwndList, WORD ch)
 
             reset_menu_count(hwndList, data);
             if (mswin_getlin_window(GETLINE_MENU_SEARCH, ATR_NONE, NO_COLOR, "Search for:", buf, BUFSZ) == IDCANCEL) {
-                strcpy(buf, "\033");
+                Strcpy(buf, "\033");
             }
             if (data->is_active)
                 SetFocus(hwndList); // set focus back to the list control

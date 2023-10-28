@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    dgn_main.c    $NHDT-Date: 1432512785 2015/05/25 00:13:05 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /*    Copyright (c) 1989 by Jean-Christophe Collet    */
@@ -99,7 +99,7 @@ char **argv;
 #if defined(MAC) && (defined(THINK_C) || defined(__MWERKS__))
             /* extract basename from path to infile */
             mark = strrchr(infile, ':');
-            strcpy(basename, mark ? mark + 1 : infile);
+            (void)vstrcpy(basename, mark ? mark + 1 : infile);
             mark = strchr(basename, '.');
             if (mark)
                 *mark = '\0';

@@ -162,7 +162,7 @@ struct monst* mon;
                 if(is_peaceful(mon) && (special_talk || (!is_undead(mon->data) && !is_demon(mon->data) && !In_endgame(&u.uz) && !Is_sanctum(&u.uz)
                     && !mon->isshk && !mon->isgd && !mon->ispriest && !mon->issmith && !mon->isnpc && !is_watch(mon->data) && !is_mercenary(mon->data)
                     && !is_lord(mon->data) && !is_prince(mon->data) && mon->m_lev < 10
-                    && !(mon->iswiz || mon->data == &mons[PM_MEDUSA] || (mon->data->geno & G_UNIQ) != 0
+                    && !(mon->iswiz || is_medusa(mon->data) || (mon->data->geno & G_UNIQ) != 0
                         || mon->data->msound == MS_NEMESIS || mon->data->msound == MS_LEADER || mon->data->msound == MS_ORACLE
                         || mon->data->msound == MS_GUARDIAN || mon->data->msound == MS_BRIBE
                         || mon->data == &mons[PM_VLAD_THE_IMPALER] || mon->data == &mons[PM_ALEAX]
@@ -175,7 +175,7 @@ struct monst* mon;
                     {
                         if (mon->mnum == PM_PRISONER)
                         {
-                            strcpy(yellbuf, "Please help me, adventurer!");
+                            Strcpy(yellbuf, "Please help me, adventurer!");
                             mon_yells(mon, yellbuf, "yell", "desperately", TRUE, FALSE);
                         }
                         mon_talked = TRUE;
@@ -187,18 +187,18 @@ struct monst* mon;
                         struct obj* otmp;
                         if (cnt == 1 && !iflags.using_gui_sounds && (otmp = get_first_sellable_item(mon)) != 0)
                         {
-                            strcpy(itembuf, otmp->quan == 1 ? acxname(otmp) : cxname(otmp));
-                            strcpy(someitembuf, itembuf);
+                            Strcpy(itembuf, otmp->quan == 1 ? acxname(otmp) : cxname(otmp));
+                            Strcpy(someitembuf, itembuf);
                         }
                         else if (cnt == 1)
                         {
-                            strcpy(itembuf, "item");
-                            strcpy(someitembuf, "an item");
+                            Strcpy(itembuf, "item");
+                            Strcpy(someitembuf, "an item");
                         }
                         else
                         {
-                            strcpy(itembuf, "items");
-                            strcpy(someitembuf, "some items");
+                            Strcpy(itembuf, "items");
+                            Strcpy(someitembuf, "some items");
                         }
 
                         switch (mon->talkstate_item_trading)
@@ -337,8 +337,10 @@ struct monst *mtmp;
     if (x == 0 && y == 0)
         return TRUE;
 
-    /* should this still be true for defiled/molochian altars? */
-    if (IS_ALTAR(levl[x][y].typ)
+    if(!isok(x, y))
+        return FALSE;
+
+    if (IS_ALTAR(levl[x][y].typ) && levl[x][y].subtyp != ALTAR_SUBTYPE_MOLOCH
         && (mtmp->data->mlet == S_VAMPIRE || is_vampshifter(mtmp)))
         return TRUE;
 
@@ -806,7 +808,7 @@ register struct monst *mtmp;
     if (mdat->msound == MS_SHRIEK && !um_dist(mtmp->mx, mtmp->my, 1))
         m_respond(mtmp);
 
-    if (mdat == &mons[PM_MEDUSA] && couldsee(mtmp->mx, mtmp->my))
+    if (is_medusa(mdat) && couldsee(mtmp->mx, mtmp->my))
         m_respond(mtmp);
 
     if (DEADMONSTER(mtmp))
@@ -951,7 +953,7 @@ register struct monst *mtmp;
                 deduct_monster_hp(m2, adjust_damage(rnd(15), mtmp, m2, AD_PSIO, ADFLAGS_NONE));
                 //m2->mhp -= rnd(15);
                 if (DEADMONSTER(m2))
-                    monkilled(m2, "", AD_DRIN);
+                    monkilled(m2, "", AD_DRIN, 0);
                 else
                 {
                     if (m2->msleeping)
@@ -1113,8 +1115,12 @@ void
 check_boss_fight(mtmp)
 struct monst* mtmp;
 {
+    if (!mtmp)
+        return;
+
     /* Trigger a boss fight if you can see the monster */
-    if ((windowprocs.wincap2 & WC2_SCREEN_TEXT) && is_boss_monster(mtmp->data) && !mtmp->boss_fight_started && !DEADMONSTER(mtmp) && !is_peaceful(mtmp) && canspotmon(mtmp) && couldsee(mtmp->mx, mtmp->my) && !(mtmp->mstrategy & STRAT_WAITFORU) && !mtmp->msleeping && !(mtmp->mon_flags & MON_FLAGS_CLONED_WIZ))
+    if ((windowprocs.wincap2 & WC2_SCREEN_TEXT) && (is_boss_monster(mtmp->data) || is_level_boss(mtmp)) && !mtmp->boss_fight_started 
+        && !DEADMONSTER(mtmp) && !is_peaceful(mtmp) && canspotmon(mtmp) && couldsee(mtmp->mx, mtmp->my) && !(mtmp->mstrategy & STRAT_WAITFORU) && !mtmp->msleeping && !is_cloned_wizard(mtmp))
     {
         mtmp->boss_fight_started = 1;
         newsym(mtmp->mx, mtmp->my);
@@ -1124,6 +1130,15 @@ struct monst* mtmp;
         display_screen_text(Monnam(mtmp), (char*)0, (char*)0, SCREEN_TEXT_BOSS_FIGHT, ATR_NONE, NO_COLOR, 1UL);
         cliparound(u.ux, u.uy, 2);
     }
+}
+
+void
+check_seen_bosses(VOID_ARGS)
+{
+    struct monst* mtmp;
+    for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
+        if (canseemon(mtmp))
+            check_boss_fight(mtmp);
 }
 
 

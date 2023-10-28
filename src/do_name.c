@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    do_name.c    $NHDT-Date: 1555627306 2019/04/18 22:41:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -25,6 +25,8 @@ STATIC_DCL void FDECL(print_artifact_catalogue, (winid, struct obj*));
 STATIC_DCL int FDECL(CFDECLSPEC citemsortcmp, (const void*, const void*));
 STATIC_DCL int FDECL(CFDECLSPEC artilistsortcmp, (const void*, const void*));
 STATIC_DCL const char* FDECL(gettitle, (short*, const char* const*, int, int, unsigned long, unsigned long));
+STATIC_DCL void NDECL(set_valid_pos_flags);
+STATIC_DCL void NDECL(clear_valid_pos_flags);
 
 extern const char what_is_an_unknown_object[]; /* from pager.c */
 
@@ -45,16 +47,47 @@ nextmbuf()
  * parameter value 0 = initialize, 1 = highlight, 2 = done
  */
 STATIC_DCL void FDECL((*getpos_hilitefunc), (int)) = (void FDECL((*), (int))) 0;
-STATIC_DCL boolean FDECL((*getpos_getvalid), (int, int)) =
-                                           (boolean FDECL((*), (int, int))) 0;
+STATIC_DCL int FDECL((*getpos_getinvalid), (int, int)) =
+                                           (int FDECL((*), (int, int))) 0;
+
+STATIC_OVL void
+set_valid_pos_flags(VOID_ARGS)
+{
+    if (!getpos_getinvalid)
+        return;
+    int x, y;
+    for (x = 1; x < COLNO; x++)
+        for (y = 0; y < ROWNO; y++)
+        {
+            int getinvalidres = getpos_getinvalid(x, y);
+            switch (getinvalidres)
+            {
+            case 0: /* Valid */
+                add_glyph_buffer_layer_flags(x, y, LFLAGS_L_LEGAL, 0UL);
+                break;
+            case 2: /* Too short */
+                add_glyph_buffer_layer_flags(x, y, LFLAGS_L_ILLEGAL, 0UL);
+            }
+        }
+}
+
+STATIC_OVL void
+clear_valid_pos_flags(VOID_ARGS)
+{
+    int x, y;
+    for (x = 1; x < COLNO; x++)
+        for (y = 0; y < ROWNO; y++)
+            remove_glyph_buffer_layer_flags(x, y, LFLAGS_L_LEGAL | LFLAGS_L_ILLEGAL, 0UL);
+}
 
 void
-getpos_sethilite(gp_hilitef, gp_getvalidf)
+getpos_sethilite(gp_hilitef, gp_getinvalidf)
 void FDECL((*gp_hilitef), (int));
-boolean FDECL((*gp_getvalidf), (int, int));
+int FDECL((*gp_getinvalidf), (int, int));
 {
     getpos_hilitefunc = gp_hilitef;
-    getpos_getvalid = gp_getvalidf;
+    getpos_getinvalid = gp_getinvalidf;
+    set_valid_pos_flags();
 }
 
 STATIC_VAR const char *const gloc_descr[NUM_GLOCS][4] = {
@@ -161,7 +194,7 @@ const char *goal;
     if (!iflags.terrainmode) {
         char kbuf[BUFSZ];
 
-        if (getpos_getvalid) {
+        if (getpos_getinvalid) {
             Sprintf(sbuf, "Use '%s' or '%s' to move to valid locations.",
                     visctrl(Cmd.spkeys[NHKF_GETPOS_VALID_NEXT]),
                     visctrl(Cmd.spkeys[NHKF_GETPOS_VALID_PREV]));
@@ -397,8 +430,8 @@ int x, y, gloc;
                     || IS_UNEXPLORED_LOC(x, y + 1)
                     || IS_UNEXPLORED_LOC(x, y - 1)));
     case GLOC_VALID:
-        if (getpos_getvalid)
-            return (*getpos_getvalid)(x,y);
+        if (getpos_getinvalid)
+            return !(*getpos_getinvalid)(x,y);
         /*FALLTHRU*/
     case GLOC_INTERESTING:
         return gather_locs_interesting(x,y, GLOC_DOOR)
@@ -571,16 +604,19 @@ int cx, cy;
 
     cc.x = cx;
     cc.y = cy;
-    if (do_screen_description(cc, TRUE, sym, tmpbuf, &firstmatch,
-                              (struct permonst **) 0)) {
+    if (do_screen_description(cc, TRUE, sym, tmpbuf, &firstmatch, (struct permonst **) 0)) 
+    {
         (void) coord_desc(cx, cy, tmpbuf, iflags.getpos_coords);
-        custompline(SUPPRESS_HISTORY | STAY_ON_LINE,
-                    "%s%s%s%s%s", firstmatch, *tmpbuf ? " " : "", tmpbuf,
-                    (iflags.autodescribe
-                     && getpos_getvalid && !(*getpos_getvalid)(cx, cy))
-                      ? " (illegal)" : "",
-                    (iflags.getloc_travelmode && !is_valid_travelpt(cx, cy))
-                      ? " (no travel path)" : "");
+        boolean is_illegal = (iflags.autodescribe && getpos_getinvalid && (*getpos_getinvalid)(cx, cy));
+        boolean has_no_path = (iflags.getloc_travelmode && !is_valid_travelpt(cx, cy));
+        int multicolors[5] = { NO_COLOR, NO_COLOR, NO_COLOR, CLR_RED, CLR_ORANGE };
+        pline_multi_ex_flags(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, SUPPRESS_HISTORY | STAY_ON_LINE,
+                    "%s%s%s%s%s", 
+                    firstmatch,
+                    *tmpbuf ? " " : "", 
+                    tmpbuf,
+                    is_illegal ? " (illegal)" : "",
+                    has_no_path ? " (no travel path)" : "");
         curs(WIN_MAP, cx, cy);
         flush_screen(0);
     }
@@ -1096,7 +1132,7 @@ enum game_cursor_types cursor_style;
         if (garr[i])
             free((genericptr_t) garr[i]);
     getpos_hilitefunc = (void FDECL((*), (int))) 0;
-    getpos_getvalid = (boolean FDECL((*), (int, int))) 0;
+    getpos_getinvalid = (int FDECL((*), (int, int))) 0;
 
     flags.show_cursor_on_u = FALSE;
     flags.force_paint_at_cursor = TRUE;
@@ -1105,6 +1141,8 @@ enum game_cursor_types cursor_style;
     if (cursor_style != CURSOR_STYLE_TELEPORT_CURSOR)
         issue_simple_gui_command(GUI_CMD_RESTORE_TRAVEL_MODE);
     create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
+    clear_valid_pos_flags();
+    flush_screen(0);
 
     return result;
 }
@@ -1435,14 +1473,14 @@ do_mname()
         if (has_umname(mtmp))
             free_umname(mtmp);
     }
-    else if (has_mname(mtmp))
-    {
-        if(!mtmp->u_know_mname)
-            (void)u_name_monst(mtmp, buf);
-        else
-            pline("%s will not accept the name %s.", upstart(monnambuf), buf);
-    }
-    else
+    //else if (has_mname(mtmp))
+    //{
+    //    if(!mtmp->u_know_mname || !*buf)
+    //        (void)u_name_monst(mtmp, buf);
+    //    else
+    //        pline("%s will not accept the name %s.", upstart(monnambuf), buf);
+    //}
+    else /* Nickname */
     {
         (void)u_name_monst(mtmp, buf);
     }
@@ -1488,50 +1526,6 @@ register struct obj *obj;
     /* strip leading and trailing spaces; unnames item if all spaces */
     (void) mungspaces(buf);
 
-#if 0
-    /*
-     * We don't violate illiteracy conduct here, although it is
-     * arguable that we should for anything other than "X".  Doing so
-     * would make attaching player's notes to hero's inventory have an
-     * in-game effect, which may or may not be the correct thing to do.
-     *
-     * We do violate illiteracy in oname() if player creates Sting or
-     * Orcrist, clearly being literate (no pun intended...).
-     */
-
-    /* relax restrictions over proper capitalization for artifacts */
-    if ((aname = artifact_name(buf, &objtyp)) != 0 && objtyp == obj->otyp)
-        Strcpy(buf, aname);
-
-    if (obj->oartifact) {
-        pline_The("artifact seems to resist the attempt.");
-        return;
-    } else if (restrict_name(obj, buf) || exist_artifact(obj->otyp, buf)) {
-        /* this used to change one letter, substituting a value
-           of 'a' through 'y' (due to an off by one error, 'z'
-           would never be selected) and then force that to
-           upper case if such was the case of the input;
-           now, the hand slip scuffs one or two letters as if
-           the text had been trodden upon, sometimes picking
-           punctuation instead of an arbitrary letter;
-           unfortunately, we have to cover the possibility of
-           it targetting spaces so failing to make any change
-           (we know that it must eventually target a nonspace
-           because buf[] matches a valid artifact name) */
-        Strcpy(bufcpy, buf);
-        /* for "the Foo of Bar", only scuff "Foo of Bar" part */
-        bufp = !strncmpi(bufcpy, "the ", 4) ? (buf + 4) : buf;
-        do {
-            wipeout_text(bufp, rn2_on_display_rng(2), (unsigned) 0);
-        } while (!strcmp(buf, bufcpy));
-        pline("While engraving, your %s slips.", body_part(HAND));
-        display_nhwindow(WIN_MESSAGE, FALSE);
-        You("engrave: \"%s\".", buf);
-        /* violate illiteracy conduct since hero attempted to write
-           a valid artifact name */
-        u.uconduct.literate++;
-    }
-#endif
     //++via_naming; /* This ought to be an argument rather than a static... */
     obj = uoname(obj, buf);
     //--via_naming; /* ...but oname() is used in a lot of places, so defer. */
@@ -1806,6 +1800,8 @@ const char* introline;
 
     if (!obj->dknown)
         return; /* probably blind */
+
+    flush_screen(1); /* Make sure that the screen shows the effect, if any, before query */
 
     if (obj->oclass == POTION_CLASS && (obj->speflags & SPEFLAGS_FROM_SINK))
         /* kludge, meaning it's sink water */
@@ -2106,6 +2102,12 @@ boolean called;
         Strcat(buf, rname);
         name_at_start = bogon_is_pname(rnamecode);
     }
+    else if (do_name && has_umname(mtmp))
+    {
+        char* umname = UMNAME(mtmp);
+        Strcat(buf, umname);
+        name_at_start = TRUE;
+    }
     else if (do_name && has_mname(mtmp) && mtmp->u_know_mname)
     {
         char *name = MNAME(mtmp);
@@ -2132,7 +2134,7 @@ boolean called;
         else 
         {
             char tmpbuf[BUFSIZ];
-            strcpy(tmpbuf, buf);
+            Strcpy(tmpbuf, buf);
             boolean npc_with_name_only = has_enpc(mtmp) && mtmp->isnpc && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].general_flags & NPC_FLAGS_DISPLAY_NAME_ONLY) != 0;
             if (!is_tame(mtmp) && !npc_with_name_only)
             {
@@ -2160,13 +2162,6 @@ boolean called;
     {
         Strcat(buf, pm_name);
         name_at_start = (boolean) is_mname_proper_name(mdat);
-    }
-
-    /* Append umname if has one -- called is now obsolete */
-    if (!(has_mname(mtmp) && mtmp->u_know_mname) &&/*called &&*/ has_umname(mtmp))
-    {
-        char* umname = UMNAME(mtmp);
-        Sprintf(eos(buf), " known as %s", umname);
     }
 
     /* Write article or your in start */
@@ -2371,11 +2366,11 @@ char *outbuf;
 
     if (mon->data->msound == MS_LEADER && quest_info(MS_LEADER) == mon->mnum)
     {
-        strcat(outbuf, ", quest leader");
+        Strcat(outbuf, ", quest leader");
     }
     else if (mon->data->msound == MS_NEMESIS && quest_info(MS_NEMESIS) == mon->mnum)
     {
-        strcat(outbuf, ", quest nemesis");
+        Strcat(outbuf, ", quest nemesis");
     }
 
     return outbuf;
@@ -2457,7 +2452,8 @@ roguename()
                   : "Glenn Wichman";
 }
 
-STATIC_VAR NEARDATA const char *const hcolors[] = {
+#define NUM_HCOLORS 34
+STATIC_VAR NEARDATA const char *const hcolors[NUM_HCOLORS] = {
     "ultraviolet", "infrared", "bluish-orange", "reddish-green", "dark white",
     "light black", "sky blue-pink", "salty", "sweet", "sour", "bitter",
     "striped", "spiral", "swirly", "plaid", "checkered", "argyle", "paisley",
@@ -2467,13 +2463,135 @@ STATIC_VAR NEARDATA const char *const hcolors[] = {
     "octarine", /* Discworld: the Colour of Magic */
 };
 
+STATIC_VAR NEARDATA uchar const hcolors2nhcolor[NUM_HCOLORS] = {
+    CLR_MAGENTA, CLR_RED, CLR_ORANGE, CLR_GREEN, CLR_GRAY,
+    CLR_GRAY, CLR_BRIGHT_MAGENTA, CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX,
+    CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX,
+    CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX, CLR_MAX,
+    CLR_MAX, CLR_RED, CLR_RED, CLR_MAX, CLR_MAX, CLR_BRIGHT_GREEN,
+    CLR_ORANGE, CLR_MAX, CLR_RED, CLR_BRIGHT_MAGENTA,
+    CLR_MAX, /* Discworld: the Colour of Magic */
+};
+
 const char *
 hcolor(colorpref)
 const char *colorpref;
 {
-    return (Hallucination || !colorpref)
-        ? hcolors[rn2_on_display_rng(SIZE(hcolors))]
-        : colorpref;
+    return hcolor_multi(colorpref, (int*)0, 0);
+    //return (Hallucination || !colorpref)
+    //    ? hcolors[rn2_on_display_rng(NUM_HCOLORS)]
+    //    : colorpref;
+}
+
+const char*
+hcolor_multi_buf0(colorpref)
+const char* colorpref;
+{
+    return hcolor_multi(colorpref, get_colorless_multicolor_buffer(), 0);
+}
+
+const char*
+hcolor_multi_buf1(colorpref)
+const char* colorpref;
+{
+    return hcolor_multi(colorpref, get_colorless_multicolor_buffer(), 1);
+}
+
+const char*
+hcolor_multi_buf2(colorpref)
+const char* colorpref;
+{
+    return hcolor_multi(colorpref, get_colorless_multicolor_buffer(), 2);
+}
+
+const char*
+hcolor_multi_buf3(colorpref)
+const char* colorpref;
+{
+    return hcolor_multi(colorpref, get_colorless_multicolor_buffer(), 3);
+}
+
+const char*
+hcolor_multi_buf4(colorpref)
+const char* colorpref;
+{
+    return hcolor_multi(colorpref, get_colorless_multicolor_buffer(), 4);
+}
+
+const char*
+hcolor_multi(colorpref, multicolors_buf, multicolor_idx)
+const char* colorpref;
+int* multicolors_buf;
+int multicolor_idx;
+{
+    if (colorpref && !*colorpref)
+    {
+        return colorpref;
+    }
+    else if (Hallucination || !colorpref)
+    {
+        int random_color = rn2_on_display_rng(NUM_HCOLORS);
+        if (multicolors_buf)
+        {
+            int nhcolor = (int)hcolors2nhcolor[random_color];
+            if (nhcolor == CLR_MAX)
+            {
+                nhcolor = rn2(CLR_MAX - 1); /* All colors are equally likely, and NO_COLOR implies CLR_WHITE */
+                if (nhcolor == NO_COLOR)
+                    nhcolor = CLR_WHITE;
+            }
+            multicolors_buf[multicolor_idx] = nhcolor;
+        }
+        return hcolors[random_color] ? hcolors[random_color] : "colorless";
+    }
+    else
+    {
+        if (multicolors_buf)
+            multicolors_buf[multicolor_idx] = color_name_to_nhcolor(colorpref);
+        return colorpref;
+    }
+}
+
+int
+color_name_to_nhcolor(colorpref)
+const char* colorpref;
+{
+    int nhcolor;
+    if (!colorpref || !*colorpref || colorpref == NH_COLORLESS)
+        nhcolor = NO_COLOR;
+    else if (colorpref == NH_BLACK)
+        nhcolor = CLR_BLACK;
+    else if (colorpref == NH_AMBER)
+        nhcolor = CLR_YELLOW;
+    else if (colorpref == NH_GOLDEN)
+        nhcolor = HI_GOLD;
+    else if (colorpref == NH_LIGHT_BLUE)
+        nhcolor = CLR_BRIGHT_BLUE;
+    else if (colorpref == NH_RED)
+        nhcolor = CLR_RED;
+    else if (colorpref == NH_GREEN)
+        nhcolor = CLR_GREEN;
+    else if (colorpref == NH_SILVER)
+        nhcolor = HI_SILVER;
+    else if (colorpref == NH_BLUE)
+        nhcolor = CLR_BLUE;
+    else if (colorpref == NH_PURPLE)
+        nhcolor = CLR_MAGENTA;
+    else if (colorpref == NH_WHITE)
+        nhcolor = CLR_WHITE;
+    else if (colorpref == NH_ORANGE)
+        nhcolor = CLR_ORANGE;
+    else if (colorpref == NH_BROWN)
+        nhcolor = CLR_BROWN;
+    else if (colorpref == NH_GRAY)
+        nhcolor = CLR_GRAY;
+    else if (colorpref == NH_DARK_RED)
+        nhcolor = CLR_RED;
+    else
+    {
+        nhcolor = clrnameptr2color(colorpref);
+    }
+    return nhcolor;
 }
 
 /* return a random real color unless hallucinating */
@@ -2567,7 +2685,7 @@ char* s;
     static const char* end_previous_novowel[] = { "din", "rin", "in", "lin", "rim", "im", "ri", "as", "dis" };
 
     if (s) {
-        strcpy(s, "");
+        Strcpy(s, "");
         if (!rn2(4))
         {
             /* with middle syllable */
@@ -2605,7 +2723,7 @@ char* s;
         "in", "un", "ellas", "anel", "odel", "uil" };
 
     if (s) {
-        strcpy(s, "");
+        Strcpy(s, "");
         if (rn2(3))
         {
             /* with middle syllable */
@@ -2642,7 +2760,7 @@ char* s;
 
     if (s) 
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         if (!rn2(3))
         {
             /* with middle syllable */
@@ -2681,7 +2799,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         if (rn2(3))
         {
             /* with middle syllable */
@@ -2710,7 +2828,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         Sprintf(s, "%s%s%s", start[rn2(SIZE(start))], v[rn2(SIZE(v))],
             end[rn2(SIZE(end))]);
     }
@@ -2727,7 +2845,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
             Sprintf(s, "%s%s%s", start[rn2(SIZE(start))], v[rn2(SIZE(v))],
                 end[rn2(SIZE(end))]);
     }
@@ -2740,7 +2858,7 @@ char* s;
 {
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         char ns[BUFSIZ];
         (void)randomize_gnoll_name(ns);
         Sprintf(s, "yee%s", ns);
@@ -3045,7 +3163,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         Sprintf(s, "%s", names[rn2(SIZE(names))]);
     }
     return s;
@@ -3438,7 +3556,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         Sprintf(s, "%s", names[rn2(SIZE(names))]);
     }
     return s;
@@ -3562,7 +3680,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         Sprintf(s, "%s", names[rn2(SIZE(names))]);
     }
     return s;
@@ -3594,7 +3712,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         Sprintf(s, "%s", names[rn2(SIZE(names))]);
     }
     return s;
@@ -3767,7 +3885,7 @@ char* s;
 
     if (s)
     {
-        strcpy(s, "");
+        Strcpy(s, "");
         Sprintf(s, "%s", names[rn2(SIZE(names))]);
     }
     return s;
@@ -4156,10 +4274,6 @@ struct obj* obj;
         return;
     }
 
-    if (!u.uconduct.literate++)
-        livelog_printf(LL_CONDUCT | LL_ARTIFACT, "became literate by reading %s",
-            acxname(obj));
-
     winid datawin;
     char buf[BUFSZ];
 
@@ -4523,6 +4637,7 @@ struct obj* obj;
 
     Sprintf(buf, "[%s]", manual_names[mnlidx]);
     putstr(datawin, ATR_HEADING, buf);
+    issue_gui_command(GUI_CMD_LIBRARY_MANUAL, datawin, mnlidx, manual_names[mnlidx]);
     display_nhwindow(datawin, TRUE);
     destroy_nhwindow(datawin);
 

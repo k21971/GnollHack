@@ -223,21 +223,21 @@ register int show;
 {
     register int glyph = back_to_glyph(x, y);
     int symbol_index = generic_glyph_to_cmap(glyph);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, defsyms[symbol_index].layer, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, defsyms[symbol_index].layer, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     int new_floor_glyph = NO_GLYPH;
     int new_floor_gui_glyph = NO_GLYPH;
     int new_floor_doodad_glyph = symbol_index <= S_stone ? NO_GLYPH : get_floor_doodad_layer_glyph(x, y);
-    int new_floor_doodad_gui_glyph = maybe_get_replaced_glyph(new_floor_doodad_glyph, x, y, data_to_replacement_info(new_floor_doodad_glyph, LAYER_FLOOR_DOODAD, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    int new_floor_doodad_gui_glyph = maybe_get_replaced_glyph(new_floor_doodad_glyph, x, y, data_to_replacement_info(new_floor_doodad_glyph, LAYER_FLOOR_DOODAD, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
     int new_feature_glyph = NO_GLYPH;
     int new_feature_gui_glyph = NO_GLYPH;
     int new_cover_feature_glyph = NO_GLYPH;
     int new_cover_feature_gui_glyph = NO_GLYPH;
     int new_carpet_glyph = symbol_index <= S_stone ? NO_GLYPH : get_carpet_layer_glyph(x, y);
-    int new_carpet_gui_glyph = maybe_get_replaced_glyph(new_carpet_glyph, x, y, data_to_replacement_info(new_carpet_glyph, LAYER_CARPET, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    int new_carpet_gui_glyph = maybe_get_replaced_glyph(new_carpet_glyph, x, y, data_to_replacement_info(new_carpet_glyph, LAYER_CARPET, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
     schar new_feature_doodad_height = 0;
     int new_feature_doodad_glyph = symbol_index <= S_stone ? NO_GLYPH : get_feature_doodad_layer_glyph(x, y, &new_feature_doodad_height);
-    int new_feature_doodad_gui_glyph = maybe_get_replaced_glyph(new_feature_doodad_glyph, x, y, data_to_replacement_info(new_feature_doodad_glyph, LAYER_FEATURE_DOODAD, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    int new_feature_doodad_gui_glyph = maybe_get_replaced_glyph(new_feature_doodad_glyph, x, y, data_to_replacement_info(new_feature_doodad_glyph, LAYER_FEATURE_DOODAD, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
     unsigned long new_layer_flags = 0UL;
     if (symbol_index > S_stone && levl[x][y].decoration_typ > 0)
         new_layer_flags |= LFLAGS_C_DECORATION;
@@ -247,7 +247,7 @@ register int show;
     if (defsyms[symbol_index].layer != LAYER_FLOOR)
     {
         new_floor_glyph = get_floor_layer_glyph(x, y);
-        new_floor_gui_glyph = maybe_get_replaced_glyph(new_floor_glyph, x, y, data_to_replacement_info(new_floor_glyph, LAYER_FLOOR, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+        new_floor_gui_glyph = maybe_get_replaced_glyph(new_floor_glyph, x, y, data_to_replacement_info(new_floor_glyph, LAYER_FLOOR, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
         if (defsyms[symbol_index].layer == LAYER_FEATURE)
         {
             new_feature_glyph = glyph;
@@ -362,14 +362,12 @@ register int show;
 {
     register int x = trap->tx, y = trap->ty;
     register int glyph = trap_to_glyph(trap, newsym_rn2);
-
-    /* Replace */
-    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_TRAP, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
-
     struct monst* mtmp = m_at(x, y);
     boolean utrapped = (x == u.ux && y == u.uy && u.utrap > 0);
     boolean mtrapped = (mtmp && mtmp->mtrapped);
     boolean trapped_draw_in_front = (trap->ttyp == STATUE_TRAP || ((utrapped || mtrapped) && (trap->ttyp == WEB || trap->ttyp == BEAR_TRAP)));
+    /* Replace */
+    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_TRAP, (struct obj*)0, (struct monst*)0, (utrapped || mtrapped) ? LFLAGS_T_TRAPPED : 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     if (level.flags.hero_memory)
     {
@@ -395,9 +393,9 @@ register int show;
         if (trapped_draw_in_front)
             show_gui_glyph_on_layer(x, y, glyph, gui_glyph, LAYER_COVER_TRAP);
         if (mtrapped || utrapped)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_T_TRAPPED);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_T_TRAPPED, 0UL);
         else
-            remove_glyph_buffer_layer_flags(x, y, LFLAGS_T_TRAPPED);
+            remove_glyph_buffer_layer_flags(x, y, LFLAGS_T_TRAPPED, 0UL);
 
     }
 }
@@ -464,7 +462,7 @@ boolean exclude_ascii;
     int obj_height = get_obj_height(obj);
 
     /* Replace */
-    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, layer, obj, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, layer, obj, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     /* Save this object's glyph for showing in here window (ASCII) and in object pile in GUI */
     obj->glyph = glyph;
@@ -480,7 +478,7 @@ boolean exclude_ascii;
         if (Hallucination && obj->otyp == STATUE)
         {
             new_glyph = random_obj_to_glyph(newsym_rn2);
-            new_gui_glyph = maybe_get_replaced_glyph(new_glyph, x, y, data_to_replacement_info(glyph, layer, obj, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+            new_gui_glyph = maybe_get_replaced_glyph(new_glyph, x, y, data_to_replacement_info(glyph, layer, obj, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
             obj_height = 0;
         }
 
@@ -524,9 +522,9 @@ boolean exclude_ascii;
             set_glyph_buffer_oid(x, y, obj->o_id); /* Moving object */
 
         if(in_pit)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_O_IN_PIT);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_O_IN_PIT, 0UL);
         if (isok(x, y) && uchain && obj == uchain && uchain->ox == x && uchain->oy == y)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_O_CHAIN);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_O_CHAIN, 0UL);
     }
 }
 
@@ -567,7 +565,7 @@ register xchar x, y;
             levl[x][y].hero_memory_layers.layer_gui_glyphs[LAYER_MONSTER] = GLYPH_INVISIBLE;
             clear_monster_layerinfo(&levl[x][y].hero_memory_layers);
         }
-        show_monster_glyph_with_extra_info(x, y, GLYPH_INVISIBLE, (struct monst*)0, 0UL, 0, 0);
+        show_monster_glyph_with_extra_info(x, y, GLYPH_INVISIBLE, (struct monst*)0, 0UL, 0UL, 0, 0);
     }
 }
 
@@ -600,7 +598,7 @@ boolean
 unmap_invisible(x, y)
 int x, y;
 {
-    if (isok(x,y) && glyph_is_invisible(levl[x][y].hero_memory_layers.glyph)) 
+    if (isok(x, y) && glyph_is_invisible(levl[x][y].hero_memory_layers.glyph)) 
     {
         clear_monster_layer_memory_at(x, y);
         unmap_object(x, y);
@@ -610,6 +608,20 @@ int x, y;
     return FALSE;
 }
 
+boolean 
+unmap_invisible_with_animation(x, y, spef_idx)
+int x, y, spef_idx UNUSED;
+{
+    boolean was_invis_glyph = isok(x, y) && glyph_is_invisible(levl[x][y].hero_memory_layers.glyph);
+    boolean res = unmap_invisible(x, y);
+    if ((windowprocs.wincap2 & WC2_FADING_ANIMATIONS) != 0 && was_invis_glyph && !glyph_is_invisible(levl[x][y].hero_memory_layers.glyph))
+    {
+        play_special_effect_with_details_at(spef_idx, x, y, GLYPH_INVISIBLE, LAYER_GENERAL_EFFECT, -2, 20, 0, 0, FALSE);
+        special_effect_wait_until_action(spef_idx);
+        special_effect_wait_until_end(spef_idx);
+    }
+    return res;
+}
 
 /*
  * unmap_object()
@@ -714,7 +726,7 @@ int x, y, show;
         }
     }
     if (is_objpile(x, y) && !Hallucination)
-        add_glyph_buffer_layer_flags(x, y, LFLAGS_O_PILE);
+        add_glyph_buffer_layer_flags(x, y, LFLAGS_O_PILE, 0UL);
 
     remember_topology(x, y);
 
@@ -749,25 +761,28 @@ boolean dropping_piercer;
         return;
 
     boolean mon_mimic = (M_AP_TYPE(mon) != M_AP_NOTHING);
-    int sensed = (mon_mimic && (Protection_from_shape_changers || sensemon(mon)));
+    boolean sensed = (mon_mimic && (Protection_from_shape_changers || sensemon(mon)));
     /*
      * We must do the mimic check first.  If the mimic is mimicing something,
      * and the location is in sight, we have to change the hero's memory
      * so that when the position is out of sight, the hero remembers what
      * the mimic was mimicing.
      */
-    if (mon_mimic && (sightflags == PHYSICALLY_SEEN)) {
-        switch (M_AP_TYPE(mon)) {
+    if (mon_mimic && (sightflags == PHYSICALLY_SEEN)) 
+    {
+        switch (M_AP_TYPE(mon)) 
+        {
         default:
             impossible("display_monster:  bad m_ap_type value [ = %d ]",
                        (int) mon->m_ap_type);
             /*FALLTHRU*/
         case M_AP_NOTHING:
-            show_monster_glyph_with_extra_info(x, y, any_mon_to_glyph(mon, newsym_rn2),  mon, 0UL, 0, 0);
+            show_monster_glyph_with_extra_info(x, y, any_mon_to_glyph(mon, newsym_rn2),  mon, 0UL, 0UL, 0, 0);
             clear_monster_layer_memory_at(x, y);
             break;
 
-        case M_AP_FURNITURE: {
+        case M_AP_FURNITURE: 
+        {
             /*
              * This is a poor man's version of map_background().  I can't
              * use map_background() because we are overriding what is in
@@ -781,7 +796,7 @@ boolean dropping_piercer;
             int sym = mon->mappearance, glyph = cmap_with_type_to_glyph(sym, cmap_type);
 
             /* Replace */
-            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_FEATURE, (struct obj*)0, mon, 0UL, 0UL, MAT_NONE, 0));
+            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_FEATURE, (struct obj*)0, mon, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
 
             //levl[x][y].hero_memory_layers.glyph = glyph;
@@ -791,8 +806,8 @@ boolean dropping_piercer;
                 levl[x][y].hero_memory_layers.layer_glyphs[LAYER_FEATURE] = glyph; /* Override, as otherwise not very credible */
                 levl[x][y].hero_memory_layers.layer_gui_glyphs[LAYER_FEATURE] = gui_glyph; /* Override, as otherwise not very credible */
             }
-            if (!sensed) {
-                //show_monster_glyph_with_extra_info(x, y, glyph, (struct monst*)0, LFLAGS_M_MIMIC_FURNITURE, 0, 0);
+            if (!sensed) 
+            {
                 /* override real topology with mimic's fake one */
                 show_glyph_ascii(x, y, glyph);
                 show_gui_glyph_on_layer(x, y, glyph, gui_glyph, LAYER_FEATURE);
@@ -801,7 +816,8 @@ boolean dropping_piercer;
             break;
         }
 
-        case M_AP_OBJECT: {
+        case M_AP_OBJECT: 
+        {
             /* Make a fake object to send to map_object(). */
             struct obj obj;
             if (has_mobj(mon))
@@ -819,12 +835,9 @@ boolean dropping_piercer;
             obj.ox = x;
             obj.oy = y;
             int glyph = obj_to_glyph(&obj, newsym_rn2);
-            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, &obj, mon, 0UL, 0UL, MAT_NONE, 0));
+            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, &obj, mon, 0UL, 0UL, 0UL, MAT_NONE, 0));
             obj.glyph = glyph;
             obj.gui_glyph = gui_glyph;
-            //show_monster_glyph_with_extra_info(x, y,
-            //    glyph, mon, LFLAGS_M_MIMIC_OBJECT, 0, 0);
-            //map_object(&obj, !sensed);
             if (level.flags.hero_memory)
             {
                 int new_glyph = glyph;
@@ -832,7 +845,7 @@ boolean dropping_piercer;
                 if (Hallucination && obj.otyp == STATUE)
                 {
                     new_glyph = random_obj_to_glyph(newsym_rn2);
-                    new_gui_glyph = maybe_get_replaced_glyph(new_glyph, x, y, data_to_replacement_info(new_glyph, LAYER_OBJECT, &obj, mon, 0UL, 0UL, MAT_NONE, 0));
+                    new_gui_glyph = maybe_get_replaced_glyph(new_glyph, x, y, data_to_replacement_info(new_glyph, LAYER_OBJECT, &obj, mon, 0UL, 0UL, 0UL, MAT_NONE, 0));
                 }
                 obj.glyph = new_glyph;
                 obj.gui_glyph = new_gui_glyph;
@@ -851,20 +864,20 @@ boolean dropping_piercer;
             }
             show_glyph_ascii(x, y, glyph);
             show_gui_glyph_on_layer(x, y, glyph, gui_glyph, LAYER_OBJECT);
-
             break;
         }
 
         case M_AP_MONSTER:
-            show_monster_glyph_with_extra_info(x, y, any_monnum_to_glyph(mon->female, what_mon((int)mon->mappearance, rn2_on_display_rng)), mon, 0UL, 0, 0 );
+            show_monster_glyph_with_extra_info(x, y, any_monnum_to_glyph(mon->female, what_mon((int)mon->mappearance, rn2_on_display_rng)), mon, 0UL, 0UL, 0, 0 );
             clear_monster_layer_memory_at(x, y);
             break;
         }
     }
 
     /* If mimic is unsuccessfully mimicing something, display the monster. */
-    if (!mon_mimic || sensed) {
-        int num;
+    if (!mon_mimic || sensed) 
+    {
+        int glyph = NO_GLYPH;
 
         /* [ALI] Only use detected glyphs when monster wouldn't be
          * visible by any other means.
@@ -874,46 +887,52 @@ boolean dropping_piercer;
          * If both are being highlighted in the same way, it doesn't
          * matter, but if not, showing them as pets is preferrable.
          */
-        unsigned long extra_flags = 0;
-
+        unsigned long extra_flags = 0UL;
+        unsigned long extra_mflags = 0UL;
         if (mon->mleashed)
         {
-            extra_flags |= LFLAGS_M_TETHERED;
+            extra_mflags |= LMFLAGS_TETHERED;
             show_leash_info(x, y, mon->mx, mon->my, u.ux, u.uy);
         }
-        if (is_tame(mon) && !Hallucination) {
+        if (is_tame(mon) && !Hallucination) 
+        {
             if (worm_tail)
-                num = monnum_to_glyph(get_worm_tail_mnum(mon->data));
+                glyph = monnum_to_glyph(get_worm_tail_mnum(mon->data));
             else
-                num = any_mon_to_glyph(mon, rn2_on_display_rng);
+                glyph = any_mon_to_glyph(mon, rn2_on_display_rng);
 
-            extra_flags |= LFLAGS_M_PET;
-        } else if (sightflags == DETECTED) {
+            extra_mflags |= LMFLAGS_PET;
+        } 
+        else if (sightflags == DETECTED) 
+        {
             if (worm_tail)
-                num = monnum_to_glyph(
+                glyph = monnum_to_glyph(
                              what_mon(get_worm_tail_mnum(mon->data), rn2_on_display_rng));
             else
-                num = any_mon_to_glyph(mon, rn2_on_display_rng);
+                glyph = any_mon_to_glyph(mon, rn2_on_display_rng);
 
-            extra_flags |= LFLAGS_M_DETECTED;
-        } else {
+            extra_mflags |= LMFLAGS_DETECTED;
+        } 
+        else 
+        {
             if (worm_tail)
-                num = monnum_to_glyph(
+                glyph = monnum_to_glyph(
                              what_mon(get_worm_tail_mnum(mon->data), rn2_on_display_rng));
             else
-                num = any_mon_to_glyph(mon, rn2_on_display_rng);
+                glyph = any_mon_to_glyph(mon, rn2_on_display_rng);
         }
         if (worm_tail)
-            extra_flags |= (LFLAGS_M_WORM_TAIL | LFLAGS_M_WORM_SEEN);
+            extra_mflags |= (LMFLAGS_WORM_TAIL | LMFLAGS_WORM_SEEN);
 
         if (dropping_piercer)
         {
-            extra_flags |= LFLAGS_M_DROPPING_PIERCER;
-            show_glyph_on_layer_and_ascii(x, y, num, LAYER_MISSILE);
-            show_extra_info(x, y, extra_flags, 0, 0);
+            extra_mflags |= LMFLAGS_DROPPING_PIERCER;
+            int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MISSILE, (struct obj*)0, mon, extra_flags, 0UL, 0UL, MAT_NONE, 0));
+            show_gui_glyph_on_layer_and_ascii(x, y, glyph, gui_glyph, LAYER_MISSILE);
+            show_extra_info(x, y, extra_flags, extra_mflags, 0, 0);
         }
         else
-            show_monster_glyph_with_extra_info(x, y, num, /*worm_tail ? (struct monst*)0 :*/ mon, extra_flags, 0, 0);
+            show_monster_glyph_with_extra_info(x, y, glyph, /*worm_tail ? (struct monst*)0 :*/ mon, extra_flags, extra_mflags, 0, 0);
         clear_monster_layer_memory_at(x, y);
     }
 }
@@ -952,7 +971,7 @@ register struct monst *mon;
     if (glyph_is_invisible(levl[x][y].hero_memory_layers.glyph))
         unmap_object(x, y);
 
-    show_monster_glyph_with_extra_info(x, y, glyph, (struct monst*)0, 0UL, 0, 0);
+    show_monster_glyph_with_extra_info(x, y, glyph, (struct monst*)0, 0UL, 0UL, 0, 0);
 }
 
 int
@@ -1190,7 +1209,7 @@ void
 newsym(x, y)
 register int x, y;
 {
-    newsym_with_extra_info_and_flags(x, y, 0UL, 0, 0, 0UL);
+    newsym_with_extra_info_and_flags(x, y, 0UL, 0UL, 0, 0, 0UL);
 }
 
 void
@@ -1198,22 +1217,13 @@ newsym_with_flags(x, y, newsym_flags)
 register int x, y;
 unsigned long newsym_flags;
 {
-    newsym_with_extra_info_and_flags(x, y, 0UL, 0, 0, newsym_flags);
+    newsym_with_extra_info_and_flags(x, y, 0UL, 0UL, 0, 0, newsym_flags);
 }
 
 void
-newsym_with_extra_info(x, y, disp_flags, hit_tile_id, damage_shown)
+newsym_with_extra_info_and_flags(x, y, disp_flags, disp_mflags, hit_tile_id, damage_shown, specific_newsym_flags)
 register int x, y;
-unsigned long disp_flags;
-int hit_tile_id, damage_shown;
-{
-    newsym_with_extra_info_and_flags(x, y, disp_flags, hit_tile_id, damage_shown, 0UL);
-}
-
-void
-newsym_with_extra_info_and_flags(x, y, disp_flags, hit_tile_id, damage_shown, specific_newsym_flags)
-register int x, y;
-unsigned long disp_flags, specific_newsym_flags;
+unsigned long disp_flags, disp_mflags, specific_newsym_flags;
 int hit_tile_id, damage_shown;
 {
     if (!isok(x, y))
@@ -1292,12 +1302,13 @@ int hit_tile_id, damage_shown;
     }
 
     unsigned long old_flags = layers.layer_flags;
+    unsigned long old_mflags = layers.monster_flags;
 
     /* only permit updating the hero when swallowed */
     if (u.uswallow)
     {
         if (x == u.ux && y == u.uy)
-            display_self_with_extra_info_choose_ascii(disp_flags, hit_tile_id, damage_shown, FALSE);
+            display_self_with_extra_info_choose_ascii(disp_flags, disp_mflags, hit_tile_id, damage_shown, FALSE);
         goto new_sym_end_here;
     }
 
@@ -1313,17 +1324,12 @@ int hit_tile_id, damage_shown;
     clear_all_glyphs_at(x, y);
 
     /* Extra info shown */
-    show_extra_info(x, y, disp_flags, hit_tile_id, damage_shown);
+    show_extra_info(x, y, disp_flags, disp_mflags, hit_tile_id, damage_shown);
 
     /* Can physically see the location. */
     if (cansee(x, y)) 
     {
         boolean old_glyph_is_invisible = glyph_is_invisible(lev->hero_memory_layers.glyph);
-        if(u.uachieve.ascended)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_ASCENSION_RADIANCE);
-
-        //clear_hero_memory_at(x, y);
-
         /* RECALL FIRST WHETHER THE LOCATION IS LIT OR NOT */
         /*
          * Don't use templit here:  E.g.
@@ -1340,7 +1346,11 @@ int hit_tile_id, damage_shown;
         lev->waslit = (lev->lit != 0); /* remember lit condition */
 
         /* THEN, SHOW THE LOCATION IS AND PUT IT TO MEMORY */
+        /* Note: clears layer flags */
         map_location(x, y, 1);
+
+        if (u.uachieve.ascended)
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_ASCENSION_RADIANCE, 0UL);
 
         /* Monster layer */
         if (x == u.ux && y == u.uy)
@@ -1355,9 +1365,10 @@ int hit_tile_id, damage_shown;
 #endif
             boolean location_has_boulder = (sobj_at(BOULDER, x, y) != 0);
             unsigned long extra_flags = 0UL;
+            unsigned long extra_mflags = 0UL;
             if (carrying_leashed_leash())
             {
-                extra_flags |= LFLAGS_U_TETHERED;
+                extra_mflags |= LMFLAGS_U_TETHERED;
                 struct monst* leashed_mon;
                 for (leashed_mon = fmon; leashed_mon; leashed_mon = leashed_mon->nmon)
                 {
@@ -1372,10 +1383,10 @@ int hit_tile_id, damage_shown;
                 }
             }
             if (see_self)
-                display_self_with_extra_info_choose_ascii(disp_flags | extra_flags, hit_tile_id, damage_shown, location_has_boulder);
+                display_self_with_extra_info_choose_ascii(disp_flags | extra_flags, disp_mflags | extra_mflags, hit_tile_id, damage_shown, location_has_boulder);
             else
             {
-                show_extra_info(x, y, disp_flags | extra_flags, hit_tile_id, damage_shown);
+                show_extra_info(x, y, disp_flags | extra_flags, disp_mflags | extra_mflags, hit_tile_id, damage_shown);
                 refresh_u_tile_gui_info(FALSE);
                 gbuf[y][x].layers.monster_origin_x = u.ux0;
                 gbuf[y][x].layers.monster_origin_y = u.uy0;
@@ -1471,7 +1482,7 @@ int hit_tile_id, damage_shown;
             /* Monster layer */
             if (canspotself())
             {
-                display_self_with_extra_info_choose_ascii(disp_flags, hit_tile_id, damage_shown, FALSE);
+                display_self_with_extra_info_choose_ascii(disp_flags, disp_mflags, hit_tile_id, damage_shown, FALSE);
             }
             else
             {
@@ -1484,7 +1495,7 @@ int hit_tile_id, damage_shown;
             /*** Show memory from floor to environment layer ***/
             /* Ascii */
             show_glyph_ascii(x, y, lev->hero_memory_layers.glyph);
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY, 0UL);
 
             /* Floor to environment, monster layer replaced below, if needed */
             enum layer_types layer_idx;
@@ -1493,7 +1504,7 @@ int hit_tile_id, damage_shown;
                 show_gui_glyph_on_layer(x, y, lev->hero_memory_layers.layer_glyphs[layer_idx], lev->hero_memory_layers.layer_gui_glyphs[layer_idx], layer_idx);
             }
             /* Add layer flags and object height from memory */
-            add_glyph_buffer_layer_flags(x, y, lev->hero_memory_layers.layer_flags);
+            add_glyph_buffer_layer_flags(x, y, lev->hero_memory_layers.layer_flags, lev->hero_memory_layers.monster_flags);
             set_glyph_buffer_feature_doodad_height(x, y, lev->hero_memory_layers.special_feature_doodad_layer_height);
             set_glyph_buffer_object_height(x, y, lev->hero_memory_layers.object_height);
             set_glyph_buffer_oid(x, y, lev->hero_memory_layers.o_id);
@@ -1518,7 +1529,7 @@ int hit_tile_id, damage_shown;
                 }
                 else if (is_worm_tail(mon))
                 {
-                    add_glyph_buffer_layer_flags(x, y, LFLAGS_M_WORM_TAIL);
+                    add_glyph_buffer_layer_flags(x, y, 0UL, LMFLAGS_WORM_TAIL);
                 }
             }
         }
@@ -1528,7 +1539,7 @@ new_sym_end_here:
 
     if (x == u.ux && y == u.uy)
     {
-        add_glyph_buffer_layer_flags(x, y, LFLAGS_UXUY); /* Mark player location */
+        add_glyph_buffer_layer_flags(x, y, LFLAGS_UXUY, 0UL); /* Mark player location */
     }
     
     if (newsym_flags & NEWSYM_FLAGS_KEEP_OLD_MISSILE_GLYPH)
@@ -1539,7 +1550,7 @@ new_sym_end_here:
     if (newsym_flags & NEWSYM_FLAGS_KEEP_OLD_ZAP_GLYPH)
     {
         show_gui_glyph_on_layer(x, y, zap_glyph, zap_gui_glyph, LAYER_ZAP);
-        add_glyph_buffer_layer_flags(x, y, zap_flags);
+        add_glyph_buffer_layer_flags(x, y, zap_flags, 0UL);
     }
     if (newsym_flags & NEWSYM_FLAGS_KEEP_OLD_GENERAL_EFFECT_GLYPH)
     {
@@ -1555,7 +1566,7 @@ new_sym_end_here:
     }
     if (newsym_flags & NEWSYM_FLAGS_KEEP_OLD_FLAGS)
     {
-        add_glyph_buffer_layer_flags(x, y, old_flags);
+        add_glyph_buffer_layer_flags(x, y, old_flags, old_mflags);
     }
 
 }
@@ -1707,7 +1718,7 @@ short missile_special_quality;
         tglyph->sidx = 0;
         tglyph->style = x;
         tglyph->glyph = y;
-        tglyph->gui_glyph = maybe_get_replaced_glyph(y, 0, 0, data_to_replacement_info(y, LAYER_MISSILE, obj, (struct monst*)0, 0UL, missile_flags, missile_material, missile_special_quality));
+        tglyph->gui_glyph = maybe_get_replaced_glyph(y, 0, 0, data_to_replacement_info(y, LAYER_MISSILE, obj, (struct monst*)0, 0UL, 0UL, missile_flags, missile_material, missile_special_quality));
         context.tether_x = 0;
         context.tether_y = 0;
         flush_screen(1); /* flush buffered glyphs */
@@ -1737,7 +1748,7 @@ short missile_special_quality;
     switch (x) {
     case DISP_CHANGE:
         tglyph->glyph = y;
-        tglyph->gui_glyph = maybe_get_replaced_glyph(y, 0, 0, data_to_replacement_info(y, LAYER_MISSILE, obj, (struct monst*)0, 0UL, missile_flags, missile_material, missile_special_quality));
+        tglyph->gui_glyph = maybe_get_replaced_glyph(y, 0, 0, data_to_replacement_info(y, LAYER_MISSILE, obj, (struct monst*)0, 0UL, 0UL, missile_flags, missile_material, missile_special_quality));
         break;
 
     case DISP_END:
@@ -1807,7 +1818,7 @@ short missile_special_quality;
                 show_glyph_on_layer_and_ascii(px, py, tether_glyph(px, py), LAYER_MISSILE);
                 if (obj)
                     show_missile_info(px, py, obj->opoisoned, obj->material, obj->special_quality, obj->elemental_enchantment, obj->exceptionality, obj->mythic_prefix, obj->mythic_suffix, obj->oeroded, obj->oeroded2, get_missile_flags(obj, TRUE), get_obj_height(obj), 0, 0);
-
+                clear_found_this_turn_at(px, py);
             }
             /* save pos for later use or erasure */
             context.tether_x = x;
@@ -1820,6 +1831,7 @@ short missile_special_quality;
                 newsym(tglyph->saved[0].x, tglyph->saved[0].y);
                 force_redraw_at(tglyph->saved[0].x, tglyph->saved[0].y);
                 tglyph->sidx = 0; /* display is presently up to date */
+                clear_found_this_turn_at(tglyph->saved[0].x, tglyph->saved[0].y);
             }
             if (!cansee(x, y) && tglyph->style != DISP_ALWAYS)
             {
@@ -1837,6 +1849,7 @@ short missile_special_quality;
         if (obj)
             show_missile_info(x, y, obj->opoisoned, obj->material, obj->special_quality, obj->elemental_enchantment, obj->exceptionality, obj->mythic_prefix, obj->mythic_suffix, obj->oeroded, obj->oeroded2, get_missile_flags(obj, TRUE), get_obj_height(obj), 0, 0);
 
+        clear_found_this_turn_at(x, y);
         flush_screen(1);                 /* make sure it shows up */
         break;
     } /* end case */
@@ -2339,8 +2352,8 @@ docrt()
             if (lev->hero_memory_layers.glyph != cmap_to_glyph(S_unexplored))
             {
                 show_glyph_ascii(x, y, lev->hero_memory_layers.glyph);
-                add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY);
-                add_glyph_buffer_layer_flags(x, y, lev->hero_memory_layers.layer_flags);
+                add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY, 0UL);
+                add_glyph_buffer_layer_flags(x, y, lev->hero_memory_layers.layer_flags, lev->hero_memory_layers.monster_flags);
                 set_glyph_buffer_feature_doodad_height(x, y, lev->hero_memory_layers.special_feature_doodad_layer_height);
                 set_glyph_buffer_object_height(x, y, lev->hero_memory_layers.object_height);
                 set_glyph_buffer_oid(x, y, lev->hero_memory_layers.o_id);
@@ -2591,9 +2604,9 @@ xchar ux, uy;
 }
 
 void
-show_extra_info(x, y, disp_flags, hit_tile_id, damage_displayed)
+show_extra_info(x, y, disp_flags, disp_mflags, hit_tile_id, damage_displayed)
 int x, y;
-unsigned long disp_flags;
+unsigned long disp_flags, disp_mflags;
 int hit_tile_id, damage_displayed;
 {
     if (isok(x, y))
@@ -2604,7 +2617,11 @@ int hit_tile_id, damage_displayed;
         unsigned long old_flags = gbuf[y][x].layers.layer_flags;
         gbuf[y][x].layers.layer_flags |= disp_flags;
 
-        if (old_flags != gbuf[y][x].layers.layer_flags)
+        unsigned long old_mflags = gbuf[y][x].layers.monster_flags;
+        gbuf[y][x].layers.monster_flags |= disp_mflags;
+
+        if (old_flags != gbuf[y][x].layers.layer_flags ||
+            old_mflags != gbuf[y][x].layers.monster_flags)
         {
             gbuf[y][x].isnew = 1;
             if (gbuf_start[y] > x)
@@ -2722,16 +2739,19 @@ int hit_tile_id;
 }
 
 void
-add_glyph_buffer_layer_flags(x, y, added_flags)
+add_glyph_buffer_layer_flags(x, y, added_flags, added_mflags)
 int x, y;
-unsigned long added_flags;
+unsigned long added_flags, added_mflags;
 {
     if (isok(x, y))
     {
         unsigned long old_flags = gbuf[y][x].layers.layer_flags;
         gbuf[y][x].layers.layer_flags |= added_flags;
+        unsigned long old_mflags = gbuf[y][x].layers.monster_flags;
+        gbuf[y][x].layers.monster_flags |= added_mflags;
 
-        if (old_flags != gbuf[y][x].layers.layer_flags)
+        if (old_flags != gbuf[y][x].layers.layer_flags ||
+            old_mflags != gbuf[y][x].layers.monster_flags)
         {
             gbuf[y][x].isnew = 1;
             if (gbuf_start[y] > x)
@@ -2743,16 +2763,19 @@ unsigned long added_flags;
 }
 
 void
-remove_glyph_buffer_layer_flags(x, y, removed_flags)
+remove_glyph_buffer_layer_flags(x, y, removed_flags, removed_mflags)
 int x, y;
-unsigned long removed_flags;
+unsigned long removed_flags, removed_mflags;
 {
     if (isok(x, y))
     {
         unsigned long old_flags = gbuf[y][x].layers.layer_flags;
         gbuf[y][x].layers.layer_flags &= ~removed_flags;
+        unsigned long old_mflags = gbuf[y][x].layers.monster_flags;
+        gbuf[y][x].layers.monster_flags &= ~removed_mflags;
 
-        if (old_flags != gbuf[y][x].layers.layer_flags)
+        if (old_flags != gbuf[y][x].layers.layer_flags ||
+            old_mflags != gbuf[y][x].layers.monster_flags)
         {
             gbuf[y][x].isnew = 1;
             if (gbuf_start[y] > x)
@@ -2816,7 +2839,7 @@ int x, y;
         change_layer_hit_tile(x, y, 0);
 
         unsigned long old_flags = gbuf[y][x].layers.layer_flags;
-        gbuf[y][x].layers.layer_flags &= ~(LFLAGS_M_MASK);
+        gbuf[y][x].layers.monster_flags = 0UL;
         if (old_flags != gbuf[y][x].layers.layer_flags)
         {
             gbuf[y][x].isnew = 1;
@@ -2828,7 +2851,6 @@ int x, y;
     }
 }
 
-
 void
 clear_monster_layer_at(x, y)
 int x, y;
@@ -2839,23 +2861,22 @@ int x, y;
 
 }
 
-
 void
-show_monster_glyph_with_extra_info(x, y, glyph, mtmp, disp_flags, hit_tile_id, damage_displayed)
+show_monster_glyph_with_extra_info(x, y, glyph, mtmp, disp_flags, disp_mflags, hit_tile_id, damage_displayed)
 int x, y, glyph;
 struct monst* mtmp;
-unsigned long disp_flags;
+unsigned long disp_flags, disp_mflags;
 int hit_tile_id, damage_displayed;
 {
     boolean isyou = (mtmp == &youmonst);
-    show_monster_glyph_with_extra_info_choose_ascii(x, y, glyph, mtmp, mtmp ? (isyou ? u.ux0 : mtmp->mx0) : 0, mtmp ? (isyou ? u.uy0 : mtmp->my0) : 0, disp_flags, hit_tile_id, damage_displayed, FALSE);
+    show_monster_glyph_with_extra_info_choose_ascii(x, y, glyph, mtmp, mtmp ? (isyou ? u.ux0 : mtmp->mx0) : 0, mtmp ? (isyou ? u.uy0 : mtmp->my0) : 0, disp_flags, disp_mflags, hit_tile_id, damage_displayed, FALSE);
 }
 
 void
-show_monster_glyph_with_extra_info_choose_ascii(x, y, glyph,  mtmp, x0, y0, disp_flags, hit_tile_id, damage_displayed, exclude_ascii)
+show_monster_glyph_with_extra_info_choose_ascii(x, y, glyph,  mtmp, x0, y0, disp_flags, disp_mflags, hit_tile_id, damage_displayed, exclude_ascii)
 int x, y, glyph, x0, y0;
 struct monst* mtmp;
-unsigned long disp_flags;
+unsigned long disp_flags, disp_mflags;
 int hit_tile_id, damage_displayed;
 boolean exclude_ascii;
 {
@@ -2864,21 +2885,21 @@ boolean exclude_ascii;
         boolean loc_is_you = (u.ux == x && u.uy == y);
 
         /* Replace */
-        int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MONSTER, mtmp ? (has_mobj(mtmp) ? MOBJ(mtmp) : 0) : 0, mtmp, 0UL, 0UL, MAT_NONE, 0));
+        int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MONSTER, mtmp ? (has_mobj(mtmp) ? MOBJ(mtmp) : 0) : 0, mtmp, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
         if(!exclude_ascii)
             show_glyph_ascii(x, y, glyph);
 
         show_gui_glyph_on_layer(x, y, glyph, gui_glyph, LAYER_MONSTER);
         clear_monster_extra_info(x, y);
-        show_extra_info(x, y, disp_flags, hit_tile_id, damage_displayed);
+        show_extra_info(x, y, disp_flags, disp_mflags, hit_tile_id, damage_displayed);
 
         clear_monster_layerinfo(&gbuf[y][x].layers);
         gbuf[y][x].layers.monster_origin_x = x0;
         gbuf[y][x].layers.monster_origin_y = y0;
         gbuf[y][x].layers.m_id = mtmp && mtmp != &youmonst ? mtmp->m_id : 0;
 
-        if (disp_flags & LFLAGS_M_YOU)
+        if (disp_mflags & LMFLAGS_YOU)
         {
             if (u.utrap)
             {
@@ -2902,7 +2923,7 @@ boolean exclude_ascii;
         }
 
         unsigned long extra_flags = 0UL;
-
+        unsigned long extra_mflags = 0UL;
 
         /* Monster info flags; can be set only in this function */
         if (loc_is_you || mtmp)
@@ -2924,6 +2945,27 @@ boolean exclude_ascii;
             if (is_long_worm_tail(used_mtmp->data))
                 gbuf[y][x].layers.monster_flags |= LMFLAGS_LONG_WORM_TAIL;
 
+            if (mon_fades_upon_death(used_mtmp))
+                gbuf[y][x].layers.monster_flags |= LMFLAGS_FADES_UPON_DEATH;
+
+            if (is_flying(used_mtmp))
+                gbuf[y][x].layers.monster_flags |= LMFLAGS_FLYING;
+
+            if (has_swimming(used_mtmp) && IS_POOL(levl[x][y].typ) && !has_blobby_animation(used_mtmp->data) && !Hallucination)
+                gbuf[y][x].layers.monster_flags |= (has_shark_animation(used_mtmp->data) ? LMFLAGS_SHARK_ANIMATION : LMFLAGS_SWIM_ANIMATION);
+
+            if (is_levitating(used_mtmp))
+                gbuf[y][x].layers.monster_flags |= LMFLAGS_LEVITATING;
+
+            if (has_blobby_animation(used_mtmp->data) && !Hallucination)
+                gbuf[y][x].layers.monster_flags |= LMFLAGS_BLOBBY_ANIMATION;
+
+            if (has_human_breathe_animation(used_mtmp->data) && !Hallucination)
+                gbuf[y][x].layers.monster_flags |= LMFLAGS_HUMAN_BREATHE_ANIMATION;
+
+            if (has_animal_breathe_animation(used_mtmp->data) && !Hallucination)
+                gbuf[y][x].layers.monster_flags |= LMFLAGS_ANIMAL_BREATHE_ANIMATION;
+
             if (loc_is_you)
             {
                 if (mtmp && mtmp != &youmonst) /* Steed */
@@ -2935,6 +2977,10 @@ boolean exclude_ascii;
                 {
                     if (Invis)
                         gbuf[y][x].layers.monster_flags |= LMFLAGS_INVISIBLE_TRANSPARENT;
+                    if (Flying)
+                        gbuf[y][x].layers.monster_flags |= LMFLAGS_FLYING;
+                    if (Levitation)
+                        gbuf[y][x].layers.monster_flags |= LMFLAGS_LEVITATING;
                 }
                 if (canspotself())
                     gbuf[y][x].layers.monster_flags |= LMFLAGS_CAN_SPOT_SELF;
@@ -2943,7 +2989,7 @@ boolean exclude_ascii;
             {
                 if (is_invisible(mtmp) && canspotmon(mtmp))
                     gbuf[y][x].layers.monster_flags |= LMFLAGS_INVISIBLE_TRANSPARENT;
-                if (is_boss_monster(mtmp->data) && !is_peaceful(mtmp))
+                if ((is_boss_monster(mtmp->data) || is_level_boss(mtmp)) && !is_peaceful(mtmp))
                     gbuf[y][x].layers.monster_flags |= LMFLAGS_BOSS_MONSTER_FIGHT;
             }
         }
@@ -2951,13 +2997,13 @@ boolean exclude_ascii;
         if (mtmp && mtmp != &youmonst)
         {
             if (is_tame(mtmp) && !Hallucination)
-                extra_flags |= LFLAGS_M_PET;
+                extra_mflags |= LMFLAGS_PET;
 
             if (is_peaceful(mtmp) && !is_tame(mtmp) && !Hallucination)
-                extra_flags |= LFLAGS_M_PEACEFUL;
+                extra_mflags |= LMFLAGS_PEACEFUL;
 
             if (canspotmon(mtmp))
-                extra_flags |= LFLAGS_M_CANSPOTMON;
+                extra_mflags |= LMFLAGS_CANSPOTMON;
 
             /* Worm info */
             int wdir_out = get_wseg_dir_at(mtmp, x, y);
@@ -2973,24 +3019,25 @@ boolean exclude_ascii;
         }
 
         /* Add to layer */
-        if(extra_flags != 0UL)
-            add_glyph_buffer_layer_flags(x, y, extra_flags);
+        if(extra_flags != 0UL || extra_mflags != 0)
+            add_glyph_buffer_layer_flags(x, y, extra_flags, extra_mflags);
 
         if(loc_is_you || mtmp)
         {
             unsigned long layer_flags = disp_flags | extra_flags;
-            update_tile_gui_info(loc_is_you, mtmp, x, y, layer_flags);
+            unsigned long monster_flags = disp_mflags | extra_mflags;
+            update_tile_gui_info(loc_is_you, mtmp, x, y, layer_flags, monster_flags);
         }
 
     }
 }
 
 void
-update_tile_gui_info(loc_is_you, mtmp, x, y, layer_flags)
+update_tile_gui_info(loc_is_you, mtmp, x, y, layer_flags, monster_flags)
 boolean loc_is_you;
 struct monst* mtmp;
 int x, y;
-unsigned long layer_flags;
+unsigned long layer_flags UNUSED, monster_flags;
 {
     if (loc_is_you && !mtmp)
         mtmp = &youmonst;
@@ -3000,9 +3047,9 @@ unsigned long layer_flags;
 
     /* Status bits*/
     boolean issteed = (mtmp == u.usteed);
-    boolean ispeaceful = (layer_flags & LFLAGS_M_PEACEFUL) != 0;
-    boolean ispet = (layer_flags & LFLAGS_M_PET) != 0;
-    boolean isdetected = (layer_flags & LFLAGS_M_DETECTED) != 0;
+    boolean ispeaceful = (monster_flags & LMFLAGS_PEACEFUL) != 0;
+    boolean ispet = (monster_flags & LMFLAGS_PET) != 0;
+    boolean isdetected = (monster_flags & LMFLAGS_DETECTED) != 0;
 
     gbuf[y][x].layers.status_bits = get_m_status_bits(mtmp, loc_is_you, ispeaceful, ispet, isdetected);
 
@@ -3016,7 +3063,7 @@ unsigned long layer_flags;
     if (loc_is_you && issteed)
     {
         int rider_glyph = u_to_glyph();
-        int rider_gui_glyph = maybe_get_replaced_glyph(rider_glyph, x, y, data_to_replacement_info(rider_glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
+        int rider_gui_glyph = maybe_get_replaced_glyph(rider_glyph, x, y, data_to_replacement_info(rider_glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
         gbuf[y][x].layers.rider_glyph = rider_glyph;
         gbuf[y][x].layers.rider_gui_glyph = rider_gui_glyph;
     }
@@ -3026,12 +3073,13 @@ void
 refresh_u_tile_gui_info(flush)
 boolean flush;
 {
-    update_tile_gui_info(TRUE, &youmonst, u.ux, u.uy, gbuf[u.uy][u.ux].layers.layer_flags);
+    update_tile_gui_info(TRUE, &youmonst, u.ux, u.uy, gbuf[u.uy][u.ux].layers.layer_flags, gbuf[u.uy][u.ux].layers.monster_flags);
     force_redraw_at(u.ux, u.uy);
     if(flush)
         flush_screen(1);
 }
 
+/* Note: if something has an impact on the ASCII graphics (peaceful and tame, in particular), use newsym instead; this is only for info not shown in ASCII */
 void
 refresh_m_tile_gui_info(mtmp, flush)
 struct monst* mtmp;
@@ -3048,7 +3096,7 @@ boolean flush;
     }
     else
     {
-        update_tile_gui_info(loc_is_you, mtmp, mtmp->mx, mtmp->my, gbuf[mtmp->my][mtmp->mx].layers.layer_flags);
+        update_tile_gui_info(loc_is_you, mtmp, mtmp->mx, mtmp->my, gbuf[mtmp->my][mtmp->mx].layers.layer_flags, gbuf[mtmp->my][mtmp->mx].layers.monster_flags);
         force_redraw_at(mtmp->mx, mtmp->my);
         if(flush)
             flush_screen(1);
@@ -3081,14 +3129,14 @@ boolean remove;
         {
             int cmap_idx = generic_glyph_to_cmap(glyph);
             if (!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, defsyms[cmap_idx].layer, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, defsyms[cmap_idx].layer, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
             gbuf[y][x].layers.layer_glyphs[defsyms[cmap_idx].layer] = remove ? NO_GLYPH : glyph;
             gbuf[y][x].layers.layer_gui_glyphs[defsyms[cmap_idx].layer] = remove ? NO_GLYPH : gui_glyph;
         }
         else if (glyph_is_monster(glyph) || glyph_is_invisible(glyph) || glyph_is_warning(glyph)) /* includes also players */
         {
             if (!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, m_at(x, y), 0UL, 0UL, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, m_at(x, y), 0UL, 0UL, 0UL, MAT_NONE, 0));
             gbuf[y][x].layers.layer_glyphs[LAYER_MONSTER] = remove ? NO_GLYPH : glyph;
             gbuf[y][x].layers.layer_gui_glyphs[LAYER_MONSTER] = remove ? NO_GLYPH : gui_glyph;
             clear_monster_extra_info(x, y);
@@ -3098,7 +3146,7 @@ boolean remove;
         {
             int obj_idx = glyph_to_obj(glyph);
             if (!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, is_otyp_drawn_in_front(obj_idx, x, y) ? LAYER_COVER_OBJECT : LAYER_OBJECT, level.objects[x][y], (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, is_otyp_drawn_in_front(obj_idx, x, y) ? LAYER_COVER_OBJECT : LAYER_OBJECT, level.objects[x][y], (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
             if (is_otyp_drawn_in_front(obj_idx, x, y))
             {
@@ -3116,7 +3164,7 @@ boolean remove;
         else if (glyph_is_missile(glyph))
         {
             if (!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MISSILE, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_MISSILE, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
             gbuf[y][x].layers.layer_glyphs[LAYER_MISSILE] = remove ? NO_GLYPH : glyph;
             gbuf[y][x].layers.layer_gui_glyphs[LAYER_MISSILE] = remove ? NO_GLYPH : gui_glyph;
@@ -3124,7 +3172,7 @@ boolean remove;
         else if (glyph_is_zap(glyph))
         {
             if(!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_ZAP, (struct obj*)0, (struct monst*)0, 0UL, gbuf[y][x].layers.missile_flags, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_ZAP, (struct obj*)0, (struct monst*)0, 0UL, 0UL, gbuf[y][x].layers.missile_flags, MAT_NONE, 0));
 
             gbuf[y][x].layers.layer_glyphs[LAYER_ZAP] = remove ? NO_GLYPH : glyph;
             gbuf[y][x].layers.layer_gui_glyphs[LAYER_ZAP] = remove ? NO_GLYPH : gui_glyph;
@@ -3132,7 +3180,7 @@ boolean remove;
         else if (glyph_is_swallow(glyph) || glyph_is_explosion(glyph))
         {
             if (!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_GENERAL_EFFECT, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_GENERAL_EFFECT, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
             gbuf[y][x].layers.layer_glyphs[LAYER_GENERAL_EFFECT] = remove ? NO_GLYPH : glyph;
             gbuf[y][x].layers.layer_gui_glyphs[LAYER_GENERAL_EFFECT] = remove ? NO_GLYPH : gui_glyph;
@@ -3140,7 +3188,7 @@ boolean remove;
         else
         {
             if (!remove)
-                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_GENERAL_UI, (struct obj*)0, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+                gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_GENERAL_UI, (struct obj*)0, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
             /* Should not get here */
             gbuf[y][x].layers.layer_glyphs[LAYER_GENERAL_UI] = remove ? NO_GLYPH : glyph;
             gbuf[y][x].layers.layer_gui_glyphs[LAYER_GENERAL_UI] = remove ? NO_GLYPH : gui_glyph;
@@ -3345,7 +3393,7 @@ show_memory_everywhere()
     for (x = 1; x < COLNO; x++) 
     {
         for (y = 0; y < ROWNO; y++)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY, 0UL);
     }
 
 }
@@ -3357,7 +3405,7 @@ show_detection_everywhere()
     for (x = 1; x < COLNO; x++)
     {
         for (y = 0; y < ROWNO; y++)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_DETECTION);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_DETECTION, 0UL);
     }
 
 }
@@ -3369,7 +3417,7 @@ show_memory_and_detection_everywhere()
     for (x = 1; x < COLNO; x++)
     {
         for (y = 0; y < ROWNO; y++)
-            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY | LFLAGS_SHOWING_DETECTION);
+            add_glyph_buffer_layer_flags(x, y, LFLAGS_SHOWING_MEMORY | LFLAGS_SHOWING_DETECTION, 0UL);
     }
 
 }
@@ -3478,24 +3526,14 @@ int cursor_on_u;
         {
             if (cansee(x, y))
             {
-                add_glyph_buffer_layer_flags(x, y, LFLAGS_CAN_SEE);
+                add_glyph_buffer_layer_flags(x, y, LFLAGS_CAN_SEE, 0UL);
             }
 
             boolean is_lit_unknown_wall = (levl[x][y].waslit && IS_NON_STONE_WALL(levl[x][y].typ) && wall_angle(&levl[x][y]) == S_stone);
             if (!levl[x][y].waslit || is_lit_unknown_wall)
             {
-                add_glyph_buffer_layer_flags(x, y, LFLAGS_APPEARS_UNLIT);
+                add_glyph_buffer_layer_flags(x, y, LFLAGS_APPEARS_UNLIT, 0UL);
             }
-
-            //boolean nwead = NO_WALL_END_AUTODRAW(x, y);
-            //boolean cur = (gbuf[y][x].layers.layer_flags & LFLAGS_NO_WALL_END_AUTODRAW) != 0;
-            //if (nwead != cur)
-            //{
-            //    if (nwead)
-            //        add_glyph_buffer_layer_flags(x, y, LFLAGS_NO_WALL_END_AUTODRAW);
-            //    else
-            //        remove_glyph_buffer_layer_flags(x, y, LFLAGS_NO_WALL_END_AUTODRAW);
-            //}
         }
     }
 
@@ -5296,8 +5334,8 @@ int dx, dy;
 
 
 void
-display_self_with_extra_info_choose_ascii(displayed_flags, hit_tile_id, dmg_received, exclude_ascii)
-unsigned long displayed_flags;
+display_self_with_extra_info_choose_ascii(displayed_flags, displayed_mflags, hit_tile_id, dmg_received, exclude_ascii)
+unsigned long displayed_flags, displayed_mflags;
 int hit_tile_id, dmg_received;
 boolean exclude_ascii;
 {
@@ -5314,9 +5352,8 @@ boolean exclude_ascii;
             : any_monnum_to_glyph(flags.female, youmonst.mappearance)
         ),
         u.usteed ? u.usteed : &youmonst, u.ux0, u.uy0,
-        displayed_flags | LFLAGS_M_YOU | (u.usteed && mon_visible(u.usteed) ? LFLAGS_M_RIDDEN : 0UL),
+        displayed_flags, displayed_mflags | LMFLAGS_YOU | (u.usteed && mon_visible(u.usteed) ? LMFLAGS_RIDDEN : 0UL),
         hit_tile_id, dmg_received, exclude_ascii);
-
 }
 
 void
@@ -5351,7 +5388,7 @@ struct obj* otmp;
     xchar x = 0, y = 0;
     get_obj_location(otmp, &x, &y, CONTAINED_TOO | BURIED_TOO);
     int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, is_obj_drawn_in_front(otmp) ? LAYER_COVER_OBJECT : LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, MAT_NONE, 0));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, is_obj_drawn_in_front(otmp) ? LAYER_COVER_OBJECT : LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
     otmp->glyph = glyph;
     otmp->gui_glyph = gui_glyph;
 }
@@ -5364,7 +5401,7 @@ struct monst* mtmp;
         return NO_GLYPH;
 
     int glyph = any_seen_mon_to_glyph(mtmp, rn2_on_display_rng);
-    int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     return gui_glyph;
 }

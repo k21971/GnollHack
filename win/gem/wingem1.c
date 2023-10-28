@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0	wingem1.c	$NHDT-Date: 1433806613 2015/06/08 23:36:53 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Christian Bressler 1999 	  */
@@ -2942,8 +2942,8 @@ int x, y;
 }
 
 void
-mar_issue_gui_command(cmd_id, cmd_param, cmd_str)
-int cmd_id, cmd_param;
+mar_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str)
+int cmd_id, cmd_param, cmd_param2;
 const char* cmd_str;
 {
     return;

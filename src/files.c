@@ -9,7 +9,9 @@
 
 #include "hack.h"
 #include "dlb.h"
-
+#ifdef UNIX
+#include <stdio.h>
+#endif
 #ifdef TTY_GRAPHICS
 #include "wintty.h" /* more() */
 #endif
@@ -45,8 +47,15 @@ const
 
 #if defined(UNIX) && (defined(QT_GRAPHICS) || defined(ANDROID) || defined(GNH_MOBILE))
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <stdlib.h>
+#ifdef GNH_IOS
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/param.h>
+#include <sys/resource.h>
+#endif
 #endif
 
 #if defined(UNIX) || defined(VMS) || !defined(NO_SIGNAL)
@@ -338,6 +347,28 @@ const char* savefilename;
     return TRUE;
 }
 
+int is_imported_backup_savefile_name(savefilename)
+const char* savefilename;
+{
+    if (!savefilename || !*savefilename)
+        return FALSE;
+
+    size_t dlen = strlen(savefilename);
+    char ebuf[BUFSZ] = "";
+    print_special_savefile_extension(ebuf, BACKUP_EXTENSION);
+    print_imported_savefile_extension(ebuf);
+    size_t elen = strlen(ebuf);
+    if (dlen <= elen)
+        return FALSE;
+
+    size_t i;
+    for (i = 0; i < elen; i++)
+        if (savefilename[dlen - 1 - i] != ebuf[elen - 1 - i])
+            return FALSE;
+
+    return TRUE;
+}
+
 int is_backup_savefile_name(savefilename)
 const char* savefilename;
 {
@@ -459,7 +490,7 @@ int buffnum UNUSED_if_not_PREFIXES_IN_USE;
         return basenam; /* XXX */
     }
     Strcpy(fqn_filename_buffer[buffnum], fqn_prefix[whichprefix]);
-    strcat(fqn_filename_buffer[buffnum], basenam);
+    Strcat(fqn_filename_buffer[buffnum], basenam);
 
     return fqn_filename_buffer[buffnum];
 #endif
@@ -608,14 +639,177 @@ char errbuf[];
     fd = creat(fq_lock, FCMASK);
 #endif
 #endif /* MICRO || WIN32 */
-
+    issue_debuglog_fd(fd, "create_levelfile");
     if (fd >= 0)
         level_info[lev].flags |= LFILE_EXISTS;
     else if (errbuf) /* failure explanation */
+    {
         Sprintf(errbuf, "Cannot create file \"%s\" for level %d (errno %d).",
-                lock, lev, errno);
+            lock, lev, errno);
+        maybe_report_file_descriptors(errbuf, errno);
+    }
 
     return fd;
+}
+
+#if defined(UNIX) && defined(GNH_MOBILE)
+/* This changes the soft limit */
+boolean
+increase_file_descriptor_limit_to_at_least(new_cur_minimum)
+unsigned long new_cur_minimum;
+{
+    struct rlimit rlim;
+    if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) 
+    {
+        if (rlim.rlim_max != RLIM_INFINITY && rlim.rlim_max < (rlim_t)new_cur_minimum)
+        {
+            /* Limit the file descriptor number to lower of 32768 and current hard limit */
+            rlim_t maxlimit = min((rlim_t)32768, rlim.rlim_max);
+            new_cur_minimum = min(new_cur_minimum, (unsigned long)maxlimit);
+        }
+        if (rlim.rlim_cur != RLIM_INFINITY && rlim.rlim_cur < (rlim_t)new_cur_minimum)
+            rlim.rlim_cur = (rlim_t)new_cur_minimum;
+        if (setrlimit(RLIMIT_NOFILE, &rlim) == -1) 
+        {
+            /* Failed */
+            return FALSE;
+        }
+        return TRUE;
+    }
+    else 
+    {
+        /* Failed */
+        return FALSE;
+    }
+}
+
+int
+get_file_descriptor_limit(is_max_limit)
+boolean is_max_limit;
+{
+    struct rlimit rlim;
+    if (getrlimit(RLIMIT_NOFILE, &rlim) == 0)
+    {
+        if (is_max_limit)
+        {
+            if (rlim.rlim_max == RLIM_INFINITY)
+                return -1;
+            else
+                return (int)rlim.rlim_max;
+        }
+        else
+        {
+            if (rlim.rlim_cur == RLIM_INFINITY)
+                return -1;
+            else
+                return (int)rlim.rlim_cur;
+        }
+    }
+    else
+    {
+        /* Failed */
+        return -2;
+    }
+}
+
+/* Dummy for non-Mac/iOS systems */
+#ifndef F_GETPATH
+#define F_GETPATH 127
+#endif
+
+char *
+gnh_lsof(VOID_ARGS)
+{
+    char* outptr = 0;
+#ifdef GNH_IOS
+    int flags;
+    int fd;
+    char buf[MAXPATHLEN + 1 + BUFSZ * 2];
+    int n = 1;
+    char outbuf[MAXPATHLEN + BUFSZ * 4];
+
+    for (fd = 0; fd < (int)FD_SETSIZE; fd++) {
+        *buf = 0;
+        *outbuf = 0;
+        errno = 0;
+        flags = fcntl(fd, F_GETFD, 0);
+        if (flags == -1 && errno) {
+            if (errno != EBADF) {
+                return outptr;
+            }
+            else
+                continue;
+        }
+        fcntl(fd, F_GETPATH, buf);
+        Sprintf(outbuf, "File Descriptor %d (number %d) in use for: %s | ", fd, n, buf);
+        if (!outptr)
+        {
+            outptr = (char*)alloc(strlen(outbuf) + 1);
+            Strcpy(outptr, outbuf);
+        }
+        else
+        {
+            char* newptr = (char*)alloc(strlen(outptr) + strlen(outbuf) + 1);
+            Strcpy(newptr, outptr);
+            Strcat(newptr, outbuf);
+            free((genericptr_t)outptr);
+            outptr = newptr;
+        }
+        ++n;
+    }
+#endif
+    return outptr;
+}
+#endif
+
+void
+maybe_report_file_descriptors(logtext, error_number)
+const char* logtext UNUSED;
+int error_number UNUSED;
+{
+#if defined(UNIX) && defined(GNH_MOBILE)
+    if (error_number == EMFILE)
+    {
+#if GNH_IOS
+        char* ptr = gnh_lsof();
+        if (ptr)
+        {
+            if (issue_gui_command)
+            {
+                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT, DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST, ptr);
+                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CRITICAL, 0, "gnh_lsof");
+            }
+            free((genericptr_t)ptr);
+        }
+#else
+        char cmd[BUFSZ];
+        char msgbuf[BUFSZ] = "";
+        (void)mkdir("temp", 0700);
+        int pid = (int)getpid();
+#ifdef GNH_ANDROID
+        Sprintf(cmd, "lsof -a -p %d > temp/file_descriptors.txt", pid);
+#else
+        Sprintf(cmd, "ls -l /proc/%d/fd > temp/file_descriptors.txt", pid);
+#endif
+        FILE* poutput = popen(cmd, "r");
+        if (poutput)
+        {
+            if (logtext)
+            {
+                Strcpy(msgbuf, logtext);
+                Strcat(msgbuf, " - ");
+            }
+            Strcat(msgbuf, cmd);
+            pclose(poutput);
+            if (issue_gui_command)
+            {
+                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_ATTACHMENT, DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST, "temp/file_descriptors.txt");
+                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CRITICAL, 0, msgbuf);
+            }
+        }
+#endif
+    }
+#endif
 }
 
 int
@@ -645,14 +839,17 @@ char errbuf[];
 #endif
         fd = open(fq_lock, O_RDONLY | O_BINARY, 0);
 #endif
+    issue_debuglog_fd(fd, "open_levelfile");
 
     /* for failure, return an explanation that our caller can use;
        settle for `lock' instead of `fq_lock' because the latter
        might end up being too big for GnollHack's BUFSZ */
     if (fd < 0 && errbuf)
+    {
         Sprintf(errbuf, "Cannot open file \"%s\" for level %d (errno %d).",
-                lock, lev, errno);
-
+            lock, lev, errno);
+        maybe_report_file_descriptors(errbuf, errno);
+    }
     return fd;
 }
 
@@ -944,9 +1141,11 @@ char errbuf[];
 #endif
 #endif
     if (fd < 0 && errbuf) /* failure explanation */
+    {
         Sprintf(errbuf, "Cannot create bones \"%s\", id %s (errno %d).", lock,
-                *bonesid, errno);
-
+            *bonesid, errno);
+        maybe_report_file_descriptors(errbuf, errno);
+    }
 #if defined(VMS) && !defined(SECURE)
     /*
        Re-protect bones file with world:read+write+execute+delete access.
@@ -1186,6 +1385,7 @@ create_savefile()
 #define getuid() vms_getuid()
 #endif /* VMS && !SECURE */
 #endif /* MICRO */
+    issue_debuglog_fd(fd, "create_savefile");
 
     return fd;
 }
@@ -1203,6 +1403,7 @@ open_savefile()
 #else
     fd = open(fq_save, O_RDONLY | O_BINARY, 0);
 #endif
+    issue_debuglog_fd(fd, "open_savefile");
     return fd;
 }
 
@@ -1288,7 +1489,7 @@ make_tmp_backup_savefile_from_uncompressed_savefile(filename)
 const char* filename; /* Filename must have already been uncompressed */
 {
     Strcpy(fq_tmp_backup, "");
-    if (sysopt.make_backup_savefiles && filename && *filename)
+    if (sysopt.make_backup_savefiles && filename && *filename && !plname_from_imported_savefile) /* Imported save file comes with its own backup */
     {
         if (access(filename, F_OK) != 0) 
         {
@@ -1435,6 +1636,22 @@ delete_tmp_backup_savefile(VOID_ARGS)
     return -1; /* Making backups is not on */
 }
 
+int
+delete_error_savefile(VOID_ARGS)
+{
+    if (*SAVEF)
+    {
+        char bakbuf[4096];
+        Strcpy(bakbuf, fqname(SAVEF, SAVEPREFIX, 0));
+        print_special_savefile_extension(bakbuf, ERROR_EXTENSION);
+        nh_uncompress(bakbuf);
+        if (access(bakbuf, F_OK) != 0)
+            return -2; /* Error file does not exist */
+        return unlink(bakbuf);
+    }
+    return -1;
+}
+
 boolean check_has_backup_savefile(VOID_ARGS)
 {
     if (sysopt.make_backup_savefiles && *SAVEF)
@@ -1498,7 +1715,9 @@ boolean* is_backup_ptr;
         return -1;
 #endif /* MFLOPPY */
     fq_save = fqname(SAVEF, SAVEPREFIX, 0);
+
 #ifdef COMPRESS
+    /* Handle corrupted compressed file */
     if (allow_replace_backup)
     {
         /* Uncompress might fail due to corruption; if so, restore backup file */
@@ -1510,6 +1729,38 @@ boolean* is_backup_ptr;
     }
 #endif
     nh_uncompress(fq_save);
+
+    /* Handle error and backup save files in the case of a missing fq_save (which normally does not happen if you select your character from the load saved game menu) */
+    char fbuf[4096];
+    if (access(fq_save, F_OK) != 0) /* cannot access */
+    {
+        boolean filerenamed = FALSE;
+        if (sysopt.allow_loading_error_savefiles)
+        {
+            Strcpy(fbuf, fq_save);
+            print_error_savefile_extension(fbuf);
+            nh_uncompress(fbuf);
+            if (access(fbuf, F_OK) == 0)
+            {
+                (void)rename(fbuf, fq_save);
+                filerenamed = TRUE;
+            }
+        }
+        
+        if (!filerenamed && allow_replace_backup && !backup_replaced)
+        {
+            Strcpy(fbuf, fq_save);
+            print_special_savefile_extension(fbuf, BACKUP_EXTENSION);
+            nh_uncompress(fbuf);
+            if (access(fbuf, F_OK) == 0)
+            {
+                (void)rename(fbuf, fq_save);
+                if (is_backup_ptr)
+                    *is_backup_ptr = TRUE;
+            }
+        }
+    }
+
     (void) make_tmp_backup_savefile_from_uncompressed_savefile(fq_save);
     if ((fd = open_savefile()) < 0)
         return fd;
@@ -1668,6 +1919,7 @@ boolean savefilekept;
 {
     if (plname_from_error_savefile || plname_from_imported_savefile)
     {
+        boolean was_from_imported_savefile = plname_from_imported_savefile;
         if (plname_from_imported_savefile)
         {
             flags.non_scoring = TRUE;
@@ -1679,8 +1931,34 @@ boolean savefilekept;
         set_savefile_name(TRUE);
         if (savefilekept && strcmp(SAVEF, oldsavef))
         {
-            (void)remove(SAVEF); //If it happens to exist
-            (void)rename(oldsavef, SAVEF);
+            const char* fq_save_old = fqname(oldsavef, SAVEPREFIX, 0);
+            const char* fq_save = fqname(SAVEF, SAVEPREFIX, 0);
+            nh_uncompress(fq_save_old);
+            nh_uncompress(fq_save); //If it happens to exist
+            (void)remove(fq_save); //If it happens to exist
+            (void)rename(fq_save_old, fq_save);
+            nh_compress(fq_save);
+        }
+        if (was_from_imported_savefile)
+        {
+            /* If an imported backup savefile exists, rename it too */
+            char backupfilename[BUFSZ];
+            Strcpy(backupfilename, SAVEF);
+            print_special_savefile_extension(backupfilename, BACKUP_EXTENSION);
+            print_special_savefile_extension(backupfilename, IMPORTED_EXTENSION);
+            const char* fq_save_backup = fqname(backupfilename, SAVEPREFIX, 0);
+            nh_uncompress(fq_save_backup);
+            if (access(fq_save_backup, F_OK) == 0)
+            {
+                char nonimportedbackupfilename[BUFSZ];
+                Strcpy(nonimportedbackupfilename, SAVEF);
+                print_special_savefile_extension(nonimportedbackupfilename, BACKUP_EXTENSION);
+                const char* fq_save_nonimportedbackup = fqname(nonimportedbackupfilename, SAVEPREFIX, 0);
+                nh_uncompress(fq_save_nonimportedbackup); //If it happens to exist
+                (void)remove(fq_save_nonimportedbackup); //If it happens to exist
+                (void)rename(fq_save_backup, fq_save_nonimportedbackup);
+                nh_compress(fq_save_nonimportedbackup);
+            }
         }
     }
 }
@@ -1844,6 +2122,13 @@ const struct dirent* entry;
     return is_backup_savefile_name(entry->d_name);
 }
 
+int filter_imported_backup(entry)
+const struct dirent* entry;
+{
+    return is_imported_backup_savefile_name(entry->d_name);
+}
+
+
 char*
 plname_from_running(filename, stats_ptr)
 const char* filename;
@@ -1944,6 +2229,8 @@ get_saved_games()
                     do {
                         if (is_backup_savefile_name(foundfile))
                             continue;
+                        if (is_imported_backup_savefile_name(foundfile))
+                            continue;
                         char* r;
                         r = plname_from_file(foundfile, &gamestats);
                         if (r)
@@ -1957,6 +2244,8 @@ get_saved_games()
                 if (findfirst(fq_save_ebuf)) {
                     n2 = 0;
                     do {
+                        if (is_imported_backup_savefile_name(foundfile))
+                            continue;
                         char* r;
                         r = plname_from_file(foundfile, &gamestats);
                         if (r)
@@ -2043,7 +2332,8 @@ get_saved_games()
         if (sscanf(namelist[i]->d_name, "%d%63s", &uid, name) == 2) {
             if (uid == myuid) {
                 boolean isbackupfile = !!filter_backup(namelist[i]);
-                if (isbackupfile)
+                boolean isimportedbackupfile = !!filter_imported_backup(namelist[i]);
+                if (isbackupfile || isimportedbackupfile)
                     continue;
                 char filename[BUFSZ];
                 char* r;
@@ -2321,14 +2611,14 @@ char *cfn;
 {
 #ifndef SHORT_FILENAMES
     /* Assume free-form filename with no 8.3 restrictions */
-    strcpy(cfn, filename);
-    strcat(cfn, COMPRESS_EXTENSION);
+    Strcpy(cfn, filename);
+    Strcat(cfn, COMPRESS_EXTENSION);
     return TRUE;
 #else
 #ifdef SAVE_EXTENSION
     char *bp = (char *) 0;
 
-    strcpy(cfn, filename);
+    Strcpy(cfn, filename);
     if ((bp = strstri(cfn, SAVE_EXTENSION))) {
         strsubst(bp, SAVE_EXTENSION, ".saz");
         return TRUE;
@@ -3049,8 +3339,8 @@ char sep;
 STATIC_OVL void
 free_config_sections()
 {
-    strcpy(config_section_chosen, "");
-    strcpy(config_section_current, "");
+    Strcpy(config_section_chosen, "");
+    Strcpy(config_section_current, "");
 #if 0
     if (config_section_chosen) {
         free(config_section_chosen);
@@ -3082,11 +3372,11 @@ char *buf;
 #if 0
         if (strcmp(config_section_current, ""))
         {
-            strcpy(config_section_current, "");
+            Strcpy(config_section_current, "");
             //free(config_section_current);
         }
 #endif
-        strcpy(config_section_current, &buf[1]);
+        Strcpy(config_section_current, &buf[1]);
         //config_section_current = dupstr(&buf[1]);
         send = rindex(config_section_current, ']');
         *send = '\0';
@@ -3466,6 +3756,12 @@ char *origbuf;
             n = atoi(bufp);
             sysopt.make_backup_savefiles = n;
     }
+    else if (src == SET_IN_SYS
+        && match_varname(buf, "ALLOW_LOADING_ERROR_SAVEFILES", 29))
+        {
+            n = atoi(bufp);
+            sysopt.allow_loading_error_savefiles = n;
+            }
     else if (match_varname(buf, "SEDUCE", 6))
     {
         n = !!atoi(bufp); /* XXX this could be tighter */
@@ -4154,7 +4450,7 @@ boolean FDECL((*proc), (char *));
     char *ep;
     boolean skip = FALSE, morelines = FALSE;
     char buf[INBUF_SIZ];
-    strcpy(buf, "");
+    Strcpy(buf, "");
     size_t inbufsz = sizeof inbuf;
 
     free_config_sections();
@@ -4211,7 +4507,7 @@ boolean FDECL((*proc), (char *));
                 {
                     rv = FALSE;
                     if (strcmp(buf, ""))
-                        strcpy(buf, "");
+                        Strcpy(buf, "");
                     break;
                 }
 
@@ -4252,7 +4548,7 @@ boolean FDECL((*proc), (char *));
                     {
                         Strcat(strcpy(tmpbuf, buf), " ");
                     }
-                    strcpy(buf, strcat(tmpbuf, ep));
+                    Strcpy(buf, strcat(tmpbuf, ep));
                     //free(tmpbuf);
                     if (strlen(buf) >= sizeof inbuf)
                         buf[sizeof inbuf - 1] = '\0';
@@ -4263,7 +4559,7 @@ boolean FDECL((*proc), (char *));
 
                 if (handle_config_section(buf)) 
                 { //ep
-                    strcpy(buf, "");
+                    Strcpy(buf, "");
                     continue;
                 }
 
@@ -4278,33 +4574,33 @@ boolean FDECL((*proc), (char *));
                         config_error_add(
                                     "Format is CHOOSE=section1,section2,...");
                         rv = FALSE;
-                        strcpy(buf, "");
+                        Strcpy(buf, "");
                         continue;
                     }
                     bufp++;
 
                     if (strcmp(config_section_chosen, ""))
-                        strcpy(config_section_chosen, ""); // free(config_section_chosen), config_section_chosen = 0;
+                        Strcpy(config_section_chosen, ""); // free(config_section_chosen), config_section_chosen = 0;
 
                     section = choose_random_part(bufp, ',');
 
                     if (section)
                     {
-                        strcpy(config_section_chosen, section); // = dupstr(section);
+                        Strcpy(config_section_chosen, section); // = dupstr(section);
                     } 
                     else
                     {
                         config_error_add("No config section to choose");
                         rv = FALSE;
                     }
-                    strcpy(buf, "");
+                    Strcpy(buf, "");
                     continue;
                 }
 
                 if (!proc(buf))
                     rv = FALSE;
 
-                strcpy(buf, "");
+                Strcpy(buf, "");
             }
         }
     }
@@ -4339,9 +4635,8 @@ int
 read_sym_file(which_set)
 int which_set;
 {
-    FILE *fp;
-
-    if (!(fp = fopen_sym_file()))
+    FILE *fp = fopen_sym_file();
+    if (!fp)
         return 0;
 
     symset_count = 0;
@@ -4700,6 +4995,23 @@ const char *dir UNUSED_if_not_OS2_CODEVIEW;
 #endif /* MAC */
 
 #endif /* MICRO || WIN32*/
+}
+
+int
+check_current_fd(str)
+const char* str;
+{
+#ifdef UNIX
+    const char* fq_record = fqname(RECORD, SCOREPREFIX, 0);
+    int fd = open(fq_record, O_RDWR, 0);
+    if (str)
+        issue_debuglog_fd(fd, str);
+    if (fd != -1)
+        (void)close(fd);
+    return fd;
+#else
+    return -2;
+#endif
 }
 
 /* ----------  END SCOREBOARD CREATION ----------- */
@@ -5181,7 +5493,8 @@ unsigned oid; /* book identifier */
     char line[BUFSZ], lastline[BUFSZ];
 
     int scope = 0;
-    int linect = 0, passagecnt = 0, targetpassage = 0;
+    //int linect = 0;
+    int passagecnt = 0, targetpassage = 0;
     const char *badtranslation = "an incomprehensible foreign translation";
     boolean matchedsection = FALSE, matchedtitle = FALSE;
     winid tribwin = WIN_ERR;
@@ -5230,7 +5543,7 @@ unsigned oid; /* book identifier */
 
     *line = *lastline = '\0';
     while (dlb_fgets(line, sizeof line, fp) != 0) {
-        linect++;
+        //linect++;
         (void) strip_newline(line);
         switch (line[0]) {
         case '%':
@@ -5289,8 +5602,8 @@ unsigned oid; /* book identifier */
                 if (scope)
                     --scope;
             } else {
-                debugpline1("tribute file error: bad %% command, line %d.",
-                            linect);
+                //debugpline1("tribute file error: bad %% command, line %d.",
+                //            linect);
             }
             break;
         case '#':
@@ -5536,7 +5849,7 @@ const char* str;
             long currenttime = get_current_game_duration();
             char* duration = format_duration_with_units(currenttime);
             Sprintf(postbuf, "%s (%s) %s, on T:%ld (%s) [%s]", plname, cbuf, str, moves, duration, mbuf);
-            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_ACHIEVEMENT, postbuf);
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_ACHIEVEMENT, (int)ll_type, postbuf);
         }
     }
 }

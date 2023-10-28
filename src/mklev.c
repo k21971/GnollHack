@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    mklev.c    $NHDT-Date: 1550800390 2019/02/22 01:53:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -36,6 +36,7 @@ STATIC_DCL void FDECL(finddpos, (coord *, XCHAR_P, XCHAR_P,
                                  XCHAR_P, XCHAR_P));
 STATIC_DCL void FDECL(mkinvpos, (XCHAR_P, XCHAR_P, int));
 STATIC_DCL void FDECL(mk_knox_portal, (XCHAR_P, XCHAR_P));
+STATIC_DCL void FDECL(clear_nearby_fireplaces, (XCHAR_P, XCHAR_P));
 
 #define create_vault() create_room(-1, -1, 2, 2, -1, -1, VAULT, TRUE, ROOM, 0, NON_PM, -1, 0)
 #define init_vault() vault_x = -1
@@ -710,8 +711,7 @@ boolean nxcor;
     dest.x = tx;
     dest.y = ty;
 
-    if (!dig_corridor(&org, &dest, nxcor, level.flags.arboreal || level.flags.swampy ? GRASS : CORR,
-                      STONE))
+    if (!dig_corridor(&org, &dest, nxcor, level.flags.arboreal || level.flags.swampy ? GRASS : CORR, STONE))
         return;
 
     /* we succeeded in digging the corridor */
@@ -1148,7 +1148,7 @@ clear_level_structures()
     level.flags.corrmaze = 0;
     level.flags.mapping_does_not_reveal_special = 0;
     level.flags.no_special_level_naming_checks = 0;
-    strcpy(level.flags.special_description, "");
+    Strcpy(level.flags.special_description, "");
     level.flags.special_naming_reveal_type = SPECIAL_LEVEL_NAMING_REVEALED_NEVER;
     level.flags.special_naming_seen_monster_type = NON_PM;
     level.flags.special_naming_seen_monster_class = 0;
@@ -1385,7 +1385,7 @@ makelevel()
         if (res)
             room_threshold++;
 
-        if (u_depth >= 2 && nroom >= room_threshold && u_depth < depth(&medusa_level) && !rn2(6))
+        if (u_depth >= 2 && nroom >= room_threshold && u_depth < depth(&medusa_level)  && !rn2(6))
         {
             (void)make_room(GARDEN);
             room_threshold++;
@@ -1475,12 +1475,17 @@ makelevel()
                 }
             }
         }
-        /* put traps and mimics inside */
-        x = 8 - (level_dif / 6);
-        if (x <= 1)
-            x = 2;
-        while (!rn2(x) && !startingroom)
-            (void)mktrap(0, 0, croom, (coord *) 0);
+
+        if (context.game_difficulty >= 0 || u_depth > 1) /* If difficulty is less than expert, no traps on the first level */
+        {
+            /* put traps and mimics inside */
+            x = 8 - (level_dif / 6);
+            if (x <= 1)
+                x = 2;
+            while (!rn2(x) && !startingroom)
+                (void)mktrap(0, 0, croom, (coord*)0);
+        }
+
         if (!rn2(3))
             (void) mkgold(0L, somex(croom), somey(croom));
         if (Is_really_rogue_level(&u.uz))
@@ -1695,7 +1700,7 @@ makelevel()
                     x = somex(croom);
                     y = somey(croom);
                 } while (levl[x][y].typ != ROOM && !rn2(40));
-                if (!(IS_POOL(levl[x][y].typ) || IS_FURNITURE(levl[x][y].typ)) && levl[x][y].carpet_typ == 0)
+                if (!(IS_POOL(levl[x][y].typ) || IS_FURNITURE(levl[x][y].typ) || t_at(x, y) != 0) && levl[x][y].carpet_typ == 0)
                     make_engr_at(x, y, mesg, 0L, MARK, ENGR_FLAGS_NONE);
             }
         }
@@ -2061,6 +2066,7 @@ xchar x, y; /* location */
             if (!isok(x - 1, y) || levl[x - 1][y].typ < DOOR)
                 levl[x][y].facing_right = TRUE;
         }
+        clear_nearby_fireplaces(x, y);
     }
     /*
      * Set made_branch to TRUE even if we didn't make a stairwell (i.e.
@@ -2121,7 +2127,7 @@ struct mkroom *aroom;
         return;
     }
 
-    int normaldoor = (context.game_difficulty < 0 && u.uz.dnum == main_dungeon_dnum && u.uz.dlevel <= 2) ? TRUE : rn2(8);
+    int normaldoor = (context.game_difficulty <= NO_SECRET_DOORS_DIFFICULTY_THRESHOLD && u.uz.dnum == main_dungeon_dnum && u.uz.dlevel <= NO_SECRET_DOORS_DUNGEON_LEVEL_THRESHOLD) ? TRUE : rn2(8);
     dosdoor(x, y, aroom, normaldoor ? DOOR : SDOOR, 0);
 }
 
@@ -2511,12 +2517,18 @@ int subtyp;
         if (!isok(x - 1, y) || levl[x - 1][y].typ < DOOR)
             levl[x][y].facing_right = TRUE;
     }
+    clear_nearby_fireplaces(x, y);
+}
 
+STATIC_OVL void
+clear_nearby_fireplaces(x, y)
+xchar x, y;
+{
     int i;
     for (i = 0; i < 4; i++)
     {
-        int t_x = x;
-        int t_y = y;
+        int t_x = (int)x;
+        int t_y = (int)y;
         switch (i)
         {
         case 0:

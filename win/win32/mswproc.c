@@ -97,7 +97,7 @@ struct window_procs mswin_procs = {
 #ifdef STATUS_HILITES
     WC2_HITPOINTBAR | WC2_FLUSH_STATUS | WC2_RESET_STATUS | WC2_HILITE_STATUS |
 #endif
-    WC2_STATUSLINES | WC2_PREFERRED_SCREEN_SCALE | WC2_PLAY_GHSOUNDS | WC2_VOLUME_CONTROLS, 
+    WC2_STATUSLINES | WC2_PREFERRED_SCREEN_SCALE | WC2_VOLUME_CONTROLS | WC2_ANIMATIONS,
     mswin_init_nhwindows, mswin_player_selection, mswin_askname,
     mswin_get_nh_event, mswin_exit_nhwindows, mswin_suspend_nhwindows,
     mswin_resume_nhwindows, mswin_create_nhwindow_ex, mswin_clear_nhwindow,
@@ -1175,7 +1175,7 @@ mswin_putstr_ex(winid wid, const char *text, int attr, int color, int app)
         else
             GetNHApp()->saved_text = tempchar_ptr;
 
-        strcat(GetNHApp()->saved_text, text);
+        Strcat(GetNHApp()->saved_text, text);
     }
 }
 
@@ -1215,7 +1215,7 @@ mswin_putstr_ex2(winid wid, const char* text, const char* attrs, const char* col
         else
             GetNHApp()->saved_text = tempchar_ptr;
 
-        strcat(GetNHApp()->saved_text, text);
+        Strcat(GetNHApp()->saved_text, text);
     }
 }
 
@@ -1490,7 +1490,7 @@ mswin_cliparound(int x, int y, BOOLEAN_P force)
 }
 
 void
-mswin_issue_gui_command(int cmd_id, int cmd_param, const char* cmd_str)
+mswin_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char* cmd_str)
 {
     return;
 }
@@ -1729,7 +1729,7 @@ mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* titl
             realloc(strdup(GetNHApp()->saved_text),
                     strlen(question) + strlen(GetNHApp()->saved_text) + 1);
         DWORD box_result;
-        strcat(text, question);
+        Strcat(text, question);
         box_result =
             NHMessageBox(NULL, NH_W2A(text, message, sizeof(message)),
                          MB_ICONQUESTION | MB_YESNOCANCEL
@@ -1753,9 +1753,9 @@ mswin_yn_function_ex(int style, int attr, int color, int glyph, const char* titl
         }
         Strncpy(message, question, QBUFSZ - 1);
         message[QBUFSZ - 1] = '\0';
-        sprintf(eos(message), " [%s]", choicebuf);
+        Sprintf(eos(message), " [%s]", choicebuf);
         if (def)
-            sprintf(eos(message), " (%c)", def);
+            Sprintf(eos(message), " (%c)", def);
         Strcat(message, " ");
         /* escape maps to 'q' or 'n' or default, in that order */
         yn_esc_map =
@@ -1917,7 +1917,7 @@ mswin_getlin_ex(int style, int attr, int color, const char *question, char *inpu
             c = (char)mswin_nhgetch();
             switch (c) {
             case VK_ESCAPE:
-                strcpy(input, "\033");
+                Strcpy(input, "\033");
                 done = TRUE;
                 break;
             case '\n':
@@ -1948,7 +1948,7 @@ mswin_getlin_ex(int style, int attr, int color, const char *question, char *inpu
                     (WPARAM) MSNH_MSG_CARET, (LPARAM) &createcaret);
     } else {
         if (mswin_getlin_window(style, attr, color, promptbuf, input, BUFSZ) == IDCANCEL) {
-            strcpy(input, "\033");
+            Strcpy(input, "\033");
         }
     }
 }
@@ -2837,7 +2837,7 @@ mswin_read_reg()
     RGB(0xFF, 0xFF, 0xFF)  /* CLR_WHITE */
     };
 
-    sprintf(keystring, "%s\\%s\\%s\\%s", CATEGORYKEY, COMPANYKEY, PRODUCTKEY,
+    Sprintf(keystring, "%s\\%s\\%s\\%s", CATEGORYKEY, COMPANYKEY, PRODUCTKEY,
             SETTINGSKEY);
 
     /* Set the defaults here. The very first time the app is started, nothing
@@ -2904,7 +2904,7 @@ mswin_read_reg()
     for (i = 0; i < CLR_MAX; i++) {
         COLORREF cl;
         char mapcolorkey[64];
-        sprintf(mapcolorkey, "MapColor%02d", i);
+        Sprintf(mapcolorkey, "MapColor%02d", i);
         if (RegQueryValueEx(key, mapcolorkey, NULL, NULL, (BYTE *)&cl, &size) == ERROR_SUCCESS)
             GetNHApp()->regMapColors[i] = cl;
     }
@@ -2933,7 +2933,7 @@ mswin_write_reg()
         char keystring[MAX_PATH];
         DWORD safe_buf;
 
-        sprintf(keystring, "%s\\%s\\%s\\%s", CATEGORYKEY, COMPANYKEY,
+        Sprintf(keystring, "%s\\%s\\%s\\%s", CATEGORYKEY, COMPANYKEY,
                 PRODUCTKEY, SETTINGSKEY);
 
         if (RegOpenKeyEx(HKEY_CURRENT_USER, keystring, 0, KEY_WRITE, &key)
@@ -2992,7 +2992,7 @@ mswin_write_reg()
         for (i = 0; i < CLR_MAX; i++) {
             COLORREF cl = GetNHApp()->regMapColors[i];
             char mapcolorkey[64];
-            sprintf(mapcolorkey, "MapColor%02d", i);
+            Sprintf(mapcolorkey, "MapColor%02d", i);
             RegSetValueEx(key, mapcolorkey, 0, REG_DWORD, (BYTE *)&cl, sizeof(DWORD));
         }
 
@@ -3008,15 +3008,15 @@ mswin_destroy_reg()
     DWORD nrsubkeys;
 
     /* Delete keys one by one, as NT does not delete trees */
-    sprintf(keystring, "%s\\%s\\%s\\%s", CATEGORYKEY, COMPANYKEY, PRODUCTKEY,
+    Sprintf(keystring, "%s\\%s\\%s\\%s", CATEGORYKEY, COMPANYKEY, PRODUCTKEY,
             SETTINGSKEY);
     RegDeleteKey(HKEY_CURRENT_USER, keystring);
-    sprintf(keystring, "%s\\%s\\%s", CATEGORYKEY, COMPANYKEY, PRODUCTKEY);
+    Sprintf(keystring, "%s\\%s\\%s", CATEGORYKEY, COMPANYKEY, PRODUCTKEY);
     RegDeleteKey(HKEY_CURRENT_USER, keystring);
     /* The company key will also contain information about newer versions
        of GnollHack (e.g. a subkey called GnollHack 4.0), so only delete that
        if it's empty now. */
-    sprintf(keystring, "%s\\%s", CATEGORYKEY, COMPANYKEY);
+    Sprintf(keystring, "%s\\%s", CATEGORYKEY, COMPANYKEY);
     /* If we cannot open it, we probably cannot delete it either... Just
        go on and see what happens. */
     RegOpenKeyEx(HKEY_CURRENT_USER, keystring, 0, KEY_READ, &key);
@@ -3928,7 +3928,7 @@ mswin_display_popup_text(const char* text, const char* title, int style, int att
 }
 
 void
-mswin_display_gui_effect(int x, int y, int style, unsigned long tflags)
+mswin_display_gui_effect(int style, int subtype, int x, int y, int x2, int y2, unsigned long tflags)
 {
 
 }
@@ -4010,7 +4010,7 @@ size_t bufsize;
     else
         copybuf[sizeof(copybuf) - 1] = (char)'\0';
 
-    strcpy(buf, copybuf);
+    Strcpy(buf, copybuf);
 }
 
 

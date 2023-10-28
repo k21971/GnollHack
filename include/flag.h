@@ -182,6 +182,7 @@ struct flag {
 #define PARANOID_WATER      0x0200
 #define PARANOID_TRAP       0x0400
 #define PARANOID_AUTOALL    0x0800
+#define PARANOID_TIP        0x1000
     int pickup_burden; /* maximum burden before prompt */
     int pile_limit;    /* controls feedback when walking over objects */
     char inv_order[MAX_OBJECT_CLASSES];
@@ -240,9 +241,9 @@ struct flag {
     uchar spellorder;
     schar max_hint_difficulty; /* Maximum difficulty level where hints are shown */
     boolean non_scoring; /* The game has been, for example, loaded from an imported save file and has thereby become non-scoring */
+    uchar auto_bag_in_style;
 
     /* Emergency reserved variables to make non-save-game-breaking changes */
-    char reserved_char2;
     short reserved_short1;
     short reserved_short2;
     int reserved_int1;
@@ -462,6 +463,7 @@ struct instance_flags {
     boolean time_botl;       /* context.botl for 'time' (moves) only */
     boolean wizweight;       /* display weight of everything in wizard mode */
     boolean takeoff_uses_all;/* takeoff command is implemented using takeoffall command with a single item */
+    boolean autoswap_launchers; /* will attempt to swap launchers on for ranged attack and off for melee attack */
 
     /* Is the system in demo version */
     boolean demo_version;  /* OBSOLETE */
@@ -636,6 +638,8 @@ enum runmode_types {
 #define ParanoidTrap ((flags.paranoia_bits & PARANOID_TRAP) != 0)
 /* auto-select all: accepting auto-select all */
 #define ParanoidAutoSelectAll ((flags.paranoia_bits & PARANOID_AUTOALL) != 0)
+/* tip: accepting tipping a container */
+#define ParanoidTip ((flags.paranoia_bits & PARANOID_TIP) != 0)
 
 /* command parsing, mainly dealing with number_pad handling;
    not saved and restored */

@@ -7,8 +7,6 @@
 #include "hack.h"
 #include <stdio.h>
 
-#ifdef GNH_MOBILE
-#endif
 /*
  * ***********************************************************
  * This is a complete WindowPort implementation that can be
@@ -367,8 +365,8 @@ boolean force;
 #endif /* CLIPPING */
 
 void
-safe_issue_gui_command(cmd_id, cmd_param, cmd_str)
-int cmd_id, cmd_param;
+safe_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str)
+int cmd_id, cmd_param, cmd_param2;
 const char* cmd_str;
 {
     return;
@@ -615,7 +613,7 @@ safe_display_popup_text(const char* text UNUSED, const char* title UNUSED, int s
 }
 
 void
-safe_display_gui_effect(int x UNUSED, int y UNUSED, int style UNUSED, unsigned long tflags UNUSED)
+safe_display_gui_effect(int style UNUSED, int subtype UNUSED, int x UNUSED, int y UNUSED, int x2 UNUSED, int y2 UNUSED, unsigned long tflags UNUSED)
 {
     return;
 }

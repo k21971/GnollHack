@@ -49,37 +49,49 @@ include/onames.h
 include/pm.h
 include/animoff.h
 include/animtotals.h
-win/win32/gnollhack_64x96_transparent_32bits*.png
-win/win32/xam/GnollHackX/GnollHackX/Assets/gnollhack_64x96_transparent_32bits*.png
+*.sjson
+gnollhack_64x96_transparent_32bits*.png
 win/win32/vs/*.lev
 win/win32/vs/default.nh
 win/win32/vs/dumplog
 win/win32/vs/dumplog/*.*
 *.vcxproj.FileListAbsolute.txt
-win/win32/xam/GnollHackX/GnollHackX.Android/libs/x86/libgnollhackdroid.so*
-win/win32/xam/GnollHackX/GnollHackX.Android/libs/x86_64/libgnollhackdroid.so*
-win/win32/xam/GnollHackX/GnollHackX.Android/libs/arm64-v8a/libgnollhackdroid.so*
-win/win32/xam/GnollHackX/GnollHackX.Android/libs/armeabi-v7a/libgnollhackdroid.so*
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/credits
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/xcredits
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/symbols
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/license
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/nhdat
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/sysconf
-win/win32/xam/GnollHackX/GnollHackX.Android/gnh/defaults.gnh
-win/win32/xam/GnollHackX/GnollHackX.Android/assetpacks/*.zip
+*assetpack.zip
+libgnollhackdroid.so*
 libgnollhackios.a
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/credits
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/xcredits
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/symbols
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/license
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/nhdat
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/sysconf
-win/win32/xam/GnollHackX/GnollHackX.iOS/gnh/defaults.gnh
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/credits
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/xcredits
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/symbols
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/license
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/nhdat
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/sysconf
+win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/defaults.gnh
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/credits
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/xcredits
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/symbols
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/license
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/nhdat
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/sysconf
+win/win32/xpl/GnollHackX/GnollHackX.iOS/gnh/defaults.gnh
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/credits
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/xcredits
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/symbols
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/license
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/nhdat
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/sysconf
+win/win32/xpl/GnollHackM/Platforms/Android/gnh/defaults.gnh
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/credits
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/xcredits
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/symbols
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/license
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/nhdat
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/sysconf
+win/win32/xpl/GnollHackM/Platforms/iOS/gnh/defaults.gnh
 dat/dlb.lst
-win/win32/xam/GnollHackX/gnollhackdroid/date*.h
-win/win32/xam/GnollHackX/gnollhackios/date*.h
-win/win32/xam/GnollHackX/gnollhackios/download*.bat
+win/win32/xpl/gnollhackdroid/date*.h
+win/win32/xpl/gnollhackios/date*.h
+win/win32/xpl/gnollhackios/download*.bat
+win/win32/xpl/GnollHackM/.maui/*.*
 *.lastbuildstate
 *.csv
 *.wav
@@ -92,6 +104,7 @@ win/win32/xam/GnollHackX/gnollhackios/download*.bat
 enc_temp_folder
 _Isincrementalbuild
 *.payload.desc
+*.ps1
 
 # User-specific files
 *.suo
@@ -114,8 +127,12 @@ bld/
 [Oo]bj/
 [Ll]og/
 
-# Visual Studio 2015/2017 cache/options directory
+# Visual Studio 2015-2022 cache/options directory
 .vs/
+
+# Visual Studio Code cache/options directory
+.vscode/
+
 # Uncomment if you have tasks that create the project's static files in wwwroot
 #wwwroot/
 
@@ -419,5 +436,5 @@ ASALocalRun/
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
 
-!win/win32/xam/GnollHackX/GnollHackX.Android/libs/*
+!win/win32/xpl/GnollHackX/GnollHackX.Android/libs/*
 !*.json

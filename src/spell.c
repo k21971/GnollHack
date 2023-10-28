@@ -683,7 +683,7 @@ uchar capitalize_style;
         /*Fall through*/
     default:
     case 0:
-        strcpy(buf, lvlbuf);
+        Strcpy(buf, lvlbuf);
         break;
     case 2:
         strcpy_capitalized_for_title(buf, lvlbuf);
@@ -703,13 +703,13 @@ int booktype;
 
     char lvlbuf[BUFSZ];
     if (objects[booktype].oc_spell_level == -1)
-        strcpy(lvlbuf, "c");
+        Strcpy(lvlbuf, "c");
     else if (objects[booktype].oc_spell_level == 0)
-        strcpy(lvlbuf, "C");
+        Strcpy(lvlbuf, "C");
     else if (objects[booktype].oc_spell_level > 0)
         Sprintf(lvlbuf, "%ld", objects[booktype].oc_spell_level);
     else
-        strcpy(lvlbuf, "*");
+        Strcpy(lvlbuf, "*");
 
     Sprintf(buf, "%s %s", spelltypesymbol(objects[booktype].oc_skill), lvlbuf);
 }
@@ -735,8 +735,8 @@ register struct obj *spellbook;
     if (!(context.spbook.delay && spellbook == context.spbook.book)
         && !(objects[spellbook->otyp].oc_flags & O1_NON_SPELL_SPELLBOOK))
     {
-        strcpy(namebuf, OBJ_NAME(objects[booktype]));
-        strcpy(Namebuf2, OBJ_NAME(objects[booktype]));
+        Strcpy(namebuf, OBJ_NAME(objects[booktype]));
+        Strcpy(Namebuf2, OBJ_NAME(objects[booktype]));
         *Namebuf2 = highc(*Namebuf2);
 
         print_spell_level_text(lvlbuf, booktype, TRUE, FALSE, FALSE);
@@ -1113,7 +1113,7 @@ int spell_list_type;
     char titlebuf[BUFSZ];
     char verbbufC[BUFSZ];
     char verbtitlebufC[BUFSZ];
-    strcpy(verbbufC, verbs[spell_list_type]);
+    Strcpy(verbbufC, verbs[spell_list_type]);
     *verbbufC = highc(*verbbufC);
     strcpy_capitalized_for_title(verbtitlebufC, verbs[spell_list_type]);
     Sprintf(titlebuf, "Choose a Spell to %s", verbtitlebufC);
@@ -1201,163 +1201,190 @@ int* spell_no;
     anything any;
     const char* nodesc = "(No short description)";
 
-    tmpwin = create_nhwindow(NHW_MENU);
-    start_menu_ex(tmpwin, GHMENU_STYLE_SPELLS_ALTERNATE);
-    any = zeroany; /* zero out all bits */
-
-    if (splaction == SPELLMENU_DETAILS || splaction == SPELLMENU_REORDER || splaction == SPELLMENU_SORT || splaction >= 0)
+    do
     {
-        for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++) 
-        {
-            splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
-            int glyph = spell_to_glyph(splnum);
-            char fullname[BUFSZ] = "";
-            Sprintf(fullname, "%s", spellname(splnum));
-            *fullname = highc(*fullname);
+        tmpwin = create_nhwindow(NHW_MENU);
+        start_menu_ex(tmpwin, splaction == SPELLMENU_DETAILS ? GHMENU_STYLE_VIEW_SPELL_ALTERNATE :  GHMENU_STYLE_SPELLS_ALTERNATE);
+        any = zeroany; /* zero out all bits */
 
-            if (OBJ_ITEM_DESC(spellid(splnum)))
+        if (splaction == SPELLMENU_DETAILS || splaction == SPELLMENU_REORDER || splaction == SPELLMENU_SORT || splaction >= 0)
+        {
+            for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
             {
-                Strcpy(descbuf, OBJ_ITEM_DESC(spellid(splnum)));
-            }
-            else
-                Strcpy(descbuf, nodesc);
+                splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
+                int glyph = spell_to_glyph(splnum);
+                char fullname[BUFSZ] = "";
+                Sprintf(fullname, "%s", spellname(splnum));
+                *fullname = highc(*fullname);
 
-            boolean inactive = FALSE;
-            struct extended_menu_info info = zeroextendedmenuinfo;
-            int mcolor = NO_COLOR;
-            info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
-            if (spellknow(splnum) <= 0)
+                if (OBJ_ITEM_DESC(spellid(splnum)))
+                {
+                    Strcpy(descbuf, OBJ_ITEM_DESC(spellid(splnum)));
+                }
+                else
+                    Strcpy(descbuf, nodesc);
+
+                boolean inactive = FALSE;
+                struct extended_menu_info info = zeroextendedmenuinfo;
+                int mcolor = NO_COLOR;
+                info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+                if (spellknow(splnum) <= 0)
+                {
+                    Sprintf(buf, "%s %s", fullname, "(You cannot recall this spell)");
+                    mcolor = CLR_BLACK;
+                    info.menu_flags |= MENU_FLAGS_USE_COLOR_FOR_SUFFIXES;
+                    inactive = TRUE;
+                }
+                else
+                {
+                    Sprintf(buf, "%s (%s)", fullname, descbuf);
+                    mcolor = NO_COLOR;
+                    info.menu_flags |= MENU_FLAGS_ACTIVE;
+                }
+                if (!inactive)
+                    info.menu_flags |= MENU_FLAGS_ACTIVE;
+
+                any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
+                add_extended_menu(tmpwin, glyph, &any, 0, 0, ATR_INDENT_AT_DOUBLE_SPACE, mcolor, buf,
+                    (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED, info);
+            }
+        }
+        else if (splaction == SPELLMENU_PREPARE)
+        {
+            for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
             {
-                Sprintf(buf, "%s %s", fullname, "(You cannot recall this spell)");
-                mcolor = CLR_BLACK;
-                info.menu_flags |= MENU_FLAGS_USE_COLOR_FOR_SUFFIXES;
-                inactive = TRUE;
+                add_alt_spell_prepare_menu_item(tmpwin, i, splaction);
             }
-            else
-            {
-                Sprintf(buf, "%s (%s)", fullname, descbuf);
-                mcolor = NO_COLOR;
-                info.menu_flags |= MENU_FLAGS_ACTIVE;
-            }
-            if (!inactive)
-                info.menu_flags |= MENU_FLAGS_ACTIVE;
-
-            any.a_int = inactive ? 0 : splnum + 1; /* must be non-zero */
-            add_extended_menu(tmpwin, glyph, &any, 0, 0, ATR_INDENT_AT_DOUBLE_SPACE, mcolor, buf,
-                (splnum == splaction) ? MENU_SELECTED : MENU_UNSELECTED, info);
-        }
-    }
-    else if (splaction == SPELLMENU_PREPARE)
-    {
-        for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
-        {
-            add_alt_spell_prepare_menu_item(tmpwin, i, splaction);
-        }
-    }
-    else
-    {
-        int splcnt = 0;
-        for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
-        {
-            add_alt_spell_cast_menu_item(tmpwin, i, splaction);
-            splcnt++;
-        }
-        if (splcnt > 0)
-        {
-            add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
-                "", MENU_UNSELECTED);
-            any.a_int = -1;
-            int glyph = VIEW_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
-            add_active_menu(tmpwin, glyph, &any, '?', 0, ATR_NONE, NO_COLOR,
-                "View Spells", MENU_UNSELECTED);
-            any.a_int = -2;
-            glyph = MIX_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
-            add_active_menu(tmpwin, glyph, &any, '!', 0, ATR_NONE, NO_COLOR,
-                "Mix Spells", MENU_UNSELECTED);
-        }
-    }
-
-    how = PICK_ONE;
-    if (splaction == SPELLMENU_REORDER) 
-    {
-        if (spellid(1) == NO_SPELL) 
-        {
-            /* only one spell => nothing to swap with */
-            how = PICK_NONE;
-        }
-        else 
-        {
-            /* more than 1 spell, add an extra menu entry */
-            any.a_int = SPELLMENU_SORT + 1;
-            add_menu(tmpwin, NO_GLYPH, &any, '+', 0, ATR_NONE, NO_COLOR,
-                "[sort spells]", MENU_UNSELECTED);
-        }
-    }
-
-#ifdef GNH_MOBILE
-    if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && (splaction == SPELLMENU_PREPARE || splaction == SPELLMENU_CAST))
-    {
-        char subbuf[BUFSZ];
-        if (splaction == SPELLMENU_CAST)
-        {
-            Strcpy(subbuf, "&success; Success %, &mana; Mana Cost, &cool; Cooldown, &casts; Casts Left");
         }
         else
         {
-            Strcpy(subbuf, "&casts; Casts Left, &adds; Casts Added");
-        }
-        end_menu_ex(tmpwin, prompt, subbuf);
-
-    }
-    else
-    {
-        end_menu(tmpwin, prompt);
-    }
-#else 
-    end_menu(tmpwin, prompt);
-#endif
-
-    //Show menu
-    n = select_menu(tmpwin, how, &selected);
-    destroy_nhwindow(tmpwin);
-
-    if (n > 0) 
-    {
-        if (selected[0].item.a_int <= 0)
-        {
-            int res = selected[0].item.a_int;
-            free((genericptr_t)selected);
-            switch (res)
+            int splcnt = 0;
+            for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
             {
-            case -1:
-                return dospellview();
-            case -2:
-                return domix();
-            default:
-                return 0;
+                add_alt_spell_cast_menu_item(tmpwin, i, splaction);
+                splcnt++;
+            }
+            if (splcnt > 0)
+            {
+                any.a_int = 0;
+                add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
+                    "", MENU_UNSELECTED);
+                any.a_int = -1;
+                int glyph = VIEW_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
+                add_active_menu(tmpwin, glyph, &any, '?', 0, ATR_NONE, NO_COLOR,
+                    "View Spells", MENU_UNSELECTED);
+                any.a_int = -2;
+                glyph = MIX_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
+                add_active_menu(tmpwin, glyph, &any, '!', 0, ATR_NONE, NO_COLOR,
+                    "Mix Spells", MENU_UNSELECTED);
+                any.a_int = -3;
+                glyph = SORT_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
+                add_active_menu(tmpwin, glyph, &any, '<', 0, ATR_NONE, NO_COLOR,
+                    "Sort Spells", MENU_UNSELECTED);
+                any.a_int = -4;
+                glyph = REORDER_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF;
+                add_active_menu(tmpwin, glyph, &any, '>', 0, ATR_NONE, NO_COLOR,
+                    "Reorder Spells", MENU_UNSELECTED);
             }
         }
 
-        *spell_no = selected[0].item.a_int - 1;
-        /* menu selection for `PICK_ONE' does not
-           de-select any preselected entry */
-        if (n > 1 && *spell_no == splaction)
-            *spell_no = selected[1].item.a_int - 1;
-        free((genericptr_t)selected);
-        /* default selection of preselected spell means that
-           user chose not to swap it with anything */
-        if (*spell_no == splaction)
-            return FALSE;
-        return TRUE;
-    }
-    else if (splaction >= 0) 
-    {
-        /* explicit de-selection of preselected spell means that
-           user is still swapping but not for the current spell */
-        *spell_no = splaction;
-        return TRUE;
-    }
-    return FALSE; 
+        how = PICK_ONE;
+        if (splaction == SPELLMENU_REORDER)
+        {
+            if (spellid(1) == NO_SPELL)
+            {
+                /* only one spell => nothing to swap with */
+                how = PICK_NONE;
+            }
+            else
+            {
+                any.a_int = 0;
+                add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
+                    "", MENU_UNSELECTED);
+                /* more than 1 spell, add an extra menu entry */
+                any.a_int = SPELLMENU_SORT + 1;
+                add_active_menu(tmpwin, SORT_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any, '+', 0, ATR_NONE, NO_COLOR,
+                    "Sort Spells", MENU_UNSELECTED);
+            }
+        }
+
+#ifdef GNH_MOBILE
+        if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && (splaction == SPELLMENU_PREPARE || splaction == SPELLMENU_CAST))
+        {
+            char subbuf[BUFSZ];
+            if (splaction == SPELLMENU_CAST)
+            {
+                Strcpy(subbuf, "&success; Success %, &mana; Mana Cost, &cool; Cooldown, &casts; Casts Left");
+            }
+            else
+            {
+                Strcpy(subbuf, "&casts; Casts Left, &adds; Casts Added");
+            }
+            end_menu_ex(tmpwin, prompt, subbuf);
+
+        }
+        else
+        {
+            end_menu(tmpwin, prompt);
+        }
+#else 
+        end_menu(tmpwin, prompt);
+#endif
+
+        //Show menu
+        n = select_menu(tmpwin, how, &selected);
+        destroy_nhwindow(tmpwin);
+
+        if (n > 0)
+        {
+            if (selected[0].item.a_int <= 0)
+            {
+                int res = selected[0].item.a_int;
+                free((genericptr_t)selected);
+                int action_result = 0;
+                switch (res)
+                {
+                case -1:
+                    action_result = dospellview();
+                    break;
+                case -2:
+                    return domix(); /* mixing might have failed, so returning to the cast menu may be confusing */
+                case -3:
+                    action_result = dosortspell();
+                    break;
+                case -4:
+                    action_result = dovspell();
+                    break;
+                default:
+                    return 0;
+                }
+                if (!action_result)
+                    continue;
+                else
+                    return action_result;
+            }
+
+            *spell_no = selected[0].item.a_int - 1;
+            /* menu selection for `PICK_ONE' does not
+               de-select any preselected entry */
+            if (n > 1 && *spell_no == splaction)
+                *spell_no = selected[1].item.a_int - 1;
+            free((genericptr_t)selected);
+            /* default selection of preselected spell means that
+               user chose not to swap it with anything */
+            if (*spell_no == splaction)
+                return FALSE;
+            return TRUE;
+        }
+        else if (splaction >= 0)
+        {
+            /* explicit de-selection of preselected spell means that
+               user is still swapping but not for the current spell */
+            *spell_no = splaction;
+            return TRUE;
+        }
+        return FALSE;
+    } while (TRUE); /* continue repeats the menu */
 }
 
 
@@ -2580,6 +2607,7 @@ struct monst* targetmonst;
     case SPE_POWER_WORD_STUN:
     case SPE_POWER_WORD_BLIND:
     case SPE_SUNLIGHT_BEAM:
+    case SPE_RAY_OF_RADIANCE:
     case SPE_RESURRECTION:
     case SPE_RAISE_MINOR_ZOMBIE:
     case SPE_CREATE_MINOR_MUMMY:
@@ -2967,7 +2995,7 @@ struct monst* targetmonst;
         const char enchant_objects[] = { ALL_CLASSES, ALLOW_NONE, 0 };
         struct obj* otmp;
         char buf[BUFSZ] = "";
-        strcpy(buf, otyp == SPE_COLD_ENCHANT_ITEM ? "cold-enchant" :
+        Strcpy(buf, otyp == SPE_COLD_ENCHANT_ITEM ? "cold-enchant" :
             otyp == SPE_FIRE_ENCHANT_ITEM ? "fire-enchant" :
             otyp == SPE_LIGHTNING_ENCHANT_ITEM ? "lightning-enchant" :
             otyp == SPE_DEATH_ENCHANT_ITEM ? "death-enchant" :
@@ -3712,6 +3740,7 @@ dovspell()
                 spl_book[splnum] = spl_book[othnum];
                 spl_book[othnum] = spl_tmp;
 
+                flags.spellorder = SORTBY_CURRENT; /* sorting needs to be turned off */
                 sortspells();
             }
         }
@@ -3743,7 +3772,7 @@ int *spell_no;
     //}
 
     tmpwin = create_nhwindow(NHW_MENU);
-    start_menu_ex(tmpwin, GHMENU_STYLE_SPELLS);
+    start_menu_ex(tmpwin, splaction == SPELLMENU_DETAILS ? GHMENU_STYLE_VIEW_SPELL : GHMENU_STYLE_SPELLS);
     any = zeroany; /* zero out all bits */
 
     int hotkeys[11] = { 0 };
@@ -3814,7 +3843,7 @@ int *spell_no;
             Sprintf(buf, "Name\tH\tDescription");
         }
 
-        add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+        add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR, buf,
             MENU_UNSELECTED, menu_heading_info());
 
 
@@ -3966,7 +3995,7 @@ int *spell_no;
         } else {
             /* more than 1 spell, add an extra menu entry */
             any.a_int = SPELLMENU_SORT + 1;
-            add_menu(tmpwin, NO_GLYPH, &any, '+', 0, ATR_NONE, NO_COLOR,
+            add_menu(tmpwin, SORT_SPELLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any, '+', 0, ATR_NONE, NO_COLOR,
                      "[sort spells]", MENU_UNSELECTED);
         }
     }
@@ -4049,7 +4078,7 @@ boolean addemptyline;
     }
 
     any = zeroany;
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR, buf,
         MENU_UNSELECTED, menu_heading_info());
 
 }
@@ -4208,7 +4237,7 @@ boolean addemptyline;
     }
 
     any = zeroany;
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR, buf,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR, buf,
         MENU_UNSELECTED, menu_heading_info());
 
 }
@@ -4224,7 +4253,7 @@ int splaction;
     char buf[BUFSIZ], availablebuf[BUFSZ], descbuf[BUFSZ], levelbuf[BUFSZ] = "";
     char fullname[BUFSZ] = "";
     anything any = zeroany;
-    strcpy(fullname, spellname(splnum));
+    Strcpy(fullname, spellname(splnum));
     *fullname = highc(*fullname);
 
     int glyph = spell_to_glyph(splnum);
@@ -4295,7 +4324,7 @@ int splaction;
     anything any = zeroany;
     char fullname[BUFSZ];
     char addsbuf[BUFSZ];
-    strcpy(fullname, spellname(splnum));
+    Strcpy(fullname, spellname(splnum));
     *fullname = highc(*fullname);
 
     int glyph = NO_GLYPH;
@@ -4536,7 +4565,7 @@ dospellmanagemenu()
 
 #if 0
     /* Spell description */
-    strcpy(available_selection_item[selnum].name, "Detailed spell description");
+    Strcpy(available_selection_item[selnum].name, "Detailed spell description");
     available_selection_item[selnum].function_ptr = &spelldescription;
     available_selection_item[selnum].charnum = 'a' + selnum;
 
@@ -4551,7 +4580,7 @@ dospellmanagemenu()
 #endif
 
 #ifndef GNH_MOBILE
-    strcpy(available_selection_item[selnum].name, "Set or clear a hotkey for a spell");
+    Strcpy(available_selection_item[selnum].name, "Set or clear a hotkey for a spell");
     //available_selection_item[selnum].function_ptr = &setspellhotkey;
     available_selection_item[selnum].action = 4;
     available_selection_item[selnum].charnum = 'a' + selnum;
@@ -4567,7 +4596,7 @@ dospellmanagemenu()
 #endif
 
     /* Forget spell */
-    strcpy(available_selection_item[selnum].name, "Forget a spell");
+    Strcpy(available_selection_item[selnum].name, "Forget a spell");
     //available_selection_item[selnum].function_ptr = &forgetspell;
     available_selection_item[selnum].action = 5;
     available_selection_item[selnum].charnum = 'a' + selnum;
@@ -4584,7 +4613,7 @@ dospellmanagemenu()
 
     /* Finalize the menu */
     char qbuf[BUFSZ] = "";
-    strcpy(qbuf, "What do you want to do?");
+    Strcpy(qbuf, "What do you want to do?");
 
     /* Finish the menu */
     end_menu(win, qbuf);
@@ -4693,7 +4722,7 @@ int spell;
 {
     char qbuf[BUFSZ] = "";
     char spellnamebuf[BUFSZ] = "";
-    strcpy(spellnamebuf, spellname(spell));
+    Strcpy(spellnamebuf, spellname(spell));
 
     Sprintf(qbuf, "Are you sure you want to forget \'%s\' permanently?", spellnamebuf);
     if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, (char*)0, qbuf) == 'y')
@@ -4720,24 +4749,28 @@ int spell;
     return 0;
 }
 
+/* Now a percentage */
 long
 get_object_spell_casting_penalty(obj)
 struct obj* obj;
 {
     if (!obj)
-        return 0;
+        return 0L;
 
-    long res = objects[obj->otyp].oc_spell_casting_penalty;
-
+    double res = (double)objects[obj->otyp].oc_spell_casting_penalty;
     if (obj->material != objects[obj->otyp].oc_material && is_armor(obj))
     {
+        res = res * material_definitions[obj->material].spell_casting_penalty_multiplier;
         res += material_definitions[obj->material].spell_casting_penalty_armor[objects[obj->otyp].oc_armor_category];
     }
 
     if (res > 0 && has_obj_mythic_spellcasting(obj))
         return 0;
 
-    return res;
+    if (res < 0)
+        res = 0;
+
+    return (long)(res * (double)ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER);
 }
 
 STATIC_OVL int
@@ -4749,56 +4782,56 @@ boolean limited;
      * the probability of player's success at cast a given spell.
      */
     int chance, statused = A_INT;
-    long armor_penalty;
+    long armor_penalty_percentage;
     int skill;
 
-    /* Calculate intrinsic ability (armor_penalty) */
-    armor_penalty = 0L; // urole.spelbase;
     statused = attribute_value_for_spellbook(spellid(spell));
 
+    /* Calculate intrinsic ability (armor_penalty) */
+    armor_penalty_percentage = 0L; // urole.spelbase;
     if (!(objects[spellid(spell)].oc_spell_flags & S1_NO_SOMATIC_COMPONENT))
     {
         if (uarm)
-            armor_penalty += get_object_spell_casting_penalty(uarm);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarm);
         if (uarms)
-            armor_penalty += get_object_spell_casting_penalty(uarms);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarms);
         if (uarmh)
-            armor_penalty += get_object_spell_casting_penalty(uarmh);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarmh);
         if (uarmg)
-            armor_penalty += get_object_spell_casting_penalty(uarmg);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarmg);
         if (uarmf)
-            armor_penalty += get_object_spell_casting_penalty(uarmf);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarmf);
         if (uarmu)
-            armor_penalty += get_object_spell_casting_penalty(uarmu);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarmu);
         if (uarmo)
-            armor_penalty += get_object_spell_casting_penalty(uarmo);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarmo);
         if (uarmb)
-            armor_penalty += get_object_spell_casting_penalty(uarmb);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uarmb);
         if (umisc)
-            armor_penalty += get_object_spell_casting_penalty(umisc);
+            armor_penalty_percentage += get_object_spell_casting_penalty(umisc);
         if (umisc2)
-            armor_penalty += get_object_spell_casting_penalty(umisc2);
+            armor_penalty_percentage += get_object_spell_casting_penalty(umisc2);
         if (umisc3)
-            armor_penalty += get_object_spell_casting_penalty(umisc3);
+            armor_penalty_percentage += get_object_spell_casting_penalty(umisc3);
         if (umisc4)
-            armor_penalty += get_object_spell_casting_penalty(umisc4);
+            armor_penalty_percentage += get_object_spell_casting_penalty(umisc4);
         if (umisc5)
-            armor_penalty += get_object_spell_casting_penalty(umisc5);
+            armor_penalty_percentage += get_object_spell_casting_penalty(umisc5);
         if (uamul)
-            armor_penalty += get_object_spell_casting_penalty(uamul);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uamul);
         if (uleft)
-            armor_penalty += get_object_spell_casting_penalty(uleft);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uleft);
         if (uright)
-            armor_penalty += get_object_spell_casting_penalty(uright);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uright);
         if (ublindf)
-            armor_penalty += get_object_spell_casting_penalty(ublindf);
+            armor_penalty_percentage += get_object_spell_casting_penalty(ublindf);
         if (uwep)
-            armor_penalty += get_object_spell_casting_penalty(uwep);
+            armor_penalty_percentage += get_object_spell_casting_penalty(uwep);
     }
 
     /* Calculate success chance */
     chance = -130;
-    chance += -60 * (spellev(spell) + 0);
+    chance += -50 * (spellev(spell) + 0);
 
     skill = P_SKILL_LEVEL(spell_skilltype(spellid(spell)));
 
@@ -4810,7 +4843,7 @@ boolean limited;
     bonus += 5L * (long)u.uspellcastingbonus_all; /* items */
 
     chance += (int)bonus;
-    chance -= (int)(ARMOR_SPELL_CASTING_PENALTY_MULTIPLIER * armor_penalty);
+    chance -= (int)armor_penalty_percentage;
 
     if (limited)
     {
@@ -5047,8 +5080,8 @@ int spell;
 
     char spellname[BUFSZ] = "";
     char capspellname[BUFSZ] = "";
-    strcpy(spellname, obj_descr[spellid(spell)].oc_name);
-    strcpy(capspellname, spellname);
+    Strcpy(spellname, obj_descr[spellid(spell)].oc_name);
+    Strcpy(capspellname, spellname);
     *capspellname = highc(*capspellname); //Make first letter capital
 
     int matcnt = 0;
@@ -5061,7 +5094,7 @@ int spell;
         struct obj* otmp = (struct obj*)0;
         char buf[BUFSZ], buf3[BUFSZ], buf5[BUFSZ];
         struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
-        strcpy(buf3, domatcompname(mc));
+        Strcpy(buf3, domatcompname(mc));
 
         Sprintf(buf, "You need %s%s. ",
             buf3, ((mc->flags & MATCOMP_NOT_SPENT) ? " as a catalyst" : " as a component"));
@@ -5470,8 +5503,8 @@ struct materialcomponent* mc;
 
     static char buf3[BUFSZ];
     char buf2[BUFSZ], buf4[BUFSZ];
-    strcpy(buf2, "");
-    strcpy(buf4, "");
+    Strcpy(buf2, "");
+    Strcpy(buf4, "");
 
     if (permon && perobj)
     {
@@ -5503,7 +5536,7 @@ struct materialcomponent* mc;
 
     //Indicate how many
     if (mc->amount == 1)
-        strcpy(buf3, an(buf2));
+        Strcpy(buf3, an(buf2));
     else
         Sprintf(buf3, "%d %s", mc->amount, makeplural(buf2));
 

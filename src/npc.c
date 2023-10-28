@@ -294,8 +294,9 @@ char roomno;
 
 /* called from check_special_room() when the player enters the residence */
 void
-in_npc_room(roomno)
+in_npc_room(roomno, ignore_already_there)
 int roomno;
+boolean ignore_already_there;
 {
     struct monst* npc;
     struct enpc* enpc_p;
@@ -304,7 +305,7 @@ int roomno;
     int npctype = 0;
 
     /* don't do anything if hero is already in the room */
-    if (npc_room_occupied(u.urooms0))
+    if (!ignore_already_there && npc_room_occupied(u.urooms0))
         return;
 
     if ((npc = findnpc((char)roomno)) != 0)
@@ -326,6 +327,13 @@ int roomno;
                     canseemon(npc) ? Monnam(npc) : "A nearby voice");
                 enpc_p->intone_time = moves + (long)d(10, 500); /* ~2505 */
                 enpc_p->enter_time = 0L;
+            }
+
+            if (context.reviving && !npc->mpeaceful)
+            {
+                /* Revival pacifies nearby NPCs */
+                npc->mpeaceful = 1;
+                newsym(npc->mx, npc->my);
             }
 
             if (context.reviving && (npc_subtype_definitions[npctype].general_flags & NPC_FLAGS_COMMENTS_ON_REVIVAL))

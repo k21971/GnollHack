@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    mhmain.c    $NHDT-Date: 1432512811 2015/05/25 00:13:31 $  $NHDT-Branch: master $:$NHDT-Revision: 1.62 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -1448,21 +1448,21 @@ nh_compose_ascii_screenshot()
     FillMemory(text->colors, NO_COLOR, TEXT_BUFFER_SIZE);
     SendMessage(mswin_hwnd_from_winid(WIN_MESSAGE), WM_MSNH_COMMAND,
                 (WPARAM) MSNH_MSG_GETTEXT, (LPARAM) text);
-    strcpy(retval, text->buffer);
+    Strcpy(retval, text->buffer);
 
     ZeroMemory(text->buffer, TEXT_BUFFER_SIZE);
     FillMemory(text->attrs, ATR_NONE, TEXT_BUFFER_SIZE);
     FillMemory(text->colors, NO_COLOR, TEXT_BUFFER_SIZE);
     SendMessage(mswin_hwnd_from_winid(WIN_MAP), WM_MSNH_COMMAND,
                 (WPARAM) MSNH_MSG_GETTEXT, (LPARAM) text);
-    strcat(retval, text->buffer);
+    Strcat(retval, text->buffer);
 
     ZeroMemory(text->buffer, TEXT_BUFFER_SIZE);
     FillMemory(text->attrs, ATR_NONE, TEXT_BUFFER_SIZE);
     FillMemory(text->colors, NO_COLOR, TEXT_BUFFER_SIZE);
     SendMessage(mswin_hwnd_from_winid(WIN_STATUS), WM_MSNH_COMMAND,
                 (WPARAM) MSNH_MSG_GETTEXT, (LPARAM) text);
-    strcat(retval, text->buffer);
+    Strcat(retval, text->buffer);
 
     free(text);
     return retval;

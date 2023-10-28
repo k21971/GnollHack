@@ -30,7 +30,6 @@ STATIC_DCL int FDECL(mfind0, (struct monst *, BOOLEAN_P));
 STATIC_DCL int FDECL(reveal_terrain_getglyph, (int, int, int,
                                                unsigned, int, int));
 
-
 /* bring hero out from underwater or underground or being engulfed;
    return True iff any change occurred */
 STATIC_OVL boolean
@@ -79,7 +78,7 @@ map_monst(mtmp, showtail)
 struct monst *mtmp;
 boolean showtail;
 {
-    show_monster_glyph_with_extra_info(mtmp->mx, mtmp->my, any_mon_to_glyph(mtmp, newsym_rn2), mtmp, 0UL, 0, 0);
+    show_monster_glyph_with_extra_info(mtmp->mx, mtmp->my, any_mon_to_glyph(mtmp, newsym_rn2), mtmp, 0UL, 0UL, 0, 0);
     check_special_level_naming_by_mon(mtmp);
     if (showtail && is_long_worm_with_tail(mtmp->data))
         detect_wsegs(mtmp, 0);
@@ -1278,7 +1277,7 @@ struct obj **optr;
         if (!obj->charges)
         {
             play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY2);
-            pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "All you see is funky %s haze.", hcolor((char *) 0));
+            pline_multi_ex(ATR_NONE, CLR_MSG_HALLUCINATED, no_multiattrs, multicolor_buffer, "All you see is funky %s haze.", hcolor_multi_buf0((char *) 0));
         } 
         else 
         {
@@ -1293,8 +1292,8 @@ struct obj **optr;
                       poly_gender() == 1 ? "babe" : "dude");
                 break;
             case 3:
-                pline_The_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "crystal pulses with sinister %s light!",
-                          hcolor((char *) 0));
+                pline_The_multi_ex(ATR_NONE, CLR_MSG_HALLUCINATED, no_multiattrs, multicolor_buffer, "crystal pulses with sinister %s light!",
+                          hcolor_multi_buf0((char *) 0));
                 break;
             case 4:
                 You_see_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "goldfish swimming above fluorescent rocks.");
@@ -1546,9 +1545,12 @@ do_mapping()
 
     unconstrained = unconstrain_map();
     for (zx = 1; zx < COLNO; zx++)
+    {
+        for (zy = 0; zy < ROWNO; zy++)
+            show_map_spot(zx, zy);
         for (zy = ROWNO - 1; zy >= 0; zy--)
             show_map_spot(zx, zy);
-
+    }
     if (!level.flags.hero_memory || unconstrained) {
         flush_screen(1);                 /* flush temp screen */
         /* browse_map() instead of display_nhwindow(WIN_MAP, TRUE) */
@@ -1683,6 +1685,43 @@ struct obj *sobj; /* scroll--actually fake spellbook--object */
 
     if (refresh)
         docrt();
+}
+
+void
+cvt_scorr_to_corr_with_animation(x, y)
+int x, y;
+{
+    if (!isok(x, y))
+        return;
+
+    struct layer_info layers = layers_at(x, y);
+    int glyph = layers.layer_gui_glyphs[LAYER_FLOOR];
+    create_basic_floor_location(x, y, levl[x][y].floortyp ? levl[x][y].floortyp : CORR, 0, 0, FALSE);
+    unblock_vision_and_hearing_at_point(x, y); /* vision */
+    feel_newsym(x, y);
+    if (windowprocs.wincap2 & WC2_FADING_ANIMATIONS)
+    {
+        play_special_effect_with_details_at(0, x, y, glyph, LAYER_BACKGROUND_EFFECT, -2, 20, 0, 0, FALSE);
+        special_effect_wait_until_action(0);
+        special_effect_wait_until_end(0);
+    }
+}
+
+void
+cvt_sdoor_to_door_with_animation(x, y)
+int x, y;
+{
+    if (!isok(x, y))
+        return;
+
+    if (windowprocs.wincap2 & WC2_FADING_ANIMATIONS)
+    {
+        play_special_effect_with_details_at(0, x, y, levl[x][y].horizontal ? cmap_to_glyph(S_hcdoor) : cmap_to_glyph(S_vcdoor), LAYER_BACKGROUND_EFFECT, -1, 20, 0, 0, FALSE);
+        special_effect_wait_until_action(0);
+        special_effect_wait_until_end(0);
+    }
+    cvt_sdoor_to_door(x, y);
+    flush_screen(1);
 }
 
 /* convert a secret door into a normal door */
@@ -2013,14 +2052,14 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
         int itemsfound = unearth_objs(&youmonst, u.ux, u.uy, TRUE, TRUE);
         if (itemsfound)
         {
-            (void)pickup(1);
+            (void)pickup(1, FALSE);
         }
         else
         {
             if (!aflag && (context.first_time_cmd || !occupation))
             {
                 play_simple_player_sound_with_flags(MONSTER_SOUND_TYPE_SEARCH, PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING);
-                display_gui_effect(u.ux, u.uy, GUI_EFFECT_SEARCH, 0UL);
+                display_gui_effect(GUI_EFFECT_SEARCH, 0, u.ux, u.uy, 0, 0, 0UL);
                 if (iflags.using_gui_sounds)
                     delay_output_milliseconds(10 * ANIMATION_FRAME_INTERVAL);
             }
@@ -2041,24 +2080,27 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                     {
                         if (rn2(7 - fund))
                             continue;
-                        cvt_sdoor_to_door(x, y); /* .typ = DOOR */
+                        play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
+                        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden door.");
+                        cvt_sdoor_to_door_with_animation(x, y); /* .typ = DOOR */
                         exercise(A_WIS, TRUE);
                         nomul(0);
                         feel_location(x, y); /* make sure it shows up */
-                        play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
-                        You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden door.");
+                        flush_screen(1);
                     } 
                     else if (levl[x][y].typ == SCORR) 
                     {
                         if (rn2(7 - fund))
                             continue;
-                        levl[x][y].typ = CORR;
-                        unblock_vision_and_hearing_at_point(x, y); /* vision */
-                        exercise(A_WIS, TRUE);
-                        nomul(0);
-                        feel_newsym(x, y); /* make sure it shows up */
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
                         You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden passage.");
+                        cvt_scorr_to_corr_with_animation(x, y);
+                        //levl[x][y].typ = CORR;
+                        //unblock_vision_and_hearing_at_point(x, y); /* vision */
+                        //feel_newsym(x, y); /* make sure it shows up */
+                        exercise(A_WIS, TRUE);
+                        nomul(0);
+                        flush_screen(1);
                     }
                     else
                     {

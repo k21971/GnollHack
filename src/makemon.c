@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    makemon.c    $NHDT-Date: 1556150377 2019/04/24 23:59:37 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.134 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -17,7 +17,7 @@
 
 STATIC_DCL boolean FDECL(ungeneratable_monster_type, (int));
 STATIC_DCL int FDECL(align_shift, (struct permonst *));
-STATIC_DCL boolean FDECL(mk_gen_ok, (int, UCHAR_P, unsigned long, BOOLEAN_P));
+STATIC_DCL boolean FDECL(mk_gen_ok, (int, UCHAR_P, unsigned long, BOOLEAN_P, BOOLEAN_P));
 #if 0
 STATIC_DCL void FDECL(m_initgrp, (struct monst *, int, int, int, int));
 #endif
@@ -1645,7 +1645,7 @@ register struct monst *mtmp;
         }
         else if (ptr == &mons[PM_VLAD_THE_IMPALER])
         {
-            otmp = mksobj_with_flags(SPEAR, TRUE, FALSE, 0, mtmp, MAT_NONE, EXCEPTIONALITY_INFERNAL, 0L, MKOBJ_FLAGS_FORCE_LEGENDARY | MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY);
+            otmp = mksobj_with_flags(SPEAR, TRUE, FALSE, 0, mtmp, MAT_NONE, EXCEPTIONALITY_INFERNAL, 0L, MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY);
             if (otmp)
             {
                 otmp->enchantment = 4 + rn2(4);
@@ -1653,7 +1653,6 @@ register struct monst *mtmp;
                 (void)mpickobj(mtmp, otmp);
             }
             (void) mongets(mtmp, POT_FULL_HEALING);
-            (void) mongets(mtmp, POT_SPEED);
             (void) mongets(mtmp, AMULET_OF_REFLECTION);
         }
         break;
@@ -3226,7 +3225,6 @@ aligntyp alignment;
             struct obj *otmp = mksobj(SADDLE, TRUE, FALSE, FALSE);
             put_saddle_on_mon(otmp, mtmp);
         }
-
     }
     else
     {
@@ -3390,7 +3388,7 @@ STATIC_OVL boolean
 ungeneratable_monster_type(mndx)
 int mndx;
 {
-    return !mk_gen_ok(mndx, MV_GONE, (G_NOGEN | G_UNIQ), FALSE);
+    return !mk_gen_ok(mndx, MV_GONE, (G_NOGEN | G_UNIQ), FALSE, FALSE);
 
     //if (mons[mndx].geno & (G_NOGEN | G_UNIQ))
     //    return TRUE;
@@ -3463,24 +3461,24 @@ int level_limit;
     if (u.uz.dnum == quest_dnum && rn2(7) && (ptr = qt_montype()) != 0)
         return ptr;
 
-    if (u.uz.dnum == modron_dnum && (ptr = mkclass(S_MODRON, 0)) != (struct permonst*)0)
+    if (u.uz.dnum == modron_dnum && (ptr = mkclass(S_MODRON, 0)) != 0)
         return ptr;
 
     if (u.uz.dnum == bovine_dnum)
     {
         ptr = (struct permonst*)0;
-        if(!(mons[PM_HELL_BOVINE].geno & MV_GONE))
+        if(!(mvitals[PM_HELL_BOVINE].mvflags & MV_GONE))
             ptr = &mons[PM_HELL_BOVINE];
         
-        if (!(mons[PM_MINOTAUR].geno & MV_GONE) && (!ptr || !rn2(2)))
+        if (!(mvitals[PM_MINOTAUR].mvflags & MV_GONE) && (!ptr || !rn2(2)))
             ptr = &mons[PM_MINOTAUR];
 
-        if (!(mons[PM_BISON].geno & MV_GONE) && (!ptr || !rn2(6)))
+        if (!(mvitals[PM_BISON].mvflags & MV_GONE) && (!ptr || !rn2(6)))
             ptr = &mons[PM_BISON];
 
-        return ptr;
+        if(ptr)
+            return ptr;
     }
-
 
     /* Normal case */
     if (rndmonst_state.choice_count < 0) 
@@ -3564,7 +3562,7 @@ int level_limit;
         if ((ct -= (int) rndmonst_state.mchoices[mndx]) <= 0)
             break;
 
-    if (mndx == SPECIAL_PM || ungeneratable_monster_type(mndx) || mndx < LOW_PM || mndx >= NUM_MONSTERS) 
+    if (mndx < LOW_PM || mndx >= SPECIAL_PM || ungeneratable_monster_type(mndx))
     { /* shouldn't happen */
         impossible("rndmonst: bad `mndx' [#%d]", mndx);
         return (struct permonst *) 0;
@@ -3679,15 +3677,15 @@ int mndx; /* particular species that can no longer be created */
 
 /* decide whether it's ok to generate a candidate monster by mkclass() */
 STATIC_OVL boolean
-mk_gen_ok(mndx, mvflagsmask, genomask, ispoly)
+mk_gen_ok(mndx, excluded_mvflags, genomask, ispoly, issummon)
 int mndx;
-uchar mvflagsmask;
+uchar excluded_mvflags;
 unsigned long genomask;
-boolean ispoly;
+boolean ispoly, issummon;
 {
     struct permonst *ptr = &mons[mndx];
 
-    if (mvitals[mndx].mvflags & mvflagsmask)
+    if (mvitals[mndx].mvflags & excluded_mvflags)
         return FALSE;
     if (ispoly)
     {
@@ -3698,26 +3696,27 @@ boolean ispoly;
     {
         if (is_placeholder(ptr))
             return FALSE;
-        if ((mons[mndx].geno & G_STRAYED) && u.ualign.type == u.ualignbase[A_ORIGINAL]) /* Does not appear if you are on the right path */
-            return FALSE;
-        if ((ptr->geno & G_MODRON) && (ptr->geno & G_NOGEN) && u.uz.dnum != modron_dnum)
-            return FALSE;
-        if ((ptr->geno & G_YACC) && (ptr->geno & G_NOGEN) && u.uz.dnum != bovine_dnum)
-            return FALSE;
-        if ((ptr->geno & G_MODRON) && u.uz.dnum == modron_dnum) /* Overrides G_NOGEN */
-            return TRUE;
-        if ((ptr->geno & G_YACC) && u.uz.dnum == bovine_dnum) /* Overrides G_NOGEN */
-            return TRUE;
-        if ((ptr->geno & G_NOMINES) && In_mines(&u.uz))
-            return FALSE;
-        if ((ptr->geno & G_NOHELL) && Inhell)
-            return FALSE;
-        if ((ptr->geno & G_HELL) && !Inhell)
-            return FALSE;
-        if (In_endgame(&u.uz) && !Is_astralevel(&u.uz) && wrong_elem_type(ptr))
-            return FALSE;
-        //if (Inhell && (ptr->maligntyp <= A_NEUTRAL))
-        //    return FALSE;
+        if (!issummon)
+        {
+            if ((mons[mndx].geno & G_STRAYED) && u.ualign.type == u.ualignbase[A_ORIGINAL]) /* Does not appear if you are on the right path */
+                return FALSE;
+            if ((ptr->geno & G_MODRON) && (ptr->geno & G_NOGEN) && u.uz.dnum != modron_dnum)
+                return FALSE;
+            if ((ptr->geno & G_YACC) && (ptr->geno & G_NOGEN) && u.uz.dnum != bovine_dnum)
+                return FALSE;
+            if ((ptr->geno & G_MODRON) && u.uz.dnum == modron_dnum) /* Overrides G_NOGEN */
+                return TRUE;
+            if ((ptr->geno & G_YACC) && u.uz.dnum == bovine_dnum) /* Overrides G_NOGEN */
+                return TRUE;
+            if ((ptr->geno & G_NOMINES) && In_mines(&u.uz))
+                return FALSE;
+            if ((ptr->geno & G_NOHELL) && Inhell)
+                return FALSE;
+            if ((ptr->geno & G_HELL) && !Inhell)
+                return FALSE;
+            if (In_endgame(&u.uz) && !Is_astralevel(&u.uz) && wrong_elem_type(ptr))
+                return FALSE;
+        }
     }
 
     /* Note that G_MODRON and G_YACC override G_NOGEN */
@@ -3740,29 +3739,33 @@ mkclass(mclass, spc)
 char mclass;
 int spc;
 {
-    return mkclass_core(mclass, spc, A_NONE, 0);
+    return mkclass_core(mclass, spc, A_NONE, 0, 0UL);
 }
 
 /* mkclass() with alignment restrictions; used by ndemon() */
 struct permonst*
-mkclass_aligned(mclass, spc, atyp)
+mkclass_aligned(mclass, spc, atyp, mflags)
 char mclass;
 int spc;
 aligntyp atyp;
+unsigned long mflags;
 {
-    return mkclass_core(mclass, spc, atyp, 0);
+    return mkclass_core(mclass, spc, atyp, 0, mflags);
 }
 
 struct permonst *
-mkclass_core(mclass, spc, atyp, difficulty_adj)
+mkclass_core(mclass, spc, atyp, difficulty_adj, mflags)
 char mclass;
 int spc;
 aligntyp atyp;
 int difficulty_adj;
+unsigned long mflags;
 {
     register int first = 0, last = 0, num = 0;
     int k, nums[SPECIAL_PM + 1]; /* +1: insurance for final return value */
     int minmlev = 0, maxmlev = 0, mask = (G_NOGEN | G_UNIQ) & ~spc;
+    boolean issummon = (mflags & MKCLASS_FLAGS_SUMMON) != 0;
+    boolean ispoly = (mflags & MKCLASS_FLAGS_POLYMORPH) != 0;
 
     if (mclass < 1 || mclass >= MAX_MONSTER_CLASSES) {
         impossible("mkclass called with bad class!");
@@ -3786,10 +3789,10 @@ int difficulty_adj;
         for (int firstindex = LOW_PM; firstindex < SPECIAL_PM; firstindex++)
             if (mons[firstindex].mlet == mclass)
             {
-                if(first == 0)
+                if(first == NON_PM)
                     first = firstindex;
 
-                if(!tooweak(firstindex,minmlev))
+                if((mflags & MKCLASS_FLAGS_IGNORE_DIFFICULTY) != 0 || !tooweak(firstindex,minmlev))
                 {
                     first = firstindex;
                     foundfirst = TRUE;
@@ -3803,7 +3806,7 @@ int difficulty_adj;
 
     if (first == NON_PM) //SPECIAL_PM)
     {
-        impossible("mkclass found no class %d monsters", mclass);
+        //impossible("mkclass found no class %d monsters", mclass);
         return (struct permonst *) 0;
     }
 
@@ -3814,17 +3817,19 @@ int difficulty_adj;
     {
         if (atyp != A_NONE && sgn(mons[last].maligntyp) != sgn(atyp))
             continue;
-        if (mk_gen_ok(last, MV_GONE, mask, FALSE))
+        if (mk_gen_ok(last, MV_GONE, mask, ispoly, issummon))
         {
             /* consider it; don't reject a toostrong() monster if we
                don't have anything yet (num==0) or if it is the same
                (or lower) difficulty as preceding candidate (non-zero
                'num' implies last > first so mons[last-1] is safe);
                sometimes accept it even if high difficulty */
-            if (num && toostrong(last, maxmlev)
-                && mons[last].difficulty > mons[last - 1].difficulty)
+            if (num && toostrong(last, maxmlev) && (mflags & MKCLASS_FLAGS_IGNORE_DIFFICULTY) == 0
+                && last > first && mons[last].difficulty > mons[last - 1].difficulty)
                 break;
-            if ((k = (int)(mons[last].geno & G_FREQ)) > 0)
+
+            k = (int)(mons[last].geno & G_FREQ);
+            if (k > 0)
             {
                 /* skew towards lower value monsters at lower exp. levels
                    (this used to be done in the next loop, but that didn't
@@ -3849,13 +3854,16 @@ int difficulty_adj;
         if ((num -= nums[first]) <= 0)
             break;
 
-    if (first < LOW_PM || first >= NUM_MONSTERS)
+    if (first < LOW_PM || first >= SPECIAL_PM)
     {
         impossible("mkclass: bad `first' [#%d]", first);
         return (struct permonst*)0;
     }
 
-    return nums[first] ? &mons[first] : (struct permonst *) 0;
+    if (nums[first])
+        return &mons[first];
+    else
+        return (struct permonst*)0;
 }
 
 /* like mkclass(), but excludes difficulty considerations; used when
@@ -3875,13 +3883,13 @@ int mclass;
         return NON_PM;
 
     for (last = first; last < SPECIAL_PM && mons[last].mlet == mclass; last++)
-        if (mk_gen_ok(last, MV_GENOCIDED, (G_NOGEN | G_UNIQ), TRUE))
+        if (mk_gen_ok(last, MV_GENOCIDED, (G_NOGEN | G_UNIQ), TRUE, FALSE))
             num += (int)(mons[last].geno & G_FREQ);
     if (!num)
         return NON_PM;
 
     for (num = rnd(num); num > 0; first++)
-        if (mk_gen_ok(first, MV_GENOCIDED, (G_NOGEN | G_UNIQ), TRUE))
+        if (mk_gen_ok(first, MV_GENOCIDED, (G_NOGEN | G_UNIQ), TRUE, FALSE))
             num -= (int)(mons[first].geno & G_FREQ);
     first--; /* correct an off-by-one error */
 
@@ -4360,7 +4368,7 @@ register struct permonst *ptr;
     /* minions are hostile to players that have strayed at all */
     if (is_minion(ptr))
         return (boolean) (u.ualign.record >= 0);
-
+    
     /* Last case:  a chance of a co-aligned monster being
      * hostile.  This chance is greater if the player has strayed
      * (u.ualign.record negative) or the monster is not strongly aligned.

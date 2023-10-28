@@ -556,10 +556,10 @@ int summoner_level;
 {
     int res = NON_PM;
     int roguetrycnt = 0;
-
+    int tryct;
     do
     {
-        for(int tryct = 0; tryct < 50 && (res == NON_PM || (res >= NON_PM && mons[res].difficulty > (9 * summoner_level + 1) / 10)); tryct++)
+        for(tryct = 0; tryct < 50 && (res == NON_PM || (res >= LOW_PM && ((mons[res].difficulty > (9 * summoner_level + 1) / 10) || (mvitals[res].mvflags & MV_GONE) != 0))); tryct++)
         {
             res = nasties[rn2(SIZE(nasties))];
         }
@@ -567,7 +567,6 @@ int summoner_level;
         if(res == NON_PM)
         {
             struct permonst* pm = rndmonst();
-
             if(pm)
                 res = monsndx(pm);
         }
@@ -575,9 +574,22 @@ int summoner_level;
     } while ((!Is_really_rogue_level(&u.uz) && res == NON_PM && roguetrycnt <= 5)
         || (Is_really_rogue_level(&u.uz) && (res == NON_PM || !('A' <= mons[res].mlet && mons[res].mlet <= 'Z')) && roguetrycnt <= 5));
 
-    /* Finally, if nothing, just pick something from the nasties list */
+    /* Finally, if nothing, just pick a demon */
+    int i;
     if (res == NON_PM)
-        res = nasties[rn2(SIZE(nasties))];
+    {
+        for (i = PM_BALOR; i > PM_VROCK; i--)
+        {
+            if (!(mvitals[i].mvflags & MV_GONE))
+            {
+                res = i;
+                break;
+            }
+        }
+    }
+
+    if (res == NON_PM)
+        res = PM_VROCK;
 
     return res;
 }
@@ -780,7 +792,7 @@ resurrect()
     if (!context.no_of_wizards) {
         /* make a new Wizard */
         verb = "kill";
-        mtmp = makemon(&mons[PM_WIZARD_OF_YENDOR], u.ux, u.uy, MM_NOWAIT | MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_NASTY_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END);
+        mtmp = makemon2(&mons[PM_WIZARD_OF_YENDOR], u.ux, u.uy, MM_NOWAIT | MM_PLAY_SUMMON_ANIMATION | MM_SUMMON_NASTY_ANIMATION | MM_PLAY_SUMMON_SOUND | MM_ANIMATION_WAIT_UNTIL_END | MM_NOCOUNTBIRTH, MM2_REVIVING);
         /* affects experience; he's not coming back from a corpse
            but is subject to repeated killing like a revived corpse */
         if (mtmp) mtmp->mrevived = 1;
@@ -853,7 +865,7 @@ intervene()
         break;
     case 2:
         if (!Blind)
-            You_ex(ATR_NONE, CLR_MSG_WARNING, "notice a %s glow surrounding you.", hcolor(NH_BLACK));
+            You_multi_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_WARNING, no_multiattrs, multicolor_buffer, "notice a %s glow surrounding you.", hcolor_multi_buf0(NH_BLACK));
         rndcurse();
         break;
     case 3:

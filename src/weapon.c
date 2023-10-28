@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    weapon.c    $NHDT-Date: 1548209744 2019/01/23 02:15:44 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.69 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -1823,16 +1823,16 @@ int skill_level;
         percentage = 10;
         break;
     case P_SKILLED:
-        percentage = 25;
+        percentage = 20;
         break;
     case P_EXPERT:
-        percentage = 45;
+        percentage = 30;
         break;
     case P_MASTER:
-        percentage = 70;
+        percentage = 40;
         break;
     case P_GRAND_MASTER:
-        percentage = 100;
+        percentage = 50;
         break;
     default:
         break;
@@ -2137,14 +2137,14 @@ doskill_core()
                     }
                     if (skillcount > 0)
                     {
-                        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                             skill_ranges[pass].name, MENU_UNSELECTED, menu_heading_info());
                     }
                 }
                 if (P_RESTRICTED(i))
                     continue;
 
-                strcpy(furtherbuf, "");
+                Strcpy(furtherbuf, "");
                 if (can_advance(i, speedy))
                 {
                     color = CLR_GREEN;
@@ -2168,7 +2168,7 @@ doskill_core()
 
                 (void)skill_level_name(i, skilllevelbuf, FALSE);
                 (void)skill_level_name(i, skillmaxbuf, TRUE);
-                strcpy(skillnamebuf, P_NAME(i));
+                Strcpy(skillnamebuf, P_NAME(i));
                 *skillnamebuf = highc(*skillnamebuf);
 
                 Sprintf(buf, "%s (%s / %s%s)", skillnamebuf, skilllevelbuf, skillmaxbuf, furtherbuf);
@@ -2228,7 +2228,7 @@ boolean speedy;
     char skilllevelbuf[BUFSZ] = "";
     char nextlevelbuf[BUFSZ] = "";
 
-    strcpy(skillnamebuf, P_NAME(skill_id));
+    Strcpy(skillnamebuf, P_NAME(skill_id));
     (void)skill_level_name(skill_id, skilllevelbuf, FALSE);
     (void)skill_level_name(skill_id, nextlevelbuf, 2);
     int skill_slots_needed = slots_required(skill_id);
@@ -2456,11 +2456,11 @@ int skill_id;
         putstr(win, ATR_HALF_SIZE, " ");
         if (skill_id == P_BARE_HANDED_COMBAT && P_SKILL_LEVEL(P_MARTIAL_ARTS) > P_UNSKILLED)
         {
-            strcpy(buf, "Levels (bonuses from Martial Arts):");
+            Strcpy(buf, "Levels (bonuses from Martial Arts):");
         }
         else
         {
-            strcpy(buf, "Levels:");
+            Strcpy(buf, "Levels:");
         }
         putstr(win, ATR_HEADING, buf);
 
@@ -2621,8 +2621,8 @@ int skill_id;
             }
             else if (skill_id == P_DISARM_TRAP)
             {
-                int arrowtrap_chance = untrap_probability(ARROW_TRAP, lvl);
-                int magictrap_chance = untrap_probability(MAGIC_TRAP, lvl);
+                int arrowtrap_chance = untrap_probability(ARROW_TRAP, lvl, &youmonst);
+                int magictrap_chance = untrap_probability(MAGIC_TRAP, lvl, &youmonst);
                 Sprintf(arrowbuf, "%d%%", arrowtrap_chance);
                 Sprintf(magicbuf, "%d%%", magictrap_chance);
             }
@@ -2948,7 +2948,7 @@ enhance_weapon_skill()
                     to_advance + eventually_advance > 0 ? "Next level" : "");
         }
 
-        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
             headerbuf, MENU_UNSELECTED, menu_heading_info());
         
         for (pass = 0; pass < SIZE(skill_ranges); pass++)
@@ -3005,7 +3005,7 @@ enhance_weapon_skill()
                     */
                     if (skillcount > 0)
                     {
-                        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                        add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                             skill_ranges[pass].name, MENU_UNSELECTED, menu_heading_info());
                         //firstheader = FALSE;
                     }
@@ -3070,13 +3070,13 @@ enhance_weapon_skill()
                 (void)skill_level_name(i, skillmaxbuf, TRUE);
 
                 char skillnamebuf[BUFSZ];
-                strcpy(skillnamebuf, P_NAME(i));
+                Strcpy(skillnamebuf, P_NAME(i));
                 *skillnamebuf = highc(*skillnamebuf);
 
                 int skill_slots_needed = slots_required(i);
                 char skillslotbuf[BUFSZ];
                 if (P_SKILL_LEVEL(i) >= P_MAX_SKILL_LEVEL(i))
-                    strcpy(skillslotbuf, "-");
+                    Strcpy(skillslotbuf, "-");
                 else
                     Sprintf(skillslotbuf, "%d", skill_slots_needed);
 
@@ -3263,21 +3263,21 @@ enhance_weapon_skill()
                             switch (i)
                             {
                             case P_DIGGING:
-                                tohitbonus = weapon_skill_hit_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
-                                dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
-                                criticalhitpct = digging_skill_speed_bonus(nextlevel);
+                                tohitbonus2 = weapon_skill_hit_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
+                                dmgbonus2 = weapon_skill_dmg_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
+                                criticalhitpct2 = digging_skill_speed_bonus(nextlevel);
                                 addplus2 = TRUE;
                                 break;
                             case P_RIDING:
-                                tohitbonus = riding_skill_hit_bonus(nextlevel);
-                                dmgbonus = riding_skill_dmg_bonus(nextlevel);
-                                criticalhitpct = riding_skill_jousting_bonus(nextlevel);
+                                tohitbonus2 = riding_skill_hit_bonus(nextlevel);
+                                dmgbonus2 = riding_skill_dmg_bonus(nextlevel);
+                                criticalhitpct2 = riding_skill_jousting_bonus(nextlevel);
                                 addplus2 = TRUE;
                                 break;
                             default:
-                                tohitbonus = weapon_skill_hit_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
-                                dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
-                                criticalhitpct = get_skill_critical_strike_chance(i, TRUE, FALSE, 0, FALSE);
+                                tohitbonus2 = weapon_skill_hit_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
+                                dmgbonus2 = weapon_skill_dmg_bonus((struct obj*)0, i, TRUE, FALSE, FALSE, 0, FALSE);
+                                criticalhitpct2 = get_skill_critical_strike_chance(i, TRUE, FALSE, 0, FALSE);
                                 break;
                             }
 
@@ -3288,7 +3288,7 @@ enhance_weapon_skill()
                             {
                                 Sprintf(hbuf2, "--");
                                 Sprintf(dbuf2, "--");
-                                criticalhitpct = get_skill_critical_strike_chance(P_MARTIAL_ARTS, TRUE, FALSE, 0, FALSE);
+                                criticalhitpct2 = get_skill_critical_strike_chance(P_MARTIAL_ARTS, TRUE, FALSE, 0, FALSE);
                             }
                             else
                             {
@@ -3322,8 +3322,8 @@ enhance_weapon_skill()
                     }
                     else if (i == P_DISARM_TRAP)
                     {
-                        int arrowtrap_chance = untrap_probability(ARROW_TRAP, P_SKILL_LEVEL(i));
-                        int magictrap_chance = untrap_probability(MAGIC_TRAP, P_SKILL_LEVEL(i));
+                        int arrowtrap_chance = untrap_probability(ARROW_TRAP, P_SKILL_LEVEL(i), &youmonst);
+                        int magictrap_chance = untrap_probability(MAGIC_TRAP, P_SKILL_LEVEL(i), &youmonst);
                         char abuf[BUFSZ] = "";
                         char mbuf[BUFSZ] = "";
                         Sprintf(abuf, "%d%%", arrowtrap_chance);
@@ -3332,8 +3332,8 @@ enhance_weapon_skill()
                         if (can_advance(i, speedy) || could_advance(i))
                         {
                             int nextlevel = min(P_MAX_SKILL_LEVEL(i), P_SKILL_LEVEL(i) + 1); /* restricted is not able to advance, so we need not consider it here */
-                            int arrowtrap_chance2 = untrap_probability(ARROW_TRAP, nextlevel);
-                            int magictrap_chance2 = untrap_probability(MAGIC_TRAP, nextlevel);
+                            int arrowtrap_chance2 = untrap_probability(ARROW_TRAP, nextlevel, &youmonst);
+                            int magictrap_chance2 = untrap_probability(MAGIC_TRAP, nextlevel, &youmonst);
                             char abuf2[BUFSZ] = "";
                             char mbuf2[BUFSZ] = "";
                             Sprintf(abuf2, "%d%%", arrowtrap_chance2);
@@ -3574,7 +3574,7 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
     boolean apply_two_weapon_bonus = apply_extra_bonuses && (u.twoweap && (!weapon || (weapon && !bimanual(weapon) && (weapon == uwep || weapon == uarms))));
     boolean apply_two_handed_weapon_bonus = apply_extra_bonuses && weapon && bimanual(weapon) && is_weapon(weapon) && !is_launcher(weapon);
     boolean Is_worn_gauntlets = (weapon && is_gloves(weapon) && (weapon->owornmask & W_ARMG));
-    boolean apply_martial_arts_bonus = ((!weapon && (!uarmg || (uarmg && !is_metallic(uarmg)))) || (Is_worn_gauntlets && !is_metallic(weapon)));
+    boolean apply_martial_arts_bonus = ((!weapon/* && (!uarmg || (uarmg && !is_metallic(uarmg)))*/) || (Is_worn_gauntlets/* && !is_metallic(weapon)*/));
     int wep_type = weapon_skill_type(weapon);
     int type = use_this_skill ? use_this_skill : wep_type;
     
@@ -3647,19 +3647,19 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
             bonus += 0;
             break;
         case P_BASIC:
-            bonus += 3;
+            bonus += 2;
             break;
         case P_SKILLED:
-            bonus += 6;
+            bonus += 4;
             break;
         case P_EXPERT:
-            bonus += 9;
+            bonus += 6;
             break;
         case P_MASTER:
-            bonus += 12;
+            bonus += 8;
             break;
         case P_GRAND_MASTER:
-            bonus += 15;
+            bonus += 10;
             break;
         }
     }
@@ -3733,7 +3733,7 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
     boolean apply_two_weapon_bonus = apply_extra_bonuses && (u.twoweap && (!weapon || (weapon && !bimanual(weapon) && (weapon == uwep || weapon == uarms))));
     boolean apply_two_handed_weapon_bonus = apply_extra_bonuses && weapon && bimanual(weapon) && is_weapon(weapon) && !is_launcher(weapon);
     boolean Is_worn_gauntlets = (weapon && is_gloves(weapon) && (weapon->owornmask & W_ARMG));
-    boolean apply_martial_arts_bonus = ((!weapon && (!uarmg || (uarmg && !is_metallic(uarmg)))) || (Is_worn_gauntlets && !is_metallic(weapon)));
+    boolean apply_martial_arts_bonus = ((!weapon/* && (!uarmg || (uarmg && !is_metallic(uarmg)))*/) || (Is_worn_gauntlets/* && !is_metallic(weapon)*/));
     int wep_type = weapon_skill_type(weapon);
     int type = use_this_skill > P_NONE ? use_this_skill : wep_type;
 
@@ -3773,22 +3773,22 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
         /* fall through */
         case P_ISRESTRICTED:
         case P_UNSKILLED:
-            bonus += -3;
+            bonus += -2;
             break;
         case P_BASIC:
             bonus += 0;
             break;
         case P_SKILLED:
-            bonus += 3;
+            bonus += 2;
             break;
         case P_EXPERT:
-            bonus += 6;
+            bonus += 4;
             break;
         case P_MASTER:
-            bonus += 9;
+            bonus += 6;
             break;
         case P_GRAND_MASTER:
-            bonus += 12;
+            bonus += 8;
             break;
         }
     } 
@@ -3805,19 +3805,19 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
             bonus += 0;
             break;
         case P_BASIC:
-            bonus += 4;
+            bonus += 1;
             break;
         case P_SKILLED:
-            bonus += 8;
+            bonus += 2;
             break;
         case P_EXPERT:
-            bonus += 12;
+            bonus += 3;
             break;
         case P_MASTER:
-            bonus += 16;
+            bonus += 4;
             break;
         case P_GRAND_MASTER:
-            bonus += 20;
+            bonus += 5;
             break;
         }
     }
@@ -3994,19 +3994,19 @@ int skill_level;
     case P_UNSKILLED:
         break;
     case P_BASIC:
-        bonus += 3;
+        bonus += 2;
         break;
     case P_SKILLED:
-        bonus += 6;
+        bonus += 4;
         break;
     case P_EXPERT:
-        bonus += 9;
+        bonus += 6;
         break;
     case P_MASTER:
-        bonus += 12;
+        bonus += 8;
         break;
     case P_GRAND_MASTER:
-        bonus += 15;
+        bonus += 10;
         break;
     }
     return bonus;
@@ -4208,10 +4208,10 @@ int use_this_level;
             res = 20;
             break;
         case P_MASTER:
-            res = 40;
+            res = 35;
             break;
         case P_GRAND_MASTER:
-            res = 70;
+            res = 50;
             break;
         default:
             break;
@@ -4226,13 +4226,13 @@ int use_this_level;
             res = get_skill_critical_strike_chance(P_BARE_HANDED_COMBAT, nextlevel, limit_by_twoweap, use_this_level, use_adjusted_sklvl);
             break;
         case P_BASIC:
-            res = 75;
+            res = 60;
             break;
         case P_SKILLED:
-            res = 80;
+            res = 70;
             break;
         case P_EXPERT:
-            res = 85;
+            res = 80;
             break;
         case P_MASTER:
             res = 90;
@@ -4261,10 +4261,10 @@ int use_this_level;
             res = 20;
             break;
         case P_MASTER:
-            res = 40;
+            res = 35;
             break;
         case P_GRAND_MASTER:
-            res = 70;
+            res = 50;
             break;
         default:
             break;
@@ -4331,7 +4331,7 @@ boolean is_left_arm;
         return;
 
     struct obj* wep = is_left_arm ? uarms : uwep;
-    strcpy(buf, "");
+    Strcpy(buf, "");
     if (!wep)
     {
         const char* unarmedstr = (uarmg ? (is_weapon(uarmg) ? "mg" : "g") : "-");
@@ -4340,37 +4340,37 @@ boolean is_left_arm;
             if (!uwep)
             {
                 if(u.twoweap)
-                    strcpy(buf, unarmedstr);
+                    Strcpy(buf, unarmedstr);
                 else
-                    strcpy(buf, "");
+                    Strcpy(buf, "");
             }
             else if(objects[uwep->otyp].oc_bimanual)
-                strcpy(buf, "");
+                Strcpy(buf, "");
             else if(u.twoweap)
-                strcpy(buf, unarmedstr);
+                Strcpy(buf, unarmedstr);
             else
-                strcpy(buf, "");
+                Strcpy(buf, "");
         }
         else
-            strcpy(buf, unarmedstr);
+            Strcpy(buf, unarmedstr);
     }
     else if (wep->otyp == CORPSE)
     {
-        strcpy(buf, "c");
+        Strcpy(buf, "c");
     }
     else if (wep->oclass == POTION_CLASS)
     {
-        strcpy(buf, "!");
+        Strcpy(buf, "!");
     }
     else if (!is_weapon(wep) && !is_shield(wep) && !is_pick(wep))
     {
-        strcpy(buf, "*");
+        Strcpy(buf, "*");
     }
     else
     {
         if ((is_weapon(wep) || is_pick(wep)) && objects[wep->otyp].oc_bimanual)
         {
-            strcpy(eos(buf), "2h");
+            Strcpy(eos(buf), "2h");
         }
 
         if (is_launcher(wep))
@@ -4378,49 +4378,80 @@ boolean is_left_arm;
             if (uquiver)
             {
                 if (ammo_and_launcher(uquiver, wep))
-                    strcpy(eos(buf), "R");
+                    Strcpy(eos(buf), "R");
                 else
-                    strcpy(eos(buf), "Re");
+                    Strcpy(eos(buf), "Re");
             }
             else
-                strcpy(eos(buf), "R0");
+                Strcpy(eos(buf), "R0");
         }
         else if (is_ammo(wep))
         {
-            strcpy(eos(buf), "A");
+            Strcpy(eos(buf), "A");
         }
         else if (nonmelee_throwing_weapon(wep))
         {
-            strcpy(eos(buf), "T");
+            Strcpy(eos(buf), "T");
         }
         else if (is_appliable_pole_type_weapon(wep))
         {
-            strcpy(eos(buf), "P");
+            Strcpy(eos(buf), "P");
         }
         else if (is_weapon(wep))
         {
-            strcpy(eos(buf), "M");
+            Strcpy(eos(buf), "M");
             if (throwing_weapon(wep))
             {
-                strcpy(eos(buf), "T");
+                Strcpy(eos(buf), "T");
             }
             if (is_pick(wep))
             {
-                strcpy(eos(buf), "D");
+                Strcpy(eos(buf), "D");
             }
         }
         else if (is_pick(wep))
         {
-            strcpy(eos(buf), "D");
+            Strcpy(eos(buf), "D");
         }
 
         if (is_shield(wep))
         {
-            strcpy(eos(buf), "S");
+            Strcpy(eos(buf), "S");
         }
     }
 }
 
+void
+print_quivered_weapon_style_string(buf)
+char* buf;
+{
+    if (uquiver)
+    {
+        if (throwing_weapon(uquiver) && !is_ammo(uquiver))
+            Strcpy(buf, "t");
+        else if (is_ammo(uquiver))
+        {
+            if (uwep)
+            {
+                if (is_launcher(uwep))
+                {
+                    if(ammo_and_launcher(uquiver, uwep))
+                        Strcpy(buf, "A");
+                    else
+                        Strcpy(buf, "e");
+                }
+                else
+                    Strcpy(buf, "a");
+            }
+            else
+                Strcpy(buf, "a");
+        }
+        else
+            Strcpy(buf, "?");
+    }
+    else
+        Strcpy(buf, "-");
+}
 
 int
 exceptionality_digging_speed_bonus(obj)

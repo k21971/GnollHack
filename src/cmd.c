@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    cmd.c    $NHDT-Date: 1557088405 2019/05/05 20:33:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.333 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -65,6 +65,8 @@ extern int NDECL(doextlist);          /**/
 extern int NDECL(enter_explore_mode); /**/
 extern int NDECL(dodrop);             /**/
 extern int NDECL(doddrop);            /**/
+extern int NDECL(dodropmany);         /**/
+extern int NDECL(doautostash);        /**/
 extern int NDECL(dodown);             /**/
 extern int NDECL(doup);               /**/
 extern int NDECL(donull);             /**/
@@ -134,6 +136,7 @@ extern int NDECL(dowield);            /**/
 extern int NDECL(dowieldquiver);      /**/
 extern int NDECL(dounwield);          /**/
 extern int NDECL(dostash);            /**/
+extern int NDECL(dostashfloor);       /**/
 extern int NDECL(dozap);              /**/
 extern int NDECL(doorganize);         /**/
 #endif /* DUMB */
@@ -165,6 +168,7 @@ STATIC_PTR int NDECL(wiz_where);
 STATIC_PTR int NDECL(wiz_detect);
 #if defined(DEBUG)
 STATIC_PTR int NDECL(wiz_panic);
+STATIC_PTR int NDECL(wiz_debug);
 #endif
 STATIC_PTR int NDECL(wiz_polyself);
 STATIC_PTR int NDECL(wiz_level_tele);
@@ -769,325 +773,332 @@ int
 doability(VOID_ARGS)
 {
     int i;
+    int res = 0;
 
-    menu_item* pick_list = (menu_item*)0;
-    winid win;
-    anything any;
-    int abilitynum = 0;
-    int glyph = 0;
-    glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
-    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
-
-    any = zeroany;
-    win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_MENU_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
-    start_menu_ex(win, GHMENU_STYLE_CHARACTER);
-
-    /* CHARACTER ABILITY INFORMATION */
-    any = zeroany;
-    add_extended_menu(win, NO_GLYPH, &any,
-        0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
-        "Character Abilities                   ", MENU_UNSELECTED, menu_heading_info());
-
-    Strcpy(available_ability_list[abilitynum].name, "Statistics");
-    available_ability_list[abilitynum].function_ptr = &docharacterstatistics;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, YOU_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-
-    Strcpy(available_ability_list[abilitynum].name, "Attributes");
-    available_ability_list[abilitynum].function_ptr = &doattributes;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, ATTRIBUTES_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-    Strcpy(available_ability_list[abilitynum].name, "Skills");
-    available_ability_list[abilitynum].function_ptr = &doskill;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, SKILLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-    if (Upolyd)
+    do
     {
-        Strcpy(available_ability_list[abilitynum].name, "Polymorphed form");
-        available_ability_list[abilitynum].function_ptr = &dopolyformstatistics;
-        available_ability_list[abilitynum].target_mtmp = 0;
+        menu_item* pick_list = (menu_item*)0;
+        winid win;
+        anything any;
+        int abilitynum = 0;
+        int glyph = 0;
+        glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
+        int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
+
+        any = zeroany;
+        win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_CHARACTER_MENU_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
+        start_menu_ex(win, GHMENU_STYLE_CHARACTER);
+
+        /* CHARACTER ABILITY INFORMATION */
+        any = zeroany;
+        add_extended_menu(win, NO_GLYPH, &any,
+            0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+            "Character Abilities                   ", MENU_UNSELECTED, menu_heading_info());
+
+        Strcpy(available_ability_list[abilitynum].name, "Statistics");
+        available_ability_list[abilitynum].function_ptr = &docharacterstatistics;
 
         any = zeroany;
         any.a_int = abilitynum + 1;
-        glyph = flags.female ? female_monnum_to_glyph(u.umonnum) : monnum_to_glyph(u.umonnum);
-        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
 
-        add_menu(win, gui_glyph, &any,
+        add_active_menu(win, YOU_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
             0, 0, ATR_NONE, NO_COLOR,
             available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
         abilitynum++;
 
-        /* Monster abilities */
-        Strcpy(available_ability_list[abilitynum].name, "Monster abilities");
-        available_ability_list[abilitynum].function_ptr = &domonsterability;
+
+        Strcpy(available_ability_list[abilitynum].name, "Attributes");
+        available_ability_list[abilitynum].function_ptr = &doattributes;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_active_menu(win, ATTRIBUTES_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+
+        Strcpy(available_ability_list[abilitynum].name, "Skills");
+        available_ability_list[abilitynum].function_ptr = &doskill;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_active_menu(win, SKILLS_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+
+        if (Upolyd)
+        {
+            Strcpy(available_ability_list[abilitynum].name, "Polymorphed form");
+            available_ability_list[abilitynum].function_ptr = &dopolyformstatistics;
+            available_ability_list[abilitynum].target_mtmp = 0;
+
+            any = zeroany;
+            any.a_int = abilitynum + 1;
+            glyph = flags.female ? female_monnum_to_glyph(u.umonnum) : monnum_to_glyph(u.umonnum);
+            gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
+
+            add_menu(win, gui_glyph, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+            abilitynum++;
+
+#ifndef GNH_MOBILE
+            /* Monster abilities */
+            Strcpy(available_ability_list[abilitynum].name, "Monster abilities");
+            available_ability_list[abilitynum].function_ptr = &domonsterability;
+            available_ability_list[abilitynum].target_mtmp = 0;
+
+            any = zeroany;
+            any.a_int = abilitynum + 1;
+
+            int monabilitynum = print_monster_abilities(WIN_ERR);
+            add_extended_menu(win, MONSTER_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+                0, 0, ATR_NONE, NO_COLOR,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, monabilitynum > 0 ? active_menu_info() : zeroextendedmenuinfo);
+
+            abilitynum++;
+#endif
+        }
+
+#ifndef GNH_MOBILE
+        /* SKILL-BASED ABILITIES */
+        any = zeroany;
+        add_extended_menu(win, NO_GLYPH, &any,
+            0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+            "Use Skill-Based Abilities             ", MENU_UNSELECTED, menu_heading_info());
+
+        /* Ride */
+        Strcpy(available_ability_list[abilitynum].name, "Ride");
+        available_ability_list[abilitynum].function_ptr = &doride;
         available_ability_list[abilitynum].target_mtmp = 0;
 
         any = zeroany;
         any.a_int = abilitynum + 1;
 
-        int monabilitynum = print_monster_abilities(WIN_ERR);
-        add_extended_menu(win, MONSTER_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+        add_extended_menu(win, RIDE_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
             0, 0, ATR_NONE, NO_COLOR,
-            available_ability_list[abilitynum].name, MENU_UNSELECTED, monabilitynum > 0 ? active_menu_info() : zeroextendedmenuinfo);
+            available_ability_list[abilitynum].name, MENU_UNSELECTED, !P_RESTRICTED(P_RIDING) ? active_menu_info() : zeroextendedmenuinfo);
 
         abilitynum++;
-    }
 
-#ifndef GNH_MOBILE
-    /* SKILL-BASED ABILITIES */
-    any = zeroany;
-    add_extended_menu(win, NO_GLYPH, &any,
-        0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
-        "Use Skill-Based Abilities             ", MENU_UNSELECTED, menu_heading_info());
+        /* Untrap */
+        Strcpy(available_ability_list[abilitynum].name, "Untrap");
+        available_ability_list[abilitynum].function_ptr = &dountrap;
+        available_ability_list[abilitynum].target_mtmp = 0;
 
-    /* Ride */
-    Strcpy(available_ability_list[abilitynum].name, "Ride");
-    available_ability_list[abilitynum].function_ptr = &doride;
-    available_ability_list[abilitynum].target_mtmp = 0;
+        any = zeroany;
+        any.a_int = abilitynum + 1;
 
-    any = zeroany;
-    any.a_int = abilitynum + 1;
+        add_extended_menu(win, UNTRAP_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED, !P_RESTRICTED(P_DISARM_TRAP) ? active_menu_info() : zeroextendedmenuinfo);
 
-    add_extended_menu(win, RIDE_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED, !P_RESTRICTED(P_RIDING) ? active_menu_info() : zeroextendedmenuinfo);
-
-    abilitynum++;
-
-    /* Untrap */
-    Strcpy(available_ability_list[abilitynum].name, "Untrap");
-    available_ability_list[abilitynum].function_ptr = &dountrap;
-    available_ability_list[abilitynum].target_mtmp = 0;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_extended_menu(win, UNTRAP_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED, !P_RESTRICTED(P_DISARM_TRAP) ? active_menu_info() : zeroextendedmenuinfo);
-
-    abilitynum++;
+        abilitynum++;
 
 #endif
 
-    /* Game Status */
-    any = zeroany;
-    add_extended_menu(win, NO_GLYPH, &any,
-        0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
-        "Game Status                           ", MENU_UNSELECTED, menu_heading_info());
-
-    /*
-    strcpy(available_ability_list[abilitynum].name, "Quests");
-    available_ability_list[abilitynum].function_ptr = &doquests;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_menu(win, NO_GLYPH, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-    */
-
-    Strcpy(available_ability_list[abilitynum].name, "Goals and achievements");
-    available_ability_list[abilitynum].function_ptr = &doconduct;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, CONDUCT_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-    Strcpy(available_ability_list[abilitynum].name, "Dungeon overview");
-    available_ability_list[abilitynum].function_ptr = &dooverview;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, OVERVIEW_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-    Strcpy(available_ability_list[abilitynum].name, "Game events");
-    available_ability_list[abilitynum].function_ptr = &do_gamelog;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, CHRONICLE_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-    Strcpy(available_ability_list[abilitynum].name, "Killed monsters");
-    available_ability_list[abilitynum].function_ptr = &dokilledmonsters;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    int nkilled = 0;
-    for (i = LOW_PM; i < NUM_MONSTERS; i++)
-        nkilled += (int)mvitals[i].died;
-
-    add_extended_menu(win, KILLED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED, nkilled ? active_menu_info() : zeroextendedmenuinfo);
-
-    abilitynum++;
-
-    Strcpy(available_ability_list[abilitynum].name, "Genocided monsters");
-    available_ability_list[abilitynum].function_ptr = &dogenocidedmonsters;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_extended_menu(win, GENOCIDED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED, num_genocides() ? active_menu_info() : zeroextendedmenuinfo);
-
-    abilitynum++;
-
-    Strcpy(available_ability_list[abilitynum].name, "Discovered items");
-    available_ability_list[abilitynum].function_ptr = &dodiscovered;
-
-    any = zeroany;
-    any.a_int = abilitynum + 1;
-
-    add_active_menu(win, DISCOVERED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
-        0, 0, ATR_NONE, NO_COLOR,
-        available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-    abilitynum++;
-
-
-
-    /* Your pets' statistics */
-    int petcount = 0;
-    struct monst* mtmp;
-    for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
-    {
-        if (!DEADMONSTER(mtmp) && is_tame(mtmp))
-        {
-            petcount++;
-        }
-    }
-
-    if (petcount > 0)
-    {
+        /* Game Status */
         any = zeroany;
         add_extended_menu(win, NO_GLYPH, &any,
             0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
-            "Companion Statistics                ", MENU_UNSELECTED, menu_heading_info());
+            "Game Status                           ", MENU_UNSELECTED, menu_heading_info());
 
+        /*
+        Strcpy(available_ability_list[abilitynum].name, "Quests");
+        available_ability_list[abilitynum].function_ptr = &doquests;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_menu(win, NO_GLYPH, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+        */
+
+        Strcpy(available_ability_list[abilitynum].name, "Goals and achievements");
+        available_ability_list[abilitynum].function_ptr = &doconduct;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_active_menu(win, CONDUCT_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+
+        Strcpy(available_ability_list[abilitynum].name, "Dungeon overview");
+        available_ability_list[abilitynum].function_ptr = &dooverview;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_active_menu(win, OVERVIEW_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+
+        Strcpy(available_ability_list[abilitynum].name, "Game events");
+        available_ability_list[abilitynum].function_ptr = &do_gamelog;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_active_menu(win, CHRONICLE_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+
+        Strcpy(available_ability_list[abilitynum].name, "Killed monsters");
+        available_ability_list[abilitynum].function_ptr = &dokilledmonsters;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        int nkilled = 0;
+        for (i = LOW_PM; i < NUM_MONSTERS; i++)
+            nkilled += (int)mvitals[i].died;
+
+        add_extended_menu(win, KILLED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED, nkilled ? active_menu_info() : zeroextendedmenuinfo);
+
+        abilitynum++;
+
+        Strcpy(available_ability_list[abilitynum].name, "Genocided monsters");
+        available_ability_list[abilitynum].function_ptr = &dogenocidedmonsters;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_extended_menu(win, GENOCIDED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED, num_genocides() ? active_menu_info() : zeroextendedmenuinfo);
+
+        abilitynum++;
+
+        Strcpy(available_ability_list[abilitynum].name, "Discovered items");
+        available_ability_list[abilitynum].function_ptr = &dodiscovered;
+
+        any = zeroany;
+        any.a_int = abilitynum + 1;
+
+        add_active_menu(win, DISCOVERED_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
+            0, 0, ATR_NONE, NO_COLOR,
+            available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+        abilitynum++;
+
+
+
+        /* Your pets' statistics */
+        int petcount = 0;
+        struct monst* mtmp;
         for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
         {
             if (!DEADMONSTER(mtmp) && is_tame(mtmp))
             {
-                char namebuf[MAXNAMELENGTH];
-                if (UMNAME(mtmp))
-                {
-                    char umnbuf[BUFSIZ];
-                    Strcpy(umnbuf, UMNAME(mtmp));
-                    umnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
-                    Strcpy(namebuf, umnbuf);
-                }
-                else if (MNAME(mtmp) && mtmp->u_know_mname)
-                {
-                    char mnbuf[BUFSIZ];
-                    Strcpy(mnbuf, MNAME(mtmp));
-                    mnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
-                    Strcpy(namebuf, mnbuf);
-                }
-                else
-                {
-                    char buf[BUFSZ];
-                    Strcpy(buf, mon_monster_name(mtmp));
-                    *buf = highc(*buf);
-                    Strncpy(namebuf, buf, MAXNAMELENGTH - 1);
-                    namebuf[MAXNAMELENGTH - 1] = '\0';
-                }
-
-                Sprintf(available_ability_list[abilitynum].name, "%s", namebuf);
-                available_ability_list[abilitynum].function_mtmp_ptr = &doviewpetstatistics;
-                available_ability_list[abilitynum].target_mtmp = mtmp;
-
-                any = zeroany;
-                any.a_int = abilitynum + 1;
-
-                glyph = abs(any_mon_to_glyph(mtmp, rn2_on_display_rng));
-                gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, MAT_NONE, 0));
-
-                add_menu(win, gui_glyph, &any,
-                    0, 0, ATR_NONE, NO_COLOR,
-                    available_ability_list[abilitynum].name, MENU_UNSELECTED);
-
-                abilitynum++;
-
-                if (abilitynum >= MAXABILITYNUM)
-                    break;
+                petcount++;
             }
         }
-    }
 
-    end_menu(win, "Character and Game Status");
+        if (petcount > 0)
+        {
+            any = zeroany;
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
+                "Companion Statistics                ", MENU_UNSELECTED, menu_heading_info());
+
+            for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
+            {
+                if (!DEADMONSTER(mtmp) && is_tame(mtmp))
+                {
+                    char namebuf[MAXNAMELENGTH];
+                    if (UMNAME(mtmp))
+                    {
+                        char umnbuf[BUFSIZ];
+                        Strcpy(umnbuf, UMNAME(mtmp));
+                        umnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
+                        Strcpy(namebuf, umnbuf);
+                    }
+                    else if (MNAME(mtmp) && mtmp->u_know_mname)
+                    {
+                        char mnbuf[BUFSIZ];
+                        Strcpy(mnbuf, MNAME(mtmp));
+                        mnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
+                        Strcpy(namebuf, mnbuf);
+                    }
+                    else
+                    {
+                        char buf[BUFSZ];
+                        Strcpy(buf, mon_monster_name(mtmp));
+                        *buf = highc(*buf);
+                        Strncpy(namebuf, buf, MAXNAMELENGTH - 1);
+                        namebuf[MAXNAMELENGTH - 1] = '\0';
+                    }
+
+                    Sprintf(available_ability_list[abilitynum].name, "%s", namebuf);
+                    available_ability_list[abilitynum].function_mtmp_ptr = &doviewpetstatistics;
+                    available_ability_list[abilitynum].target_mtmp = mtmp;
+
+                    any = zeroany;
+                    any.a_int = abilitynum + 1;
+
+                    glyph = abs(any_mon_to_glyph(mtmp, rn2_on_display_rng));
+                    gui_glyph = maybe_get_replaced_glyph(glyph, mtmp->mx, mtmp->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, 0UL, MAT_NONE, 0));
+
+                    add_menu(win, gui_glyph, &any,
+                        0, 0, ATR_NONE, NO_COLOR,
+                        available_ability_list[abilitynum].name, MENU_UNSELECTED);
+
+                    abilitynum++;
+
+                    if (abilitynum >= MAXABILITYNUM)
+                        break;
+                }
+            }
+        }
+
+        end_menu(win, "Character and Game Status");
 
 
-    if (abilitynum <= 0)
-    {
-        You("don't have any special abilities.");
+        if (abilitynum <= 0)
+        {
+            You("don't have any special abilities.");
+            destroy_nhwindow(win);
+            return 0;
+        }
+
+        i = '\0';
+        if (select_menu(win, PICK_ONE, &pick_list) > 0)
+        {
+            i = pick_list->item.a_int;
+            free((genericptr_t)pick_list);
+        }
         destroy_nhwindow(win);
-        return 0;
-    }
 
-    i = '\0';
-    if (select_menu(win, PICK_ONE, &pick_list) > 0) 
-    {
-        i = pick_list->item.a_int;
-        free((genericptr_t)pick_list);
-    }
-    destroy_nhwindow(win);
+        if (i == '\0' || i > abilitynum || i < 1)
+            return 0;
 
-    if (i == '\0' || i > abilitynum || i < 1)
-        return 0;
-
-    int res = 0;
-    int j = i - 1;
-    if (available_ability_list[j].function_mtmp_ptr && available_ability_list[j].target_mtmp)
-        res = (available_ability_list[j].function_mtmp_ptr)(available_ability_list[j].target_mtmp);
-    else if (available_ability_list[j].function_ptr)
-        res = (available_ability_list[j].function_ptr)();
+        int j = i - 1;
+        if (available_ability_list[j].function_mtmp_ptr && available_ability_list[j].target_mtmp)
+            res = (available_ability_list[j].function_mtmp_ptr)(available_ability_list[j].target_mtmp);
+        else if (available_ability_list[j].function_ptr)
+            res = (available_ability_list[j].function_ptr)();
+        else
+            return 0;
+    } while (!res);
 
     return res;
 }
@@ -1102,7 +1113,7 @@ domonsterability(VOID_ARGS)
     winid win;
     int glyph, gui_glyph;
     glyph = abs(u_to_glyph());
-    gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
+    gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     struct extended_create_window_info createinfo = extended_create_window_info_from_mon(&youmonst);
     win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_COMMAND_MENU, gui_glyph, createinfo);
@@ -1451,10 +1462,10 @@ winid win;
     {
         any = zeroany;
         glyph = abs(any_mon_to_glyph(u.usteed, rn2_on_display_rng));
-        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL, 0UL, MAT_NONE, 0));
+        gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, u.usteed, 0UL, 0UL, 0UL, MAT_NONE, 0));
         if (win != WIN_ERR)
             add_extended_menu(win, gui_glyph, &any,
-            0, 0, iflags.menu_headings, NO_COLOR,
+            0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
             "Your Steed's Abilities", MENU_UNSELECTED, menu_heading_info());
 
         if (can_breathe(u.usteed->data))
@@ -1789,7 +1800,7 @@ STATIC_PTR int
 wiz_level_tele(VOID_ARGS)
 {
     if (wizard)
-        level_tele(1, TRUE, zerodlevel);
+        level_tele(1, TRUE, zerodlevel, 0);
     else
         pline(unavailcmd, visctrl((int) cmd_from_func(wiz_level_tele)));
     return 0;
@@ -1844,13 +1855,54 @@ wiz_level_change(VOID_ARGS)
 STATIC_PTR int
 wiz_panic(VOID_ARGS)
 {
-    if (iflags.debug_fuzzer) {
-        u.uhp = u.uhpmax = 1000;
-        u.uen = u.uenmax = 1000;
-        return 0;
+    if (wizard)
+    {
+        if (iflags.debug_fuzzer) {
+            u.uhp = u.uhpmax = 1000;
+            u.uen = u.uenmax = 1000;
+            return 0;
+        }
+        if (yn_query("Do you want to call panic() and end your game?") == 'y')
+            panic("Crash test.");
     }
-    if (yn_query("Do you want to call panic() and end your game?") == 'y')
-        panic("Crash test.");
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_panic)));
+    return 0;
+}
+
+STATIC_PTR int
+wiz_debug(VOID_ARGS)
+{
+    if (wizard)
+    {
+        int wiz_debug_cmd_idx = 0;
+        switch (wiz_debug_cmd_idx)
+        {
+        case 0:
+        {
+            struct obj* otmp;
+            struct monst* mtmp;
+            int cnt = 0;
+            for (otmp = fobj; otmp; otmp = otmp->nobj)
+            {
+                if (has_omonst(otmp)
+                    && (mtmp = get_mtraits(otmp, FALSE)) != 0
+                    && is_tame(mtmp))
+                {
+                    pline("obj found: %s at (%d,%d)", cxname(otmp), otmp->ox, otmp->oy);
+                    cnt++;
+                }
+            }
+            pline("%d obj%s found. u at (%d,%d)", cnt, plur(cnt), u.ux, u.uy);
+            break;
+        }
+        default:
+            pline1(Never_mind);
+            break;
+        }
+    }
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_debug)));
     return 0;
 }
 #endif
@@ -1859,7 +1911,10 @@ wiz_panic(VOID_ARGS)
 STATIC_PTR int
 wiz_polyself(VOID_ARGS)
 {
-    polyself(1);
+    if (wizard)
+        polyself(1);
+    else
+        pline(unavailcmd, visctrl((int)cmd_from_func(wiz_polyself)));
     return 0;
 }
 
@@ -3195,7 +3250,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
 {
     char buf[BUFSZ], tmpbuf[BUFSZ];
     int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
-    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, MAT_NONE, 0));
+    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_ENLIGHTENMENT_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
     en_via_menu = !final;
@@ -3357,7 +3412,7 @@ int final;
     if (usenextrow)
     {
         enlght_out(buf, ATR_NONE);
-        strcpy(buf, "");
+        Strcpy(buf, "");
     }
 
     /* show the rest of this game's pantheon (finishes previous sentence)
@@ -3553,7 +3608,7 @@ int final;
     enl_msg("Autopickup ", "is ", "was ", buf, "");
 
     const char* game_dif_text = get_game_difficulty_text(context.game_difficulty);
-    strcpy(buf, game_dif_text);
+    Strcpy(buf, game_dif_text);
     double monster_damage_mult = 1;
     double monster_hp_mult = 1;
     get_game_difficulty_multipliers(&monster_damage_mult, &monster_hp_mult);
@@ -4865,7 +4920,7 @@ int final;
     if (Reflecting)
         you_have("reflection", from_what(REFLECTING));
     if (Free_action)
-        you_have("free action", from_what(FREE_ACTION));
+        you_have("paralysis resistance", from_what(FREE_ACTION));
     if (Fixed_abil)
         you_have("fixed abilities", from_what(FIXED_ABIL));
     if (Lifesaved)
@@ -5219,7 +5274,7 @@ int cmdflag;
 
         any.a_nfunc = efp->ef_funct;
 
-        strcpy(cmdbuf, efp->ef_txt);
+        Strcpy(cmdbuf, efp->ef_txt);
         cmdlen = strlen(cmdbuf);
         if (cmdlen < maxcommandlength)
         {
@@ -5231,7 +5286,7 @@ int cmdflag;
         if ((efp->flags & CMD_NOT_AVAILABLE) != 0 || (efp->flags & cmdflag) == 0)
             continue;
 
-        strcpy(descbuf, efp->ef_desc);
+        Strcpy(descbuf, efp->ef_desc);
         *descbuf = highc(*descbuf);
 
 #ifndef GNH_MOBILE
@@ -5252,7 +5307,7 @@ int cmdflag;
             (efp->bound_key & ctrlmask) == 0 ? "Ctrl-" : (efp->bound_key & altmask) == altmask ? "Alt-" : "",
                 (efp->bound_key & ctrlmask) == 0 ? efp->bound_key | ctrlmask : (efp->bound_key & altmask) == altmask ? efp->bound_key & ~altmask : efp->bound_key);
         else
-            strcpy(shortcutbuf, "");
+            Strcpy(shortcutbuf, "");
 #endif
         Sprintf(buf, "%s  %s", cmdbuf, descbuf);
 
@@ -5334,6 +5389,7 @@ dodeletesavedgame(VOID_ARGS)
             {
                 delete_tmp_backup_savefile();
                 delete_backup_savefile();
+                delete_error_savefile();
                 delete_savefile();
                 pline1("Save file has been deleted.");
             }
@@ -5697,6 +5753,7 @@ struct ext_func_tab extcmdlist[] = {
             doattributes, IFBURIED | AUTOCOMPLETE },
     { '@', "autopickup", "toggle the pickup option on/off",
             dotogglepickup, IFBURIED },
+    { M(15), "autostash", "auto-stash specific item types", doautostash, AUTOCOMPLETE },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M('b'), "bars", "toggle tile hit point bars on/off",
             dotogglehpbars, IFBURIED | AUTOCOMPLETE },
@@ -5734,7 +5791,7 @@ struct ext_func_tab extcmdlist[] = {
             enter_explore_mode, IFBURIED },
     { 'f', "fire", "fire ammunition from quiver", dofire, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_allowall, "fire" },
     { M('f'), "force", "force a lock", doforce, AUTOCOMPLETE | INCMDMENU },
-    { ';', "glance", "show what type of thing a map symbol corresponds to",
+    { '\'', "glance", "show what type of thing a map symbol corresponds to",
             doquickwhatis, IFBURIED | GENERALCMD },
     { M('g'), "genocided", "list genocided monsters",
             dogenocidedmonsters, IFBURIED },
@@ -5791,6 +5848,7 @@ struct ext_func_tab extcmdlist[] = {
             wiz_panic, IFBURIED },
 #endif
     { 'p', "pay", "pay your shopping bill", dopay },
+    { ';', "pickstash", "pick up things at the current location and stash them into a container", doput2bag },
     { ',', "pickup", "pick up things at the current location", dopickup },
     { M(1), "polyself", "polymorph self", /* Special hotkey launchable from GUI */
             wiz_polyself, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
@@ -5843,6 +5901,7 @@ struct ext_func_tab extcmdlist[] = {
     },
     { C('s'), "sit", "sit down", dosit, AUTOCOMPLETE | INCMDMENU },
     { M(7), "stash", "stash an item into a container", dostash, SINGLE_OBJ_CMD_GENERAL, 0, getobj_stash_objs, "stash", "stash into a container" },
+    { M(14), "stashfloor", "stash an item into a container on the floor", dostashfloor, SINGLE_OBJ_CMD_GENERAL, 0, getobj_stash_objs, "stash into a container on the floor", "stash into a container on the floor" },
     { '\0', "stats", "show memory statistics",
             wiz_show_stats, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { C('z'), "suspend", "suspend the game",
@@ -5896,14 +5955,14 @@ struct ext_func_tab extcmdlist[] = {
     { 'w', "wield", "wield (put in use) a weapon", dowield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_wield_objs, "wield" },
     { M('w'), "wipe", "wipe off your face", dowipe, AUTOCOMPLETE | INCMDMENU },
     { 'x', "swap", "swap wielded and secondary weapons", doswapweapon_right_or_both, INCMDMENU },
-    { M('x'), "examine", "describe an item", doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO, 0, getobj_allobj, "examine" },
+    { M('x'), "examine", "describe an item", doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO | ALLOW_RETURN_TO_INVENTORY | ALLOW_RETURN_TO_CMD_MENU, 0, getobj_allobj, "examine" },
     { M(5), "unwield", "unwield a weapon", dounwield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_unwield_objs, "unwield"},
     { '}', "you", "describe your character", docharacterstatistics, IFBURIED | AUTOCOMPLETE },
     { C('y'), "yell", "yell for your companions",
             doyell, IFBURIED | AUTOCOMPLETE | INCMDMENU },
     { 'z', "zap", "zap a wand", dozap, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_zap_syms, "zap" },
-    { M(8), "markautostash", "mark a container as auto-stash", domarkautostash, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_mark_autostashs, "mark as auto-stash", "mark as auto-stash"  },
-    { M(9), "unmarkautostash", "unmark a container as auto-stash", dounmarkautostash, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_unmark_autostashs, "unmark as auto-stash", "unmark as auto-stash" },
+    { M(8), "favorite", "mark an item as favorite", dofavorite, SINGLE_OBJ_CMD_SPECIFIC | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "mark as favorite", "mark as favorite"  },
+    { M(9), "unfavorite", "unmark an item as favorite", dounfavorite, SINGLE_OBJ_CMD_SPECIFIC | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "unmark as favorite", "unmark as favorite" },
     { 'Z', "cast", "cast a spell", docast, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
     { 'X', "mix", "prepare a spell from material components",
             domix, AUTOCOMPLETE | INSPELLMENU },
@@ -5934,6 +5993,8 @@ struct ext_func_tab extcmdlist[] = {
 #ifdef DEBUG
     { '\0', "wizbury", "bury objs under and around you",
             wiz_debug_cmd_bury, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "wizdebug", "choose and execute a debug command",
+            wiz_debug, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #endif
     { C('e'), "wizdetect", "reveal hidden things within a small radius",
             wiz_detect, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
@@ -7143,7 +7204,7 @@ STATIC_OVL boolean
 accept_menu_prefix(cmd_func)
 int NDECL((*cmd_func));
 {
-    if (cmd_func == dopickup || cmd_func == dotip
+    if (cmd_func == dopickup || cmd_func == doput2bag || cmd_func == dotip
         /* eat, #offer, and apply tinning-kit all use floorfood() to pick
            an item on floor or in invent; 'm' skips picking from floor
            (ie, inventory only) rather than request use of menu operation */
@@ -7237,7 +7298,6 @@ register char *cmd;
     update_here_window();
     issue_simple_gui_command(GUI_CMD_CLEAR_PET_DATA);
 
-    //reset_all_monster_origin_coordinates();
     check_gui_special_effect();
     check_mobbed_hint();
 
@@ -7250,6 +7310,12 @@ register char *cmd;
         context.nopick = 0;
         cmd = parse();
     }
+
+    reset_monster_origin_coordinates(&youmonst);
+    reset_all_monster_origin_coordinates();
+    reset_all_object_origin_coordinates();
+    reset_found_this_turn();
+
     if (*cmd == Cmd.spkeys[NHKF_ESC]) {
 #ifdef ANDROID
         quit_possible();
@@ -7273,7 +7339,7 @@ register char *cmd;
 
     /* handle most movement commands */
     prefix_seen = FALSE;
-    context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
+    clear_run_and_travel();
     spkey = ch2spkeys(*cmd, NHKF_RUN, NHKF_CLICKLOOK);
 
     if (flags.prefer_fast_move)
@@ -7298,6 +7364,7 @@ register char *cmd;
     case NHKF_RUSH:
         if (movecmd(cmd[1])) {
             context.run = 2;
+            mark_spotted_monsters_in_run();
             domove_attempting |= DOMOVE_RUSH;
         } else
             prefix_seen = TRUE;
@@ -7309,6 +7376,7 @@ register char *cmd;
     case NHKF_RUN:
         if (movecmd(lowc(cmd[1]))) {
             context.run = 3;
+            mark_spotted_monsters_in_run();
             domove_attempting |= DOMOVE_RUSH;
         } else
             prefix_seen = TRUE;
@@ -7344,6 +7412,7 @@ register char *cmd;
         if (movecmd(lowc(cmd[1]))) {
             context.run = 1;
             context.nopick = 1;
+            mark_spotted_monsters_in_run();
             domove_attempting |= DOMOVE_RUSH;
         } else
             prefix_seen = TRUE;
@@ -7386,6 +7455,7 @@ register char *cmd;
             context.travel_mode = (spkey == NHKF_TRAVEL_WALK) ? TRAVEL_MODE_WALK : TRAVEL_MODE_NORMAL;
             context.tmid = 0;
             context.toid = 0;
+            mark_spotted_monsters_in_run();
             if (isok(u.tx, u.ty))
             {
                 if (spkey == NHKF_TRAVEL_ATTACK)
@@ -7411,12 +7481,14 @@ register char *cmd;
             movecmd(Cmd.num_pad ? unmeta(*cmd) : lowc(*cmd))) 
         {
             context.run = 1;
+            mark_spotted_monsters_in_run();
             domove_attempting |= DOMOVE_RUSH;
         } 
         else if (Cmd.gnh_layout ? (digit(unctrl(*cmd)) && movecmd(unctrl(*cmd))) :
             movecmd(unctrl(*cmd))) 
         {
             context.run = 3;
+            mark_spotted_monsters_in_run();
             domove_attempting |= DOMOVE_RUSH;
         }
         break;
@@ -7445,9 +7517,8 @@ register char *cmd;
            feedback and led to strangeness if the key pressed
            ('u' in particular) was overloaded for num_pad use */
         You_cant("get there from here...");
-        context.run = 0;
+        clear_run_and_travel();
         context.nopick = context.forcefight = FALSE;
-        context.move = context.mv = FALSE;
         multi = 0;
         return;
     }
@@ -8169,7 +8240,8 @@ boolean doit;
 
     if ((u.ux == xupstair && u.uy == yupstair)
         || (u.ux == sstairs.sx && u.uy == sstairs.sy && sstairs.up)
-        || (u.ux == xupladder && u.uy == yupladder)) {
+        || (u.ux == xupladder && u.uy == yupladder)) 
+    {
         Sprintf(buf, "Go up the %s",
                 (u.ux == xupladder && u.uy == yupladder)
                 ? "ladder" : "stairs");
@@ -8177,13 +8249,15 @@ boolean doit;
     }
     if ((u.ux == xdnstair && u.uy == ydnstair)
         || (u.ux == sstairs.sx && u.uy == sstairs.sy && !sstairs.up)
-        || (u.ux == xdnladder && u.uy == ydnladder)) {
+        || (u.ux == xdnladder && u.uy == ydnladder)) 
+    {
         Sprintf(buf, "Go down the %s",
                 (u.ux == xdnladder && u.uy == ydnladder)
                 ? "ladder" : "stairs");
         add_herecmd_menuitem(win, dodown, buf);
     }
-    if (u.usteed) { /* another movement choice */
+    if (u.usteed)
+    { /* another movement choice */
         Sprintf(buf, "Dismount %s",
                 x_monnam(u.usteed, ARTICLE_THE, (char *) 0, SUPPRESS_SADDLE, FALSE));
         add_herecmd_menuitem(win, doride, buf);
@@ -8197,17 +8271,24 @@ boolean doit;
     }
 #endif
 
-    if (OBJ_AT(u.ux, u.uy)) {
-        struct obj *otmp = level.objects[u.ux][u.uy];
-
-        Sprintf(buf, "Pick up %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known));
+    struct obj* otmp = level.objects[u.ux][u.uy];
+    if (otmp) 
+    {
+        Sprintf(buf, "Pick up %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE));
         add_herecmd_menuitem(win, dopickup, buf);
 
-        if (Is_container(otmp)) {
+        if (count_bags_for_stashing(invent, otmp, FALSE, TRUE) > 0)
+        {
+            Sprintf(buf, "Pick up and auto-stash %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE));
+            add_herecmd_menuitem(win, doput2bag, buf);
+        }
+        if (Is_container(otmp)) 
+        {
             Sprintf(buf, "Loot %s", doname(otmp));
             add_herecmd_menuitem(win, doloot, buf);
         }
-        if (otmp->oclass == FOOD_CLASS) {
+        if (otmp->oclass == FOOD_CLASS) 
+        {
             Sprintf(buf, "Eat %s", doname(otmp));
             add_herecmd_menuitem(win, doeat, buf);
         }
@@ -8224,15 +8305,19 @@ boolean doit;
     npick = select_menu(win, PICK_ONE, &picks);
     destroy_nhwindow(win);
     ch = '\0';
-    if (npick > 0) {
+    if (npick > 0) 
+    {
         int NDECL((*func)) = picks->item.a_nfunc;
         free((genericptr_t) picks);
 
-        if (doit) {
+        if (doit) 
+        {
             int ret = (*func)();
 
             ch = (char) ret;
-        } else {
+        } 
+        else 
+        {
             ch = cmd_from_func(func);
         }
     }
@@ -8289,9 +8374,22 @@ int x, y, mod;
                 mtmp = m_at(target_x, target_y);
             }
 
-            if (mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp))
+            boolean mon_mimic = FALSE;
+            boolean sensed = FALSE;
+            if (mtmp)
             {
-                if (iflags.clickfire && ((uwep && is_launcher(uwep)) || (uquiver && throwing_weapon(uquiver))) && dist2(u.ux, u.uy, target_x, target_y) > 2)
+                mon_mimic = (M_AP_TYPE(mtmp) != M_AP_NOTHING);
+                sensed = (mon_mimic && (Protection_from_shape_changers || sensemon(mtmp)));
+            }
+
+            if (mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp) && (!mon_mimic || sensed))
+            {
+                boolean has_launcher = (uwep && is_launcher(uwep));
+                boolean has_swapped_launcher_and_ammo = (uswapwep && is_launcher(uswapwep) && ammo_and_launcher(uquiver, uswapwep));
+                boolean has_throwing_weapon_quivered = (uquiver && throwing_weapon(uquiver));
+                boolean cursed_weapon_blocks_swap = (uswapwep && objects[uswapwep->otyp].oc_bimanual) || (uswapwep && uswapwep2 && !flags.swap_rhand_only) ? ((uwep && welded(uwep, &youmonst)) || (uarms && welded(uarms, &youmonst))) : (uwep && welded(uwep, &youmonst));
+                if (iflags.clickfire && dist2(u.ux, u.uy, target_x, target_y) > 2 &&
+                    (has_launcher || (iflags.autoswap_launchers && has_swapped_launcher_and_ammo && !cursed_weapon_blocks_swap) || has_throwing_weapon_quivered))
                 {
                     if (!x || !y || abs(x) == abs(y)) /* straight line or diagonal */
                     {
@@ -8299,6 +8397,13 @@ int x, y, mod;
                         struct monst* mtmpinway = spotted_linedup_monster_in_way(u.ux, u.uy, target_x, target_y);
                         if (path_is_clear && !mtmpinway)
                         {
+                            if (iflags.autoswap_launchers && !has_launcher && has_swapped_launcher_and_ammo && !cursed_weapon_blocks_swap)
+                            {
+                                if(uswapwep && objects[uswapwep->otyp].oc_bimanual)
+                                    (void)doswapweapon();
+                                else
+                                    (void)doswapweapon_right_or_both();
+                            }
                             //clickfire_cc.x = target_x;
                             //clickfire_cc.y = target_y;
                             cmd[0] = Cmd.spkeys[NHKF_CLICKFIRE];
@@ -8923,6 +9028,14 @@ char def;
 }
 
 char
+yn_function_end(query, resp, def, resp_desc)
+const char* query, * resp, * resp_desc;
+char def;
+{
+    return yn_function_ex(YN_STYLE_END, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, (const char*)0, 0UL);
+}
+
+char
 yn_function_mon(mtmp, query, chars, def, descs)
 struct monst* mtmp;
 const char* query;
@@ -9241,9 +9354,9 @@ dolight(VOID_ARGS)
     if (get_location_light_range(cc.x, cc.y) != 0)
     {
         char ebuf[BUFSZ];
-        strcpy(ebuf, "");
+        Strcpy(ebuf, "");
         if(levl[cc.x][cc.y].typ == ALTAR)
-            strcpy(ebuf, "fires on the ");
+            Strcpy(ebuf, "fires on the ");
 
         if (levl[cc.x][cc.y].lamplit == 0)
         {
@@ -9271,6 +9384,29 @@ dolight(VOID_ARGS)
 
     return 0;
 }
+
+void
+reset_found_this_turn(VOID_ARGS)
+{
+    /* Clear out finds from last turn */
+    struct obj* otmp;
+    for (otmp = fobj; otmp; otmp = otmp->nobj)
+        obj_clear_found(otmp);
+}
+
+void
+clear_found_this_turn_at(x, y)
+int x, y;
+{
+    if (!isok(x, y))
+        return;
+
+    /* Clear out finds from last turn */
+    struct obj* otmp;
+    for (otmp = o_at(x, y); otmp; otmp = otmp->nexthere)
+        obj_clear_found(otmp);
+}
+
 
 void
 create_context_menu(menu_type)
@@ -9396,6 +9532,10 @@ enum create_context_menu_types menu_type;
                     "Pit", 0, NO_COLOR);
             }
         }
+        else if (t && t->tseen && is_lever(t->ttyp))
+        {
+            add_context_menu('a', cmd_from_func(doapply), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Apply", "the Lever", 0, NO_COLOR);
+        }
 
         struct monst* shkp = can_pay_to_shkp();
         if (shkp && has_eshk(shkp))
@@ -9469,10 +9609,20 @@ enum create_context_menu_types menu_type;
             add_context_menu('C', cmd_from_func(dotalksteed), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(u.usteed, rn2_on_display_rng), "Steed", Monnam(u.usteed), 0, NO_COLOR);
         }
 
-        if (otmp)
+        struct obj* otmp_here;
+        boolean showpickup = FALSE;
+        for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
+            if (otmp_here != uchain)
+            {
+                showpickup = TRUE;
+                break;
+            }
+
+        if (showpickup)
         {
             add_context_menu(',', cmd_from_func(dopickup), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick Up", cxname(otmp), 0, NO_COLOR);
-            struct obj* otmp_here;
+            if(count_bags_for_stashing(invent, otmp, FALSE, TRUE) > 0)
+                add_context_menu(';', cmd_from_func(doput2bag), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick & Stash", cxname(otmp), 0, NO_COLOR);
             boolean eat_added = FALSE;
             boolean loot_added = FALSE;
             for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
@@ -9512,49 +9662,50 @@ enum create_context_menu_types menu_type;
 }
 
 int
-domarkautostash(VOID_ARGS)
+dofavorite(VOID_ARGS)
 {
-    struct obj* obj = getobj(getobj_mark_autostashs, "mark as auto-stash", 0, "");
+    struct obj* obj = getobj(getobj_favorites, "mark as favorite", 0, "");
     if (!obj)
         return 0;
 
-    if (obj && (Is_proper_container(obj) || (Is_container(obj) && !objects[obj->otyp].oc_name_known)))
+    if (obj->oclass != COIN_CLASS)
     {
-        if (obj->speflags & SPEFLAGS_AUTOSTASH)
+        if (obj->speflags & SPEFLAGS_FAVORITE)
         {
-            pline("%s is already an auto-stash.", The(cxname(obj)));
+            pline("%s is already a favorite.", The(cxname(obj)));
         }
         else
         {
-            obj->speflags |= SPEFLAGS_AUTOSTASH;
-            pline("%s is now marked as an auto-stash.", The(cxname(obj)));
+            obj->speflags |= SPEFLAGS_FAVORITE;
+            pline("%s is now marked as a favorite.", The(cxname(obj)));
+            update_inventory();
         }
     }
     else
     {
-        pline("%s is not an auto-stashable item.", The(cxname(obj)));
+        pline("%s is not an item that can be marked as a favorite.", The(cxname(obj)));
     }
 
     return 0;
 }
 
 int
-dounmarkautostash(VOID_ARGS)
+dounfavorite(VOID_ARGS)
 {
-    struct obj* obj = getobj(getobj_unmark_autostashs, "unmark as auto-stash", 0, "");
+    struct obj* obj = getobj(getobj_favorites, "unmark as favorite", 0, "");
     if (!obj)
         return 0;
 
-    if (!(obj->speflags & SPEFLAGS_AUTOSTASH))
+    if (!(obj->speflags & SPEFLAGS_FAVORITE))
     {
-        pline("%s is not an auto-stash.", The(cxname(obj)));
+        pline("%s is not a favorite.", The(cxname(obj)));
     }
     else
     {
-        obj->speflags &= ~SPEFLAGS_AUTOSTASH;
-        pline("%s was unmarked as an auto-stash.", The(cxname(obj)));
+        obj->speflags &= ~SPEFLAGS_FAVORITE;
+        pline("%s was unmarked as a favorite.", The(cxname(obj)));
+        update_inventory();
     }
-
     return 0;
 }
 

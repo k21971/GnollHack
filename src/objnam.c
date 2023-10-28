@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
 
 /* GnollHack 4.0    objnam.c    $NHDT-Date: 1551138256 2019/02/25 23:44:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.235 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -8,7 +8,7 @@
 #include "hack.h"
 
 const char* multishot_style_names[MAX_MULTISHOT_TYPES] = {
-    "None",
+    "1",
     "1+1/4 per skill level after basic when firing",
     "2 when firing",
     "1/1.5/2 for basic/skilled/expert when firing",
@@ -71,7 +71,6 @@ STATIC_DCL short FDECL(rnd_otyp_by_namedesc, (const char *, CHAR_P, int));
 STATIC_DCL boolean FDECL(wishymatch, (const char *, const char *, BOOLEAN_P));
 STATIC_DCL void FDECL(releaseobuf, (char *));
 STATIC_DCL char *FDECL(minimal_xname, (struct obj *));
-STATIC_DCL char *FDECL(doname_base, (struct obj *obj, unsigned));
 STATIC_DCL char *FDECL(just_an, (char *str, const char *));
 STATIC_DCL boolean FDECL(singplur_lookup, (char *, char *, BOOLEAN_P,
                                            const char *const *));
@@ -1042,10 +1041,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     }
     else if (has_uoname(obj))
     {
-        if(obj->otyp == CORPSE)
-            Strcat(buf, " known as "); /* corpses are not labeled */
-        else
-            Strcat(buf, " labeled ");
+        Strcat(buf, " labeled ");
         Strcat(buf, UONAME(obj));
     }
     if (!strncmpi(buf, "the ", 4))
@@ -1066,7 +1062,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         }
         else if (has_umname(OMONST(obj)))
         {
-            Strcat(buf, " called ");
+            Strcat(buf, " nicknamed ");
             Strcat(buf, UMNAME(OMONST(obj)));
         }
     }
@@ -1267,15 +1263,8 @@ struct obj *obj;
     return FALSE;
 }
 
-#define DONAME_WITH_PRICE 0x0001
-#define DONAME_VAGUE_QUAN 0x0002
-#define DONAME_WITH_WEIGHT_FIRST 0x0004
-#define DONAME_WITH_WEIGHT_LAST 0x0008
-#define DONAME_LOADSTONE_CORRECTLY 0x0010
-#define DONAME_LIT_IN_FRONT  0x0020
-
-STATIC_OVL char *
-doname_base(obj, doname_flags)
+char *
+doname_with_flags(obj, doname_flags)
 struct obj *obj;
 unsigned doname_flags;
 {
@@ -1354,6 +1343,7 @@ unsigned doname_flags;
 
     /* "empty" goes at the beginning, but item count goes at the end */
     if ((obj->oclass == TOOL_CLASS && (objects[obj->otyp].oc_subtyp == TOOLTYPE_JAR || objects[obj->otyp].oc_subtyp == TOOLTYPE_CAN || objects[obj->otyp].oc_subtyp == TOOLTYPE_GRAIL) && obj->charges == 0 && !known)
+        || is_light_source_empty(obj)
         || (cknown
         /* bag of tricks: include "empty" prefix if it's known to
            be empty but its precise number of charges isn't known
@@ -1389,7 +1379,9 @@ unsigned doname_flags;
              * printed to avoid ambiguity between an item whose curse
              * status is unknown, and an item known to be uncursed.
              */
-                 || ((!known || !objects[obj->otyp].oc_enchantable
+                 || ((!known 
+                      || (!objects[obj->otyp].oc_enchantable && !objects[obj->otyp].oc_charged)
+                      || (obj->oclass == GEM_CLASS && objects[obj->otyp].oc_enchantable && obj->enchantment == 0 && obj->elemental_enchantment == 0 && obj->exceptionality == 0)
                       || obj->oclass == ARMOR_CLASS
                       || obj->oclass == RING_CLASS
                       || obj->oclass == MISCELLANEOUS_CLASS
@@ -1468,6 +1460,10 @@ unsigned doname_flags;
             Sprintf(eos(bp), " (%d:%d)", (int)obj->recharged, (int)obj->charges);
     }
 
+    long burnleft = 0;
+    boolean burnleftset = FALSE;
+    char burnbuf[BUFSZ] = "";
+
     /* post and prefixes */
     switch (is_weptool(obj) ? WEAPON_CLASS : obj->oclass) {
     case AMULET_CLASS:
@@ -1482,7 +1478,7 @@ unsigned doname_flags;
             else
             {
                 char replacetxt[OBUFSZ] = "";
-                strcpy(replacetxt, misc_type_worn_texts[objects[obj->otyp].oc_subtyp]);
+                Strcpy(replacetxt, misc_type_worn_texts[objects[obj->otyp].oc_subtyp]);
 
                 /* special replacement for some types */
                 switch (objects[obj->otyp].oc_subtyp)
@@ -1631,10 +1627,6 @@ weapon_here:
             Strcat(bp, " (being worn)");
             break;
         }
-        if (obj->speflags & SPEFLAGS_AUTOSTASH) {
-            Strcat(bp, " (auto-stash)");
-            break;
-        }
         if (obj->otyp == LEASH && obj->leashmon != 0) {
             struct monst *mlsh = find_mid(obj->leashmon, FM_FMON);
 
@@ -1647,23 +1639,44 @@ weapon_here:
             }
             break;
         }
+
+        if (!(doname_flags & DONAME_HIDE_REMAINING_LIT_TURNS)
+            && is_obj_light_source(obj) && object_stats_known(obj)
+            && (obj->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0)
+        {
+            long maxburn = obj_light_maximum_burn_time(obj);
+            if (maxburn >= 0 && !obj_burns_infinitely(obj))
+            {
+                burnleft = obj_light_burn_time_left(obj);
+                if(burnleft > 0) /* Hide if empty */
+                    burnleftset = TRUE;
+            }
+        }
+
         if (is_obj_candelabrum(obj)) 
         {
             if (!obj->special_quality)
                 Strcpy(tmpbuf, "no");
             else
                 Sprintf(tmpbuf, "%d", obj->special_quality);
+
             if (lit_in_front)
             {
                 if(obj->lamplit)
                     Strcat(prefix, "lit ");
 
-                Sprintf(eos(bp), " with %s candle%s%s", tmpbuf, plur(obj->special_quality),
-                    " attached");
+                if (burnleftset)
+                    Sprintf(burnbuf, " (%ld turn%s left)", burnleft, plur(burnleft));
+                Sprintf(eos(bp), " with %s candle%s%s%s", tmpbuf, plur(obj->special_quality),
+                    " attached", burnbuf);
             }
             else
-                Sprintf(eos(bp), " (%s candle%s%s)", tmpbuf, plur(obj->special_quality),
-                        !obj->lamplit ? " attached" : ", lit");
+            {
+                if (burnleftset)
+                    Sprintf(burnbuf, ", %ld turn%s left", burnleft, plur(burnleft));
+                Sprintf(eos(bp), " (%s candle%s%s%s)", tmpbuf, plur(obj->special_quality),
+                    !obj->lamplit ? " attached" : ", lit", burnbuf);
+            }
             break;
         } 
         else if (is_lamp(obj) || is_candle(obj) || is_torch(obj))
@@ -1674,28 +1687,56 @@ weapon_here:
                 || (is_torch(obj) && obj->age < torch_maximum_burn_time(obj))
                 )
                 Strcat(prefix, "partly used ");
+
             if (obj->lamplit)
             {
-                if(lit_in_front)
+                if (lit_in_front)
+                {
                     Strcat(prefix, "lit ");
+                    if (burnleftset)
+                        Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+                }
                 else
-                    Strcat(bp, " (lit)");
+                {
+                    if (burnleftset)
+                        Sprintf(burnbuf, ", %ld turn%s left", burnleft, plur(burnleft));
+                    Sprintf(eos(bp), " (lit%s)", burnbuf);
+                }
+            }
+            else
+            {
+                if (burnleftset)
+                    Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
             }
             break;
         }
-//        if (objects[obj->otyp].oc_charged)
-//            goto charges;
+
         break;
     case WAND_CLASS:
- //charges:
         break;
     case POTION_CLASS:
-        if (obj->otyp == POT_OIL && obj->lamplit)
+        if (obj->otyp == POT_OIL)
         {
-            if (lit_in_front)
-                Strcat(prefix, "lit ");
+            if (obj->lamplit)
+            {
+                if (lit_in_front)
+                {
+                    Strcat(prefix, "lit ");
+                    if (burnleftset)
+                        Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+                }
+                else
+                {
+                    if (burnleftset)
+                        Sprintf(burnbuf, ", %ld turn%s left", burnleft, plur(burnleft));
+                    Sprintf(eos(bp), " (lit%s)", burnbuf);
+                }
+            }
             else
-                Strcat(bp, " (lit)");
+            {
+                if (burnleftset)
+                    Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+            }
         }
         break;
     case RING_CLASS:
@@ -1929,23 +1970,23 @@ weapon_here:
     {
         char colorbuf[OBUFSZ] = "red";
         if (obj->oartifact)
-            strcpy(colorbuf, glow_color(obj->oartifact));
+            Strcpy(colorbuf, glow_color(obj->oartifact));
 
-        if (!obj->oartifact || strcmp(colorbuf, "no color") == 0)
+        if (!obj->oartifact || strcmp(colorbuf, "no color") == 0 || strcmp(colorbuf, "colorless") == 0)
         {
             if ((objects[obj->otyp].oc_flags2 & O2_FLICKER_COLOR_MASK) == O2_FLICKER_COLOR_BLACK)
-                strcpy(colorbuf, "black");
+                Strcpy(colorbuf, "black");
             else if ((objects[obj->otyp].oc_flags2 & O2_FLICKER_COLOR_MASK) == O2_FLICKER_COLOR_WHITE)
-                strcpy(colorbuf, "white");
+                Strcpy(colorbuf, "white");
             else if ((objects[obj->otyp].oc_flags2 & O2_FLICKER_COLOR_MASK) == O2_FLICKER_COLOR_BLUE)
-                strcpy(colorbuf, "blue");
+                Strcpy(colorbuf, "blue");
             else
-                strcpy(colorbuf, "red");
+                Strcpy(colorbuf, "red");
         }
         if (!Blind)
             Sprintf(eos(bp), " (%s %s)",
                 glow_verb(obj->detectioncount, TRUE),
-                colorbuf);
+                hcolor(colorbuf));
     }
 
     /* Mark if glowing when detected something */
@@ -1992,14 +2033,14 @@ char *
 doname(obj)
 struct obj *obj;
 {
-    return doname_base(obj, 0U);
+    return doname_with_flags(obj, 0U);
 }
 
 char*
 doname_in_text(obj)
 struct obj* obj;
 {
-    return doname_base(obj, DONAME_LIT_IN_FRONT);
+    return doname_with_flags(obj, DONAME_LIT_IN_FRONT);
 }
 
 /* Name of object including price. */
@@ -2007,7 +2048,7 @@ char *
 doname_with_price(obj)
 struct obj *obj;
 {
-    return doname_base(obj, DONAME_WITH_PRICE);
+    return doname_with_flags(obj, DONAME_WITH_PRICE);
 }
 
 /* Name of object including price. */
@@ -2016,7 +2057,7 @@ doname_with_price_and_weight_last(obj,  loadstonecorrectly)
 struct obj* obj;
 boolean loadstonecorrectly;
 {
-    return doname_base(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
 }
 
 /* Name of object including price. */
@@ -2024,7 +2065,7 @@ char*
 doname_in_text_with_price_and_weight_last(obj)
 struct obj* obj;
 {
-    return doname_base(obj, DONAME_LIT_IN_FRONT | DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (objects[LOADSTONE].oc_name_known ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_LIT_IN_FRONT | DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (objects[LOADSTONE].oc_name_known ? DONAME_LOADSTONE_CORRECTLY : 0));
 }
 
 /* Name of object including price. */
@@ -2033,7 +2074,7 @@ doname_with_price_and_weight_first(obj, loadstonecorrectly)
 struct obj* obj;
 boolean loadstonecorrectly;
 {
-    return doname_base(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
 }
 
 /* "some" instead of precise quantity if obj->dknown not set */
@@ -2053,40 +2094,40 @@ struct obj *obj;
      * TODO: add obj->qknown flag for 'quantity known' on stackable
      * items; it could overlay obj->cknown since no containers stack.
      */
-    return doname_base(obj, DONAME_VAGUE_QUAN);
+    return doname_with_flags(obj, DONAME_VAGUE_QUAN);
 }
 
 char*
-doname_with_weight_first(obj, loadstonecorrectly)
+doname_with_weight_first(obj, loadstonecorrectly, is_perm_inv)
 struct obj* obj;
-boolean loadstonecorrectly;
+boolean loadstonecorrectly, is_perm_inv;
 
 {
-    return doname_base(obj, DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0));
 }
 
 char*
 doname_with_weight_first_true(obj)
 struct obj* obj;
 {
-    return doname_base(obj, DONAME_WITH_WEIGHT_FIRST | DONAME_LOADSTONE_CORRECTLY);
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | DONAME_LOADSTONE_CORRECTLY);
 }
 
 char*
 doname_with_weight_last_true(obj)
 struct obj* obj;
 {
-    return doname_base(obj, DONAME_WITH_WEIGHT_LAST | DONAME_LOADSTONE_CORRECTLY);
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | DONAME_LOADSTONE_CORRECTLY);
 }
 
 
 
 char*
-doname_with_weight_last(obj, loadstonecorrectly)
+doname_with_weight_last(obj, loadstonecorrectly, is_perm_inv)
 struct obj* obj;
-boolean loadstonecorrectly;
+boolean loadstonecorrectly, is_perm_inv;
 {
-    return doname_base(obj, DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0));
 }
 
 
@@ -2141,6 +2182,15 @@ struct obj *otmp;
     else /* lack of `rknown' only matters for vulnerable objects */
         return (boolean) (is_rustprone(otmp) || is_corrodeable(otmp)
                           || is_flammable(otmp));
+}
+
+boolean
+is_obj_unknown(otmp)
+struct obj* otmp;
+{
+    if (!otmp)
+        return FALSE;
+    return !objects[otmp->otyp].oc_name_known || (otmp->oartifact && otmp->nknown && !otmp->aknown);
 }
 
 /* format a corpse name (xname() omits monster type; doname() calls us);
@@ -2272,6 +2322,15 @@ struct obj* obj;
     if (obj->otyp == CORPSE)
         return corpse_xname(obj, (const char*)0, CXN_ARTICLE);
     return obj->oartifact && obj->aknown ? the(xname(obj)) : obj->quan != 1 ? xname(obj) : an(xname(obj));
+}
+
+char*
+thecxname(obj)
+struct obj* obj;
+{
+    if (obj->otyp == CORPSE)
+        return corpse_xname(obj, (const char*)0, CXN_PFX_THE);
+    return the(xname(obj));
 }
 
 /* like cxname, but ignores quantity */
@@ -2529,6 +2588,29 @@ const char *str;
     return tmp;
 }
 
+char*
+an_prefix(str)
+const char* str;
+{
+    char* buf = nextobuf();
+
+    if (!str || !*str) {
+        impossible("Alphabet soup: 'an(%s)'.", str ? "\"\"" : "<null>");
+        return strcpy(buf, "an []");
+    }
+    return just_an(buf, str);
+}
+
+char*
+An_prefix(str)
+const char* str;
+{
+    char* tmp = an_prefix(str);
+
+    *tmp = highc(*tmp);
+    return tmp;
+}
+
 /*
  * Prepend "the" if necessary; assumes str is a subject derived from xname.
  * Use is_mname_proper_name() for monster names, not the().  the() is idempotent.
@@ -2705,7 +2787,7 @@ struct obj *obj;
         if (strncmpi(s, "the ", 4))
         {
             char tempbuf[OBUFSZ];
-            strcpy(tempbuf, s);
+            Strcpy(tempbuf, s);
             Sprintf(s, "the %s", tempbuf);
         }
     }
@@ -3750,6 +3832,7 @@ STATIC_VAR const struct alt_spellings {
     { "galadhrim boots", GALADHRIM_BOOTS },
     { "bag of gluttony", BAG_OF_THE_GLUTTON },
     { "uruk-hai shield", GREAT_ORCISH_SHIELD },
+    { "heavy repeating crossbow", REPEATING_HEAVY_CROSSBOW },
     { (const char *) 0, 0 },
 };
 
@@ -5429,7 +5512,7 @@ retry:
         uchar affix_idx;
         for (affix_idx = 0; affix_idx <= 1; affix_idx++)
         {
-            struct mythic_definition* mythic_definitions = (affix_idx == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
+            const struct mythic_definition* mythic_definitions = (affix_idx == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
             int mythic_quality = (affix_idx == 0 ? mythic_prefix : mythic_suffix);
             uchar* otmp_mythic_quality_ptr = (affix_idx == 0 ? &otmp->mythic_prefix : &otmp->mythic_suffix);
 
@@ -5891,7 +5974,7 @@ int *otyp_ptr, *sq_ptr;
     {
         char buf[OBUFSZ];
         size_t ln = 0;
-        strcpy(buf, key_special_descriptions[i].description);
+        Strcpy(buf, key_special_descriptions[i].description);
         Strcat(buf, " ");
         ln = strlen(buf);
         if (!strncmpi(inbuf, buf, ln) && strstr(inbuf, OBJ_NAME(objects[key_special_descriptions[i].otyp])) != 0)

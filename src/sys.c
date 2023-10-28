@@ -105,6 +105,7 @@ sys_early_init()
     sysopt.check_plname = 0;
     sysopt.select_pet_details = 0;
     sysopt.make_backup_savefiles = 0;
+    sysopt.allow_loading_error_savefiles = 0;
     sysopt.seduce = 1; /* if it's compiled in, default to on */
     sysopt_seduce_set(sysopt.seduce);
     return;
@@ -205,7 +206,9 @@ reset_global_variables(VOID_ARGS)
     memset((genericptr_t)&flags, 0, sizeof(flags)); // Just in case
     memset((genericptr_t)&youmonst, 0, sizeof(youmonst));
     memset((genericptr_t)&bhitpos, 0, sizeof(bhitpos));
+    lock_thread_lock();
     memset((genericptr_t)&urealtime, 0, sizeof(urealtime));
+    unlock_thread_lock();
     memset((genericptr_t)&hearing_array, 0, sizeof(hearing_array));
     memset((genericptr_t)&fqn_prefix, 0, sizeof(fqn_prefix));
     memset((genericptr_t)&level, 0, sizeof(level));
@@ -249,7 +252,6 @@ reset_global_variables(VOID_ARGS)
     tbx = tby = 0;
     defer_see_monsters = FALSE;
     in_mklev = FALSE;
-    stoned = FALSE; /* done to monsters hit by 'c' */
     unweapon1 = FALSE;
     unweapon2 = FALSE;
     mrg_to_wielded = FALSE;
@@ -283,6 +285,7 @@ reset_global_variables(VOID_ARGS)
     toplineattrs[sizeof(toplineattrs) - 1] = toplinecolors[sizeof(toplinecolors) - 1] = 0;
     upstairs_room = dnstairs_room = sstairs_room = 0;
 
+    (void)get_colorless_multicolor_buffer();
     reset_item_global_variables();
 
     /* This needs to be setup already here early due to tiledata processing */
