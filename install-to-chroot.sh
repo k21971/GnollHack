@@ -73,6 +73,8 @@ cp "$NETHACK_GIT/dat/nhdat" "$NAO_CHROOT/$NHSUBDIR"
 chmod 644 "$NAO_CHROOT/$NHSUBDIR/nhdat"
 cp "$NETHACK_GIT/dat/symbols" "$NAO_CHROOT/$NHSUBDIR"
 chmod 644 "$NAO_CHROOT/$NHSUBDIR/symbols"
+cp "$NETHACK_GIT/dat/license" "$NAO_CHROOT/$NHSUBDIR"
+chmod 644 "$NAO_CHROOT/$NHSUBDIR/license"
 
 echo "Copying sysconf file"
 SYSCF="$NAO_CHROOT/$NHSUBDIR/sysconf"
