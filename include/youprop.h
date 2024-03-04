@@ -480,7 +480,7 @@
 #define HWwalking u.uprops[WATER_WALKING].intrinsic
 #define EWwalking u.uprops[WATER_WALKING].extrinsic
 #define Wwalking (EWwalking || HWwalking)
-#define Walks_on_water (Wwalking&& !Is_waterlevel(&u.uz))
+#define Walks_on_water (Wwalking && !Is_waterlevel(&u.uz))
 /* Don't get wet, can't go under water; overrides others except levitation */
 /* Wwalking is meaningless on water level */
 
@@ -739,9 +739,9 @@
 #define ERapidest_energy_regeneration u.uprops[RAPIDEST_ENERGY_REGENERATION].extrinsic
 #define Rapidest_energy_regeneration (HRapidest_energy_regeneration || ERapidest_energy_regeneration)
 
-#define HMelee_life_leech u.uprops[MELEE_LIFE_LEECH].intrinsic
-#define EMelee_life_leech u.uprops[MELEE_LIFE_LEECH].extrinsic
-#define Melee_life_leech (HMelee_life_leech || EMelee_life_leech)
+#define HWounding_resistance u.uprops[WOUNDING_RESISTANCE].intrinsic
+#define EWounding_resistance u.uprops[WOUNDING_RESISTANCE].extrinsic
+#define Wounding_resistance (HWounding_resistance || EWounding_resistance)
 
 #define HCrazed u.uprops[CRAZED].intrinsic
 #define ECrazed u.uprops[CRAZED].extrinsic

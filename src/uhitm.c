@@ -18,7 +18,6 @@ STATIC_DCL boolean FDECL(hmon_hitmon, (struct monst *, struct obj *, int,
                                        int, boolean *));
 STATIC_DCL int FDECL(joust, (struct monst *, struct obj *));
 STATIC_DCL void NDECL(demonpet);
-STATIC_DCL boolean FDECL(m_slips_free, (struct monst *, struct attack *));
 STATIC_DCL int FDECL(explum, (struct monst *, struct attack *));
 STATIC_DCL void FDECL(start_engulf, (struct monst *));
 STATIC_DCL void NDECL(end_engulf);
@@ -152,7 +151,7 @@ struct obj *wep; /* uwep for attack(), null for kick_monster() */
         if (M_AP_TYPE(mtmp) && !Protection_from_shape_changers
             /* applied pole-arm attack is too far to get stuck */
             && distu(mtmp->mx, mtmp->my) <= 2) {
-            if (!u.ustuck && !is_fleeing(mtmp) && dmgtype(mtmp->data, AD_STCK))
+            if (!u.ustuck && !is_fleeing(mtmp) && check_stuck_and_slip(mtmp))
             {
                 play_sfx_sound(SFX_ACQUIRE_GRAB);
                 u.ustuck = mtmp;
@@ -251,11 +250,14 @@ struct monst *mtmp;
 
     if (Role_if(PM_KNIGHT) && u.ualign.type == A_LAWFUL
         && (!mon_can_move(mtmp)
-            || (is_fleeing(mtmp) && !mtmp->mavenge))) {
+            || (is_fleeing(mtmp) && !mtmp->mavenge && mtmp != u.ustuck))) 
+    {
         play_sfx_sound(SFX_CAITIFF);
         You_ex(ATR_NONE, CLR_MSG_WARNING, "caitiff!");
         adjalign(-1);
-    } else if (Role_if(PM_SAMURAI) && is_peaceful(mtmp)) {
+    } 
+    else if (Role_if(PM_SAMURAI) && is_peaceful(mtmp)) 
+    {
         /* attacking peaceful creatures is bad for the samurai's giri */
         play_sfx_sound(SFX_CAITIFF);
         You_ex(ATR_NONE, CLR_MSG_WARNING, "dishonorably attack the innocent!");
@@ -543,7 +545,8 @@ register struct monst *mtmp;
         }
     }
 
-    if (strcmp(qbuf, ""))
+    boolean do_bash_prompt = strcmp(qbuf, "") != 0;
+    if (do_bash_prompt)
     {
         char ans = yn_query(qbuf);
         if (ans == 'n')
@@ -554,6 +557,27 @@ register struct monst *mtmp;
         }
         else
             unweapon1 = unweapon2 = FALSE;
+    }
+
+    boolean has_right_weapon = (uwep && is_weapon(uwep));
+    boolean has_left_weapon = (u.twoweap && uwep2 && is_weapon(uwep2));
+    if (/* !do_bash_prompt && */ ParanoidMonkWeapon && Role_if(PM_MONK) && u.uconduct.weaphit == 0 && (has_right_weapon || has_left_weapon))
+    {
+        if(has_right_weapon && !has_left_weapon)
+            Sprintf(qbuf, "You begin attacking with %s. Continue?", yname(uwep));
+        else if (!has_right_weapon && has_left_weapon)
+            Sprintf(qbuf, "You begin attacking with %s. Continue?", yname(uwep2));
+        else if (has_right_weapon && has_left_weapon)
+            Sprintf(qbuf, "You begin attacking with %s and %s. Continue?", yname(uwep), cxname(uwep2));
+        else
+            Sprintf(qbuf, "You begin attacking with %s. Continue?", "weapons");
+        char ans = yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "Attacking with Weapon", qbuf);
+        if (ans != 'y')
+        {
+            nomul(0);
+            context.move = FALSE;
+            return TRUE;
+        }
     }
 
     exercise(A_STR, TRUE); /* you're exercising muscles */
@@ -622,9 +646,8 @@ int dieroll;
         long oldweaphit = u.uconduct.weaphit;
 
         /* KMH, conduct */
-        if (weapon && (weapon->oclass == WEAPON_CLASS || is_weptool(weapon)))
-            if (!u.uconduct.weaphit++)
-                livelog_printf(LL_CONDUCT, "%s", "hit with a wielded weapon for the first time");
+        if (weapon && is_weapon(weapon))
+            u.uconduct.weaphit++; /* Livelog is below */
 
         /* we hit the monster; be careful: it might die or
            be knocked into a different location */
@@ -977,7 +1000,7 @@ boolean* obj_destroyed;
     int needenchantmsg = 0;
     double poisondamage = 0;
     boolean enchantkilled = FALSE, unenchantmsg = FALSE;
-    boolean silvermsg = FALSE, silverobj = FALSE;
+    boolean silvermsg = FALSE, silverobj = FALSE, reallysilverobj = FALSE;
     boolean lightobj = FALSE;
     boolean valid_weapon_attack = FALSE;
     boolean unarmed = !uwep && !uarm && !uarms;
@@ -1113,6 +1136,7 @@ boolean* obj_destroyed;
                 /* silver gauntelts? */
                 damage += adjust_damage(special_dmgval(&youmonst, mon, W_ARMG, &silverhit), &youmonst, mon, AD_PHYS, ADFLAGS_NONE);
                 barehand_silver_gauntlets = !!(silverhit & W_ARMG);
+                reallysilverobj = uarmg && uarmg->material == MAT_SILVER;
                 if (barehand_silver_gauntlets)
                     silvermsg = TRUE;
             }
@@ -1125,6 +1149,12 @@ boolean* obj_destroyed;
                 if (barehand_silver_rings > 0)
                     silvermsg = TRUE;
             }
+
+            /* Play hit sound; note that uarmg == 0 indicates bare-handed */
+            if (is_long_worm_with_tail(mon->data) && isok(bhitpos.x, bhitpos.y) && !is_wseg_head(mon, bhitpos.x, bhitpos.y))
+                play_monster_weapon_hit_sound_at_location(&youmonst, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), 0, uarmg, damage, thrown, bhitpos.x, bhitpos.y);
+            else
+                play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), 0, uarmg, damage, thrown);
         }
         valid_weapon_attack = (damage > 0);
     }
@@ -1134,6 +1164,22 @@ boolean* obj_destroyed;
             Strcpy(saved_oname, cxname(obj));
         else
             Strcpy(saved_oname, bare_artifactname(obj));
+
+        /* Play hit sound */
+        if (is_long_worm_with_tail(mon->data) && isok(bhitpos.x, bhitpos.y) && !is_wseg_head(mon, bhitpos.x, bhitpos.y))
+        {
+            if (thrown == HMON_MELEE)
+                play_monster_weapon_hit_sound_at_location(&youmonst, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), 0, obj, damage, thrown, bhitpos.x, bhitpos.y);
+            else
+                play_object_hit_sound_at_location(obj, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), damage, thrown, bhitpos.x, bhitpos.y);
+        }
+        else
+        {
+            if (thrown == HMON_MELEE)
+                play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), 0, obj, damage, thrown);
+            else
+                play_object_hit_sound(obj, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), damage, thrown);
+        }
 
         if (is_weapon(obj) || obj->oclass == GEM_CLASS) 
         {
@@ -1159,11 +1205,12 @@ boolean* obj_destroyed;
                 else
                     damage = adjust_damage(rnd(2), &youmonst, mon, objects[obj->otyp].oc_damagetype, ADFLAGS_NONE);
 
-                if (obj->material == MAT_SILVER
+                if (obj_counts_as_silver(obj)
                     && mon_hates_silver(mon)) 
                 {
                     silvermsg = TRUE;
                     silverobj = TRUE;
+                    reallysilverobj = obj->material == MAT_SILVER;
 
                     /* if it will already inflict dmg, make it worse */
                     damage += adjust_damage(rnd((min(1, (int)damage)) ? 20 : 10), &youmonst, mon, AD_PHYS, ADFLAGS_NONE);
@@ -1292,11 +1339,12 @@ boolean* obj_destroyed;
                 {
                     damage += adjust_damage(special_hit_dmg, &youmonst, mon, spec_adtyp, ADFLAGS_NONE);
                 }
-                if (obj->material == MAT_SILVER
+                if (obj_counts_as_silver(obj)
                     && mon_hates_silver(mon)) 
                 {
                     silvermsg = TRUE;
                     silverobj = TRUE;
+                    reallysilverobj = obj->material == MAT_SILVER;
                 }
 
                 if ((artifact_light(obj) || obj_shines_magical_light(obj) || has_obj_mythic_magical_light(obj)) && obj->lamplit
@@ -1461,10 +1509,11 @@ boolean* obj_destroyed;
                             luck_change += -5;
                     }
 
-                    if (touch_petrifies(&mons[obj->corpsenm])) 
+                    if (obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]))
                     {
                         /*learn_egg_type(obj->corpsenm);*/
-                        pline("Splat!  You hit %s with %s %s egg%s!",
+                        pline1("Splat!");
+                        You("hit %s with %s %s egg%s!",
                             mon_nam(mon),
                             obj->known ? "the" : cnt > 1L ? "some" : "a",
                             obj->known ? mons[obj->corpsenm].mname
@@ -1499,7 +1548,7 @@ boolean* obj_destroyed;
 
                         if (touch_petrifies(mdat) && !stale_egg(obj))
                         {
-                            pline_The("egg%s %s alive any more...", plur(cnt),
+                            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "egg%s %s alive any more...", plur(cnt),
                                 (cnt == 1L) ? "isn't" : "aren't");
                             if (obj->timed)
                                 obj_stop_timers(obj);
@@ -1519,9 +1568,7 @@ boolean* obj_destroyed;
                             useup_eggs(obj);
                             exercise(A_WIS, FALSE);
                         }
-
                         change_luck(luck_change, TRUE);
-
                     }
                     break;
 #undef useup_eggs
@@ -1548,7 +1595,7 @@ boolean* obj_destroyed;
                         }
                         else if (obj->otyp == BLINDING_VENOM) 
                         {
-                            pline_The("venom blinds %s%s!", mon_nam(mon),
+                            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "venom blinds %s%s!", mon_nam(mon),
                                 !is_blinded(mon) ? "" : " further");
                         }
                         else 
@@ -1563,7 +1610,7 @@ boolean* obj_destroyed;
                                 && mdat != &mons[PM_FLOATING_EYE])
                                 whom = strcat(strcat(s_suffix(whom), " "),
                                     mbodypart(mon, FACE));
-                            pline("%s %s over %s!", what,
+                            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s over %s!", what,
                                 vtense(what, "splash"), whom);
                         }
                         setmangry(mon, TRUE);
@@ -1628,12 +1675,13 @@ boolean* obj_destroyed;
                      * Things like silver wands can arrive here so
                      * so we need another silver check.
                      */
-                    if (obj->material == MAT_SILVER
+                    if (obj_counts_as_silver(obj)
                         && mon_hates_silver(mon)) 
                     {
                         damage += adjust_damage(rnd(20), &youmonst, mon, objects[obj->otyp].oc_damagetype, ADFLAGS_NONE);
                         silvermsg = TRUE;
                         silverobj = TRUE;
+                        reallysilverobj = obj->material == MAT_SILVER;
                     }
                 }
             }
@@ -1724,7 +1772,7 @@ boolean* obj_destroyed;
         if(u.twoweap && obj && uarms && obj == uarms) /* Dual weapon combat skill is increased when you successfully hit with a weapon in your left hand */
             use_skill(P_DUAL_WEAPON_COMBAT, 1);
 
-        if (two_handed_bonus_applies(uwep))
+        if (thrown == HMON_MELEE && obj && uwep && obj == uwep && two_handed_bonus_applies(obj))
             use_skill(P_TWO_HANDED_WEAPON, 1);
     }
 
@@ -1954,21 +2002,6 @@ boolean* obj_destroyed;
 
     if (!already_killed)
     {
-        if (is_long_worm_with_tail(mon->data) && isok(bhitpos.x, bhitpos.y) && !is_wseg_head(mon, bhitpos.x, bhitpos.y))
-        {
-            if (thrown == HMON_MELEE)
-                play_monster_weapon_hit_sound_at_location(&youmonst, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), 0, obj, damage, thrown, bhitpos.x, bhitpos.y);
-            else
-                play_object_hit_sound_at_location(obj, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), damage, thrown, bhitpos.x, bhitpos.y);
-        }
-        else
-        {
-            if (thrown == HMON_MELEE)
-                play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), 0, obj, damage, thrown);
-            else
-                play_object_hit_sound(obj, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(mon), damage, thrown);
-        }
-
         deduct_monster_hp(mon, damage); //    mon->mhp -= tmp;
         remove_monster_and_nearby_waitforu(mon);
     }
@@ -2092,19 +2125,27 @@ boolean* obj_destroyed;
             else if (barehand_silver_rings == 2)
                 fmt = "Your silver rings sear %s!";
             else if (barehand_silver_gauntlets)
-                fmt = "Your silver gauntlets sear %s!";
+                fmt = reallysilverobj ? "Your silver gauntlets sear %s!" : "Your gauntlets sear %s!";
             else if (silverobj && saved_oname[0]) {
                 /* guard constructed format string against '%' in
                    saved_oname[] from xname(via cxname()) */
+                char* oname_ptr = saved_oname;
+                if (strlen(oname_ptr) > 4 && !strncmpi(oname_ptr, "the ", 4))
+                    oname_ptr += 4;
                 Sprintf(silverobjbuf, "Your %s%s %s",
-                    strstri(saved_oname, "silver") ? "" : "silver ",
-                    saved_oname, vtense(saved_oname, "sear"));
+                    strstri(oname_ptr, "silver") || !reallysilverobj ? "" : "silver ",
+                    oname_ptr, vtense(oname_ptr, "sear"));
                 (void)strNsubst(silverobjbuf, "%", "%%", 0);
                 Strcat(silverobjbuf, " %s!");
                 fmt = silverobjbuf;
             }
-            else
+            else if (reallysilverobj)
                 fmt = "The silver sears %s!";
+            else 
+            {
+                *whom = highc(*whom);
+                fmt = "%s is seared!";
+            }
         }
         else {
             *whom = highc(*whom); /* "it" -> "It" */
@@ -2148,7 +2189,7 @@ boolean* obj_destroyed;
     int crit_strike_die_roll_threshold = crit_strike_probability / 5;
 
     /* Wounding */
-    if (obj && !uses_spell_flags && !is_rider(mon->data))
+    if (obj && !uses_spell_flags)
     {
         int extradmg = 0;
         if (
@@ -2181,21 +2222,23 @@ boolean* obj_destroyed;
 
         if (extradmg > 0)
         {
-            mon->mbasehpdrain -= extradmg;
-            update_mon_maxhp(mon);
+            if (!resists_wounding(mon))
+            {
+                mon->mbasehpdrain -= extradmg;
+                update_mon_maxhp(mon);
 
-            if (mon->mhp > mon->mhpmax)
-                mon->mhp = mon->mhpmax;
+                if (mon->mhp > mon->mhpmax)
+                    mon->mhp = mon->mhpmax;
 
+                char* whom = mon_nam(mon);
+                if (canspotmon(mon))
+                {
+                    pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s deeply into %s!", Yobjnam2(obj, "cut"), whom);
+                }
+            }
             if (DEADMONSTER(mon))
             {
                 destroyed = TRUE;
-            }
-
-            char* whom = mon_nam(mon);
-            if (canspotmon(mon))
-            {
-                pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s deeply into %s!", Yobjnam2(obj, "cut"), whom);
             }
         }
     }
@@ -2499,14 +2542,14 @@ struct obj *obj;
         || obj->otyp == MIRROR          /* silver in the reflective surface */
         || obj->otyp == MAGIC_MIRROR          /* silver in the reflective surface */
         || obj->otyp == CLOVE_OF_GARLIC /* causes shades to flee */
-        || obj->material == MAT_SILVER)
+        || obj_counts_as_silver(obj))
         return TRUE;
     return FALSE;
 }
 
 /* check whether slippery clothing protects from hug or wrap attack */
 /* [currently assumes that you are the attacker] */
-STATIC_OVL boolean
+boolean
 m_slips_free(mdef, mattk)
 struct monst *mdef;
 struct attack *mattk;
@@ -2527,7 +2570,7 @@ struct attack *mattk;
 
     /* if monster's cloak/armor is greased, your grab slips off; this
        protection might fail (33% chance) when the armor is cursed */
-    if (obj && (obj->greased || obj->otyp == OILSKIN_CLOAK)
+    if (obj && (obj->greased || (objects[obj->otyp].oc_flags5 & O5_PERMANENTLY_GREASED) != 0 || obj->otyp == OILSKIN_CLOAK)
         && (!obj->cursed || rn2(3))) {
         You("%s %s %s %s!",
             mattk->adtyp == AD_WRAP ? "slip off of"
@@ -2694,6 +2737,7 @@ struct attack *mattk;
         if (!Upolyd)
             break; /* no longer have ability to steal */
         /* take the object away from the monster */
+        Strcpy(debug_buf_2, "steal_it");
         obj_extract_self(otmp);
         if ((unwornmask = otmp->owornmask) != 0L) {
             mdef->worn_item_flags &= ~unwornmask;
@@ -2971,6 +3015,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
            real gold only, no lesser coins */
         mongold = findgold(mdef->minvent);
         if (mongold) {
+            Strcpy(debug_buf_2, "damageum");
             obj_extract_self(mongold);
             if (merge_choice(invent, mongold) || inv_cnt(FALSE) < 52) {
                 addinv(mongold);
@@ -3830,7 +3875,7 @@ register struct monst *mon;
             if (u.twoweap && uarms /* set up 'altwep' flag for next iteration */
                 /* only consider seconary when wielding one-handed primary */
                 && !bimanual(uwep)
-                && !(uarms->material == MAT_SILVER && Hate_silver))
+                && !(obj_counts_as_silver(uarms) && Hate_silver))
                 altwep = !altwep; /* toggle for next attack */
             weapon = *originalweapon;
             if (!weapon) /* no need to go beyond no-gloves to rings; not ...*/
@@ -4446,7 +4491,7 @@ boolean wep_was_destroyed;
                 incr_itimeout(&HParalyzed, basedmg);
                 context.botl = context.botlx = 1;
                 refresh_u_tile_gui_info(TRUE);
-                standard_hint("Get free action as early as possible. Use ranged weapons to attack monsters with paralyzing passive defense.", &u.uhint.paralyzed_by_cube);
+                standard_hint("Get paralysis resistance as early as possible. Use ranged weapons to attack monsters with paralyzing passive defense.", &u.uhint.paralyzed_by_cube);
             }
             break;
         case AD_COLD: /* brown mold or blue jelly */
@@ -4607,13 +4652,6 @@ struct monst *mtmp;
 {
     const char *fmt = "Wait!  That's %s!", *generic = "a monster", *what = 0;
 
-    if (!u.ustuck && !is_fleeing(mtmp) && dmgtype(mtmp->data, AD_STCK))
-    {
-        play_sfx_sound(SFX_ACQUIRE_GRAB);
-        u.ustuck = mtmp;
-        refresh_m_tile_gui_info(mtmp, FALSE);
-    }
-
     if (Blind) 
     {
         if (!(Blind_telepat || Unblind_telepat || Detect_monsters))
@@ -4646,12 +4684,22 @@ struct monst *mtmp;
         pline_ex(ATR_NONE, CLR_MSG_WARNING, fmt, what);
     }
 
+    /* Make mimic grab you */
+    if (!u.ustuck && !is_fleeing(mtmp) && check_stuck_and_slip(mtmp))
+    {
+        play_sfx_sound(SFX_ACQUIRE_GRAB);
+        u.ustuck = mtmp;
+        refresh_m_tile_gui_info(mtmp, FALSE);
+    }
+
     wakeup(mtmp, FALSE); /* clears mimicking */
     /* if hero is blind, wakeup() won't display the monster even though
        it's no longer concealed */
     if (!canspotmon(mtmp)
         && !glyph_is_invisible(levl[mtmp->mx][mtmp->my].hero_memory_layers.glyph))
         map_invisible(mtmp->mx, mtmp->my);
+
+    flush_screen(1);
 }
 
 STATIC_OVL void

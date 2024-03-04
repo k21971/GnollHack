@@ -50,11 +50,11 @@ const
 #include <sys/stat.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 #ifdef GNH_IOS
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/param.h>
-#include <sys/resource.h>
 #endif
 #endif
 
@@ -639,7 +639,7 @@ char errbuf[];
     fd = creat(fq_lock, FCMASK);
 #endif
 #endif /* MICRO || WIN32 */
-    issue_debuglog_fd(fd, "create_levelfile");
+    //issue_debuglog_fd(fd, "create_levelfile");
     if (fd >= 0)
         level_info[lev].flags |= LFILE_EXISTS;
     else if (errbuf) /* failure explanation */
@@ -721,12 +721,14 @@ char *
 gnh_lsof(VOID_ARGS)
 {
     char* outptr = 0;
-#ifdef GNH_IOS
+#if defined (GNH_IOS) && defined(UNIX)
+#define GNH_LSOF_BUFFER_SIZE (MAXPATHLEN + 1 + BUFSZ * 2)
+#define GNH_LSOF_OUTPUT_BUFFER_SIZE (GNH_LSOF_BUFFER_SIZE + BUFSZ * 2)
     int flags;
     int fd;
-    char buf[MAXPATHLEN + 1 + BUFSZ * 2];
+    char buf[GNH_LSOF_BUFFER_SIZE];
     int n = 1;
-    char outbuf[MAXPATHLEN + BUFSZ * 4];
+    char outbuf[GNH_LSOF_OUTPUT_BUFFER_SIZE];
 
     for (fd = 0; fd < (int)FD_SETSIZE; fd++) {
         *buf = 0;
@@ -741,15 +743,20 @@ gnh_lsof(VOID_ARGS)
                 continue;
         }
         fcntl(fd, F_GETPATH, buf);
+        buf[GNH_LSOF_BUFFER_SIZE - 1] = 0;
         Sprintf(outbuf, "File Descriptor %d (number %d) in use for: %s | ", fd, n, buf);
         if (!outptr)
         {
             outptr = (char*)alloc(strlen(outbuf) + 1);
+            if (!outptr)
+                break;
             Strcpy(outptr, outbuf);
         }
         else
         {
             char* newptr = (char*)alloc(strlen(outptr) + strlen(outbuf) + 1);
+            if (!newptr)
+                break;
             Strcpy(newptr, outptr);
             Strcat(newptr, outbuf);
             free((genericptr_t)outptr);
@@ -757,6 +764,8 @@ gnh_lsof(VOID_ARGS)
         }
         ++n;
     }
+#undef GNH_LSOF_BUFFER_SIZE
+#undef GNH_LSOF_OUTPUT_BUFFER_SIZE
 #endif
     return outptr;
 }
@@ -770,42 +779,99 @@ int error_number UNUSED;
 #if defined(UNIX) && defined(GNH_MOBILE)
     if (error_number == EMFILE)
     {
-#if GNH_IOS
+        char extbuf[BUFSZ] = "";
+        struct rlimit rlim = { 0 };
+        if (getrlimit(RLIMIT_NOFILE, &rlim) == 0)
+        {
+            char curbuf[BUFSZ];
+            char maxbuf[BUFSZ];
+            if (rlim.rlim_cur == RLIM_INFINITY)
+                Strcpy(curbuf, "Inf");
+            else
+                Sprintf(curbuf, "%ld", (long)rlim.rlim_cur);
+
+            if (rlim.rlim_max == RLIM_INFINITY)
+                Strcpy(maxbuf, "Inf");
+            else
+                Sprintf(maxbuf, "%ld", (long)rlim.rlim_max);
+
+            Sprintf(extbuf, " (c:%s, m:%s)", curbuf, maxbuf);
+        }
+
+#if defined(GNH_IOS)
         char* ptr = gnh_lsof();
         if (ptr)
         {
             if (issue_gui_command)
             {
+                char titlebuf[BUFSZ];
+                Strcpy(titlebuf, "gnh_lsof");
+                Strcat(titlebuf, extbuf);
                 issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT, DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST, ptr);
-                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CRITICAL, 0, "gnh_lsof");
+                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CRITICAL, 0, titlebuf);
             }
             free((genericptr_t)ptr);
         }
 #else
         char cmd[BUFSZ];
         char msgbuf[BUFSZ] = "";
-        (void)mkdir("temp", 0700);
+        //(void)mkdir("temp", 0777);
         int pid = (int)getpid();
+        //char cwd[PATH_MAX];
+        //char pathbuf[PATH_MAX + BUFSZ];
+        //if (getcwd(cwd, sizeof(cwd)) != NULL)
+        //    Sprintf(pathbuf, "%s/temp/file_descriptors.txt", cwd);
+        //else
+        //    Strcpy(pathbuf, "temp/file_descriptors.txt");
+
 #ifdef GNH_ANDROID
-        Sprintf(cmd, "lsof -a -p %d > temp/file_descriptors.txt", pid);
+        Sprintf(cmd, "lsof -p %d 2>&1", pid);
 #else
-        Sprintf(cmd, "ls -l /proc/%d/fd > temp/file_descriptors.txt", pid);
+        Sprintf(cmd, "ls -l /proc/%d/fd 2>&1", pid);
 #endif
         FILE* poutput = popen(cmd, "r");
         if (poutput)
         {
+            char buf[BUFSZ];
+            char* outputbuf = 0;
+            while (fgets(buf, BUFSZ - 1, poutput))
+            {
+                buf[BUFSZ - 1] = 0;
+                if (!outputbuf)
+                {
+                    outputbuf = (char*)alloc(strlen(buf) + 1);
+                    if (!outputbuf)
+                        break;
+                    Strcpy(outputbuf, buf);
+                }
+                else
+                {
+                    char* newoutbuf = (char*)alloc(strlen(outputbuf) + strlen(buf) + 1);
+                    if (!newoutbuf)
+                        break;
+                    Strcpy(newoutbuf, outputbuf);
+                    Strcat(newoutbuf, buf);
+                    free((genericptr_t)outputbuf);
+                    outputbuf = newoutbuf;
+                }
+            }
+            pclose(poutput);
+
             if (logtext)
             {
                 Strcpy(msgbuf, logtext);
                 Strcat(msgbuf, " - ");
             }
             Strcat(msgbuf, cmd);
-            pclose(poutput);
+            Strcat(msgbuf, extbuf);
+
             if (issue_gui_command)
             {
-                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_ATTACHMENT, DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST, "temp/file_descriptors.txt");
+                issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT, DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST, outputbuf ? outputbuf : "(No output)");
                 issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_CRITICAL, 0, msgbuf);
             }
+            if (outputbuf)
+                free((genericptr_t)outputbuf);
         }
 #endif
     }
@@ -839,7 +905,7 @@ char errbuf[];
 #endif
         fd = open(fq_lock, O_RDONLY | O_BINARY, 0);
 #endif
-    issue_debuglog_fd(fd, "open_levelfile");
+    //issue_debuglog_fd(fd, "open_levelfile");
 
     /* for failure, return an explanation that our caller can use;
        settle for `lock' instead of `fq_lock' because the latter
@@ -1385,7 +1451,7 @@ create_savefile()
 #define getuid() vms_getuid()
 #endif /* VMS && !SECURE */
 #endif /* MICRO */
-    issue_debuglog_fd(fd, "create_savefile");
+    //issue_debuglog_fd(fd, "create_savefile");
 
     return fd;
 }
@@ -1403,7 +1469,7 @@ open_savefile()
 #else
     fd = open(fq_save, O_RDONLY | O_BINARY, 0);
 #endif
-    issue_debuglog_fd(fd, "open_savefile");
+    //issue_debuglog_fd(fd, "open_savefile");
     return fd;
 }
 
@@ -5758,7 +5824,7 @@ const char* buffer;
                 LLOG_SEP,
                 urace.filecode,
                 LLOG_SEP,
-                genders[flags.female].filecode,
+                genders[Ufemale].filecode,
                 LLOG_SEP,
                 aligns[u.ualign.type == A_NONE ? 3 : 1 - u.ualign.type].filecode,
                 LLOG_SEP,
@@ -5844,7 +5910,7 @@ const char* str;
             char cbuf[BUFSZ];
             (void)describe_mode(mbuf);
             Sprintf(cbuf, "%.3s %.3s %.3s %.3s XL:%d", urole.filecode,
-                urace.filecode, genders[flags.female].filecode,
+                urace.filecode, genders[Ufemale].filecode,
                 aligns[1 - u.ualign.type].filecode, u.ulevel);
             long currenttime = get_current_game_duration();
             char* duration = format_duration_with_units(currenttime);
@@ -6161,7 +6227,7 @@ boolean playing; /**< True if game is running.  */
         botl_score(),
         urole.filecode,
         urace.filecode,
-        genders[flags.female].filecode,
+        genders[Ufemale].filecode,
         aligns[u.ualign.type == A_NONE ? 3 : 1 - u.ualign.type].filecode,
         encodeconduct(),
         u.uhave.amulet ? 1 : 0,

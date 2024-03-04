@@ -25,6 +25,7 @@ NEARDATA const struct ghsound_eventmapping ghsound2event[MAX_GHSOUNDS] = {
     { SOUND_BANK_MASTER, "event:/Music/Room/Temple", BACKGROUND_MUSIC_VOLUME},
     { SOUND_BANK_MASTER, "event:/Music/Level/Medusa", BACKGROUND_MUSIC_VOLUME},
     { SOUND_BANK_MASTER, "event:/Music/Level/Castle", BACKGROUND_MUSIC_VOLUME},
+    { SOUND_BANK_MASTER, "event:/Music/Room/Court", BACKGROUND_MUSIC_VOLUME * 3.0f },
     { SOUND_BANK_MASTER, "event:/Music/Dungeon/Gnomish-Mines-Normal", BACKGROUND_MUSIC_VOLUME * 2.5f},
     { SOUND_BANK_MASTER, "event:/Music/Level/Mine-Town", BACKGROUND_MUSIC_VOLUME * 2.5f},
 
@@ -169,8 +170,10 @@ NEARDATA const struct ghsound_eventmapping ghsound2event[MAX_GHSOUNDS] = {
     { SOUND_BANK_MASTER, "event:/Ray/Camera Flash/Camera Flash Create", 1.0f },
 
     { SOUND_BANK_MASTER, "event:/Music/Dungeon/Quest-Normal", BACKGROUND_MUSIC_VOLUME * 2.0f },
+    { SOUND_BANK_MASTER, "event:/Music/Dungeon/Quest-Completed", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/Dungeon/Vlad-Tower-Normal", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/Dungeon/Modron-Normal", BACKGROUND_MUSIC_VOLUME * 2.0f },
+    { SOUND_BANK_MASTER, "event:/Music/Room/Modron Temple", BACKGROUND_MUSIC_VOLUME },
     { SOUND_BANK_MASTER, "event:/Music/Dungeon/Bovine-Normal", BACKGROUND_MUSIC_VOLUME * 1.5f },
     { SOUND_BANK_MASTER, "event:/Music/Dungeon/Large-Circular-Dungeon-Normal", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/End Game/Normal", BACKGROUND_MUSIC_VOLUME * 2.0f },
@@ -208,9 +211,12 @@ NEARDATA const struct ghsound_eventmapping ghsound2event[MAX_GHSOUNDS] = {
     { SOUND_BANK_MASTER, "event:/Music/NPC/Tertiary", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/NPC/Artificer", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/NPC/Warp Engineer", BACKGROUND_MUSIC_VOLUME * 2.0f },
+    { SOUND_BANK_MASTER, "event:/Music/NPC/Hermit", BACKGROUND_MUSIC_VOLUME * 3.0f },
     { SOUND_BANK_MASTER, "event:/Music/Shop/Izchak", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/Room/Leprechaun Hall", BACKGROUND_MUSIC_VOLUME * 2.0f },
     { SOUND_BANK_MASTER, "event:/Music/Level/Quantum Core", BACKGROUND_MUSIC_VOLUME * 2.0f },
+    { SOUND_BANK_MASTER, "event:/Music/Level/Fort Ludious", BACKGROUND_MUSIC_VOLUME * 3.0f },
+
     { SOUND_BANK_MASTER, "event:/SFX/General/Disintegrate", 1.0f },
     { SOUND_BANK_MASTER, "event:/SFX/General/Life Saved", 1.0f },
     { SOUND_BANK_MASTER, "event:/SFX/Spell/Healing/Healing", 0.3f },
@@ -16486,7 +16492,7 @@ struct container_soundset_definition container_soundsets[MAX_CONTAINER_SOUNDSETS
 
 
 void
-update_game_music()
+update_game_music(VOID_ARGS)
 {
     struct ghsound_music_info musicinfo = { 0 };
     musicinfo.volume = 1.0f;
@@ -16524,7 +16530,7 @@ update_game_music()
 }
 
 void
-play_level_ambient_sounds()
+play_level_ambient_sounds(VOID_ARGS)
 {
     struct ghsound_level_ambient_info lainfo = { 0 };
     lainfo.volume = 1.0f;
@@ -16561,7 +16567,7 @@ play_level_ambient_sounds()
 }
 
 void
-play_environment_ambient_sounds()
+play_environment_ambient_sounds(VOID_ARGS)
 {
     struct ghsound_environment_ambient_info eainfo = { 0 };
     eainfo.volume = 1.0f;
@@ -16586,8 +16592,8 @@ play_environment_ambient_sounds()
 }
 
 enum floor_surface_types
-    get_floor_surface_type(x, y, is_underwater)
-    int x, y;
+get_floor_surface_type(x, y, is_underwater)
+int x, y;
 boolean is_underwater;
 {
     if (!isok(x, y))
@@ -16610,10 +16616,10 @@ play_movement_sound(mtmp, climbingid)
 struct monst* mtmp;
 enum climbing_types climbingid;
 {
-    if (!mtmp)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!mtmp)
         return;
 
     boolean isyou = (mtmp == &youmonst);
@@ -16838,11 +16844,10 @@ struct obj* obj;
 enum object_sound_types sound_type;
 {
     /* Do not use for hit sounds */
-
-    if (!obj)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!obj)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -16891,11 +16896,10 @@ int x, y;
 enum object_sound_types sound_type;
 {
     /* Do not use for hit sounds */
-
-    if (!obj || !isok(x, y))
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!obj || !isok(x, y))
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -16989,11 +16993,10 @@ int x, y;
 enum container_sound_types sound_type;
 {
     /* Do not use for hit sounds */
-
-    if (!obj || !isok(x, y))
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!obj || !isok(x, y))
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -17196,8 +17199,8 @@ float* volume_ptr;
 }
 
 enum ghsound_types
-    get_monster_ambient_sound_id(mss)
-    enum monster_soundset_types mss;
+get_monster_ambient_sound_id(mss)
+enum monster_soundset_types mss;
 {
     enum ghsound_types sound_id = GHSOUND_NONE;
     float volume = 0.0f;
@@ -17225,10 +17228,10 @@ enum object_sound_types sound_type;
 int x, y;
 boolean is_underwater;
 {
-    if (!obj)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!obj)
         return;
 
     xchar ox = x, oy = y;
@@ -17280,10 +17283,10 @@ struct obj* obj;
 enum object_sound_types sound_type;
 boolean is_underwater;
 {
-    if (!obj)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!obj)
         return;
 
     xchar ox = 0, oy = 0;
@@ -17301,10 +17304,10 @@ play_object_container_in_sound(obj, container)
 struct obj* obj;
 struct obj* container;
 {
-    if (!obj || !container)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!obj || !container)
         return;
 
     enum object_sound_types sound_type = OBJECT_SOUND_TYPE_DROP;
@@ -17347,14 +17350,14 @@ play_simple_location_sound(x, y, sound_type)
 xchar x, y;
 enum location_sound_types sound_type;
 {
+    if (!iflags.using_gui_sounds || Deaf)
+        return;
+
     enum ghsound_types soundid = GHSOUND_NONE;
     float volume = 1.0f;
     struct ghsound_immediate_info immediateinfo = { 0 };
 
     if (!isok(x, y))
-        return;
-
-    if (Deaf)
         return;
 
     int ltyp = levl[x][y].typ;
@@ -17408,8 +17411,7 @@ enum monster_sound_types sound_type;
 unsigned long play_flags;
 {
     /* Do not use for hit sounds */
-
-    if (Deaf)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -17460,8 +17462,7 @@ enum immediate_sound_types sfx_sound_type;
 unsigned long pflags;
 {
     /* Do not use for hit sounds */
-
-    if (Deaf)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -17522,8 +17523,7 @@ play_simple_player_voice(sound_type)
 enum player_voice_types sound_type;
 {
     /* Do not use for hit sounds */
-
-    if (Deaf)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -17571,12 +17571,12 @@ enum monster_sound_types sound_type;
 unsigned long play_flags;
 {
     /* Do not use for hit sounds */
+    if (!iflags.using_gui_sounds || Deaf)
+        return;
+
     boolean isyou = (mon == &youmonst);
 
     if (!mon)
-        return;
-
-    if (Deaf)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -17646,11 +17646,10 @@ struct obj* weapon;
 enum object_sound_types sound_type;
 {
     /* Do not use for hit sounds */
-
-    if (!magr)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!magr)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -17726,7 +17725,7 @@ struct monst* mtmp;
 int attack_number;
 enum object_sound_types sound_type;
 {
-    if (Deaf)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
     boolean isyou = (mtmp == &youmonst);
@@ -17856,8 +17855,8 @@ xchar* defx_ptr, * defy_ptr;
 
 
 enum hit_surface_types
-    get_hit_surface_type(surface_type, surface_source_ptr)
-    enum hit_surface_source_types surface_type;
+get_hit_surface_type(surface_type, surface_source_ptr)
+enum hit_surface_source_types surface_type;
 anything* surface_source_ptr;
 {
     enum hit_surface_types surfaceid = HIT_SURFACE_NONE;
@@ -17875,7 +17874,7 @@ anything* surface_source_ptr;
 
         boolean you_defend = (mdef == &youmonst);
 
-        surface_material = mdef->data->natural_armor_material_type;
+        surface_material = mdef->data->body_material_type;
         if (you_defend)
         {
             /* Maybe change if you are wearing armor */
@@ -17924,10 +17923,10 @@ struct obj* weapon;
 double damage;
 enum hmon_atkmode_types thrown;
 {
-    if (!magr || !surface_source_ptr)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!magr || !surface_source_ptr)
         return;
 
     xchar defx = 0, defy = 0;
@@ -17949,10 +17948,10 @@ double damage;
 enum hmon_atkmode_types thrown;
 xchar x, y;
 {
-    if (!magr || !surface_source_ptr)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!magr || !surface_source_ptr)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -18020,10 +18019,10 @@ anything* surface_source_ptr;
 double damage;
 enum hmon_atkmode_types thrown;
 {
-    if (!surface_source_ptr || !obj)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!surface_source_ptr || !obj)
         return;
 
     xchar defx = 0, defy = 0;
@@ -18043,10 +18042,10 @@ double damage;
 enum hmon_atkmode_types thrown;
 xchar x, y;
 {
-    if (!surface_source_ptr || !obj)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!surface_source_ptr || !obj)
         return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
@@ -18109,6 +18108,9 @@ play_sfx_sound_with_flags(sfx_sound_id, play_flags)
 enum sfx_sound_types sfx_sound_id;
 unsigned long play_flags;
 {
+    if (!iflags.using_gui_sounds)
+        return;
+
     if (sfx_sound_id < 0 || sfx_sound_id >= MAX_SFX_SOUND_TYPES)
         return;
 
@@ -18136,6 +18138,8 @@ void
 play_ui_sound(ui_sound_id)
 enum ui_sound_types ui_sound_id;
 {
+    if (!iflags.using_gui_sounds)
+        return;
 
     enum ghsound_types soundid = GHSOUND_NONE;
     float volume = 1.0f;
@@ -18167,6 +18171,9 @@ enum sfx_sound_types sfx_sound_id;
 int x, y;
 double min_volume_d;
 {
+    if (!iflags.using_gui_sounds)
+        return;
+
     if (sfx_sound_id < 0 || sfx_sound_id >= MAX_SFX_SOUND_TYPES)
         return;
 
@@ -18213,10 +18220,10 @@ enum object_instrument_soundset_types instrument_soundset_id;
 enum instrument_sound_types instrument_sound_type;
 int x, y;
 {
-    if (!isok(x, y) || (hearing_array[x][y] == 0.0f && context.global_minimum_volume == 0.0f))
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!isok(x, y) || (hearing_array[x][y] == 0.0f && context.global_minimum_volume == 0.0f))
         return;
 
     enum object_instrument_soundset_types typ = instrument_soundset_id;
@@ -18245,10 +18252,10 @@ int ray_soundset_id;
 enum ray_sound_types ray_sound_type;
 int x, y;
 {
-    if (!isok(x, y) || hearing_array[x][y] == 0.0f)
+    if (!iflags.using_gui_sounds || Deaf)
         return;
 
-    if (Deaf)
+    if (!isok(x, y) || hearing_array[x][y] == 0.0f)
         return;
 
     enum object_ray_soundset_types typ = ray_soundset_id;
@@ -18325,7 +18332,6 @@ int ray_type;
     set_effect_ambient_volume(vinfo);
 }
 
-
 void
 start_occupation_ambient_sound(object_soundset_id, occupation_type)
 enum object_soundset_types object_soundset_id;
@@ -18355,7 +18361,6 @@ enum object_occupation_types occupation_type;
     info.volume = 0.0f;
 
     play_ghsound_occupation_ambient(info);
-
 }
 
 void
@@ -18364,7 +18369,8 @@ enum object_soundset_types object_soundset_id;
 enum object_occupation_types occupation_type;
 enum occupation_sound_types sound_type;
 {
-
+    if (!iflags.using_gui_sounds || Deaf)
+        return;
     if (occupation_soundset_definitions[object_soundsets[object_soundset_id].occupation_soundsets[occupation_type]].sounds[sound_type].ghsound == GHSOUND_NONE
         || occupation_soundset_definitions[object_soundsets[object_soundset_id].occupation_soundsets[occupation_type]].sounds[sound_type].ghsound == MAX_GHSOUNDS)
         return;
@@ -18384,7 +18390,8 @@ enum object_occupation_types occupation_type;
 enum occupation_sound_types sound_type;
 int x, y;
 {
-
+    if (!iflags.using_gui_sounds || Deaf)
+        return;
     if (!isok(x, y) || occupation_soundset_definitions[object_soundsets[object_soundset_id].occupation_soundsets[occupation_type]].sounds[sound_type].ghsound == GHSOUND_NONE
         || occupation_soundset_definitions[object_soundsets[object_soundset_id].occupation_soundsets[occupation_type]].sounds[sound_type].ghsound == MAX_GHSOUNDS)
         return;
@@ -18400,7 +18407,7 @@ int x, y;
 }
 
 enum player_soundset_types
-    get_player_soundset()
+get_player_soundset(VOID_ARGS)
 {
     if (Upolyd)
     {
@@ -18475,7 +18482,7 @@ enum player_soundset_types
 }
 
 void
-dosetsoundvolume()
+dosetsoundvolume(VOID_ARGS)
 {
     adjust_ghsound_general_volumes();
 }
@@ -19077,6 +19084,7 @@ int fd;
 {
     int count;
     sound_source* ss;
+    Strcpy(debug_buf_4, "restore_sound_sources");
 
     /* restore elements */
     mread(fd, (genericptr_t)&count, sizeof count);
@@ -19645,7 +19653,7 @@ int dnum;
     else if (dnum == sokoban_dnum)
         res = GHSOUND_SOKOBAN_MUSIC_NORMAL;
     else if (dnum == quest_dnum)
-        res = GHSOUND_QUEST_MUSIC_NORMAL;
+        res = u.uevent.qcompleted ? GHSOUND_QUEST_MUSIC_COMPLETED : GHSOUND_QUEST_MUSIC_NORMAL;
     else if (dnum == gehennom_dnum)
         res = GHSOUND_GEHENNOM_MUSIC_NORMAL;
     else if (dnum == tower_dnum)
@@ -19705,6 +19713,8 @@ struct d_level* dlvl;
         return GHSOUND_ENDGAME_MUSIC_ASTRAL;
     else if (Is_quantum_core_level(dlvl))
         return GHSOUND_DUNGEON_NORMAL_MUSIC_QUANTUM_CORE;
+    else if (Is_knox(dlvl))
+        return GHSOUND_DUNGEON_NORMAL_MUSIC_FORT_LUDIOS;
     else
         return get_dungeon_music(dnum);
 }
@@ -19790,6 +19800,7 @@ struct mkroom* room;
         case OROOM:
             break;
         case COURT:
+            res = GHSOUND_DUNGEON_NORMAL_MUSIC_COURT;
             break;
         case SWAMP:
             break;
@@ -19815,7 +19826,10 @@ struct mkroom* room;
             res = GHSOUND_DUNGEON_NORMAL_MUSIC_ORACLE;
             break;
         case TEMPLE:
-            res = GHSOUND_DUNGEON_NORMAL_MUSIC_TEMPLE;
+            if(In_modron_level(&u.uz))
+                res = GHSOUND_MODRON_MUSIC_TEMPLE;
+            else
+                res = GHSOUND_DUNGEON_NORMAL_MUSIC_TEMPLE;
             break;
         case SMITHY:
             if (Inhell)
@@ -19835,6 +19849,8 @@ struct mkroom* room;
                     break;
                 case NPC_HERMIT2:
                 case NPC_HERMIT3:
+                    res = GHSOUND_DUNGEON_NORMAL_MUSIC_NPC_HERMIT;
+                    break;
                 case NPC_ELVEN_BARD:
                     res = GHSOUND_DUNGEON_NORMAL_MUSIC_NPC_TERTIARY;
                     break;
@@ -19861,6 +19877,9 @@ struct mkroom* room;
                     break;
                 case NPC_HERMIT2:
                 case NPC_HERMIT3:
+                case NPC_ORC_HERMIT3:
+                    res = GHSOUND_DUNGEON_NORMAL_MUSIC_NPC_HERMIT;
+                    break;
                 case NPC_ELVEN_BARD:
                     res = GHSOUND_DUNGEON_NORMAL_MUSIC_NPC_TERTIARY;
                     break;
@@ -19884,6 +19903,9 @@ struct mkroom* room;
                     break;
                 case NPC_HERMIT2:
                 case NPC_HERMIT3:
+                case NPC_ORC_HERMIT3:
+                    res = GHSOUND_DUNGEON_NORMAL_MUSIC_NPC_HERMIT;
+                    break;
                 case NPC_ELVEN_BARD:
                     res = GHSOUND_DUNGEON_NORMAL_MUSIC_NPC_TERTIARY;
                     break;
@@ -19939,8 +19961,8 @@ struct d_level* dlvl;
 }
 
 enum ghsound_types
-    get_room_ambient_sounds(room)
-    struct mkroom* room;
+get_room_ambient_sounds(room)
+struct mkroom* room;
 {
     enum roomtype_types rtype = room->orig_rtype;
     enum ghsound_types res = get_level_ambient_sounds(&u.uz);
@@ -20024,7 +20046,7 @@ enum ghsound_types
 }
 
 enum ghsound_types
-    get_environment_ambient_sounds()
+get_environment_ambient_sounds(VOID_ARGS)
 {
     enum ghsound_types res = GHSOUND_NONE;
 
@@ -20375,7 +20397,7 @@ int* titleandgodindex_ptr;
 }
 
 void
-play_intro_text()
+play_intro_text(VOID_ARGS)
 {
     int godindex = 7;
     int titleandgodindex = 9;
@@ -20401,6 +20423,9 @@ struct monst* mon;
 int msgnum;
 boolean via_pline;
 {
+    if (!iflags.using_gui_sounds)
+        return;
+
     /* Special cases first */
     if (msgnum >= QT_ANGELIC && msgnum <= QT_ANGELIC + QTN_ANGELIC - 1)
     {
@@ -20451,6 +20476,9 @@ struct monst* mon;
 int msgnum;
 boolean via_pline;
 {
+    if (!iflags.using_gui_sounds)
+        return;
+
     struct ghsound_immediate_info info = { 0 };
     info.ghsound = GHSOUND_QUEST_PAGER;
     info.sound_type = IMMEDIATE_SOUND_DIALOGUE; //  is_dialogue ? IMMEDIATE_SOUND_DIALOGUE : IMMEDIATE_SOUND_SFX;
@@ -20527,7 +20555,7 @@ play_voice_shopkeeper_welcome(shkp, rt)
 struct monst* shkp;
 int rt;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
 
     int shoptype = (rt - SHOPBASE);
@@ -20578,7 +20606,7 @@ play_voice_shopkeeper_simple_line(shkp, line_idx)
 struct monst* shkp;
 enum shopkeeper_lines line_idx;
 {
-    if (!shkp || (!has_eshk(shkp) && line_idx != SHOPKEEPER_LINE_SEEN_UNTENDED_SHOPS) || line_idx == SHOPKEEPER_LINE_NONE || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || (!has_eshk(shkp) && line_idx != SHOPKEEPER_LINE_SEEN_UNTENDED_SHOPS) || line_idx == SHOPKEEPER_LINE_NONE || Deaf)
         return;
 
     enum role_types yourrole = urole.rolenum;
@@ -21035,7 +21063,7 @@ const char* tool_str;
 int cnt;
 boolean is_angry;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21108,7 +21136,7 @@ struct monst* shkp;
 enum shopkeeper_cad_lines line_id;
 const char* cad_str;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf || line_id == SHOPKEEPER_CAD_LINE_NONE)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf || line_id == SHOPKEEPER_CAD_LINE_NONE)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21194,7 +21222,7 @@ play_voice_shopkeeper_candelabrum_candles(shkp, candelabrum)
 struct monst* shkp;
 struct obj* candelabrum;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || !candelabrum || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || !candelabrum || Deaf)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21236,7 +21264,7 @@ play_voice_shopkeeper_izchak_talks(shkp, line_idx)
 struct monst* shkp;
 int line_idx;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21278,7 +21306,7 @@ struct monst* shkp;
 int honorific_idx, base_line_idx;
 long quan;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21331,7 +21359,7 @@ play_voice_shopkeeper_pay_before_buying(shkp, obj_quan, save_quan)
 struct monst* shkp;
 long obj_quan, save_quan;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21443,7 +21471,7 @@ uchar style;
 const char* dmg_str;
 boolean is_shop;
 {
-    if (!shkp || !shkp->mextra || !ESHK(shkp) || Deaf)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21546,7 +21574,7 @@ struct monst* shkp;
 struct obj* otmp;
 enum cost_alteration_types alteration_type;
 {
-    if (!shkp || !has_eshk(shkp) || Deaf || !otmp)
+    if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf || !otmp)
         return;
 
     boolean is_undead_shk = is_undead(shkp->data) || is_demon(shkp->data);
@@ -21588,7 +21616,7 @@ void
 play_voice_quest_leader_whoareyou(mtmp)
 struct monst* mtmp;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -21625,7 +21653,7 @@ play_voice_monster_cuss(mtmp, cuss_id)
 struct monst* mtmp;
 int cuss_id;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -21664,7 +21692,7 @@ play_voice_monster_cuss_with_god_name(mtmp, cuss_id)
 struct monst* mtmp;
 int cuss_id;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     int godindex = 7;
@@ -21709,7 +21737,7 @@ play_voice_monster_advice(mtmp, has_advice)
 struct monst* mtmp;
 boolean has_advice;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -21746,7 +21774,7 @@ play_voice_wizard_of_yendor_cuss(mtmp, malediction_id, insult_id)
 struct monst* mtmp;
 int malediction_id, insult_id;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -21785,7 +21813,7 @@ play_voice_wizard_of_yendor_simple_line(mtmp, line_id)
 struct monst* mtmp;
 enum wizard_of_yendor_simple_lines line_id;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -21883,7 +21911,7 @@ double minimum_volume;
 const char* index_name;
 unsigned long pflags;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -22154,7 +22182,7 @@ enum ghsound_types soundid;
 uchar soundindextype;
 int lineid;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };
@@ -22202,6 +22230,8 @@ play_voice_god_simple_line_at(x, y, line_id)
 xchar x, y;
 enum god_simple_lines line_id;
 {
+    if (!iflags.using_gui_sounds)
+        return;
     if (!IS_ALTAR(levl[x][y].typ))
         return; /* No altar */
 
@@ -22222,6 +22252,8 @@ aligntyp godalign;
 enum god_simple_lines line_id;
 {
     /* You will hear the god even if you are deaf */
+    if (!iflags.using_gui_sounds)
+        return;
 
     boolean isfemale = align_gfemale(godalign);
     struct ghsound_immediate_info info = { 0 };
@@ -22246,7 +22278,7 @@ play_voice_oracle_major_consultation(mtmp, line_idx)
 struct monst* mtmp;
 int line_idx;
 {
-    if (!mtmp || Deaf)
+    if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
 
     struct ghsound_immediate_info info = { 0 };

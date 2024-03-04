@@ -46,6 +46,7 @@ STATIC_DCL struct obj *FDECL(find_unpaid, (struct obj *, struct obj **));
 STATIC_DCL int FDECL(menu_identify, (int));
 STATIC_DCL boolean FDECL(tool_in_use, (struct obj *));
 STATIC_DCL char FDECL(obj_to_let, (struct obj *));
+STATIC_DCL void FDECL(add_inventory_menu_item, (winid, struct obj*, CHAR_P, BOOLEAN_P, BOOLEAN_P, int, BOOLEAN_P, BOOLEAN_P, int*));
 
 static int lastinvnr = 51; /* 0 ... 51 (never saved&restored) */
 
@@ -737,7 +738,6 @@ merged(potmp, pobj)
 struct obj **potmp, **pobj;
 {
     register struct obj *otmp = *potmp, *obj = *pobj;
-    Strcpy(debug_buf_4, "merged");
 
     if (mergable(otmp, obj)) {
         /* Approximate age: we do it this way because if we were to
@@ -766,6 +766,7 @@ struct obj **potmp, **pobj;
             otmp = *potmp = uoname(otmp, UONAME(obj));
         if (!has_oname(otmp) && has_oname(obj))
             otmp = *potmp = oname(otmp, ONAME(obj));
+        Strcpy(debug_buf_2, "merged");
         obj_extract_self(obj);
 
         /* really should merge the timeouts */
@@ -884,8 +885,9 @@ struct obj *obj;
         {
             achievement_gained("Candelabrum of Invocation");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Candelabrum of Invocation");
+            u.uachieve.menorah = 1;
+            invocation_ritual_quest_update(TRUE);
         }
-        u.uachieve.menorah = 1;
     }
     else if (obj->otyp == BELL_OF_OPENING)
     {
@@ -898,8 +900,9 @@ struct obj *obj;
         {
             achievement_gained("Bell of Opening");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Bell of Opening");
+            u.uachieve.bell = 1;
+            invocation_ritual_quest_update(TRUE);
         }
-        u.uachieve.bell = 1;
     }
     else if (obj->otyp == SPE_BOOK_OF_THE_DEAD)
     {
@@ -912,8 +915,9 @@ struct obj *obj;
         {
             achievement_gained("Book of the Dead");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Book of the Dead");
+            u.uachieve.book = 1;
+            invocation_ritual_quest_update(TRUE);
         }
-        u.uachieve.book = 1;
     } 
     else if (obj->oartifact) 
     {
@@ -1013,6 +1017,70 @@ struct obj *obj;
             u.uachieve.role_achievement = 1;
             achievement_gained("Found the Holy Grail");
             livelog_printf(LL_ACHIEVE, "%s", "found the Holy Grail");
+        }
+    }
+}
+
+void
+play_hint_sound_with_delay(dodelay)
+boolean dodelay;
+{
+    if (iflags.using_gui_sounds)
+    {
+        if (dodelay)
+            delay_output_milliseconds(500);
+        play_sfx_sound(SFX_HINT);
+    }
+}
+
+void
+invocation_ritual_quest_update(dodelay)
+boolean dodelay;
+{
+    if ((u.uevent.invocation_ritual_known || u.uevent.heard_of_invocation_ritual) && !u.uevent.invoked)
+    {
+        if (!u.uachieve.bell && !u.uachieve.book && !u.uachieve.menorah)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Candelabrum of Invocation, Silver Bell, and the Book of the Dead");
+        }
+        else if (!u.uachieve.bell && !u.uachieve.book)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Silver Bell and the Book of the Dead");
+        }
+        else if (!u.uachieve.bell && !u.uachieve.menorah)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Candelabrum of Invocation and the Silver Bell");
+        }
+        else if (!u.uachieve.book && !u.uachieve.menorah)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Candelabrum of Invocation and the Book of the Dead");
+        }
+        else if (!u.uachieve.menorah)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Candelabrum of Invocation");
+        }
+        else if (!u.uachieve.book)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Book of the Dead");
+        }
+        else if (!u.uachieve.bell)
+        {
+            play_hint_sound_with_delay(dodelay);
+            custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Silver Bell");
+        }
+        else if (u.uevent.invocation_ritual_known)
+        {
+            play_hint_sound_with_delay(dodelay);
+            if (!u.uevent.uvibrated)
+                custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Locate the Vibrating Square at the bottom of Gehennom");
+            else
+                custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Perform the Invocation Ritual at the Vibrating Square");
         }
     }
 }
@@ -1647,8 +1715,7 @@ struct obj *obj;
         picked_container(obj); /* clear no_charge */
     obj_was_thrown = obj->was_thrown;
     obj->was_thrown = 0;       /* not meaningful for invent */
-    obj->speflags &= ~SPEFLAGS_GRABBED_FROM_YOU; /* You got it back! */
-    obj->speflags &= ~SPEFLAGS_CAUGHT_IN_LEAVES; /* Obviously not caught anymore! */
+    obj->speflags &= ~(SPEFLAGS_GRABBED_FROM_YOU | SPEFLAGS_CAUGHT_IN_LEAVES | SPEFLAGS_PREVIOUSLY_WIELDED | SPEFLAGS_NO_PREVIOUS_WEAPON); /* You got it back / Not in leaves / Not previously held if was not in inventory */
     obj_clear_found(obj); /* Not relevant in inventory */
     obj->speflags |= SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO; /* Has been owned by the hero */
 
@@ -1804,6 +1871,7 @@ const char *drop_fmt, *drop_arg, *hold_msg;
         newsym(u.ux, u.uy);
 
         if (!touch_artifact(obj, &youmonst)) {
+            Strcpy(debug_buf_2, "hold_another_object1");
             obj_extract_self(obj); /* remove it from the floor */
             dropy(obj);            /* now put it back again :-) */
             return obj;
@@ -1811,10 +1879,12 @@ const char *drop_fmt, *drop_arg, *hold_msg;
             /* loose your grip if you revert your form */
             if (drop_fmt)
                 pline(drop_fmt, drop_arg);
+            Strcpy(debug_buf_2, "hold_another_object2");
             obj_extract_self(obj);
             dropy(obj);
             return obj;
         }
+        Strcpy(debug_buf_2, "hold_another_object3");
         obj_extract_self(obj);
 #if 0
         if (crysknife) {
@@ -1990,6 +2060,7 @@ register struct obj *obj;
         context.last_picked_obj_oid = 0;
         context.last_picked_obj_show_duration_left = 0;
     }
+    Sprintf(debug_buf_4, "freeinv: otyp=%d", obj->otyp);
     extract_nobj(obj, &invent);
     freeinv_core(obj);
     update_inventory();
@@ -2040,6 +2111,7 @@ unsigned long newsym_flags;
         return;
     }
     update_map = (obj->where == OBJ_FLOOR);
+    Strcpy(debug_buf_2, "delobj_with_flags");
     obj_extract_self(obj);
     if (update_map)
         newsym_with_flags(obj->ox, obj->oy, newsym_flags);
@@ -2116,7 +2188,7 @@ int x, y;
             }
         }
 
-    return otmp;
+    return (struct obj*)0;
 }
 
 /* Note: uses nobj, not nexthere */
@@ -3833,7 +3905,7 @@ struct obj *otmp;
     if (is_obj_rotting_corpse(otmp) && otmp->corpsenm > NON_PM)
         learn_corpse_type(otmp->corpsenm);
     if (is_obj_rotting_corpse(otmp))
-        otmp->speflags |= SPEFLAGS_ROTTING_STATUS_KNOWN;
+        otmp->rotknown = 1;
 }
 
 /* ggetobj callback routine; identify an object and give immediate feedback */
@@ -3870,7 +3942,7 @@ int id_limit;
             original_id_limit <= 1 ? "" : first ? " first" : " next");
 
         n = query_objlist(buf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE
-                                         | USE_INVLET | INVORDER_SORT),
+                                         | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON),
                           &pick_list, id_limit == 1 ? PICK_ONE : PICK_ANY, not_fully_identified, 0);
 
         if (n > 0)
@@ -4034,7 +4106,6 @@ boolean learning_id; /* true if we just read unknown identify scroll */
             res += idres;
         }
     }
-    update_inventory();
     return res;
 }
 
@@ -4226,7 +4297,7 @@ ddoinv()
         pickcnt = 0;
         return_to_inv = FALSE;
         invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, 1, FALSE);
-        if (!invlet || invlet == '\033' || invlet == '\0')
+        if (invlet == '\033' || invlet == '\0')
             return 0;
 
         if (flags.inventory_obj_cmd)
@@ -4488,9 +4559,13 @@ boolean* return_to_inv_ptr;
 
                 Sprintf(buf, "%s%s", cmdbuf, shortcutbuf);
 
-                add_menu(win, NO_GLYPH, &any,
+                struct extended_menu_info info = zeroextendedmenuinfo;
+                if(efp->flags & CMD_MENU_AUTO_CLICK_OK)
+                    info.menu_flags |= MENU_FLAGS_AUTO_CLICK_OK;
+
+                add_extended_menu(win, NO_GLYPH, &any,
                     0, 0, ATR_NONE, NO_COLOR,
-                    buf, MENU_UNSELECTED);
+                    buf, MENU_UNSELECTED, info);
 
                 actioncount++;
             }
@@ -4643,6 +4718,56 @@ free_pickinv_cache()
     }
 }
 
+STATIC_OVL void
+add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, want_reply, comparison_stats, wtcount_ptr)
+winid win;
+struct obj* otmp;
+char ilet;
+boolean wizid, loadstonecorrectly, want_reply, comparison_stats;
+int show_weights;
+int* wtcount_ptr;
+{
+    anything any = zeroany;
+    if (wizid)
+        any.a_obj = otmp;
+    else
+        any.a_char = ilet;
+
+    /*calculate weight sum here*/
+    if (otmp->otyp == LOADSTONE && !loadstonecorrectly)
+        *wtcount_ptr += objects[LUCKSTONE].oc_weight;
+    else
+        *wtcount_ptr += otmp->owt;
+
+    char applied_class_accelerator = wizid ? def_oc_syms[(int)otmp->oclass].sym : 0;
+
+    int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
+    int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
+
+    char objbuf[BUFSZ * 2];
+    char attrs[BUFSZ * 2];
+    char colors[BUFSZ * 2];
+    memset(attrs, ATR_NONE, sizeof(attrs));
+    memset(colors, NO_COLOR, sizeof(colors));
+    Strcpy(objbuf,
+        show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply)
+            : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply))
+        : doname_with_flags(otmp, iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0, (char**)0, (char**)0));
+    struct extended_menu_info eminfo = obj_to_extended_menu_info(otmp);
+    if (comparison_stats)
+    {
+        char compbuf[BUFSZ];
+        print_comparison_stats(otmp, compbuf, WIN_ERR, ATR_NONE, NO_COLOR, TRUE, TRUE, objbuf, attrs, colors);
+        eminfo.attrs = attrs;
+        eminfo.colors = colors;
+        eminfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+    }
+
+    add_extended_menu(win, gui_glyph, &any, ilet,
+        applied_class_accelerator, ATR_NONE, NO_COLOR,
+        objbuf, MENU_UNSELECTED, eminfo);
+}
+
 /*
  * Internal function used by display_inventory and getobj that can display
  * inventory and return a count as well as a letter. If out_cnt is not null,
@@ -4662,7 +4787,7 @@ boolean addinventoryheader, wornonly;
     static const char not_carrying_anything[] = "Not carrying anything";
     struct obj *otmp, wizid_fakeobj;
     char ilet, ret;
-    char *invlet = flags.inv_order;
+    char *classlet = flags.inv_order;
     int n, classcount;
     winid win;                        /* windows being used */
     anything any;
@@ -4671,7 +4796,7 @@ boolean addinventoryheader, wornonly;
     Loot *sortedinvent, *srtinv;
     boolean wizid = FALSE;
     int wtcount = 0;
-
+    boolean comparison_stats = !wornonly && iflags.show_comparison_stats && !iflags.in_dumplog && !program_state.gameover;
     boolean loadstonecorrectly = FALSE;
 
     if(show_weights == 1) // Inventory
@@ -4754,7 +4879,7 @@ boolean addinventoryheader, wornonly;
             if (otmp)
                 ret = message_menu(otmp->invlet,
                                    want_reply ? PICK_ONE : PICK_NONE,
-                                   xprname(otmp, (char *) 0, lets[0],
+                                   xprname(otmp, (char *) 0, !lets ? otmp->invlet : lets[0],
                                            TRUE, 0L, 0L));
         }
         if (out_cnt)
@@ -4850,26 +4975,7 @@ boolean addinventoryheader, wornonly;
            classcount++;
            favorites_printed = TRUE;
        }
-       if (wizid)
-           any.a_obj = otmp;
-       else
-           any.a_char = ilet;
-
-       /*calculate weight sum here*/
-       if (otmp->otyp == LOADSTONE && !loadstonecorrectly)
-           wtcount += objects[LUCKSTONE].oc_weight;
-       else
-           wtcount += otmp->owt;
-
-       char applied_class_accelerator = wizid ? def_oc_syms[(int)otmp->oclass].sym : 0;
-
-       int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-       int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
-       add_extended_menu(win, gui_glyph, &any, ilet,
-           applied_class_accelerator, ATR_NONE, NO_COLOR,
-           show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply)
-               : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply))
-           : doname_with_flags(otmp, iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
+       add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, want_reply, comparison_stats && !otmp->owornmask, &wtcount);
    }
 
    /* Others by class */
@@ -4883,7 +4989,7 @@ nextclass:
             continue;
         if (otmp->speflags & SPEFLAGS_FAVORITE)
             continue;
-        if (!flags.sortpack || otmp->oclass == *invlet)
+        if (!flags.sortpack || otmp->oclass == *classlet)
         {
             if (wizid && !not_fully_identified(otmp))
                 continue;
@@ -4893,10 +4999,10 @@ nextclass:
             {
                 add_extended_menu(win, NO_GLYPH, &any,
                     0, 0, iflags.menu_headings, NO_COLOR,
-                         let_to_name(*invlet, FALSE,
+                         let_to_name(*classlet, FALSE,
                                      (want_reply && iflags.menu_head_objsym)),
                          MENU_UNSELECTED,
-                    menu_group_heading_info(*invlet > ILLOBJ_CLASS && *invlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*invlet)].sym : '\0'));
+                    menu_group_heading_info(*classlet > ILLOBJ_CLASS && *classlet < MAX_OBJECT_CLASSES ? def_oc_syms[(int)(*classlet)].sym : '\0'));
                 classcount++;
             }
             else if (!flags.sortpack && !classcount && favorites_printed)
@@ -4908,36 +5014,16 @@ nextclass:
                     menu_group_heading_info('\0'));
                 classcount++;
             }
-
-            if (wizid)
-                any.a_obj = otmp;
-            else
-                any.a_char = ilet;
-
-            /*calculate weight sum here*/
-            if(otmp->otyp == LOADSTONE && !loadstonecorrectly)
-                wtcount += objects[LUCKSTONE].oc_weight;
-            else
-                wtcount += otmp->owt;
-
-            char applied_class_accelerator = wizid ? def_oc_syms[(int)otmp->oclass].sym : 0;
-
-            int glyph = obj_to_glyph(otmp, rn2_on_display_rng);
-            int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
-            add_extended_menu(win, gui_glyph, &any, ilet,
-                applied_class_accelerator, ATR_NONE, NO_COLOR, 
-                show_weights > 0 ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply) 
-                    : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply)) 
-                    : doname_with_flags(otmp, iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
+            add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, want_reply, comparison_stats && !otmp->owornmask, &wtcount);
         }
     }
     if (flags.sortpack) 
     {
-        if (*++invlet)
+        if (*++classlet)
             goto nextclass;
-        if (--invlet != venom_inv) 
+        if (--classlet != venom_inv) 
         {
-            invlet = venom_inv;
+            classlet = venom_inv;
             goto nextclass;
         }
     }
@@ -5024,7 +5110,7 @@ nextclass:
                     }
                 }
             }
-        } 
+        }
         else 
         {
             ret = selected[0].item.a_char;
@@ -5304,7 +5390,7 @@ char avoidlet;
 {
     struct obj *otmp;
     char ilet, ret = 0;
-    char *invlet = flags.inv_order;
+    char *classlet = flags.inv_order;
     int n, classcount, invdone = 0;
     winid win;
     anything any;
@@ -5320,12 +5406,12 @@ char avoidlet;
                 ilet = otmp->invlet;
                 if (ilet == avoidlet)
                     continue;
-                if (!flags.sortpack || otmp->oclass == *invlet) {
+                if (!flags.sortpack || otmp->oclass == *classlet) {
                     if (flags.sortpack && !classcount) {
                         any = zeroany; /* zero */
                         add_extended_menu(win, NO_GLYPH, &any, 0, 0,
                                  iflags.menu_headings | ATR_HEADING, NO_COLOR,
-                                 let_to_name(*invlet, FALSE, FALSE),
+                                 let_to_name(*classlet, FALSE, FALSE),
                                  MENU_UNSELECTED, menu_heading_info());
                         classcount++;
                     }
@@ -5338,7 +5424,7 @@ char avoidlet;
                                  doname_with_weight_first(otmp, TRUE, FALSE)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
                 }
             }
-            if (flags.sortpack && *++invlet)
+            if (flags.sortpack && *++classlet)
                 continue;
             invdone = 1;
         }
@@ -5517,7 +5603,7 @@ dounpaid()
     winid win;
     struct obj *otmp, *marker, *contnr;
     register char ilet;
-    char *invlet = flags.inv_order;
+    char *classlet = flags.inv_order;
     int classcount, count, num_so_far;
     long cost, totcost;
 
@@ -5550,9 +5636,9 @@ dounpaid()
         for (otmp = invent; otmp; otmp = otmp->nobj) {
             ilet = otmp->invlet;
             if (otmp->unpaid) {
-                if (!flags.sortpack || otmp->oclass == *invlet) {
+                if (!flags.sortpack || otmp->oclass == *classlet) {
                     if (flags.sortpack && !classcount) {
-                        putstr(win, 0, let_to_name(*invlet, TRUE, FALSE));
+                        putstr(win, 0, let_to_name(*classlet, TRUE, FALSE));
                         classcount++;
                     }
 
@@ -5565,7 +5651,7 @@ dounpaid()
                 }
             }
         }
-    } while (flags.sortpack && (*++invlet));
+    } while (flags.sortpack && (*++classlet));
 
     if (count > num_so_far) {
         /* something unpaid is contained */
@@ -5618,7 +5704,7 @@ dounidentified()
     winid win;
     struct obj* otmp;
     register char ilet;
-    char* invlet = flags.inv_order;
+    char* classlet = flags.inv_order;
     int classcount, count;
 
     count = count_unidentified(invent, 0, FALSE);
@@ -5640,9 +5726,9 @@ dounidentified()
         for (otmp = invent; otmp; otmp = otmp->nobj) {
             ilet = otmp->invlet;
             if (not_fully_identified(otmp)) {
-                if (!flags.sortpack || otmp->oclass == *invlet) {
+                if (!flags.sortpack || otmp->oclass == *classlet) {
                     if (flags.sortpack && !classcount) {
-                        putstr(win, 0, let_to_name(*invlet, 2, FALSE));
+                        putstr(win, 0, let_to_name(*classlet, 2, FALSE));
                         classcount++;
                     }
 
@@ -5651,7 +5737,7 @@ dounidentified()
                 }
             }
         }
-    } while (flags.sortpack && (*++invlet));
+    } while (flags.sortpack && (*++classlet));
 
     display_nhwindow(win, FALSE);
     destroy_nhwindow(win);
@@ -5663,7 +5749,7 @@ dounknown()
     winid win;
     struct obj* otmp;
     register char ilet;
-    char* invlet = flags.inv_order;
+    char* classlet = flags.inv_order;
     int classcount, count;
 
     count = count_unknown(invent, 0, FALSE);
@@ -5685,9 +5771,9 @@ dounknown()
         for (otmp = invent; otmp; otmp = otmp->nobj) {
             ilet = otmp->invlet;
             if (is_obj_unknown(otmp)) {
-                if (!flags.sortpack || otmp->oclass == *invlet) {
+                if (!flags.sortpack || otmp->oclass == *classlet) {
                     if (flags.sortpack && !classcount) {
-                        putstr(win, 0, let_to_name(*invlet, 2, FALSE));
+                        putstr(win, 0, let_to_name(*classlet, 2, FALSE));
                         classcount++;
                     }
 
@@ -5696,7 +5782,7 @@ dounknown()
                 }
             }
         }
-    } while (flags.sortpack && (*++invlet));
+    } while (flags.sortpack && (*++classlet));
 
     display_nhwindow(win, FALSE);
     destroy_nhwindow(win);
@@ -5932,7 +6018,7 @@ dotypeinv()
     }
     if (query_objlist((char *) 0, &invent,
                       ((flags.invlet_constant ? USE_INVLET : 0)
-                       | INVORDER_SORT),
+                       | INVORDER_SORT | OBJECT_COMPARISON),
                       &pick_list, PICK_NONE, this_type_only, 1) > 0)
         free((genericptr_t) pick_list);
     return 0;
@@ -6289,7 +6375,52 @@ boolean picked_some, explicit_cmd;
         if (dfeature)
             pline1(fbuf);
         read_engr_at(u.ux, u.uy); /* Eric Backus */
-        You("%s here %s.", verb, doname_in_text_with_price_and_weight_last(otmp)); //See on the ground
+
+        char* attrs = 0, * colors = 0;
+        char* item_name_buf = doname_in_text_with_price_and_weight_last_and_comparison(otmp, &attrs, &colors);
+        int mattr = ATR_NONE, mcolor = NO_COLOR;
+
+        if (iflags.use_menu_color && get_menu_coloring(item_name_buf, &mcolor, &mattr))
+        {
+            if (attrs && colors)
+            {
+                size_t len = strlen(item_name_buf);
+                size_t i;
+                if (mattr != ATR_NONE)
+                {
+                    for (i = 0; i < len; i++)
+                    {
+                        if (attrs[i] == ATR_NONE)
+                            attrs[i] = mattr;
+                    }
+                }
+                if (mcolor != NO_COLOR)
+                {
+                    for (i = 0; i < len; i++)
+                    {
+                        if (colors[i] == NO_COLOR)
+                            colors[i] = mcolor;
+                    }
+                }
+            }
+        }
+
+        if (attrs && colors)
+        {
+            char startbuf[BUFSZ];
+            Sprintf(startbuf, "You %s here ", verb);
+            concatenate_colored_text(startbuf, ".", ATR_NONE, NO_COLOR, item_name_buf, attrs, colors);
+            pline1_multi_ex(item_name_buf, attrs, colors, ATR_NONE, NO_COLOR);
+        }
+        else
+        {
+            int multicolors[2] = { NO_COLOR, NO_COLOR };
+            multicolors[1] = mcolor;
+            int multiattrs[2] = { ATR_NONE, ATR_NONE };
+            multiattrs[1] = mattr;
+            pline_multi_ex(ATR_NONE, NO_COLOR, multiattrs, multicolors, "You %s here %s.", verb, item_name_buf); //See on the ground
+        }
+
         iflags.last_msg = PLNMSG_ONE_ITEM_HERE;
         if (otmp->otyp == CORPSE)
             feel_cockatrice(otmp, FALSE);
@@ -6300,12 +6431,15 @@ boolean picked_some, explicit_cmd;
         {
             char buf[BUFSZ];
             char buf2[BUFSZ];
+            char compbuf[BUFSZ] = "";
             int count = 0;
             int totalweight = 0;
 
             display_nhwindow(WIN_MESSAGE, FALSE);
 
-            tmpwin = create_nhwindow(NHW_MENU);
+            struct extended_create_window_info ecwinfo = zerocreatewindowinfo;
+            ecwinfo.create_flags = WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS;
+            tmpwin = create_nhwindow_ex(NHW_MENU, 0, NO_GLYPH, ecwinfo);
 
             if (dfeature) {
                 putstr(tmpwin, 0, fbuf);
@@ -6340,7 +6474,17 @@ boolean picked_some, explicit_cmd;
                     //Nothing
                 }
                 putstr_ex(tmpwin, buf2, ATR_INDENT_AT_DASH, NO_COLOR, 1);
-                putstr_ex(tmpwin, buf, ATR_INDENT_AT_DASH | attr, color, 0);
+                putstr_ex(tmpwin, buf, ATR_INDENT_AT_DASH | attr, color, 1);
+                if (iflags.show_comparison_stats)
+                {
+                    boolean add_parentheses = (windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) == 0; /* Only if not using symbols */
+                    if (!add_parentheses) /* Need a space in that case first */
+                        putstr_ex(tmpwin, " ", ATR_INDENT_AT_DASH, NO_COLOR, 1);
+                    print_comparison_stats(otmp, compbuf, tmpwin, ATR_INDENT_AT_DASH | attr, color, add_parentheses, TRUE, 0, 0, 0);
+                }
+                else
+                    putstr_ex(tmpwin, "", ATR_INDENT_AT_DASH | attr, color, 0);
+
             }
 
             if (flags.show_weight_summary)
@@ -6515,13 +6659,33 @@ print_things_here_to_window(VOID_ARGS)
             Sprintf(buf2, "%c", sym);
             putstr_ex(tmpwin, buf2, ATR_NONE, color, 1);
             putstr_ex(tmpwin, "' ", attr, textcolor, 1);
-            Sprintf(buf2, "%s", (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known)));
+
+            char* attrs = 0, * colors = 0;
+            char* item_name_buf = doname_with_price_and_weight_last_and_comparison(otmp, objects[LOADSTONE].oc_name_known, TRUE, &attrs, &colors);
             int mcolor = NO_COLOR, mattr = ATR_NONE;
-            if (iflags.use_menu_color && get_menu_coloring(buf2, &mcolor, &mattr))
-                putstr_ex(tmpwin, buf2, mattr, mcolor, 0);
+            if (attrs && colors)
+            {
+                int used_color, used_attr;
+                if (iflags.use_menu_color && get_menu_coloring(item_name_buf, &mcolor, &mattr))
+                {
+                    used_color = mcolor;
+                    used_attr = mattr;
+                }
+                else
+                {
+                    used_color = textcolor;
+                    used_attr = attr;
+                }
+                putstr_ex2(tmpwin, item_name_buf, attrs, colors, used_attr, used_color, 0);
+            }
             else
-                putstr_ex(tmpwin, buf2, attr, textcolor, 0);
-           
+            {
+                //Sprintf(buf2, "%s", item_name_buf); // (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known)));
+                if (iflags.use_menu_color && get_menu_coloring(item_name_buf, &mcolor, &mattr))
+                    putstr_ex(tmpwin, item_name_buf, mattr, mcolor, 0);
+                else
+                    putstr_ex(tmpwin, item_name_buf, attr, textcolor, 0);
+            }
         }
     }
 }
@@ -6656,7 +6820,7 @@ register struct obj *otmp, *obj;
             return FALSE;
     }
 
-    if (is_obj_rotting_corpse(obj) && (obj->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) != (otmp->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN)) {
+    if (is_obj_rotting_corpse(obj) && obj->rotknown != otmp->rotknown) {
         return FALSE;
     }
 
@@ -7147,6 +7311,9 @@ doorganize() /* inventory organizer by Del Lamb */
     char *objname, *uobjname, *otmpname, *uotmpname;
     const char *adj_type;
     boolean ever_mind = FALSE, collect;
+    Strcpy(debug_buf_2, "doorganize");
+    *debug_buf_3 = 0;
+    *debug_buf_4 = 0;
 
     if (!invent) {
         You1("aren't carrying anything to adjust.");
@@ -7223,7 +7390,7 @@ doorganize() /* inventory organizer by Del Lamb */
 
     /* get 'to' slot to use as destination */
     for (trycnt = 1; ; ++trycnt) {
-#if GNH_MOBILE
+#ifdef GNH_MOBILE
         let = '?';
 #else
         char qbuf[QBUFSZ];
@@ -7485,7 +7652,7 @@ register struct obj *obj;
                      "that");
 
     if (obj->cobj) {
-        n = query_objlist(qbuf, &(obj->cobj), INVORDER_SORT,
+        n = query_objlist(qbuf, &(obj->cobj), INVORDER_SORT | OBJECT_COMPARISON,
                           &selected, PICK_NONE, allow_all, 5); //Looking at things in container's inventory far away
     } else {
         invdisp_nothing(qbuf, "(empty)");
@@ -7537,7 +7704,7 @@ boolean as_if_seen;
         only.x = x;
         only.y = y;
         if (query_objlist("Things that are buried here:",
-                          &level.buriedobjlist, INVORDER_SORT,
+                          &level.buriedobjlist, INVORDER_SORT | OBJECT_COMPARISON,
                           &selected, PICK_NONE, only_here, 2) > 0)
             free((genericptr_t) selected);
         only.x = only.y = 0;

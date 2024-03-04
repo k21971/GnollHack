@@ -10,6 +10,7 @@
 
 #include "general.h"
 #include "soundset.h"
+#include "objclass.h"
 
 #define E extern
 
@@ -208,6 +209,7 @@ E NEARDATA struct sinfo {
     int in_paniclog;
 #endif
     int wizkit_wishing;
+    int in_tricked;
 } program_state;
 
 E int exit_hack_code;
@@ -216,6 +218,7 @@ E boolean restoring;
 E boolean saving;
 E boolean reseting;
 E boolean check_pointing;
+E boolean ignore_onsleep_autosave;
 E boolean ransacked;
 
 E struct gamelog_line* gamelog;

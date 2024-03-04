@@ -362,13 +362,15 @@ int force;
 
                     mtmp = m_at(x, y);
 
-                    if ((otmp = sobj_at(BOULDER, x, y)) != 0) {
+                    if ((otmp = sobj_at(BOULDER, x, y)) != 0) 
+                    {
                         if (cansee(x, y))
                             pline("KADOOM!  The boulder falls into a chasm%s!",
                                   (x == u.ux && y == u.uy) ? " below you"
                                                            : "");
                         if (mtmp)
                             mtmp->mtrapped = 0;
+                        Strcpy(debug_buf_2, "do_earthquake");
                         obj_extract_self(otmp);
                         (void) flooreffects(otmp, x, y, "");
                         break;
@@ -376,9 +378,10 @@ int force;
 
                     /* We have to check whether monsters or player
                        falls in a chasm... */
-                    if (mtmp) {
-                        if (!is_flyer(mtmp->data)
-                            && !is_clinger(mtmp->data)) {
+                    if (mtmp) 
+                    {
+                        if (!has_flying(mtmp) && !has_levitation(mtmp) && !is_clinger(mtmp->data)) 
+                        {
                             boolean m_already_trapped = mtmp->mtrapped;
 
                             mtmp->mtrapped = 1;
@@ -417,8 +420,11 @@ int force;
                                 }
                             }
                         }
-                    } else if (x == u.ux && y == u.uy) {
-                        if (u.utrap && u.utraptype == TT_BURIEDBALL) {
+                    } 
+                    else if (x == u.ux && y == u.uy) 
+                    {
+                        if (u.utrap && u.utraptype == TT_BURIEDBALL) 
+                        {
                             /* Note:  the chain should break if a pit gets
                                created at the buried ball's location, which
                                is not necessarily here.  But if we don't do
@@ -428,21 +434,26 @@ int force;
                             Your("chain breaks!");
                             reset_utrap(TRUE);
                         }
-                        if (Levitation || Flying
-                            || is_clinger(youmonst.data)) {
-                            if (!tu_pit) { /* no pit here previously */
+                        if (Levitation || Flying || is_clinger(youmonst.data)) 
+                        {
+                            if (!tu_pit) 
+                            { /* no pit here previously */
                                 pline("A chasm opens up under you!");
                                 You("don't fall in!");
                             }
-                        } else if (!tu_pit || !u.utrap
-                                   || (u.utrap && u.utraptype != TT_PIT)) {
+                        }
+                        else if (!tu_pit || !u.utrap
+                                   || (u.utrap && u.utraptype != TT_PIT)) 
+                        {
                             /* no pit here previously, or you were
                                not in it even if there was */
                             You("fall into a chasm!");
                             set_utrap(rn1(6, 2), TT_PIT);
                             losehp(adjust_damage(rnd(6), (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE), "fell into a chasm", NO_KILLER_PREFIX);
                             selftouch("Falling, you");
-                        } else if (u.utrap && u.utraptype == TT_PIT) {
+                        }
+                        else if (u.utrap && u.utraptype == TT_PIT) 
+                        {
                             boolean keepfooting =
                                 ((Fumbling && !rn2(5))
                                  || (!rnl(Role_if(PM_ARCHAEOLOGIST) ? 3 : 9))
@@ -461,7 +472,8 @@ int force;
                                         ? "Shaken, you"
                                         : "Falling down, you");
                         }
-                    } else
+                    } 
+                    else
                         newsym(x, y);
                     break;
                 case DOOR: /* Make the door collapse */
@@ -474,7 +486,15 @@ int force;
                     if (*in_rooms(x, y, SHOPBASE))
                         add_damage(x, y, 0L);
                     levl[x][y].doormask &= ~D_MASK;
-                    levl[x][y].doormask |= D_NODOOR;
+                    if ((levl[x][y].doormask & D_MASK) == D_BROKEN)
+                    {
+                        levl[x][y].doormask |= D_NODOOR;
+                        levl[x][y].subtyp = 0;
+                    }
+                    else
+                    {
+                        levl[x][y].doormask |= D_BROKEN;
+                    }
                     unblock_vision_and_hearing_at_point(x, y);
                     newsym(x, y);
                     break;
@@ -633,7 +653,7 @@ struct obj *instr;
         consume_obj_charge(instr, TRUE);
         You("produce a strange, vibrating sound.");
         wake_nearby();
-        int dur_dice = objects[instr->otyp].oc_spell_dur_dice;
+        int dur_dice = objects[instr->otyp].oc_spell_dur_dice * (1 + (int)min(4, instr->exceptionality));
         int dur_diesize = objects[instr->otyp].oc_spell_dur_diesize;
         int dur_plus = objects[instr->otyp].oc_spell_dur_plus;
         int radius = 10;
@@ -671,7 +691,7 @@ struct obj *instr;
             is_scary = TRUE;
         }
         You("produce a %sgrave sound.", is_scary ? "frightful, " : "");
-        awaken_monsters(u.ulevel * 30, is_scary);
+        awaken_monsters(u.ulevel * 30 * (1 + (int)min(4, instr->exceptionality)), is_scary);
         exercise(A_WIS, FALSE);
         makeknown(instr->otyp);
         break;

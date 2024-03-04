@@ -1403,13 +1403,13 @@ boolean loc_is_you, ispeaceful, ispet, isdetected;
             break;
         case STATUS_MARK_HUNGRY:
             if ((loc_is_you && u.uhs == HUNGRY)
-                || (!loc_is_you && ispet && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty == 0)
+                || (!loc_is_you && ispet && !is_non_eater(mtmp->data) && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty == 0)
                 )
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_WEAK:
             if ((loc_is_you && u.uhs == WEAK)
-                || (!loc_is_you && ispet && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty > 0)
+                || (!loc_is_you && ispet && !is_non_eater(mtmp->data) && has_edog(mtmp) && monstermoves >= EDOG(mtmp)->hungrytime && EDOG(mtmp)->mhpmax_penalty > 0)
                 )
                 display_this_status_mark = TRUE;
             break;
@@ -1632,9 +1632,9 @@ char* outbuf5;
                 Sprintf(eos(tempbuf), "%d/%d%%", mc, mcpct);
             }
 
-            if (has_edog(mtmp))
+            if (has_edog(mtmp) && !is_non_eater(mtmp->data))
             {
-                if (EDOG(mtmp)->hungrytime + 500 <= monstermoves)
+                if (EDOG(mtmp)->hungrytime + PET_WEAK_TIME <= monstermoves)
                     Strcat(tempbuf, " Weak");
                 else if (EDOG(mtmp)->hungrytime <= monstermoves)
                     Strcat(tempbuf, " Hungry");
@@ -2510,7 +2510,7 @@ status_eval_next_unhilite()
 
 /* called by options handling when 'statushilites' value is changed */
 void
-reset_status_hilites()
+reset_status_hilites(VOID_ARGS)
 {
     if (iflags.hilite_delta) {
         int i;

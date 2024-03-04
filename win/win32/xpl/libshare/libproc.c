@@ -472,7 +472,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
 
     lib_callbacks.callback_print_glyph(wid, x, y, layers.glyph, layers.bkglyph, symbol, ocolor, special, &layers);
 
-    if (program_state.in_bones)
+    if (program_state.in_bones || program_state.in_tricked)
         return;
 
     /* Now send all object data */
@@ -579,15 +579,37 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
             }
         }
     }
+
+    /* Add engravings */
+    /* Note: print_glyph clears engraving data */
+    struct engr* en;
+    if ((layers.layer_flags & LFLAGS_L_ENGRAVING) != 0 && (en = engr_at(x, y)) != 0 && (en->engr_flags & ENGR_FLAGS_SEEN) != 0 && en->engr_txt && *en->engr_txt)
+    {
+        unsigned long gflags = 0UL;
+        if (((!strcmp(en->engr_txt, Elbereth_word) || !strcmp(en->engr_txt, Gilthoniel_word)) && !Inhell) || (!strcmp(en->engr_txt, Morgoth_word) && Inhell))
+            gflags |= 1;
+        lib_callbacks.callback_send_engraving_data(0, x, y, en->engr_txt, (int)en->engr_type, (unsigned long)en->engr_flags, gflags);
+    }
 }
 
 void lib_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char* cmd_str)
 {
-    char utf8buf[UTF8BUFSZ];
+    char* utf8buf = 0;
     if (cmd_str)
-        write_text2buf_utf8(utf8buf, UTF8BUFSZ, cmd_str);
+    {
+        size_t utf8bufsize = strlen(cmd_str) * 4 + 1;
+        utf8buf = (char*)alloc(utf8bufsize); 
+        if (!utf8buf)
+            return;
+        if (!*cmd_str)
+            *utf8buf = 0;
+        else
+            write_text2buf_utf8(utf8buf, utf8bufsize, cmd_str);
+    }
 
-    lib_callbacks.callback_issue_gui_command(cmd_id, cmd_param, cmd_param2, cmd_str ? utf8buf : 0);
+    lib_callbacks.callback_issue_gui_command(cmd_id, cmd_param, cmd_param2, utf8buf);
+    if (utf8buf)
+        free((genericptr_t)utf8buf);
 
     switch (cmd_id)
     {
@@ -981,7 +1003,28 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
         struct obj* ammo = idx == BL_UQUIVER ? (struct obj*)0 : idx == BL_UWEP ? uquiver : uquiver;
 
         if (idx == BL_UWEP)
+        {
             owepflags |= OBJDATA_FLAGS_UWEP;
+            if (uwep && (is_pick(uwep) || is_saw(uwep) || is_axe(uwep) || is_whip(uwep) || is_hook(uwep) || is_appliable_pole_type_weapon(uwep) || is_lamp(uwep)))
+            {
+                if (uwep->speflags & SPEFLAGS_NO_PREVIOUS_WEAPON)
+                {
+                    owepflags |= OBJDATA_FLAGS_PREV_UNWIELD;
+                }
+                else
+                {
+                    struct obj* prevwep;
+                    for (prevwep = invent; prevwep; prevwep = prevwep->nobj)
+                    {
+                        if (prevwep->speflags & SPEFLAGS_PREVIOUSLY_WIELDED)
+                        {
+                            owepflags |= OBJDATA_FLAGS_PREV_WEP_FOUND;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         else if (idx == BL_UWEP2)
         {
             owepflags |= OBJDATA_FLAGS_UWEP2;

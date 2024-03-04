@@ -332,7 +332,7 @@ recalc_wt()
 
 /* called when eating interrupted by an event */
 void
-reset_eat()
+reset_eat(VOID_ARGS)
 {
     /* we only set a flag here - the actual reset process is done after
      * the round is spent eating.
@@ -482,7 +482,7 @@ struct obj *old_obj, *new_obj;
 }
 
 STATIC_OVL void
-do_reset_eat()
+do_reset_eat(VOID_ARGS)
 {
     debugpline0("do_reset_eat...");
     if (context.victual.piece) {
@@ -1760,7 +1760,7 @@ int forcetype;
             && (obj->corpsenm == NON_PM /* empty or already spinach */
                 || !vegetarian(&mons[obj->corpsenm])))) { /* replace meat */
         obj->corpsenm = NON_PM; /* not based on any monster */
-        obj->special_quality = 1;           /* spinach */
+        obj->special_quality = SPEQUAL_TIN_CONTAINS_SPINACH;           /* spinach */
         return;
     } else if (forcetype == HEALTHY_TIN) {
         r = tin_variety(obj, FALSE);
@@ -3240,7 +3240,7 @@ struct obj *otmp;
         if (cadaver && mnum >= LOW_PM && !nonrotting_corpse(mnum))
         {
             rotted = get_rotted_status(otmp);
-            otmp->speflags |= SPEFLAGS_ROTTING_STATUS_KNOWN;
+            otmp->rotknown = 1;
             //long age = peek_at_iced_corpse_age(otmp);
 
             ///* worst case rather than random
@@ -4263,7 +4263,7 @@ boolean incr;
             /* if we return, we lifesaved, and that calls update_hunger_status */
             return;
         }
-        pray_hint("recover from fainting due to hunger", "eating food", &u.uhint.got_fainting);
+        pray_hint("recover from fainting due to hunger", "eating food (including fresh edible corpses)", &u.uhint.got_fainting);
     }
 
     if (newhs != u.uhs) {
@@ -4298,7 +4298,7 @@ boolean incr;
                 && (occupation != eatfood && occupation != opentin))
                 stop_occupation();
             clear_run_and_travel();
-            pray_hint("recover from hunger", "eating food", & u.uhint.got_hungry);
+            pray_hint("recover from hunger", "eating food (including fresh edible corpses)", &u.uhint.got_hungry);
             break;
         case WEAK:
             if (Hallucination)
@@ -4319,7 +4319,7 @@ boolean incr;
                 && (occupation != eatfood && occupation != opentin))
                 stop_occupation();
             clear_run_and_travel();
-            pray_hint("recover from weakness due to hunger", "eating food", &u.uhint.got_weak);
+            pray_hint("recover from weakness due to hunger", "eating food (including fresh edible corpses)", &u.uhint.got_weak);
             break;
         }
         u.uhs = newhs;

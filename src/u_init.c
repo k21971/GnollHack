@@ -289,7 +289,7 @@ STATIC_VAR const struct trobj PriestSilverMace[] = { { MACE, 3, WEAPON_CLASS, 1,
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj PriestNormalMace[] = { { MACE, 3, WEAPON_CLASS, 1, 0, 1, 0, 0, MAT_NONE },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
-STATIC_VAR const struct trobj PriestLawfulSummonSpell[] = { { SPE_CELESTIAL_DOVE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
+STATIC_VAR const struct trobj PriestLawfulSummonSpell[] = { { SPE_SUMMON_CELESTIAL_DOVE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj PriestNeutralSummonSpell[] = { { SPE_STICK_TO_SNAKE, 0, SPBOOK_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
@@ -299,13 +299,13 @@ STATIC_VAR const struct trobj KnightSmallShield[] = { { SMALL_SHIELD, 0, ARMOR_C
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj KnightSpikedSilverShield[] = { { SPIKED_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_SILVER },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
-STATIC_VAR const struct trobj PriestSmallShield[] = { { SMALL_SHIELD, 1, ARMOR_CLASS, 1, 0, 1, 0, 0, MAT_NONE },
+STATIC_VAR const struct trobj PriestSmallShield[] = { { SMALL_SHIELD, 0, ARMOR_CLASS, 1, 0, 1, 0, 0, MAT_NONE },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj PriestSpikedSilverShield[] = { { SPIKED_SHIELD, 0, ARMOR_CLASS, 1, 0, 1, 0, 0, MAT_SILVER },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
-STATIC_VAR const struct trobj ValkyrieSpikedShield[] = { { SPIKED_SHIELD, 3, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
+STATIC_VAR const struct trobj ValkyrieSpikedShield[] = { { SPIKED_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
-STATIC_VAR const struct trobj ValkyrieSpikedSilverShield[] = { { SPIKED_SHIELD, 3, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_SILVER },
+STATIC_VAR const struct trobj ValkyrieSpikedSilverShield[] = { { SPIKED_SHIELD, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_SILVER },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj KnightLeatherGloves[] = { { LEATHER_GLOVES, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
@@ -1156,7 +1156,6 @@ u_init()
         else
             ini_inv(ValkyrieSpikedShield);
 
-
         if (!rn2(6))
             ini_inv(Lamp);
         //knows_class(WEAPON_CLASS);
@@ -1446,7 +1445,6 @@ void
 add_school_specific_spellbooks(VOID_ARGS)
 {
     int skill;
-    Strcpy(debug_buf_2, "add_school_specific_spellbooks");
     for (skill = P_FIRST_SPELL; skill <= P_LAST_SPELL; skill++)
     {
         if (P_SKILL_LEVEL(skill) >= P_BASIC)
@@ -1570,8 +1568,6 @@ register const struct trobj * trop;
     struct obj *obj;
     int otyp;
     long quan;
-    Strcpy(debug_buf_2, "ini_inv");
-    Strcpy(debug_buf_4, "ini_inv");
 
     while (trop->trclass) 
     {
@@ -1581,7 +1577,7 @@ register const struct trobj * trop;
             otyp = (int)trop->trotyp;
             if (otyp != UNDEF_TYP)
             {
-                obj = mksobj_with_flags(otyp, TRUE, FALSE, FALSE, (struct monst*)0, trop->material, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
+                obj = mksobj_with_flags(otyp, TRUE, FALSE, MKOBJ_TYPE_INITIAL, (struct monst*)0, trop->material, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
             }
             else
             { /* UNDEF_TYP */
@@ -2095,7 +2091,7 @@ mk_obj_with_material_in_container_known(container, itemtype, material)
 struct obj* container;
 int itemtype, material;
 {
-    struct obj* otmp = mksobj_with_flags(itemtype, FALSE, FALSE, TRUE, (struct monst*)0, material, 0L, 0L, 0UL);
+    struct obj* otmp = mksobj_with_flags(itemtype, FALSE, FALSE, MKOBJ_TYPE_CONTAINER, (struct monst*)0, material, 0L, 0L, 0UL);
     if (otmp)
     {
         otmp->bknown = 1;
@@ -2145,9 +2141,9 @@ boolean is_past_participle;
         break;
     case ROLE_CAVEMAN:
         if (is_past_participle)
-            res = "attained the level of Grand Master in bludgeoning weapons";
+            res = "attained the level of Grand Master in Bludgeoning Weapons";
         else
-            res = "attain the level of Grand Master in bludgeoning weapons";
+            res = "attain the level of Grand Master in Bludgeoning Weapons";
         break;
     case ROLE_HEALER:
         if (is_past_participle)
@@ -2163,9 +2159,9 @@ boolean is_past_participle;
         break;
     case ROLE_MONK:
         if (is_past_participle)
-            res = "attained the level of Grand Master in martial arts";
+            res = "attained the level of Grand Master in Martial Arts";
         else
-            res = "attain the level of Grand Master in martial arts";
+            res = "attain the level of Grand Master in Martial Arts";
         break;
     case ROLE_PRIEST:
         if (is_past_participle)
@@ -2181,9 +2177,9 @@ boolean is_past_participle;
         break;
     case ROLE_RANGER:
         if (is_past_participle)
-            res = "attained the level of Grand Master in bow or crossbow";
+            res = "attained the level of Grand Master in Bow or Crossbow";
         else
-            res = "attain the level of Grand Master in bow or crossbow";
+            res = "attain the level of Grand Master in Bow or Crossbow";
         break;
     case ROLE_SAMURAI:
         if (is_past_participle)
@@ -2199,9 +2195,9 @@ boolean is_past_participle;
         break;
     case ROLE_VALKYRIE:
         if (is_past_participle)
-            res = "attained the level of Grand Master in two-weapon combat";
+            res = "attained the level of Grand Master in Dual Wielding";
         else
-            res = "achieve the level of Grand Master in two-weapon combat";
+            res = "achieve the level of Grand Master in Dual Wielding";
         break;
     case ROLE_WIZARD:
         if (is_past_participle)

@@ -174,7 +174,7 @@ enum prop_types {
     RAPID_ENERGY_REGENERATION = 151,
     RAPIDER_ENERGY_REGENERATION = 152,
     RAPIDEST_ENERGY_REGENERATION = 153,
-    MELEE_LIFE_LEECH  = 154,
+    WOUNDING_RESISTANCE = 154,
     CRAZED            = 155,
     DIVINE_REGENERATION = 156,
     IMPROVED_FIRE_RESISTANCE = 157,
@@ -327,6 +327,7 @@ struct propname {
     int prop_num;
     const char* prop_name;
     const char* prop_noun;
+    const char* prop_desc;
 };
 
 extern const struct propname propertynames[];

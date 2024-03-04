@@ -4,6 +4,7 @@ using GnollHackM;
 #else
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using GnollHackX.Pages.Game;
 #endif
 using Newtonsoft.Json;
@@ -14,11 +15,30 @@ using System.IO.Compression;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Text;
+using System.Threading;
+using System.Net;
+using System.Net.Mail;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Timers;
+using System.Collections;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace GnollHackX
 {
     public delegate Task<bool> BackButtonHandler(object sender, EventArgs e);
+    public struct SendResult
+    {
+        public bool IsSuccess;
+        public bool HasHttpStatusCode;
+        public HttpStatusCode StatusCode;
+        public string Message;
+    }
+
 
     public static class GHApp
     {
@@ -27,15 +47,18 @@ namespace GnollHackX
             VersionTracking.Track();
             GetDependencyServices();
             PlatformService.InitializePlatform();
+            GHPath = GnollHackService.GetGnollHackPath();
 
             _batteryChargeLevel = Battery.ChargeLevel;
             _batteryChargeLevelTimeStamp = DateTime.Now;
             Battery.BatteryInfoChanged += Battery_BatteryInfoChanged;
 
-            InitBaseTypefaces();
-            InitializeCachedBitmaps();
+            TotalMemory = GHApp.PlatformService.GetDeviceMemoryInBytes();
 
             Assembly assembly = typeof(App).GetTypeInfo().Assembly;
+            InitBaseTypefaces(assembly);
+            InitBaseCachedBitmaps(assembly);
+
             ButtonNormalImageSource = ImageSource.FromResource(AppResourceName + ".Assets.button_normal.png", assembly);
             ButtonSelectedImageSource = ImageSource.FromResource(AppResourceName + ".Assets.button_selected.png", assembly);
             ButtonDisabledImageSource = ImageSource.FromResource(AppResourceName + ".Assets.button_disabled.png", assembly);
@@ -55,33 +78,131 @@ namespace GnollHackX
             InformAboutCrashReport = !InformAboutGameTermination;
             PostingGameStatus = Preferences.Get("PostingGameStatus", GHConstants.DefaultPosting);
             PostingDiagnosticData = Preferences.Get("PostingDiagnosticData", GHConstants.DefaultPosting);
+            PostingXlogEntries = Preferences.Get("PostingXlogEntries", GHConstants.DefaultPosting);
+            PostingReplays = Preferences.Get("PostingReplays", GHConstants.DefaultPosting);
+            PostingBonesFiles = Preferences.Get("PostingBonesFiles", GHConstants.DefaultPosting);
+            BonesUserListIsBlack = Preferences.Get("BonesUserListIsBlack", false);
             CustomGameStatusLink = Preferences.Get("CustomGameStatusLink", "");
+            CustomXlogAccountLink = Preferences.Get("CustomXlogAccountLink", "");
+            CustomXlogPostLink = Preferences.Get("CustomXlogPostLink", "");
             UseHTMLDumpLogs = Preferences.Get("UseHTMLDumpLogs", GHConstants.DefaultHTMLDumpLogs);
             UseSingleDumpLog = Preferences.Get("UseSingleDumpLog", GHConstants.DefaultUseSingleDumpLog);
-            ReadStreamingBankToMemory = Preferences.Get("ReadStreamingBankToMemory", GHConstants.DefaultReadStreamingBankToMemory);
+            ReadStreamingBankToMemory = Preferences.Get("ReadStreamingBankToMemory", DefaultStreamingBankToMemory);
             CopyStreamingBankToDisk = Preferences.Get("CopyStreamingBankToDisk", GHConstants.DefaultCopyStreamingBankToDisk);
+            ForcePostBones = IsDebug && Preferences.Get("ForcePostBones", false);
             AppSwitchSaveStyle = Preferences.Get("AppSwitchSaveStyle", 0);
+            XlogUserName = Preferences.Get("XlogUserName", "");
+            XlogPassword = Preferences.Get("XlogPassword", "");
+            XlogReleaseAccount = Preferences.Get("XlogReleaseAccount", false);
+            AllowBones = Preferences.Get("AllowBones", true);
+            BonesAllowedUsers = Preferences.Get("BonesAllowedUsers", "");
+            EmptyWishIsNothing = Preferences.Get("EmptyWishIsNothing", true);
+            RecommendedSettingsChecked = Preferences.Get("RecommendedSettingsChecked", false);
+            RecordGame = Preferences.Get("RecordGame", false);
+            UseGZipForReplays = Preferences.Get("UseGZipForReplays", GHConstants.GZipIsDefaultReplayCompression);
+            ulong FreeDiskSpaceInBytes = PlatformService.GetDeviceFreeDiskSpaceInBytes();
+            if(FreeDiskSpaceInBytes < GHConstants.LowFreeDiskSpaceThresholdInBytes)
+            {
+                if(RecordGame)
+                {
+                    RecordGame = false;
+                    Preferences.Set("RecordGame", false);
+                    InformAboutRecordingSetOff = true;
+                }
+                
+                if (FreeDiskSpaceInBytes < GHConstants.VeryLowFreeDiskSpaceThresholdInBytes)
+                {
+                    InformAboutFreeDiskSpace = true;
+                }
+            }
 
             BackButtonPressed += EmptyBackButtonPressed;
         }
 
+        public static bool RecommendedSettingsChecked { get; set; }
+
+        
+        private static readonly object _recordGameLock = new object();
+        private static bool _recordGame = false;
+        public static bool RecordGame { get { lock (_recordGameLock) { return _recordGame; } } set { lock (_recordGameLock) { _recordGame = value; } } }
+
+        private static object _networkAccessLock = new object();
+        private static NetworkAccess _networkAccessState = NetworkAccess.None;
+        public static bool HasInternetAccess { get { lock (_networkAccessLock) { return _networkAccessState == NetworkAccess.Internet; } } }
+
+        public static void InitializeConnectivity()
+        {
+            try
+            {
+                _networkAccessState = Connectivity.NetworkAccess;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            Connectivity.ConnectivityChanged += Connectivity_ConnectivityChanged;
+        }
+
+        private static void Connectivity_ConnectivityChanged(object sender, ConnectivityChangedEventArgs e)
+        {
+            lock(_networkAccessLock)
+            {
+                _networkAccessState = e.NetworkAccess;
+            }
+        }
+
+        public static ulong TotalMemory { get; set; }
+        public static bool DefaultStreamingBankToMemory 
+        { 
+            get 
+            {
+                return GHConstants.DefaultReadStreamingBankToMemory || 
+                    IsDebug && IsAndroid && TotalMemory >= GHConstants.AndroidBanksToMemoryThreshold;
+            }
+        }
+
+        public static bool IsDebug
+        {
+            get
+            {
+#if DEBUG
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
 
         public static bool BatterySavingMode { get; set; }
 
         private static double _batteryChargeLevel = -1;
         private static double _previousBatteryChargeLevel = -1;
+        private static double _previousBatteryCheckPointChargeLevel = 2; /* Dummy initial value of 200% */
         private static DateTime _batteryChargeLevelTimeStamp;
         private static DateTime _previousBatteryChargeLevelTimeStamp;
         private static readonly object _batteryLock = new object();
 
         private static void Battery_BatteryInfoChanged(object sender, BatteryInfoChangedEventArgs e)
         {
+            double chargediff;
+            double prevcheckpointcharge;
             lock (_batteryLock)
             {
+                prevcheckpointcharge = _previousBatteryCheckPointChargeLevel;
                 _previousBatteryChargeLevel = _batteryChargeLevel;
                 _previousBatteryChargeLevelTimeStamp = _batteryChargeLevelTimeStamp;
                 _batteryChargeLevel = e.ChargeLevel;
                 _batteryChargeLevelTimeStamp = DateTime.Now;
+                chargediff = _batteryChargeLevel - _previousBatteryChargeLevel;
+            }
+
+            if (chargediff < 0 && CurrentGHGame != null && e.ChargeLevel >= 0.04 && e.ChargeLevel <= 0.06 && e.ChargeLevel - prevcheckpointcharge < -0.0075)
+            {
+                lock (_batteryLock)
+                {
+                    _previousBatteryCheckPointChargeLevel = e.ChargeLevel;
+                }
+                CurrentGHGame.ActiveGamePage.SaveCheckPoint();
             }
         }
 
@@ -121,32 +242,77 @@ namespace GnollHackX
         public static bool InformAboutGameTermination = false;
         public static bool InformAboutCrashReport = false;
         public static bool InformAboutIncompatibleSavedGames = false;
+        public static bool InformAboutRecordingSetOff = false;
+        public static bool InformAboutFreeDiskSpace = false;
+        public static bool SavedLongerMessageHistory { get; set; }
+
+        public static bool InformAboutSlowSounds
+        {
+            get
+            {
+                return IsAndroid && IsDebug && LoadBanks && !ReadStreamingBankToMemory;
+            }
+        }
 
         public static bool IsGPUDefault
         {
             get
             {
 #if GNH_MAUI
-                return false;
+                return true;
 #else
+                if (IsiOS || !GHConstants.IsGPUDefault)
+                    return GHConstants.IsGPUDefault; /* No need to check on Apple or if GHConstants.IsGPUDefault is set to false */
+
                 string manufacturer = DeviceInfo.Manufacturer;
                 string model = DeviceInfo.Model;
-                bool isGooglePixel6orGreater = false;
-                if (manufacturer != null && model != null && model.Length >= 7 &&
-                    manufacturer.ToLower() == "google" && model.Substring(0, 6).ToLower() == "pixel ")
+                bool isGoogleMali = false;
+                bool isSamsungMali = false;
+                bool isVivo = false;
+                bool isAlldocube = false;
+                bool isDoogee= false;
+                if (!string.IsNullOrWhiteSpace(manufacturer) && !string.IsNullOrWhiteSpace(model))
                 {
-                    int pixelver;
-                    string endstr = model.Substring(6);
-                    int cnt = 0;
-                    foreach (char c in endstr)
+                    string manufacturer_lc = manufacturer.ToLower();
+                    if (manufacturer_lc == "google")
                     {
-                        if (c < '0' || c > '9')
-                            break;
-                        cnt++;
+                        if (model.Length >= 7 && model.Substring(0, 6).ToLower() == "pixel ")
+                        {
+                            int pixelver;
+                            string endstr = model.Substring(6);
+                            int cnt = 0;
+                            foreach (char c in endstr)
+                            {
+                                if (c < '0' || c > '9')
+                                    break;
+                                cnt++;
+                            }
+                            isGoogleMali = cnt > 0 && int.TryParse(endstr.Substring(0, cnt), out pixelver) && pixelver >= 6;
+                        }
+                        else if (model.Length >= 7 && model.Substring(0, 7).ToLower() == "bluejay")
+                            isGoogleMali = true;
+                        else if (model.Length >= 6 && model.Substring(0, 6).ToLower() == "oriole")
+                            isGoogleMali = true;
+                        else if (model.Length >= 4 && model.Substring(0, 4).ToLower() == "lynx")
+                            isGoogleMali = true;
+                        else if (model.Length >= 5 && model.Substring(0, 5).ToLower() == "husky")
+                            isGoogleMali = true;
+                        else if (model.Length >= 5 && model.Substring(0, 5).ToLower() == "raven")
+                            isGoogleMali = true;
                     }
-                    isGooglePixel6orGreater = cnt > 0 && int.TryParse(endstr.Substring(0, cnt), out pixelver) && pixelver >= 6;
+                    else if (manufacturer_lc == "samsung")
+                    {
+                        if (model.Length >= 5 && model.Substring(0, 5).ToLower() == "a03su")
+                            isSamsungMali = true;
+                    }
+                    else if (manufacturer_lc == "vivo")
+                        isVivo = true;
+                    else if (manufacturer_lc == "alldocube")
+                        isAlldocube = true;
+                    else if (manufacturer_lc == "doogee")
+                        isDoogee = true;
                 }
-                return isGooglePixel6orGreater ? false : GHConstants.IsGPUDefault;
+                return isGoogleMali || isSamsungMali || isVivo || isAlldocube || isDoogee ? false : GHConstants.IsGPUDefault;
 #endif
             }
         }
@@ -293,12 +459,15 @@ namespace GnollHackX
                 CurrentMainPage.Suspend();
             if (CurrentGamePage != null)
                 CurrentGamePage.Suspend();
-            if (CurrentGHGame != null)
+            if (CurrentGHGame != null && !CurrentGHGame.PlayingReplay)
             {
                 //Detect background app killing OS, mark that exit has been through going to sleep, and save the game
                 Preferences.Set("WentToSleepWithGameOn", true);
                 Preferences.Set("GameSaveResult", 0);
-                CurrentGHGame.ActiveGamePage.SaveGameAndWaitForResume();
+                if (GHApp.BatteryChargeLevel > 3) /* Save only if there is enough battery left to prevent save file corruption when the phone powers off */
+                {
+                    CurrentGHGame.ActiveGamePage.SaveGameAndWaitForResume();
+                }
             }
             CollectGarbage();
         }
@@ -307,6 +476,18 @@ namespace GnollHackX
         {
             if (PlatformService != null)
                 PlatformService.OverrideAnimatorDuration();
+
+            /* Check current battery level, internet connection, and xlog user name when returning to app */
+            try
+            {
+                Battery_BatteryInfoChanged(null, new BatteryInfoChangedEventArgs(Battery.ChargeLevel, Battery.State, Battery.PowerSource));
+                Connectivity_ConnectivityChanged(null, new ConnectivityChangedEventArgs(Connectivity.NetworkAccess, Connectivity.ConnectionProfiles));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            TryVerifyXlogUserName();
 
             CancelSaveGame = true;
             SleepMuteMode = false;
@@ -352,7 +533,6 @@ namespace GnollHackX
         private readonly static object _gameMuteModeLock = new object();
         private static bool _gameMuteMode = false;
         public static bool GameMuteMode { get { lock (_gameMuteModeLock) { return _gameMuteMode; } } set { UpdateSoundMuteness(value, SilentMode, SleepMuteMode); lock (_gameMuteModeLock) { _gameMuteMode = value; } } }    /* Muteness due to game state */
-        /* Game can also have mute mode */
 
         public static void UpdateSoundMuteness(bool newGameMuted, bool newSilentMode, bool newSleepMuteMode)
         {
@@ -497,7 +677,7 @@ namespace GnollHackX
         public static string SkiaVersionString { get; set; }
         public static string SkiaSharpVersionString { get; set; }
         public static string FMODVersionString { get; set; }
-        public static string GHPath { get; set; }
+        public static string GHPath { get; private set; } = ".";
         public static bool LoadBanks { get; set; }
 
         public static event BackButtonHandler BackButtonPressed;
@@ -520,6 +700,19 @@ namespace GnollHackX
         public static readonly float DisplayScale = DeviceDisplay.MainDisplayInfo.Density <= 0 ? 1.0f : (float)DeviceDisplay.MainDisplayInfo.Density;
         public static readonly float DisplayWidth = (float)DeviceDisplay.MainDisplayInfo.Width * DisplayScale;
         public static readonly float DisplayHeight = (float)DeviceDisplay.MainDisplayInfo.Height * DisplayScale;
+
+        public static GHPlatform PlatformId
+        {
+            get
+            {
+                if (IsAndroid)
+                    return GHPlatform.Android;
+                else if (IsiOS)
+                    return GHPlatform.iOS;
+                else
+                    return GHPlatform.Unknown;
+            }
+        }
 
         public static async Task<bool> OnBackButtonPressed()
         {
@@ -550,6 +743,19 @@ namespace GnollHackX
             return verstr;
         }
 
+        public static string VersionNumberToFileNameSuffix(ulong vernum)
+        {
+            if (vernum == 0UL)
+                return "";
+
+            ulong majorver = (vernum >> 24) & 0xFFUL;
+            ulong minorver = (vernum >> 16) & 0xFFUL;
+            ulong patchver = (vernum >> 8) & 0xFFUL;
+            ulong editver = (vernum) & 0xFFUL;
+            string verstr = majorver.ToString() + minorver.ToString() + patchver.ToString() + "-" + editver;
+            return verstr;
+        }
+
         public static SKTypeface DiabloTypeface { get; set; }
         public static SKTypeface ImmortalTypeface { get; set; }
         public static SKTypeface EndorTypeface { get; set; }
@@ -576,9 +782,8 @@ namespace GnollHackX
                 return LatoRegular;
         }
 
-        public static void InitBaseTypefaces()
+        public static void InitBaseTypefaces(Assembly assembly)
         {
-            Assembly assembly = typeof(App).GetTypeInfo().Assembly;
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.diablo_h.ttf"))
             {
                 if (stream != null)
@@ -737,7 +942,7 @@ namespace GnollHackX
 
         //public static void SaveDumplogTypefaces(Assembly assembly)
         //{
-        //    string targetdir = Path.Combine(GHPath, "dumplog");
+        //    string targetdir = Path.Combine(GHPath, GHConstants.DumplogDirectory);
         //    if (!Directory.Exists(targetdir))
         //        return;
 
@@ -1014,12 +1219,18 @@ namespace GnollHackX
 
         public static SKBitmap _logoBitmap;
         public static SKBitmap _skillBitmap;
+        public static SKBitmap _prevWepBitmap;
+        public static SKBitmap _prevUnwieldBitmap;
         public static SKBitmap[] _arrowBitmap = new SKBitmap[9];
         public static SKBitmap _orbBorderBitmap;
         public static SKBitmap _orbFillBitmap;
         public static SKBitmap _orbFillBitmapRed;
         public static SKBitmap _orbFillBitmapBlue;
         public static SKBitmap _orbGlassBitmap;
+
+        public static SKBitmap _batteryFrameBitmap;
+        public static SKBitmap _batteryRedFrameBitmap;
+        public static SKBitmap _fpsBitmap;
 
         public static SKBitmap _statusWizardBitmap;
         public static SKBitmap _statusCasualBitmap;
@@ -1051,6 +1262,7 @@ namespace GnollHackX
 
         public static SKBitmap _searchBitmap;
         public static SKBitmap _waitBitmap;
+        public static SKBitmap _damageBitmap;
 
 
         public static bool StartGameDataSet = false;
@@ -1497,6 +1709,36 @@ namespace GnollHackX
                 _orbGlassBitmap.SetImmutable();
             }
 
+            using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.battery-frame.png"))
+            {
+                _batteryFrameBitmap = SKBitmap.Decode(stream);
+                _batteryFrameBitmap.SetImmutable();
+            }
+
+            using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.fps.png"))
+            {
+                _fpsBitmap = SKBitmap.Decode(stream);
+                _fpsBitmap.SetImmutable();
+            }
+
+            using (SKPaint bmpPaint = new SKPaint())
+            {
+                bmpPaint.Color = SKColors.White;
+                var redbitmap = new SKBitmap(_batteryFrameBitmap.Width, _batteryFrameBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
+                var redcanvas = new SKCanvas(redbitmap);
+                redcanvas.Clear(SKColors.Transparent);
+                bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                    {
+                    1.0f,  0,     0,    0, 0,
+                    0,     0.0f,  0,    0, 0,
+                    0,     0,     0.0f, 0, 0,
+                    0,     0,     0,    1, 0
+                    });
+                redcanvas.DrawBitmap(_batteryFrameBitmap, 0, 0, bmpPaint);
+                _batteryRedFrameBitmap = redbitmap;
+                _batteryRedFrameBitmap.SetImmutable();
+            }
+
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-wizard-mode.png"))
             {
                 _statusWizardBitmap = SKBitmap.Decode(stream);
@@ -1624,6 +1866,11 @@ namespace GnollHackX
             {
                 _waitBitmap = SKBitmap.Decode(stream);
                 _waitBitmap.SetImmutable();
+            }
+            using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-damage.png"))
+            {
+                _damageBitmap = SKBitmap.Decode(stream);
+                _damageBitmap.SetImmutable();
             }
         }
 
@@ -1844,11 +2091,11 @@ namespace GnollHackX
         public static string CreateGameZipArchive()
         {
             string ghdir = GnollHackService.GetGnollHackPath();
-            string targetpath = Path.Combine(ghdir, "archive");
+            string targetpath = Path.Combine(ghdir, GHConstants.ArchiveDirectory);
 
             CheckCreateDirectory(targetpath);
 
-            string filepath = Path.Combine(targetpath, "crash_report.zip");
+            string filepath = Path.Combine(targetpath, "crash_report-" + GHApp.VersionNumberToFileNameSuffix(GHApp.GHVersionNumber) + GHConstants.GenericZipFileNameSuffix);
             if (File.Exists(filepath))
                 File.Delete(filepath);
 
@@ -1861,17 +2108,23 @@ namespace GnollHackX
                 {
                     archive.CreateEntryFromFile(fPath, Path.GetFileName(fPath));
                 }
-                string[] ghsubdirlist = { "save", "dumplog" };
+                string[] ghsubdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory, GHConstants.ReplayDirectory, GHConstants.UserDataDirectory };
                 foreach (string ghsubdir in ghsubdirlist)
                 {
                     string subdirpath = Path.Combine(ghdir, ghsubdir);
-                    string[] subfiles = Directory.GetFiles(subdirpath);
-                    foreach (var fPath in subfiles)
+                    if(Directory.Exists(subdirpath))
                     {
-                        archive.CreateEntryFromFile(fPath, Path.Combine(ghsubdir, Path.GetFileName(fPath)));
+                        string[] subfiles = Directory.GetFiles(subdirpath);
+                        if(subfiles != null)
+                        {
+                            foreach (var fPath in subfiles)
+                            {
+                                if(fPath != null)
+                                    archive.CreateEntryFromFile(fPath, Path.Combine(ghsubdir, Path.GetFileName(fPath)));
+                            }
+                        }
                     }
                 }
-
             }
             return zipFile;
         }
@@ -1879,11 +2132,11 @@ namespace GnollHackX
         public static string CreateDumplogZipArchive()
         {
             string ghdir = GnollHackService.GetGnollHackPath();
-            string targetpath = Path.Combine(ghdir, "archive");
+            string targetpath = Path.Combine(ghdir, GHConstants.ArchiveDirectory);
 
             CheckCreateDirectory(targetpath);
 
-            string filepath = Path.Combine(targetpath, "dumplogs.zip");
+            string filepath = Path.Combine(targetpath, "dumplogs-" + VersionNumberToFileNameSuffix(GHVersionNumber) + GHConstants.GenericZipFileNameSuffix);
             if (File.Exists(filepath))
                 File.Delete(filepath);
 
@@ -1892,7 +2145,7 @@ namespace GnollHackX
 
             using (ZipArchive archive = ZipFile.Open(zipFile, ZipArchiveMode.Create))
             {
-                string[] ghsubdirlist = { "dumplog" };
+                string[] ghsubdirlist = { GHConstants.DumplogDirectory };
                 foreach (string ghsubdir in ghsubdirlist)
                 {
                     string subdirpath = Path.Combine(ghdir, ghsubdir);
@@ -1910,17 +2163,11 @@ namespace GnollHackX
         public static string CreateSavedGamesZipArchive()
         {
             string ghdir = GnollHackService.GetGnollHackPath();
-            string targetpath = Path.Combine(ghdir, "archive");
+            string targetpath = Path.Combine(ghdir, GHConstants.ArchiveDirectory);
 
             CheckCreateDirectory(targetpath);
 
-            ulong vernum = GHVersionNumber;
-            ulong majorver = (vernum >> 24) & 0xFFUL;
-            ulong minorver = (vernum >> 16) & 0xFFUL;
-            ulong patchlvl = (vernum >> 8) & 0xFFUL;
-            ulong editlvl = (vernum) & 0xFFUL;
-            string versionstring = majorver.ToString() + minorver.ToString() + patchlvl.ToString() + "-" + editlvl;
-            string filepath = Path.Combine(targetpath, "savedgames-" + versionstring + ".zip");
+            string filepath = Path.Combine(targetpath, "savedgames-" + VersionNumberToFileNameSuffix(GHVersionNumber) + GHConstants.SavedGameSharedZipFileNameSuffix);
             if (File.Exists(filepath))
                 File.Delete(filepath);
 
@@ -1929,7 +2176,7 @@ namespace GnollHackX
 
             using (ZipArchive archive = ZipFile.Open(zipFile, ZipArchiveMode.Create))
             {
-                string[] ghsubdirlist = { "save" };
+                string[] ghsubdirlist = { GHConstants.SaveDirectory };
                 foreach (string ghsubdir in ghsubdirlist)
                 {
                     string subdirpath = Path.Combine(ghdir, ghsubdir);
@@ -1940,6 +2187,42 @@ namespace GnollHackX
                     }
                 }
 
+            }
+            return zipFile;
+        }
+
+        public static string CreateReplayZipArchive()
+        {
+            string ghdir = GnollHackService.GetGnollHackPath();
+            string targetpath = Path.Combine(ghdir, GHConstants.ArchiveDirectory);
+
+            CheckCreateDirectory(targetpath);
+
+            string filepath = Path.Combine(targetpath, GHConstants.ReplayAllSharedZipFileNamePrefix + VersionNumberToFileNameSuffix(GHVersionNumber) + GHConstants.ReplaySharedZipFileNameSuffix);
+            if (File.Exists(filepath))
+                File.Delete(filepath);
+
+            string zipFile = filepath;
+            using (ZipArchive archive = ZipFile.Open(zipFile, ZipArchiveMode.Create))
+            {
+                string[] ghsubdirlist = { GHConstants.ReplayDirectory };
+                foreach (string ghsubdir in ghsubdirlist)
+                {
+                    string subdirpath = Path.Combine(ghdir, ghsubdir);
+                    string[] subfiles = Directory.GetFiles(subdirpath);
+                    foreach (var fPath in subfiles)
+                    {
+                        if(!string.IsNullOrWhiteSpace(fPath))
+                        {
+                            FileInfo fi = new FileInfo(fPath);
+                            if (!string.IsNullOrWhiteSpace(fi.Name))
+                            {
+                                if(!fi.Name.StartsWith(GHConstants.ReplaySharedZipFileNamePrefix))
+                                    archive.CreateEntryFromFile(fPath, Path.GetFileName(fPath));
+                            }
+                        }
+                    }
+                }
             }
             return zipFile;
         }
@@ -2015,14 +2298,14 @@ namespace GnollHackX
         {
             try
             {
-                string savepath = Path.Combine(GHPath, "save");
+                string savepath = Path.Combine(GHPath, GHConstants.SaveDirectory);
                 string[] savefiles = Directory.GetFiles(savepath);
                 if (savefiles != null && savefiles.Length > 0)
                     InformAboutIncompatibleSavedGames = true;
             }
-            catch
+            catch (Exception ex)
             {
-                /* Nothing */
+                Debug.WriteLine(ex.Message);
             }
         }
 
@@ -2106,6 +2389,18 @@ namespace GnollHackX
             {
                 bitmap = _spellTransmutationBitmap;
             }
+            else if (trimmed_str == "&damage;")
+            {
+                bitmap = _damageBitmap;
+            }
+            else if (trimmed_str == "&AC;")
+            {
+                bitmap = _statusACBitmap;
+            }
+            else if (trimmed_str == "&MC;")
+            {
+                bitmap = _statusMCBitmap;
+            }
 
             if (bitmap != null)
             {
@@ -2116,19 +2411,49 @@ namespace GnollHackX
         }
 
         static readonly object _cachedBitmapsLock = new object();
-        static readonly Dictionary<string, SKBitmap> _cachedBitmaps = new Dictionary<string, SKBitmap>();
+        static readonly ConcurrentDictionary<string, SKBitmap> _cachedBitmaps = new ConcurrentDictionary<string, SKBitmap>();
 
-        public static void InitializeCachedBitmaps()
+        public static void InitBaseCachedBitmaps(Assembly assembly)
         {
             lock (_cachedBitmapsLock)
             {
                 try
                 {
                     _cachedBitmaps.Clear();
-                    Assembly assembly = typeof(App).GetTypeInfo().Assembly;
                     string[] cachedBitmaps = new string[]
                     {
                     AppResourceName + ".Assets.UI.missing_icon.png",
+                    AppResourceName + ".Assets.FMOD-Logo-192-White.png",
+                    AppResourceName + ".Assets.gnollhack-logo-test-2.png",
+                    };
+                    foreach (string imagePath in cachedBitmaps)
+                    {
+                        using (Stream stream = assembly.GetManifestResourceStream(imagePath))
+                        {
+                            SKBitmap newBitmap = SKBitmap.Decode(stream);
+                            if (newBitmap != null)
+                            {
+                                newBitmap.SetImmutable();
+                                _cachedBitmaps.TryAdd("resource://" + imagePath, newBitmap);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                }
+            }
+        }
+
+        public static void InitAdditionalCachedBitmaps(Assembly assembly)
+        {
+            lock (_cachedBitmapsLock)
+            {
+                try
+                {
+                    string[] cachedBitmaps = new string[]
+                    {
                     AppResourceName + ".Assets.UI.yes.png",
                     AppResourceName + ".Assets.UI.yestoall.png",
                     AppResourceName + ".Assets.UI.no.png",
@@ -2149,7 +2474,6 @@ namespace GnollHackX
                     AppResourceName + ".Assets.UI.stone-travel-on.png",
                     AppResourceName + ".Assets.UI.stone-altmap-off.png",
                     AppResourceName + ".Assets.UI.stone-altmap-on.png",
-                    AppResourceName + ".Assets.UI.tombstone.png",
                     AppResourceName + ".Assets.UI.stairs-down.png",
                     AppResourceName + ".Assets.UI.stairs-up.png",
                     AppResourceName + ".Assets.UI.chat.png",
@@ -2159,8 +2483,7 @@ namespace GnollHackX
                     AppResourceName + ".Assets.UI.offer.png",
                     AppResourceName + ".Assets.UI.loot.png",
                     AppResourceName + ".Assets.UI.lastitem.png",
-                    AppResourceName + ".Assets.FMOD-Logo-192-White.png",
-                    AppResourceName + ".Assets.gnollhack-logo-test-2.png",
+                    AppResourceName + ".Assets.tombstone.png",
                     };
                     foreach (string imagePath in cachedBitmaps)
                     {
@@ -2170,17 +2493,17 @@ namespace GnollHackX
                             if (newBitmap != null)
                             {
                                 newBitmap.SetImmutable();
-                                _cachedBitmaps.Add("resource://" + imagePath, newBitmap);
+                                _cachedBitmaps.TryAdd("resource://" + imagePath, newBitmap);
                             }
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.WriteLine(ex.Message);
                 }
             }
         }
-
         public static SKBitmap GetCachedImageSourceBitmap(string sourcePath, bool addToCache)
         {
             if (sourcePath == null || sourcePath == "")
@@ -2202,7 +2525,7 @@ namespace GnollHackX
                             {
                                 newBitmap.SetImmutable();
                                 if (addToCache)
-                                    _cachedBitmaps.Add(sourcePath, newBitmap);
+                                    _cachedBitmaps.TryAdd(sourcePath, newBitmap);
 
                                 return newBitmap;
                             }
@@ -2219,29 +2542,245 @@ namespace GnollHackX
             }
         }
 
-        public static bool PostingGameStatus { get; set; }
-        public static bool PostingDiagnosticData { get; set; }
-        public static string CustomGameStatusLink { get; set; }
+        private static readonly object _postingGameStatusLock = new object();
+        private static bool _postingGameStatus;
+        public static bool PostingGameStatus { get { lock (_postingGameStatusLock) { return _postingGameStatus; } } set { lock (_postingGameStatusLock) { _postingGameStatus = value; } } }
 
-        public static string GetGameStatusPostAddress()
+        private static readonly object _postingDiagnosticDataLock = new object();
+        private static bool _postingDiagnosticData;
+        public static bool PostingDiagnosticData { get { lock (_postingDiagnosticDataLock) { return _postingDiagnosticData; } } set { lock (_postingDiagnosticDataLock) { _postingDiagnosticData = value; } } }
+
+        private static readonly object _postingXlogEntriesLock = new object();
+        private static bool _postingXlogEntries;
+        public static bool PostingXlogEntries { get { lock (_postingXlogEntriesLock) { return _postingXlogEntries; } } set { lock (_postingXlogEntriesLock) { _postingXlogEntries = value; } } }
+
+        private static readonly object _postingReplaysLock = new object();
+        private static bool _postingReplays;
+        public static bool PostingReplays { get { lock (_postingReplaysLock) { return _postingReplays; } } set { lock (_postingReplaysLock) { _postingReplays = value; } } }
+
+        private static readonly object _postingBonesFilesLock = new object();
+        private static bool _postingBonesFiles;
+        public static bool PostingBonesFiles { get { lock (_postingBonesFilesLock) { return _postingBonesFiles; } } set { lock (_postingBonesFilesLock) { _postingBonesFiles = value; } } }
+
+        private static readonly object _bonesUserListIsBlackLock = new object();
+        private static bool _bonesUserListIsBlack;
+        public static bool BonesUserListIsBlack { get { lock (_bonesUserListIsBlackLock) { return _bonesUserListIsBlack; } } set { lock (_bonesUserListIsBlackLock) { _bonesUserListIsBlack = value; } } }
+
+        private static readonly object _allowBonesLock = new object();
+        private static bool _allowBones;
+        public static bool AllowBones { get { lock (_allowBonesLock) { return _allowBones; } } set { lock (_allowBonesLock) { _allowBones = value; } } }
+
+        private static readonly object _emptyWishIsNothingLock = new object();
+        private static bool _emptyWishIsNothing;
+        public static bool EmptyWishIsNothing { get { lock (_emptyWishIsNothingLock) { return _emptyWishIsNothing; } } set { lock (_emptyWishIsNothingLock) { _emptyWishIsNothing = value; } } }
+
+        public static string CustomGameStatusLink { get; set; }
+        public static string CustomXlogAccountLink { get; set; }
+        public static string CustomXlogPostLink { get; set; }
+
+        public static string GameStatusPostAddress
         {
-            if (CustomGameStatusLink != null && CustomGameStatusLink != "")
+            get
             {
-                return CustomGameStatusLink;
-            }
-            else
-            {
+                if (CustomGameStatusLink != null && CustomGameStatusLink != "")
+                {
+                    return CustomGameStatusLink;
+                }
+                else
+                {
 #if DEBUG
-                return CurrentUserSecrets.DefaultDiagnosticDataPostAddress;
+                    return CurrentUserSecrets?.DefaultDiagnosticDataPostAddress;
 #else
-                return CurrentUserSecrets.DefaultGamePostAddress;
+                return CurrentUserSecrets?.DefaultGamePostAddress;
+#endif
+                }
+            }
+        }
+        public static string DiagnosticDataPostAddress
+        {
+            get
+            {
+                string address = CurrentUserSecrets?.DefaultDiagnosticDataPostAddress;
+                if (address == null)
+                    return "";
+                else
+                    return address;
+            }
+        }
+
+        public static string XlogPostAddress
+        {
+            get
+            {
+                string address;
+                if (!string.IsNullOrWhiteSpace(CustomXlogPostLink))
+                {
+                    address = CustomXlogPostLink;
+                }
+                else
+                {
+                    address = CurrentUserSecrets?.DefaultXlogPostAddress;
+                }
+                if (address == null)
+                    return "";
+#if DEBUG
+                if(XlogReleaseAccount)
+                    return address;
+                else
+                    return address?.Replace("https://", "https://test-");
+#else
+                return address;
 #endif
             }
         }
-        public static string GetDiagnosticDataPostAddress()
+
+        public static string XlogAccountAddress
         {
-            return CurrentUserSecrets.DefaultDiagnosticDataPostAddress;
+            get
+            {
+                string address;
+                if (CustomXlogAccountLink != null && CustomXlogAccountLink != "")
+                {
+                    address = CustomXlogAccountLink;
+                }
+                else
+                {
+                    address = CurrentUserSecrets?.DefaultXlogAccountLink;
+                }
+#if DEBUG
+                if (XlogReleaseAccount)
+                    return address;
+                else
+                    return address?.Replace("https://", "https://test-");
+#else
+                return address;
+#endif
+            }
         }
+
+        public static string XlogTopScoreAddress
+        {
+            get
+            {
+                string address = XlogPostAddress;
+                string shortened_address;
+                if (address.Length > 8)
+                    shortened_address = address.Substring(0, address.Length - 8);
+                else
+                    shortened_address = "";
+
+                string final_address = shortened_address + GHConstants.XlogTopScorePage;
+                return final_address;
+            }
+        }
+
+        public static string BonesPostAddress
+        {
+            get
+            {
+                string address = XlogPostAddress;
+                string shortened_address;
+                if (address.Length > 8)
+                    shortened_address = address.Substring(0, address.Length - 8);
+                else
+                    shortened_address = "";
+
+                string final_address = shortened_address + GHConstants.BonesPostPage;
+                return final_address;
+            }
+        }
+
+        private static readonly object _forcePostBonesLock = new object();
+        private static bool _forcePostBones = false;
+        public static bool ForcePostBones { get { lock (_forcePostBonesLock) { return _forcePostBones; } } set { lock (_forcePostBonesLock) { _forcePostBones = value; } } }
+
+        private static readonly object _bonesAllowedUsersLock = new object();
+        private static string _bonesAllowedUsers = "";
+        public static string BonesAllowedUsers { get { lock (_bonesAllowedUsersLock) { return _bonesAllowedUsers; } } set { lock (_bonesAllowedUsersLock) { _bonesAllowedUsers = value; } } }
+
+        private static readonly object _xlogCreditialLock = new object();
+        private static string _xlogUserName = "";
+        private static string _xlogPassword = "";
+
+        public static string XlogUserName { get { lock (_xlogCreditialLock) { return _xlogUserName; } } set { lock (_xlogCreditialLock) { _xlogUserName = value; } } }
+        public static string XlogPassword { get { lock (_xlogCreditialLock) { return _xlogPassword; } } set { lock (_xlogCreditialLock) { _xlogPassword = value; } } }
+        public static string XlogAntiForgeryToken 
+        {
+            get
+            {
+                return CurrentUserSecrets?.DefaultXlogAntiForgeryToken;
+            }
+        }
+
+        private static readonly object _xlogReleaseAccountLock = new object();
+        private static bool _xlogReleaseAccount;
+        public static bool XlogReleaseAccount { get { lock (_xlogReleaseAccountLock) { return _xlogReleaseAccount; } } set { lock (_xlogReleaseAccountLock) { _xlogReleaseAccount = value; } } }
+
+        private static string _verifiedUserName;
+        private static string _verifiedPassword;
+        private static bool _xlogUserNameVerified;
+        private static readonly object _xlogUserNameVerifiedLock = new object();
+        public static bool XlogUserNameVerified { get { lock (_xlogUserNameVerifiedLock) { return _xlogUserNameVerified; } } }
+
+        private static readonly object _xlogCredentialsIncorrectLock = new object();
+        private static bool _xlogCredentialsIncorrect;
+        public static bool XlogCredentialsIncorrect { get { lock (_xlogCredentialsIncorrectLock) { return _xlogCredentialsIncorrect; } } set { lock (_xlogCredentialsIncorrectLock) { _xlogCredentialsIncorrect = value; } } }
+
+        public static void SetXlogUserNameVerified(bool isverified, string username, string password)
+        {
+            lock(_xlogUserNameVerifiedLock)
+            {
+                _xlogUserNameVerified = isverified;
+                _verifiedUserName = username;
+                _verifiedPassword = password;
+            }
+        }
+
+        public static bool AreCredentialsVerified(string username, string password)
+        {
+            lock (_xlogUserNameVerifiedLock)
+            {
+                return _xlogUserNameVerified && _verifiedUserName != null && _verifiedPassword != null && username == _verifiedUserName && password == _verifiedPassword;
+            }
+        }
+
+        public static async void TryVerifyXlogUserName()
+        {
+            await TryVerifyXlogUserNameAsync();
+        }
+
+        public static async Task TryVerifyXlogUserNameAsync()
+        {
+            if(!PostingXlogEntries && !PostingReplays && !PostingBonesFiles)
+            {
+                SetXlogUserNameVerified(false, null, null);
+                return;
+            }
+            if (XlogUserNameVerified)
+                return;
+
+            string username = XlogUserName;
+            string password = XlogPassword;
+            if (!string.IsNullOrEmpty(username))
+            {
+                if(_verifiedUserName != null && _verifiedPassword != null && username == _verifiedUserName && password == _verifiedPassword)
+                {
+                    lock (_xlogUserNameVerifiedLock)
+                    {
+                        _xlogUserNameVerified = true;
+                    }
+                }
+                else
+                {
+                    SendResult res = await SendXLogEntry("", 1, 0, new List<GHPostAttachment>(), true);
+                    if (res.IsSuccess)
+                        Debug.WriteLine("XLog user name successfully verified.");
+                    else
+                        Debug.WriteLine("XLog user name verification failed.");
+                }
+            }
+        }
+
         public static bool IsValidHttpsURL(string uriString)
         {
             try
@@ -2500,6 +3039,2309 @@ namespace GnollHackX
                 await page.DisplayAlert("Share File Failure", "GnollHack failed to share a crash report archive: " + ex.Message, "OK");
                 return false;
             }
+        }
+
+        public static async Task<SendResult> SendXLogEntry(string xlogentry_string, int status_type, int status_datatype, List<GHPostAttachment> xlogattachments, bool is_from_queue)
+        {
+            SendResult res = new SendResult();
+            try
+            {
+                string postaddress = XlogPostAddress;
+                Debug.WriteLine("XlogPostAddress: " + postaddress);
+                if (postaddress != null && postaddress.Length > 8 && postaddress.Substring(0, 8) == "https://" && Uri.IsWellFormedUriString(postaddress, UriKind.Absolute))
+                {
+                    using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
+                    {
+                        MultipartFormDataContent multicontent = new MultipartFormDataContent("-------------------boundary");
+
+                        string username = XlogUserName;
+                        string password = XlogPassword;
+                        StringContent content1 = new StringContent(username, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv1 = new ContentDispositionHeaderValue("form-data");
+                        cdhv1.Name = "UserName";
+                        content1.Headers.ContentDisposition = cdhv1;
+                        multicontent.Add(content1);
+                        Debug.WriteLine("UserName: " + username);
+
+                        StringContent content3 = new StringContent(password, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv3 = new ContentDispositionHeaderValue("form-data");
+                        cdhv3.Name = "Password";
+                        content3.Headers.ContentDisposition = cdhv3;
+                        multicontent.Add(content3);
+                        Debug.WriteLine("Password: " + password);
+
+                        StringContent content4 = new StringContent(XlogAntiForgeryToken, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv4 = new ContentDispositionHeaderValue("form-data");
+                        cdhv4.Name = "AntiForgeryToken";
+                        content4.Headers.ContentDisposition = cdhv4;
+                        multicontent.Add(content4);
+                        Debug.WriteLine("AntiForgeryToken: " + XlogAntiForgeryToken);
+
+                        string adjusted_entry_string = "";
+                        if(!string.IsNullOrWhiteSpace(xlogentry_string))
+                        {
+                            adjusted_entry_string = xlogentry_string.Replace("○", "\t").Replace("◙", Environment.NewLine);
+                            adjusted_entry_string = adjusted_entry_string.Replace(Environment.NewLine, "") // Should be just on at the end
+                                    + "\tplatform=" + DeviceInfo.Platform.ToString()?.ToLower()
+                                    + "\tplatformversion=" + DeviceInfo.VersionString?.ToLower()
+                                    + "\tport=" + GHConstants.PortName?.ToLower()
+                                    + "\tportversion=" + VersionTracking.CurrentVersion?.ToLower()
+                                    + "\tportbuild=" + VersionTracking.CurrentBuild?.ToLower()
+                                    + Environment.NewLine;
+                        }
+
+                        StringContent content2 = new StringContent(adjusted_entry_string, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
+                        cdhv2.Name = "XLogEntry";
+                        content2.Headers.ContentDisposition = cdhv2;
+                        multicontent.Add(content2);
+                        Debug.WriteLine("XLogEntry: " + adjusted_entry_string);
+
+                        List<FileStream> filestreams = new List<FileStream>();
+                        List<StreamContent> contents = new List<StreamContent>();
+
+                        if (xlogattachments != null)
+                        {
+                            foreach (GHPostAttachment attachment in xlogattachments)
+                            {
+                                string fullFilePath = attachment.FullPath;
+                                bool fileexists = File.Exists(fullFilePath);
+                                if (fileexists)
+                                {
+                                    FileInfo fileinfo = new FileInfo(fullFilePath);
+                                    string filename = fileinfo.Name;
+                                    FileStream stream = new FileStream(fullFilePath, FileMode.Open);
+                                    StreamContent content5 = new StreamContent(stream);
+                                    filestreams.Add(stream);
+                                    contents.Add(content5);
+                                    ContentDispositionHeaderValue cdhv5 = new ContentDispositionHeaderValue("form-data");
+                                    cdhv5.Name = attachment.ContentType == "text/plain" ? "PlainTextDumpLog" : attachment.ContentType == "text/html" ? "HtmlDumpLog" : "GameData";
+                                    cdhv5.FileName = filename;
+                                    content5.Headers.ContentDisposition = cdhv5;
+                                    multicontent.Add(content5);
+                                    Debug.WriteLine("XLog entry, file added: " + cdhv5.Name + ", " + fullFilePath);
+                                }
+                            }
+                        }
+                        using (var cts = new CancellationTokenSource())
+                        {
+                            cts.CancelAfter(string.IsNullOrEmpty(xlogentry_string) ? 5000 : xlogattachments == null || xlogattachments.Count == 0 ? 10000 : 120000);
+                            string responseContent = "";
+                            //string htmlrequest = await multicontent.ReadAsStringAsync();
+                            //Debug.WriteLine(htmlrequest);
+
+                            try
+                            {
+                                using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
+                                {
+                                    responseContent = await response.Content.ReadAsStringAsync();
+                                    Debug.WriteLine("XLog entry response content:");
+                                    Debug.WriteLine(responseContent);
+                                    res.IsSuccess = response.IsSuccessStatusCode;
+                                    res.HasHttpStatusCode = true;
+                                    res.StatusCode = response.StatusCode;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine("Exception occurred while sending XLog entry: " + ex.Message);
+                                res.IsSuccess = false;
+                                res.Message = ex.Message;
+                            }
+
+                            XlogCredentialsIncorrect = false;
+                            if (res.IsSuccess)
+                            {
+                                SetXlogUserNameVerified(true, username, password);
+                                WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication successful" : "XLog entry successfully sent") + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
+                            }
+                            else
+                            {
+                                Debug.WriteLine("Sending " + (string.IsNullOrEmpty(xlogentry_string) ? "server authentication" : "XLog entry") + " failed. Status Code: " + (int)res.StatusCode);
+                                if (XlogUserNameVerified && res.HasHttpStatusCode && (res.StatusCode == HttpStatusCode.Forbidden /* 403 */)) // || res.StatusCode == HttpStatusCode.Locked /* 423 */
+                                    SetXlogUserNameVerified(false, null, null);
+                                if (res.StatusCode == HttpStatusCode.Forbidden)
+                                    XlogCredentialsIncorrect = true;
+                            }
+
+                            if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
+                            {
+                                WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: "+ res.Message);
+                                SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
+                            }                            
+                        }
+                        content1.Dispose();
+                        content2.Dispose();
+                        content3.Dispose();
+                        content4.Dispose();
+                        foreach(FileStream fs in filestreams)
+                        {
+                            fs.Dispose();
+                        }
+                        filestreams.Clear();
+                        foreach (StreamContent cnt in contents)
+                        {
+                            cnt.Dispose();
+                        }
+                        contents.Clear();
+                        multicontent.Dispose();
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+                res.Message = e.Message;
+            }
+            if (xlogattachments != null)
+            {
+                if(res.IsSuccess)
+                {
+                    foreach (var attachment in xlogattachments)
+                    {
+                        if (attachment.IsTemporary)
+                        {
+                            try
+                            {
+                                File.Delete(attachment.FullPath);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.WriteLine(e.Message);
+                            }
+                        }
+                    }
+                }
+                xlogattachments.Clear();
+            }
+            return res;
+        }
+
+        public static void SaveXLogEntryToDisk(int status_type, int status_datatype, string xlogentry_string, List<GHPostAttachment> xlogattachments)
+        {
+            string targetpath = Path.Combine(GHPath, GHConstants.XlogPostQueueDirectory);
+            if (!Directory.Exists(targetpath))
+                CheckCreateDirectory(targetpath);
+            if (Directory.Exists(targetpath))
+            {
+                string targetfilename;
+                string targetfilepath;
+                int id = 0;
+                do
+                {
+                    targetfilename = GHConstants.XlogPostFileNamePrefix + id + GHConstants.XlogPostFileNameSuffix;
+                    targetfilepath = Path.Combine(targetpath, targetfilename);
+                    id++;
+                } while (File.Exists(targetfilepath));
+
+                try
+                {
+                    using (StreamWriter sw = File.CreateText(targetfilepath))
+                    {
+                        GHPost fp = new GHPost(1, true, status_type, status_datatype, xlogentry_string, xlogattachments != null ? xlogattachments : new List<GHPostAttachment>(), false);
+                        string json = JsonConvert.SerializeObject(fp);
+                        Debug.WriteLine(json);
+                        sw.Write(json);
+                        WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication request" : "XLog entry send request") + " written to the queue on disk: " + targetfilepath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteGHLog("Writing the " + (string.IsNullOrEmpty(xlogentry_string) ? "server authentication request" : "XLog entry send request") + " to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                }
+            }
+        }
+
+        public static async Task<SendResult> SendForumPost(bool is_game_status, string message, int status_type, int status_datatype, List<GHPostAttachment> forumpostattachments, bool forcesend, bool is_from_queue)
+        {
+            SendResult res = new SendResult();
+            try
+            {
+                string postaddress = is_game_status ? GHApp.GameStatusPostAddress : GHApp.DiagnosticDataPostAddress;
+                if (postaddress != null && postaddress.Length > 8 && postaddress.Substring(0, 8) == "https://" && Uri.IsWellFormedUriString(postaddress, UriKind.Absolute))
+                {
+                    using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
+                    {
+                        HttpContent content = null;
+                        StringContent content1 = null;
+                        List<FileStream> filestreams = new List<FileStream>();
+                        List<StreamContent> contents = new List<StreamContent>();
+                        if (forumpostattachments != null && forumpostattachments.Count > 0)
+                        {
+                            DiscordWebHookPostWithAttachment post = new DiscordWebHookPostWithAttachment(message);
+                            foreach (GHPostAttachment attachment in forumpostattachments)
+                            {
+                                string fullFilePath = attachment.FullPath;
+                                FileInfo fileinfo = new FileInfo(fullFilePath);
+                                string filename = fileinfo.Name;
+                                if (File.Exists(fullFilePath))
+                                    post.AddAttachment(attachment.Description, filename);
+                            }
+                            string json = JsonConvert.SerializeObject(post);
+                            MultipartFormDataContent multicontent = new MultipartFormDataContent("-------------------boundary");
+                            content1 = new StringContent(json, Encoding.UTF8, "application/json");
+                            ContentDispositionHeaderValue cdhv = new ContentDispositionHeaderValue("form-data");
+                            cdhv.Name = "payload_json";
+                            content1.Headers.ContentDisposition = cdhv;
+                            multicontent.Add(content1);
+                            int aidx = 0;
+                            foreach (GHPostAttachment attachment in forumpostattachments)
+                            {
+                                string fullFilePath = attachment.FullPath;
+                                bool fileexists = File.Exists(fullFilePath);
+                                if (fileexists)
+                                {
+                                    FileInfo fileinfo = new FileInfo(fullFilePath);
+                                    string filename = fileinfo.Name;
+                                    var stream = new FileStream(fullFilePath, FileMode.Open);
+                                    StreamContent content2 = new StreamContent(stream);
+                                    filestreams.Add(stream);
+                                    contents.Add(content2);
+                                    ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
+                                    cdhv2.Name = "files[" + aidx + "]";
+                                    cdhv2.FileName = filename;
+                                    content2.Headers.ContentDisposition = cdhv2;
+                                    content2.Headers.ContentType = new MediaTypeHeaderValue(attachment.ContentType);
+                                    multicontent.Add(content2);
+                                    aidx++;
+                                }
+                            }
+                            content = multicontent;
+                        }
+                        else
+                        {
+                            DiscordWebHookPost post = new DiscordWebHookPost(message);
+                            string json = JsonConvert.SerializeObject(post);
+                            content = new StringContent(json, Encoding.UTF8, "application/json");
+                        }
+
+                        using (var cts = new CancellationTokenSource())
+                        {
+                            cts.CancelAfter(is_game_status || forumpostattachments == null || forumpostattachments.Count == 0 ? 10000 : 120000);
+                            string responseContent = "";
+
+                            try
+                            {
+                                using (HttpResponseMessage response = await client.PostAsync(postaddress, content, cts.Token))
+                                {
+                                    responseContent = await response.Content.ReadAsStringAsync();
+                                    Debug.WriteLine(responseContent);
+                                    res.IsSuccess = response.IsSuccessStatusCode;
+                                    res.HasHttpStatusCode = true;
+                                    res.StatusCode = response.StatusCode;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine(ex.Message);
+                                res.IsSuccess = false;
+                                res.Message = ex.Message;
+                            }
+
+                            if(res.IsSuccess)
+                            {
+                                WriteGHLog("Forum post successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
+                            }
+
+                            if (!res.IsSuccess && !is_from_queue)
+                            {
+                                WriteGHLog("Forum post send request redirected to the queue on disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                SaveForumPostToDisk(is_game_status, status_type, status_datatype, message, forumpostattachments, forcesend);
+                            }
+                        }
+                        if(content1 != null)
+                            content1.Dispose();
+                        if (content != null)
+                            content.Dispose();
+                        foreach (FileStream fs in filestreams)
+                        {
+                            fs.Dispose();
+                        }
+                        filestreams.Clear();
+                        foreach (StreamContent cnt in contents)
+                        {
+                            cnt.Dispose();
+                        }
+                        contents.Clear();
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+                res.Message = e.Message;
+            }
+
+            if (forumpostattachments != null)
+            {
+                if(res.IsSuccess)
+                {
+                    foreach (var attachment in forumpostattachments)
+                    {
+                        if (attachment.IsTemporary)
+                        {
+                            try
+                            {
+                                File.Delete(attachment.FullPath);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.WriteLine(e.Message);
+                            }
+                        }
+                    }
+                }
+                forumpostattachments.Clear();
+            }
+
+            return res;
+        }
+
+        public static void SaveForumPostToDisk(bool is_game_status, int status_type, int status_datatype, string message, List<GHPostAttachment> forumpostattachments, bool forcesend)
+        {
+            string targetpath = Path.Combine(GHPath, GHConstants.ForumPostQueueDirectory);
+            if (!Directory.Exists(targetpath))
+                GHApp.CheckCreateDirectory(targetpath);
+            if (Directory.Exists(targetpath))
+            {
+                string targetfilename;
+                string targetfilepath;
+                int id = 0;
+                do
+                {
+                    targetfilename = GHConstants.ForumPostFileNamePrefix + id + GHConstants.ForumPostFileNameSuffix;
+                    targetfilepath = Path.Combine(targetpath, targetfilename);
+                    id++;
+                } while (File.Exists(targetfilepath));
+
+                try
+                {
+                    using (StreamWriter sw = File.CreateText(targetfilepath))
+                    {
+                        GHPost fp = new GHPost(0, is_game_status, status_type, status_datatype, message, forumpostattachments != null ? forumpostattachments : new List<GHPostAttachment>(), forcesend);
+                        string json = JsonConvert.SerializeObject(fp);
+                        sw.Write(json);
+                        WriteGHLog("Forum post send request written to the queue on disk: " + targetfilepath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteGHLog("Writing the forum post send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                }
+            }
+        }
+
+        public static async Task<SendResult> SendBonesFile(string bones_filename, int status_type, int status_datatype, bool is_from_queue)
+        {
+            SendResult res = new SendResult();
+            bool didReceiveBonesFile = false;
+            bool didWriteBonesFileSuccessfully = false;
+            string receivedBonesServerFilePath = null;
+            try
+            {
+                string username = XlogUserName;
+                string password = XlogPassword;
+                string postaddress = BonesPostAddress;
+                Debug.WriteLine("BonesPostAddress: " + postaddress);
+                if (postaddress != null && postaddress.Length > 8 && postaddress.Substring(0, 8) == "https://" && Uri.IsWellFormedUriString(postaddress, UriKind.Absolute))
+                {
+                    using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
+                    {
+                        MultipartFormDataContent multicontent = new MultipartFormDataContent("-------------------boundary");
+
+                        StringContent content1 = new StringContent(username, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv1 = new ContentDispositionHeaderValue("form-data");
+                        cdhv1.Name = "UserName";
+                        content1.Headers.ContentDisposition = cdhv1;
+                        multicontent.Add(content1);
+                        Debug.WriteLine("UserName: " + username);
+
+                        StringContent content3 = new StringContent(password, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv3 = new ContentDispositionHeaderValue("form-data");
+                        cdhv3.Name = "Password";
+                        content3.Headers.ContentDisposition = cdhv3;
+                        multicontent.Add(content3);
+                        Debug.WriteLine("Password: " + password);
+
+                        StringContent content4 = new StringContent(XlogAntiForgeryToken, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv4 = new ContentDispositionHeaderValue("form-data");
+                        cdhv4.Name = "AntiForgeryToken";
+                        content4.Headers.ContentDisposition = cdhv4;
+                        multicontent.Add(content4);
+                        Debug.WriteLine("AntiForgeryToken: " + XlogAntiForgeryToken);
+
+                        string convertedUsers = (BonesUserListIsBlack ? "!" : "") + BonesAllowedUsers.Trim();
+                        StringContent content7 = new StringContent(convertedUsers, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv7 = new ContentDispositionHeaderValue("form-data");
+                        cdhv7.Name = "AllowedUsers";
+                        content7.Headers.ContentDisposition = cdhv7;
+                        multicontent.Add(content7);
+                        Debug.WriteLine("AllowedUsers: " + convertedUsers);
+
+                        StringContent content2 = new StringContent("SendBonesFile", Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
+                        cdhv2.Name = "Command";
+                        content2.Headers.ContentDisposition = cdhv2;
+                        multicontent.Add(content2);
+                        Debug.WriteLine("Command: SendBonesFile");
+
+                        StringContent content5 = new StringContent(status_type.ToString(), Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhv5 = new ContentDispositionHeaderValue("form-data");
+                        cdhv5.Name = "Data";
+                        content5.Headers.ContentDisposition = cdhv5;
+                        multicontent.Add(content5);
+                        Debug.WriteLine("Data: " + status_type.ToString());
+
+                        StringContent contentE1 = new StringContent(DeviceInfo.Platform.ToString(), Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve1 = new ContentDispositionHeaderValue("form-data");
+                        cdhve1.Name = "Platform";
+                        contentE1.Headers.ContentDisposition = cdhve1;
+                        multicontent.Add(contentE1);
+                        Debug.WriteLine("Platform: " + DeviceInfo.Platform.ToString());
+
+                        StringContent contentE2 = new StringContent(DeviceInfo.VersionString, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve2 = new ContentDispositionHeaderValue("form-data");
+                        cdhve2.Name = "PlatformVersion";
+                        contentE2.Headers.ContentDisposition = cdhve2;
+                        multicontent.Add(contentE2);
+                        Debug.WriteLine("PlatformVersion: " + DeviceInfo.VersionString);
+
+                        StringContent contentE3 = new StringContent(GHConstants.PortName, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve3 = new ContentDispositionHeaderValue("form-data");
+                        cdhve3.Name = "Port";
+                        contentE3.Headers.ContentDisposition = cdhve3;
+                        multicontent.Add(contentE3);
+                        Debug.WriteLine("Port: " + GHConstants.PortName);
+
+                        StringContent contentE4 = new StringContent(VersionTracking.CurrentVersion, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve4 = new ContentDispositionHeaderValue("form-data");
+                        cdhve4.Name = "PortVersion";
+                        contentE4.Headers.ContentDisposition = cdhve4;
+                        multicontent.Add(contentE4);
+                        Debug.WriteLine("PortVersion: " + VersionTracking.CurrentVersion);
+
+                        StringContent contentE5 = new StringContent(VersionTracking.CurrentBuild, Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve5 = new ContentDispositionHeaderValue("form-data");
+                        cdhve5.Name = "PortBuild";
+                        contentE5.Headers.ContentDisposition = cdhve5;
+                        multicontent.Add(contentE5);
+                        Debug.WriteLine("PortBuild: " + VersionTracking.CurrentBuild);
+
+                        StringContent contentE6 = new StringContent(GHApp.GHVersionNumber.ToString(), Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve6 = new ContentDispositionHeaderValue("form-data");
+                        cdhve6.Name = "VersionNumber";
+                        contentE6.Headers.ContentDisposition = cdhve6;
+                        multicontent.Add(contentE6);
+                        Debug.WriteLine("VersionNumber: " + GHApp.GHVersionNumber.ToString());
+
+                        StringContent contentE7 = new StringContent(GHApp.GHVersionCompatibility.ToString(), Encoding.UTF8, "text/plain");
+                        ContentDispositionHeaderValue cdhve7 = new ContentDispositionHeaderValue("form-data");
+                        cdhve7.Name = "VersionCompatibilityNumber";
+                        contentE7.Headers.ContentDisposition = cdhve7;
+                        multicontent.Add(contentE7);
+                        Debug.WriteLine("VersionCompatibilityNumber: " + GHApp.GHVersionCompatibility.ToString());
+
+                        List<FileStream> filestreams = new List<FileStream>();
+                        List<StreamContent> contents = new List<StreamContent>();
+
+                        string full_filepath = Path.Combine(GHPath, bones_filename);
+                        bool fileexists = File.Exists(full_filepath);
+                        if (fileexists)
+                        {
+                            FileInfo fileinfo = new FileInfo(full_filepath);
+                            string filename = fileinfo.Name;
+                            FileStream stream = new FileStream(full_filepath, FileMode.Open);
+                            StreamContent content6 = new StreamContent(stream);
+                            filestreams.Add(stream);
+                            contents.Add(content6);
+                            ContentDispositionHeaderValue cdhv6 = new ContentDispositionHeaderValue("form-data");
+                            cdhv6.Name = "BonesFile";
+                            cdhv6.FileName = filename;
+                            content6.Headers.ContentDisposition = cdhv6;
+                            multicontent.Add(content6);
+                            Debug.WriteLine("Bones file added: " + cdhv6.Name + ", " + bones_filename);
+                        }
+                        using (var cts = new CancellationTokenSource())
+                        {
+                            cts.CancelAfter(string.IsNullOrEmpty(bones_filename) ? 10000 : 120000);
+                            byte[] bytearray = null;
+                            try
+                            {
+                                using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
+                                {
+                                    if(response.Content.Headers.ContentType.MediaType == "application/octet-stream")
+                                        bytearray = await response.Content.ReadAsByteArrayAsync();
+                                    res.IsSuccess = response.IsSuccessStatusCode;
+                                    res.HasHttpStatusCode = true;
+                                    res.StatusCode = response.StatusCode;
+                                    if(res.IsSuccess)
+                                    {
+                                        WriteGHLog("Bones file successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + "): " + full_filepath);
+                                        if (res.StatusCode == HttpStatusCode.OK)
+                                        {
+                                            // Delete sent file first on OK status code
+                                            try
+                                            {
+                                                File.Delete(full_filepath);
+                                                WriteGHLog("Deleted the sent bones file: " + full_filepath);
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                WriteGHLog("Deleting the sent bones file from client failed: " + ex.Message);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            Debug.WriteLine("Not deleting the sent bones file because status code was " + (int)res.StatusCode + " (" + res.StatusCode.ToString() + ")");
+                                        }
+
+                                        //We may or may not have received another bones file in return
+                                        if (bytearray != null && bytearray.Length > 0)
+                                        {
+                                            WriteGHLog("Bones file received from the server. Writing the bones file to disk.");
+                                            didReceiveBonesFile = true;
+                                            Debug.WriteLine("Response Headers: " + response.Headers.ToString());
+                                            if (response.Headers.TryGetValues("X-GH-OriginalFileName", out IEnumerable<string> origFileNames))
+                                            {
+                                                if (origFileNames != null)
+                                                {
+                                                    List<string> list = origFileNames.ToList();
+                                                    if (list.Count > 0)
+                                                    {
+                                                        string filename = list[0];
+                                                        if (!string.IsNullOrWhiteSpace(filename))
+                                                        {
+                                                            string savepath = Path.Combine(GHPath, filename);
+                                                            if (!File.Exists(savepath))
+                                                            {
+                                                                Debug.WriteLine("Starting writing bones byte array into file: " + savepath);
+                                                                try
+                                                                {
+                                                                    using (FileStream fs = File.OpenWrite(savepath))
+                                                                    {
+                                                                        await fs.WriteAsync(bytearray, 0, bytearray.Length);
+                                                                    }
+                                                                    didWriteBonesFileSuccessfully = true;
+
+                                                                    if(response.Headers.TryGetValues("X-GH-BonesFilePath", out IEnumerable<string> bonesfilepathienum))
+                                                                    {
+                                                                        var bonesfilepathlist = bonesfilepathienum.ToList();
+                                                                        if(bonesfilepathlist.Count > 0)
+                                                                            receivedBonesServerFilePath = bonesfilepathlist[0];
+                                                                    }
+                                                                }
+                                                                catch (Exception ex)
+                                                                {
+                                                                    WriteGHLog("Writing the received bones file " + savepath + " to disk failed: " + ex.Message);
+                                                                }
+                                                            }
+                                                            else
+                                                                WriteGHLog("Bones file already exists: " + savepath + ". Ignoring the received bones file.");
+                                                        }
+                                                        else
+                                                            WriteGHLog("Bones file name is null or empty.");
+                                                    }
+                                                    else
+                                                        WriteGHLog("Bones original file name list is empty in the server response.");
+                                                }
+                                                else
+                                                    WriteGHLog("Bones original file name list is null in the server response.");
+                                            }
+                                            else
+                                                WriteGHLog("Bones original file name header could not be found in the server response.");
+                                        }
+                                        else
+                                        {
+                                            WriteGHLog("No bones file received from the server: Bones byte array was null or empty.");
+                                            string str = "";
+                                            try
+                                            {
+                                                str = await response.Content.ReadAsStringAsync();
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                WriteGHLog("Reading bones response content failed: " + ex.Message);
+                                            }
+                                            WriteGHLog("Bones response content: " + str);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        Debug.WriteLine("Sending the bones file " + full_filepath + " failed. No bones file received in exchange. (" + (int)res.StatusCode + ")");
+                                        string str = "";
+                                        try
+                                        {
+                                            str = await response.Content.ReadAsStringAsync();
+                                        }
+                                        catch (Exception ex) 
+                                        {
+                                            Debug.WriteLine("Reading bones response content failed: " + ex.Message);
+                                        }
+                                        Debug.WriteLine("Bones response content: " + str);
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine("Exception occurred while sending bones file: " + ex.Message);
+                                res.IsSuccess = false;
+                                res.Message = ex.Message;
+                            }
+
+                            XlogCredentialsIncorrect = false;
+                            if (res.IsSuccess)
+                            {
+                                SetXlogUserNameVerified(true, username, password);
+                                WriteGHLog("Bones file exchange successfully completed. (" + (int)res.StatusCode + ")");
+                            }
+                            else
+                            {
+                                Debug.WriteLine("Sending bones file failed. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                if (XlogUserNameVerified && res.HasHttpStatusCode && (res.StatusCode == HttpStatusCode.Forbidden /* 403 */)) // || res.StatusCode == HttpStatusCode.Locked /* 423 */
+                                    SetXlogUserNameVerified(false, null, null);
+                                if (res.StatusCode == HttpStatusCode.Forbidden)
+                                    XlogCredentialsIncorrect = true;
+                            }
+
+                            if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(bones_filename))
+                            {
+                                WriteGHLog("Bones file send request redirected to the queue on disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                SaveBonesPostToDisk(status_type, status_datatype, bones_filename);
+                            }
+                        }
+                        content1.Dispose();
+                        content2.Dispose();
+                        content3.Dispose();
+                        content4.Dispose();
+                        content5.Dispose();
+                        content7.Dispose();
+                        contentE1.Dispose();
+                        contentE2.Dispose();
+                        contentE3.Dispose();
+                        contentE4.Dispose();
+                        contentE5.Dispose();
+                        contentE6.Dispose();
+                        contentE7.Dispose();
+                        foreach (FileStream fs in filestreams)
+                        {
+                            fs.Dispose();
+                        }
+                        filestreams.Clear();
+                        foreach (StreamContent cnt in contents)
+                        {
+                            cnt.Dispose();
+                        }
+                        contents.Clear();
+                        multicontent.Dispose();
+                    }
+                }
+                if (didReceiveBonesFile)
+                {
+                    if (didWriteBonesFileSuccessfully && receivedBonesServerFilePath != null)
+                    {
+                        // Confirm with server that the file was successfully written to disk
+                        Debug.WriteLine("Starting confirming received bones file");
+                        using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
+                        {
+                            MultipartFormDataContent multicontent = new MultipartFormDataContent("-------------------boundary");
+
+                            StringContent content1 = new StringContent(username, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv1 = new ContentDispositionHeaderValue("form-data");
+                            cdhv1.Name = "UserName";
+                            content1.Headers.ContentDisposition = cdhv1;
+                            multicontent.Add(content1);
+                            Debug.WriteLine("UserName: " + username);
+
+                            StringContent content3 = new StringContent(password, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv3 = new ContentDispositionHeaderValue("form-data");
+                            cdhv3.Name = "Password";
+                            content3.Headers.ContentDisposition = cdhv3;
+                            multicontent.Add(content3);
+                            Debug.WriteLine("Password: " + password);
+
+                            StringContent content4 = new StringContent(XlogAntiForgeryToken, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv4 = new ContentDispositionHeaderValue("form-data");
+                            cdhv4.Name = "AntiForgeryToken";
+                            content4.Headers.ContentDisposition = cdhv4;
+                            multicontent.Add(content4);
+                            Debug.WriteLine("AntiForgeryToken: " + XlogAntiForgeryToken);
+
+                            string convertedUsers = (BonesUserListIsBlack ? "!" : "") + BonesAllowedUsers;
+                            StringContent content7 = new StringContent(convertedUsers, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv7 = new ContentDispositionHeaderValue("form-data");
+                            cdhv7.Name = "AllowedUsers";
+                            content7.Headers.ContentDisposition = cdhv7;
+                            multicontent.Add(content7);
+                            Debug.WriteLine("AllowedUsers: " + convertedUsers);
+
+                            StringContent content2 = new StringContent("ConfirmReceipt", Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
+                            cdhv2.Name = "Command";
+                            content2.Headers.ContentDisposition = cdhv2;
+                            multicontent.Add(content2);
+                            Debug.WriteLine("Command: ConfirmReceipt");
+
+                            StringContent content5 = new StringContent(receivedBonesServerFilePath, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv5 = new ContentDispositionHeaderValue("form-data");
+                            cdhv5.Name = "Data";
+                            content5.Headers.ContentDisposition = cdhv5;
+                            multicontent.Add(content5);
+                            Debug.WriteLine("Data: " + receivedBonesServerFilePath);
+
+                            StringContent contentE1 = new StringContent(DeviceInfo.Platform.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve1 = new ContentDispositionHeaderValue("form-data");
+                            cdhve1.Name = "Platform";
+                            contentE1.Headers.ContentDisposition = cdhve1;
+                            multicontent.Add(contentE1);
+                            Debug.WriteLine("Platform: " + DeviceInfo.Platform.ToString());
+
+                            StringContent contentE2 = new StringContent(DeviceInfo.VersionString, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve2 = new ContentDispositionHeaderValue("form-data");
+                            cdhve2.Name = "PlatformVersion";
+                            contentE2.Headers.ContentDisposition = cdhve2;
+                            multicontent.Add(contentE2);
+                            Debug.WriteLine("PlatformVersion: " + DeviceInfo.VersionString);
+
+                            StringContent contentE3 = new StringContent(GHConstants.PortName, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve3 = new ContentDispositionHeaderValue("form-data");
+                            cdhve3.Name = "Port";
+                            contentE3.Headers.ContentDisposition = cdhve3;
+                            multicontent.Add(contentE3);
+                            Debug.WriteLine("Port: " + GHConstants.PortName);
+
+                            StringContent contentE4 = new StringContent(VersionTracking.CurrentVersion, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve4 = new ContentDispositionHeaderValue("form-data");
+                            cdhve4.Name = "PortVersion";
+                            contentE4.Headers.ContentDisposition = cdhve4;
+                            multicontent.Add(contentE4);
+                            Debug.WriteLine("PortVersion: " + VersionTracking.CurrentVersion);
+
+                            StringContent contentE5 = new StringContent(VersionTracking.CurrentBuild, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve5 = new ContentDispositionHeaderValue("form-data");
+                            cdhve5.Name = "PortBuild";
+                            contentE5.Headers.ContentDisposition = cdhve5;
+                            multicontent.Add(contentE5);
+                            Debug.WriteLine("PortBuild: " + VersionTracking.CurrentBuild);
+
+                            StringContent contentE6 = new StringContent(GHApp.GHVersionNumber.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve6 = new ContentDispositionHeaderValue("form-data");
+                            cdhve6.Name = "VersionNumber";
+                            contentE6.Headers.ContentDisposition = cdhve6;
+                            multicontent.Add(contentE6);
+                            Debug.WriteLine("VersionNumber: " + GHApp.GHVersionNumber.ToString());
+
+                            StringContent contentE7 = new StringContent(GHApp.GHVersionCompatibility.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhve7 = new ContentDispositionHeaderValue("form-data");
+                            cdhve7.Name = "VersionCompatibilityNumber";
+                            contentE7.Headers.ContentDisposition = cdhve7;
+                            multicontent.Add(contentE7);
+                            Debug.WriteLine("VersionCompatibilityNumber: " + GHApp.GHVersionCompatibility.ToString());
+
+                            using (var cts = new CancellationTokenSource())
+                            {
+                                cts.CancelAfter(10000);
+                                try
+                                {
+                                    using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
+                                    {
+                                        if(response.IsSuccessStatusCode)
+                                        {
+                                            WriteGHLog("Bones receipt confirmation of server bones file " + receivedBonesServerFilePath + " sent successfully (" + (int)response.StatusCode + ").");
+                                        }
+                                        else
+                                        {
+                                            Debug.WriteLine("Sending bones receipt confirmation failed. Status code: " + (int)response.StatusCode + " (" + response.StatusCode.ToString() + ")");
+                                            string str = "";
+                                            try
+                                            {
+                                                str = await response.Content.ReadAsStringAsync();
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Debug.WriteLine("Reading the response content for the bones receipt confirmation failed: " + ex.Message);
+                                            }
+                                            Debug.WriteLine("Bones receipt confirmation response content: " + str);
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine("Exception occurred while confirming received bones file (" + receivedBonesServerFilePath + "): " + ex.Message);
+                                }
+                            }
+                            content1.Dispose();
+                            content2.Dispose();
+                            content3.Dispose();
+                            content4.Dispose();
+                            content5.Dispose();
+                            content7.Dispose();
+                            contentE1.Dispose();
+                            contentE2.Dispose();
+                            contentE3.Dispose();
+                            contentE4.Dispose();
+                            contentE5.Dispose();
+                            contentE6.Dispose();
+                            contentE7.Dispose();
+                            multicontent.Dispose();
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+                res.Message = e.Message;
+            }
+            return res;
+        }
+
+        public static void SaveBonesPostToDisk(int status_type, int status_datatype, string bones_filename)
+        {
+            string targetpath = Path.Combine(GHPath, GHConstants.BonesPostQueueDirectory);
+            if (!Directory.Exists(targetpath))
+                CheckCreateDirectory(targetpath);
+            if (Directory.Exists(targetpath))
+            {
+                string targetfilename;
+                string targetfilepath;
+                int id = 0;
+                do
+                {
+                    targetfilename = GHConstants.BonesPostFileNamePrefix + id + GHConstants.BonesPostFileNameSuffix;
+                    targetfilepath = Path.Combine(targetpath, targetfilename);
+                    id++;
+                } while (File.Exists(targetfilepath));
+
+                try
+                {
+                    using (StreamWriter sw = File.CreateText(targetfilepath))
+                    {
+                        GHPost fp = new GHPost(2, true, status_type, status_datatype, bones_filename, null, false);
+                        string json = JsonConvert.SerializeObject(fp);
+                        Debug.WriteLine(json);
+                        sw.Write(json);
+                    }
+                    WriteGHLog("Bones file send request written to the queue on disk: " + targetfilepath);
+                }
+                catch (Exception ex)
+                {
+                    WriteGHLog("Writing the bones file send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                }
+            }
+        }
+
+        public static string AddForumPostInfo(string message)
+        {
+            if (message == null)
+                message = "";
+
+            bool isCustomXlogServerLink = !string.IsNullOrWhiteSpace(CustomXlogPostLink);
+            string username = XlogUserName;
+            if (PostingXlogEntries && !string.IsNullOrWhiteSpace(username) && XlogUserNameVerified)
+                message = message + (isCustomXlogServerLink ? " {" : " [") + username + (isCustomXlogServerLink ? "}" : "]");
+
+            string portver = VersionTracking.CurrentVersion;
+            DevicePlatform platform = DeviceInfo.Platform;
+            string platstr = platform != null ? platform.ToString() : "";
+            if (platstr == null)
+                platstr = "";
+            string platid;
+            if (platstr.Length > 0)
+                platid = platstr.Substring(0, 1).ToLower();
+            else
+                platid = "";
+
+            message = message + " [" + portver + platid + "]";
+            return message;
+        }
+
+        public static string AddDiagnosticInfo(string info_str, int status_type)
+        {
+            if (info_str == null)
+                info_str = "";
+
+            string ver = GHApp.GHVersionString + " / " + VersionTracking.CurrentVersion + " / " + VersionTracking.CurrentBuild;
+            string manufacturer = DeviceInfo.Manufacturer;
+            if (manufacturer.Length > 0)
+                manufacturer = manufacturer.Substring(0, 1).ToUpper() + manufacturer.Substring(1);
+            string device_model = manufacturer + " " + DeviceInfo.Model;
+            string platform_with_version = DeviceInfo.Platform + " " + DeviceInfo.VersionString;
+
+            ulong TotalMemInBytes = GHApp.PlatformService.GetDeviceMemoryInBytes();
+            ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
+            ulong FreeDiskSpaceInBytes = GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes();
+            ulong FreeDiskSpaceInGB = ((FreeDiskSpaceInBytes / 1024) / 1024) / 1024;
+            ulong TotalDiskSpaceInBytes = GHApp.PlatformService.GetDeviceTotalDiskSpaceInBytes();
+            ulong TotalDiskSpaceInGB = ((TotalDiskSpaceInBytes / 1024) / 1024) / 1024;
+
+            string totmem = TotalMemInMB + " MB";
+            string diskspace = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
+
+            string player_name = Preferences.Get("LastUsedPlayerName", "Unknown Player");
+            string info = ver + ", " + platform_with_version + ", " + device_model + ", " + totmem + ", " + diskspace;
+
+            switch (status_type)
+            {
+                case (int)diagnostic_data_types.DIAGNOSTIC_DATA_PANIC:
+                    info_str = player_name + " - Panic: " + info_str + " [" + info + "]";
+                    break;
+                case (int)diagnostic_data_types.DIAGNOSTIC_DATA_IMPOSSIBLE:
+                    info_str = player_name + " - Impossible: " + info_str + " [" + info + "]";
+                    break;
+                case (int)diagnostic_data_types.DIAGNOSTIC_DATA_CRITICAL:
+                    info_str = player_name + " - Critical:\n" + info_str + "\n[" + info + "]";
+                    break;
+                default:
+                    info_str = player_name + " - Diagnostics: " + info_str + " [" + info + "]";
+                    break;
+            }
+            return info_str;
+        }
+
+        public static void MaybeWriteGHLog(string loggedtext)
+        {
+            if (string.IsNullOrWhiteSpace(loggedtext))
+                return;
+
+            if (DebugLogMessages)
+                WriteGHLog(loggedtext);
+            else
+                Debug.WriteLine(loggedtext);
+        }
+
+        private static readonly object _ghlogLock = new object();
+        public static void WriteGHLog(string loggedtext)
+        {
+            try
+            {
+                lock (_ghlogLock)
+                {
+                    Debug.WriteLine(loggedtext);
+                    string logdir = Path.Combine(GHPath, GHConstants.AppLogDirectory);
+                    string logfullpath = Path.Combine(logdir, GHConstants.AppLogFileName);
+                    if (!Directory.Exists(logdir))
+                    {
+                        CheckCreateDirectory(logdir);
+                    }
+                    if (Directory.Exists(logdir))
+                    {
+                        if (File.Exists(logfullpath))
+                        {
+                            FileInfo fi = new FileInfo(logfullpath);
+                            if (fi.Length > GHConstants.MaxGHLogSize)
+                            {
+                                string[] lines = File.ReadAllLines(logfullpath);
+                                File.Delete(logfullpath);
+                                List<string> halflines = new List<string>(lines.Length / 2 + 1);
+                                for (int i = lines.Length / 2; i < lines.Length; i++)
+                                {
+                                    halflines.Add(lines[i]);
+                                }
+                                File.AppendAllLines(logfullpath, halflines);
+                            }
+                        }
+                        var now = DateTime.UtcNow;
+                        File.AppendAllText(logfullpath, now.ToString("yyyy-MM-dd HH:mm:ss") + ": "
+                            + loggedtext
+                            + " [" + VersionTracking.CurrentVersion + "]"
+                            + Environment.NewLine);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+        }
+
+        static Dictionary<ulong, ulong> _soundSourceIdDictionary = new Dictionary<ulong, ulong>();
+        public static bool IsTimeStampedFunctionCall(byte cmd)
+        {
+            switch (cmd)
+            {
+                case (byte)RecordedFunctionID.GetEvent:
+                case (byte)RecordedFunctionID.GetChar:
+                case (byte)RecordedFunctionID.GetLine:
+                case (byte)RecordedFunctionID.YnFunction:
+                case (byte)RecordedFunctionID.SelectMenu:
+                case (byte)RecordedFunctionID.DisplayWindow:
+                case (byte)RecordedFunctionID.DisplayPopupText:
+                case (byte)RecordedFunctionID.InitializeWindows:
+                case (byte)RecordedFunctionID.ExitHack:                    
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static void DeleteReplay(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return;
+
+            File.Delete(filePath);
+
+            /* Delete also continuation files */
+            FileInfo fi = new FileInfo(filePath);
+            string dir = fi.DirectoryName;
+            string fileName = fi.Name;
+            if (fileName != null && fileName.StartsWith(GHConstants.ReplayFileNamePrefix))
+            {
+                bool isGZip = fileName.Length > GHConstants.ReplayGZipFileNameSuffix.Length && fileName.EndsWith(GHConstants.ReplayGZipFileNameSuffix);
+                bool isNormalZip = fileName.Length > GHConstants.ReplayZipFileNameSuffix.Length && fileName.EndsWith(GHConstants.ReplayZipFileNameSuffix);
+                bool isZip = isGZip || isNormalZip;
+                string usedZipSuffix = isGZip ? GHConstants.ReplayGZipFileNameSuffix : GHConstants.ReplayZipFileNameSuffix;
+                int subLen = fileName.Length - GHConstants.ReplayFileNamePrefix.Length - GHConstants.ReplayFileNameSuffix.Length - (isZip ? usedZipSuffix.Length : 0);
+                if (subLen > 0 && Directory.Exists(dir))
+                {
+                    string[] files = Directory.GetFiles(dir);
+                    if (files != null)
+                    {
+                        foreach (string file in files)
+                        {
+                            if (file != null)
+                            {
+                                string contStart = GHConstants.ReplayContinuationFileNamePrefix + fileName.Substring(GHConstants.ReplayFileNamePrefix.Length, subLen);
+                                FileInfo contFI = new FileInfo(file);
+                                if (contFI != null && contFI.Name != null)
+                                {
+                                    if (contFI.Name.StartsWith(contStart) && (!isZip || file.EndsWith(usedZipSuffix)) && File.Exists(file))
+                                    {
+                                        File.Delete(file);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public static string GetReplayFileName(ulong versionCode, long timeStampInBinary, int contNumber, string playerName, int firstTurn, bool newFormat)
+        {
+            return (contNumber > 0 ? GHConstants.ReplayContinuationFileNamePrefix : GHConstants.ReplayFileNamePrefix) 
+                + (playerName != null ? playerName + "-" : "") 
+                + (firstTurn >= 0 ? "T" + firstTurn + "-" : "") 
+                + (newFormat ? VersionNumberToFileNameSuffix(versionCode) : versionCode.ToString()) 
+                + GHConstants.ReplayFileNameMiddleDivisor + (newFormat ? ((ulong)timeStampInBinary).ToString() :  timeStampInBinary.ToString()) 
+                + (contNumber > 0 ? (GHConstants.ReplayFileContinuationNumberDivisor + contNumber.ToString()) : "") 
+                + GHConstants.ReplayFileNameSuffix;
+        }
+
+        public static bool ValidateReplayFile(string replayFileName, out string out_str)
+        {
+            if (string.IsNullOrWhiteSpace(replayFileName))
+            {
+                out_str = "File name is null or whitespace.";
+                return false;
+            }
+
+            if (!File.Exists(replayFileName))
+            {
+                out_str = "File " + replayFileName + " does not exist.";
+                return false;
+            }
+
+            bool res = false;
+            bool isGZip = replayFileName.Length > GHConstants.ReplayGZipFileNameSuffix.Length && replayFileName.EndsWith(GHConstants.ReplayGZipFileNameSuffix);
+            bool isNormalZip = replayFileName.Length > GHConstants.ReplayZipFileNameSuffix.Length && replayFileName.EndsWith(GHConstants.ReplayZipFileNameSuffix);
+            bool isZip = isGZip || isNormalZip;
+            string usedZipSuffix = isGZip ? GHConstants.ReplayGZipFileNameSuffix : GHConstants.ReplayZipFileNameSuffix;
+            string usedReplayFileName = replayFileName;
+
+            try
+            {
+                if (isZip)
+                {
+                    string unZippedFileName = replayFileName.Substring(0, replayFileName.Length - usedZipSuffix.Length);
+                    if (File.Exists(unZippedFileName))
+                        File.Delete(unZippedFileName);
+
+                    if(isGZip)
+                    {
+                        using (FileStream compressedFileStream = File.Open(replayFileName, FileMode.Open))
+                        {
+                            using (FileStream outputFileStream = File.Create(unZippedFileName))
+                            {
+                                using (var decompressor = new GZipStream(compressedFileStream, CompressionMode.Decompress))
+                                {
+                                    decompressor.CopyTo(outputFileStream);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        using (ZipArchive ziparch = ZipFile.OpenRead(replayFileName))
+                        {
+                            string dir = Path.GetDirectoryName(replayFileName);
+                            ziparch.ExtractToDirectory(string.IsNullOrWhiteSpace(dir) ? "." : dir);
+                        }
+                    }
+
+                    if (File.Exists(unZippedFileName))
+                    {
+                        usedReplayFileName = unZippedFileName;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                out_str = ex.Message;
+                goto end_here;
+            }
+
+            try
+            {
+                using (FileStream fs = File.OpenRead(usedReplayFileName))
+                {
+                    if (fs != null)
+                    {
+                        using (BinaryReader br = new BinaryReader(fs))
+                        {
+                            /* Header */
+                            ulong verno = br.ReadUInt64();
+                            ulong vercompat = br.ReadUInt64();
+
+                            bool isValid = GHVersionNumber == verno ? true :
+                                GHVersionNumber > verno ? GHVersionCompatibility <= verno : /* If the replay is made with an older GnollHack version than the current app, check that current app version's compatibility covers the replay's version */
+                                vercompat <= GHVersionNumber; /* If the replay is made with a newer GnollHack version than the current app, check that replay's version compatibility covers the current app version */
+                            res = isValid;
+                            out_str = isValid ? "Replay is valid." : "Replay " + usedReplayFileName + " has invalid version: " + verno + ", compatibility: " + vercompat + " vs the app's " + GHVersionNumber + ", compatibility: " + GHVersionCompatibility;
+                        }
+                    }
+                    else
+                        out_str = "Replay file stream is null.";
+                }
+            }
+            catch (Exception ex)
+            {
+                out_str = ex.Message;
+            }
+
+        end_here:
+            if (isZip && File.Exists(replayFileName) && File.Exists(usedReplayFileName) && replayFileName != usedReplayFileName)
+            {
+                File.Delete(usedReplayFileName);
+            }
+            return res;
+        }
+
+        private static readonly object _replayLock = new object();
+        private static bool _stopReplay = false;
+        private static bool _pauseReplay = false;
+        private static double _replaySpeed = 1.0;
+        private static int _replayGotoTurn = -1;
+        private static int _originalReplayTurn = -1;
+        private static int _replayTurn = -1;
+        private static string _replayRealTime = null;
+
+        public static bool StopReplay { get { lock (_replayLock) { return _stopReplay; } } set { lock (_replayLock) { _stopReplay = value; } } }
+        public static bool PauseReplay { get { lock (_replayLock) { return _pauseReplay; } } set { lock (_replayLock) { _pauseReplay = value; } } }
+        public static double ReplaySpeed { get { lock (_replayLock) { return _replaySpeed; } } set { lock (_replayLock) { _replaySpeed = value; } } }
+        public static int GoToTurn { get { lock (_replayLock) { return _replayGotoTurn; } } set { lock (_replayLock) { _replayGotoTurn = value; if (value == -1) _originalReplayTurn = -1; else _originalReplayTurn = _replayTurn; } } }
+        public static int OriginalReplayTurn { get { lock (_replayLock) { return _originalReplayTurn; } } }
+        public static int ReplayTurn { get { lock (_replayLock) { return _replayTurn; } } set { lock (_replayLock) { _replayTurn = value; } } }
+        public static string ReplayRealTime { get { lock (_replayLock) { return _replayRealTime; } } set { lock (_replayLock) { _replayRealTime = value; } } }
+
+        public static void ResetReplay()
+        {
+            lock (_replayLock)
+            {
+                _stopReplay = false;
+                _pauseReplay = false;
+                _replaySpeed = 1.0;
+                _replayGotoTurn = -1;
+                _originalReplayTurn = -1;
+                _replayTurn = -1;
+                _replayRealTime = null;
+            }
+        }
+
+        private static readonly object _gzipLock = new object();
+        private static bool _useGZipForReplays = GHConstants.GZipIsDefaultReplayCompression;
+
+        public static bool UseGZipForReplays { get { lock (_gzipLock) { return _useGZipForReplays; } } set { lock (_gzipLock) { _useGZipForReplays = value; } } }
+
+        /* Called from GHGame thread! */
+        public static PlayReplayResult PlayReplay(GHGame game, string replayFileName)
+        {
+            if (game == null)
+                return PlayReplayResult.GameIsNull;
+            if(string.IsNullOrWhiteSpace(replayFileName))
+                return PlayReplayResult.FilePathIsNullOrEmpty;
+
+            string knownPlayerName = null;
+            int knownFirstTurn = -1;
+            bool exitHackCalled = false;
+            bool isGZip = replayFileName.Length > GHConstants.ReplayGZipFileNameSuffix.Length && replayFileName.EndsWith(GHConstants.ReplayGZipFileNameSuffix);
+            bool isNormalZip = replayFileName.Length > GHConstants.ReplayZipFileNameSuffix.Length && replayFileName.EndsWith(GHConstants.ReplayZipFileNameSuffix);
+            bool isZip = isGZip || isNormalZip;
+            string usedZipSuffix = isGZip ? GHConstants.ReplayGZipFileNameSuffix : GHConstants.ReplayZipFileNameSuffix;
+            bool contnextfile = false;
+            string rawFileName = replayFileName;
+            bool restartReplay = false;
+            do
+            {
+                if(restartReplay)
+                {
+                    restartReplay = false;
+                    rawFileName = replayFileName;
+                    ReplayTurn = 0;
+                    GoToTurn = GoToTurn; /* Reset original replay turn */
+                    ConcurrentQueue<GHRequest> queue;
+                    if (GHGame.RequestDictionary.TryGetValue(game, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(game, GHRequestType.CloseAllDialogs));
+                        queue.Enqueue(new GHRequest(game, GHRequestType.RestartReplay));
+                    }
+                    return PlayReplayResult.Restarting;
+                }
+
+                if (string.IsNullOrWhiteSpace(rawFileName))
+                    break;
+
+                if (!File.Exists(rawFileName))
+                {
+                    if (!exitHackCalled)
+                        game.ClientCallback_ExitHack(0);
+                    return PlayReplayResult.FileDoesNotExist;
+                }
+
+                string usedReplayFileName = rawFileName;
+                string origRawFileName = rawFileName;
+
+                if (isZip && rawFileName.Length > usedZipSuffix.Length)
+                {
+                    string unZippedFileName = rawFileName.Substring(0, rawFileName.Length - usedZipSuffix.Length);
+                    try
+                    {
+                        if (File.Exists(unZippedFileName))
+                            File.Delete(unZippedFileName);
+
+                        if (isGZip)
+                        {
+                            using (FileStream compressedFileStream = File.Open(rawFileName, FileMode.Open))
+                            {
+                                using (FileStream outputFileStream = File.Create(unZippedFileName))
+                                {
+                                    using (var decompressor = new GZipStream(compressedFileStream, CompressionMode.Decompress))
+                                    {
+                                        decompressor.CopyTo(outputFileStream);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            using (ZipArchive ziparch = ZipFile.OpenRead(rawFileName))
+                            {
+                                string dir = Path.GetDirectoryName(rawFileName);
+                                ziparch.ExtractToDirectory(string.IsNullOrWhiteSpace(dir) ? "." : dir);
+                            }
+                        }
+
+                        if (File.Exists(unZippedFileName))
+                        {
+                            usedReplayFileName = unZippedFileName;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MaybeWriteGHLog(ex.Message);
+                        if (!exitHackCalled)
+                            game.ClientCallback_ExitHack(0);
+                        if (File.Exists(unZippedFileName))
+                            File.Delete(unZippedFileName);
+                        return PlayReplayResult.Error;
+                    }
+                }
+
+                contnextfile = false;
+                _soundSourceIdDictionary.Clear();
+
+                byte prevcmd_byte = 0;
+                try
+                {
+                    using (FileStream fs = File.OpenRead(usedReplayFileName))
+                    {
+                        if (fs != null)
+                        {
+                            using (BinaryReader br = new BinaryReader(fs))
+                            {
+                                /* Header */
+                                ulong verno = br.ReadUInt64();
+                                ulong vercompat = br.ReadUInt64();
+
+                                bool isValid = GHVersionNumber == verno ? true : 
+                                    GHVersionNumber > verno ? GHVersionCompatibility <= verno : /* If the replay is made with an older GnollHack version than the current app, check that current app version's compatibility covers the replay's version */
+                                    vercompat <= GHVersionNumber; /* If the replay is made with a newer GnollHack version than the current app, check that replay's version compatibility covers the current app version */
+
+                                if(isValid)
+                                {
+                                    /* Read the rest of the header */
+                                    ulong date = br.ReadUInt64();
+                                    string plname = br.ReadString();
+                                    bool wizmode = br.ReadBoolean();
+                                    bool modernmode = br.ReadBoolean();
+                                    bool casualmode = br.ReadBoolean();
+                                    int replayType = br.ReadInt32();
+                                    int platformType = br.ReadInt32();
+                                    ulong flags1 = br.ReadUInt64();
+                                    ulong flags2 = br.ReadUInt64();
+
+                                    if (game.ActiveGamePage != null)
+                                    {
+                                        game.ActiveGamePage.EnableWizardMode = wizmode;
+                                        game.ActiveGamePage.EnableModernMode = modernmode;
+                                        game.ActiveGamePage.EnableCasualMode = casualmode;
+                                    }
+
+                                    byte cmd_byte = 0;
+                                    int cmd;
+                                    bool breakwhile;
+                                    ulong time;
+                                    do
+                                    {
+                                        breakwhile = false;
+                                        time = 0UL;
+                                        prevcmd_byte = cmd_byte;
+                                        cmd_byte = br.ReadByte();
+                                        cmd = (int)cmd_byte;
+                                        if (IsTimeStampedFunctionCall(cmd_byte))
+                                            time = br.ReadUInt64(); /* Time is only for input functions */
+
+                                        do
+                                        {
+                                            if (StopReplay)
+                                            {
+                                                cmd = (int)RecordedFunctionID.EndOfFile;
+                                                break;
+                                            }
+                                            else if (PauseReplay && GoToTurn < 0)
+                                                Thread.Sleep(GHConstants.PollingInterval);
+                                        } 
+                                        while (PauseReplay && GoToTurn < 0);
+
+                                        switch (cmd)
+                                        {
+                                            case (int)RecordedFunctionID.EndOfFile:
+                                                breakwhile = true;
+                                                break;
+                                            case (int)RecordedFunctionID.ContinueToNextFile:
+                                                {
+                                                    ulong nextfile_versionnumber = br.ReadUInt64();
+                                                    long nextfile_timestamp = br.ReadInt64();
+                                                    string nextfile_config_string = br.ReadInt32() == 0 ? null : br.ReadString(); /* unused */
+                                                    int nextfile_replay_continuation = br.ReadInt32();
+                                                    rawFileName = Path.Combine(GHPath, GHConstants.ReplayDirectory, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, knownPlayerName, knownFirstTurn, true));
+                                                    if (isZip)
+                                                        rawFileName += usedZipSuffix;
+                                                    for(int i = 0; i < 8; i++) /* Support for various other name formats */
+                                                    {
+                                                        if (File.Exists(rawFileName))
+                                                            break;
+                                                        rawFileName = Path.Combine(GHPath, GHConstants.ReplayDirectory, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, (i & 1) != 0 ? null : knownPlayerName, (i & 2) != 0 ? -1 : knownFirstTurn, (i & 4) == 0));
+                                                        if (isZip)
+                                                            rawFileName += usedZipSuffix;
+                                                    }
+                                                    contnextfile = true;
+                                                    breakwhile = true;
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.InitializeWindows:
+                                                {
+                                                    int gl2ti_sz = br.ReadInt32();
+                                                    int[] gl2ti = new int[gl2ti_sz];
+                                                    for (int j = 0; j < gl2ti_sz; j++)
+                                                        gl2ti[j] = br.ReadInt32();
+
+                                                    int gltifl_sz = br.ReadInt32();
+                                                    byte[] gltifl = new byte[gltifl_sz];
+                                                    for (int j = 0; j < gltifl_sz; j++)
+                                                        gltifl[j] = br.ReadByte();
+
+                                                    int ti2an_sz = br.ReadInt32();
+                                                    short[] ti2an = new short[ti2an_sz];
+                                                    for (int j = 0; j < ti2an_sz; j++)
+                                                        ti2an[j] = br.ReadInt16();
+
+                                                    int ti2en_sz = br.ReadInt32();
+                                                    short[] ti2en = new short[ti2en_sz];
+                                                    for (int j = 0; j < ti2en_sz; j++)
+                                                        ti2en[j] = br.ReadInt16();
+
+                                                    int ti2ad_sz = br.ReadInt32();
+                                                    short[] ti2ad = new short[ti2ad_sz];
+                                                    for (int j = 0; j < ti2ad_sz; j++)
+                                                        ti2ad[j] = br.ReadInt16();
+
+                                                    int anoff_sz = br.ReadInt32();
+                                                    int[] anoff = new int[anoff_sz];
+                                                    for (int j = 0; j < anoff_sz; j++)
+                                                        anoff[j] = br.ReadInt32();
+
+                                                    int enoff_sz = br.ReadInt32();
+                                                    int[] enoff = new int[enoff_sz];
+                                                    for (int j = 0; j < enoff_sz; j++)
+                                                        enoff[j] = br.ReadInt32();
+
+                                                    int reoff_sz = br.ReadInt32();
+                                                    int[] reoff = new int[reoff_sz];
+                                                    for (int j = 0; j < reoff_sz; j++)
+                                                        reoff[j] = br.ReadInt32();
+
+                                                    int nosheets = br.ReadInt32();
+                                                    int notiles = br.ReadInt32();
+
+                                                    int tilesperrow_sz = br.ReadInt32();
+                                                    int[] tilesperrow = new int[tilesperrow_sz];
+                                                    for (int j = 0; j < tilesperrow_sz; j++)
+                                                        tilesperrow[j] = br.ReadInt32();
+
+                                                    lock (Glyph2TileLock)
+                                                    {
+                                                        Glyph2Tile = gl2ti;
+                                                        GlyphTileFlags = gltifl;
+                                                        Tile2Animation = ti2an;
+                                                        Tile2Enlargement = ti2en;
+                                                        Tile2Autodraw = ti2ad;
+                                                        AnimationOffsets = anoff;
+                                                        EnlargementOffsets = enoff;
+                                                        ReplacementOffsets = reoff;
+                                                        UsedTileSheets = nosheets;
+                                                        TotalTiles = notiles;
+                                                        for (int j = 0; j < tilesperrow_sz; j++)
+                                                            TilesPerRow[j] = tilesperrow[j];
+                                                    }
+                                                    unsafe
+                                                    {
+                                                        fixed (int* p1 = gl2ti)
+                                                        {
+                                                            IntPtr ptr_gl2ti = (IntPtr)p1;
+                                                            fixed (byte* p2 = gltifl)
+                                                            {
+                                                                IntPtr ptr_gltifl = (IntPtr)p2;
+                                                                fixed (short* p3 = ti2an)
+                                                                {
+                                                                    IntPtr ptr_ti2an = (IntPtr)p3;
+                                                                    GnollHackService.SetArrays(ptr_gl2ti, gl2ti.Length, ptr_gltifl, gltifl.Length, ptr_ti2an, ti2an.Length); /* Need to initialize since the drawing routine uses the library table to do the animations */
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    game.ClientCallback_InitWindows();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.CreateWindow:
+                                                {
+                                                    int wintype = br.ReadInt32();
+                                                    int style = br.ReadInt32();
+                                                    int glyph = br.ReadInt32();
+                                                    byte dataflags = br.ReadByte();
+
+                                                    int objdata_size = br.ReadInt32();
+                                                    byte[] objdata_bytes = br.ReadBytes(objdata_size);
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* objdata_byte_ptr = objdata_bytes)
+                                                        {
+                                                            IntPtr objdata_ptr = (IntPtr)objdata_byte_ptr;
+
+                                                            int otypdata_size = br.ReadInt32();
+                                                            byte[] otypdata_bytes = br.ReadBytes(otypdata_size);
+                                                            fixed (byte* otypdata_byte_ptr = otypdata_bytes)
+                                                            {
+                                                                IntPtr otypdata_ptr = (IntPtr)otypdata_byte_ptr;
+                                                                game.ClientCallback_CreateGHWindow(wintype, style, glyph, dataflags, objdata_ptr, otypdata_ptr);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DestroyWindow:
+                                                {
+                                                    int winHandle = br.ReadInt32();
+                                                    game.ClientCallback_DestroyGHWindow(winHandle);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ClearWindow:
+                                                {
+                                                    int winHandle = br.ReadInt32();
+                                                    game.ClientCallback_ClearGHWindow(winHandle);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DisplayWindow:
+                                                {
+                                                    int winHandle = br.ReadInt32();
+                                                    byte blocking = br.ReadByte();
+                                                    game.ClientCallback_DisplayGHWindow(winHandle, blocking);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ExitWindows:
+                                                {
+                                                    string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.ClientCallback_ExitWindows(str);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayerSelection:
+                                                {
+                                                    game.ClientCallback_PlayerSelection();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.Curs:
+                                                {
+                                                    int winHandle = br.ReadInt32();
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    game.ClientCallback_Curs(winHandle, x, y);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PrintGlyph:
+                                                {
+                                                    int winHandle = br.ReadInt32();
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    int glyph = br.ReadInt32();
+                                                    int bkglyph = br.ReadInt32();
+                                                    int symbol = br.ReadInt32();
+                                                    int ocolor = br.ReadInt32();
+                                                    uint special = br.ReadUInt32();
+                                                    int layers_size = br.ReadInt32();
+                                                    byte[] layers_bytes = br.ReadBytes(layers_size);
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* layers_byte_ptr = layers_bytes)
+                                                        {
+                                                            IntPtr layers_ptr = (IntPtr)layers_byte_ptr;
+                                                            game.ClientCallback_PrintGlyph(winHandle, x, y, glyph, bkglyph, symbol, ocolor, special, layers_ptr);
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.AskName:
+                                                {
+                                                    string modeName = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string modeDescription = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string chName = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.Replay_AskName(modeName, modeDescription, chName);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.GetEvent:
+                                                {
+                                                    /* No function call in replay */
+                                                    //game.ClientCallback_get_nh_event();
+                                                    if (GoToTurn < 0)
+                                                        Thread.Sleep((int)(GHConstants.ReplayGetEventDelay / ReplaySpeed));
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.GetChar:
+                                                {
+                                                    int res = br.ReadInt32();
+                                                    /* No function call in replay */
+                                                    //game.ClientCallback_nhgetch();
+                                                    if (GoToTurn < 0)
+                                                        Thread.Sleep((int)(GHConstants.ReplayStandardDelay / ReplaySpeed));
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PosKey:
+                                                {
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    int mod = br.ReadInt32();
+                                                    int res = br.ReadInt32();
+                                                    /* No function call in replay */
+                                                    //game.ClientCallback_nh_poskey();
+                                                    if (GoToTurn < 0)
+                                                        Thread.Sleep((int)(GHConstants.ReplayStandardDelay / ReplaySpeed));
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.YnFunction:
+                                                {
+                                                    int style = br.ReadInt32();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    int glyph = br.ReadInt32();
+                                                    string title = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string question = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string responses = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string def = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string descriptions = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string introline = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    ulong ynflags = br.ReadUInt64();
+                                                    int res = br.ReadInt32();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.ClientCallback_YnFunction(style, attr, color, glyph, title, question, responses, def, descriptions, introline, ynflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ClipAround:
+                                                {
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    byte force = br.ReadByte();
+                                                    game.ClientCallback_Cliparound(x, y, force);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.RawPrint:
+                                                {
+                                                    string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.ClientCallback_RawPrint(str);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.RawPrintBold:
+                                                {
+                                                    string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.ClientCallback_RawPrintBold(str);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PutStrEx:
+                                                {
+                                                    int win_id = br.ReadInt32();
+                                                    string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int attributes = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    int append = br.ReadInt32();
+                                                    game.ClientCallback_PutStrEx(win_id, str, attributes, color, append);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PutStrEx2:
+                                                {
+                                                    int win_id = br.ReadInt32();
+                                                    string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    //int len = str.Length + 1;
+                                                    int attr_len = br.ReadInt32();
+                                                    byte[] attributes_bytes = attr_len == 0 ? null : br.ReadBytes(attr_len);
+                                                    int color_len = br.ReadInt32();
+                                                    byte[] colors_bytes = color_len == 0 ? null : br.ReadBytes(color_len);
+                                                    int attributes = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    int append = br.ReadInt32();
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* attributes_byte_ptr = attributes_bytes)
+                                                        {
+                                                            IntPtr attributes_ptr = (IntPtr)attributes_byte_ptr;
+                                                            fixed (byte* colors_byte_ptr = colors_bytes)
+                                                            {
+                                                                IntPtr colors_ptr = (IntPtr)colors_byte_ptr;
+                                                                game.ClientCallback_PutStrEx2(win_id, str, attributes_ptr, colors_ptr, attributes, color, append);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DelayOutput:
+                                                {
+                                                    game.ClientCallback_DelayOutput();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DelayOutputMilliseconds:
+                                                {
+                                                    int ms = br.ReadInt32();
+                                                    game.ClientCallback_DelayOutputMilliseconds(ms);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DelayOutputIntervals:
+                                                {
+                                                    int i = br.ReadInt32();
+                                                    game.ClientCallback_DelayOutputIntervals(i);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PreferenceUpdate:
+                                                {
+                                                    string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.ClientCallback_PreferenceUpdate(str);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.StatusInit:
+                                                {
+                                                    int reassessment = br.ReadInt32();
+                                                    game.ClientCallback_StatusInit(reassessment);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.StatusFinish:
+                                                {
+                                                    game.ClientCallback_StatusFinish();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.StatusEnable:
+                                                {
+                                                    int fieldidx = br.ReadInt32();
+                                                    string nm = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string fmt = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    byte enable = br.ReadByte();
+                                                    game.ClientCallback_StatusEnable(fieldidx, nm, fmt, enable);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.StatusUpdate:
+                                                {
+                                                    int fieldidx = br.ReadInt32();
+                                                    string text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    long condbits = br.ReadInt64();
+                                                    int cng = br.ReadInt32();
+                                                    int percent = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    int condlen = br.ReadInt32();
+                                                    short[] condcolors = new short[condlen];
+                                                    for (int i = 0; i < condlen; i++)
+                                                        condcolors[i] = br.ReadInt16();
+
+                                                    if(fieldidx == (int)statusfields.BL_TIME && !string.IsNullOrWhiteSpace(text) && int.TryParse(text.Trim(), out int curTurn))
+                                                    {
+                                                        ReplayTurn = curTurn;
+                                                        if(knownFirstTurn == -1)
+                                                            knownFirstTurn = curTurn;
+                                                    }
+                                                    else if (fieldidx == (int)statusfields.BL_REALTIME && !string.IsNullOrWhiteSpace(text))
+                                                    {
+                                                        ReplayRealTime = text;
+                                                    }
+                                                    if(GoToTurn >= 0)
+                                                    {
+                                                        if (ReplayTurn >= GoToTurn && GoToTurn >= OriginalReplayTurn) /* Was searching for a túrn in the future */
+                                                            GoToTurn = -1;
+                                                        else if (GoToTurn < OriginalReplayTurn)
+                                                        {
+                                                            restartReplay = true;
+                                                            breakwhile = true;
+                                                        }
+                                                    }
+
+                                                    unsafe
+                                                    {
+                                                        fixed (short* p = condcolors)
+                                                        {
+                                                            IntPtr condcolorptr = (IntPtr)p;
+                                                            game.ClientCallback_StatusUpdate(fieldidx, text, condbits, cng, percent, color, condcolorptr);
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.GetMsgHistory:
+                                                {
+                                                    //game.GetMsgHistory();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PutMsgHistory:
+                                                {
+                                                    string msg = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    //int len = msg.Length + 1;
+                                                    int attr_len = br.ReadInt32();
+                                                    byte[] attributes_bytes = attr_len == 0 ? null : br.ReadBytes(attr_len);
+                                                    int color_len = br.ReadInt32();
+                                                    byte[] colors_bytes = color_len == 0 ? null : br.ReadBytes(color_len);
+                                                    byte is_restoring = br.ReadByte();
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* attributes_byte_ptr = attributes_bytes)
+                                                        {
+                                                            IntPtr attributes_ptr = attributes_bytes == null ? IntPtr.Zero : (IntPtr)attributes_byte_ptr;
+                                                            fixed (byte* colors_byte_ptr = colors_bytes)
+                                                            {
+                                                                IntPtr colors_ptr = colors_bytes == null ? IntPtr.Zero : (IntPtr)colors_byte_ptr;
+                                                                game.ClientCallback_PutMsgHistory(msg, attributes_ptr, colors_ptr, is_restoring);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.StartMenu:
+                                                {
+                                                    int winid = br.ReadInt32();
+                                                    int style = br.ReadInt32();
+                                                    game.ClientCallback_StartMenu(winid, style);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.AddExtendedMenu:
+                                                {
+                                                    int winid = br.ReadInt32();
+                                                    int glyph = br.ReadInt32();
+                                                    long identifier = br.ReadInt64();
+                                                    char accel = br.ReadChar();
+                                                    char groupaccel = br.ReadChar();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    string text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    byte presel = br.ReadByte();
+                                                    int maxcount = br.ReadInt32();
+                                                    ulong oid = br.ReadUInt64();
+                                                    ulong mid = br.ReadUInt64();
+                                                    char headingaccel = br.ReadChar();
+                                                    char special_mark = br.ReadChar();
+                                                    ulong menuflags = br.ReadUInt64();
+                                                    byte dataflags = br.ReadByte();
+                                                    int style = br.ReadInt32();
+
+                                                    int objdata_size = br.ReadInt32();
+                                                    byte[] objdata_bytes = br.ReadBytes(objdata_size);
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* objdata_byte_ptr = objdata_bytes)
+                                                        {
+                                                            IntPtr otmpdata_ptr = (IntPtr)objdata_byte_ptr;
+
+                                                            int otypdata_size = br.ReadInt32();
+                                                            byte[] otypdata_bytes = br.ReadBytes(otypdata_size);
+                                                            fixed (byte* otypdata_byte_ptr = otypdata_bytes)
+                                                            {
+                                                                IntPtr otypdata_ptr = (IntPtr)otypdata_byte_ptr;
+                                                                game.ClientCallback_AddExtendedMenu(winid, glyph, identifier, accel, groupaccel, attr, color, text, presel,
+                                                                    maxcount, oid, mid, headingaccel, special_mark, menuflags, dataflags, style, otmpdata_ptr, otypdata_ptr);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.EndMenu:
+                                                {
+                                                    int winid = br.ReadInt32();
+                                                    string prompt = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string subtitle = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.ClientCallback_EndMenu(winid, prompt, subtitle);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.SelectMenu:
+                                                {
+                                                    int winid = br.ReadInt32();
+                                                    int how = br.ReadInt32();
+                                                    int arrsize = br.ReadInt32();
+                                                    for (int i = 0; i < arrsize; i++)
+                                                        br.ReadInt64();
+                                                    int listsize = br.ReadInt32();
+                                                    int count = br.ReadInt32();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.Replay_SelectMenu(winid, how, count);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.FreeMemory:
+                                                {
+                                                    //game.ClientCallback_FreeMemory();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ReportPlayerName:
+                                                {
+                                                    string name = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    knownPlayerName = name;
+                                                    //game.ClientCallback_ReportPlayerName(name);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ReportPlayTime:
+                                                {
+                                                    long timePassed = br.ReadInt64();
+                                                    long currentPlayTime = br.ReadInt64();
+                                                    //game.ClientCallback_ReportPlayTime(timePassed, currentPlayTime);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.SendObjectData:
+                                                {
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+
+                                                    int objdata_size = br.ReadInt32();
+                                                    byte[] objdata_bytes = br.ReadBytes(objdata_size);
+
+                                                    int cmdtype = br.ReadInt32();
+                                                    int where = br.ReadInt32();
+
+                                                    int otypdata_size = br.ReadInt32();
+                                                    byte[] otypdata_bytes = br.ReadBytes(otypdata_size);
+
+                                                    ulong oflags = br.ReadUInt64();
+
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* objdata_byte_ptr = objdata_bytes)
+                                                        {
+                                                            IntPtr otmp_ptr = (IntPtr)objdata_byte_ptr;
+
+                                                            fixed (byte* otypdata_byte_ptr = otypdata_bytes)
+                                                            {
+                                                                IntPtr otypdata_ptr = (IntPtr)otypdata_byte_ptr;
+                                                                game.ClientCallback_SendObjectData(x, y, otmp_ptr, cmdtype, where, otypdata_ptr, oflags);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.SendMonsterData:
+                                                {
+                                                    int cmdtype = br.ReadInt32();
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+
+                                                    int mondata_size = br.ReadInt32();
+                                                    byte[] mondata_bytes = br.ReadBytes(mondata_size);
+
+                                                    ulong oflags = br.ReadUInt64();
+
+                                                    unsafe
+                                                    {
+                                                        fixed (byte* monster_data_byte_ptr = mondata_bytes)
+                                                        {
+                                                            IntPtr monster_data_ptr = (IntPtr)monster_data_byte_ptr;
+                                                            game.ClientCallback_SendMonsterData(cmdtype, x, y, monster_data_ptr, oflags);
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.SendEngravingData:
+                                                {
+                                                    int cmdtype = br.ReadInt32();
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    string engraving_text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int etype = br.ReadInt32();
+                                                    ulong eflags = br.ReadUInt64();
+                                                    ulong gflags = br.ReadUInt64();
+
+                                                    game.ClientCallback_SendEngravingData(cmdtype, x, y, engraving_text, etype, eflags, gflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.GetLine:
+                                                {
+                                                    int style = br.ReadInt32();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    string query = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string placeholder = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string linesuffix = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string introline = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string line = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.Replay_GetLine(style, attr, color, query, placeholder, linesuffix, introline, IntPtr.Zero, line);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ClearContextMenu:
+                                                {
+                                                    game.ClientCallback_ClearContextMenu();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.AddContextMenu:
+                                                {
+                                                    int cmd_def_char = br.ReadInt32();
+                                                    int cmd_cur_char = br.ReadInt32();
+                                                    int style = br.ReadInt32();
+                                                    int glyph = br.ReadInt32();
+                                                    string cmd_text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string target_text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    game.ClientCallback_AddContextMenu(cmd_def_char, cmd_cur_char, style, glyph, cmd_text, target_text, attr, color);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.UpdateStatusButton:
+                                                {
+                                                    int btncmd = br.ReadInt32();
+                                                    int btn = br.ReadInt32();
+                                                    int val = br.ReadInt32();
+                                                    ulong bflags = br.ReadUInt64();
+                                                    game.ClientCallback_UpdateStatusButton(btncmd, btn, val, bflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ToggleAnimationTimer:
+                                                {
+                                                    int timetype = br.ReadInt32();
+                                                    int timerid = br.ReadInt32();
+                                                    int state = br.ReadInt32();
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    int layer = br.ReadInt32();
+                                                    ulong tflags = br.ReadUInt64();
+                                                    game.ClientCallback_ToggleAnimationTimer(timetype, timerid, state, x, y, layer, tflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DisplayFloatingText:
+                                                {
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    string text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int style = br.ReadInt32();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    ulong tflags = br.ReadUInt64();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.ClientCallback_DisplayFloatingText(x, y, text, style, attr, color, tflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DisplayScreenText:
+                                                {
+                                                    string text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string supertext = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string subtext = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int style = br.ReadInt32();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    ulong tflags = br.ReadUInt64();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.ClientCallback_DisplayScreenText(text, supertext, subtext, style, attr, color, tflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DisplayPopupText:
+                                                {
+                                                    string text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string title = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int style = br.ReadInt32();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    int glyph = br.ReadInt32();
+                                                    ulong tflags = br.ReadUInt64();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.ClientCallback_DisplayPopupText(text, title, style, attr, color, glyph, tflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DisplayGUIEffect:
+                                                {
+                                                    int style = br.ReadInt32();
+                                                    int subtype = br.ReadInt32();
+                                                    int x = br.ReadInt32();
+                                                    int y = br.ReadInt32();
+                                                    int x2 = br.ReadInt32();
+                                                    int y2 = br.ReadInt32();
+                                                    ulong tflags = br.ReadUInt64();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.ClientCallback_DisplayGUIEffect(style, subtype, x, y, x2, y2, tflags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.UpdateCursor:
+                                                {
+                                                    int style = br.ReadInt32();
+                                                    int force_paint = br.ReadInt32();
+                                                    int show_on_u = br.ReadInt32();
+                                                    game.ClientCallback_UpdateCursor(style, force_paint, show_on_u);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayImmediateSound:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    int parameterNameArraySize = br.ReadInt32();
+                                                    string[] parameterNames = new string[parameterNameArraySize];
+                                                    for (int j = 0; j < parameterNameArraySize; j++)
+                                                        parameterNames[j] = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int parameterValueArraySize = br.ReadInt32();
+                                                    float[] parameterValues = new float[parameterValueArraySize];
+                                                    for (int j = 0; j < parameterValueArraySize; j++)
+                                                        parameterValues[j] = br.ReadSingle();
+                                                    int arraysize = br.ReadInt32();
+                                                    int sound_type = br.ReadInt32();
+                                                    int play_group = br.ReadInt32();
+                                                    uint dialogue_mid = br.ReadUInt32();
+                                                    ulong play_flags = br.ReadUInt64();
+                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                        game.ClientCallback_PlayImmediateSound(ghsound, eventPath, bankid, eventVolume, soundVolume, parameterNames, parameterValues,
+                                                        arraysize, sound_type, play_group, dialogue_mid, play_flags);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayMusic:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    game.ClientCallback_PlayMusic(ghsound, eventPath, bankid, eventVolume, soundVolume);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayLevelAmbient:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    game.ClientCallback_PlayLevelAmbient(ghsound, eventPath, bankid, eventVolume, soundVolume);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayEnvironmentAmbient:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    game.ClientCallback_PlayEnvironmentAmbient(ghsound, eventPath, bankid, eventVolume, soundVolume);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayOccupationAmbient:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    game.ClientCallback_PlayOccupationAmbient(ghsound, eventPath, bankid, eventVolume, soundVolume);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.PlayEffectAmbient:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    game.ClientCallback_PlayEffectAmbient(ghsound, eventPath, bankid, eventVolume, soundVolume);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.SetEffectAmbientVolume:
+                                                {
+                                                    double soundVolume = br.ReadDouble();
+                                                    game.ClientCallback_SetEffectAmbientVolume(soundVolume);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.AddAmbientSound:
+                                                {
+                                                    int ghsound = br.ReadInt32();
+                                                    string eventPath = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int bankid = br.ReadInt32();
+                                                    double eventVolume = br.ReadDouble();
+                                                    double soundVolume = br.ReadDouble();
+                                                    ulong origSoundSourceId = br.ReadUInt64();
+                                                    int origRes = br.ReadInt32();
+                                                    ulong soundSourceId;
+                                                    int res = game.ClientCallback_AddAmbientSound(ghsound, eventPath, bankid, eventVolume, soundVolume, out soundSourceId);
+                                                    _soundSourceIdDictionary.Add(origSoundSourceId, soundSourceId);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.DeleteAmbientSound:
+                                                {
+                                                    ulong origSoundSourceId = br.ReadUInt64();
+                                                    int res = br.ReadInt32();
+                                                    if (_soundSourceIdDictionary.TryGetValue(origSoundSourceId, out ulong soundSourceId))
+                                                    {
+                                                        res = game.ClientCallback_DeleteAmbientSound(soundSourceId);
+                                                        _soundSourceIdDictionary.Remove(origSoundSourceId);
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.SetAmbientSoundVolume:
+                                                {
+                                                    ulong origSoundSourceId = br.ReadUInt64();
+                                                    double soundVolume = br.ReadDouble();
+                                                    int res = br.ReadInt32();
+                                                    if (_soundSourceIdDictionary.TryGetValue(origSoundSourceId, out ulong soundSourceId))
+                                                    {
+                                                        res = game.ClientCallback_SetAmbientSoundVolume(soundSourceId, soundVolume);
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.StopAllSounds:
+                                                {
+                                                    uint stop_flags = br.ReadUInt32();
+                                                    uint dialogue_mid = br.ReadUInt32();
+                                                    int res = br.ReadInt32();
+                                                    res = game.ClientCallback_StopAllSounds(stop_flags, dialogue_mid);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.IssueGuiCommand:
+                                                {
+                                                    int cmd_id = br.ReadInt32();
+                                                    switch (cmd_id)
+                                                    {
+                                                        case (int)gui_command_types.GUI_CMD_LOAD_GLYPHS:
+                                                            int gl2ti_sz = br.ReadInt32();
+                                                            int[] gl2ti = new int[gl2ti_sz];
+                                                            for (int j = 0; j < gl2ti_sz; j++)
+                                                                gl2ti[j] = br.ReadInt32();
+
+                                                            int gltifl_sz = br.ReadInt32();
+                                                            byte[] gltifl = new byte[gltifl_sz];
+                                                            for (int j = 0; j < gltifl_sz; j++)
+                                                                gltifl[j] = br.ReadByte();
+
+                                                            lock (Glyph2TileLock)
+                                                            {
+                                                                Glyph2Tile = gl2ti;
+                                                                GlyphTileFlags = gltifl;
+                                                            }
+                                                            break;
+                                                        default:
+                                                            int cmd_param = br.ReadInt32();
+                                                            int cmd_param2 = br.ReadInt32();
+                                                            string cmd_str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                            game.ClientCallback_IssueGuiCommand(cmd_id, cmd_param, cmd_param2, cmd_str);
+                                                            break;
+                                                    }
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.OutRip:
+                                                {
+                                                    int winid = br.ReadInt32();
+                                                    string player_name = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int points = br.ReadInt32();
+                                                    string killer = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string timestr = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    game.ClientCallback_OutRip(winid, player_name, points, killer, timestr);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.UIHasInput:
+                                                {
+                                                    int queueCount = br.ReadInt32();
+                                                    //int res = game.ClientCallback_UIHasInput();
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.OpenSpecialView:
+                                                {
+                                                    int viewtype = br.ReadInt32();
+                                                    string text = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    string title = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    int attr = br.ReadInt32();
+                                                    int color = br.ReadInt32();
+                                                    game.ClientCallback_OpenSpecialView(viewtype, text, title, attr, color);
+                                                }
+                                                break;
+                                            case (int)RecordedFunctionID.ExitHack:
+                                                {
+                                                    int status = br.ReadInt32();
+                                                    game.ClientCallback_ExitHack(status);
+                                                    exitHackCalled = true;
+                                                }
+                                                break;
+                                            default:
+                                                breakwhile = true; /* error; quitting */
+                                                break;
+                                        }
+                                    } while (!breakwhile);
+                                }
+                                else
+                                {
+                                    if (!exitHackCalled)
+                                        game.ClientCallback_ExitHack(2);
+                                    MaybeWriteGHLog("Replay " + usedReplayFileName + " has invalid version: " + verno + ", compatibility: " + vercompat + " vs the app's " + GHVersionNumber + ", compatibility: " + GHVersionCompatibility);
+                                    if (isZip && File.Exists(origRawFileName) && File.Exists(usedReplayFileName) && origRawFileName != usedReplayFileName)
+                                    {
+                                        File.Delete(usedReplayFileName);
+                                    }
+                                    return PlayReplayResult.InvalidVersion;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (!exitHackCalled)
+                        game.ClientCallback_ExitHack(0);
+                    MaybeWriteGHLog(prevcmd_byte + ": " + ex.Message);
+                    if (isZip && File.Exists(origRawFileName) && File.Exists(usedReplayFileName) && origRawFileName != usedReplayFileName)
+                    {
+                        File.Delete(usedReplayFileName);
+                    }
+                    return PlayReplayResult.Error;
+                }
+                _soundSourceIdDictionary.Clear();
+                if (isZip && File.Exists(origRawFileName) && File.Exists(usedReplayFileName) && origRawFileName != usedReplayFileName)
+                {
+                    File.Delete(usedReplayFileName);
+                }
+            }
+            while (contnextfile || restartReplay);
+
+            if (!exitHackCalled)
+                game.ClientCallback_ExitHack(0);
+            return PlayReplayResult.Success;
         }
     }
 

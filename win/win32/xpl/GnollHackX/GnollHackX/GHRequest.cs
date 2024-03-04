@@ -11,9 +11,12 @@ namespace GnollHackX
         Location,
         PosKey,
         GetLine,
+        HideGetLine,
+        EnterGetLineText,
         PrintTopLine,
         PrintHistory,
         AskName,
+        HideAskNamePage,
         ReturnToMainMenu,
         ShowMenuPage,
         HideMenuPage,
@@ -25,6 +28,7 @@ namespace GnollHackX
         ClearWindowView,
         DestroyWindowView,
         DisplayWindowView,
+        HideTextWindow,
         HideLoadingScreen,
         ClearContextMenu,
         AddContextMenu,
@@ -36,6 +40,7 @@ namespace GnollHackX
         ShowSkillButton,
         HideSkillButton,
         ShowOutRipPage,
+        HideOutRipPage,
         FadeToBlack,
         FadeFromBlack,
         ShowGUITips,
@@ -55,9 +60,16 @@ namespace GnollHackX
         YnConfirmation,
         PostGameStatus,
         PostDiagnosticData,
+        PostXlogEntry,
+        PostBonesFile,
         RestartGame,
         DebugLog,
         CloseAllDialogs,
+        UseLongerMessageHistory,
+        SaveInsuranceCheckPoint,
+        EndReplayFile,
+        InformRecordingWentOff,
+        RestartReplay,
     }
 
     public struct AddContextMenuData
@@ -132,18 +144,20 @@ namespace GnollHackX
         public GHOutRipInfo RequestOutRipInfo { get; set; }
         public string RequestString { get; set; }
         public string RequestString2 { get; set; }
+        public string RequestString3 { get; set; }
         public string PlaceHolderString { get; set; }
         public string DefValueString { get; set; }
         public string IntroLineString { get; set; }
         public string TitleString { get; set; }
         public uint RequestStringAttributes { get; set; }
+        public bool RequestBool { get; set; }
         public int RequestInt { get; set; }
         public int RequestInt2 { get; set; }
         public int RequestAttr { get; set; }
         public int RequestNhColor { get; set; }
         public int RequestGlyph { get; set; }
         public ulong RequestFlags { get; set; }
-        public List<GHMsgHistoryItem> MessageHistory { get; set; }
+        public GHMsgHistoryItem[] MessageHistory { get; set; } = null;
         public string Responses { get; set; }
         public string ResponseDescriptions { get; set; }
         public List<GHPutStrItem> RequestPutStrItems { get; set; }
@@ -170,6 +184,12 @@ namespace GnollHackX
             RequestingGame = ghGame;
             RequestType = requesttype;
             RequestInt = requestint;
+        }
+        public GHRequest(GHGame ghGame, GHRequestType requesttype, bool requestbool)
+        {
+            RequestingGame = ghGame;
+            RequestType = requesttype;
+            RequestBool = requestbool;
         }
         public GHRequest(GHGame ghGame, GHRequestType requesttype, int requestint, int requestint2)
         {
@@ -239,6 +259,14 @@ namespace GnollHackX
             RequestString = requeststring;
             RequestString2 = requeststring2;
         }
+        public GHRequest(GHGame ghGame, GHRequestType requesttype, string requeststring, string requeststring2, string requeststring3)
+        {
+            RequestingGame = ghGame;
+            RequestType = requesttype;
+            RequestString = requeststring;
+            RequestString2 = requeststring2;
+            RequestString3 = requeststring3;
+        }
         public GHRequest(GHGame ghGame, GHRequestType requesttype, string titlestring, string requeststring, string acceptstring, string cancelstring)
         {
             RequestingGame = ghGame;
@@ -285,7 +313,7 @@ namespace GnollHackX
             RequestString = requeststring;
             RequestStringAttributes = attributes;
         }
-        public GHRequest(GHGame ghGame, GHRequestType requesttype, List<GHMsgHistoryItem> msgHistory)
+        public GHRequest(GHGame ghGame, GHRequestType requesttype, GHMsgHistoryItem[] msgHistory)
         {
             RequestingGame = ghGame;
             RequestType = requesttype;

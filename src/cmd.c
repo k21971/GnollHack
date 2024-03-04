@@ -236,7 +236,8 @@ STATIC_DCL void FDECL(show_direction_keys, (winid, CHAR_P, BOOLEAN_P));
 STATIC_DCL boolean FDECL(help_dir, (CHAR_P, int, const char *));
 STATIC_DCL void FDECL(add_command_menu_items, (winid, int));
 STATIC_DCL void NDECL(check_gui_special_effect);
-STATIC_DCL int FDECL(print_monster_abilities, (winid));
+STATIC_DCL int FDECL(print_monster_abilities, (winid, int));
+STATIC_DCL int FDECL(print_steed_abilities, (winid, int));
 STATIC_DCL void FDECL(print_weapon_skill_line_core, (enum p_skills, BOOLEAN_P, int));
 STATIC_DCL void FDECL(print_weapon_skill_line, (struct obj*, BOOLEAN_P, int));
 
@@ -276,7 +277,7 @@ timed_occupation(VOID_ARGS)
  *                      Setting traps.
  */
 void
-reset_occupations()
+reset_occupations(VOID_ARGS)
 {
     reset_remarm();
     reset_pick();
@@ -782,7 +783,7 @@ doability(VOID_ARGS)
         anything any;
         int abilitynum = 0;
         int glyph = 0;
-        glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
+        glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Ufemale, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
         int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
         any = zeroany;
@@ -858,7 +859,7 @@ doability(VOID_ARGS)
             any = zeroany;
             any.a_int = abilitynum + 1;
 
-            int monabilitynum = print_monster_abilities(WIN_ERR);
+            int monabilitynum = print_monster_abilities(WIN_ERR, 0); /* Count monster abilities */
             add_extended_menu(win, MONSTER_COMMAND_TILE + GLYPH_COMMAND_TILE_OFF, &any,
                 0, 0, ATR_NONE, NO_COLOR,
                 available_ability_list[abilitynum].name, MENU_UNSELECTED, monabilitynum > 0 ? active_menu_info() : zeroextendedmenuinfo);
@@ -1118,7 +1119,7 @@ domonsterability(VOID_ARGS)
     struct extended_create_window_info createinfo = extended_create_window_info_from_mon(&youmonst);
     win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_MONSTER_COMMAND_MENU, gui_glyph, createinfo);
     start_menu_ex(win, GHMENU_STYLE_MONSTER_ABILITY);
-    int abilitynum = print_monster_abilities(win);
+    int abilitynum = print_monster_abilities(win, 0);
     end_menu(win, "Monster Abilities");
 
     if (abilitynum <= 0)
@@ -1151,11 +1152,11 @@ domonsterability(VOID_ARGS)
 
 STATIC_OVL
 int
-print_monster_abilities(win)
+print_monster_abilities(win, abilitynum)
 winid win;
+int abilitynum;
 {
     anything any;
-    int abilitynum = 0;
     int glyph = 0, gui_glyph = 0;
     const char* fmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
         "%s (&mana; %d)" : "%s (%d mana)";
@@ -1468,44 +1469,62 @@ winid win;
             0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
             "Your Steed's Abilities", MENU_UNSELECTED, menu_heading_info());
 
-        if (can_breathe(u.usteed->data))
-        {
-            if (win != WIN_ERR)
-            {
-                struct extended_menu_info steedmenuinfo = zeroextendedmenuinfo;
-                int mcolor = NO_COLOR;
-                steedmenuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
-                any = zeroany;
-                if (u.usteed->mspec_used > 0)
-                {
-                    Strcpy(available_ability_list[abilitynum].name, "(Breath weapon cooling down)");
-                    mcolor = CLR_GRAY;
-                }
-                else
-                {
-                    const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
-                        "%s (&cool; %s)" : "%s (%s round cooldown)";
-                    Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command steed to use breath weapon", "1d10+4");
-                    any.a_int = abilitynum + 1;
-                    mcolor = NO_COLOR;
-                }
-
-                available_ability_list[abilitynum].function_ptr = &dosteedbreathe;
-                available_ability_list[abilitynum].target_mtmp = 0;
-
-                any = zeroany;
-
-                add_extended_menu(win, NO_GLYPH, &any,
-                    0, 0, ATR_NONE, mcolor,
-                    available_ability_list[abilitynum].name, MENU_UNSELECTED, steedmenuinfo);
-            }
-            abilitynum++;
-        }
+        abilitynum = print_steed_abilities(win, abilitynum);
     }
 
     return abilitynum;
 }
 
+STATIC_OVL
+int
+print_steed_abilities(win, abilitynum)
+winid win;
+int abilitynum;
+{
+    if (!u.usteed)
+        return 0;
+
+    anything any;
+    if (can_breathe(u.usteed->data))
+    {
+        if (win != WIN_ERR)
+        {
+            struct extended_menu_info steedmenuinfo = zeroextendedmenuinfo;
+            int mcolor = NO_COLOR;
+            steedmenuinfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+            any = zeroany;
+            if (u.usteed->mspec_used > 0)
+            {
+                Sprintf(available_ability_list[abilitynum].name, "Breath weapon cooling down (%u round%s left)", u.usteed->mspec_used, plur(u.usteed->mspec_used));
+                mcolor = CLR_GRAY;
+            }
+            else
+            {
+                char cooldownbuf[BUFSZ];
+                struct attack* mattk = attacktype_fordmg(u.usteed->data, AT_BREA, AD_ANY);
+                int typ = get_ray_adtyp(mattk->adtyp);
+                if (typ == AD_SLEE)
+                    Sprintf(cooldownbuf, "%dd%d+%d", MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT);
+                else
+                    Sprintf(cooldownbuf, "%dd%d+%d", MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT);
+                const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
+                    "%s (&cool; %s after use)" : "%s (%s round cooldown after use)";
+                Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command the steed to use breath weapon", cooldownbuf);
+                any.a_int = abilitynum + 1;
+                mcolor = NO_COLOR;
+            }
+
+            available_ability_list[abilitynum].function_ptr = &dosteedbreathe;
+            available_ability_list[abilitynum].target_mtmp = 0;
+
+            add_extended_menu(win, NO_GLYPH, &any,
+                0, 0, ATR_NONE, mcolor,
+                available_ability_list[abilitynum].name, MENU_UNSELECTED, steedmenuinfo);
+        }
+        abilitynum++;
+    }
+    return abilitynum;
+}
 
 #undef MAXNAMELENGTH
 #undef MAXABILITYNUM
@@ -1639,6 +1658,7 @@ wiz_identify(VOID_ARGS)
             iflags.override_ID = C('I');
         (void) display_inventory((char *) 0, FALSE, 0);
         iflags.override_ID = 0;
+        update_inventory();
     } else
         pline(unavailcmd, visctrl((int) cmd_from_func(wiz_identify)));
     return 0;
@@ -1691,7 +1711,7 @@ wiz_makemap(VOID_ARGS)
         dmonsfree(); /* purge dead monsters from 'fmon' */
         /* keep steed and other adjacent pets after releasing them
            from traps, stopping eating, &c as if hero were ascending */
-        keepdogs(TRUE); /* (pets-only; normally we'd be using 'FALSE' here) */
+        keepdogs(TRUE, TRUE); /* (pets-only; normally we'd be using 'FALSE' here) */
 
         /* discard current level; "saving" is used to release dynamic data */
         savelev(-1, ledger_no(&u.uz), FREE_SAVE);
@@ -2329,7 +2349,7 @@ wiz_save_monsters(VOID_ARGS) /* Save a csv file for monsters */
                 mons[i].difficulty, mons[i].mcolor);
             (void)write(fd, buf, strlen(buf));
             Sprintf(buf, ",%d,%d,%d,%d,%0.1f\n",
-                strength_tohit_bonus(mons[i].str), strength_damage_bonus(mons[i].str), dexterity_tohit_bonus(mons[i].dex), dexterity_ac_bonus(mons[i].dex),constitution_hp_bonus(mons[i].con));
+                (int)strength_tohit_bonus_core(mons[i].str, TRUE), (int)strength_damage_bonus_core(mons[i].str, TRUE), dexterity_tohit_bonus(mons[i].dex), dexterity_ac_bonus(mons[i].dex),constitution_hp_bonus(mons[i].con));
             (void)write(fd, buf, strlen(buf));
 
         }
@@ -3249,7 +3269,7 @@ int mode;  /* BASICENLIGHTENMENT | MAGICENLIGHTENMENT (| both) */
 int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
 {
     char buf[BUFSZ], tmpbuf[BUFSZ];
-    int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
+    int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Ufemale, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_ENLIGHTENMENT_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
@@ -3266,7 +3286,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
 #endif
     {
         Sprintf(buf, "%s the %s's attributes:", tmpbuf,
-            ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
+            (Ufemale && urole.name.f)
             ? urole.name.f
             : urole.name.m);
 
@@ -3302,7 +3322,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
         menu_item *selected = 0;
 #ifdef GNH_MOBILE
         Sprintf(buf, "%s the %s", tmpbuf,
-            ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
+            (Ufemale && urole.name.f)
             ? urole.name.f
             : urole.name.m);
 
@@ -3336,7 +3356,7 @@ int final;
 
     /* note that if poly'd, we need to use u.mfemale instead of flags.female
        to access hero's saved gender-as-human/elf/&c rather than current one */
-    innategend = (Upolyd ? u.mfemale : flags.female) ? 1 : 0;
+    innategend = Ufemale ? 1 : 0;
     role_titl = (innategend && urole.name.f) ? urole.name.f : urole.name.m;
     rank_titl = rank_of(u.ulevel, Role_switch, innategend);
 #ifndef GNH_MOBILE
@@ -3729,9 +3749,9 @@ int mode, final, attrindx;
     if (attrindx == A_STR)
     {
         int currstr = ACURR(A_STR);
-        int tohitbonus_constant = (currstr < STR18(100) ? strength_tohit_bonus(min(18, currstr)) : strength_tohit_bonus(currstr));
+        int tohitbonus_constant = (currstr < STR18(100) ? (int)strength_tohit_bonus_core(min(18, currstr), TRUE) : (int)strength_tohit_bonus_core(currstr, TRUE));
         int tohitbonus_random = ((currstr > 18 && currstr < STR18(100)) ? 1 : 0);
-        int dmgbonus_constant = (currstr < STR18(100) ? strength_damage_bonus(min(18, currstr)) : strength_damage_bonus(currstr));
+        int dmgbonus_constant = (currstr < STR18(100) ? (int)strength_damage_bonus_core(min(18, currstr), TRUE) : (int)strength_damage_bonus_core(currstr, TRUE));
         int dmgbonus_random = ((currstr > 18 && currstr < STR18(100)) ? 2 : 0);
         //int random_chance = ((currstr > 18 && currstr < STR18(100)) ? currstr - 18 : 0);
         char tohitbuf[BUFSIZ];
@@ -3898,11 +3918,11 @@ int final;
                   /* better phrasing desperately wanted... */
                   : Blind_because_of_blindfold_only ? "deliberately"
                     : "temporarily");
-        if (wizard && (Blinded & TIMEOUT) != 0L
-            && !u.uroleplay.blind && haseyes(youmonst.data))
-            Sprintf(eos(buf), " (%ld)", (Blinded & TIMEOUT));
+        //if (wizard && (Blinded & TIMEOUT) != 0L
+        //    && !u.uroleplay.blind && haseyes(youmonst.data))
+        //    Sprintf(eos(buf), " (%ld)", (Blinded & TIMEOUT));
         /* !haseyes: avoid "you are innately blind innately" */
-        you_are(buf, !haseyes(youmonst.data) ? "" : from_what(BLINDED));
+        you_are(buf, !haseyes(youmonst.data) || !(magic || is_innate(BLINDED) || cause_known(BLINDED)) ? "" : from_what(BLINDED));
     }
     if (Deaf)
         you_are("deaf", !(magic || is_innate(DEAF) || cause_known(DEAF)) ? "" : from_what(DEAF));
@@ -4446,8 +4466,9 @@ int final;
     if (Bisection_resistance)
         you_cannot("be bisected", from_what(BISECTION_RESISTANCE));
     if (Halluc_resistance)
-        enl_msg(You_, "resist", "resisted", " hallucinations",
-                from_what(HALLUC_RES));
+        enl_msg(You_, "resist", "resisted", " hallucinations", from_what(HALLUC_RES));
+    if (Wounding_resistance)
+        enl_msg(You_, "resist", "resisted", " wounding", from_what(WOUNDING_RESISTANCE));
     if (u.uedibility || maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)))
         you_can("recognize detrimental food", "");
 
@@ -4733,27 +4754,36 @@ int final;
         else
             enl_msg("You cause", "", "d", " 150% damage", from_what(HEROISM));
     }
-    if (Melee_life_leech)
-        enl_msg("You leech", "", "d", " life in melee", from_what(MELEE_LIFE_LEECH));
-
 
     int role_ac_bonus = get_role_AC_bonus();
     int role_mc_bonus = get_role_MC_bonus();
+    char protbuf[BUFSZ];
     if (role_ac_bonus != 0 || role_mc_bonus != 0)
     {
-        char protbuf[BUFSZ];
         Sprintf(protbuf, "innate protection (-%d to AC and +%d to MC)", role_ac_bonus, role_mc_bonus);
         you_have(protbuf, "");
     }
 
     if (Magical_protection)
-        you_have("magical protection (-3 to AC and +1 to MC)", from_what(MAGICAL_PROTECTION));
+    {
+        Sprintf(protbuf, "magical protection (%d to AC and +%d to MC)", -MAGICAL_PROTECTION_AC_BONUS, MAGICAL_PROTECTION_MC_BONUS);
+        you_have(protbuf, from_what(MAGICAL_PROTECTION));
+    }
     if (Magical_shielding)
-        you_have("magical shielding (-6 to AC and +2 to MC)", from_what(MAGICAL_SHIELDING));
+    {
+        Sprintf(protbuf, "magical shielding (%d to AC and +%d to MC)", -MAGICAL_SHIELDING_AC_BONUS, MAGICAL_SHIELDING_MC_BONUS);
+        you_have(protbuf, from_what(MAGICAL_SHIELDING));
+    }
     if (Magical_barkskin)
-        you_have("magical barkskin (-12 to AC and +4 to MC)", from_what(MAGICAL_BARKSKIN));
+    {
+        Sprintf(protbuf, "magical barkskin (%d to AC and +%d to MC)", -MAGICAL_BARKSKIN_AC_BONUS, MAGICAL_BARKSKIN_MC_BONUS);
+        you_have(protbuf, from_what(MAGICAL_BARKSKIN));
+    }
     if (Magical_stoneskin)
-        you_have("magical stoneskin (-18 to AC and +6 to MC)", from_what(MAGICAL_STONESKIN));
+    {
+        Sprintf(protbuf, "magical stoneskin (%d to AC and +%d to MC)", -MAGICAL_STONESKIN_AC_BONUS, MAGICAL_STONESKIN_MC_BONUS);
+        you_have(protbuf, from_what(MAGICAL_STONESKIN));
+    }
     if (Titan_strength)
         you_are("magically as strong as a titan", from_what(TITAN_STRENGTH));
     if (Divine_dexterity)
@@ -5188,7 +5218,7 @@ docommandmenu(VOID_ARGS)
     int n = 0;
 
     menuwin = create_nhwindow(NHW_MENU);
-    start_menu_ex(menuwin, GHMENU_STYLE_ITEM_COMMAND);
+    start_menu_ex(menuwin, GHMENU_STYLE_GENERAL_COMMAND);
 
     add_command_menu_items(menuwin, INCMDMENU);
 
@@ -5218,7 +5248,7 @@ dospellmainmenu(VOID_ARGS)
     int n = 0;
 
     menuwin = create_nhwindow(NHW_MENU);
-    start_menu_ex(menuwin, GHMENU_STYLE_ITEM_COMMAND);
+    start_menu_ex(menuwin, GHMENU_STYLE_GENERAL_COMMAND);
 
     add_command_menu_items(menuwin, INSPELLMENU);
 
@@ -5422,6 +5452,7 @@ show_conduct(final)
 int final;
 {
     char buf[BUFSZ];
+    char goalbuf[BUFSZ];
     int ngenocided;
     int dumpwin;
 
@@ -5436,22 +5467,21 @@ int final;
 #else
     dumpwin = en_win;
 #endif
-
-    if (!u.uachieve.ascended || !u.uachieve.amulet || !u.uachieve.role_achievement)
+    boolean added_goals = FALSE;
+    if (!u.uachieve.ascended || !u.uachieve.amulet)
     {
+        added_goals = TRUE;
         putstr(en_win, ATR_TITLE, "Goals:");
         if (!final)
             putstr(en_win, ATR_HALF_SIZE, " ");
 
         if (!u.uachieve.amulet)
         {
-            char goalbuf[BUFSZ];
             Sprintf(goalbuf, "on a mission to recover the Amulet of Yendor for %s", u_gname());
             you_are(goalbuf, "");
         }
         else if (!u.uachieve.ascended)
         {
-            char goalbuf[BUFSZ];
             Sprintf(goalbuf, "on a mission to sacrifice the Amulet of Yendor on the high altar to %s on the Astral Plane", u_gname());
             you_are(goalbuf, "");
             if (!u.uachieve.entered_elemental_planes && !u.uachieve.entered_astral_plane)
@@ -5460,16 +5490,140 @@ int final;
                 you_are(goalbuf, "");
             }
         }
+    }
+
+    boolean looking_for_menorah = !u.uachieve.menorah && (context.quest_flags & QUEST_FLAGS_HEARD_OF_MENORAH);
+    boolean looking_for_bell = !u.uachieve.bell && (context.quest_flags & QUEST_FLAGS_HEARD_OF_BELL);
+    boolean looking_for_book = !u.uachieve.book && (context.quest_flags & QUEST_FLAGS_HEARD_OF_BOOK);
+    boolean seeking_to_enter_sanctum = !u.uevent.invoked && ((context.quest_flags & QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM) || u.uevent.heard_of_invocation_ritual || u.uevent.invocation_ritual_known);
+    boolean seeking_to_enter_gehennom = !u.uevent.invoked && !u.uevent.gehennom_entered && (context.quest_flags & QUEST_FLAGS_HEARD_OF_AMULET_IN_GEHENNOM);
+    boolean on_nh_quest = ((quest_status.got_quest || quest_status.met_leader || u.uevent.qcalled) && !(u.uevent.qcompleted || u.uevent.qexpelled || quest_status.leader_is_dead));
+    boolean added_quests = FALSE;
+
+    if (!final /* Do not print intermediate quests / related game hints / spoilers in dumplog */
+        && (!u.uachieve.role_achievement || looking_for_menorah || looking_for_bell || looking_for_book || seeking_to_enter_sanctum || seeking_to_enter_gehennom || on_nh_quest))
+    {
+        added_quests = TRUE;
+        if(added_goals)
+            putstr(dumpwin, ATR_NONE, "");
+        putstr(en_win, ATR_TITLE, "Quests:");
+        if (!final)
+            putstr(en_win, ATR_HALF_SIZE, " ");
+
+        if (!(u.uevent.qcompleted || u.uevent.qexpelled || quest_status.leader_is_dead))
+        {
+            if (quest_status.got_quest)
+            {
+                if (quest_status.killed_nemesis && quest_status.touched_artifact)
+                {
+                    Sprintf(goalbuf, "defeated %s and %s to return %s to %s", neminame(), final ? "needed" : "need", the(artiname(urole.questarti)), ldrname());
+                    you_have(goalbuf, "");
+                }
+                else if (quest_status.killed_nemesis)
+                {
+                    Sprintf(goalbuf, "defeated %s and %s to recover %s", neminame(), final ? "needed" : "need", the(artiname(urole.questarti)));
+                    you_have(goalbuf, "");
+                }
+                else if (quest_status.touched_artifact)
+                {
+                    Sprintf(goalbuf, "on a quest to defeat %s but already %s recovered %s", neminame(), final ? "had" : "have", the(artiname(urole.questarti)));
+                    you_are(goalbuf, "");
+                }
+                else
+                {
+                    Sprintf(goalbuf, "on a quest to defeat %s and recover %s", neminame(), the(artiname(urole.questarti)));
+                    you_are(goalbuf, "");
+                }
+            }
+            else if (quest_status.met_leader)
+            {
+                if (is_pure(FALSE) <= 0)
+                {
+                    Strcpy(goalbuf, "seeking to convert yourself back to your original alignment to be admitted to your quest");
+                    you_are(goalbuf, "");
+                }
+                else if (not_capable())
+                {
+                    Sprintf(goalbuf, "seeking to achieve the rank of %s at level %d to access your quest", rank_of(MIN_QUEST_LEVEL, Role_switch, flags.female), MIN_QUEST_LEVEL);
+                    you_are(goalbuf, "");
+                }
+                else
+                {
+                    Sprintf(goalbuf, "achieved the rank of %s and %s to speak again with %s to start your quest", rank_of(MIN_QUEST_LEVEL, Role_switch, flags.female), final ? "needed" : "need", ldrname());
+                    you_have(goalbuf, "");
+                }
+            }
+            else if (u.uevent.qcalled)
+            {
+                Sprintf(goalbuf, "been summoned by %s to %s", ldrname(), urole.homebase);
+                you_have(goalbuf, "");
+            }
+        }
+
+        if (looking_for_menorah)
+        {
+            Strcpy(goalbuf, "searching for the Candelabrum of Invocation");
+            you_are(goalbuf, "");
+            if (context.quest_flags & QUEST_FLAGS_HEARD_OF_MENORAH_OWNER)
+                putstr(en_win, ATR_INDENT_AT_DASH, "  - Rumored to be held by Vlad the Impaler in his tower in Gehennom.");
+        }
+        if (looking_for_bell)
+        {
+            Strcpy(goalbuf, "searching for the Silver Bell");
+            you_are(goalbuf, "");
+            if (context.quest_flags & QUEST_FLAGS_HEARD_OF_BELL_OWNER)
+            {
+                char heldbybuf[BUFSZ];
+                Sprintf(heldbybuf, "  - Rumored to be held by %s near your home.", (context.quest_flags & QUEST_FLAGS_HEARD_OF_BELL_OWNER_IS_NEMESIS) ? neminame() : "a great enemy of yours");
+                putstr(en_win, ATR_INDENT_AT_DASH, heldbybuf);
+            }
+        }
+        if (looking_for_book)
+        {
+            Strcpy(goalbuf, "searching for the Book of the Dead");
+            you_are(goalbuf, "");
+            if (context.quest_flags & QUEST_FLAGS_HEARD_OF_BOOK_OWNER)
+                putstr(en_win, ATR_INDENT_AT_DASH, "  - Rumored to be held by the Wizard of Yendor in his tower in Gehennom.");
+        }
+        if (seeking_to_enter_sanctum)
+        {
+            Sprintf(goalbuf, "seeking to access Moloch's Sanctum%s", (context.quest_flags & QUEST_FLAGS_HEARD_OF_AMULET_IN_GEHENNOM) ? " in Gehennom" : "");
+            you_are(goalbuf, "");
+            if (context.quest_flags & QUEST_FLAGS_HEARD_OF_RITUAL)
+            {
+                if (!u.uevent.invocation_ritual_known && context.quest_flags & QUEST_FLAGS_HEARD_ORACLE_KNOWS_MORE_DETAILS)
+                {
+                    putstr(en_win, ATR_INDENT_AT_DASH, "  - Consult the Oracle of Delphi for details of the Ritual.");
+                }
+
+                char invocbuf[BUFSZ];
+                Sprintf(invocbuf, "  - Perform the Invocation Ritual%s.", (context.quest_flags & QUEST_FLAGS_HEARD_OF_VIBRATING_SQUARE) ? " at the Vibrating Square at the bottom of Gehennom" : "");
+                putstr(en_win, ATR_INDENT_AT_DASH, invocbuf);
+
+                if (u.uevent.invocation_ritual_known)
+                {
+                    putstr(en_win, ATR_INDENT_AT_DASH, "  - Use the Candelabrum of Invocation, Silver Bell, and Book of the Dead to enter the Sanctum.");
+                }
+
+            }
+        }
+        else if (seeking_to_enter_gehennom)
+        {
+            Strcpy(goalbuf, "seeking to enter Gehennom at the bottom of the Dungeons of Doom");
+            you_are(goalbuf, "");
+        }
+
         if (!u.uachieve.role_achievement)
         {
-            char goalbuf[BUFSZ];
             Sprintf(goalbuf, "an optional quest to %s", get_role_achievement_description(FALSE));
             you_have(goalbuf, "");
         }
     }
 
     int num_achievements = 0;
-    putstr(dumpwin, ATR_NONE, "");
+    if(added_goals || added_quests)
+        putstr(dumpwin, ATR_NONE, "");
+    
     putstr(en_win, ATR_TITLE, "Achievements:");
     if (!final)
         putstr(en_win, ATR_HALF_SIZE, " ");
@@ -5485,9 +5639,14 @@ int final;
     }
     if (u.uachieve.crowned && u.uevent.uhand_of_elbereth > 0)
     {
-        char achbuf[BUFSZ];
-        Sprintf(achbuf, "become %s", hofe_titles[u.uevent.uhand_of_elbereth - 1]);
-        you_have(achbuf, "");
+        Sprintf(goalbuf, "become %s", hofe_titles[u.uevent.uhand_of_elbereth - 1]);
+        you_have(goalbuf, "");
+        num_achievements++;
+    }
+    if (u.uevent.qcompleted)
+    {
+        Sprintf(goalbuf, "completed your quest by defeating %s and recovering %s", neminame(), the(artiname(urole.questarti)));
+        you_have(goalbuf, "");
         num_achievements++;
     }
     if (u.uachieve.role_achievement)
@@ -5508,6 +5667,11 @@ int final;
     if (u.uachieve.menorah)
     {
         you_have("found the Candelabrum of Invocation", "");
+        num_achievements++;
+    }
+    if (u.uevent.invoked)
+    {
+        you_have("performed the Invocation Ritual", "");
         num_achievements++;
     }
     if (u.uachieve.prime_codex)
@@ -5608,6 +5772,11 @@ int final;
     if (u.uachieve.killed_yacc)
     {
         you_have("defeated Yacc, the Demon Lord of Bovines", "");
+        num_achievements++;
+    }
+    if (u.uachieve.killed_demogorgon)
+    {
+        you_have("defeated Demogorgon, the Prince of Demons", "");
         num_achievements++;
     }
     if (!num_achievements)
@@ -5856,6 +6025,7 @@ struct ext_func_tab extcmdlist[] = {
             dopray, IFBURIED | AUTOCOMPLETE | INCMDMENU },
     { C('p'), "prevmsg", "view recent game messages",
             doprev_message, IFBURIED | GENERALCMD },
+    { M(16), "prevwep", "wield a previously wielded weapon", dowieldprevwep }, /* For wielding back weapons that were wielded before wielding a pick-axe or a saw */
     { 'P', "puton", "put on an accessory (ring, amulet, etc)", doputon, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_accessories, "put on", "put on" },
     { 'q', "quaff", "quaff (drink) something", dodrink, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_beverages, "drink", "drink" },
     { M('q'), "quit", "exit without saving current game",
@@ -5955,14 +6125,14 @@ struct ext_func_tab extcmdlist[] = {
     { 'w', "wield", "wield (put in use) a weapon", dowield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_wield_objs, "wield" },
     { M('w'), "wipe", "wipe off your face", dowipe, AUTOCOMPLETE | INCMDMENU },
     { 'x', "swap", "swap wielded and secondary weapons", doswapweapon_right_or_both, INCMDMENU },
-    { M('x'), "examine", "describe an item", doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO | ALLOW_RETURN_TO_INVENTORY | ALLOW_RETURN_TO_CMD_MENU, 0, getobj_allobj, "examine" },
+    { M('x'), "examine", "describe an item", doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO | ALLOW_RETURN_TO_INVENTORY | ALLOW_RETURN_TO_CMD_MENU | CMD_MENU_AUTO_CLICK_OK, 0, getobj_allobj, "examine" },
     { M(5), "unwield", "unwield a weapon", dounwield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_unwield_objs, "unwield"},
     { '}', "you", "describe your character", docharacterstatistics, IFBURIED | AUTOCOMPLETE },
     { C('y'), "yell", "yell for your companions",
             doyell, IFBURIED | AUTOCOMPLETE | INCMDMENU },
     { 'z', "zap", "zap a wand", dozap, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_zap_syms, "zap" },
-    { M(8), "favorite", "mark an item as favorite", dofavorite, SINGLE_OBJ_CMD_SPECIFIC | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "mark as favorite", "mark as favorite"  },
-    { M(9), "unfavorite", "unmark an item as favorite", dounfavorite, SINGLE_OBJ_CMD_SPECIFIC | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "unmark as favorite", "unmark as favorite" },
+    { M(8), "favorite", "mark an item as favorite", dofavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "mark as favorite", "mark as favorite"  },
+    { M(9), "unfavorite", "unmark an item as favorite", dounfavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "unmark as favorite", "unmark as favorite" },
     { 'Z', "cast", "cast a spell", docast, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
     { 'X', "mix", "prepare a spell from material components",
             domix, AUTOCOMPLETE | INSPELLMENU },
@@ -9649,6 +9819,19 @@ enum create_context_menu_types menu_type;
         {
             add_context_menu(':', cmd_from_func(dolook), CONTEXT_MENU_STYLE_GENERAL, NO_GLYPH, "Look Here", "", 0, NO_COLOR);
         }
+
+        //if (uwep && !cantwield(youmonst.data) && (is_pick(uwep) || is_saw(uwep) || is_lamp(uwep))) // Axes are too often main weapons
+        //{
+        //    struct obj* prevwep;
+        //    for (prevwep = invent; prevwep; prevwep = prevwep->nobj)
+        //    {
+        //        if (prevwep->speflags & SPEFLAGS_PREVIOUSLY_WIELDED)
+        //        {
+        //            add_context_menu(M(16), cmd_from_func(dowieldprevwep), CONTEXT_MENU_STYLE_GENERAL, prevwep->gui_glyph, "Wield Last", "", 0, NO_COLOR);
+        //            break;
+        //        }
+        //    }
+        //}
 
         if (context.last_picked_obj_oid > 0 && context.last_picked_obj_show_duration_left > 0)
         {

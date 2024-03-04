@@ -260,6 +260,7 @@ static struct Bool_Opt {
     { "showrealtime", "show elapsed wall-clock time in status line", &flags.showrealtime, TRUE, SET_IN_GAME },
     { "showscore", "show current score in status line", &flags.showscore, TRUE, SET_IN_GAME },
     { "show_buff_timer", "show buff timer on tiles", &flags.show_buff_timer, FALSE, SET_IN_GAME},
+    { "show_comparison_stats", "show comparison statistics for items when picking them up", &iflags.show_comparison_stats, TRUE, SET_IN_GAME },
     { "show_decorations", "show decorations via colors in ASCII mode", &flags.show_decorations, TRUE, SET_IN_GAME },
     { "show_grid", "show grid between tiles", &flags.show_grid, FALSE, SET_IN_GAME},
     { "show_tile_mon_hp_bar", "show monster hit points on tiles", &flags.show_tile_mon_hp_bar, FALSE, SET_IN_GAME},
@@ -465,6 +466,8 @@ static struct Comp_Opt {
       DISP_IN_GAME },
     { "runmode", "display frequency when `running' or `travelling'",
       sizeof "teleport", SET_IN_GAME },
+    { "run_spot_distance", "longest distance for spotting a monster to stop running or travelling", 3,
+      SET_IN_GAME },
     { "scores", "the parts of the score list you wish to see", 32,
       SET_IN_GAME },
     { "scroll_amount", "amount to scroll map when scroll_margin is reached",
@@ -847,7 +850,7 @@ init_options()
     flags.end_own = FALSE;
     flags.end_top = 3;
     flags.end_around = 2;
-    flags.paranoia_bits = PARANOID_PRAY | PARANOID_AUTOALL; /* old prayconfirm=TRUE */
+    flags.paranoia_bits = PARANOID_PRAY | PARANOID_AUTOALL | PARANOID_MONK_WEAPON; /* old prayconfirm=TRUE */
     flags.runmode = RUN_LEAP;
     iflags.msg_history = 20;
     /* msg_window has conflicting defaults for multi-interface binary */
@@ -956,6 +959,7 @@ init_options()
     flags.auto_bag_in_style = 0;
     flags.force_hint = (CasualMode || ModernMode);
     flags.max_hint_difficulty = DEFAULT_MAX_HINT_DIFFICULTY;
+    iflags.run_spot_distance = DEFAULT_RUN_SPOT_DISTANCE;
 
     /* since this is done before init_objects(), do partial init here */
     objects[SLIME_MOLD].oc_name_idx = SLIME_MOLD;
@@ -1510,6 +1514,8 @@ STATIC_VAR const struct paranoia_opts {
       "y to select all items" },
     { PARANOID_TIP, "tip", 2, (const char*)0, 0,
       "yes vs y to tip a container" },
+    { PARANOID_MONK_WEAPON, "monk-weapon", 1, (const char*)0, 0,
+      "y to attack with a weapon as a monk" },
       /* for config file parsing; interactive menu skips these */
     { 0, "none", 4, 0, 0, 0 }, /* require full word match */
     { ~0, "all", 3, 0, 0, 0 }, /* ditto */
@@ -4878,6 +4884,43 @@ boolean tinitial, tfrom_file;
         return retval;
     }
 
+    fullname = "run_spot_distance";
+    if (match_optname(opts, fullname, 17, TRUE))
+    {
+        int itmp = 0;
+
+        op = string_for_opt(opts, negated);
+        if (negated)
+        {
+            bad_negation(fullname, TRUE);
+            itmp = 0;
+            retval = FALSE;
+        }
+        else if (op)
+        {
+            if (!*op || *op == 'o' || *op == 'O') /* suppose this means off; 0 means the character never stops upon seeing somebody */
+                itmp = 0;
+            else if (*op == 'i' || *op == 'I')  /* suppose this means infinity, so the character will always stop */
+                itmp = -1;
+            else if (*op != '-' && *op != '+' && *op != ' ' && !(*op >= '0' && *op <= '9')) /* invalid */
+                itmp = -2;
+            else
+                itmp = atoi(op);
+        }
+
+        if (itmp < -1 || itmp > 999)
+        {
+            config_error_add("'%s' requires a value between %d and %d (-1 is infinity)", fullname, -1, 999);
+            retval = FALSE;
+        }
+        else
+        {
+            iflags.run_spot_distance = itmp;
+        }
+        return retval;
+    }
+
+
     /* menustyle:traditional or combination or full or partial */
     fullname = "menustyle";
     if (match_optname(opts, fullname, 4, TRUE)) {
@@ -7269,6 +7312,13 @@ char *buf;
         char dlbuf[BUFSZ];
         Strcpy(dlbuf, flags.max_hint_difficulty < MIN_DIFFICULTY_LEVEL ? "off" : get_game_difficulty_text(flags.max_hint_difficulty));
         Sprintf(buf, "%s (%d)", dlbuf, (int)flags.max_hint_difficulty);
+    }
+    else if (!strcmp(optname, "run_spot_distance"))
+    {
+        if(iflags.run_spot_distance <= 0)
+            Sprintf(buf, "%s (%d)", iflags.run_spot_distance < 0 ? "infinity" : "off", iflags.run_spot_distance);
+        else
+            Sprintf(buf, "%d squares", iflags.run_spot_distance);
     }
     else if (!strcmp(optname, "sound_volume_ambient"))
     {

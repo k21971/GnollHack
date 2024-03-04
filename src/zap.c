@@ -138,9 +138,10 @@ struct monst* targetmonst;
     return skill_level;
 }
 
-int 
-get_spell_damage(otyp, origmonst, targetmonst)
+int
+get_spell_damage(otyp, exceptionality, origmonst, targetmonst)
 int otyp;
+uchar exceptionality;
 struct monst* origmonst;
 struct monst* targetmonst;
 {
@@ -150,19 +151,23 @@ struct monst* targetmonst;
     /* Skill bonus from using wand -- affects only non-tame monsters for the player */
     double dicemult = 1.0;
     boolean same_side = (origmonst && targetmonst && ((origmonst == targetmonst) || ((origmonst == &youmonst) && is_tame(targetmonst)) || ((origmonst != &youmonst && !is_peaceful(origmonst) && !is_peaceful(targetmonst)))));
-    if (origmonst && (objects[otyp].oc_class == WAND_CLASS || (objects[otyp].oc_class == TOOL_CLASS && objects[otyp].oc_skill == P_WAND)))
+    if (objects[otyp].oc_class == WAND_CLASS || (objects[otyp].oc_class == TOOL_CLASS && objects[otyp].oc_skill == P_WAND))
     {
-        int skill_level = P_UNSKILLED;
-        if (same_side)
+        if (origmonst)
         {
-            /* Use unskilled */
-        }
-        else if (origmonst == &youmonst)
-            skill_level = P_SKILL_LEVEL(P_WAND);
-        else
-            skill_level = is_prince(origmonst->data) ? P_SKILLED : is_lord(origmonst->data) || is_wizard(origmonst->data) ? P_BASIC : P_UNSKILLED; /* No increase in wand damage for monsters to avoid unnecessary instadeaths */
+            int skill_level = P_UNSKILLED;
+            if (same_side)
+            {
+                /* Use unskilled */
+            }
+            else if (origmonst == &youmonst)
+                skill_level = P_SKILL_LEVEL(P_WAND);
+            else
+                skill_level = is_prince(origmonst->data) ? P_SKILLED : is_lord(origmonst->data) || is_wizard(origmonst->data) ? P_BASIC : P_UNSKILLED; /* No increase in wand damage for monsters to avoid unnecessary instadeaths */
 
-        dicemult = get_wand_damage_multiplier(skill_level);
+            dicemult *= get_wand_skill_damage_multiplier(skill_level);
+        }
+        dicemult *= get_wand_exceptionality_damage_multiplier(exceptionality);
     }
 
     int dmg = d(max(1, (int)((double)objects[otyp].oc_spell_dmg_dice * dicemult)), objects[otyp].oc_spell_dmg_diesize) + objects[otyp].oc_spell_dmg_plus;
@@ -369,11 +374,16 @@ struct monst* origmonst;
     boolean disguised_mimic = (is_mimic(mtmp->data)
                                && M_AP_TYPE(mtmp) != M_AP_NOTHING);
     int duration = get_obj_spell_duration(otmp);
-    int dmg = get_spell_damage(otyp, origmonst, mtmp);
+    int dmg = get_spell_damage(otyp, otmp->exceptionality, origmonst, mtmp);
     int save_adj = get_saving_throw_adjustment(otmp, mtmp, origmonst);
     boolean surpress_noeffect_message = FALSE;
     //boolean magic_resistance_success = check_magic_resistance_and_inflict_damage(mtmp, otmp, 0, 0, 0, NOTELL);
     boolean magic_cancellation_success = check_magic_cancellation_success(mtmp, save_adj);
+    boolean iswand = objects[otyp].oc_class == WAND_CLASS;
+    boolean zapped_by_u = origmonst == &youmonst;
+    boolean gainwandskill = iswand && zapped_by_u && (otmp->speflags & SPEFLAGS_BEING_BROKEN) == 0;
+    int wandskilladded = 0;
+    
     if (u.uswallow && mtmp == u.ustuck)
         reveal_invis = FALSE;
 
@@ -404,9 +414,9 @@ struct monst* origmonst;
             play_sfx_sound_at_location(SFX_MAGIC_ARROW_HIT, mtmp->mx, mtmp->my);
             hit_with_hit_tile(zap_type_text, mtmp, exclam(dmg), -1, "", HIT_GENERAL, FALSE);
             (void) inflict_spell_damage(mtmp, otmp, origmonst, dmg, AD_MAGM, TELL);
-        } 
-        //else
-        //    miss(zap_type_text, mtmp);
+        }
+        if (gainwandskill)
+            wandskilladded = 1;
         learn_it = TRUE;
         break;
     case SPE_SHOCKING_TOUCH:
@@ -739,13 +749,14 @@ struct monst* origmonst;
             if (skill_level > P_UNSKILLED)
                 save_adj -= 2 * (skill_level - P_UNSKILLED);
         }
-        if (!check_ability_resistance_success(mtmp, A_WIS, save_adj)) {
+        if (!check_ability_resistance_success(mtmp, A_WIS, save_adj)) 
+        {
             if (disguised_mimic)
                 seemimic(mtmp);
 
             play_sfx_sound_at_location(SFX_ACQUIRE_SLOW, mtmp->mx, mtmp->my);
             increase_mon_property_verbosely(mtmp, SLOWED, duration);
-            m_dowear(mtmp, FALSE); /* might want speed boots */
+            m_dowear(mtmp, FALSE, FALSE); /* might want speed boots */
             if (u.uswallow && (mtmp == u.ustuck) && is_whirly(mtmp->data)) {
                 You_ex(ATR_NONE, CLR_MSG_SPELL, "disrupt %s!", mon_nam(mtmp));
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A huge hole opens up...");
@@ -758,6 +769,8 @@ struct monst* origmonst;
                 special_effect_wait_until_end(0);
             }
         }
+        if (gainwandskill)
+            wandskilladded = 3;
         break;
     case SPE_HASTE_MONSTER:
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
@@ -853,10 +866,12 @@ struct monst* origmonst;
         boolean visible_effect = increase_mon_property_verbosely(mtmp, VERY_FAST, duration);
         if (visible_effect)
             makeknown(WAN_SPEED_MONSTER);
-        m_dowear(mtmp, FALSE); /* might want speed boots */
+        m_dowear(mtmp, FALSE, FALSE); /* might want speed boots */
         if (is_tame(mtmp))
             helpful_gesture = TRUE;
         special_effect_wait_until_end(0);
+        if (gainwandskill)
+            wandskilladded = 3;
         break;
     }
     case SPE_SILENCE:
@@ -886,6 +901,8 @@ struct monst* origmonst;
                 monflee(mtmp, duration, FALSE, TRUE);
             }
             special_effect_wait_until_end(0);
+            if (gainwandskill)
+                wandskilladded = 3;
         }
         break;
     case SPE_FEAR:
@@ -911,6 +928,8 @@ struct monst* origmonst;
         {
             res = 1;
             wake = TRUE;
+            if (gainwandskill)
+                wandskilladded = 3;
         }
         break;
     case SPE_NEGATE_UNDEATH:
@@ -1058,6 +1077,8 @@ struct monst* origmonst;
         {
             play_sfx_sound_at_location(SFX_POLYMORPH_FAIL, mtmp->mx, mtmp->my);
         }
+        if (gainwandskill)
+            wandskilladded = 3;
         break;
     case WAN_CANCELLATION:
     case SPE_CANCELLATION:
@@ -1074,6 +1095,8 @@ struct monst* origmonst;
             (void)nonadditive_increase_mon_property_verbosely(mtmp, CANCELLATION_RESISTANCE, 10);
             special_effect_wait_until_end(0);
         }
+        if (gainwandskill)
+            wandskilladded = 3;
         break;
     case WAN_DISJUNCTION:
     case SPE_DISJUNCTION:
@@ -1087,6 +1110,8 @@ struct monst* origmonst;
         special_effect_wait_until_action(0);
         (void)cancel_monst(mtmp, otmp, TRUE, TRUE, FALSE, duration);
         special_effect_wait_until_end(0);
+        if (gainwandskill)
+            wandskilladded = 3;
         break;
     case SPE_LOWER_MAGIC_RESISTANCE:
     case SPE_DIMINISH_MAGIC_RESISTANCE:
@@ -1105,6 +1130,8 @@ struct monst* origmonst;
         if (disguised_mimic)
             seemimic(mtmp);
         reveal_invis = !u_teleport_mon(mtmp, TRUE);
+        if (gainwandskill)
+            wandskilladded = 3;
         break;
     case WAN_MAKE_INVISIBLE: {
         res = 1;
@@ -1117,7 +1144,8 @@ struct monst* origmonst;
         special_effect_wait_until_action(0);
         increase_mon_property_verbosely(mtmp, INVISIBILITY, duration);
         special_effect_wait_until_end(0);
-
+        if (gainwandskill)
+            wandskilladded = 3;
         if (!oldinvis && knowninvisible(mtmp)) {
             reveal_invis = TRUE;
             learn_it = TRUE;
@@ -1127,8 +1155,12 @@ struct monst* origmonst;
     case WAN_LOCKING:
     case SPE_WIZARD_LOCK:
         wake = closeholdingtrap(mtmp, &learn_it);
-        if(wake)
+        if (wake)
+        {
+            if (gainwandskill)
+                wandskilladded = 3;
             res = 1;
+        }
         break;
     case SPE_PROBE:
     case WAN_PROBING:
@@ -1136,6 +1168,8 @@ struct monst* origmonst;
         wake = FALSE;
         reveal_invis = TRUE;
         probe_monster(mtmp);
+        if (gainwandskill)
+            wandskilladded = 1;
         learn_it = TRUE;
         break;
     case WAN_OPENING:
@@ -1153,12 +1187,18 @@ struct monst* origmonst;
             /* zap which hits steed will only release saddle if it
                doesn't hit a holding or falling trap; playability
                here overrides the more logical target ordering */
+            if (gainwandskill)
+                wandskilladded = 3;
         } else if (openholdingtrap(mtmp, &learn_it)) {
             res = 1;
+            if (gainwandskill)
+                wandskilladded = 3;
             break;
         } else if (openfallingtrap(mtmp, TRUE, &learn_it)) {
             /* mtmp might now be on the migrating monsters list */
             res = 1;
+            if (gainwandskill)
+                wandskilladded = 3;
             break;
         } else if ((obj = which_armor(mtmp, W_SADDLE)) != 0) {
             res = 1;
@@ -1174,8 +1214,11 @@ struct monst* origmonst;
             } else if (canspotmon(mtmp)) {
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s falls off.", buf);
             }
+            Strcpy(debug_buf_2, "bhitm");
             obj_extract_self(obj);
             mdrop_obj(mtmp, obj, FALSE, TRUE);
+            if (gainwandskill)
+                wandskilladded = 3;
         }
         break;
     case JAR_OF_MEDICINAL_SALVE:
@@ -1525,6 +1568,8 @@ cure_petrification_here:
             map_invisible(bhitpos.x, bhitpos.y);
     }
 
+    if (wandskilladded > 0)
+        use_skill(P_WAND, wandskilladded);
     /* if effect was observable then discover the wand type provided
        that the wand itself has been seen */
     if (learn_it)
@@ -2761,6 +2806,7 @@ boolean replaceundead;
             /* transfer the ghost's inventory along with it */
             while ((otmp = ghost->minvent) != 0) 
             {
+                Strcpy(debug_buf_2, "revive1");
                 obj_extract_self(otmp);
                 add_to_minv(mtmp, otmp);
             }
@@ -2827,6 +2873,7 @@ boolean replaceundead;
         m_useup(corpse->ocarry, corpse);
         break;
     case OBJ_CONTAINED:
+        Strcpy(debug_buf_2, "revive2");
         obj_extract_self(corpse);
         obfree(corpse, (struct obj *) 0);
         break;
@@ -3515,7 +3562,6 @@ int id;
     long old_wornmask, new_wornmask = 0L;
     boolean can_merge = (id == STRANGE_OBJECT);
     int obj_location = obj->where;
-    Strcpy(debug_buf_4, "poly_obj");
 
     if (obj->otyp == BOULDER)
         sokoban_guilt();
@@ -3534,7 +3580,6 @@ int id;
         {
             if (otmp)
                 delobj(otmp);
-            Strcpy(debug_buf_2, "polyobj");
             otmp = mkobj(obj->oclass, FALSE, FALSE);
         } while (--try_limit > 0
                  && objects[otmp->otyp].oc_magic != magic_obj);
@@ -3566,7 +3611,7 @@ int id;
     if (obj->otyp == SCR_MAIL) 
     {
         otmp->otyp = SCR_MAIL;
-        otmp->special_quality = 1;
+        otmp->special_quality = SPEQUAL_MAIL_FROM_BONES_OR_WISHING;
     }
 
     /* avoid abusing eggs laid by you */
@@ -3929,6 +3974,7 @@ struct obj *obj;
             } else {
                 /* unlikely to get here since genociding monsters also
                    sets the G_NOCORPSE flag; drop statue's contents */
+                Strcpy(debug_buf_2, "flesh_to_stone_obj");
                 while ((item = obj->cobj) != 0) {
                     bypass_obj(item); /* make stone-to-flesh miss it */
                     obj_extract_self(item);
@@ -4477,6 +4523,7 @@ boolean stop_at_first_hit_object;
         hit_only_one == 3 ? (bucstatus == -1 ? 1 : bucstatus == 0 ? 4 : 7) :
         hit_only_one == 4 ? (bucstatus == -1 ? 2 : bucstatus == 0 ? 4 : 6) :
         0;
+    int hitores;
 
     if (obj->otyp == SPE_FORCE_BOLT || obj->otyp == SPE_FORCE_STRIKE || obj->otyp == WAN_STRIKING)
     {
@@ -4495,8 +4542,7 @@ boolean stop_at_first_hit_object;
     poly_zapped = -1;
     for (otmp = level.objects[tx][ty]; otmp; otmp = next_obj) 
     {
-        context.bhitcount++;
-        if (hit_only_one && hitanything > bhitlimit)
+        if (hit_only_one && context.bhitcount >= bhitlimit)
             break;
 
         next_obj = otmp->nexthere;
@@ -4505,7 +4551,9 @@ boolean stop_at_first_hit_object;
             && hides_under(youmonst.data))
             continue;
 
-        hitanything += (*fhito)(otmp, obj, origmonst);
+        hitores = (*fhito)(otmp, obj, origmonst);
+        hitanything += hitores;
+        context.bhitcount += hitores;
 
         if (hitanything && stop_at_first_hit_object)
             break;
@@ -4833,11 +4881,11 @@ register struct obj *obj;
         mtmp = summoncreature(obj->otyp, PM_GIANT_ANACONDA, "You throw the stick you prepared in the front of you. It turns into %s!", MM_NEUTRAL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
             SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
-    case SPE_CELESTIAL_DOVE:
+    case SPE_SUMMON_CELESTIAL_DOVE:
         mtmp = summoncreature(obj->otyp, PM_CELESTIAL_DOVE, "%s descends from the heavens.", MM_LAWFUL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
             SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_PACIFIST | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
-    case SPE_CELESTIAL_EAGLE:
+    case SPE_SUMMON_CELESTIAL_EAGLE:
         mtmp = summoncreature(obj->otyp, PM_CELESTIAL_EAGLE, "%s descends from the heavens.", MM_LAWFUL_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
             SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_MARK_AS_SUMMONED | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_PACIFIST | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
@@ -5314,7 +5362,7 @@ register struct obj *obj;
         {
             if (dist2(u.ux, u.uy, mon->mx, mon->my) <= radius * (radius + 1))
             {
-                int dmg = get_spell_damage(obj->otyp, &youmonst, mon);
+                int dmg = get_spell_damage(obj->otyp, 0, &youmonst, mon);
                 if (is_undead(mon->data) || is_demon(mon->data) || is_vampshifter(mon) || hates_light(mon->data))
                 {
                     if (is_peaceful(mon))
@@ -5343,7 +5391,7 @@ register struct obj *obj;
                 if (is_peaceful(mon))
                     setmangry(mon, FALSE);
 
-                int dmg = get_spell_damage(obj->otyp, &youmonst, mon);
+                int dmg = get_spell_damage(obj->otyp, 0, &youmonst, mon);
                 if (is_mon_immune_to_fire(mon))
                 {
                     if (canspotmon(mon))
@@ -5375,7 +5423,7 @@ register struct obj *obj;
                 if (is_peaceful(mon))
                     setmangry(mon, FALSE);
 
-                int dmg = get_spell_damage(obj->otyp, &youmonst, mon);
+                int dmg = get_spell_damage(obj->otyp, 0, &youmonst, mon);
                 if (is_mon_immune_to_cold(mon))
                 {
                     if (canspotmon(mon))
@@ -5407,7 +5455,7 @@ register struct obj *obj;
                 if (is_peaceful(mon))
                     setmangry(mon, FALSE);
 
-                int dmg = get_spell_damage(obj->otyp, &youmonst, mon);
+                int dmg = get_spell_damage(obj->otyp, 0, &youmonst, mon);
                 if (is_mon_immune_to_elec(mon))
                 {
                     if (canspotmon(mon))
@@ -5439,7 +5487,7 @@ register struct obj *obj;
                 if(is_peaceful(mon))
                     setmangry(mon, FALSE);
 
-                int dmg = get_spell_damage(obj->otyp, &youmonst, mon);
+                int dmg = get_spell_damage(obj->otyp, 0, &youmonst, mon);
                 if (resists_magic(mon))
                 {
                     if (canspotmon(mon))
@@ -5751,6 +5799,7 @@ register struct obj *obj;
 
             known = TRUE;
             (void)identify_pack(1, FALSE);
+            update_inventory();
         }
         else
         {
@@ -5895,6 +5944,7 @@ dozap()
         return 0;
     }
 
+    wish_insurance_check(obj->otyp == WAN_WISHING);
     check_unpaid(obj);
 
     /* zappable addition done by GAN 11/03/86 */
@@ -6032,7 +6082,7 @@ boolean ordinary;
         return 0.0;
 
     boolean learn_it = FALSE;
-    int basedmg = get_spell_damage(obj->otyp, &youmonst, &youmonst);
+    int basedmg = get_spell_damage(obj->otyp, obj->exceptionality, &youmonst, &youmonst);
     int duration = get_obj_spell_duration(obj);
     double damage = 0;
     //boolean magic_resistance_success = check_magic_resistance_and_inflict_damage(&youmonst, obj, FALSE, 0, 0, NOTELL);
@@ -7405,7 +7455,7 @@ struct obj *obj; /* wand or spell */
             /* similar to zap_dig() */
             pline("A rock is dislodged from the %s and falls on your %s.",
                   ceiling(x, y), body_part(HEAD));
-            dmg = rnd((uarmh && is_metallic(uarmh)) ? 2 : 6);
+            dmg = rnd((uarmh && is_hard_helmet(uarmh)) ? 2 : 6);
             losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE), "falling rock", KILLED_BY_AN);
             if ((otmp = mksobj_at(ROCK, x, y, FALSE, FALSE)) != 0) {
                 (void) xname(otmp); /* set dknown, maybe bknown */
@@ -7670,26 +7720,7 @@ struct obj *obj;
 
         /* Give skill points for wand use */
         if (objects[otyp].oc_class == WAND_CLASS)
-        {
-            use_skill(P_WAND, 2);
-        }
-
-        /*
-        if (otyp == WAN_DIGGING || otyp == SPE_DIG)
-            zap_dig();
-        else if (otyp == SPE_FINGER_OF_DEATH)
-            buzz(ZT_SPELL(ZT_DEATH), u.ulevel / 2 + 1, u.ux, u.uy, u.dx, u.dy);
-        else if (otyp == WAN_DEATH)
-            buzz(ZT_WAND(ZT_DEATH), 1, u.ux, u.uy, u.dx, u.dy);
-        else if (otyp >= SPE_MAGIC_MISSILE && otyp <= SPE_DISINTEGRATE)
-            buzz(otyp - SPE_MAGIC_MISSILE + 10, u.ulevel / 2 + 1, u.ux, u.uy,
-                 u.dx, u.dy);
-        else if (otyp >= WAN_MAGIC_MISSILE && otyp <= WAN_LIGHTNING)
-            buzz(otyp - WAN_MAGIC_MISSILE,
-                 (otyp == WAN_MAGIC_MISSILE) ? 2 : 6, u.ux, u.uy, u.dx, u.dy);
-        else
-            impossible("weffects: unexpected spell or wand");
-            */
+            use_skill(P_WAND, osubtype == RAY_WND_MAGIC_MISSILE || osubtype == RAY_MAGIC_MISSILE ? 1 : 2);
 
         disclose = TRUE;
     }
@@ -8583,7 +8614,7 @@ uchar* out_flags_ptr;
     //Base damage here, set to zero, if not needed
     if (origobj)
     {
-        dmg = get_spell_damage(origobj->otyp, origmonst, mon);
+        dmg = get_spell_damage(origobj->otyp, origobj->exceptionality, origmonst, mon);
     }
     else
         dmg = d(dmgdice, dicesize) + dmgplus;
@@ -8853,7 +8884,7 @@ const char *fltxt;
     //Base damage here, set to zero, if not needed
     if (origobj)
     {
-        dam = get_spell_damage(origobj->otyp, origmonst, &youmonst);
+        dam = get_spell_damage(origobj->otyp, origobj->exceptionality, origmonst, &youmonst);
     }
     else
         dam = d(dmgdice, dicesize) + dmgplus;
@@ -9378,6 +9409,7 @@ const char *fltxt;
                 if (mon == u.usteed && otmp->otyp == SADDLE)
                     dismount_steed(DISMOUNT_FELL);
             }
+            Strcpy(debug_buf_2, "disintegrate_mon");
             obj_extract_self(otmp);
             obfree(otmp, (struct obj *) 0);
         }
@@ -9843,7 +9875,7 @@ boolean say; /* Announce out of sight hit/miss events if true */
             {
                 if (origobj)
                 {
-                    long dam = (long)get_spell_damage(origobj_copy.otyp, origmonst, &youmonst);
+                    long dam = (long)get_spell_damage(origobj_copy.otyp, origobj_copy.exceptionality, origmonst, &youmonst);
                     (void)flashburn(dam);
                 }
                 else
@@ -10076,6 +10108,7 @@ const char *msg;
 
         do 
         {
+            Strcpy(debug_buf_2, "melt_ice");
             obj_extract_self(otmp); /* boulder isn't being pushed */
             if (!boulder_hits_pool(otmp, x, y, FALSE))
                 impossible("melt_ice: no pool?");
@@ -10450,7 +10483,6 @@ short exploding_wand_typ;
         case ZT_PETRIFICATION:
             if (door_subtype_definitions[lev->subtyp].material == MAT_WOOD && !is_door_indestructible_at_ptr(lev))
             {
-                //new_doormask = D_NODOOR;
                 see_txt = "The door petrifies!";
                 sense_txt = "hear stone cracking.";
                 new_door_subtype = DOOR_SUBTYPE_STONE;
@@ -10517,6 +10549,8 @@ short exploding_wand_typ;
             {
                 lev->doormask &= ~D_MASK;
                 lev->doormask |= new_doormask;
+                if(new_doormask == D_NODOOR)
+                    lev->subtyp = 0;
             }
 
             if (new_door_subtype >= 0)
@@ -10671,6 +10705,7 @@ boolean verbose;
 
     if (obj->where == OBJ_FLOOR) 
     {
+        Strcpy(debug_buf_2, "fracture_rock");
         obj_extract_self(obj); /* move rocks back on top */
         obj_set_found(obj);
         place_object(obj, obj->ox, obj->oy);
@@ -10695,18 +10730,19 @@ register struct obj* obj;
         && activate_statue_trap(trap, obj->ox, obj->oy, TRUE))
         return FALSE;
     /* drop any objects contained inside the statue */
+    Strcpy(debug_buf_2, "pre_break_statue");
     while ((item = obj->cobj) != 0) {
         obj_extract_self(item);
         obj_set_found(item);
         place_object(item, obj->ox, obj->oy);
     }
-    if (by_you && Role_if(PM_ARCHAEOLOGIST) && (obj->speflags & SPEFLAGS_STATUE_HISTORIC))
+    if (by_you && Role_if(PM_ARCHAEOLOGIST) && obj->special_quality == SPEQUAL_STATUE_HISTORIC)
     {
         play_sfx_sound(SFX_GUILTY);
         You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "guilty about damaging such a historic statue.");
         adjalign(-1);
     }
-    obj->speflags &= ~SPEFLAGS_STATUE_HISTORIC;
+    obj->special_quality = 0;
     return TRUE;
 }
 
@@ -11539,6 +11575,7 @@ boolean is_wiz_wish, play_sound;
             play_sfx_sound(SFX_WISH_FOR_OBJECT);
         You("may wish for an object.");
     }
+    ignore_onsleep_autosave = TRUE;
 retry:
     Strcpy(promptbuf, "For what do you wish");
     if (iflags.cmdassist && tries > 0)
@@ -11559,7 +11596,7 @@ retry:
      *  value to remain distinct.
      */
     Strcpy(bufcpy, buf);
-    boolean isremovedfromgame = FALSE;;
+    boolean isremovedfromgame = FALSE;
     otmp = readobjnam(buf, &nothing, is_wiz_wish, &isremovedfromgame);
     if (!otmp) {
         pline(isremovedfromgame ? "The requested object has been removed from the game." : "Nothing fitting that description exists in the game.");
@@ -11568,10 +11605,14 @@ retry:
         pline1(thats_enough_tries);
         otmp = readobjnam((char *) 0, (struct obj *) 0, is_wiz_wish, (boolean*)0);
         if (!otmp)
+        {
+            ignore_onsleep_autosave = FALSE;
             return; /* for safety; should never happen */
+        }
     } else if (otmp == &nothing) {
         /* explicitly wished for "nothing", presumably attempting
            to retain wishless conduct */
+        ignore_onsleep_autosave = FALSE;
         return;
     }
 
@@ -11617,6 +11658,7 @@ retry:
                                    (const char *) 0);
         u.uprayer_timeout += rn1(100, 50) / (Role_if(PM_PRIEST) ? 2 : 1); /* the gods take notice */
     }
+    ignore_onsleep_autosave = FALSE;
 }
 
 void
@@ -11637,10 +11679,21 @@ int otyp;
     struct obj* otmp;
 
     otmp = mksobj(otyp, FALSE, FALSE, FALSE);
-    if (otmp && otmp != &zeroobj) 
+    if (otmp) 
     {
         otmp->age = d(objects[spell_otmp->otyp].oc_spell_dur_dice, objects[spell_otmp->otyp].oc_spell_dur_diesize) + objects[spell_otmp->otyp].oc_spell_dur_plus;
         otmp->nomerge = 1;
+        switch (spell_otmp->otyp)
+        {
+        case SPE_MAGE_ARMOR:
+            otmp->enchantment = max(0, P_SKILL_LEVEL(objects[spell_otmp->otyp].oc_skill) - 1) * 2 + (u.ulevel - 1) / 4;
+            break;
+        case SPE_BLACK_BLADE_OF_DISASTER:
+            otmp->enchantment = max(0, P_SKILL_LEVEL(objects[spell_otmp->otyp].oc_skill) - 1);
+            break;
+        default:
+            break;
+        }
         begin_existence(otmp);
         
         const char
@@ -11996,6 +12049,22 @@ int otyp;
     }
     return NON_PM;
 
+}
+
+void
+wish_insurance_check(check_insurance)
+int check_insurance;
+{
+    /* Save insurance checkpoint before zapping a wand of wishing or other similar device on mobile, since saving the game is disabled during wishing on mobile */
+    /* Should be placed before charges are deducted; and omitted from random wish gain in order to avoid abuse */
+    if (check_insurance)
+    {
+#ifdef GNH_MOBILE
+#ifdef INSURANCE
+        save_currentstate();
+#endif
+#endif
+    }
 }
 
 void

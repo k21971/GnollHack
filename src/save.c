@@ -78,6 +78,7 @@ STATIC_VAR struct save_procs {
 STATIC_VAR unsigned ustuck_id = 0, usteed_id = 0;
 boolean saving = FALSE;
 boolean check_pointing = FALSE;
+boolean ignore_onsleep_autosave = FALSE;
 
 int
 dosave()
@@ -156,6 +157,10 @@ boolean quietly;
     xchar ltmp;
     d_level uz_save;
     char whynot[BUFSZ];
+    Strcpy(debug_buf_1, "dosave0");
+    Strcpy(debug_buf_2, "dosave0");
+    Strcpy(debug_buf_3, "dosave0");
+    Strcpy(debug_buf_4, "dosave0");
 
 #ifdef WHEREIS_FILE
     delete_whereis();
@@ -494,10 +499,12 @@ int fd;
 char *whynot;
 {
     if (fd < 0) {
+        program_state.in_tricked = 1;
         pline1(whynot);
         pline("Probably someone removed it.");
         Strcpy(killer.name, whynot);
         done(TRICKED);
+        program_state.in_tricked = 0;
         return TRUE;
     }
     return FALSE;
@@ -1443,7 +1450,7 @@ int fd;
     gamestats.gui_glyph = maybe_get_replaced_glyph(gamestats.glyph, u.ux, u.uy, data_to_replacement_info(gamestats.glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
     gamestats.rolenum = urole.rolenum;
     gamestats.racenum = urace.racenum;
-    gamestats.gender = Upolyd ? u.mfemale : flags.female;
+    gamestats.gender = Ufemale;
     gamestats.alignment = u.ualign.type;
     gamestats.ulevel = (short)u.ulevel;
     Strcpy(gamestats.dgn_name, dungeons[u.uz.dnum].dname);

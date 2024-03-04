@@ -23,7 +23,7 @@
                                                   EnableTouchEvents="True"
                                                   PaintSurface="canvasView_PaintSurface" 
                                                   Touch="canvasView_Touch"
-                                                  AbsoluteLayout.LayoutBounds="0.0, 0, 1.0, 1.0"
+                                                  AbsoluteLayout.LayoutBounds="0.0, 0.0, 1.0, 1.0"
                                                   AbsoluteLayout.LayoutFlags="HeightProportional,WidthProportional">
                     </controls:SwitchableCanvasView>
 
@@ -40,6 +40,12 @@
                         AbsoluteLayout.LayoutFlags="PositionProportional" BackgroundColor="Transparent" >
                         <controls:LabeledImageButton x:Name="lAbilitiesButton" LblText="" BtnLetter="A" LargerFont="True" BtnClicked="GHButton_Clicked" />
                     </StackLayout>
+                    
+                    <Frame x:Name="MessageFilterFrame" BackgroundColor="#66000000" BorderColor="Black" CornerRadius="10" IsVisible="False"
+                           AbsoluteLayout.LayoutBounds="0.0, 0.0, AutoSize, AutoSize" AbsoluteLayout.LayoutFlags="PositionProportional" >
+                        <Entry x:Name="MessageFilterEntry" FontFamily="Underwood" FontSize="18" TextColor="White" BackgroundColor="#66000000" Placeholder="Search" PlaceholderColor="LightGray"
+                                   WidthRequest="200" Keyboard="Default" HorizontalTextAlignment="Center" TextChanged="MessageFilterEntry_TextChanged" />
+                    </Frame>
                 </AbsoluteLayout>
 
                 <Grid x:Name="UIGrid" Grid.Row="0" InputTransparent="True" CascadeInputTransparent="False"
@@ -190,7 +196,6 @@
                         <gnh:GHCachedImage x:Name="MenuWindowGlyphImage" HorizontalOptions="End" VerticalOptions="Start" Margin="15,15" WidthRequest="75" HeightRequest="75" Aspect="AspectFit" />
                         <controls:SwitchableCanvasView x:Name="MenuCanvas" UseGL="False" CanvasType="MenuCanvas" RevertBlackAndWhite="True" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" PaintSurface="MenuCanvas_PaintSurface" Touch="MenuCanvas_Touch" EnableTouchEvents="True" />
                     </Grid>
-
                     <Grid x:Name="MenuCloseGrid" BackgroundColor="Transparent" >
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
@@ -210,7 +215,6 @@
                         <Frame BackgroundColor="#66000000" BorderColor="Black" CornerRadius="10" HorizontalOptions="FillAndExpand" VerticalOptions="CenterAndExpand">
                             <StackLayout x:Name="MenuCountLayout" HorizontalOptions="FillAndExpand" VerticalOptions="CenterAndExpand">
                                 <Label x:Name="MenuCountCaption" Text="Select Count" FontFamily="Immortal" FontSize="20" HorizontalOptions="CenterAndExpand" TextColor="White" />
-
                                 <Picker x:Name="CountPicker"
                                         VerticalOptions="Center"
                                         VerticalTextAlignment="Center"
@@ -225,7 +229,6 @@
                                         TitleColor="Gray"
                                         Title="Count"
                                         />
-
                                 <Entry x:Name="MenuCountEntry" IsVisible="False"
                                     HorizontalTextAlignment="Center"
                                     VerticalTextAlignment="Center"
@@ -240,7 +243,6 @@
                                     WidthRequest="180"
                                     Completed="MenuEntry_Completed"
                                     />
-
                                 <Grid HorizontalOptions="FillAndExpand" VerticalOptions="CenterAndExpand">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="65" />
@@ -294,7 +296,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <controls:CustomImageButton Grid.Column="0" x:Name="GetLineOkButton" Text="OK" FontSize="19" WidthRequest="160" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
+                                <controls:CustomImageButton Grid.Column="0" x:Name="GetLineOkButton" Text="OK" FontSize="19" WidthRequest="170" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
                                             BackgroundColor="Transparent" TextColor="White"
                                             Clicked="GetLineOkButton_Clicked" />
                                 <controls:CustomImageButton Grid.Column="1" x:Name="GetLineCancelButton" Text="Cancel" FontSize="19" WidthRequest="170" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
@@ -364,6 +366,61 @@
                                           Touch="TipView_Touch"
                                           AbsoluteLayout.LayoutBounds="0.0, 0, 1.0, 1.0"
                                           AbsoluteLayout.LayoutFlags="HeightProportional,WidthProportional"/>
+            <Grid x:Name="ReplayGrid" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" BackgroundColor="Transparent" InputTransparent="True" CascadeInputTransparent="False" IsVisible="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Frame x:Name="ReplayFrame" HorizontalOptions="CenterAndExpand" VerticalOptions="End" HeightRequest="65" BackgroundColor="#88000000" BorderColor="Black" CornerRadius="10" Padding="4" Margin="1">
+                    <Grid Margin="0" BackgroundColor="Transparent" HorizontalOptions="Center" VerticalOptions="Center" HeightRequest="60" Padding="0" RowSpacing="1" >
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Label Grid.Row="0" x:Name="ReplayHeaderLabel" Text="" TextColor="White" HorizontalOptions="Center" VerticalOptions="End" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" FontFamily="Immortal" FontSize="14" Margin="0" />
+                        <Label Grid.Row="0" x:Name="ReplayRealTimeLabel" Text="" TextColor="White" HorizontalOptions="End" VerticalOptions="End" HorizontalTextAlignment="End" VerticalTextAlignment="Center" FontFamily="Lato-Regular" FontSize="13" Margin="0" />
+                        <StackLayout Grid.Row="1" Margin="0" BackgroundColor="Transparent" Orientation="Horizontal" HeightRequest="40">
+                            <controls:CustomImageButton x:Name="ReplayPauseButton" Text="Pause" Clicked="ReplayPauseButton_Clicked" WidthRequest="75" HeightRequest="40" FontFamily="Diablo" FontSize="13" BackgroundColor="Transparent" TextColor="White"/>
+                            <controls:CustomImageButton x:Name="ReplaySlowerButton" Text="0.50x" Clicked="ReplaySlowerButton_Clicked" WidthRequest="75" HeightRequest="40" FontFamily="Diablo" FontSize="13" BackgroundColor="Transparent" TextColor="White"/>
+                            <controls:CustomImageButton x:Name="ReplayFasterButton" Text="2.00x" Clicked="ReplayFasterButton_Clicked" WidthRequest="75" HeightRequest="40" FontFamily="Diablo" FontSize="13" BackgroundColor="Transparent" TextColor="White"/>
+                            <controls:CustomImageButton IsVisible="False" x:Name="ReplayGotoButton" Text="Go To" Clicked="ReplayGotoButton_Clicked" WidthRequest="75" HeightRequest="40" FontFamily="Diablo" FontSize="13" BackgroundColor="Transparent" TextColor="White"/>
+                            <controls:CustomImageButton IsVisible="False" x:Name="ReplayNextButton" Text="Next" Clicked="ReplayNextButton_Clicked" WidthRequest="75" HeightRequest="40" FontFamily="Diablo" FontSize="12" BackgroundColor="Transparent" TextColor="White"/>
+                            <controls:CustomImageButton x:Name="ReplayQuitButton" Text="Quit" Clicked="ReplayQuitButton_Clicked" WidthRequest="75" HeightRequest="40" FontFamily="Diablo" FontSize="13" BackgroundColor="Transparent" TextColor="#FFFFAAAA"/>
+                        </StackLayout>
+                    </Grid>
+                </Frame>
+                <Grid x:Name="GotoTurnGrid" IsVisible="False"  BackgroundColor="#66000000" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" >
+                    <Frame x:Name="GotoTurnFrame" Margin="0,50,0,10" WidthRequest="440" BackgroundColor="#66000000" BorderColor="Black" CornerRadius="10" HorizontalOptions="CenterAndExpand" VerticalOptions="StartAndExpand">
+                        <StackLayout x:Name="GotoTurnLayout" HorizontalOptions="FillAndExpand" VerticalOptions="CenterAndExpand">
+                            <Label x:Name="GotoTurnCaption" Text="Go to Turn" FontFamily="Immortal" FontSize="20" HorizontalOptions="CenterAndExpand" TextColor="White" />
+                            <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
+                                <Entry x:Name="GotoTurnEntryText" Keyboard="Numeric" WidthRequest="360" HorizontalOptions="Center" Placeholder="Enter the turn here" PlaceholderColor="Gray" TextColor="White" BackgroundColor="#40000000"
+                                       HorizontalTextAlignment="Center" FontSize="20" />
+                            </StackLayout>
+                            <Grid WidthRequest="360" HorizontalOptions="Center" VerticalOptions="CenterAndExpand">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="65" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <controls:CustomImageButton Grid.Column="0" x:Name="GotoTurnOkButton" Text="OK" FontSize="19" WidthRequest="160" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
+                                            BackgroundColor="Transparent" TextColor="White"
+                                            Clicked="GotoTurnOkButton_Clicked" />
+                                <controls:CustomImageButton Grid.Column="1" x:Name="GotoTurnCancelButton" Text="Cancel" FontSize="19" WidthRequest="170" HeightRequest="60" FontFamily="Diablo" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" 
+                                            BackgroundColor="Transparent" TextColor="White"
+                                            Clicked="GotoTurnCancelButton_Clicked" />
+                            </Grid>
+                        </StackLayout>
+                    </Frame>
+                </Grid>
+            </Grid>
             <Grid x:Name="LoadingGrid" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" >
                 <gnh:GHCachedImage Source="resource://GnollHackX.Assets.dgn_entrance.jpg" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" 
                                 Aspect="AspectFill" CacheImage="False" />

@@ -1279,7 +1279,7 @@ boolean hitsroof;
     }
     else
     { /* neither potion nor other breaking object */
-        boolean less_damage = uarmh && is_metallic(uarmh), artimsg = FALSE;
+        boolean less_damage = uarmh && is_hard_helmet(uarmh), artimsg = FALSE;
         int basedmg = is_launcher(obj) ? d(1, 2) : weapon_total_dmg_value(obj, &youmonst, &youmonst, 1);
         double damage = adjust_damage(basedmg, (struct monst*)0, &youmonst, objects[obj->otyp].oc_damagetype, ADFLAGS_NONE);
 
@@ -1308,14 +1308,14 @@ boolean hitsroof;
             if (less_damage && damage < (Upolyd ? u.mh : u.uhp))
             {
                 if (!artimsg)
-                    pline("Fortunately, you are wearing a hard helmet.");
+                    pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately, you are wearing a hard helmet.");
                 /* helmet definitely protects you when it blocks petrification
                  */
             }
             else if (!petrifier) 
             {
                 if (flags.verbose)
-                    Your("%s does not protect you.", helm_simple_name(uarmh));
+                    Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s does not protect you.", helm_simple_name(uarmh));
             }
         } 
         else if (petrifier && !Stone_resistance
@@ -1491,7 +1491,6 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
 
             if (wep_mask && !(obj->owornmask & wep_mask)) 
             {
-                Strcpy(debug_buf_4, "throwit");
                 setworn(obj, wep_mask);
             }
             thrownobj = (struct obj *) 0;
@@ -2640,7 +2639,7 @@ struct obj *obj;
                       ceiling(u.ux, u.uy), body_part(HEAD));
             /* some self damage? */
             if (uarmh)
-                pline("Fortunately, you are wearing %s!",
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately, you are wearing %s!",
                       an(helm_simple_name(uarmh)));
         }
         bhitpos.x = u.ux;

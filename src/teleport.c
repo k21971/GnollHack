@@ -65,14 +65,12 @@ unsigned long gpflags;
             return FALSE;
 
         mdat = mtmp->data;
-        if (is_pool(x, y) && !ignorewater) 
+        if (is_pool(x, y) && (Is_waterlevel(&u.uz) || !(mtmp == &youmonst ? Levitation || Flying || mon_clings_on_water(mtmp) : is_flying(mtmp) || is_levitating(mtmp) || mon_clings_on_water(mtmp))) && !ignorewater)
         {
             if (mtmp == &youmonst)
-                return (Levitation || Flying || Walks_on_water || Swimming
-                        || Amphibious);
+                return (Walks_on_water || Swimming || Amphibious);
             else
-                return ((is_flying(mtmp) || is_levitating(mtmp) || has_swimming(mtmp) || amphibious(mdat)
-                        || is_clinger(mdat)) && !is_mimic(mdat));
+                return ((mon_walks_on_water(mtmp) || has_swimming(mtmp) || has_magical_breathing(mtmp) || amphibious(mdat)) && !is_mimic(mdat));
         } 
         else if (In_modron_level(&u.uz) && IS_AIR(levl[x][y].typ))
         {
@@ -2006,6 +2004,7 @@ register struct obj *obj;
     obj->speflags &= ~SPEFLAGS_CAUGHT_IN_LEAVES;
     obj_clear_found(obj);
 
+    Strcpy(debug_buf_2, "rloco");
     obj_extract_self(obj);
     otx = obj->ox;
     oty = obj->oy;

@@ -673,7 +673,7 @@ boolean do_auto_in_bag;
 
             Sprintf(qbuf, "Pick%s %d of what?", do_auto_in_bag ? " and out into bag" : "", count);
             val_for_n_or_more = count; /* set up callback selector */
-            n = query_objlist(qbuf, objchain_p, traverse_how,
+            n = query_objlist(qbuf, objchain_p, traverse_how | OBJECT_COMPARISON,
                               &pick_list, PICK_ONE, n_or_more, 2);
             /* correct counts, if any given */
             for (i = 0; i < n; i++)
@@ -682,7 +682,7 @@ boolean do_auto_in_bag;
         else 
         {
             n = query_objlist(do_auto_in_bag ? "Pick up and auto-stash what?" : "Pick up what?", objchain_p,
-                              (traverse_how | FEEL_COCKATRICE),
+                              (traverse_how | FEEL_COCKATRICE | OBJECT_COMPARISON),
                               &pick_list, PICK_ANY, all_but_uchain, 2);
         }
 
@@ -742,7 +742,7 @@ boolean do_auto_in_bag;
                     goto pickupdone;
                 if (selective)
                     traverse_how |= INVORDER_SORT;
-                n = query_objlist(do_auto_in_bag ? "Pick up and auto-stash what?" : "Pick up what?", objchain_p, traverse_how,
+                n = query_objlist(do_auto_in_bag ? "Pick up and auto-stash what?" : "Pick up what?", objchain_p, traverse_how | OBJECT_COMPARISON,
                                   &pick_list, PICK_ANY,
                                   (via_menu == -2) ? allow_all
                                                    : allow_category, 2);
@@ -1075,6 +1075,7 @@ int show_weights;
     anything any;
     boolean printed_type_name, first,
             sorted = (qflags & INVORDER_SORT) != 0,
+            comparison_stats = (qflags & OBJECT_COMPARISON) != 0 && iflags.show_comparison_stats && !iflags.in_dumplog && !program_state.gameover,
             engulfer = (qflags & INCLUDE_HERO) != 0;
     unsigned sortflags;
     Loot *sortedolist, *srtoli;
@@ -1178,10 +1179,29 @@ int show_weights;
                 get_obj_location(curr, &x, &y, CONTAINED_TOO | BURIED_TOO);
                 int glyph = obj_to_glyph(curr, rn2_on_display_rng);
                 int gui_glyph = maybe_get_replaced_glyph(glyph, x, y, data_to_replacement_info(glyph, LAYER_OBJECT, curr, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
+                char objbuf[BUFSZ * 2];
+                char attrs[BUFSZ * 2];
+                char colors[BUFSZ * 2];
+                memset(attrs, ATR_NONE, sizeof(attrs));
+                memset(colors, NO_COLOR, sizeof(colors));
+                Strcpy(objbuf, 
+                    show_weights > 0 ? 
+                    (flags.inventory_weights_last ? doname_with_price_and_weight_last(curr, loadstonecorrectly) : doname_with_price_and_weight_first(curr, loadstonecorrectly)) : 
+                    doname_with_price(curr));
+                struct extended_menu_info eminfo = obj_to_extended_menu_info(curr);
+                if (comparison_stats)
+                {
+                    char compbuf[BUFSZ];
+                    print_comparison_stats(curr, compbuf, WIN_ERR, ATR_NONE, NO_COLOR, TRUE, TRUE, objbuf, attrs, colors);
+                    eminfo.attrs = attrs;
+                    eminfo.colors = colors;
+                    eminfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+                }
+
                 add_extended_menu(win, gui_glyph, &any,
                     applied_invlet, applied_group_accelerator, ATR_NONE, NO_COLOR, 
-                    show_weights > 0 ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(curr, loadstonecorrectly) : doname_with_price_and_weight_first(curr, loadstonecorrectly)) : doname_with_price(curr), 
-                    MENU_UNSELECTED, obj_to_extended_menu_info(curr));
+                    objbuf,
+                    MENU_UNSELECTED, eminfo);
                 first = FALSE;
             }
         }
@@ -1778,7 +1798,7 @@ boolean telekinesis;
     }
 
     if (obj->otyp == SCR_SCARE_MONSTER && result <= 0 && !container)
-        obj->speflags &= ~SPEFLAGS_WILL_TURN_TO_DUST_ON_PICKUP;
+        obj->special_quality = 0;
 
     return result;
 }
@@ -1826,8 +1846,8 @@ uchar* obj_gone_ptr; /* 1 = merged, 2 = put in bag, 3 = gone */
     {
         if (obj->blessed)
             obj->blessed = 0;
-        else if (!(obj->speflags & SPEFLAGS_WILL_TURN_TO_DUST_ON_PICKUP) && !obj->cursed)
-            obj->speflags |= SPEFLAGS_WILL_TURN_TO_DUST_ON_PICKUP;
+        else if (obj->special_quality == 0 && !obj->cursed)
+            obj->special_quality = SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP;
         else 
         {
             char dcbuf[BUFSZ] = "";
@@ -2049,6 +2069,7 @@ struct obj *otmp;
         delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
     }
 
+    Strcpy(debug_buf_2, "pick_obj");
     obj_extract_self(otmp);
     newsym(ox, oy);
 
@@ -2412,7 +2433,7 @@ boolean* got_something_ptr;
             boolean subtyp_is_item_special_quality = (decoration_type_definitions[levl[x][y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_SUBTYP_IS_OBJ_SPECIAL_QUALITY) != 0;
             boolean item_is_statue = decoration_type_definitions[levl[x][y].decoration_typ].lootable_item == STATUE;
             int mnum = decoration_type_definitions[levl[x][y].decoration_typ].mnum;
-            struct obj* newobj = mksobj_with_flags(decoration_type_definitions[levl[x][y].decoration_typ].lootable_item, TRUE, FALSE, 0, (struct monst*)0, MAT_NONE, item_is_statue ? mnum : subtyp_is_item_special_quality ? (long)levl[x][y].decoration_subtyp : 0L, 0L, item_is_statue ? MKOBJ_FLAGS_PARAM_IS_MNUM : subtyp_is_item_special_quality ? MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY : 0UL);
+            struct obj* newobj = mksobj_with_flags(decoration_type_definitions[levl[x][y].decoration_typ].lootable_item, TRUE, FALSE, MKOBJ_TYPE_GENERATED, (struct monst*)0, MAT_NONE, item_is_statue ? mnum : subtyp_is_item_special_quality ? (long)levl[x][y].decoration_subtyp : 0L, 0L, item_is_statue ? MKOBJ_FLAGS_PARAM_IS_MNUM : subtyp_is_item_special_quality ? MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY : 0UL);
             if (newobj)
             {
                 *got_something_ptr = TRUE;
@@ -2432,6 +2453,7 @@ boolean* got_something_ptr;
                     }
                 }
                 play_simple_object_sound(newobj, OBJECT_SOUND_TYPE_PICK_UP);
+                Strcpy(debug_buf_2, "loot_decoration");
                 obj_extract_self(newobj);
                 newobj = hold_another_object(newobj, "Oops!  %s out of your grasp!",
                     The(aobjnam(newobj, "slip")), (const char*)0);
@@ -2443,7 +2465,7 @@ boolean* got_something_ptr;
         int lootable_item = itemnumber == 2 ? decoration_type_definitions[levl[x][y].decoration_typ].lootable_item2 : decoration_type_definitions[levl[x][y].decoration_typ].lootable_item3;
         if (lootable_item != STRANGE_OBJECT)
         {
-            struct obj* newobj = mksobj_with_flags(lootable_item, TRUE, FALSE, 0, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
+            struct obj* newobj = mksobj_with_flags(lootable_item, TRUE, FALSE, MKOBJ_TYPE_GENERATED, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
             if (newobj)
             {
                 if(itemnumber == 2)
@@ -2962,6 +2984,7 @@ boolean do_auto_in_bag;
             }
 
             play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_APPLY);
+            Strcpy(debug_buf_2, "loot_mon");
             obj_extract_self(otmp);
 
             if ((unwornmask = otmp->owornmask) != 0L)
@@ -3050,6 +3073,7 @@ int held;
             otmp = curr->nobj;
             if (!rn2(13)) 
             {
+                Strcpy(debug_buf_2, "boh_loss");
                 obj_extract_self(curr);
                 loss += mbag_item_gone(held, curr);
             }
@@ -3320,6 +3344,7 @@ boolean dobot;
 
         explode(u.ux, u.uy, RAY_MAGIC_MISSILE, (struct monst*)0, 2, 6, 0, saved_otyp, saved_oclass, EXPL_MAGICAL);
         /*delete_contents(current_container);*/
+        Strcpy(debug_buf_2, "in_container_core");
         register struct obj* curr;
         while ((curr = current_container->cobj) != 0) {
             obj_extract_self(curr);
@@ -3603,6 +3628,7 @@ uchar* obj_gone_ptr;
         obj = splitobj(obj, count);
 
     /* Remove the object from the list. */
+    Strcpy(debug_buf_2, "out_container_core");
     obj_extract_self(obj);
     current_container->owt = weight(current_container);
 
@@ -3731,6 +3757,7 @@ boolean makecat, givemsg;
             livecat->u_know_mname = TRUE; /* It is famous! */
             if (deadcat)
             {
+                Strcpy(debug_buf_2, "observe_quantum_cat");
                 obj_extract_self(deadcat);
                 obfree(deadcat, (struct obj *) 0), deadcat = 0;
             }
@@ -4501,7 +4528,7 @@ struct obj* other_container UNUSED;
     }
     else 
     {
-        mflags = INVORDER_SORT;
+        mflags = INVORDER_SORT | OBJECT_COMPARISON;
         if (command_id == 1 && flags.invlet_constant)
             mflags |= USE_INVLET;
         if (command_id == 6)
@@ -4652,7 +4679,7 @@ boolean outokay, inokay, alreadyused, more_containers;
 
     any = zeroany;
     win = create_nhwindow(NHW_MENU);
-    start_menu_ex(win, GHMENU_STYLE_ITEM_COMMAND);
+    start_menu_ex(win, GHMENU_STYLE_GENERAL_COMMAND);
 
     any.a_int = 1; /* ':' */
     Sprintf(buf, "Look inside %s", thesimpleoname(obj));
@@ -4884,7 +4911,7 @@ dotip()
         spillage = "wax";
     } else if ((cobj->otyp == POT_OIL && cobj->lamplit)
                || (cobj->otyp == OIL_LAMP && cobj->age != 0L)
-               || (cobj->otyp == MAGIC_LAMP && cobj->special_quality == 1)) {
+               || (cobj->otyp == MAGIC_LAMP && cobj->special_quality == SPEQUAL_MAGIC_LAMP_CONTAINS_DJINN)) {
         spillage = "oil";
         /* todo: reduce potion's remaining burn timer or oil lamp's fuel */
     } else if (cobj->otyp == CAN_OF_GREASE && cobj->charges > 0) {
@@ -5028,6 +5055,7 @@ struct obj *box; /* or bag */
         pline("%s out%c",
               box->cobj->nobj ? "Objects spill" : "An object spills",
               terse ? ':' : '.');
+        Strcpy(debug_buf_2, "tip_container");
         for (otmp = box->cobj; otmp; otmp = nobj) {
             nobj = otmp->nobj;
             obj_extract_self(otmp);

@@ -466,6 +466,7 @@ struct objclass {
 #define is_slurpable(otmp) (material_definitions[(otmp)->material].slurpable != 0)
 #define melts_in_lava(otmp) (material_definitions[(otmp)->material].destroyed_in_lava != 0)
 #define is_metallic(otmp)  (material_definitions[(otmp)->material].metallic != 0) 
+#define is_material_flimsy(otmp)  (material_definitions[(otmp)->material].flimsy != 0) 
 #define is_fragile(otmp)  (material_definitions[(otmp)->material].fragile != 0) 
 #define is_obj_stony(otmp)  (material_definitions[(otmp)->material].mineral != 0) 
 
@@ -1066,7 +1067,7 @@ struct objclass {
 #define O5_EFFECT_IS_DAMAGE            0x00001000UL /* (Potion) Effect data is damage */
 #define O5_EFFECT_FOR_BLESSED_ONLY     0x00002000UL /* Effect data is for blessed potion only (monster detection, scroll of fire) */
 #define O5_EFFECT_FLAGS_ARE_HEALING    0x00004000UL /* aflags2 bits determine what ailments the effect cures */
-/* free bit */
+#define O5_PERMANENTLY_GREASED         0x00008000UL
 #define O5_LIGHT_SOURCE                0x00010000UL
 #define O5_BURNS_INFINITELY            0x00020000UL
 #define O5_NO_CATALOGUE                0x00040000UL

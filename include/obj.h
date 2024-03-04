@@ -6,6 +6,7 @@
 /* GnollHack may be freely redistributed.  See license for details. */
 
 #include "general.h"
+#include "objclass.h"
 
 #ifndef OBJ_H
 #define OBJ_H
@@ -59,6 +60,19 @@ struct obj {
                   OBSOLETE (moved to speflags): historic and gender for statues */
     short charges; /* number of charges for wand or charged tool ( >= -1 ), always set to -1/0 by cancellation */
     short special_quality; /* item-specific special quality, e.g., the amount of wetness of a towel, number of candles attached to candelabrum, not affected by cancellation */
+
+#define SPEQUAL_STATUE_HISTORIC                1
+#define SPEQUAL_RULING_RING_INSCRIPTION_READ   1
+#define SPEQUAL_MAIL_FROM_BONES_OR_WISHING     1
+#define SPEQUAL_MAIL_FROM_MAGIC_MARKER         2
+#define SPEQUAL_MAGIC_LAMP_CONTAINS_DJINN      1
+#define SPEQUAL_TIN_CONTAINS_SPINACH           1
+#define SPEQUAL_MAGIC_CANDLE_PARTLY_USED       1
+#define SPEQUAL_MAGIC_CANDLE_UNUSED            2
+#define SPEQUAL_LIGHT_SOURCE_FUNCTIONAL        1
+#define SPEQUAL_UBALL_SPECIAL                  1
+#define SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP   1
+
     unsigned long speflags; /* anything else that might be going on with an item, not affected by cancellation */
 
 #define SPEFLAGS_YOURS                         0x00000001UL
@@ -66,7 +80,7 @@ struct obj {
 #define SPEFLAGS_MALE                          0x00000004UL
 #define SPEFLAGS_FACING_RIGHT                  0x00000008UL
 #define SPEFLAGS_SCHROEDINGERS_BOX             0x00000010UL
-#define SPEFLAGS_STATUE_HISTORIC               0x00000020UL
+#define SPEFLAGS_INTENDED_FOR_SALE             0x00000020UL  /* Monsters will not wear this item */
 #define SPEFLAGS_CORPSE_ON_ICE                 0x00000040UL
 #define SPEFLAGS_DETECTED                      0x00000080UL
 #define SPEFLAGS_SERVICED_SPELL                0x00000100UL
@@ -81,12 +95,12 @@ struct obj {
 #define SPEFLAGS_LID_OPENED                    0x00020000UL
 #define SPEFLAGS_GRABBED_FROM_YOU              0x00040000UL
 #define SPEFLAGS_ADDED_TO_YOUR_BILL            0x00080000UL
-#define SPEFLAGS_WILL_TURN_TO_DUST_ON_PICKUP   0x00100000UL
+#define SPEFLAGS_CERTAIN_WISH                  0x00100000UL
 #define SPEFLAGS_CAUGHT_IN_LEAVES              0x00200000UL
 #define SPEFLAGS_CLONED_ITEM                   0x00400000UL
-#define SPEFLAGS_INSCRIPTION_REVEALED          0x00800000UL
+#define SPEFLAGS_NO_PREVIOUS_WEAPON            0x00800000UL
 #define SPEFLAGS_ALTERNATIVE_APPEARANCE        0x01000000UL /* Alternative glyph is used for the object */
-#define SPEFLAGS_ROTTING_STATUS_KNOWN          0x02000000UL
+#define SPEFLAGS_PREVIOUSLY_WIELDED            0x02000000UL
 #define SPEFLAGS_FAVORITE                      0x04000000UL
 #define SPEFLAGS_EMPTY_NOTICED                 0x08000000UL
 #define SPEFLAGS_BEING_BROKEN                  0x10000000UL
@@ -158,9 +172,8 @@ struct obj {
     Bitfield(tknown, 1); /* trapped status of a container is known */
     Bitfield(nknown, 1); /* artifact's true name is known */
     Bitfield(aknown, 1); /* artifact status is known; if set, the artifact will be termed "the Artifact" instead of "item named Artifact" */
-
     Bitfield(mknown, 1); /* mythic quality is known */
-    /* 1 free bit to 32-bit integer */
+    Bitfield(rotknown, 1); /* rotting status is known */
 
     int corpsenm;         /* type of corpse is mons[corpsenm] */
 #define leashmon corpsenm /* gets m_id of attached pet */
@@ -280,6 +293,9 @@ enum elemental_enchantments {
 #define is_otyp_whip(otyp)                                             \
     (objects[otyp].oc_class == WEAPON_CLASS && objects[otyp].oc_subtyp == WEP_WHIP)
 #define is_whip(o) is_otyp_whip((o)->otyp) 
+#define is_otyp_hook(otyp)                                             \
+    (objects[otyp].oc_class == TOOL_CLASS && objects[otyp].oc_subtyp == TOOLTYPE_HOOK)
+#define is_hook(o) is_otyp_hook((o)->otyp) 
 #define is_otyp_sword(otyp) \
     (objects[otyp].oc_class == WEAPON_CLASS                     \
      && objects[otyp].oc_skill == P_SWORD)
@@ -657,9 +673,11 @@ enum elemental_enchantments {
     (is_key(obj) || (obj)->otyp == LOCK_PICK)
 
 /* misc helpers, simple enough to be macros */
-#define is_flimsy(otmp)                           \
-    ((otmp)->material <= MAT_LEATHER \
-     || (get_obj_oc_flags2(otmp) & O2_FLIMSY) != 0)
+#define is_flimsy(otmp) \
+    (is_material_flimsy(otmp) || (get_obj_oc_flags2(otmp) & O2_FLIMSY) != 0)
+
+#define is_hard_helmet(otmp)  ((is_metallic(otmp) || !is_flimsy(otmp)) && !is_fragile(otmp)) 
+
 #define is_plural(o) \
     ((o)->quan != 1L                                                    \
      /* "the Eyes of the Overworld" are plural, but                     \
@@ -869,6 +887,8 @@ enum mythic_prefix_types {
     MYTHIC_PREFIX_SORCERERS,
     MYTHIC_PREFIX_OLYMPIAN,
     MYTHIC_PREFIX_JOTUNHEIMIAN,
+    MYTHIC_PREFIX_CIMMERIAN,
+    MYTHIC_PREFIX_MELNIBONEAN,
     MAX_MYTHIC_PREFIXES
 };
 
@@ -936,39 +956,51 @@ enum mythic_power_types {
 
 enum mythic_prefix_power_types {
     MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN = 0,
-    MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN,
-    MYTHIC_PREFIX_POWER_INDEX_HP_GAIN,
+    MYTHIC_PREFIX_POWER_INDEX_ARMOR_MANA_GAIN,
+    MYTHIC_PREFIX_POWER_INDEX_ARMOR_HP_GAIN,
     MYTHIC_PREFIX_POWER_INDEX_LIFE_DRAINING,
     MYTHIC_PREFIX_POWER_INDEX_SHINES_LIGHT,
     MYTHIC_PREFIX_POWER_INDEX_ARMOR_DEATH_RESISTANCE,
     MYTHIC_PREFIX_POWER_INDEX_ARMOR_DRAIN_RESISTANCE,
-    MYTHIC_PREFIX_POWER_INDEX_REGENERATION,
-    MYTHIC_PREFIX_POWER_INDEX_MANA_REGENERATION,
-    MYTHIC_PREFIX_POWER_INDEX_CURSE_RESISTANCE,
+    MYTHIC_PREFIX_POWER_INDEX_ARMOR_REGENERATION,
+    MYTHIC_PREFIX_POWER_INDEX_ARMOR_MANA_REGENERATION,
+    MYTHIC_PREFIX_POWER_INDEX_ARMOR_CURSE_RESISTANCE,
     MYTHIC_PREFIX_POWER_INDEX_TRIPLE_BASE_DAMAGE,
     MYTHIC_PREFIX_POWER_INDEX_ADDED_ENCHANTABILITY,
     MYTHIC_PREFIX_POWER_INDEX_UNCURSEABLE,
     MYTHIC_PREFIX_POWER_INDEX_GREAT_STRENGTH,
     MYTHIC_PREFIX_POWER_INDEX_SORCERY,
+    MYTHIC_PREFIX_POWER_INDEX_GREAT_CONSTITUTION,
+    MYTHIC_PREFIX_POWER_INDEX_DOUBLE_BASE_DAMAGE,
+    MYTHIC_PREFIX_POWER_INDEX_COUNTS_AS_SILVER,
+    MYTHIC_PREFIX_POWER_INDEX_SPELL_CASTING,
+    MYTHIC_PREFIX_POWER_INDEX_GREAT_ACCURACY,
+    MYTHIC_PREFIX_POWER_INDEX_GREAT_DAMAGE,
     MAX_MYTHIC_PREFIX_POWERS
 };
 
 #define MYTHIC_PREFIX_POWER_NONE                    0x00000000UL
 #define MYTHIC_PREFIX_POWER_LEVEL_DRAIN             (1UL << MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN)
-#define MYTHIC_PREFIX_POWER_MANA_GAIN               (1UL << MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN)
-#define MYTHIC_PREFIX_POWER_HP_GAIN                 (1UL << MYTHIC_PREFIX_POWER_INDEX_HP_GAIN)
+#define MYTHIC_PREFIX_POWER_ARMOR_MANA_GAIN         (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_MANA_GAIN)
+#define MYTHIC_PREFIX_POWER_ARMOR_HP_GAIN           (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_HP_GAIN)
 #define MYTHIC_PREFIX_POWER_LIFE_DRAINING           (1UL << MYTHIC_PREFIX_POWER_INDEX_LIFE_DRAINING)
 #define MYTHIC_PREFIX_POWER_SHINES_LIGHT            (1UL << MYTHIC_PREFIX_POWER_INDEX_SHINES_LIGHT)
 #define MYTHIC_PREFIX_POWER_ARMOR_DEATH_RESISTANCE  (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_DEATH_RESISTANCE)
 #define MYTHIC_PREFIX_POWER_ARMOR_DRAIN_RESISTANCE  (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_DRAIN_RESISTANCE)
-#define MYTHIC_PREFIX_POWER_REGENERATION            (1UL << MYTHIC_PREFIX_POWER_INDEX_REGENERATION)
-#define MYTHIC_PREFIX_POWER_MANA_REGENERATION       (1UL << MYTHIC_PREFIX_POWER_INDEX_MANA_REGENERATION)
-#define MYTHIC_PREFIX_POWER_CURSE_RESISTANCE        (1UL << MYTHIC_PREFIX_POWER_INDEX_CURSE_RESISTANCE)
+#define MYTHIC_PREFIX_POWER_ARMOR_REGENERATION      (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_REGENERATION)
+#define MYTHIC_PREFIX_POWER_ARMOR_MANA_REGENERATION (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_MANA_REGENERATION)
+#define MYTHIC_PREFIX_POWER_ARMOR_CURSE_RESISTANCE  (1UL << MYTHIC_PREFIX_POWER_INDEX_ARMOR_CURSE_RESISTANCE)
 #define MYTHIC_PREFIX_POWER_TRIPLE_BASE_DAMAGE      (1UL << MYTHIC_PREFIX_POWER_INDEX_TRIPLE_BASE_DAMAGE)
 #define MYTHIC_PREFIX_POWER_ADDED_ENCHANTABILITY    (1UL << MYTHIC_PREFIX_POWER_INDEX_ADDED_ENCHANTABILITY)
 #define MYTHIC_PREFIX_POWER_UNCURSEABLE             (1UL << MYTHIC_PREFIX_POWER_INDEX_UNCURSEABLE)
 #define MYTHIC_PREFIX_POWER_GREAT_STRENGTH          (1UL << MYTHIC_PREFIX_POWER_INDEX_GREAT_STRENGTH)
 #define MYTHIC_PREFIX_POWER_SORCERY                 (1UL << MYTHIC_PREFIX_POWER_INDEX_SORCERY)
+#define MYTHIC_PREFIX_POWER_GREAT_CONSTITUTION      (1UL << MYTHIC_PREFIX_POWER_INDEX_GREAT_CONSTITUTION)
+#define MYTHIC_PREFIX_POWER_DOUBLE_BASE_DAMAGE      (1UL << MYTHIC_PREFIX_POWER_INDEX_DOUBLE_BASE_DAMAGE)
+#define MYTHIC_PREFIX_POWER_COUNTS_AS_SILVER        (1UL << MYTHIC_PREFIX_POWER_INDEX_COUNTS_AS_SILVER)
+#define MYTHIC_PREFIX_POWER_SPELL_CASTING           (1UL << MYTHIC_PREFIX_POWER_INDEX_SPELL_CASTING)
+#define MYTHIC_PREFIX_POWER_GREAT_ACCURACY          (1UL << MYTHIC_PREFIX_POWER_INDEX_GREAT_ACCURACY)
+#define MYTHIC_PREFIX_POWER_GREAT_DAMAGE          (1UL << MYTHIC_PREFIX_POWER_INDEX_GREAT_DAMAGE)
 
 enum mythic_suffix_power_types {
     MYTHIC_SUFFIX_POWER_INDEX_LIGHTNESS = 0,
@@ -1068,12 +1100,17 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 #define MYTHIC_LIFE_DRAINING_DIESIZE 6
 #define MYTHIC_HP_GAIN_PERCENTAGE 25
 #define MYTHIC_MANA_GAIN_PERCENTAGE 25
+#define MYTHIC_SPELL_CASTING_BASE_GAIN_PERCENTAGE 50
+#define MYTHIC_SPELL_CASTING_BASE_GAIN (MYTHIC_SPELL_CASTING_BASE_GAIN_PERCENTAGE / 5)
+#define MYTHIC_GREAT_ACCURACY_BASE 5
+#define MYTHIC_GREAT_DAMAGE_DICE 2
+#define MYTHIC_GREAT_DAMAGE_DIESIZE 8
 
 #define has_obj_mythic_lightness(o)             has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_LIGHTNESS)
 #define has_obj_mythic_spellcasting(o)          (has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_SORCERY) || has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_SORCERY))
 #define has_obj_mythic_level_drain(o)           has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN)
-#define has_obj_mythic_mana_gain(o)             has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_MANA_GAIN)
-#define has_obj_mythic_hp_gain(o)               has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_HP_GAIN)
+#define has_obj_mythic_mana_gain(o)             has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_ARMOR_MANA_GAIN)
+#define has_obj_mythic_hp_gain(o)               has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_ARMOR_HP_GAIN)
 #define has_obj_mythic_wounding(o)              has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_WOUNDING)
 #define mythic_wounding_amount(o)               (d(MYTHIC_WOUNDING_DICE, MYTHIC_WOUNDING_DIESIZE) + (o)->enchantment)
 #define has_obj_mythic_defense(o)               has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_DEFENSE)
@@ -1088,6 +1125,14 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 #define has_obj_mythic_return_to_hand(o)        has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_RETURN_TO_HAND_AFTER_THROW)
 #define has_obj_mythic_uncurseable(o)           has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_UNCURSEABLE)
 #define has_obj_mythic_great_strength(o)        has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_STRENGTH)
+#define has_obj_mythic_great_constitution(o)    has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_CONSTITUTION)
+#define has_obj_mythic_double_base_damage(o)    has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_DOUBLE_BASE_DAMAGE)
+#define has_obj_mythic_silver_damage(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_COUNTS_AS_SILVER)
+#define has_obj_mythic_spell_casting(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_SPELL_CASTING)
+#define has_obj_mythic_great_accuracy(o)        has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_ACCURACY)
+#define has_obj_mythic_great_damage(o)          has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_DAMAGE)
+
+#define obj_counts_as_silver(o) ((o)->material == MAT_SILVER || has_obj_mythic_silver_damage(o))
 
 #define is_obj_uncurseable(o) \
     ((get_obj_oc_flags(o) & O1_NOT_CURSEABLE) != 0 || has_obj_mythic_uncurseable(o))
@@ -1157,12 +1202,13 @@ enum manual_types
     MANUAL_CATALOGUE_OF_COMESTIBLES,
     MANUAL_CATALOGUE_OF_GEMS_AND_STONES,
     MANUAL_CATALOGUE_OF_ARTIFACTS,
+    MANUAL_CATALOGUE_OF_AMULETS,
     MAX_MANUAL_TYPES
 };
 
 #define NUM_RANDOM_MANUALS MANUAL_GUIDE_TO_DRAGON_SCALE_MAILS
 #define FIRST_CATALOGUE MANUAL_CATALOGUE_OF_WEAPONS
-#define LAST_CATALOGUE MANUAL_CATALOGUE_OF_ARTIFACTS
+#define LAST_CATALOGUE MANUAL_CATALOGUE_OF_AMULETS
 #define NUM_CATALOGUES (LAST_CATALOGUE - FIRST_CATALOGUE + 1)
 
 /* Flags for get_obj_location(). */

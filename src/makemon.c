@@ -170,7 +170,7 @@ int elemental_enchantment, exceptionality, material;
 {
     register struct obj *otmp;
 
-    otmp = mksobj_with_flags(otyp, TRUE, FALSE, FALSE, mtmp, material, 0L, 0L, 0UL);
+    otmp = mksobj_with_flags(otyp, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, material, 0L, 0L, 0UL);
     if(!(oquan_const == 0 && oquan_rnd == 0))
         otmp->quan = (long) rn1(oquan_rnd, oquan_const);
     otmp->owt = weight(otmp);
@@ -265,7 +265,6 @@ struct obj* obj;
 
     int otyp = obj->otyp;
     boolean generate_random_item = FALSE;
-    Strcpy(debug_buf_1, "m_inityour");
 
     if (obj->oartifact)
     {
@@ -552,7 +551,7 @@ register struct monst *mtmp;
         else if (ptr->msound == MS_PRIEST
                    || quest_mon_represents_role(ptr, PM_PRIEST)) 
         {
-            otmp = mksobj_with_flags(MACE, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(MACE, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
             if (otmp)
             {
                 if (has_epri(mtmp) && mm == PM_HIGH_PRIEST)
@@ -723,7 +722,7 @@ register struct monst *mtmp;
                     break;
                 }
                 int weaptype = is_major_weapon ? aligntyp_major_weapon : !rn2(3) ? LONG_SWORD : aligntyp_minor_weapon;
-                otmp = mksobj_with_flags(weaptype, FALSE, FALSE, FALSE, mtmp, material, 0L, 0L, weapon_flags);
+                otmp = mksobj_with_flags(weaptype, FALSE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, material, 0L, 0L, weapon_flags);
                 if (otmp)
                 {
                     if (otmp->oartifact == 0)
@@ -744,7 +743,7 @@ register struct monst *mtmp;
                 }
 
                 otmp = mksobj_with_flags(!rn2(4) || is_lord(ptr) ? SHIELD_OF_REFLECTION : !rn2(3) ? SPIKED_SHIELD : LARGE_SHIELD,
-                    FALSE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+                    FALSE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
                 
                 if (otmp)
                 {
@@ -776,7 +775,7 @@ register struct monst *mtmp;
 
                 }
 
-                otmp = mksobj_with_flags(weaptype, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+                otmp = mksobj_with_flags(weaptype, TRUE, FALSE, artifacttype > 0 ? MKOBJ_TYPE_ARTIFACT_BASE : MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
 
                 /* maybe make it special */
                 if (artifacttype > 0)
@@ -805,9 +804,7 @@ register struct monst *mtmp;
             {
                 int ringtype = RIN_SUPREME_POWER;
                 int artifacttype = ART_RULING_RING_OF_YENDOR;
-
-                otmp = mksobj(ringtype, FALSE, FALSE, FALSE);
-
+                otmp = mksobj(ringtype, FALSE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE);
                 if (otmp)
                 {
                     /* try to make it special */
@@ -1048,7 +1045,7 @@ register struct monst *mtmp;
                 default:
                     break;
                 }
-                otmp = mksobj_with_flags(weaptype, TRUE, FALSE, FALSE, mtmp, material, 0L, 0L, 0UL);
+                otmp = mksobj_with_flags(weaptype, TRUE, FALSE, artifacttype > 0 ? MKOBJ_TYPE_ARTIFACT_BASE : MKOBJ_TYPE_NORMAL, mtmp, material, 0L, 0L, 0UL);
 
                 /* maybe make it special */
                 if (artifacttype > 0 && !rn2(40))
@@ -1080,7 +1077,7 @@ register struct monst *mtmp;
         {
         case PM_BALOR:
         {
-            otmp = mksobj_with_flags(BULLWHIP, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(BULLWHIP, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
             spe2 = rnd(5);
             otmp->enchantment = max(otmp->enchantment, spe2);
             otmp->elemental_enchantment = FIRE_ENCHANTMENT;
@@ -1089,7 +1086,7 @@ register struct monst *mtmp;
 
             if (rn2(2))
             {
-                otmp = mksobj_with_flags(BROADSWORD, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+                otmp = mksobj_with_flags(BROADSWORD, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
                 spe2 = rnd(4);
                 otmp->enchantment = max(otmp->enchantment, spe2);
                 otmp->elemental_enchantment = FIRE_ENCHANTMENT;
@@ -1098,7 +1095,7 @@ register struct monst *mtmp;
             }
             else
             {
-                otmp = mksobj_with_flags(AXE, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+                otmp = mksobj_with_flags(AXE, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
                 spe2 = 1 + rnd(4);
                 otmp->enchantment = max(otmp->enchantment, spe2);
                 otmp->exceptionality = !rn2(3) ? EXCEPTIONALITY_INFERNAL : EXCEPTIONALITY_ELITE;
@@ -1125,14 +1122,14 @@ register struct monst *mtmp;
             (void)mongets(mtmp, !rn2(5) ? LONG_SWORD : !rn2(4) ? SCIMITAR : !rn2(3) ? SHORT_SWORD : !rn2(2) ? DAGGER : AXE);
             break;
         case PM_PIT_FIEND:
-            otmp = mksobj_with_flags(ANCUS, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(ANCUS, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
             curse(otmp);
             spe2 = 0 + rnd(3);
             otmp->enchantment = max(otmp->enchantment, spe2);
             otmp->exceptionality = !rn2(3) ? EXCEPTIONALITY_INFERNAL : EXCEPTIONALITY_ELITE;
             (void)mpickobj(mtmp, otmp);
 
-            otmp = mksobj_with_flags(JAGGED_TOOTHED_CLUB, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(JAGGED_TOOTHED_CLUB, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
             curse(otmp);
             spe2 = 0 + rnd(3);
             otmp->enchantment = max(otmp->enchantment, spe2);
@@ -1141,7 +1138,7 @@ register struct monst *mtmp;
             break;
         case PM_BAPHOMET:
             /* Baphomet's bardiche */
-            otmp = mksobj_with_flags(BARDICHE, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(BARDICHE, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
             curse(otmp);
             otmp->oerodeproof = TRUE;
             spe2 = 3 + rnd(7);
@@ -1154,7 +1151,7 @@ register struct monst *mtmp;
 
             break;
         case PM_ORCUS:
-            otmp = mksobj_with_flags(MACE_OF_THE_UNDERWORLD, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(MACE_OF_THE_UNDERWORLD, TRUE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE, mtmp, MAT_NONE, 0L, 0L, 0UL);
             if(otmp)
                 otmp = oname(otmp, artiname(ART_WAND_OF_ORCUS));
 
@@ -1173,7 +1170,7 @@ register struct monst *mtmp;
             }
             break;
         case PM_YEENAGHU:
-            otmp = mksobj_with_flags(TRIPLE_HEADED_FLAIL, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(TRIPLE_HEADED_FLAIL, TRUE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE, mtmp, MAT_NONE, 0L, 0L, 0UL);
             if (otmp)
                 otmp = oname(otmp, artiname(ART_TRIPLE_HEADED_FLAIL_OF_YEENAGHU));
 
@@ -1187,7 +1184,7 @@ register struct monst *mtmp;
             }
             break;
         case PM_ASMODEUS:
-            otmp = mksobj_with_flags(DIABOLICAL_SCEPTRE, TRUE, FALSE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+            otmp = mksobj_with_flags(DIABOLICAL_SCEPTRE, TRUE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE, mtmp, MAT_NONE, 0L, 0L, 0UL);
             if (otmp)
                 otmp = oname(otmp, artiname(ART_RUBY_ROD_OF_ASMODEUS));
 
@@ -1283,7 +1280,6 @@ register struct monst *mtmp;
     int mndx = mtmp->mnum;
     int n = 0;
     int i;
-    Sprintf(debug_buf_2, "m_initinv, mnum=%d", mtmp->mnum);
 
     if (Is_really_rogue_level(&u.uz))
         return;
@@ -1588,9 +1584,7 @@ register struct monst *mtmp;
             {
                 int ringtype = RIN_SUPREME_POWER;
                 short artifacttype = ART_RULING_RING_OF_YENDOR;
-
-                otmp = mksobj(ringtype, FALSE, FALSE, FALSE);
-
+                otmp = mksobj(ringtype, FALSE, FALSE, artifacttype > 0 ? MKOBJ_TYPE_ARTIFACT_BASE : MKOBJ_TYPE_NORMAL);
                 if (otmp)
                 {
                     /* try to make it special */
@@ -1645,7 +1639,7 @@ register struct monst *mtmp;
         }
         else if (ptr == &mons[PM_VLAD_THE_IMPALER])
         {
-            otmp = mksobj_with_flags(SPEAR, TRUE, FALSE, 0, mtmp, MAT_NONE, EXCEPTIONALITY_INFERNAL, 0L, MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY);
+            otmp = mksobj_with_flags(SPEAR, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, EXCEPTIONALITY_INFERNAL, 0L, MKOBJ_FLAGS_PARAM_IS_EXCEPTIONALITY);
             if (otmp)
             {
                 otmp->enchantment = 4 + rn2(4);
@@ -1662,7 +1656,7 @@ register struct monst *mtmp;
             (void)mongets(mtmp, (rn2(7) ? ATHAME : WAN_NOTHING));
         else if (ptr == &mons[PM_ARCH_LICH] && !rn2(3)) {
             otmp = mksobj_with_flags(rn2(3) ? ATHAME : QUARTERSTAFF, TRUE,
-                rn2(13) ? FALSE : TRUE, FALSE, mtmp, MAT_NONE, 0L, 0L, 0UL);
+                rn2(13) ? FALSE : TRUE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, 0L, 0L, 0UL);
             if (otmp->enchantment < 2)
                 otmp->enchantment = rnd(3);
             if (!rn2(4))
@@ -1760,7 +1754,7 @@ register struct monst *mtmp;
 
             if (!rn2(12))
             {
-                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, mtmp, MAT_NONE, MANUAL_CATALOGUE_OF_COMESTIBLES, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, MAT_NONE, MANUAL_CATALOGUE_OF_COMESTIBLES, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
                 if (otmp)
                     (void)mpickobj(mtmp, otmp);
             }
@@ -1960,7 +1954,7 @@ register struct monst *mtmp;
             boolean three_wishes_ok = TRUE;
             boolean serpent_ring_ok = TRUE;
             boolean conflict_ok = TRUE;
-            boolean true_ring_ok = TRUE;
+            boolean ruling_ring_ok = TRUE;
 
             if (exist_artifact(RIN_THREE_CHARGES, artiname(ART_RING_OF_THREE_WISHES)))
                 three_wishes_ok = FALSE;
@@ -1969,7 +1963,7 @@ register struct monst *mtmp;
             if (exist_artifact(RIN_SEVEN_CHARGES, artiname(ART_RING_OF_CONFLICT)))
                 conflict_ok = FALSE;
             if (exist_artifact(RIN_SUPREME_POWER, artiname(ART_RULING_RING_OF_YENDOR)))
-                true_ring_ok = FALSE;
+                ruling_ring_ok = FALSE;
 
             if (three_wishes_ok)
             {
@@ -1990,12 +1984,12 @@ register struct monst *mtmp;
             }
 
             /* Ruling Ring of Yendor is rare with Yacc */
-            if (true_ring_ok && !three_wishes_ok && !serpent_ring_ok && !conflict_ok && !rn2(2))
+            if (ruling_ring_ok && !three_wishes_ok && !serpent_ring_ok && !conflict_ok && !rn2(2))
             {
                 weaptype = RIN_SUPREME_POWER;
                 artifacttype = ART_RULING_RING_OF_YENDOR;
             }
-            otmp = mksobj(weaptype, TRUE, FALSE, FALSE);
+            otmp = mksobj(weaptype, TRUE, FALSE, artifacttype > 0 ? MKOBJ_TYPE_ARTIFACT_BASE : MKOBJ_TYPE_NORMAL);
 
             if (otmp && artifacttype > 0)
                 otmp = oname(otmp, artiname(artifacttype));
@@ -3217,7 +3211,7 @@ aligntyp alignment;
         if (is_armed(ptr))
             m_initweap(mtmp); /* equip with weapons / armor */
         m_initinv(mtmp); /* add on a few special items incl. more armor */
-        m_dowear(mtmp, TRUE);
+        m_dowear(mtmp, TRUE, FALSE);
 
         if ((saddled || (!rn2(100) && is_domestic(ptr)))
             && can_saddle(mtmp) && !which_armor(mtmp, W_SADDLE)) 
@@ -4130,7 +4124,7 @@ uchar material;
     if (!otyp || !mtmp)
         return (struct obj*)0;
 
-    otmp = mksobj_with_flags(otyp, TRUE, FALSE, FALSE, mtmp, material, 0L, 0L, 0UL);
+    otmp = mksobj_with_flags(otyp, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, material, 0L, 0L, 0UL);
     if (otmp) 
     {
         if (mtmp->data->mlet == S_DEMON) 
@@ -4648,7 +4642,6 @@ register struct monst *mtmp;
             } else if (s_sym == COIN_CLASS) {
                 appear = GOLD_PIECE;
             } else {
-                Sprintf(debug_buf_2, "set_mimic_sym, s_sym=%d,roll=%d", s_sym, roll);
                 otmp = mkobj((char) s_sym, FALSE, FALSE);
                 appear = otmp->otyp;
                 set_mimic_existing_mobj(mtmp, otmp);

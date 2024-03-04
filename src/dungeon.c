@@ -230,6 +230,7 @@ int fd;
     int count, i;
     mapseen *curr_ms, *last_ms;
 
+    Strcpy(debug_buf_4, "restore_dungeon");
     mread(fd, (genericptr_t) &n_dgns, sizeof(n_dgns));
     mread(fd, (genericptr_t) dungeons, sizeof(dungeon) * (size_t) n_dgns);
     mread(fd, (genericptr_t) &dungeon_topology, sizeof dungeon_topology);
@@ -2373,6 +2374,7 @@ int fd;
 
     load = (mapseen *) alloc(sizeof *load);
 
+    Strcpy(debug_buf_4, "load_mapseen");
     mread(fd, (genericptr_t) &branchnum, sizeof branchnum);
     for (brindx = 0, curr = branches; curr; curr = curr->next, ++brindx)
         if (brindx == branchnum)
@@ -3364,6 +3366,10 @@ boolean printdun;
     }
     if (mptr->flags.yacc_hint_shown) {
         Sprintf(buf, "%sHeard distant grunting and bellowing.", PREFIX);
+        putstr(win, ATR_INDENT_AT_SPACE, buf);
+    }
+    if (mptr->flags.quantum_hint_shown) {
+        Sprintf(buf, "%sHad a sensation of the fabric of reality stretching back and forth.", PREFIX);
         putstr(win, ATR_INDENT_AT_SPACE, buf);
     }
 

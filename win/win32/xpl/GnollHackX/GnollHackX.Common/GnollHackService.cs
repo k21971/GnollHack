@@ -166,7 +166,8 @@ namespace GnollHackX.Unknown
             ReportPlayerNameCallback callback_report_player_name,
             ReportPlayTimeCallback callback_report_play_time,
             SendObjectDataCallback callback_send_object_data,
-            SendMonsterDataCallback callback_send_monster_data
+            SendMonsterDataCallback callback_send_monster_data,
+            SendEngravingDataCallback callback_send_engraving_data
         );
 
         [DllImport(PlatformConstants.dll)]
@@ -187,6 +188,8 @@ namespace GnollHackX.Unknown
         public static extern int GetReplacementOffsets(out IntPtr array_ptr, out int size);
         [DllImport(PlatformConstants.dll)]
         public static extern int CountTotalTiles();
+        [DllImport(PlatformConstants.dll)]
+        public static extern int LibSetArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl, IntPtr ptr_ti2an, int size_ti2an);
         [DllImport(PlatformConstants.dll)]
         public static extern int LibGetUnexploredGlyph();
         [DllImport(PlatformConstants.dll)]
@@ -377,18 +380,13 @@ namespace GnollHackX.Unknown
         public void ClearSavedGames()
         {
             string filesdir = GetGnollHackPath();
-
-            string[] ghdirlist = { "save" };
-            foreach (string ghdir in ghdirlist)
+            string fulldirepath = Path.Combine(filesdir, GHConstants.SaveDirectory);
+            if (Directory.Exists(fulldirepath))
             {
-                string fulldirepath = Path.Combine(filesdir, ghdir);
-                if (Directory.Exists(fulldirepath))
+                DirectoryInfo disave = new DirectoryInfo(fulldirepath);
+                foreach (FileInfo file in disave.GetFiles())
                 {
-                    DirectoryInfo disave = new DirectoryInfo(fulldirepath);
-                    foreach (FileInfo file in disave.GetFiles())
-                    {
-                        file.Delete();
-                    }
+                    file.Delete();
                 }
             }
         }
@@ -396,18 +394,13 @@ namespace GnollHackX.Unknown
         public void ClearDumplogs()
         {
             string filesdir = GetGnollHackPath();
-
-            string[] ghdirlist = { "dumplog" };
-            foreach (string ghdir in ghdirlist)
+            string fulldirepath = Path.Combine(filesdir, GHConstants.DumplogDirectory);
+            if (Directory.Exists(fulldirepath))
             {
-                string fulldirepath = Path.Combine(filesdir, ghdir);
-                if (Directory.Exists(fulldirepath))
+                DirectoryInfo disave = new DirectoryInfo(fulldirepath);
+                foreach (FileInfo file in disave.GetFiles())
                 {
-                    DirectoryInfo disave = new DirectoryInfo(fulldirepath);
-                    foreach (FileInfo file in disave.GetFiles())
-                    {
-                        file.Delete();
-                    }
+                    file.Delete();
                 }
             }
         }
@@ -459,7 +452,18 @@ namespace GnollHackX.Unknown
         public string GetGnollHackPath()
         {
 #if __ANDROID__
-            return Android.App.Application.Context.FilesDir.Path;
+            try
+            {
+                string path = Android.App.Application.Context.FilesDir.Path;
+                if (string.IsNullOrWhiteSpace(path))
+                    return ".";
+                else
+                    return path;
+            }
+            catch
+            {
+                return ".";
+            }
 #elif __IOS__
             try
             {
@@ -499,7 +503,7 @@ namespace GnollHackX.Unknown
             //}
 
             /* Make relevant directories */
-            string[] ghdirlist = { "save", "dumplog" };
+            string[] ghdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory };
             foreach (string ghdir in ghdirlist)
             {
                 string fulldirepath = Path.Combine(filesdir, ghdir);
@@ -860,6 +864,10 @@ namespace GnollHackX.Unknown
 
             return array;
         }
+        public void SetArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl, IntPtr ptr_ti2an, int size_ti2an)
+        {
+            LibSetArrays(ptr_gl2ti, size_gl2ti, ptr_gltifl, size_gltifl, ptr_ti2an, size_ti2an);
+        }
         public int GetTileAnimationIndexFromGlyph(int glyph)
         {
             return get_tile_animation_index_from_glyph(glyph);
@@ -994,7 +1002,7 @@ namespace GnollHackX.Unknown
         public int StartGnollHack(GHGame ghGame)
         {
             string filesdir = GetGnollHackPath();
-            bool allowbones = Preferences.Get("AllowBones", true);
+            bool allowbones = GHApp.AllowBones;
             ulong runflags = (ulong)(ghGame.WizardMode ? RunGnollHackFlags.WizardMode : 0) |
                 (ulong)(GHApp.FullVersionMode ? RunGnollHackFlags.FullVersion : 0) |
                 (ulong)(ghGame.ModernMode ? RunGnollHackFlags.ModernMode : 0) |
@@ -1104,7 +1112,8 @@ namespace GnollHackX.Unknown
                 ghGame.ClientCallback_ReportPlayerName,
                 ghGame.ClientCallback_ReportPlayTime,
                 ghGame.ClientCallback_SendObjectData,
-                ghGame.ClientCallback_SendMonsterData
+                ghGame.ClientCallback_SendMonsterData,
+                ghGame.ClientCallback_SendEngravingData
                 );
 
         }

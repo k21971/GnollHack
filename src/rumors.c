@@ -467,6 +467,7 @@ void
 restore_oracles(fd)
 int fd;
 {
+    Strcpy(debug_buf_4, "restore_oracles");
     mread(fd, (genericptr_t) &oracle_cnt, sizeof oracle_cnt);
     if (oracle_cnt) {
         oracle_loc = (long *) alloc(oracle_cnt * sizeof(long));
@@ -551,7 +552,7 @@ int oraclesstyle; /* 0 = cookie, 1 = oracle, 2 = spell */
         putstr(tmpwin, 0, "");
 
         if (mtmp && oraclesstyle == 1)
-            play_voice_oracle_major_consultation(mtmp, used_oracle_idx - 1);
+            play_voice_oracle_major_consultation(mtmp, (int)used_oracle_idx - 1);
 
         while (dlb_fgets(line, COLNO, oracles) && strcmp(line, "---\n"))
         {
@@ -562,7 +563,11 @@ int oraclesstyle; /* 0 = cookie, 1 = oracle, 2 = spell */
             if(!u.uevent.elbereth_known && strstri(xcryptbuf, "Elbereth"))
                 u.uevent.elbereth_known = 1;
             if (!u.uevent.invocation_ritual_known && strstri(xcryptbuf, "sanctuary"))
+            {
                 u.uevent.invocation_ritual_known = 1;
+                u.uevent.heard_of_invocation_ritual = 1;
+                context.quest_flags |= QUEST_FLAGS_HEARD_OF_BOOK | QUEST_FLAGS_HEARD_OF_BELL | QUEST_FLAGS_HEARD_OF_MENORAH | QUEST_FLAGS_HEARD_OF_VIBRATING_SQUARE | QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM | QUEST_FLAGS_HEARD_OF_AMULET_IN_GEHENNOM;
+            }
         }
         display_nhwindow(tmpwin, TRUE);
         destroy_nhwindow(tmpwin);
@@ -639,7 +644,7 @@ struct monst *oracl;
         play_monster_special_dialogue_line(oracl, ORACLE_LINE_THEN_DOST_THOU_DESIRE_A_MAJOR_ONE);
         Sprintf(qbuf, "\"Then dost thou desire a major one?\" (%ld %s)",
             major_cost, currency(major_cost));
-        if (yn_query(qbuf) != 'y')
+        if (ynq_mon(oracl, qbuf) != 'y')
             return 0;
         u_pay = (umoney < major_cost) ? umoney : major_cost;
         oracleaction = 2;

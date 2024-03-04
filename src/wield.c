@@ -106,7 +106,6 @@ register struct obj *obj;
 long mask;
 boolean verbose;
 {
-    Sprintf(debug_buf_3, "setuwepcore, hasobj=%d", obj != 0);
     struct obj* olduwep = (struct obj*)0;
     if (mask == W_WEP)
     {
@@ -323,7 +322,6 @@ void
 setuqwep(obj)
 register struct obj *obj;
 {
-    Sprintf(debug_buf_3, "setuqwep, hasobj=%d", obj != 0);
     setworncore(obj, W_QUIVER, TRUE);
     context.botl = context.botlx = TRUE;
     status_reassess();
@@ -337,7 +335,6 @@ setuswapwep(obj, mask)
 register struct obj *obj;
 long mask;
 {
-    Sprintf(debug_buf_3, "setuswapwep, hasobj=%d", obj != 0);
     setworncore(obj, mask, TRUE);
     return;
 }
@@ -346,7 +343,6 @@ void
 setuqwepquietly(obj)
 register struct obj* obj;
 {
-    Sprintf(debug_buf_3, "setuqwepquietly, hasobj=%d", obj != 0);
     setworncore(obj, W_QUIVER, FALSE);
     /* no extra handling needed; this used to include a call to
        update_inventory() but that's already performed by setworn() */
@@ -358,7 +354,6 @@ setuswapwepquietly(obj, mask)
 register struct obj* obj;
 long mask;
 {
-    Sprintf(debug_buf_3, "setuswapwepquietly, hasobj=%d", obj != 0);
     setworncore(obj, mask, FALSE);
     return;
 }
@@ -399,6 +394,62 @@ dowield()
         return 0;
 
     return wield_weapon(wep);
+}
+
+int
+dowieldprevwep()
+{
+    multi = 0;
+    if (cantwield(youmonst.data))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Don't be ridiculous!");
+        return 0;
+    }
+
+    if (uwep && (uwep->speflags & SPEFLAGS_NO_PREVIOUS_WEAPON))
+    {
+        if (welded(uwep, &youmonst))
+        {
+            weldmsg(uwep);
+            /* previously interrupted armor removal mustn't be resumed */
+            reset_remarm();
+            return 0;
+        }
+        struct obj* otmp = uwep;
+        int result = ready_weapon((struct obj*)0, W_WEP);
+        boolean unwield_succeeded = uwep == (struct obj*)0;
+        if (unwield_succeeded)
+        {
+            otmp->speflags &= ~SPEFLAGS_NO_PREVIOUS_WEAPON;
+            play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_UNWIELD);
+            update_all_character_properties((struct obj*)0, TRUE);
+            status_reassess();
+        }
+        return result;
+    }
+    else
+    {
+        struct obj* wep = 0;
+        struct obj* otmp;
+        for (otmp = invent; otmp; otmp = otmp->nobj)
+        {
+            if (otmp->speflags & SPEFLAGS_PREVIOUSLY_WIELDED)
+            {
+                wep = otmp;
+                break;
+            }
+        }
+
+        if (wep)
+            return wield_weapon(wep);
+        else
+        {
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            You_ex(ATR_NONE, CLR_MSG_FAIL, "couldn't locate your previous weapon!");
+            return 0;
+        }
+    }
 }
 
 STATIC_OVL
@@ -860,7 +911,6 @@ doswapweapon()
     register struct obj* oldwep2, * oldswap2;
     int result = 0;
     int result2 = 0;
-    Strcpy(debug_buf_4, "doswapweapon");
 
     /* May we attempt this? */
     multi = 0;
@@ -1420,6 +1470,9 @@ wield_tool(obj, verb)
 struct obj *obj;
 const char *verb; /* "rub",&c */
 {
+    if (!obj)
+        return FALSE;
+
     const char *what;
     boolean more_than_1;
 
@@ -1498,6 +1551,8 @@ const char *verb; /* "rub",&c */
         return FALSE;
     }
 
+    obj->speflags &= ~SPEFLAGS_NO_PREVIOUS_WEAPON;
+
     if (uquiver == obj)
         setuqwep((struct obj *) 0);
     else if (bimanual(obj) && uswapwep == obj)
@@ -1547,6 +1602,8 @@ const char *verb; /* "rub",&c */
             setuswapwep((struct obj*)0, W_SWAPWEP2);
 
         struct obj *oldwep = selected_hand_is_right ? uwep: uarms;
+        if(!oldwep)
+            obj->speflags |= SPEFLAGS_NO_PREVIOUS_WEAPON;
 
         if (will_weld(obj, &youmonst))
         {
@@ -1566,10 +1623,29 @@ const char *verb; /* "rub",&c */
             setuwep(obj, wepslot);
         }
 
-        if (flags.pushweapon && oldwep && wep != oldwep)
-            setuswapwep(oldwep, swapwepslot);
-    }
+        /* refresh wep */
+        wep = selected_hand_is_right ? uwep : uarms;
+        boolean setprevwepflag = FALSE;
+        if (oldwep && wep != oldwep)
+        {
+            if (flags.pushweapon)
+                setuswapwep(oldwep, swapwepslot);
+            else
+            {
+                setprevwepflag = TRUE;
+            }
+        }
 
+        struct obj* otmp;
+        for (otmp = invent; otmp; otmp = otmp->nobj)
+            otmp->speflags &= ~SPEFLAGS_PREVIOUSLY_WIELDED;
+
+        if(setprevwepflag && oldwep)
+            oldwep->speflags |= SPEFLAGS_PREVIOUSLY_WIELDED;
+
+        context.botl = context.botlx = TRUE;
+        status_reassess();
+    }
 
     /* refresh wep */
     wep = selected_hand_is_right ? uwep : uarms;
@@ -1634,7 +1710,6 @@ dotwoweapon()
 void
 uwepgone()
 {
-    Strcpy(debug_buf_4, "uwepgone");
     if (uwep) {
         if ((artifact_light(uwep) || has_obj_mythic_magical_light(uwep) || obj_shines_magical_light(uwep)) && uwep->lamplit) {
             end_burn(uwep, FALSE);
@@ -1651,7 +1726,6 @@ uwepgone()
 void
 uwep2gone()
 {
-    Strcpy(debug_buf_4, "uwep2gone");
     if (uarms) {
         if ((artifact_light(uarms) || has_obj_mythic_magical_light(uarms) || obj_shines_magical_light(uarms)) && uarms->lamplit) {
             end_burn(uarms, FALSE);
@@ -1668,7 +1742,6 @@ uwep2gone()
 void
 uswapwepgone()
 {
-    Strcpy(debug_buf_4, "uswapwepgone");
     if (uswapwep) {
         setworn((struct obj *) 0, W_SWAPWEP);
         update_inventory();
@@ -1678,7 +1751,6 @@ uswapwepgone()
 void
 uswapwep2gone()
 {
-    Strcpy(debug_buf_4, "uswapwep2gone");
     if (uswapwep2) {
         setworn((struct obj*) 0, W_SWAPWEP2);
         update_inventory();
@@ -1689,7 +1761,6 @@ uswapwep2gone()
 void
 uqwepgone()
 {
-    Strcpy(debug_buf_4, "uqwepgone");
     if (uquiver) {
         setworn((struct obj *) 0, W_QUIVER);
         update_inventory();

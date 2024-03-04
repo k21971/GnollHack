@@ -233,7 +233,6 @@ struct obj* launcher;
     return m_weapon_range(&youmonst, ammo, launcher);
 }
 
-
 int
 m_weapon_range(mtmp, ammo, launcher)
 struct monst* mtmp;
@@ -356,18 +355,26 @@ int use_type; // OBSOLETE: /* 0 = Melee weapon (full enchantment bonuses), 1 = t
     if(mattacker && cursed_items_are_positive_mon(mattacker) && otmp->cursed)
     { 
         if (Is_weapon || Is_worn_gauntlets)
+        {
             tmp += abs(applicable_enchantment);
+            if (has_obj_mythic_great_accuracy(otmp))
+                tmp += MYTHIC_GREAT_ACCURACY_BASE + abs(applicable_enchantment);
+        }
     }
     else
     {
         if (Is_weapon || Is_worn_gauntlets)
+        { 
             tmp += applicable_enchantment;
+            if (has_obj_mythic_great_accuracy(otmp))
+                tmp += MYTHIC_GREAT_ACCURACY_BASE + applicable_enchantment;
+        }
     }
     tmp += objects[otmp->otyp].oc_hitbonus;
 
     return tmp;
-
 }
+
 int
 weapon_to_hit_value(otmp, mon, mattacker, use_type)
 struct obj *otmp;
@@ -473,6 +480,8 @@ int use_type; //OBSOLETE /* 0 = Melee weapon (full enchantment bonuses), 1 = thr
             int exceptionality_rounds = get_exceptionality_multiplier(otmp->exceptionality);
             if (has_obj_mythic_triple_base_damage(otmp))
                 exceptionality_rounds += 2;
+            else if (has_obj_mythic_double_base_damage(otmp))
+                exceptionality_rounds += 1;
 
             double mythic_multiplier = get_mythic_dmg_multiplier(otmp, mon, mattacker);
             int tmp2 = 0;
@@ -510,9 +519,17 @@ int use_type; //OBSOLETE /* 0 = Melee weapon (full enchantment bonuses), 1 = thr
 #endif
 
             if (mattacker && cursed_items_are_positive_mon(mattacker) && otmp->cursed)
+            {
                 tmp2 += abs(applicable_enchantment);
+                if (has_obj_mythic_great_damage(otmp))
+                    tmp2 += d(MYTHIC_GREAT_DAMAGE_DICE, MYTHIC_GREAT_DAMAGE_DIESIZE) + abs(applicable_enchantment);
+            }
             else
+            {
                 tmp2 += applicable_enchantment;
+                if (has_obj_mythic_great_damage(otmp))
+                    tmp2 += d(MYTHIC_GREAT_DAMAGE_DICE, MYTHIC_GREAT_DAMAGE_DIESIZE) + applicable_enchantment;
+            }
 
             if (tmp2 < 0)
                 tmp2 = 0;
@@ -573,7 +590,7 @@ int use_type; //OBSOLETE /* 0 = Melee weapon (full enchantment bonuses), 1 = thr
             bonus += rnd(4);
         if ((is_axe(otmp) || is_saw(otmp)) && is_wooden(ptr))
             bonus += rnd(4);
-        if (otmp->material == MAT_SILVER && mon_hates_silver(mon))
+        if (obj_counts_as_silver(otmp) && mon_hates_silver(mon))
             bonus += rnd(20);
         if ((artifact_light(otmp) || obj_shines_magical_light(otmp) || has_obj_mythic_magical_light(otmp)) && otmp->lamplit && mon_hates_light(mon))
             bonus += rnd(8);
@@ -794,7 +811,7 @@ long *silverhit_p; /* output flag mask for silver bonus */
            scales refer to color, not material) and the only way to hit
            with one--aside from throwing--is to wield it and perform a
            weapon hit, but we include a general check here */
-        if (obj->material == MAT_SILVER && mon_hates_silver(mdef)) 
+        if (obj_counts_as_silver(obj) && mon_hates_silver(mdef))
         {
             bonus += rnd(20);
             silverhit |= armask;
@@ -806,7 +823,7 @@ long *silverhit_p; /* output flag mask for silver bonus */
     {
         if (left_ring && uleft) 
         {
-            if (uleft->material == MAT_SILVER && mon_hates_silver(mdef))
+            if (obj_counts_as_silver(uleft) && mon_hates_silver(mdef))
             {
                 bonus += rnd(20);
                 silverhit |= W_RINGL;
@@ -814,7 +831,7 @@ long *silverhit_p; /* output flag mask for silver bonus */
         }
         if (right_ring && uright) 
         {
-            if (uright->material == MAT_SILVER && mon_hates_silver(mdef)) 
+            if (obj_counts_as_silver(uright) && mon_hates_silver(mdef))
             {
                 /* two silver rings don't give double silver damage
                    but 'silverhit' messages might be adjusted for them */
@@ -844,8 +861,10 @@ long silverhit;
         rtyp = ((uright && (silverhit & W_RINGR) != 0L)
                 ? uright->otyp : STRANGE_OBJECT);
     boolean both,
-        l_ag = ((ltyp != STRANGE_OBJECT && uleft ? uleft->material : objects[ltyp].oc_material) == MAT_SILVER && uleft && uleft->dknown),
-        r_ag = ((rtyp != STRANGE_OBJECT && uright ? uright->material : objects[rtyp].oc_material) == MAT_SILVER && uright && uright->dknown);
+        l_ag = ((ltyp != STRANGE_OBJECT && uleft ? obj_counts_as_silver(uleft) : objects[ltyp].oc_material == MAT_SILVER) && uleft && uleft->dknown),
+        r_ag = ((rtyp != STRANGE_OBJECT && uright ? obj_counts_as_silver(uright) : objects[rtyp].oc_material == MAT_SILVER) && uright && uright->dknown),
+        really_l_ag = ((ltyp != STRANGE_OBJECT && uleft ? uleft->material == MAT_SILVER : objects[ltyp].oc_material == MAT_SILVER) && uleft && uleft->dknown),
+        really_r_ag = ((rtyp != STRANGE_OBJECT && uright ? uright->material == MAT_SILVER : objects[rtyp].oc_material == MAT_SILVER) && uright && uright->dknown);
 
     if ((silverhit & (W_RINGL | W_RINGR)) != 0L) {
         /* plural if both the same type (so not multi_claw and both rings
@@ -858,7 +877,7 @@ long silverhit;
                 || (l_ag && r_ag));
         Sprintf(rings, "ring%s", both ? "s" : "");
         Your("%s%s %s %s!",
-             (l_ag || r_ag) ? "silver "
+             (really_l_ag || really_r_ag) ? "silver "
              : both ? ""
                : ((silverhit & W_RINGL) != 0L) ? "left "
                  : "right ",
@@ -1195,7 +1214,7 @@ int handindex;
     //Is in hwep table, extra hands do not use two-handed weapons for simplicity (maybe too weak)
     for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
         if (otmp != MON_WEP(mtmp) && !objects[otmp->otyp].oc_bimanual
-            && !(otmp->material == MAT_SILVER && mon_hates_silver(mtmp)) && otmp->otyp != CORPSE)
+            && !(obj_counts_as_silver(otmp) && mon_hates_silver(mtmp)) && otmp->otyp != CORPSE)
         {
             //Suitable weapons are in hwep array
             int i;
@@ -1238,6 +1257,7 @@ boolean polyspot;
     if (!attacktype(mon->data, AT_WEAP)) {
         setmnotwielded(mon, mw_tmp);
         mon->weapon_strategy = NO_WEAPON_WANTED;
+        Strcpy(debug_buf_2, "possibly_unwield");
         obj_extract_self(obj);
         if (cansee(mon->mx, mon->my)) {
             pline("%s drops %s.", Monnam(mon), distant_name(obj, doname));
@@ -1453,20 +1473,33 @@ u_ranged_strdex_to_hit_bonus()
     return sbon;
 }
 
-
 int strength_tohit_bonus(str)
 int str;
 {
-    int sbon = 0;
+    return (int)strength_tohit_bonus_core(str, FALSE);
+}
+
+double strength_tohit_bonus_core(str, is_average)
+int str;
+boolean is_average;
+{
+    double sbon = 0;
     if (str <= 18)
-        sbon = max(-2, (str - 6) / 4);
+        sbon = (double)max(-2, (str - 6) / 4);
     else
     {
         if (str <= STR18(100))
         {
             sbon = 3;
-            if (rn2(100) < str - 18)
-                sbon++;
+            if (is_average)
+            {
+                sbon += ((double)(str - 18)) / 100.0;
+            }
+            else
+            {
+                if (rn2(100) < str - 18)
+                    sbon++;
+            }
         }
         else if (str == STR19(19))
             sbon = 5;
@@ -1502,23 +1535,37 @@ u_thrown_str_dmg_bonus()
     return u_str_dmg_bonus() / 2;
 }
 
-
 int
 strength_damage_bonus(str)
 int str;
 {
-    int sbon = 0;
+    return (int)strength_damage_bonus_core(str, FALSE);
+}
+
+double
+strength_damage_bonus_core(str, is_average)
+int str;
+boolean is_average;
+{
+    double sbon = 0;
     if (str <= 18)
-        sbon = max(-2, (str - 5) / 2);
+        sbon = (double)max(-2, (str - 5) / 2);
     else
     {
         sbon = 6;
         if (str <= STR18(100))
         {
-            if (rn2(100) < str - 18)
-                sbon++;
-            if (rn2(100) < str - 18)
-                sbon++;
+            if (is_average)
+            {
+                sbon += 2.0 * ((double)(str - 18)) / 100.0;
+            }
+            else
+            {
+                if (rn2(100) < str - 18)
+                    sbon++;
+                if (rn2(100) < str - 18)
+                    sbon++;
+            }
         }
         else if (str == STR19(19))
             sbon = 9; /* up to 19 */
@@ -1536,8 +1583,8 @@ int str;
             sbon = 15;
     }
     return sbon;
-
 }
+
 /* monster damage bonus for strength*/
 int
 m_str_dmg_bonus(mon)
@@ -1569,8 +1616,6 @@ struct monst* mon;
     return bonus;
 
 }
-
-
 
 /* monster to hit bonus for strength and dex*/
 int
@@ -1898,20 +1943,25 @@ int skill, lvl;
 
     switch (skill)
     {
-    case P_BARE_HANDED_COMBAT:
     case P_DODGE:
     case P_SHIELD:
     case P_DIGGING:
     case P_RIDING:
     case P_DISARM_TRAP:
         return max(1, (tmp + 1) / 2);
+    case P_BARE_HANDED_COMBAT:
+        return max(1, (tmp + 2) / 3);
     case P_MARTIAL_ARTS:
-        return max(1, (tmp + 6) / 2);
+        return max(1, (tmp + 7) / 3);
     case P_DUAL_WEAPON_COMBAT:
     case P_TWO_HANDED_WEAPON:
     case P_WAND:
-    default:
         return max(1, tmp);
+    default:
+        if(is_magic_skill(skill))
+            return max(1, (tmp + 1) / 2);
+        else
+            return max(1, tmp);
     }
 
     return max(1, tmp);
@@ -2476,6 +2526,8 @@ int skill_id;
             char lvlsuccbuf[BUFSZ] = "";
             char discbuf[BUFSZ] = "";
             char arrowbuf[BUFSZ] = "";
+            char rustbuf[BUFSZ] = "";
+            char telebuf[BUFSZ] = "";
             char magicbuf[BUFSZ] = "";
             char savingbuf[BUFSZ] = "";
             char acbuf[BUFSZ] = "";
@@ -2515,7 +2567,7 @@ int skill_id;
             if (skill_id == P_WAND)
             {
                 int tohitbonus = wand_skill_hit_bonus(lvl);
-                double dicemult = get_wand_damage_multiplier(lvl);
+                double dicemult = get_wand_skill_damage_multiplier(lvl);
                 //char cbuf[BUFSZ] = "";
                 Sprintf(hbuf, "%s%d", tohitbonus >= 0 ? "+" : "", tohitbonus);
                 //Sprintf(cbuf, "%d%%", criticalhitpct);
@@ -2622,8 +2674,12 @@ int skill_id;
             else if (skill_id == P_DISARM_TRAP)
             {
                 int arrowtrap_chance = untrap_probability(ARROW_TRAP, lvl, &youmonst);
+                int rusttrap_chance = untrap_probability(RUST_TRAP, lvl, &youmonst);
+                int teletrap_chance = untrap_probability(TELEP_TRAP, lvl, &youmonst);
                 int magictrap_chance = untrap_probability(MAGIC_TRAP, lvl, &youmonst);
                 Sprintf(arrowbuf, "%d%%", arrowtrap_chance);
+                Sprintf(rustbuf, "%d%%", rusttrap_chance);
+                Sprintf(telebuf, "%d%%", teletrap_chance);
                 Sprintf(magicbuf, "%d%%", magictrap_chance);
             }
             else if (skill_id == P_RIDING)
@@ -2697,12 +2753,22 @@ int skill_id;
             }
             if (strcmp(arrowbuf, ""))
             {
-                Sprintf(buf, "    * Arrow trap untrap chance %s", arrowbuf);
+                Sprintf(buf, "    * %s to untrap simple traps", arrowbuf);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
+            }
+            if (strcmp(rustbuf, ""))
+            {
+                Sprintf(buf, "    * %s to untrap complex traps", rustbuf);
+                putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
+            }
+            if (strcmp(telebuf, ""))
+            {
+                Sprintf(buf, "    * %s to untrap minor magical traps", telebuf);
                 putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(magicbuf, ""))
             {
-                Sprintf(buf, "    * Magic trap untrap chance %s", magicbuf);
+                Sprintf(buf, "    * %s to untrap major magical traps", magicbuf);
                 putstr_ex(win, buf, ATR_INDENT_AT_ASTR, color, 0);
             }
             if (strcmp(limitbuf, ""))
@@ -3100,7 +3166,7 @@ enhance_weapon_skill()
                     {
                         int tohitbonus = wand_skill_hit_bonus(P_SKILL_LEVEL(i));
                         //int criticalhitpct = get_skill_critical_strike_chance(i, FALSE, 0, FALSE);
-                        double dicemult = get_wand_damage_multiplier(P_SKILL_LEVEL(i));
+                        double dicemult = get_wand_skill_damage_multiplier(P_SKILL_LEVEL(i));
                         char hbuf[BUFSZ] = "";
                         //char cbuf[BUFSZ] = "";
                         char dbuf[BUFSZ] = "";
@@ -3114,7 +3180,7 @@ enhance_weapon_skill()
                             int nextlevel = min(P_MAX_SKILL_LEVEL(i), P_SKILL_LEVEL(i) + 1);
                             int tohitbonus2 = wand_skill_hit_bonus(nextlevel);
                             //int criticalhitpct2 = get_skill_critical_strike_chance(i, TRUE, 0, FALSE);
-                            double dicemult2 = get_wand_damage_multiplier(nextlevel);
+                            double dicemult2 = get_wand_skill_damage_multiplier(nextlevel);
                             char hbuf2[BUFSZ] = "";
                             //char cbuf2[BUFSZ] = "";
                             char dbuf2[BUFSZ] = "";
@@ -3566,18 +3632,18 @@ uwep_skill_type()
 int
 weapon_skill_hit_bonus(weapon, use_this_skill, nextlevel, limit_by_twoweap, apply_extra_bonuses, use_this_level, use_adjusted_sklvl)
 struct obj *weapon;
-int use_this_skill, use_this_level, use_adjusted_sklvl;
-boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
+int use_this_skill, use_this_level;
+boolean nextlevel, limit_by_twoweap, apply_extra_bonuses, use_adjusted_sklvl;
 {
     int bonus = 0;
     static const char bad_skill[] = "weapon_skill_hit_bonus: bad skill %d";
     boolean apply_two_weapon_bonus = apply_extra_bonuses && (u.twoweap && (!weapon || (weapon && !bimanual(weapon) && (weapon == uwep || weapon == uarms))));
     boolean apply_two_handed_weapon_bonus = apply_extra_bonuses && weapon && bimanual(weapon) && is_weapon(weapon) && !is_launcher(weapon);
     boolean Is_worn_gauntlets = (weapon && is_gloves(weapon) && (weapon->owornmask & W_ARMG));
-    boolean apply_martial_arts_bonus = ((!weapon/* && (!uarmg || (uarmg && !is_metallic(uarmg)))*/) || (Is_worn_gauntlets/* && !is_metallic(weapon)*/));
     int wep_type = weapon_skill_type(weapon);
     int type = use_this_skill ? use_this_skill : wep_type;
-    
+    boolean apply_martial_arts_bonus = type == P_MARTIAL_ARTS && ((!weapon/* && (!uarmg || (uarmg && !is_metallic(uarmg)))*/) || (Is_worn_gauntlets/* && !is_metallic(weapon)*/));
+
     if (type == P_BARE_HANDED_COMBAT || type == P_MARTIAL_ARTS || Is_worn_gauntlets)
     {
         enum p_skills type2 = (enum p_skills)type;
@@ -3726,16 +3792,16 @@ boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
 int
 weapon_skill_dmg_bonus(weapon, use_this_skill, nextlevel, limit_by_twoweap, apply_extra_bonuses, use_this_level, use_adjusted_sklvl)
 struct obj *weapon;
-int use_this_skill, use_this_level, use_adjusted_sklvl;
-boolean nextlevel, limit_by_twoweap, apply_extra_bonuses;
+int use_this_skill, use_this_level;
+boolean nextlevel, limit_by_twoweap, apply_extra_bonuses, use_adjusted_sklvl;
 {
     int bonus = 0;
     boolean apply_two_weapon_bonus = apply_extra_bonuses && (u.twoweap && (!weapon || (weapon && !bimanual(weapon) && (weapon == uwep || weapon == uarms))));
     boolean apply_two_handed_weapon_bonus = apply_extra_bonuses && weapon && bimanual(weapon) && is_weapon(weapon) && !is_launcher(weapon);
     boolean Is_worn_gauntlets = (weapon && is_gloves(weapon) && (weapon->owornmask & W_ARMG));
-    boolean apply_martial_arts_bonus = ((!weapon/* && (!uarmg || (uarmg && !is_metallic(uarmg)))*/) || (Is_worn_gauntlets/* && !is_metallic(weapon)*/));
     int wep_type = weapon_skill_type(weapon);
     int type = use_this_skill > P_NONE ? use_this_skill : wep_type;
+    boolean apply_martial_arts_bonus = type == P_MARTIAL_ARTS && ((!weapon/* && (!uarmg || (uarmg && !is_metallic(uarmg)))*/) || (Is_worn_gauntlets/* && !is_metallic(weapon)*/));
 
     if (type == P_BARE_HANDED_COMBAT || type == P_MARTIAL_ARTS || Is_worn_gauntlets)
     {
@@ -4275,7 +4341,7 @@ int use_this_level;
 }
 
 double
-get_wand_damage_multiplier(skill_level)
+get_wand_skill_damage_multiplier(skill_level)
 int skill_level;
 {
     double res = 0.5;
@@ -4293,18 +4359,32 @@ int skill_level;
         res = 2.0;
         break;
     case P_EXPERT:
-        res = 3.0;
+        res = 2.5;
         break;
     case P_MASTER:
-        res = 4.0;
+        res = 3.0;
         break;
     case P_GRAND_MASTER:
-        res = 6.0;
+        res = 4.0;
         break;
     default:
         break;
     }
     return res;
+}
+
+double
+get_wand_exceptionality_damage_multiplier(exceptionality)
+uchar exceptionality;
+{
+    if (exceptionality <= EXCEPTIONALITY_NORMAL || exceptionality >= MAX_EXCEPTIONALITY_TYPES)
+        return 1.0;
+    else if (exceptionality == EXCEPTIONALITY_EXCEPTIONAL)
+        return 2.0;
+    else if (exceptionality == EXCEPTIONALITY_ELITE)
+        return 3.0;
+    else
+        return 4.0;
 }
 
 int

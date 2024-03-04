@@ -309,7 +309,9 @@ dosit()
                     change_luck(1, TRUE);
                 } 
                 else
+                {
                     makewish(FALSE, TRUE);
+                }
                 break;
             case 7:
               {
@@ -394,6 +396,7 @@ dosit()
                 {
                     /* rn2(5) agrees w/seffects() */
                     (void)identify_pack(rn2(5), FALSE);
+                    update_inventory();
                 }
                 break;
             case 13:

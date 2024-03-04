@@ -13,6 +13,7 @@
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PlatformToolset>v143</PlatformToolset>
+    <EnableASAN>true</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <PlatformToolset>v143</PlatformToolset>
@@ -28,6 +29,9 @@
   <PropertyGroup>
     <OutDir>$(BinDir)</OutDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalOptions>/Gs /Oi- %(AdditionalOptions)</AdditionalOptions>
@@ -35,6 +39,7 @@
       <OmitFramePointers>true</OmitFramePointers>
       <AdditionalIncludeDirectories>$(WinWin32Dir);$(IncDir);$(SysWinntDir);$(SysShareDir);$(WinShareDir);$(WinFmodDir)core\inc\;$(WinFmodDir)fsbank\inc\;$(WinFmodDir)studio\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDOWS;DLB;MSWIN_GRAPHICS;SAFEPROCS;NOTTYGRAPHICS;GNOLLHACK_MAIN_PROGRAM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -323,15 +328,15 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="InitialBuild">
-	  <Message Text="Start building beforegnollhack.proj using initial build" Importance="High" />
-	  <MSBuild Projects="beforegnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start building beforegnollhack.proj using initial build" Importance="High" />
+    <MSBuild Projects="beforegnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
   </Target>
   <Target Name="AfterBuild">
-	  <Message Text="Start building aftergnollhack.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start building aftergnollhack.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
   </Target>
   <Target Name="AfterClean">
-	  <Message Text="Start cleaning aftergnollhack.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhack.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start cleaning aftergnollhack.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhack.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
   </Target>
 </Project>

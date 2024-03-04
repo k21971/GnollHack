@@ -165,7 +165,7 @@ int expltype;
                 adtyp = (uchar)objects[objtype].oc_damagetype;
         }
     }
-    int damui = objtype > 0 ? get_spell_damage(objtype, origmonst, &youmonst) : max(0, d(dmg_n, dmg_d) + dmg_p);
+    int damui = objtype > 0 ? get_spell_damage(objtype, 0, origmonst, &youmonst) : max(0, d(dmg_n, dmg_d) + dmg_p);
     double damu = adjust_damage(damui, origmonst, &youmonst, adtyp, olet < MAX_OBJECT_CLASSES ? ADFLAGS_SPELL_DAMAGE : ADFLAGS_NONE);
     if (olet == WAND_CLASS)
     {
@@ -544,7 +544,7 @@ int expltype;
                 idamnonres += adjust_damage(destroy_mitem(mtmp, WAND_CLASS, (int) adtyp), (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
                 idamnonres += adjust_damage(destroy_mitem(mtmp, RING_CLASS, (int) adtyp), (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
 
-                int ddami = objtype > 0 ? get_spell_damage(objtype, origmonst, mtmp) : max(0, d(dmg_n, dmg_d) + dmg_p);
+                int ddami = objtype > 0 ? get_spell_damage(objtype, 0, origmonst, mtmp) : max(0, d(dmg_n, dmg_d) + dmg_p);
                 double ddam = adjust_damage(ddami, (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
 
                 if (explmask[i][j] == 1) 
@@ -846,6 +846,7 @@ struct obj *obj; /* only scatter this obj        */
         } else {
             obj = (struct obj *) 0; /* all used */
         }
+        Strcpy(debug_buf_2, "scatter1");
         obj_extract_self(otmp);
         used_up = FALSE;
 
@@ -862,6 +863,7 @@ struct obj *obj; /* only scatter this obj        */
                 place_object(otmp, sx, sy);
                 if ((otmp = sobj_at(BOULDER, sx, sy)) != 0) {
                     /* another boulder here, restack it to the top */
+                    Strcpy(debug_buf_2, "scatter2");
                     obj_extract_self(otmp);
                     place_object(otmp, sx, sy);
                 }
@@ -1041,12 +1043,10 @@ enum explosion_types expltype;
         context.expl_intervals_to_wait_until_end = 0;
         enum animation_types anim = explosion_type_definitions[expltype].animation;
         boolean playing_anim = (iflags.using_gui_tiles && anim > 0 && animations[anim].play_type == ANIMATION_PLAY_TYPE_PLAYED_SEPARATELY);
-        boolean see_it;
         for (i = 0; i < 3; i++)
             for (j = 0; j < 3; j++)
             {
-                see_it = cansee(i + x - 1, j + y - 1);
-                if (!isok(i + x - 1, j + y - 1) || !see_it)
+                if (!isok(i + x - 1, j + y - 1) || !cansee(i + x - 1, j + y - 1))
                     continue;
 
                 show_glyph_on_layer(i + x - 1, j + y - 1, explosion_to_glyph(expltype, explosion[i][j]), defsyms[explosion[i][j]].layer);

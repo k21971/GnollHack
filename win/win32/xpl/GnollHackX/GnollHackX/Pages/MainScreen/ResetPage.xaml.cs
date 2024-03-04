@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -189,7 +190,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             ResetGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            bool answer = await DisplayAlert("Delete All User Data?", "Are you sure to delete all files in the userdata directory?", "Yes", "No");
+            bool answer = await DisplayAlert("Delete All User Data?", "Are you sure to delete all files in the " + GHConstants.UserDataDirectory + " directory?", "Yes", "No");
             if (answer)
             {
                 try
@@ -394,14 +395,14 @@ namespace GnollHackX.Pages.MainScreen
                         if (s != null)
                         {
                             string gnhpath = GHApp.GHPath;
-                            if (file.FileName.EndsWith("zip", StringComparison.OrdinalIgnoreCase))
+                            if (file.FileName.EndsWith(GHConstants.GenericZipFileNameSuffix, StringComparison.OrdinalIgnoreCase))
                             {
-                                string tempdirpath = Path.Combine(gnhpath, "temp");
+                                string tempdirpath = Path.Combine(gnhpath, GHConstants.TempDirectory);
                                 if (Directory.Exists(tempdirpath))
                                     Directory.Delete(tempdirpath, true);
                                 GHApp.CheckCreateDirectory(tempdirpath);
 
-                                string temp2dirpath = Path.Combine(gnhpath, "zip");
+                                string temp2dirpath = Path.Combine(gnhpath, GHConstants.ZipDirectory);
                                 if (Directory.Exists(temp2dirpath))
                                     Directory.Delete(temp2dirpath, true);
                                 GHApp.CheckCreateDirectory(temp2dirpath);
@@ -483,7 +484,7 @@ namespace GnollHackX.Pages.MainScreen
                                 if (GHApp.GnollHackService.ValidateSaveFile(file.FullPath, out out_str))
                                 {
                                     string targetfilename = file.FileName + ".i";
-                                    string savedirpath = Path.Combine(gnhpath, "save");
+                                    string savedirpath = Path.Combine(gnhpath, GHConstants.SaveDirectory);
                                     GHApp.CheckCreateDirectory(savedirpath);
 
                                     string fulltargetpath = Path.Combine(savedirpath, targetfilename);
@@ -509,6 +510,98 @@ namespace GnollHackX.Pages.MainScreen
             catch (Exception ex)
             {
                 await DisplayAlert("Error", "An error occurred while trying to import files: " + ex.Message, "OK");
+            }
+            ResetGrid.IsEnabled = true;
+        }
+
+        private async void btnDeletePostQueues_Clicked(object sender, EventArgs e)
+        {
+            ResetGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            string directory1 = Path.Combine(GHApp.GHPath, GHConstants.ForumPostQueueDirectory);
+            string directory2 = Path.Combine(GHApp.GHPath, GHConstants.XlogPostQueueDirectory);
+            string directory3 = Path.Combine(GHApp.GHPath, GHConstants.BonesPostQueueDirectory);
+            int nofiles1 = 0;
+            int nofiles2 = 0;
+            int nofiles3 = 0;
+            if (Directory.Exists(directory1))
+            {
+                string[] files1 = Directory.GetFiles(directory1);
+                if( files1 != null )
+                {
+                    nofiles1 = files1.Length;
+                }
+            }
+            if (Directory.Exists(directory2))
+            {
+                string[] files2 = Directory.GetFiles(directory2);
+                if (files2 != null)
+                {
+                    nofiles2 = files2.Length;
+                }
+            }
+            if (Directory.Exists(directory3))
+            {
+                string[] files3 = Directory.GetFiles(directory3);
+                if (files3 != null)
+                {
+                    nofiles3 = files3.Length;
+                }
+            }
+
+            bool answer = await DisplayAlert("Clear All Post Queues?", 
+                "Are you sure to delete all files in the " + 
+                GHConstants.ForumPostQueueDirectory + " (" + nofiles1 + " file" + (nofiles1 == 1 ? "" : "s" ) + "), " + 
+                GHConstants.XlogPostQueueDirectory + " (" + nofiles2 +  " file" + (nofiles2 == 1 ? "" : "s" ) + ") and " +
+                GHConstants.BonesPostQueueDirectory + " (" + nofiles3 + " file" + (nofiles3 == 1 ? "" : "s") + ") directories?",
+                "Yes", "No");
+
+            if (answer)
+            {
+                try
+                {
+                    if (Directory.Exists(directory1))
+                        Directory.Delete(directory1, true);
+
+                    if (Directory.Exists(directory2))
+                        Directory.Delete(directory2, true);
+
+                    if (Directory.Exists(directory3))
+                        Directory.Delete(directory3, true);
+
+                    btnDeletePostQueues.Text = "Done";
+                    btnDeletePostQueues.TextColor = GHColors.Red;
+                }
+                catch
+                {
+                    btnDeletePostQueues.Text = "Failed";
+                    btnDeletePostQueues.TextColor = GHColors.Red;
+                }
+            }
+            ResetGrid.IsEnabled = true;
+        }
+
+        private async void btnDeleteAppLog_Clicked(object sender, EventArgs e)
+        {
+            ResetGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            bool answer = await DisplayAlert("Delete App Log?", "Are you sure to delete all files in the " + GHConstants.AppLogDirectory + " directory?", "Yes", "No");
+            if (answer)
+            {
+                try
+                {
+                    string datadir = Path.Combine(GHApp.GHPath, GHConstants.AppLogDirectory);
+                    if (Directory.Exists(datadir))
+                        Directory.Delete(datadir, true);
+
+                    btnDeleteAppLog.Text = "Done";
+                    btnDeleteAppLog.TextColor = GHColors.Red;
+                }
+                catch
+                {
+                    btnDeleteAppLog.Text = "Failed";
+                    btnDeleteAppLog.TextColor = GHColors.Red;
+                }
             }
             ResetGrid.IsEnabled = true;
         }

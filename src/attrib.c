@@ -1866,7 +1866,7 @@ int propidx; /* OBSOLETE: special cases can have negative values */
                 long dur = u.uprops[propidx].intrinsic & TIMEOUT;
                 if (*buf)
                     Strcat(buf, " and");
-                Sprintf(eos(buf), " %s%s (%ld rounds left)", because_used ? "" : "because of ", "an effect", dur);
+                Sprintf(eos(buf), " %s%s (%ld round%s left)", because_used ? "" : "because of ", "an effect", dur, plur(dur));
             }
         }
         else { /* negative property index */
@@ -2407,7 +2407,7 @@ struct monst* mon;
         }
 
         /* Mythic */
-        if (has_obj_mythic_great_strength(uitem) && worn)
+        if (worn && has_obj_mythic_great_strength(uitem))
         {
             long afixmincandidate = STR18(100);
             afixmincandidate += applicable_enchantment;
@@ -2416,7 +2416,19 @@ struct monst* mon;
             if (afixmincandidate > *afixmin_ptr[A_STR])
                 *afixmin_ptr[A_STR] = (schar)min(STR19(25), afixmincandidate);
         }
+        if (worn && has_obj_mythic_great_constitution(uitem))
+        {
+            long afixmincandidate = 18;
+            afixmincandidate += applicable_enchantment;
 
+            /* Take the highest minimum (most constraining) */
+            if (afixmincandidate > *afixmin_ptr[A_CON])
+                *afixmin_ptr[A_CON] = (schar)min(25, afixmincandidate);
+        }
+        if (worn && has_obj_mythic_spell_casting(uitem))
+        {
+            u.uspellcastingbonus_all += MYTHIC_SPELL_CASTING_BASE_GAIN + (schar)applicable_enchantment;
+        }
         /* Following are for all items */
         /* Luck */
         if (is_you)

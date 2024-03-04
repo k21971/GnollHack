@@ -1898,7 +1898,7 @@ namefloorobj()
         char tmpbuf[BUFSZ];
 
         /* straight role name */
-        unames[0] = ((Upolyd ? u.mfemale : flags.female) && urole.name.f)
+        unames[0] = (Ufemale && urole.name.f)
                      ? urole.name.f
                      : urole.name.m;
         /* random rank title for hero's role
@@ -4041,7 +4041,7 @@ STATIC_VAR const char* const manual_names[MAX_MANUAL_TYPES] = {
     /* Catalogues */
     "Catalogue of Weapons", "Catalogue of Armor", "Catalogue of Rings", "Catalogue of Potions", "Catalogue of Scrolls", "Catalogue of Wands",
     "Catalogue of Miscellaneous Magic Items", "Catalogue of Tools", "Catalogue of Magic Spells", "Catalogue of Clerical Spells",
-    "Catalogue of Comestibles", "Catalogue of Gems and Stones", "Catalogue of Artifacts",
+    "Catalogue of Comestibles", "Catalogue of Gems and Stones", "Catalogue of Artifacts", "Catalogue of Amulets",
 };
 
 const char*
@@ -4331,6 +4331,9 @@ struct obj* obj;
             case MANUAL_CATALOGUE_OF_GEMS_AND_STONES:
                 itemclass = GEM_CLASS;
                 break;
+            case MANUAL_CATALOGUE_OF_AMULETS:
+                itemclass = AMULET_CLASS;
+                break;
             default:
                 break;
             }
@@ -4375,7 +4378,7 @@ struct obj* obj;
             putstr(datawin, ATR_INDENT_AT_PERIOD, "2. Switching between weapons by swapping two readied sets of weapons does not cost you a turn.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "3. You can also fight with two weapons at once, but this comes a penalty to hit and damage, which depends on your skill level.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "4. You gain weapon skill points by hitting with the weapon successfully.");
-            putstr(datawin, ATR_INDENT_AT_PERIOD, "5. You gain two-weapon-fighting skill points when you it hit successfully with your off-hand weapon.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "5. You gain dual wielding skill points when you it hit successfully with your off-hand weapon.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "6. Ranged weapons incur a -30 to hit penalty when thrown or fired in melee combat.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "7. Weapons may be enchanted to be flaming, freezing, and electrified, which all cost extra damage. The enchantment may dissipate upon hit.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "8. Glass and bone weapons can be enchanted to be death-magical, which slays the target instantly upon hit. The enchantment is consequently dispelled.");
@@ -4453,7 +4456,7 @@ struct obj* obj;
         case MANUAL_GUIDE_TO_DRAGON_SCALE_MAILS:
             putstr(datawin, ATR_INDENT_AT_PERIOD, "1. If you polymorph while wearing a dragon scale mail, you will turn into a dragon and your dragon scale mail will revert to mere scales again.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "2. You can turn dragon scales into a dragon scale mail by enchanting them or by asking a smith to forge them into a mail.");
-            putstr(datawin, ATR_INDENT_AT_PERIOD, "3. An orange dragon scale mail gives you sleep resistance and free action.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "3. An orange dragon scale mail gives you sleep resistance and paralysis resistance.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "4. A green dragon scale mail gives you poison resistance and sickness resistance.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "5. A yellow dragon scale mail gives you acid resistance and petrification resistance.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "6. A gray dragon scale mail gives you magic resistance.");
@@ -4549,13 +4552,13 @@ struct obj* obj;
             break;
         case MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I:
             putstr(datawin, ATR_INDENT_AT_PERIOD, "1. You should acquire various resistances to better withstand the challenges ahead.");
-            putstr(datawin, ATR_INDENT_AT_PERIOD, "2. Most critical resistances are magic resistance, reflection, and free action.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "2. Most critical resistances are magic resistance, reflection, and paralysis resistance.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "3. Also poison, sleep, sickness, petrification, and death resistances are important for survival.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "4. Certain magic items may bestow you with some of these resistances.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "5. Your role and race can also confer you resistances as you advance in experience levels.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "6. A suitable cloak, robe, or ioun stone will confer you magic resistance.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "7. You can obtain reflection from an appropriate amulet, pair of bracers, or shield.");
-            putstr(datawin, ATR_INDENT_AT_PERIOD, "8. Free action is conferred only by a ring or a mythic weapon or armor of a suitable type.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "8. Paralysis resistance is conferred only by a ring or a mythic weapon or armor of a suitable type.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "9. Get poison resistance early on. Look for a ring or an amulet, or eat a suitable monster corpse.");
             break;
         case MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II:
@@ -4581,10 +4584,10 @@ struct obj* obj;
             putstr(datawin, ATR_INDENT_AT_PERIOD, "2. You can create multiple monsters of your choice with a cursed scroll of genocide.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "3. Wizard of Yendor may replace your amulet with a cheap plastic imitation. It is good practice to name the real amulet as soon as you get it.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "4. It is essential for survival that you get good protective equipment.");
-            putstr(datawin, ATR_INDENT_AT_PERIOD, "5. You need at least magic resistance, reflection, free action, sleep resistance, and death resistance to survive some nasty attacks.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "5. You need at least magic resistance, reflection, paralysis resistance, sleep resistance, and death resistance to survive some nasty attacks.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "6. Magic resistance will protect you from polymorph traps and some spell caster spells.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "7. Reflection will protect you from rays.");
-            putstr(datawin, ATR_INDENT_AT_PERIOD, "8. Free action will protect you from thrown potion of paralysis and paralysing monsters, such as gelatinous cube.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "8. Paralysis resistance will protect you from thrown potion of paralysis and paralysing monsters, such as gelatinous cube.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "9. Sleep resistance will protect you from sleep gas traps and thrown potions of sleep.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "10. Death resistance will protect you from some instant death attacks, such as the touch of death spell of a greater mummy high priest.");
             break;

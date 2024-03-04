@@ -30,6 +30,8 @@
 
 /* *INDENT-OFF* */
 /* clang-format off */
+#define SP_STR(A) #A     
+#define SP_XSTR(A) SP_STR(A)
 
 #ifndef OBJECTS_PASS_2_
 /* first pass */
@@ -50,6 +52,7 @@ struct monst { struct monst *dummy; };  /* lint: struct obj's union */
 #else /* !OBJECTS_PASS_2_ */
 /* second pass */
 #include "color.h"
+#include "general.h"
 //#define COLOR_FIELD(X) X,
 #endif /* !OBJECTS_PASS_2_ */
 
@@ -1210,7 +1213,7 @@ DRGN_ARMR("red dragon scale mail",
     O1_FIRE_RESISTANT, O2_DRAGON_ITEM | O2_MONSTER_SCALE_MAIL, O3_NONE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
 DRGN_ARMR("white dragon scale mail",   
     1, COLD_IMMUNITY, BISECTION_RESISTANCE, ENERGY_REGENERATION, P1_NONE, 
-    3000, 1, 4, 0, 0, 0, 0, 5, CLR_WHITE, OBJECT_SOUNDSET_GENERIC, 
+    3000, 1, 4, 0, 0, 0, 0, 0, CLR_WHITE, OBJECT_SOUNDSET_GENERIC, 
     O1_COLD_RESISTANT, O2_DRAGON_ITEM | O2_MONSTER_SCALE_MAIL, O3_NONE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
 DRGN_ARMR("orange dragon scale mail",  
     1, SLEEP_RESISTANCE,  FREE_ACTION, NO_POWER, P1_NONE, 
@@ -1249,7 +1252,7 @@ DRGN_ARMR("red dragon scales",
     O1_FIRE_RESISTANT, O2_DRAGON_ITEM | O2_MONSTER_SCALES, O3_NONE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
 DRGN_ARMR("white dragon scales",       
     0, COLD_IMMUNITY, NO_POWER, NO_POWER, P1_NONE,
-    750, 7, 1, 0, 0, 0, 0, 5, CLR_WHITE, OBJECT_SOUNDSET_GENERIC, 
+    750, 7, 1, 0, 0, 0, 0, 0, CLR_WHITE, OBJECT_SOUNDSET_GENERIC, 
     O1_COLD_RESISTANT, O2_DRAGON_ITEM | O2_MONSTER_SCALES, O3_NONE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
 DRGN_ARMR("orange dragon scales",      
     0, SLEEP_RESISTANCE, NO_POWER, NO_POWER, P1_NONE,
@@ -1425,7 +1428,7 @@ CLOAK("oilskin cloak", "slippery cloak",
     0, 0, NO_POWER, NO_POWER, NO_POWER, P1_NONE, ENCHTYPE_GENERAL_ARMOR, 
     8,  0, 10, 50,  9, 2, 0, 0, 0, 0, 0, 
     MATINIT_BASE_MATERIAL, MAT_CLOTH, HI_CLOTH, OBJECT_SOUNDSET_GENERIC, 
-    O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
+    O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_PERMANENTLY_GREASED, O6_NONE, PERMITTED_ALL),
 CLOAK("alchemy smock", "apron",
     0, 1, POISON_RESISTANCE, IMPROVED_ACID_RESISTANCE, NO_POWER, P1_NONE, ENCHTYPE_GENERAL_ARMOR, 
     9, 0, 10, 50,  9, 1, 0, 0, 0, 0, 0, 
@@ -2654,7 +2657,7 @@ TOOL("mirror",   "looking glass", None, None, None,
 TOOL("magic mirror", "looking glass", None, None, None, 
     TOOLTYPE_GENERAL, 0, 0, 0, ENCHTYPE_NO_ENCHANTMENT, CHARGED_NOT_CHARGED, RECHARGING_NOT_RECHARGEABLE, 0, 13, 10, 0, 0, 0, 0, 0, 0, /* Base item for The Magic Mirror of Merlin */
     NO_POWER, NO_POWER, NO_POWER, P1_NONE, 0, MAT_GLASS, HI_SILVER, 24, OBJECT_SOUNDSET_GENERIC, 
-    O1_NONE, O2_NONE, O3_INVOKABLE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
+    O1_NONE, O2_NONE, O3_INVOKABLE | O3_NO_GENERATION | O3_NO_WISH, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL),
 TOOL("holy symbol", "religious symbol", None, None, "Religious symbol that can be applied to turn undead", 
     TOOLTYPE_GENERAL, 0, 0, 1, ENCHTYPE_NO_ENCHANTMENT, 
     CHARGED_1D15_15, RECHARGING_HOLY_SYMBOL, 10, 10,100, 0, 0, 0, 0, 0, 0,
@@ -2776,7 +2779,7 @@ SPELLTOOL("frost horn",   "spiral horn", "blast of frost", None, "When improvise
 SPELLTOOL("fire horn",    "curved horn", "blast of fire", None, "When improvised, playing causes a blast of fire to eminate from the horn.", 
     TOOLTYPE_HORN, 0, 0, 1, CHARGED_1D30_30, RECHARGING_MUSICAL_INSTRUMENT, 
     3, 18, 50, RAY, RAY_WND_FIRE, AD_FIRE, 12, 6, 0, 0, 0, 0, 0, 0, 0, P_WAND, MAT_BONE, CLR_WHITE, 0, OBJECT_SOUNDSET_HORN, 
-    S1_NONE, S2_NONE, 
+    S1_NONE, S2_NONE,                                                                                                                                                                                                                                                                                               
     O1_FIRE_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELLTOOL("horn of chaos", "polished horn", None, None, "When improvised, playing causes nearby monsters to become crazed, attacking each other.", 
     TOOLTYPE_HORN, 0, 0, 1, CHARGED_1D4_4, RECHARGING_MUSICAL_INSTRUMENT, 
@@ -2870,7 +2873,7 @@ WEPTOOL("pick-axe", None, None,
     1, 0, 0, 15, 75, 50,  
     AD_PHYS, 1, 6, 0, 1, 3, 0, AD_PHYS, 0, 0, 0, A1_NONE, A2_NONE, 0,
     WHACK, 0, TOOLTYPE_PICK_AXE, P_DIGGING, 0, 0, MAT_IRON, HI_METAL, 0, OBJECT_SOUNDSET_GENERIC,
-    O1_NONE, O2_NONE, O3_NONE, O4_NON_MYTHIC, O5_NONE, O6_NONE, PERMITTED_ALL, ALL_TARGETS),
+    O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE, PERMITTED_ALL, ALL_TARGETS),
 WEPTOOL("spade of colossal excavation", "large shovel", None,
     0, 1, 1,  5, 60, 100,
     AD_PHYS, 6, 6, 0, 9, 6, 0, AD_PHYS, 0, 0, 0, A1_DEALS_DOUBLE_DAMAGE_TO_PERMITTED_TARGETS, A2_NONE, 0,
@@ -2952,7 +2955,7 @@ FOOD("tripe ration",    None, None, FOODTYPE_RATION, 1,
 FOOD("corpse",        None, None, FOODTYPE_CORPSE, 1,
     0, MULTIGEN_SINGLE, 1,  0, 0, MAT_FLESH, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
     0, CLR_BROWN, 0, OBJECT_SOUNDSET_GENERIC, 
-    O1_NONE, O2_NONE, O3_NONE, O4_NONE /*| O4_FULL_SIZED_BITMAP*/, O5_NO_CATALOGUE, O6_NONE, PERMITTED_ALL),
+    O1_NONE, O2_NONE, O3_NONE, O4_NONE /*| O4_FULL_SIZED_BITMAP*/, O5_NO_CATALOGUE | O5_NO_MATERIAL_NAME, O6_NONE, PERMITTED_ALL),
 FOOD("egg",            None, None, FOODTYPE_EGG, 1,
     85, MULTIGEN_SINGLE, 1,  1, 1, MAT_FLESH, EDIBLETYPE_NORMAL, EDIBLEFX_EGG, 100, 0, 0, 0, 
     80, CLR_WHITE, 16, OBJECT_SOUNDSET_GENERIC, 
@@ -2979,22 +2982,22 @@ OBJECT(OBJ("meat ring", None, None, None, None, 24, OD_NONE, 0, 0, 0),
 /* pudding 'corpses' will turn into these and combine;
    must be in same order as the pudding monsters */
 GENERAL_FOOD("glob of gray ooze",    "gray glob", None, FOODTYPE_GLOB, 0,
-    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_FLESH, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
+    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_ORGANIC, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0,
     20, CLR_GRAY, 24, OBJECT_SOUNDSET_GENERIC, 
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL, 
     OD_NONE, NO_ANIMATION, NO_ENLARGEMENT, GRAY_GLOB_REPLACEMENT),
 GENERAL_FOOD("glob of brown pudding",    "brown glob", None, FOODTYPE_GLOB, 0,
-    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_FLESH, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
+    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_ORGANIC, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0,
     20, CLR_BROWN, 24, OBJECT_SOUNDSET_GENERIC, 
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL, 
     OD_NONE, NO_ANIMATION, NO_ENLARGEMENT, BROWN_GLOB_REPLACEMENT),
 GENERAL_FOOD("glob of green slime",    "green glob", None, FOODTYPE_GLOB, 0,
-    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_FLESH, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
+    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_ORGANIC, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0,
     20, CLR_GREEN, 24, OBJECT_SOUNDSET_GENERIC, 
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL, 
     OD_NONE, NO_ANIMATION, NO_ENLARGEMENT, GREEN_GLOB_REPLACEMENT),
 GENERAL_FOOD("glob of black pudding",    "black glob", None, FOODTYPE_GLOB, 0,
-    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_FLESH, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
+    0, MULTIGEN_SINGLE, 2, 20, 1, MAT_ORGANIC, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0,
     20, CLR_BLACK, 24, OBJECT_SOUNDSET_GENERIC, 
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL, 
     OD_NONE, NO_ANIMATION, NO_ENLARGEMENT, BLACK_GLOB_REPLACEMENT),
@@ -3154,11 +3157,11 @@ FOOD("food ration", None, None, FOODTYPE_RATION, 1,
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL),
 FOOD("K-ration", None, None, FOODTYPE_RATION, 1,
     0, MULTIGEN_SINGLE,    1, 10, 0, MAT_VEGGY, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
-    525, HI_ORGANIC, 32, OBJECT_SOUNDSET_GENERIC,
+    525, HI_ORGANIC, 22, OBJECT_SOUNDSET_GENERIC,
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL),
 FOOD("C-ration", None, None, FOODTYPE_RATION, 1,
     0, MULTIGEN_SINGLE,    1, 10, 0, MAT_VEGGY, EDIBLETYPE_NORMAL, EDIBLEFX_NO_EFFECT, 0, 0, 0, 0, 
-    450, HI_ORGANIC, 32, OBJECT_SOUNDSET_GENERIC,
+    450, HI_ORGANIC, 34, OBJECT_SOUNDSET_GENERIC,
     O1_NONE, O2_NONE, O3_NONE, O4_FLOOR_TILE, O5_NONE, O6_NONE, PERMITTED_ALL),
 /* tins have type specified by obj->special_quality (+1 for spinach, other implies
    flesh; negative specifies preparation method {homemade,boiled,&c})
@@ -3515,16 +3518,17 @@ SCROLL("blank paper", "unlabeled", None, 0,  25,  60, 0, 0, 0, 0, 0, 0, 0, S1_NO
      * out in the process, allowing more than 52 spells be known but keeping
      * only 52 be castable at any given time.]
      */
-#define SPELL(name,desc,effectdesc,contentdesc,itemdesc,skill,prob,learndelay,cooldown,\
-            level,manacost,attr,range,radius,skillchance,savingthrowadj,mgc,dir,dirsubtype,extraspelldata,sdice,sdam,sdmgplus,ldice,ldam,ldmgplus,\
-            sflags,sflags2,mflags,adtype,color,soundset,flags,flags2,flags3,flags4,flags5,flags6)  \
-        OBJECT(OBJ(name, desc, effectdesc, contentdesc, itemdesc, 0, OD_NONE, 0, 0, 0),                       \
-            BITS(0, 0, 0, 0, mgc, ENCHTYPE_NO_ENCHANTMENT, CHARGED_NOT_CHARGED, RECHARGING_NOT_RECHARGEABLE, 0, 0, 0, 0, dir, 0, skill, MATINIT_BASE_MATERIAL, MAT_PAPER),       \
-            NO_POWER, NO_POWER, NO_POWER, P1_NONE, SPBOOK_CLASS, prob, MULTIGEN_SINGLE, learndelay, 50, (level + 2) * 50 + (level + 1) * (level + 1) * 5,           \
+#define SPELL(name,desc,effectdesc,contentdesc,itemdesc,skill,prob,learndelay,cooldown, \
+            level,manacost,attr,range,radius,skillchance,savingthrowadj,mgc,dir,dirsubtype,extraspelldata,sdice,sdam,sdmgplus,ldice,ldam,ldmgplus, \
+            sflags,sflags2,mflags,adtype,color,soundset,flags,flags2,flags3,flags4,flags5,flags6) \
+        OBJECT(OBJ(name, desc, effectdesc, contentdesc, itemdesc, 0, OD_NONE, 0, 0, 0), \
+            BITS(0, 0, 0, 0, mgc, ENCHTYPE_NO_ENCHANTMENT, CHARGED_NOT_CHARGED, RECHARGING_NOT_RECHARGEABLE, 0, 0, 0, 0, dir, 0, skill, MATINIT_BASE_MATERIAL, MAT_PAPER), \
+            NO_POWER, NO_POWER, NO_POWER, P1_NONE, SPBOOK_CLASS, prob, MULTIGEN_SINGLE, learndelay, 50, (level + 2) * 10 + (level + 1) * (level + 1) * 2 + 10, \
             adtype, sdice,sdam,sdmgplus,ldice,ldam,ldmgplus, 0, 0, 0, 0, sflags, sflags2, 0, \
             0, savingthrowadj, 0, 0, cooldown, level, manacost, attr, range, radius, skillchance, extraspelldata, \
             20, color, soundset, \
             dirsubtype, 0, 0, 0, PERMITTED_ALL, mflags, flags, flags2, flags3, flags4 | O4_FLOOR_TILE, flags5, flags6)
+
 /* Spellbook description normally refers to book covers (primarily color).
    Parchment and vellum would never be used for such, but rather than
    eliminate those, finagle their definitions to refer to the pages
@@ -3818,9 +3822,9 @@ SPELL("black blade of disaster", "ebony", None, "long-forgotten conjuration magi
     P_CONJURATION_SPELL,   2, 10, 0,
     11,200, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 3, 10, 30, 
     S1_SPELLBOOK_MUST_BE_READ_TO_IDENTIFY, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BLACK, OBJECT_SOUNDSET_SPELLBOOK, O1_DISINTEGRATION_RESISTANT, O2_NONE, O3_NONE, O4_VERY_RARE, O5_NONE, O6_NONE),
-SPELL("mage armor",   "ornamental", None, None, "Summons a wizard-friendly magical armor with AC4",
+SPELL("mage armor",   "ornamental", None, None, "Summons a wizard-friendly magical armor",
     P_CONJURATION_SPELL,   4,  1, 0, 
-    1, 12, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 4, 20, 200, 
+    1, 12, A_MAX_INT_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 4, 20, 500, 
     S1_NONE, S2_NONE, ALL_TARGETS, AD_NONE, CLR_GREEN, OBJECT_SOUNDSET_SPELLBOOK, O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("call hierarch modron",  "spherical", None, "alien conjuration magic", "Summons a permanent hierarch modron",
     P_CONJURATION_SPELL,   0,  5, 0,
@@ -3877,7 +3881,7 @@ SPELL("protection from curses", "cross-patterned", None, None, "Items of the cas
     5, 40, A_WIS, 0, 0, 100, 0, 1, NODIR, CURSE_RESISTANCE, 0, 0, 0, 0, 10, 6, 25,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BRIGHT_MAGENTA, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
-SPELL("protection",     "dull", None, None, "Gives -3 bonus to AC and +3 to MC",
+SPELL("protection",     "dull", None, None, "Gives -" SP_XSTR(MAGICAL_PROTECTION_AC_BONUS) " bonus to AC and +" SP_XSTR(MAGICAL_PROTECTION_MC_BONUS) " to MC",
     P_CLERIC_SPELL,    4,  3, 0, 
     2, 16, A_WIS, 0, 0, 100, 0, 1, NODIR, MAGICAL_PROTECTION, 0, 0, 0, 0, 2, 10, 130,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK,
@@ -3922,17 +3926,17 @@ SPELL("flame strike",    "pillar-patterned", None, None, "Projects a 3x3 fiery p
     S1_NO_SOMATIC_COMPONENT | S1_SPELL_EXPLOSION_EFFECT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_RED, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 
-SPELL("celestial dove",    "dove-patterned", None, None, "Summons a permanent celestial dove",
+SPELL("summon celestial dove",    "dove-patterned", None, None, "Summons a permanent celestial dove",
     P_CELESTIAL_SPELL,4,   5, 0, 
     1, 24, A_MAX_WIS_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_YELLOW, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
-SPELL("celestial eagle",    "eagle-patterned", None, None, "Summons a permanent celestial eagle",
+SPELL("summon celestial eagle",    "eagle-patterned", None, None, "Summons a permanent celestial eagle",
     P_CELESTIAL_SPELL,4,   5, 0, 
     3, 40, A_MAX_WIS_CHA, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_YELLOW, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
-SPELL("turn undead",    "copper-plated", None, None, "Makes damages undead creatures and makes them flee",
+SPELL("turn undead",    "copper-plated", None, None, "Damages undead creatures and makes them flee",
     P_CELESTIAL_SPELL,4,   3, 5, 
     3, 20, A_MAX_WIS_CHA, 0, 0, 100, 0, 1, IMMEDIATE, IMMEDIATE_NONE, 3, 6, 0, 0, 2, 50, 200,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_CLRC, HI_COPPER, OBJECT_SOUNDSET_SPELLBOOK,
@@ -4083,12 +4087,12 @@ SPELL("stick to giant anaconda", "amber-studded", None, None, "Summons a permane
     8, 150, A_MAX_WIS_CHA, 0, 0, 200, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_ORANGE, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
-SPELL("barkskin",     "emerald-studded", None, None, "Gives -12 bonus to AC and +4 to MC",
+SPELL("barkskin",     "emerald-studded", None, None, "Gives -" SP_XSTR(MAGICAL_BARKSKIN_AC_BONUS) " bonus to AC and +" SP_XSTR(MAGICAL_BARKSKIN_MC_BONUS) " to MC",
     P_NATURE_SPELL,   4,   3, 0, 
     4, 15, A_MAX_WIS_CHA, 0, 0, 100, 0, 1, NODIR, MAGICAL_BARKSKIN, 0, 0, 0, 0, 2, 10, 130,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_GREEN, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
-SPELL("stoneskin",     "diamond-studded", None, None, "Gives -18 bonus to AC and +6 to MC",
+SPELL("stoneskin",     "diamond-studded", None, None, "Gives -" SP_XSTR(MAGICAL_STONESKIN_AC_BONUS) " bonus to AC and +" SP_XSTR(MAGICAL_STONESKIN_MC_BONUS) " to MC",
     P_NATURE_SPELL,   4,   3, 0, 
     7, 30, A_MAX_WIS_CHA, 0, 0, 100, 0, 1, NODIR, MAGICAL_STONESKIN, 0, 0, 0, 0, 2, 10, 130,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_WHITE, OBJECT_SOUNDSET_SPELLBOOK,
@@ -4226,7 +4230,7 @@ SPELL("light","cloth", None, None, "Lights up the nearby area",
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("probe",    "adamantium-plated", None, None, "Displays monsters' and items' statistics",
     P_DIVINATION_SPELL, 4,   1, 0, 
-    -1, 4, A_MAX_INT_WIS_CHA, 12, 0,   5, 0, 1, IMMEDIATE, IMMEDIATE_NONE, 0, 0, 0, 0, 0, 0, 0,
+    -1, 2, A_MAX_INT_WIS_CHA, 12, 0,   5, 0, 1, IMMEDIATE, IMMEDIATE_NONE, 0, 0, 0, 0, 0, 0, 0,
     S1_NO_SOMATIC_COMPONENT | S1_DOES_NOT_TAKE_A_TURN, S2_NONE, ALL_TARGETS, AD_NONE, HI_SILVER, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("detect monsters",  "leathery", None, None, "The caster can sense all monsters on the level",
@@ -4317,7 +4321,7 @@ SPELL("mass fear",    "light blue", None, None, "Causes all monsters on the leve
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("confuse monster", "orange", None, None, "The caster can confuse monsters on hit",
     P_ENCHANTMENT_SPELL,4,  2, 0, 
-    2, 16, A_MAX_INT_CHA, 16, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0,
+    0, 4, A_MAX_INT_CHA, 16, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 0, 0, 0,
     S1_NO_SOMATIC_COMPONENT | S1_FLAGS_EFFECT_USES_SAVING_THROW_VS_WIS, S2_NONE, ALL_TARGETS, AD_NONE, CLR_ORANGE, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("charm monster",   "eye-patterned", None, None, "Charms a monster for a duration",
@@ -4545,7 +4549,7 @@ SPELL("portal",    "fulvous", None, None, "Teleports the caster to the chosen, p
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_ORANGE, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("jumping",  "thin", None, None, "Enables the caster to jump",
-    P_MOVEMENT_SPELL,4,  1, 0,
+    P_MOVEMENT_SPELL,4, 1, 0,
     -1,  4, A_MAX_INT_WIS, 0, 0, 100, 0, 1, IMMEDIATE, IMMEDIATE_NONE, 0, 0, 0, 0, 0, 0, 0,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, HI_PAPER, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
@@ -4555,14 +4559,14 @@ SPELL("water walking","circle-patterned", None, None, "Makes the caster able to 
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BLUE, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("time stop",   "ancient", None, "an ancient movement spell", "Stops the flow of time, except for the caster",
-    P_MOVEMENT_SPELL,2, 10,15,
+    P_MOVEMENT_SPELL,2, 10, 15,
     10, 150, A_MAX_INT_WIS, 0, 0, 100, 0, 1, NODIR, NODIR_NONE, 0, 0, 0, 0, 1, 4, 3,
     S1_NO_SOMATIC_COMPONENT | S1_SPELLBOOK_MUST_BE_READ_TO_IDENTIFY, S2_NONE, ALL_TARGETS, AD_NONE, CLR_MAGENTA, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_VERY_RARE, O5_NONE, O6_NONE),
 
-SPELL("shield",     "obsidian-studded", None, None, "Gives -6 bonus to AC and +2 to MC",
-    P_ABJURATION_SPELL,4,  3, 0, 
-    1, 6, A_MAX_INT_WIS, 0, 0, 100, 0, 1, NODIR, MAGICAL_SHIELDING, 0, 0, 0, 0, 2, 10, 130,
+SPELL("shield",     "obsidian-studded", None, None, "Gives -" SP_XSTR(MAGICAL_SHIELDING_AC_BONUS) " bonus to AC and +" SP_XSTR(MAGICAL_SHIELDING_MC_BONUS) " to MC",
+    P_ABJURATION_SPELL, 4, 3, 0, 
+    -1, 3, A_MAX_INT_WIS, 0, 0, 100, 0, 1, NODIR, MAGICAL_SHIELDING, 0, 0, 0, 0, 2, 10, 240,
     S1_NO_SOMATIC_COMPONENT, S2_NONE, ALL_TARGETS, AD_NONE, CLR_BLACK, OBJECT_SOUNDSET_SPELLBOOK,
     O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
 SPELL("reflection", "polished silver", None, None, "Grants reflection, which protects from rays",
@@ -4914,12 +4918,12 @@ WAND("nothing", "oak", None, None, "Does absolutely nothing.",
     CHARGED_WAND_NORMAL_DIR, RECHARGING_WAND_GENERAL, 25, 100, 0, IMMEDIATE, IMMEDIATE_NONE,
     0, 0, 0, 0, 0, 0, 0, 0, 0,
     S1_NONE, MAT_WOOD, HI_WOOD, OBJECT_SOUNDSET_WAND,
-    O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    O1_NONE, O2_NONE, O3_NONE, O4_CAN_HAVE_EXCEPTIONALITY, O5_CANNOT_BE_CELESTIAL | O5_CANNOT_BE_PRIMORDIAL | O5_CANNOT_BE_INFERNAL, O6_NONE),
 WAND("striking", "ebony", None, None, "Strikes at one target.",
     CHARGED_1D45_45, RECHARGING_WAND_GENERAL, 45, 150, 1, IMMEDIATE, IMMEDIATE_NONE,
     10, 0, 3, 6, 0, 0, 0, 0, 0,
     S1_NONE, MAT_WOOD, HI_WOOD, OBJECT_SOUNDSET_WAND,
-    O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    O1_NONE, O2_NONE, O3_NONE, O4_CAN_HAVE_EXCEPTIONALITY, O5_CANNOT_BE_CELESTIAL | O5_CANNOT_BE_PRIMORDIAL | O5_CANNOT_BE_INFERNAL, O6_NONE),
 WAND("make invisible", "marble", None, None, "Makes the target invisible.",
     CHARGED_WAND_NORMAL_DIR, RECHARGING_WAND_GENERAL, 45, 150, 1, IMMEDIATE, IMMEDIATE_NONE,
     8, 0, 0, 0, 0, 1, 50, 100, 0,
@@ -4980,17 +4984,17 @@ WAND("magic missile", "steel", None, None, "Shoots a ray of magic missiles.",
     CHARGED_1D75_75, RECHARGING_WAND_GENERAL, 45, 150, 1, RAY, RAY_WND_MAGIC_MISSILE,    
     12, 0, 3, 5, 0, 0, 0, 0, 0,
     S1_NONE, MAT_IRON, HI_METAL, OBJECT_SOUNDSET_WAND,
-    O1_NONE, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    O1_NONE, O2_NONE, O3_NONE, O4_CAN_HAVE_EXCEPTIONALITY, O5_CANNOT_BE_CELESTIAL | O5_CANNOT_BE_PRIMORDIAL | O5_CANNOT_BE_INFERNAL, O6_NONE),
 WAND("fire", "hexagonal", None, None, "Shoots a ray of fire.", 
     CHARGED_1D30_30, RECHARGING_WAND_GENERAL, 40, 175, 1, RAY, RAY_WND_FIRE,         
     8, 0, 4, 6, 0, 0, 0, 0, 0,
     S1_NONE, MAT_IRON, HI_METAL, OBJECT_SOUNDSET_WAND,
-    O1_FIRE_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    O1_FIRE_RESISTANT, O2_NONE, O3_NONE, O4_CAN_HAVE_EXCEPTIONALITY, O5_CANNOT_BE_CELESTIAL | O5_CANNOT_BE_PRIMORDIAL | O5_CANNOT_BE_INFERNAL, O6_NONE),
 WAND("cold", "short", None, None, "Shoots a ray of cold.",
     CHARGED_1D6_6, RECHARGING_WAND_GENERAL, 40, 175, 1, RAY, RAY_WND_COLD,        
     12, 0, 8, 6, 0, 0, 0, 0, 0,
     S1_NONE, MAT_IRON, HI_METAL, OBJECT_SOUNDSET_WAND,
-    O1_COLD_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    O1_COLD_RESISTANT, O2_NONE, O3_NONE, O4_CAN_HAVE_EXCEPTIONALITY, O5_CANNOT_BE_CELESTIAL | O5_CANNOT_BE_PRIMORDIAL | O5_CANNOT_BE_INFERNAL, O6_NONE),
 WAND("sleep", "runed", None, None, "Shoots a sleeping ray that makes monsters on its way to fall a sleep.",
     CHARGED_WAND_NORMAL_DIR, RECHARGING_WAND_GENERAL, 45, 175, 1, RAY, RAY_WND_SLEEP,        
     10, 0, 0, 0, 0, 4, 6, 0, 0,
@@ -5010,7 +5014,7 @@ WAND("lightning", "curved", None, None, "Shoots a ray of lightning which also ca
     CHARGED_1D15_15, RECHARGING_WAND_GENERAL, 40, 175, 1, RAY, RAY_WND_LIGHTNING,    
     14, 0, 5, 6, 0, 0, 0, 0, 0,
     S1_NONE, MAT_IRON, HI_METAL, OBJECT_SOUNDSET_WAND,
-    O1_LIGHTNING_RESISTANT, O2_NONE, O3_NONE, O4_NONE, O5_NONE, O6_NONE),
+    O1_LIGHTNING_RESISTANT, O2_NONE, O3_NONE, O4_CAN_HAVE_EXCEPTIONALITY, O5_CANNOT_BE_CELESTIAL | O5_CANNOT_BE_PRIMORDIAL | O5_CANNOT_BE_INFERNAL, O6_NONE),
 WAND("death", "skull-headed", None, None, "Shoots a death ray that causes monsters on its way to be slain.",
     CHARGED_1D4_1, RECHARGING_WAND_GENERAL, 10, 500, 1, RAY, RAY_WND_DEATH,         
     8, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5070,7 +5074,7 @@ COIN("gold piece", 1000, MAT_GOLD, 1),
 #define GENERAL_ROCK(name,desc,itemdesc,power1,power2,power3,pflags,kn,prob,wt,gval, enchtype, charge, recharge, sdice, sdam, splus, ldice, ldam, lplus, mgc,nutr,mohs,glass,color,height,soundset,subtyp,skill,wepsubtyp,\
             flags,flags2,flags3,flags4,flags5,flags6,powconfermask,odflags,stand_anim,enlarge,replacement) \
         OBJECT(OBJ(name, desc, None, None, itemdesc, height, odflags, stand_anim, enlarge, replacement),            \
-            BITS(kn, 1, (enchtype > 0 || charge > 0 ? 1 : 0), 0, mgc, enchtype, charge, recharge, 0, 0, 0,           \
+            BITS(kn, (charge > 0 ? 0 : 1), (enchtype > 0 || charge > 0 ? 1 : 0), 0, mgc, enchtype, charge, recharge, 0, 0, 0,           \
             HARDGEM(mohs), 0, subtyp, skill, MATINIT_BASE_MATERIAL, glass), \
             power1, power2, power3, pflags, GEM_CLASS, prob, MULTIGEN_SINGLE, 0, wt, gval, \
             0, sdice, sdam, splus, ldice, ldam, lplus, 0, 0, 0, 0, A1_NONE, A2_NONE, 0, \
@@ -5467,5 +5471,8 @@ objects_init()
 }
 
 #endif /* !OBJECTS_PASS_2_ */
+
+#undef SP_STR
+#undef SP_XSTR
 
 /*objects.c*/

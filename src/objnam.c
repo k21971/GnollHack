@@ -150,7 +150,7 @@ char *
 obj_typename(otyp)
 register int otyp;
 {
-    char *buf = nextobuf();
+    char *buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
     struct objclass *ocl = &objects[otyp];
     const char *actualn = OBJ_NAME(*ocl);
     const char *dn = OBJ_DESCR(*ocl);
@@ -291,7 +291,7 @@ char *
 fruitname(juice)
 boolean juice; /* whether or not to append " juice" to the name */
 {
-    char *buf = nextobuf();
+    char *buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
     const char *fruit_nam = strstri(pl_fruit, " of ");
 
     if (fruit_nam)
@@ -460,7 +460,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
 
     if (!obj)
     {
-        buf = nextobuf();
+        buf = nextobuf() + PREFIXBUFSZ;
         Strcpy(buf, empty_string);
         return buf;
     }
@@ -675,11 +675,11 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     Strcpy(actualn_fullbuf, actualn_startbuf);
     Strcpy(dn_fullbuf, dn_startbuf);
 
-    if (dknown)
+    if (dknown && obj->otyp != CORPSE)
     {
         if ((nn && (objects[obj->otyp].oc_flags5 & O5_SHOW_BASE_MATERIAL_NAME) != 0) || 
             (!nn && (artifact_description_exists ? (artilist[obj->oartifact].aflags2 & AF2_SHOW_BASE_MATERIAL_NAME) != 0 : (OBJ_DESCR_FLAGS(obj->otyp) & OD_SHOW_BASE_MATERIAL_NAME) != 0 && (OBJ_DESCR_FLAGS(obj->otyp) & OD_NO_MATERIAL_NAME) == 0))
-            || (obj->material != objects[obj->otyp].oc_material && ((nn && (objects[obj->otyp].oc_flags5 & O5_NO_MATERIAL_NAME) == 0) 
+            || (obj->material != objects[obj->otyp].oc_material && ((nn && (objects[obj->otyp].oc_flags5 & O5_NO_MATERIAL_NAME) == 0)
                 || (!nn && (artifact_description_exists ? (artilist[obj->oartifact].aflags2 & AF2_NO_MATERIAL_NAME) == 0 : (OBJ_DESCR_FLAGS(obj->otyp) & OD_NO_MATERIAL_NAME) == 0)))
                )
            )
@@ -769,7 +769,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     case ARMOR_CLASS:
         /* depends on order of the dragon scales objects -- Special case, ignores the modifiers above */
         if (typ >= GRAY_DRAGON_SCALES && typ <= YELLOW_DRAGON_SCALES) {
-            Sprintf(buf, "set of %s", actualn_fullbuf);
+            Sprintf(eos(buf), "set of %s", actualn_fullbuf);
             break;
         }
 
@@ -906,7 +906,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             }
 
             Sprintf(buf, "%s%s of %s%s",
-                    (Role_if(PM_ARCHAEOLOGIST) && (obj->speflags & SPEFLAGS_STATUE_HISTORIC))
+                    (Role_if(PM_ARCHAEOLOGIST) && (obj->special_quality == SPEQUAL_STATUE_HISTORIC))
                        ? "historic "
                        : "",
                     actualn_fullbuf,
@@ -970,11 +970,11 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         if (!dknown)
             Strcpy(buf, "wand");
         else if (nn)
-            Sprintf(buf, "wand of %s", actualn_fullbuf);
+            Sprintf(eos(buf), "wand of %s", actualn_fullbuf);
         else if (un)
-            Sprintf(buf, "wand called %s", un);
+            Sprintf(eos(buf), "wand called %s", un);
         else
-            Sprintf(buf, "%s wand", dn_fullbuf);
+            Sprintf(eos(buf), "%s wand", dn_fullbuf);
         break;
     case SPBOOK_CLASS:
         if (objects[typ].oc_subtyp == BOOKTYPE_NOVEL || objects[typ].oc_subtyp == BOOKTYPE_MANUAL) { /* 3.6 tribute */
@@ -1127,7 +1127,7 @@ char *
 mshot_xname(obj)
 struct obj *obj;
 {
-    char tmpbuf[OBUFSZ];
+    char tmpbuf[PREFIXBUFSZ];
     char *onm = xname(obj);
 
     if (m_shot.n > 1 && m_shot.o == obj->otyp) {
@@ -1264,9 +1264,10 @@ struct obj *obj;
 }
 
 char *
-doname_with_flags(obj, doname_flags)
+doname_with_flags(obj, doname_flags, attrs_ptr, colors_ptr)
 struct obj *obj;
 unsigned doname_flags;
+char** attrs_ptr, ** colors_ptr;
 {
     if (!obj)
         return xname(obj); /* Returns an empty string */
@@ -1277,7 +1278,8 @@ unsigned doname_flags;
             weightfirst = (doname_flags & DONAME_WITH_WEIGHT_FIRST) != 0,
             weightlast = (doname_flags & DONAME_WITH_WEIGHT_LAST) != 0,
             loadstonecorrectly = (doname_flags & DONAME_LOADSTONE_CORRECTLY) != 0,
-            lit_in_front = (doname_flags & DONAME_LIT_IN_FRONT) != 0;
+            lit_in_front = (doname_flags & DONAME_LIT_IN_FRONT) != 0,
+            comparison_stats = (doname_flags & DONAME_COMPARISON) != 0 && iflags.show_comparison_stats && !iflags.in_dumplog && !program_state.gameover;
     boolean known, dknown, cknown, bknown, lknown, tknown;
     int omndx = obj->corpsenm, isenchanted = 0;
     char prefix[PREFIXBUFSZ];
@@ -1683,7 +1685,7 @@ weapon_here:
         {
             if ((is_candle(obj) && obj->otyp != MAGIC_CANDLE
                 && obj->age < candle_maximum_burn_time(obj))
-                || (obj->otyp == MAGIC_CANDLE && obj->special_quality < 2)
+                || (obj->otyp == MAGIC_CANDLE && obj->special_quality < SPEQUAL_MAGIC_CANDLE_UNUSED)
                 || (is_torch(obj) && obj->age < torch_maximum_burn_time(obj))
                 )
                 Strcat(prefix, "partly used ");
@@ -1755,11 +1757,10 @@ weapon_here:
         }
         break;
     case FOOD_CLASS:
-
         if (obj->oeaten)
             Strcat(prefix, "partly eaten ");
         
-        if (is_obj_rotting_corpse(obj) && (obj->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) != 0)
+        if (is_obj_rotting_corpse(obj) && obj->rotknown)
         {
             long rotted = get_rotted_status(obj);
             if (obj->orotten || rotted > 3L)
@@ -1922,6 +1923,7 @@ weapon_here:
         else if (nochrg > 0)
             Strcat(bp, " (no charge)");
     }
+
     if (!strncmp(prefix, "a ", 2)) {
         /* save current prefix, without "a "; might be empty */
         Strcpy(tmpbuf, prefix + 2);
@@ -2014,7 +2016,6 @@ weapon_here:
         char buf[OBUFSZ];
         Sprintf(buf, "%s - %s", weightbuf, bp);
         Strcpy(bp, buf);
-
     }
     
     if (weightlast)
@@ -2026,6 +2027,24 @@ weapon_here:
         Strcpy(bp, buf);
     }
 
+    if (comparison_stats)
+    {
+        char* attrs = nextobuf();
+        char* colors = nextobuf();
+        memset(attrs, ATR_NONE, OBUFSZ - 1);
+        memset(colors, NO_COLOR, OBUFSZ - 1);
+        attrs[OBUFSZ - 1] = colors[OBUFSZ - 1] = 0;
+        char compbuf[BUFSZ] = "";
+        print_comparison_stats(obj, compbuf, WIN_ERR, ATR_NONE, NO_COLOR, TRUE, FALSE, bp, attrs, colors);
+        if (*compbuf)
+        {
+            if (attrs_ptr)
+                *attrs_ptr = attrs;
+            if (colors_ptr)
+                *colors_ptr = colors;
+        }
+    }
+
     return bp;
 }
 
@@ -2033,14 +2052,14 @@ char *
 doname(obj)
 struct obj *obj;
 {
-    return doname_with_flags(obj, 0U);
+    return doname_with_flags(obj, 0U, (char**)0, (char**)0);
 }
 
 char*
 doname_in_text(obj)
 struct obj* obj;
 {
-    return doname_with_flags(obj, DONAME_LIT_IN_FRONT);
+    return doname_with_flags(obj, DONAME_LIT_IN_FRONT, (char**)0, (char**)0);
 }
 
 /* Name of object including price. */
@@ -2048,7 +2067,16 @@ char *
 doname_with_price(obj)
 struct obj *obj;
 {
-    return doname_with_flags(obj, DONAME_WITH_PRICE);
+    return doname_with_flags(obj, DONAME_WITH_PRICE, (char**)0, (char**)0);
+}
+
+char*
+doname_with_price_and_comparison(obj, comparison_stats, attrs_ptr, colors_ptr)
+struct obj* obj;
+boolean comparison_stats;
+char** attrs_ptr, ** colors_ptr;
+{
+    return doname_with_flags(obj, DONAME_WITH_PRICE | (comparison_stats ? DONAME_COMPARISON : 0), attrs_ptr, colors_ptr);
 }
 
 /* Name of object including price. */
@@ -2057,7 +2085,16 @@ doname_with_price_and_weight_last(obj,  loadstonecorrectly)
 struct obj* obj;
 boolean loadstonecorrectly;
 {
-    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
+}
+
+char*
+doname_with_price_and_weight_last_and_comparison(obj, loadstonecorrectly, comparison_stats, attrs_ptr, colors_ptr)
+struct obj* obj;
+boolean loadstonecorrectly, comparison_stats;
+char** attrs_ptr, ** colors_ptr;
+{
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (comparison_stats ? DONAME_COMPARISON : 0), attrs_ptr, colors_ptr);
 }
 
 /* Name of object including price. */
@@ -2065,8 +2102,18 @@ char*
 doname_in_text_with_price_and_weight_last(obj)
 struct obj* obj;
 {
-    return doname_with_flags(obj, DONAME_LIT_IN_FRONT | DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (objects[LOADSTONE].oc_name_known ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_LIT_IN_FRONT | DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (objects[LOADSTONE].oc_name_known ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
 }
+
+/* Name of object including price. */
+char*
+doname_in_text_with_price_and_weight_last_and_comparison(obj, attrs_ptr, colors_ptr)
+struct obj* obj;
+char** attrs_ptr, ** colors_ptr;
+{
+    return doname_with_flags(obj, DONAME_LIT_IN_FRONT | DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | DONAME_COMPARISON | (objects[LOADSTONE].oc_name_known ? DONAME_LOADSTONE_CORRECTLY : 0), attrs_ptr, colors_ptr);
+}
+
 
 /* Name of object including price. */
 char*
@@ -2074,7 +2121,16 @@ doname_with_price_and_weight_first(obj, loadstonecorrectly)
 struct obj* obj;
 boolean loadstonecorrectly;
 {
-    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0));
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
+}
+
+char*
+doname_with_price_and_weight_first_and_comparison(obj, loadstonecorrectly, comparison_stats, attrs_ptr, colors_ptr)
+struct obj* obj;
+boolean loadstonecorrectly, comparison_stats;
+char** attrs_ptr, ** colors_ptr;
+{
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (comparison_stats ? DONAME_COMPARISON : 0), attrs_ptr, colors_ptr);
 }
 
 /* "some" instead of precise quantity if obj->dknown not set */
@@ -2094,7 +2150,7 @@ struct obj *obj;
      * TODO: add obj->qknown flag for 'quantity known' on stackable
      * items; it could overlay obj->cknown since no containers stack.
      */
-    return doname_with_flags(obj, DONAME_VAGUE_QUAN);
+    return doname_with_flags(obj, DONAME_VAGUE_QUAN, (char**)0, (char**)0);
 }
 
 char*
@@ -2103,21 +2159,21 @@ struct obj* obj;
 boolean loadstonecorrectly, is_perm_inv;
 
 {
-    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0));
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0);
 }
 
 char*
 doname_with_weight_first_true(obj)
 struct obj* obj;
 {
-    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | DONAME_LOADSTONE_CORRECTLY);
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | DONAME_LOADSTONE_CORRECTLY, (char**)0, (char**)0);
 }
 
 char*
 doname_with_weight_last_true(obj)
 struct obj* obj;
 {
-    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | DONAME_LOADSTONE_CORRECTLY);
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | DONAME_LOADSTONE_CORRECTLY, (char**)0, (char**)0);
 }
 
 
@@ -2127,7 +2183,7 @@ doname_with_weight_last(obj, loadstonecorrectly, is_perm_inv)
 struct obj* obj;
 boolean loadstonecorrectly, is_perm_inv;
 {
-    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0));
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0);
 }
 
 
@@ -2166,7 +2222,7 @@ struct obj *otmp;
         return TRUE;
     if ((otmp->mythic_prefix || otmp->mythic_suffix) && !otmp->mknown)
         return TRUE;
-    if (is_obj_rotting_corpse(otmp) && (otmp->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) == 0)
+    if (is_obj_rotting_corpse(otmp) && otmp->rotknown)
         return TRUE;
     /* otmp->rknown is the only item of interest if we reach here */
     /*
@@ -2201,7 +2257,7 @@ struct obj *otmp;
 const char *adjective;
 unsigned cxn_flags; /* bitmask of CXN_xxx values */
 {
-    char *nambuf = nextobuf();
+    char *nambuf = nextobuf() + PREFIXBUFSZ;
     int omndx = otmp->corpsenm;
     struct monst* mtmp = get_mtraits(otmp, FALSE);
     boolean isfemale = (mtmp && mtmp->female) || is_female(&mons[omndx]);
@@ -2325,6 +2381,25 @@ struct obj* obj;
 }
 
 char*
+prepend_quan(quan, name)
+long quan;
+const char* name; /* Should be already in plural */
+{
+    char* buf = nextobuf(); /* no prefix size addition needed here */
+    Sprintf(buf, "%ld %s", quan, name);
+    return buf;
+}
+
+char*
+aqcxname(obj)
+struct obj* obj;
+{
+    if (obj->otyp == CORPSE)
+        return obj->quan == 1 ? corpse_xname(obj, (const char*)0, CXN_ARTICLE) : prepend_quan(obj->quan, corpse_xname(obj, (const char*)0, CXN_NORMAL));
+    return obj->oartifact && obj->aknown ? the(xname(obj)) : obj->quan != 1 ? prepend_quan(obj->quan, xname(obj)) : an(xname(obj));
+}
+
+char*
 thecxname(obj)
 struct obj* obj;
 {
@@ -2362,7 +2437,7 @@ unsigned kxnflags;
 
     if (!obj)
     {
-        buf = nextobuf();
+        buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
         Strcpy(buf, empty_string);
         return buf;
     }
@@ -2403,17 +2478,17 @@ unsigned kxnflags;
 
     /* format the object */
     if (obj->otyp == CORPSE) {
-        buf = nextobuf();
+        buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
         Strcpy(buf, corpse_xname(obj, (const char *) 0, CXN_NORMAL));
     } else if (obj->otyp == SLIME_MOLD) {
         /* concession to "most unique deaths competition" in the annual
            devnull tournament, suppress player supplied fruit names because
            those can be used to fake other objects and dungeon features */
-        buf = nextobuf();
+        buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
         Sprintf(buf, "deadly slime mold%s", plur(obj->quan));
     } else if (obj->oclass == SPBOOK_CLASS && (kxnflags & KXNFLAGS_SPELL) != 0) {
         /* It is a spell rather than the book itself */
-        buf = nextobuf();
+        buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
         Sprintf(buf, "spell of %s", OBJ_NAME(objects[obj->otyp]));
     } else {
         buf = xname(obj);
@@ -2568,7 +2643,7 @@ char *
 an(str)
 const char *str;
 {
-    char *buf = nextobuf();
+    char *buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
 
     if (!str || !*str) {
         impossible("Alphabet soup: 'an(%s)'.", str ? "\"\"" : "<null>");
@@ -2592,7 +2667,7 @@ char*
 an_prefix(str)
 const char* str;
 {
-    char* buf = nextobuf();
+    char* buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
 
     if (!str || !*str) {
         impossible("Alphabet soup: 'an(%s)'.", str ? "\"\"" : "<null>");
@@ -2619,7 +2694,7 @@ char *
 the(str)
 const char *str;
 {
-    char *buf = nextobuf();
+    char *buf = nextobuf() + PREFIXBUFSZ; /* Just in case */
     boolean insert_the = FALSE;
 
     if (!str || !*str) {
@@ -2719,7 +2794,7 @@ const char *verb;
      * "your" for unique objects and "foo of bar" quest artifacts */
     if (!carried(obj) || !obj_is_pname(obj)
         || any_quest_artifact(obj)) {
-        char *outbuf = shk_your(nextobuf(), obj);
+        char *outbuf = shk_your(nextobuf() + PREFIXBUFSZ, obj);
         size_t space_left = OBUFSZ - 1 - strlen(outbuf);
 
         s = strncat(outbuf, s, space_left);
@@ -2777,7 +2852,7 @@ struct obj *obj;
     if (!carried(obj) || !obj_is_pname(obj)
         || any_quest_artifact(obj)) 
     {
-        char *outbuf = shk_your(nextobuf(), obj);
+        char *outbuf = shk_your(nextobuf() + PREFIXBUFSZ, obj);
         size_t space_left = OBUFSZ - 1 - strlen(outbuf);
 
         s = strncat(outbuf, s, space_left);
@@ -2814,9 +2889,9 @@ char *
 ysimple_name(obj)
 struct obj *obj;
 {
-    char *outbuf = nextobuf();
+    char *outbuf = nextobuf() + PREFIXBUFSZ; /* Just in case */;
     char *s = shk_your(outbuf, obj); /* assert( s == outbuf ); */
-    size_t space_left = OBUFSZ - 1 - strlen(s);
+    size_t space_left = OBUFSZ - PREFIXBUFSZ - 1 - strlen(s);
 
     char* min_name = minimal_xname(obj);
 
@@ -2899,7 +2974,7 @@ struct obj *obj;
     char *outbuf;
 
     if (obj->oartifact) {
-        outbuf = nextobuf();
+        outbuf = nextobuf() + PREFIXBUFSZ; /* Just in case */;
         Strcpy(outbuf, artiname(obj->oartifact));
         if (!strncmp(outbuf, "The ", 4))
             outbuf[0] = lowc(outbuf[0]);
@@ -2937,7 +3012,7 @@ const char *verb;
     if (!is_plural(otmp))
         return vtense((char *) 0, verb);
 
-    buf = nextobuf();
+    buf = nextobuf() + PREFIXBUFSZ; /* Just in case */;
     Strcpy(buf, verb);
     return buf;
 }
@@ -2961,7 +3036,7 @@ vtense(subj, verb)
 register const char *subj;
 register const char *verb;
 {
-    char *buf = nextobuf(), *bspot;
+    char *buf = nextobuf() + PREFIXBUFSZ, *bspot;
     size_t len, ltmp;
     const char *sp, *spot;
     const char *const *spec;
@@ -3231,7 +3306,7 @@ makeplural(oldstr)
 const char *oldstr;
 {
     register char *spot;
-    char lo_c, *str = nextobuf();
+    char lo_c, *str = nextobuf() + PREFIXBUFSZ; /* Just in case */;
     const char *excess = (char *) 0;
     size_t len;
 
@@ -3397,7 +3472,7 @@ const char *oldstr;
 {
     register char *p, *bp;
     const char *excess = 0;
-    char *str = nextobuf();
+    char *str = nextobuf() + PREFIXBUFSZ; /* Just in case */;
 
     if (oldstr)
         while (*oldstr == ' ')
@@ -4431,7 +4506,7 @@ boolean* removed_from_game_ptr;
             && !strstri(bp, "sword ") && !strstri(bp, "dagger ") && !strstri(bp, "arrow ") && !strstri(bp, "arrows ")
             && !strstri(bp, "axe ") && !strstri(bp, "bolt ") && !strstri(bp, "quarrel ") && !strstri(bp, "sling-bullet ")
             && !strstri(bp, "bolts ") && !strstri(bp, "quarrels ") && !strstri(bp, "sling-bullets ")
-            && !strstri(bp, "mace ") && !strstri(bp, "flail ") && !strstri(bp, "hammer ") && !strstri(bp, "morning star ")
+            && !strstri(bp, "mace ") && !strstri(bp, "flail ") && !strstri(bp, "hammer ") && !strstri(bp, "morning star ") && !strstri(bp, "mattock ")
             && !strstri(bp, "staff ") && !strstri(bp, "bow ") && !strstri(bp, "crossbow ")
             && !strstri(bp, "robe ") && !strstri(bp, "cloak ") && !strstri(bp, "gloves ")
             && !strstri(bp, "gauntlets ") && !strstri(bp, "belt ") && !strstri(bp, "girdle ")
@@ -4464,6 +4539,7 @@ boolean* removed_from_game_ptr;
         && strncmpi(bp, "tooth of tarrasque", 18) /* not the "Tarrasque" monster! */
         && strncmpi(bp, "wand of orcus", 13) /* not the "Orcus" monster! */
         && strncmpi(bp, "triple-headed flail of yeenaghu", 31) /* not the "Yeenaghu" monster! */
+        && strncmpi(bp, "mattock of the titans", 21) /* not the "Titan" monster! */
         && strncmpi(bp, "ninja-to", 8)     /* not the "ninja" rank */
         && strncmpi(bp, "master key", 10)  /* not the "master" rank */
         && strncmpi(bp, "death cap", 9)  /* not the "death" monster */
@@ -5193,13 +5269,14 @@ retry:
     if (open && typ > 0 && Is_otyp_container_with_lid(typ))
         mkflags |= MKOBJ_FLAGS_OPEN_COFFIN;
 
-    otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, 2, (struct monst*)0, MAT_NONE, 0L, 0L, mkflags) : mkobj(oclass, FALSE, 2);
+    otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, MKOBJ_TYPE_WISHING, (struct monst*)0, MAT_NONE, 0L, 0L, mkflags) : mkobj(oclass, FALSE, MKOBJ_TYPE_WISHING);
     typ = otmp->otyp, oclass = otmp->oclass; /* what we actually got */
 
     if (islit && (is_lamp(otmp) || is_candle(otmp) || is_torch(otmp) || is_obj_candelabrum(otmp) || typ == POT_OIL))
     {
         place_object(otmp, u.ux, u.uy); /* make it viable light source */
         begin_burn(otmp, FALSE);
+        Strcpy(debug_buf_2, "readobjnam");
         obj_extract_self(otmp); /* now release it for caller's use */
     }
 
@@ -5292,7 +5369,7 @@ retry:
             otmp->special_quality = 0;
         } else if (contents == CONTAINER_SPINACH) {
             otmp->corpsenm = NON_PM;
-            otmp->special_quality = 1;
+            otmp->special_quality = SPEQUAL_TIN_CONTAINS_SPINACH;
         }
         break;
     case TOWEL:
@@ -5314,7 +5391,7 @@ retry:
     case SCR_MAIL:
         /* 0: delivered in-game via external event (or randomly for fake mail);
            1: from bones or wishing; 2: written with marker */
-        otmp->special_quality = 1;
+        otmp->special_quality = SPEQUAL_MAIL_FROM_BONES_OR_WISHING;
         break;
     default:
         break;
@@ -5368,9 +5445,9 @@ retry:
                 delete_contents(otmp); /* no spellbook */
             
             if(ishistoric)
-                otmp->speflags |= SPEFLAGS_STATUE_HISTORIC;
+                otmp->special_quality = SPEQUAL_STATUE_HISTORIC;
             else
-                otmp->speflags &= ~SPEFLAGS_STATUE_HISTORIC;
+                otmp->special_quality = 0;
 
             break;
         case SCALE_MAIL:
@@ -5805,7 +5882,7 @@ struct obj *helmet;
      *      fedora, cornuthaum, dunce cap       -> hat
      *      all other types of helmets          -> helm
      */
-    return (helmet && !is_metallic(helmet)) ? "hat" : "helm";
+    return (helmet && !is_hard_helmet(helmet)) ? "hat" : "helm";
 }
 
 const char *
@@ -6076,6 +6153,265 @@ int otyp, material;
         }
     }
     return FALSE;
+}
+
+void
+print_comparison_stats(obj, buf, datawin, attr, color, add_parentheses, use_symbols, objbuf, attrs, colors)
+struct obj* obj;
+char *buf, *objbuf, *attrs, *colors;
+winid datawin;
+int attr, color; /* for putstr only */
+uchar add_parentheses; /* 1 = add parentheses, 2 = add ", " instead to start and close with ")" */
+boolean use_symbols;
+{
+    if (!obj || obj->owornmask)
+        return;
+
+    *buf = 0;
+    char tmpbuf[BUFSZ];
+    boolean do_putstr = datawin != WIN_ERR;
+    boolean do_special_symbols = (windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && use_symbols;
+    boolean parentheses_stripped = datawin == WIN_ERR && do_special_symbols;
+
+    struct item_description_stats obj_stats = { 0 };
+    (void)itemdescription_core(obj, obj->otyp, &obj_stats);
+
+    struct obj* launcher = uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : 0;
+    struct obj* cwep = is_ammo(obj) ? (uquiver && launcher && ammo_and_launcher(uquiver, launcher) && ammo_and_launcher(obj, launcher) ? uquiver : 0) :
+        is_thrown_weapon_only(obj) ? (uquiver && is_thrown_weapon_only(uquiver) ? uquiver : 0) :
+        (is_wieldable_weapon(obj) && uwep && is_launcher(obj) == is_launcher(uwep)) ? uwep :
+        (is_wieldable_weapon(obj) && uswapwep && is_launcher(obj) == is_launcher(uswapwep)) ? uswapwep : 0;
+
+    int dmgpos = -1;
+    int acpos = -1;
+    int mcpos = -1;
+    size_t dmglen = 0;
+    size_t aclen = 0;
+    size_t mclen = 0;
+    char dmgcolor = NO_COLOR;
+    char accolor = NO_COLOR;
+    char mccolor = NO_COLOR;
+
+    boolean need_closing = FALSE;
+    if (obj_stats.weapon_stats_printed)
+    {
+        double dmgdiff = obj_stats.avg_damage;
+        boolean isdmgdiff = FALSE;
+        boolean skip_weapon_print = FALSE;
+        if (cwep && cwep != obj && uwep2 != obj && uswapwep2 != obj)
+        {
+            struct item_description_stats cwep_stats = { 0 };
+            (void)itemdescription_core(cwep, cwep->otyp, &cwep_stats);
+            if (cwep_stats.stats_set && cwep_stats.weapon_stats_printed)
+            {
+                isdmgdiff = TRUE;
+                dmgdiff = obj_stats.avg_damage - cwep_stats.avg_damage;
+            }
+        }
+        else
+            skip_weapon_print = TRUE;
+
+        if (!skip_weapon_print)
+        {
+            if (*buf)
+            {
+                Strcpy(tmpbuf, do_special_symbols ? " " : ", ");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            else
+            {
+                if (add_parentheses)
+                {
+                    Strcpy(tmpbuf, add_parentheses == 2 ? ", " : do_special_symbols && !parentheses_stripped ? " ( " :" (");
+                    Strcat(buf, tmpbuf);
+                    if (do_putstr)
+                        putstr_ex(datawin, tmpbuf, attr, color, 1);
+                }
+            }
+            if (do_special_symbols)
+            {
+                Strcpy(tmpbuf, "&damage; ");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            dmgpos = (int)strlen(buf);
+            Sprintf(tmpbuf, "%s%.1f", isdmgdiff && dmgdiff >= 0 ? "+" : "", dmgdiff);
+            dmglen = strlen(tmpbuf);
+            dmgcolor = dmgdiff > 0 ? CLR_BRIGHT_GREEN : dmgdiff < 0 ? CLR_RED : CLR_GRAY;
+            Strcat(buf, tmpbuf);
+            if (do_putstr)
+                putstr_ex(datawin, tmpbuf, attr, dmgcolor, 1);
+            if (!do_special_symbols)
+            {
+                Strcpy(tmpbuf, " damage");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            need_closing = TRUE;
+        }
+    }
+    if (is_armor(obj) && obj_stats.armor_stats_printed)
+    {
+        struct obj* current_armor = 0;
+        if (is_suit(obj))
+            current_armor = uarm;
+        else if (is_cloak(obj))
+            current_armor = uarmc;
+        else if (is_robe(obj))
+            current_armor = uarmo;
+        else if (is_shirt(obj))
+            current_armor = uarmu;
+        else if (is_helmet(obj))
+            current_armor = uarmh;
+        else if (is_gloves(obj))
+            current_armor = uarmg;
+        else if (is_boots(obj))
+            current_armor = uarmf;
+        else if (is_bracers(obj))
+            current_armor = uarmb;
+        else if (is_shield(obj))
+            current_armor = uarms;
+
+        int acdiff = obj_stats.ac_bonus;
+        int mcdiff = obj_stats.mc_bonus;
+        boolean skip_armor_print = FALSE;
+        if (current_armor && obj != current_armor && is_armor(current_armor))
+        {
+            struct item_description_stats armor_stats = { 0 };
+            (void)itemdescription_core(current_armor, current_armor->otyp, &armor_stats);
+            if (armor_stats.stats_set && armor_stats.armor_stats_printed)
+            {
+                acdiff = obj_stats.ac_bonus - armor_stats.ac_bonus;
+                mcdiff = obj_stats.mc_bonus - armor_stats.mc_bonus;
+            }
+            else
+                skip_armor_print = TRUE;
+        }
+        if (!skip_armor_print)
+        {
+            if (*buf)
+            {
+                Strcpy(tmpbuf, ", ");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            else
+            {
+                if (add_parentheses)
+                {
+                    Strcpy(tmpbuf, add_parentheses == 2 ? ", " : do_special_symbols && !parentheses_stripped ? " ( " : " (");
+                    Strcat(buf, tmpbuf);
+                    if (do_putstr)
+                        putstr_ex(datawin, tmpbuf, attr, color, 1);
+                }
+            }
+
+            if (do_special_symbols)
+            {
+                Strcpy(tmpbuf, "&AC; ");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+
+            acpos = (int)strlen(buf);
+            Sprintf(tmpbuf, "%s%d", acdiff >= 0 ? "+" : "", acdiff);
+            aclen = strlen(tmpbuf);
+            Strcat(buf, tmpbuf);
+            accolor = acdiff < 0 ? CLR_BRIGHT_GREEN : acdiff > 0 ? CLR_RED : CLR_GRAY;
+            if (do_putstr)
+                putstr_ex(datawin, tmpbuf, attr, accolor, 1);
+            
+            if (!do_special_symbols)
+            {
+                Strcpy(tmpbuf, " AC");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            if (*buf)
+            {
+                Strcpy(tmpbuf, do_special_symbols ? " " : ", ");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            if (do_special_symbols)
+            {
+                Strcpy(tmpbuf, "&MC; ");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            mcpos = (int)strlen(buf);
+            Sprintf(tmpbuf, "%s%d", mcdiff >= 0 ? "+" : "", mcdiff);
+            mclen = strlen(tmpbuf);
+            mccolor = mcdiff > 0 ? CLR_BRIGHT_GREEN : mcdiff < 0 ? CLR_RED : CLR_GRAY;
+            Strcat(buf, tmpbuf);
+            if (do_putstr)
+                putstr_ex(datawin, tmpbuf, attr, mccolor, 1);
+            if (!do_special_symbols)
+            {
+                Strcpy(tmpbuf, " MC");
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, color, 1);
+            }
+            need_closing = TRUE;
+        }
+    }
+
+    if (add_parentheses && need_closing)
+    {
+        Strcpy(tmpbuf, ")");
+        Strcat(buf, tmpbuf);
+        if (do_putstr)
+            putstr_ex(datawin, tmpbuf, attr, color, 0);
+    }
+    else
+    {
+        if (do_putstr)
+            putstr_ex(datawin, "", attr, color, 0);
+    }
+    
+    if (objbuf && attrs && colors)
+    {
+        size_t orig_objbuf_len = strlen(objbuf);
+        Strcat(objbuf, buf);
+        size_t i;
+        if (dmgpos >= 0)
+        {
+            for (i = orig_objbuf_len + (size_t)dmgpos; i < orig_objbuf_len + (size_t)dmgpos + dmglen; i++)
+            {
+                attrs[i] = ATR_NONE;
+                colors[i] = dmgcolor;
+            }
+        }
+        if (acpos >= 0)
+        {
+            for (i = orig_objbuf_len + (size_t)acpos; i < orig_objbuf_len + (size_t)acpos + aclen; i++)
+            {
+                attrs[i] = ATR_NONE;
+                colors[i] = accolor;
+            }
+        }
+        if (mcpos >= 0)
+        {
+            for (i = orig_objbuf_len + (size_t)mcpos; i < orig_objbuf_len + (size_t)mcpos + mclen; i++)
+            {
+                attrs[i] = ATR_NONE;
+                colors[i] = mccolor;
+            }
+        }
+        size_t len = strlen(objbuf);
+        attrs[len] = 0;
+        colors[len] = 0;
+    }
 }
 
 /*objnam.c*/

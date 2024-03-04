@@ -59,7 +59,7 @@ boolean set_tameness;
     EDOG(mtmp)->dropdist = 10000;
     EDOG(mtmp)->apport = ACURR(A_CHA);
     EDOG(mtmp)->whistletime = 0;
-    EDOG(mtmp)->hungrytime = 1000 + monstermoves;
+    EDOG(mtmp)->hungrytime = PET_INITIAL_NUTRITION + monstermoves;
     EDOG(mtmp)->ogoal.x = -1; /* force error if used before set */
     EDOG(mtmp)->ogoal.y = -1;
     EDOG(mtmp)->abuse = 0;
@@ -802,7 +802,7 @@ makedog()
     context.startingpet_mid = mtmp->m_id;
 
     /* Horses and rams already wear a saddle */
-    if ((pettype == PM_PONY || pettype == PM_RAM ) && !!(otmp = mksobj(SADDLE, TRUE, FALSE, FALSE)))
+    if ((pettype == PM_PONY || pettype == PM_RAM) && !!(otmp = mksobj(SADDLE, TRUE, FALSE, FALSE)))
     {
         otmp->dknown = otmp->bknown = otmp->rknown = otmp->nknown = 1;
         put_saddle_on_mon(otmp, mtmp);
@@ -1382,8 +1382,8 @@ long nmv; /* number of moves */
 
 /* called when you move to another level */
 void
-keepdogs(pets_only)
-boolean pets_only; /* true for ascension or final escape */
+keepdogs(pets_only, nearby_only)
+boolean pets_only, nearby_only; /* pets_only is true for ascension or final escape */
 {
     register struct monst *mtmp, *mtmp2;
     register struct obj *obj;
@@ -1415,7 +1415,7 @@ boolean pets_only; /* true for ascension or final escape */
             mtmp->mwantstomove = 1;
             mtmp->mwantstodrop = 1;
         }
-        if ((((monnear(mtmp, u.ux, u.uy) || (is_tame(mtmp) && mon_somewhat_near(mtmp, u.ux, u.uy))) && levl_follower(mtmp))
+        if (!nearby_only || ((((monnear(mtmp, u.ux, u.uy) || (is_tame(mtmp) && mon_somewhat_near(mtmp, u.ux, u.uy))) && levl_follower(mtmp))
              /* the wiz will level t-port from anywhere to chase
                 the amulet; if you don't have it, will chase you
                 only if in range. -3. */
@@ -1425,7 +1425,7 @@ boolean pets_only; /* true for ascension or final escape */
                    to avoid following */
                 || (mtmp == u.usteed))
             /* monster won't follow if it hasn't noticed you yet */
-            && !(mtmp->mstrategy & STRAT_WAITFORU))
+            && !(mtmp->mstrategy & STRAT_WAITFORU)))
         {
             stay_behind = FALSE;
             if (mtmp->mtrapped)
@@ -1704,7 +1704,7 @@ register struct obj *obj;
         if (obj->otyp == AMULET_OF_STRANGULATION
             || obj->otyp == RIN_SLOW_DIGESTION)
             return TABU;
-        if (mon_hates_silver(mon) && obj->material == MAT_SILVER)
+        if (mon_hates_silver(mon) && obj_counts_as_silver(obj))
             return TABU;
         if (slurps_items(mptr) && is_slurpable(obj))
             return ACCFOOD;

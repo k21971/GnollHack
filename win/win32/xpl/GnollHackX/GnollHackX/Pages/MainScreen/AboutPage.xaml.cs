@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Net.WebRequestMethods;
+using static System.Net.Mime.MediaTypeNames;
+
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
@@ -17,6 +19,8 @@ using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
+using GnollHackX.Pages.Game;
+using static Xamarin.Essentials.AppleSignInAuthenticator;
 
 namespace GnollHackX.Pages.MainScreen
 #endif
@@ -24,8 +28,11 @@ namespace GnollHackX.Pages.MainScreen
     [XamlCompilation(XamlCompilationOptions.Compile)]
     public partial class AboutPage : ContentPage
     {
-        public AboutPage()
+        MainPage _mainPage = null;
+        public AboutPage(MainPage mainPage)
         {
+            _mainPage = mainPage;
+
             InitializeComponent();
 #if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
@@ -180,51 +187,20 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = true;
         }
 
-        private async void btnDumplogs_Clicked(object sender, EventArgs e)
-        {
-            AboutGrid.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
-            await GHApp.CheckAndRequestWritePermission(this);
-            await GHApp.CheckAndRequestReadPermission(this);
-            string archive_file = "";
-            try
-            {
-                archive_file = GHApp.CreateDumplogZipArchive();
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Archive Creation Failure", "GnollHack failed to create a dumplog archive: " + ex.Message, "OK");
-                AboutGrid.IsEnabled = true;
-                return;
-            }
-            try
-            {
-                if (archive_file != "")
-                    await GHApp.ShareFile(this, archive_file, "GnollHack Dumplogs");
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Share File Failure", "GnollHack failed to share a dumplog archive: " + ex.Message, "OK");
-                AboutGrid.IsEnabled = true;
-                return;
-            }
-            AboutGrid.IsEnabled = true;
-        }
-
         private async void btnViewPanicLog_Clicked(object sender, EventArgs e)
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             string fulltargetpath = Path.Combine(GHApp.GHPath, "paniclog");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "Panic Log");
-            string errormsg = "";
+            var displFilePage = new DisplayFilePage(fulltargetpath, "Panic Log", 0, true);
+            string errormsg;
             if (!System.IO.File.Exists(fulltargetpath))
             {
                 await DisplayAlert("No Panic Log", "Panic Log does not exist.", "OK");
             }
             else if (!displFilePage.ReadFile(out errormsg))
             {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the paniclog file.", "OK");
+                await DisplayAlert("Error Opening File", "GnollHack cannot open the paniclog file: " + errormsg, "OK");
             }
             else
             {
@@ -233,6 +209,28 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = true;
         }
 
+        private async void btnViewGHLog_Clicked(object sender, EventArgs e)
+        {
+            AboutGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            string fulltargetpath = Path.Combine(GHApp.GHPath, GHConstants.AppLogDirectory, GHConstants.AppLogFileName);
+            var displFilePage = new DisplayFilePage(fulltargetpath, "App Log", 0, true, false, true);
+            string errormsg;
+            
+            if (!System.IO.File.Exists(fulltargetpath))
+            {
+                await DisplayAlert("No App Log", "App Log does not exist.", "OK");
+            }
+            else if (!displFilePage.ReadFile(out errormsg))
+            {
+                await DisplayAlert("Error Opening File", "GnollHack cannot open the App Log file: " + errormsg, "OK");
+            }
+            else
+            {
+                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+            }
+            AboutGrid.IsEnabled = true;
+        }
 
         private double _currentPageWidth = 0;
         private double _currentPageHeight = 0;
@@ -259,152 +257,26 @@ namespace GnollHackX.Pages.MainScreen
 
         }
 
-        private async void btnImportSavedGames_Clicked(object sender, EventArgs e)
+        private async void btnReplays_Clicked(object sender, EventArgs e)
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.CheckAndRequestWritePermission(this);
-            await GHApp.CheckAndRequestReadPermission(this);
-            try
-            {
-                FileResult file = await FilePicker.PickAsync();
 
-                if (file != null)
-                {
-                    using (Stream s = await file.OpenReadAsync())
-                    {
-                        if (s != null)
-                        {
-                            string gnhpath = GHApp.GHPath;
-                            if (file.FileName.EndsWith("zip", StringComparison.OrdinalIgnoreCase))
-                            {
-                                string savedirpath = Path.Combine(gnhpath, "save");
-                                GHApp.CheckCreateDirectory(savedirpath);
+            string dir = Path.Combine(GHApp.GHPath, GHConstants.ReplayDirectory);
+            ReplayPage selectFilePage = new ReplayPage(dir, _mainPage);
+            await App.Current.MainPage.Navigation.PushModalAsync(selectFilePage);
 
-                                string tempdirpath = Path.Combine(gnhpath, "save", "temp");
-                                if (Directory.Exists(tempdirpath))
-                                    Directory.Delete(tempdirpath, true);
-                                GHApp.CheckCreateDirectory(tempdirpath);
-    
-                                string temp2dirpath = Path.Combine(gnhpath, "save", "zip");
-                                if (Directory.Exists(temp2dirpath))
-                                    Directory.Delete(temp2dirpath, true);
-                                GHApp.CheckCreateDirectory(temp2dirpath);
-
-                                string ziptargetfilename = file.FileName;
-                                string fulltargetpath = Path.Combine(tempdirpath, ziptargetfilename);
-                                string fulltargetpath2 = Path.Combine(savedirpath, ziptargetfilename);
-                                if(System.IO.File.Exists(fulltargetpath2))
-                                    System.IO.File.Delete(fulltargetpath2);
-
-                                using (Stream t = System.IO.File.Open(fulltargetpath, FileMode.Create))
-                                {
-                                    s.CopyTo(t);
-                                }
-                                using (ZipArchive ziparch = ZipFile.OpenRead(fulltargetpath))
-                                {
-                                    ziparch.ExtractToDirectory(temp2dirpath);
-                                }
-                                int nextracted = 0;
-                                string[] extractedfiles = Directory.GetFiles(temp2dirpath);
-                                if(extractedfiles != null)
-                                {
-                                    foreach(string filestr in extractedfiles)
-                                    {
-                                        if(System.IO.File.Exists(filestr))
-                                        {
-                                            string out_str = "";
-                                            if(GHApp.GnollHackService.ValidateSaveFile(filestr, out out_str))
-                                            {
-                                                FileInfo fileInfo = new FileInfo(filestr);
-                                                string finalname = Path.Combine(savedirpath, fileInfo.Name + ".i");
-                                                if (System.IO.File.Exists(finalname))
-                                                    System.IO.File.Delete(finalname);
-                                                System.IO.File.Move(filestr, finalname);
-                                                nextracted++;
-                                                if(out_str != "" && GHApp.DebugLogMessages)
-                                                    await DisplayAlert("ValidateSaveFile Messge", out_str, "OK");
-                                            }
-                                            else
-                                            {
-                                                await DisplayAlert("Invalid Save Game in Zip", "Saved game \'" + filestr + "\' is invalid: " + out_str, "OK");
-                                            }
-                                        }
-                                    }
-                                }
-                                Directory.Delete(tempdirpath, true);
-                                Directory.Delete(temp2dirpath, true);
-                                if(extractedfiles.Length == 0)
-                                    await DisplayAlert("No Files in Zip", "There are no files in \'" + ziptargetfilename + "\'.", "OK");
-                                else if (nextracted > 0)
-                                    await DisplayAlert("Games Saved from Zip", "Saved games from \'" + ziptargetfilename + "\' have been saved to the save directory as non-scoring imported saved games.", "OK");
-                                else
-                                    await DisplayAlert("No Games Saved in Zip", "No saved games from \'" + ziptargetfilename + "\' were saved to the save directory.", "OK");
-                            }
-                            else
-                            {
-                                string out_str = "";
-                                if (GHApp.GnollHackService.ValidateSaveFile(file.FullPath, out out_str))
-                                {
-                                    string targetfilename = file.FileName + ".i";
-                                    string savedirpath = Path.Combine(gnhpath, "save");
-                                    GHApp.CheckCreateDirectory(savedirpath);
-
-                                    string fulltargetpath = Path.Combine(savedirpath, targetfilename);
-                                    if (System.IO.File.Exists(fulltargetpath))
-                                        System.IO.File.Delete(fulltargetpath);
-                                    using (Stream t = System.IO.File.Open(fulltargetpath, FileMode.Create))
-                                    {
-                                        s.CopyTo(t);
-                                    }
-                                    await DisplayAlert("Game Saved", "Saved game \'" + file.FileName + "\' has been saved to the save directory as a non-scoring imported saved game.", "OK");
-                                    if (out_str != "" && GHApp.DebugLogMessages)
-                                        await DisplayAlert("ValidateSaveFile Messge", out_str, "OK");
-                                }
-                                else
-                                {
-                                    await DisplayAlert("Invalid Saved Game", "Saved game \'" + file.FullPath + "\' is invalid: " + out_str, "OK");
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Error", "An error occurred while trying to import a saved game: " + ex.Message, "OK");
-            }
             AboutGrid.IsEnabled = true;
         }
 
-        private async void btnSavedGames_Clicked(object sender, EventArgs e)
+        private async void btnImportExport_Clicked(object sender, EventArgs e)
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.CheckAndRequestWritePermission(this);
-            await GHApp.CheckAndRequestReadPermission(this);
-            string archive_file = "";
-            try
-            {
-                archive_file = GHApp.CreateSavedGamesZipArchive();
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Archive Creation Failure", "GnollHack failed to create a saved games archive: " + ex.Message, "OK");
-                AboutGrid.IsEnabled = true;
-                return;
-            }
-            try
-            {
-                if (archive_file != "")
-                    await GHApp.ShareFile(this, archive_file, "GnollHack Saved Games");
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Share File Failure", "GnollHack failed to share a saved games archive: " + ex.Message, "OK");
-                AboutGrid.IsEnabled = true;
-                return;
-            }
+
+            ImportExportPage manageFilesPage = new ImportExportPage();
+            await App.Current.MainPage.Navigation.PushModalAsync(manageFilesPage);
+
             AboutGrid.IsEnabled = true;
         }
     }

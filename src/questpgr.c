@@ -26,7 +26,6 @@ STATIC_DCL void FDECL(Fread, (genericptr_t, long, long, dlb *));
 STATIC_DCL struct qtmsg *FDECL(construct_qtlist, (long));
 STATIC_DCL const char *NDECL(intermed);
 STATIC_DCL struct obj *FDECL(find_qarti, (struct obj *));
-STATIC_DCL const char *NDECL(neminame);
 STATIC_DCL const char *NDECL(guardname);
 STATIC_DCL const char *NDECL(homebase);
 STATIC_DCL void FDECL(qtext_pronoun, (CHAR_P, CHAR_P));
@@ -45,6 +44,7 @@ STATIC_VAR struct qtlists qt_list;
 STATIC_VAR dlb *msg_file;
 /* used by ldrname() and neminame(), then copied into cvt_buf */
 STATIC_VAR char nambuf[sizeof cvt_buf];
+STATIC_VAR char nambuf2[sizeof cvt_buf];
 
 /* dump the character msg list to check appearance;
    build with DEBUG enabled and use DEBUGFILES=questpgr.c
@@ -186,9 +186,9 @@ ldrname()
 {
     int i = urole.ldrnum;
 
-    Sprintf(nambuf, "%s%s", is_mname_proper_name(&mons[i]) ? "" : "the ",
+    Sprintf(nambuf2, "%s%s", is_mname_proper_name(&mons[i]) ? "" : "the ",
             mons[i].mname);
-    return nambuf;
+    return nambuf2;
 }
 
 /* return your intermediate target string */
@@ -258,7 +258,7 @@ unsigned whichchains;
 }
 
 /* return your role nemesis' name */
-STATIC_OVL const char *
+const char *
 neminame()
 {
     int i = urole.neminum;
@@ -732,7 +732,8 @@ boolean dopopup;
         return;
 
     qt_msg = msg_in(qt_list.chrole, msgnum);
-    if (!qt_msg) {
+    if (!qt_msg) 
+    {
         /* some roles have an alternate message for return to the goal
            level when the quest artifact is absent (handled by caller)
            but some don't; for the latter, use the normal goal message;
@@ -742,11 +743,13 @@ boolean dopopup;
         if (msgnum == QT_ALTGOAL)
             qt_msg = msg_in(qt_list.chrole, QT_NEXTGOAL);
     }
-    if (!qt_msg) {
+    if (!qt_msg) 
+    {
         impossible("qt_pager: message %d not found.", msgnum);
         return;
     }
 
+    ignore_onsleep_autosave = TRUE;
     (void) dlb_fseek(msg_file, qt_msg->offset, SEEK_SET);
     if (qt_msg->delivery == 'p' && strcmp(windowprocs.name, "X11"))
     {
@@ -759,6 +762,7 @@ boolean dopopup;
         deliver_by_window(qt_msg, attr, color, NHW_TEXT);
         stop_all_immediate_sounds();
     }
+    ignore_onsleep_autosave = FALSE;
     return;
 }
 

@@ -88,6 +88,7 @@
     <None Remove="Assets\UI\background-loading-screen.jpg" />
     <None Remove="Assets\UI\background-loading-screen.png" />
     <None Remove="Assets\UI\background-oldpaper.png" />
+    <None Remove="Assets\UI\battery-frame.png" />
     <None Remove="Assets\UI\break.png" />
     <None Remove="Assets\UI\cancel.png" />
     <None Remove="Assets\UI\cast.png" />
@@ -111,6 +112,7 @@
     <None Remove="Assets\UI\fight.png" />
     <None Remove="Assets\UI\fire.png" />
     <None Remove="Assets\UI\forcelock.png" />
+    <None Remove="Assets\UI\fps.png" />
     <None Remove="Assets\UI\frame-horizontal.png" />
     <None Remove="Assets\UI\frame-topleft-small.png" />
     <None Remove="Assets\UI\frame-topleft.png" />
@@ -219,6 +221,7 @@
     <None Remove="Assets\UI\symbol-adds.png" />
     <None Remove="Assets\UI\symbol-casts.png" />
     <None Remove="Assets\UI\symbol-cooldown.png" />
+    <None Remove="Assets\UI\symbol-damage.png" />
     <None Remove="Assets\UI\symbol-food.png" />
     <None Remove="Assets\UI\symbol-mana.png" />
     <None Remove="Assets\UI\symbol-spell-abjuration.png" />
@@ -281,6 +284,8 @@
     <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits-2.png" />
     <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits.png" />
     <EmbeddedResource Include="Assets\UI\autostash.png" />
+    <EmbeddedResource Include="Assets\UI\battery-frame.png" />
+    <EmbeddedResource Include="Assets\UI\fps.png" />
     <EmbeddedResource Include="Assets\UI\frame2-horizontal.png" />
     <EmbeddedResource Include="Assets\UI\frame2-topleft-small.png" />
     <EmbeddedResource Include="Assets\UI\frame2-topleft.png" />
@@ -301,6 +306,7 @@
     <EmbeddedResource Include="Assets\UI\save.png" />
     <EmbeddedResource Include="Assets\UI\status-empty-handed.png" />
     <EmbeddedResource Include="Assets\UI\status-quivered-weapon-style.png" />
+    <EmbeddedResource Include="Assets\UI\symbol-damage.png" />
     <EmbeddedResource Include="Assets\UI\unwield.png" />
     <EmbeddedResource Include="Assets\Lato-Bold.ttf" />
     <EmbeddedResource Include="Assets\Lato-Regular.ttf" />
@@ -521,10 +527,16 @@
     <EmbeddedResource Update="Pages\Game\OutRipPage.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
+    <EmbeddedResource Update="Pages\MainScreen\ImportExportPage.xaml">
+      <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
+    </EmbeddedResource>
     <EmbeddedResource Update="Pages\MainScreen\LibraryPage.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Pages\MainScreen\ResetPage.xaml">
+      <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Pages\MainScreen\ReplayPage.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Pages\MainScreen\SettingsPage.xaml">
@@ -554,6 +566,9 @@
     </Compile>
     <Compile Update="Pages\MainScreen\AboutPage.xaml.cs">
       <DependentUpon>AboutPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Update="Pages\MainScreen\ReplayPage.xaml.cs">
+      <DependentUpon>ReplayPage.xaml</DependentUpon>
     </Compile>
   </ItemGroup>
 </Project>

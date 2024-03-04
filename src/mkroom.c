@@ -986,7 +986,6 @@ place_main_monst_here:
                             }
                         }
                         box->speflags |= SPEFLAGS_NO_PICKUP;
-                        //make_engr_at(sx, sy, Inhell ? Morgoth_word : Gilthoniel_word, 0L, ENGRAVE);
                         context.made_armory_box_count++;
                     }
                 }
@@ -2786,6 +2785,7 @@ int fd;
 struct mkroom *r;
 {
     short i;
+    Strcpy(debug_buf_4, "rest_room");
 
     mread(fd, (genericptr_t) r, sizeof(struct mkroom));
     for (i = 0; i < r->nsubrooms; i++) {

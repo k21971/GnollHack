@@ -102,14 +102,17 @@ struct simple_layer_info {
 /* Location */
 #define LFLAGS_L_LEGAL                  0x00000001UL
 #define LFLAGS_L_ILLEGAL                0x00000002UL
+#define LFLAGS_L_ENGRAVING              0x00000004UL /* Location has an engraving (a flag improving efficiency of locating engravings) */
 
 /* Objects */
+/* Reserved */
+#define LFLAGS_O_CHAIN                  0x00002000UL
 #define LFLAGS_O_PILE                   0x00004000UL
 #define LFLAGS_O_IN_PIT                 0x00008000UL
-#define LFLAGS_O_CHAIN                  0x00010000UL
-#define LFLAGS_O_MASK                   0x0001C000UL
+#define LFLAGS_O_MASK                   0x0000F000UL
 
 /* Effects */
+/* Reserved */
 #define LFLAGS_E_GEN_FADE_OUT           0x00020000UL
 #define LFLAGS_E_BKG_FADE_IN            0x00040000UL
 #define LFLAGS_E_BKG_FADE_OUT           0x00080000UL
@@ -164,7 +167,7 @@ struct simple_layer_info {
 #define LMFLAGS_LEVITATING                  0x02000000UL
 #define LMFLAGS_BLOBBY_ANIMATION            0x04000000UL
 #define LMFLAGS_SWIM_ANIMATION              0x08000000UL
-#define LMFLAGS_SHARK_ANIMATION             0x10000000UL
+#define LMFLAGS_SPECIAL_ANIMATION           0x10000000UL
 #define LMFLAGS_HUMAN_BREATHE_ANIMATION     0x20000000UL
 #define LMFLAGS_ANIMAL_BREATHE_ANIMATION    0x40000000UL
 #define LMFLAGS_STONED                      0x80000000UL

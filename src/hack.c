@@ -246,6 +246,7 @@ moverock()
                 case LANDMINE:
                     if (rn2(10))
                     {
+                        Strcpy(debug_buf_2, "moverock1");
                         obj_extract_self(otmp);
                         place_object(otmp, rx, ry);
                         newsym(sx, sy);
@@ -286,6 +287,7 @@ moverock()
                 case SPIKED_PIT:
                 case PIT:
                     play_sfx_sound_at_location(SFX_BOULDER_FILLS_PIT, rx, ry);
+                    Strcpy(debug_buf_2, "moverock2");
                     obj_extract_self(otmp);
                     /* vision kludge to get messages right;
                        the pit will temporarily be seen even
@@ -345,6 +347,7 @@ moverock()
                     {
                         (void) rloco(otmp);
                     } else {
+                        Strcpy(debug_buf_2, "moverock3");
                         obj_extract_self(otmp);
                         add_to_migration(otmp);
                         get_level(&dest, newlev);
@@ -675,6 +678,7 @@ xchar x, y;
             {
                 lev->doormask &= ~D_MASK;
                 lev->doormask |= D_NODOOR;
+                lev->subtyp = 0;
             }
             else
             {
@@ -713,6 +717,7 @@ xchar x, y;
             {
                 lev->doormask &= ~D_MASK;
                 lev->doormask |= D_NODOOR;
+                lev->subtyp = 0;
                 no_unblock = FALSE;
             }
             else
@@ -1882,19 +1887,23 @@ domove_core()
             return;
         }
 
-        if (context.run)
+        if (context.run && iflags.run_spot_distance != 0)
         {
             /* Check if new monsters have come to vision */
             struct monst* mtmp2;
             for (mtmp2 = fmon; mtmp2; mtmp2 = mtmp2->nmon)
             {
-                if (!DEADMONSTER(mtmp2) && !(mtmp2->mon_flags & MON_FLAGS_SPOTTED_IN_RUN) 
-                    && canspotmon(mtmp2) && !is_peaceful(mtmp2)
-                    && M_AP_TYPE(mtmp2) != M_AP_FURNITURE && M_AP_TYPE(mtmp2) != M_AP_OBJECT 
-                    && isok(mtmp2->mx, mtmp2->my) && couldsee(mtmp2->mx, mtmp2->my) 
+                if (!DEADMONSTER(mtmp2) && mtmp2 != u.usteed /* Not dead nor your steed */
+                    && !is_peaceful(mtmp2) /* Hostile */
+                    && canspotmon(mtmp2)  /* Can spot the monster */
+                    && M_AP_TYPE(mtmp2) != M_AP_FURNITURE && M_AP_TYPE(mtmp2) != M_AP_OBJECT /* Not a mimic */
+                    && isok(mtmp2->mx, mtmp2->my) && couldsee(mtmp2->mx, mtmp2->my) /* Can see the monster's location; omit telepathically spotted etc. */
+                    && (iflags.run_spot_distance < 0 || distu(mtmp2->mx, mtmp2->my) <= iflags.run_spot_distance * iflags.run_spot_distance) /* Monster is nearby enough to stop */
+                    && !(mtmp2->mon_flags & MON_FLAGS_SPOTTED_IN_RUN_AT_START) /* Hasn't been spotted at the start of running */
                     )
                 {
-                    You("spot %s.  You stop %s.", a_monnam(mtmp2), context.travel ? "travelling" : "running");
+                    You("spot %s%s.", a_monnam(mtmp2), iflags.run_spot_distance < 0 ? "" : distu(mtmp2->mx, mtmp2->my) <= RUN_SPOT_NEARBY_DISTANCE * RUN_SPOT_NEARBY_DISTANCE ? " nearby" : " at a distance");
+                    You("stop %s.", context.travel ? "travelling" : "running");
                     nomul(0);
                     context.move = 0;
                     return;
@@ -1962,9 +1971,9 @@ domove_core()
                 {
                     /* If blind, you still get the question */
 
-                    char ynqbuf[BUFSZ] = "";
+                    char ynqbuf[BUFSZ];
                     Sprintf(ynqbuf, "Are you sure you want to enter the %s?", is_pool(x, y) ? (Is_waterlevel(&u.uz) ? "water" : "pool") : is_lava(x, y) ? "lava" : "location");
-                    char tbuf[BUFSZ] = "";
+                    char tbuf[BUFSZ];
                     Sprintf(tbuf, "Entering %s?", is_pool(x, y) ? (Is_waterlevel(&u.uz) ? "Water" : "Pool") : is_lava(x, y) ? "Lava" : "Location");
 
                     if (!paranoid_query_ex(ATR_NONE, CLR_MSG_WARNING, ParanoidWater, tbuf, ynqbuf))
@@ -2313,14 +2322,22 @@ domove_core()
         /* if trapped, there's a chance the pet goes wild */
         if (mtmp->mtrapped && is_safepet(mtmp))
         {
-            if (mtmp->mtame > 0 && !rn2(mtmp->mtame))
+            struct trap* ttmp = t_at(x, y);
+            if (ttmp && succeed_untrap(ttmp->ttyp, TRUE) <= 0 && rn2(4)) /* Extra 25% chance not to stop to make sure that pets won't block passages; can be regarded as the pet actively seeking to get out of the trap, too */ // mtmp->mtame > 0 && !rn2(mtmp->mtame))
             {
-                mtmp->mtame = mtmp->mpeaceful = mtmp->msleeping = 0;
-                if (mtmp->mleashed)
-                    m_unleash(mtmp, TRUE);
-                newsym(mtmp->mx, mtmp->my);
-                growl(mtmp);
-            } 
+                //mtmp->mtame = mtmp->mpeaceful = mtmp->msleeping = 0;
+                //if (mtmp->mleashed)
+                //    m_unleash(mtmp, TRUE);
+                //newsym(mtmp->mx, mtmp->my);
+                //growl(mtmp);
+                u.ux = u.ux0, u.uy = u.uy0;
+                if (u.usteed)
+                    u.usteed->mx = u.ux, u.usteed->my = u.uy;
+                yelp(mtmp);
+                play_sfx_sound(SFX_SOMETHING_IN_WAY);
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "stop.  %s is trapped and can't move.", upstart(y_monnam(mtmp)));
+                goto finish_move;
+            }
             else 
             {
                 yelp(mtmp);
@@ -2379,7 +2396,7 @@ domove_core()
             newsym(x, y);
             newsym(u.ux0, u.uy0);
 
-            You("%s %s.", is_tame(mtmp) ? "swap places with" : is_displaceable_peaceful(mtmp) ? "displace" : "frighten",
+            You("%s %s.", is_tame(mtmp) ? "swap places with" : is_displaceable_peaceful(mtmp) ? "displace" : "annoy",
                 pnambuf);
 
             /* check for displacing it into pools and traps */
@@ -2433,6 +2450,7 @@ domove_core()
         }
     }
 
+finish_move:
     reset_occupations();
     if (context.run)
     {
@@ -2558,6 +2576,8 @@ invocation_message()
         if (otmp && otmp->special_quality == 7 && otmp->lamplit)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s!", The(xname(otmp)),
                   Blind ? "throbs palpably" : "glows with a strange light");
+
+        invocation_ritual_quest_update(FALSE);
     }
 }
 
@@ -2816,7 +2836,7 @@ boolean pick;
             { /* jumps to greet you, not attack */
                 ;
             } 
-            else if (uarmh && is_metallic(uarmh)) 
+            else if (uarmh && is_hard_helmet(uarmh))
             {
                 play_sfx_sound(SFX_ROCK_HITS_HARD_HELMET);
                 pline("Its blow glances off your %s.",
@@ -3844,8 +3864,8 @@ weight_cap()
     if (ACURR(A_STR) >= STR18(100)) //Used to be STR18(1), but anything below 18/00 is now random
     {
         //7 lbs per bonus since CON cannot increase in the same way
-        carrcap += ((long)(7 * 16)) * (strength_damage_bonus(ACURR(A_STR))- strength_damage_bonus(18));
-        carrcap += ((long)(7 * 16)) * (strength_tohit_bonus(ACURR(A_STR)) - strength_tohit_bonus(18));
+        carrcap += (long)((7.0 * 16.0) * (strength_damage_bonus_core(ACURR(A_STR), TRUE) - strength_damage_bonus_core(18, TRUE)));
+        carrcap += (long)((7.0 * 16.0) * (strength_tohit_bonus_core(ACURR(A_STR), TRUE) - strength_tohit_bonus_core(18, TRUE)));
     }
 
 //    if (Upolyd) {
@@ -4095,7 +4115,7 @@ clear_run_and_travel(VOID_ARGS)
     {
         struct monst* mtmp;
         for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
-            mtmp->mon_flags &= ~MON_FLAGS_SPOTTED_IN_RUN;
+            mtmp->mon_flags &= ~MON_FLAGS_SPOTTED_IN_RUN_AT_START;
     }
     context.travel = context.travel1 = context.travel_mode = context.mv = context.run = 0;
 }
@@ -4107,9 +4127,9 @@ mark_spotted_monsters_in_run(VOID_ARGS)
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
     {
         if (!DEADMONSTER(mtmp) && canspotmon(mtmp) && isok(mtmp->mx, mtmp->my) && couldsee(mtmp->mx, mtmp->my))
-            mtmp->mon_flags |= MON_FLAGS_SPOTTED_IN_RUN;
+            mtmp->mon_flags |= MON_FLAGS_SPOTTED_IN_RUN_AT_START;
         else
-            mtmp->mon_flags &= ~MON_FLAGS_SPOTTED_IN_RUN;
+            mtmp->mon_flags &= ~MON_FLAGS_SPOTTED_IN_RUN_AT_START;
     }
 }
 

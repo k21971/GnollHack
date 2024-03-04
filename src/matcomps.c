@@ -1013,7 +1013,7 @@ struct materialcomponentlist matlists[] =
         }
     },
 
-    { SPE_CELESTIAL_DOVE,
+    { SPE_SUMMON_CELESTIAL_DOVE,
         "Feather",
         STRANGE_OBJECT,
         2,
@@ -1026,7 +1026,7 @@ struct materialcomponentlist matlists[] =
         }
     },
 
-    { SPE_CELESTIAL_EAGLE,
+    { SPE_SUMMON_CELESTIAL_EAGLE,
         "Feather",
         STRANGE_OBJECT,
         1,
@@ -1040,7 +1040,7 @@ struct materialcomponentlist matlists[] =
     },
 
     { SPE_SUMMON_PHOENIX,
-        "Ruby, 1 feather, 2 sulfurous ash",
+        "Ruby, feather, 2 sulfurous ash",
         STRANGE_OBJECT,
         2,
         {
@@ -1972,7 +1972,7 @@ struct materialcomponentlist matlists[] =
     { SPE_MAGIC_ARROW,
     "Any kind of arrow",
     STRANGE_OBJECT,
-    10,
+    20,
         {
             {{ARROW, ELVEN_ARROW, ORCISH_ARROW, YA, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT}, NO_MATCOMP_MONSTER_ALTERNATIVES, "any type of arrow", 1, MATCOMP_NO_FLAGS},
             NO_MATCOMP,
@@ -1994,7 +1994,7 @@ struct materialcomponentlist matlists[] =
     { SPE_MAGIC_MISSILE,
     "Dart",
     STRANGE_OBJECT,
-    7,
+    15,
         {
             {
                 {DART, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT}, 
@@ -2021,7 +2021,7 @@ struct materialcomponentlist matlists[] =
     { SPE_FORCE_BOLT,
     "Any kind of crossbow bolt or quarrel",
     STRANGE_OBJECT,
-    7,
+    15,
         {
             {
                 {CROSSBOW_BOLT, GNOLLISH_QUARREL, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT, STRANGE_OBJECT},
@@ -3352,7 +3352,7 @@ struct materialcomponentlist matlists[] =
     },
 
     { SPE_MASS_CREATE_DRACOLICH,
-    "1 black opals, 2 skulls, 2 mandrake roots",
+    "Black opal, 2 skulls, 2 mandrake roots",
     STRANGE_OBJECT,
     1,
         {

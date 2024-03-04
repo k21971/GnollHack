@@ -49,7 +49,6 @@ setworn(obj, mask)
 register struct obj* obj;
 long mask;
 {
-    Sprintf(debug_buf_3, "setworn, hasobj=%d", obj != 0);
     setworncore(obj, mask, TRUE);
 }
 
@@ -59,7 +58,6 @@ setwornquietly(obj, mask)
 register struct obj* obj;
 long mask;
 {
-    Sprintf(debug_buf_3, "setwornquietly, hasobj=%d", obj != 0);
     setworncore(obj, mask, FALSE);
 }
 
@@ -106,8 +104,7 @@ boolean verbose_and_update_stats;
                 oobj = *(wp->w_obj);
                 if (oobj && !(oobj->owornmask & wp->w_mask))
                 {
-                    impossible("Setworn: mask = %ld, oworn = %ld, update = %d, buf3 = %s, buf4 = %s.", wp->w_mask, oobj->owornmask, verbose_and_update_stats, debug_buf_3, debug_buf_4);
-                    *debug_buf_3 = *debug_buf_4 = 0;
+                    impossible("Setworn: mask = %ld, oworn = %ld, update = %d.", wp->w_mask, oobj->owornmask, verbose_and_update_stats);
                 }
                 /* If old object remove wornmask */
                 if (oobj) 
@@ -145,7 +142,7 @@ boolean verbose_and_update_stats;
                 if (obj) 
                 {
                     obj->owornmask |= wp->w_mask;
-
+                    obj->speflags &= ~SPEFLAGS_PREVIOUSLY_WIELDED;
 
                     /* Prevent getting/blocking intrinsics from wielding
                      * potions, through the quiver, etc.
@@ -179,11 +176,9 @@ boolean verbose_and_update_stats;
         }
     }
 
+    /* No need to go further if verbose_and_update_stats == FALSE, as we are in newgame or restoring a saved game */
     if (!verbose_and_update_stats)
         return;
-
-    /* No need to go further if verbose_and_update_stats == FALSE, as we are in newgame or restoring a saved game */
-
 
     boolean needbecomecursedmsg = FALSE;
     /* curse first */
@@ -1347,13 +1342,13 @@ register struct monst *mon;
     mac -= mon->macbonus;
 
     if (mon->mprops[MAGICAL_STONESKIN])
-        mac -= 18;
+        mac -= MAGICAL_STONESKIN_AC_BONUS;
     else if (mon->mprops[MAGICAL_BARKSKIN])
-        mac -= 12;
+        mac -= MAGICAL_BARKSKIN_AC_BONUS;
     else if (mon->mprops[MAGICAL_SHIELDING])
-        mac -= 6;
+        mac -= MAGICAL_SHIELDING_AC_BONUS;
     else if (mon->mprops[MAGICAL_PROTECTION])
-        mac -= 3;
+        mac -= MAGICAL_PROTECTION_AC_BONUS;
 
     return mac;
 }
@@ -1378,9 +1373,9 @@ register struct monst *mon;
  * already worn body armor is too obviously buggy...
  */
 void
-m_dowear(mon, creation)
+m_dowear(mon, creation, commanded)
 register struct monst *mon;
-boolean creation;
+boolean creation, commanded;
 {
 #define RACE_EXCEPTION TRUE
     /* Note the restrictions here are the same as in dowear in do_wear.c
@@ -1395,8 +1390,7 @@ boolean creation;
 
     /* give mummies a chance to wear their wrappings
      * and let skeletons wear their initial armor */
-    if (mindless(mon->data)
-        && (!creation || !(mon->data->mlet == S_GREATER_UNDEAD || mon->data->mlet == S_LESSER_UNDEAD)))
+    if (mindless(mon->data) && (!creation && !commanded)) // !(mon->data->mlet == S_GREATER_UNDEAD || mon->data->mlet == S_LESSER_UNDEAD)))
         return;
 
     boolean wears_shirt = FALSE;
@@ -1553,6 +1547,7 @@ boolean racialexception;
 {
     struct obj *old, *best, *obj;
     int unseen = !canseemon(mon);
+    boolean ispeaceful = is_peaceful(mon);
     boolean autocurse;
     char nambuf[BUFSZ];
 
@@ -1575,8 +1570,12 @@ boolean racialexception;
         return 0; /* no such thing as better misc items */
     best = old;
 
-    for (obj = mon->minvent; obj; obj = obj->nobj) {
-        switch (flag) 
+    for (obj = mon->minvent; obj; obj = obj->nobj) 
+    {
+        if (ispeaceful && (obj->speflags & SPEFLAGS_INTENDED_FOR_SALE) != 0)
+            continue;
+
+        switch (flag)
         {
         case W_AMUL:
             if (obj->oclass != AMULET_CLASS
@@ -1775,6 +1774,7 @@ struct obj *obj;
 
     }
 
+    Strcpy(debug_buf_2, "m_lose_armor");
     obj_extract_self(obj);
     place_object(obj, mon->mx, mon->my);
     /* call stackobj() if we ever drop anything that can merge */

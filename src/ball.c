@@ -51,7 +51,7 @@ ballfall()
 
         pline_The_ex(ATR_NONE, CLR_MSG_NEGATIVE, "iron ball falls on your %s.", body_part(HEAD));
         if (uarmh) {
-            if (is_metallic(uarmh)) {
+            if (is_hard_helmet(uarmh)) {
                 pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately, you are wearing a hard helmet.");
                 dmg = 3;
             } else if (flags.verbose)
@@ -148,7 +148,11 @@ unplacebc()
              * intended. Ignore all the vision stuff.
              */
             if (!carried(uball))
+            {
+                Strcpy(debug_buf_2, "unplacebc1");
                 obj_extract_self(uball);
+            }
+            Strcpy(debug_buf_2, "unplacebc2");
             obj_extract_self(uchain);
         }
         /* ball&chain not unplaced while swallowed */
@@ -156,12 +160,14 @@ unplacebc()
     }
 
     if (!carried(uball)) {
+        Strcpy(debug_buf_2, "unplacebc3");
         obj_extract_self(uball);
         if (Blind && (u.bc_felt & BC_BALL)) /* drop glyph */
             levl[uball->ox][uball->oy].hero_memory_layers.glyph = u.bglyph;
 
         newsym(uball->ox, uball->oy);
     }
+    Strcpy(debug_buf_2, "unplacebc4");
     obj_extract_self(uchain);
     if (Blind && (u.bc_felt & BC_CHAIN)) /* drop glyph */
         levl[uchain->ox][uchain->oy].hero_memory_layers.glyph = u.cglyph;

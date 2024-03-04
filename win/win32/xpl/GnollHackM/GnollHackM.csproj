@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net7.0-android;net7.0-ios;net7.0-maccatalyst</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.19041.0</TargetFrameworks>
+		<TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
 		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net7.0-tizen</TargetFrameworks> -->
+		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
 		<OutputType>Exe</OutputType>
 		<RootNamespace>GnollHackM</RootNamespace>
 		<UseMaui>true</UseMaui>
@@ -30,7 +30,7 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(TargetFramework)'=='net7.0-ios'">
+	<PropertyGroup Condition="'$(TargetFramework)'=='net8.0-ios'">
 		<ProvisioningType>manual</ProvisioningType>
 		<CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
 		<CodesignProvision>Apple Dev M Development 2023</CodesignProvision>
@@ -38,6 +38,15 @@
 
 	<PropertyGroup>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
+	    <UseInterpreter>false</UseInterpreter>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$(TargetFramework.Contains('-ios'))">
+		<UseInterpreter>false</UseInterpreter>
+		<MtouchInterpreter>-all,FMODService.dll</MtouchInterpreter>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -67,7 +76,8 @@
 		<None Remove="..\GnollHackX\GnollHackX\DiscordWebHookPost.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\DiscordWebHookPostWithAttachment.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\EventArgs.cs" />
-		<None Remove="..\GnollHackX\GnollHackX\ForumPostAttachment.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHPost.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHPostAttachment.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\HttpClientDownloadWithProgress.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHAnimationTimerList.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHApp.cs" />
@@ -91,6 +101,8 @@
 		<None Remove="..\GnollHackX\GnollHackX\GHPetDataItem.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHPutStrItem.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHPutStrInstructions.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHRecordedFunctionCall.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHRecordedRecordedGameFile.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHResponse.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHRequest.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHScreenText.cs" />
@@ -129,16 +141,21 @@
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\TopScorePage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\LibraryPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\DisplayFilePage.xaml.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\ReplayPage.xaml.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\ImportExportPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\EditorPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\VersionPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\Game\GameMenuPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\MainPage.xaml.cs" />
+		<None Remove="Assets\UI\battery-frame.png" />
+		<None Remove="Assets\UI\fps.png" />
 		<None Remove="Assets\UI\frame2-horizontal.png" />
 		<None Remove="Assets\UI\frame2-topleft-small.png" />
 		<None Remove="Assets\UI\frame2-topleft.png" />
 		<None Remove="Assets\UI\frame2-vertical.png" />
 		<None Remove="Assets\UI\picktobag.png" />
 		<None Remove="Assets\UI\status-quivered-weapon-style.png" />
+		<None Remove="Assets\UI\symbol-damage.png" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -150,7 +167,8 @@
 		<Compile Include="..\GnollHackX\GnollHackX\DiscordWebHookPost.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\DiscordWebHookPostWithAttachment.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\EventArgs.cs" />
-		<Compile Include="..\GnollHackX\GnollHackX\ForumPostAttachment.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHPost.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHPostAttachment.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\HttpClientDownloadWithProgress.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHAnimationTimerList.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHApp.cs" />
@@ -174,6 +192,8 @@
 		<Compile Include="..\GnollHackX\GnollHackX\GHPetDataItem.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHPutStrItem.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHPutStrInstructions.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHRecordedFunctionCall.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHRecordedGameFile.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHResponse.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHRequest.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHScreenText.cs" />
@@ -213,6 +233,8 @@
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\TopScorePage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\LibraryPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\DisplayFilePage.xaml.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\ReplayPage.xaml.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\ImportExportPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\EditorPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\VersionPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\Game\GameMenuPage.xaml.cs" />
@@ -436,7 +458,7 @@
 	  <None Remove="Platforms\Android\libs\arm64-v8a\libgnollhackdroid.so" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)'=='net7.0-android'">
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-android'">
       <!--<EmbeddedJar Include="Platforms\Android\jars\fmod.jar" />-->
 	  <AndroidLibrary Include="Platforms\Android\jars\fmod.jar" />
 	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmod.so" />
@@ -466,7 +488,7 @@
 	  <Compile Include="..\GnollHackX\GnollHackX.Android\PlatformServiceAndroid.cs" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)'=='net7.0-ios' or '$(TargetFramework)'=='net7.0-maccatalyst'">
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-ios' or '$(TargetFramework)'=='net8.0-maccatalyst'">
 		<NativeReference Include="Platforms\iOS\libs\libfmodstudio_iphoneos.a">
 			<Kind>Static</Kind>
 			<Frameworks>AudioToolbox CoreAudio</Frameworks>
@@ -509,8 +531,14 @@
 	<PropertyGroup>
 		<DefineConstants>$(DefineConstants);GNH_MAUI</DefineConstants>
 	</PropertyGroup>
-	<PropertyGroup Condition="'$(TargetFramework)'=='net7.0-ios'">
+	<PropertyGroup Condition="'$(TargetFramework)'=='net8.0-ios'">
 		<DefineConstants>$(DefineConstants);UNITY_IPHONE</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-ios|AnyCPU'">
+	  <MtouchLink>SdkOnly</MtouchLink>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-ios|AnyCPU'">
+	  <MtouchLink>SdkOnly</MtouchLink>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -553,6 +581,7 @@
 	  <EmbeddedResource Include="Assets\UI\autopickup.png" />
 	  <EmbeddedResource Include="Assets\UI\background-loading-screen.png" />
 	  <EmbeddedResource Include="Assets\UI\background-oldpaper.png" />
+	  <EmbeddedResource Include="Assets\UI\battery-frame.png" />
 	  <EmbeddedResource Include="Assets\UI\break.png" />
 	  <EmbeddedResource Include="Assets\UI\cancel.png" />
 	  <EmbeddedResource Include="Assets\UI\cast.png" />
@@ -576,6 +605,7 @@
 	  <EmbeddedResource Include="Assets\UI\fight.png" />
 	  <EmbeddedResource Include="Assets\UI\fire.png" />
 	  <EmbeddedResource Include="Assets\UI\forcelock.png" />
+	  <EmbeddedResource Include="Assets\UI\fps.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-horizontal.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-topleft-small.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-topleft.png" />
@@ -685,6 +715,7 @@
 	  <EmbeddedResource Include="Assets\UI\symbol-adds.png" />
 	  <EmbeddedResource Include="Assets\UI\symbol-casts.png" />
 	  <EmbeddedResource Include="Assets\UI\symbol-cooldown.png" />
+	  <EmbeddedResource Include="Assets\UI\symbol-damage.png" />
 	  <EmbeddedResource Include="Assets\UI\symbol-food.png" />
 	  <EmbeddedResource Include="Assets\UI\symbol-mana.png" />
 	  <EmbeddedResource Include="Assets\UI\symbol-spell-abjuration.png" />
@@ -729,11 +760,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="SkiaSharp" Version="2.88.3" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="2.88.3" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="2.88.3" />
+		<PackageReference Include="SkiaSharp" Version="3.0.0-preview.2.1" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.0.0-preview.2.1" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.0.0-preview.2.1" />
 	</ItemGroup>
 
 	<ItemGroup>

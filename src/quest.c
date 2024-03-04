@@ -17,8 +17,6 @@
 STATIC_DCL void NDECL(on_start);
 STATIC_DCL void NDECL(on_locate);
 STATIC_DCL void NDECL(on_goal);
-STATIC_DCL boolean NDECL(not_capable);
-STATIC_DCL int FDECL(is_pure, (BOOLEAN_P));
 STATIC_DCL void FDECL(expulsion, (BOOLEAN_P));
 STATIC_DCL boolean FDECL(chat_with_leader, (struct monst*, BOOLEAN_P));
 STATIC_DCL boolean FDECL(chat_with_nemesis, (struct monst*, BOOLEAN_P));
@@ -150,13 +148,13 @@ ok_to_quest()
                       && is_pure(FALSE) > 0);
 }
 
-STATIC_OVL boolean
+boolean
 not_capable()
 {
     return (boolean) (u.ulevel < MIN_QUEST_LEVEL);
 }
 
-STATIC_OVL int
+int
 is_pure(talk)
 boolean talk;
 {
@@ -246,6 +244,7 @@ struct obj *obj; /* quest artifact; possibly null if carrying Amulet */
         if ((otmp = carrying(BELL_OF_OPENING)) == 0)
         {
             com_pager((struct monst*)0, 5);
+            context.quest_flags |= QUEST_FLAGS_HEARD_OF_BELL | QUEST_FLAGS_HEARD_OF_BELL_OWNER | QUEST_FLAGS_HEARD_OF_BELL_OWNER_IS_NEMESIS;
         }
     }
     Qstat(got_thanks) = TRUE;
@@ -256,8 +255,8 @@ struct obj *obj; /* quest artifact; possibly null if carrying Amulet */
            quest artifact */
         fully_identify_obj(obj);
         update_inventory();
-        livelog_printf(LL_ACHIEVE, "completed %s quest without incident",
-            uhis());
+        livelog_printf(LL_ACHIEVE, "completed %s quest without incident", uhis());
+        update_game_music();
     }
 }
 
@@ -563,6 +562,8 @@ const char* achievement_name;
 {
     play_sfx_sound(SFX_ACHIEVEMENT);
     custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "ACHIEVEMENT", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0U, "%s", achievement_name);
+    if(flags.showscore)
+        context.botl = context.botlx = 1; /* Make sure score get updated when visible on the status bar */
 }
 
 /*quest.c*/

@@ -40,7 +40,7 @@ STATIC_VAR int sex_change_ok = 0;
 
 /* update the youmonst.data structure pointer and intrinsics */
 void
-set_uasmon()
+set_uasmon(VOID_ARGS)
 {
     struct permonst *mdat = &mons[u.umonnum];
     int i;
@@ -122,7 +122,7 @@ set_uasmon()
 
 /* Levitation overrides Flying; set or clear BFlying|I_SPECIAL */
 void
-float_vs_flight()
+float_vs_flight(VOID_ARGS)
 {
     boolean stuck_in_floor = (u.utrap && u.utraptype != TT_PIT);
 
@@ -242,7 +242,7 @@ const char *fmt, *arg;
 }
 
 void
-change_sex()
+change_sex(VOID_ARGS)
 {
     /* setting u.umonster for caveman/cavewoman or priest/priestess
        swap unintentionally makes `Upolyd' appear to be true */
@@ -272,7 +272,7 @@ change_sex()
 }
 
 STATIC_OVL void
-newman()
+newman(VOID_ARGS)
 {
     int i, oldlvl, newlvl, hpmax, enmax;
 
@@ -380,7 +380,7 @@ newman()
     play_sfx_sound(SFX_POLYMORPH_NEW_MAN);
     polyman("feel like a new %s!",
             /* use saved gender we're about to revert to, not current */
-            ((Upolyd ? u.mfemale : flags.female) && urace.individual.f)
+            (Ufemale && urace.individual.f)
                 ? urace.individual.f
                 : (urace.individual.m)
                    ? urace.individual.m
@@ -1077,8 +1077,6 @@ int attribute_index;
     
 }
 
-
-
 int
 monster_attribute_minimum(monster_class_ptr, attribute_index)
 struct permonst* monster_class_ptr;
@@ -1115,18 +1113,12 @@ int attribute_index;
         return monster_attribute_score;
     else
         return 3;
-
-
 }
-
-
-
 
 STATIC_OVL void
 break_armor()
 {
     register struct obj *otmp;
-    Strcpy(debug_buf_4, "break_armor");
 
     //Suit, cloak, robe, shirt
     if (breakarm(youmonst.data)) 
@@ -1504,7 +1496,7 @@ int alone;
 }
 
 void
-rehumanize()
+rehumanize(VOID_ARGS)
 {
     boolean was_flying = (Flying != 0);
 
@@ -1551,7 +1543,7 @@ rehumanize()
 }
 
 int
-dobreathe()
+dobreathe(VOID_ARGS)
 {
     struct attack *mattk;
 
@@ -1611,7 +1603,14 @@ uchar adtyp;
 }
 
 int
-dosteedbreathe()
+dosteedbreathemon(mon)
+struct monst* mon UNUSED;
+{
+    return dosteedbreathe();
+}
+
+int
+dosteedbreathe(VOID_ARGS)
 {
     struct attack* mattk;
 
@@ -1651,17 +1650,17 @@ dosteedbreathe()
 
         buzz((int)(-(20 + typ - 1)), (struct obj*)0, u.usteed, (int)mattk->damn, (int)mattk->damd, (int)mattk->damp, u.ux, u.uy, u.dx, u.dy);
 
-        u.usteed->mspec_used = (5 + rn2(10));
-        if (typ == AD_SLEE && !Sleep_resistance)
-            u.usteed->mspec_used += rnd(20);
-
+        if (typ == AD_SLEE)
+            u.usteed->mspec_used += (MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE));
+        else
+            u.usteed->mspec_used = (MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE));
     }
     return 1;
 }
 
 
 int
-dospit()
+dospit(VOID_ARGS)
 {
     struct obj *otmp;
     struct attack *mattk;
@@ -1693,7 +1692,7 @@ dospit()
 }
 
 int
-doremove()
+doremove(VOID_ARGS)
 {
     if (!Punished) {
         if (u.utrap && u.utraptype == TT_BURIEDBALL) {
@@ -1709,7 +1708,7 @@ doremove()
 }
 
 int
-dospinweb()
+dospinweb(VOID_ARGS)
 {
     register struct trap *ttmp = t_at(u.ux, u.uy);
 
@@ -1832,7 +1831,7 @@ dospinweb()
 }
 
 int
-dosummon()
+dosummon(VOID_ARGS)
 {
     int placeholder;
     if (u.uen < WERE_SUMMON_MANA_COST) {
@@ -2075,7 +2074,7 @@ dogaze()
                                     : -200);
                                 multi_reason = "frozen by a monster's gaze";
                                 nomovemsg = 0;
-                                standard_hint("Do not gaze at floating eyes unless you have free action. Use ranged weapons against them.", &u.uhint.paralyzed_by_floating_eye);
+                                standard_hint("Do not gaze at floating eyes unless you have paralysis resistance. Use ranged weapons against them.", &u.uhint.paralyzed_by_floating_eye);
                                 return 1;
                             }
                             else
@@ -2115,7 +2114,7 @@ dogaze()
 }
 
 int
-doeyestalk()
+doeyestalk(VOID_ARGS)
 {
     if (Blind) {
         You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "see anything to gaze at.");
@@ -2182,7 +2181,7 @@ doeyestalk()
 }
 
 int
-dohide()
+dohide(VOID_ARGS)
 {
     boolean ismimic = is_mimic(youmonst.data),
             on_ceiling = is_clinger(youmonst.data) || Flying;
@@ -2255,7 +2254,7 @@ dohide()
 }
 
 int
-dopoly()
+dopoly(VOID_ARGS)
 {
     struct permonst *savedat = youmonst.data;
 
@@ -2270,7 +2269,7 @@ dopoly()
 }
 
 int
-dodryfountain()
+dodryfountain(VOID_ARGS)
 {
     if (IS_FOUNTAIN(levl[u.ux][u.uy].typ)) {
         if (split_mon(&youmonst, (struct monst*) 0))
@@ -2303,7 +2302,7 @@ douseunicornhorn()
 }
 
 int
-doshriek()
+doshriek(VOID_ARGS)
 {
     play_monster_chat_sound(&youmonst, 0);
     You("shriek.");
@@ -2315,7 +2314,7 @@ doshriek()
 }
 
 int
-dolayegg()
+dolayegg(VOID_ARGS)
 {
     struct obj* uegg;
 
@@ -2365,7 +2364,7 @@ dolayegg()
 
 
 int
-domindblast()
+domindblast(VOID_ARGS)
 {
     struct monst *mtmp, *nmon;
 
@@ -2403,7 +2402,7 @@ domindblast()
 }
 
 void
-uunstick()
+uunstick(VOID_ARGS)
 {
     if (!u.ustuck) {
         impossible("uunstick: no ustuck?");
@@ -2596,7 +2595,7 @@ int part;
 }
 
 int
-poly_gender()
+poly_gender(VOID_ARGS)
 {
     /* Returns gender of polymorphed player;
      * 0/1=same meaning as flags.female, 2=none.
@@ -2678,7 +2677,7 @@ int atyp;
 
 /* some species have awareness of other species */
 STATIC_OVL void
-polysense()
+polysense(VOID_ARGS)
 {
     short warnidx = NON_PM;
 
@@ -2708,7 +2707,7 @@ polysense()
 
 /* True iff hero's role or race has been genocided */
 boolean
-ugenocided()
+ugenocided(VOID_ARGS)
 {
     return (boolean) ((mvitals[urole.monsternum].mvflags & MV_GENOCIDED)
                       || (mvitals[urace.monsternum].mvflags & MV_GENOCIDED)
@@ -2717,7 +2716,7 @@ ugenocided()
 
 /* how hero feels "inside" after self-genocide of role or race */
 const char *
-udeadinside()
+udeadinside(VOID_ARGS)
 {
     /* self-genocide used to always say "you feel dead inside" but that
        seems silly when you're polymorphed into something undead;

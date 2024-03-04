@@ -2135,7 +2135,6 @@ struct mkroom *croom;
     schar x, y;
     char c;
     boolean named; /* has a name been supplied in level description? */
-    Sprintf(debug_buf_2, "create_object, oclass=%d, id=%d", o->class, o->id);
 
     named = o->name.str ? TRUE : FALSE;
 
@@ -2300,13 +2299,13 @@ struct mkroom *croom;
     {
         if (!exist_artifact(ORNAMENTAL_ORCISH_DAGGER, artiname(ART_GRIMTOOTH)) && rn2(3))
         {
-            otmp = mksobj(ORNAMENTAL_ORCISH_DAGGER, FALSE, FALSE, FALSE);
+            otmp = mksobj(ORNAMENTAL_ORCISH_DAGGER, FALSE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE);
             otmp = oname(otmp, artiname(ART_GRIMTOOTH));
             otmp->enchantment = 3 + rnd(4);
         }
         else
         {
-            otmp = mksobj(ORCISH_DAGGER, FALSE, FALSE, FALSE);
+            otmp = mksobj(ORCISH_DAGGER, FALSE, FALSE, MKOBJ_TYPE_NORMAL);
             otmp->enchantment = 2 + rnd(3);
             otmp->mythic_prefix = MYTHIC_PREFIX_VAMPIRIC;
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
@@ -2372,13 +2371,14 @@ struct mkroom *croom;
         else if (otmp->otyp == CHEST && o->enchantment)
             otmp->speflags |= SPEFLAGS_SCHROEDINGERS_BOX;
         else if (otmp->otyp == STATUE && o->enchantment)
-            otmp->speflags |= SPEFLAGS_STATUE_HISTORIC;
+            otmp->special_quality = SPEQUAL_STATUE_HISTORIC;
         else if (otmp->otyp == EGG && o->enchantment)
             otmp->speflags |= SPEFLAGS_YOURS;
         else
             otmp->enchantment = (schar)o->enchantment;
     }
-    switch (o->curse_state) {
+    switch (o->curse_state) 
+    {
     case 1:
         bless(otmp);
         break; /* BLESSED */
@@ -2401,7 +2401,8 @@ struct mkroom *croom;
     }
 
     /* corpsenm is "empty" if -1, random if -2, otherwise specific */
-    if (o->corpsenm != NON_PM) {
+    if (o->corpsenm != NON_PM) 
+    {
         if (o->corpsenm == NON_PM - 1)
             set_corpsenm(otmp, rndmonnum());
         else
@@ -2412,8 +2413,10 @@ struct mkroom *croom;
     if (named)
         otmp = oname(otmp, o->name.str);
 
-    if (o->eroded) {
-        if (o->eroded < 0) {
+    if (o->eroded)
+    {
+        if (o->eroded < 0) 
+        {
             otmp->oerodeproof = 1;
         } else {
             otmp->oeroded = (o->eroded % 4);
@@ -2422,14 +2425,18 @@ struct mkroom *croom;
     }
     if (o->recharged)
         otmp->recharged = min(RECHARGE_LIMIT, o->recharged);
-    if (o->locked) {
+    if (o->locked)
+    {
         otmp->olocked = 1;
-    } else if (o->broken) {
+    }
+    else if (o->broken) 
+    {
         otmp->obroken = 1;
         otmp->olocked = 0; /* obj generation may set */
     }
     
-    if (o->open) {
+    if (o->open) 
+    {
         otmp->speflags |= SPEFLAGS_LID_OPENED;
         set_corpsenm(otmp, NON_PM);
         otmp->owt = weight(otmp);
@@ -2499,15 +2506,21 @@ struct mkroom *croom;
         otmp->special_tileset = levl[x][y].use_special_tileset ? levl[x][y].special_tileset : get_current_cmap_type_index();
     }
 
-    if (o->quan > 0 && objects[otmp->otyp].oc_merge) {
+    if (o->quan > 0 && objects[otmp->otyp].oc_merge) 
+    {
         otmp->quan = o->quan;
         otmp->owt = weight(otmp);
     }
 
     /* contents */
-    if (o->containment & SP_OBJ_CONTENT) {
-        if (!container_idx) {
-            if (!invent_carrying_monster) {
+    boolean added_to_container = FALSE;
+    boolean added_to_monster_inventory = FALSE;
+    if (o->containment & SP_OBJ_CONTENT)
+    {
+        if (!container_idx) 
+        {
+            if (!invent_carrying_monster)
+            {
                 /*impossible("create_object: no container");*/
                 /* don't complain, the monster may be gone legally
                    (e.g. unique demon already generated)
@@ -2516,7 +2529,9 @@ struct mkroom *croom;
                    outside the des-file.  Maybe another data file that
                    determines what inventories monsters get by default?
                  */
-            } else {
+            } 
+            else 
+            {
                 int ci;
                 struct obj *objcheck = otmp;
                 int inuse = -1;
@@ -2525,8 +2540,10 @@ struct mkroom *croom;
                     if (container_obj[ci] == objcheck)
                         inuse = ci;
                 remove_object(otmp);
-                if (mpickobj(invent_carrying_monster, otmp)) {
-                    if (inuse > -1) {
+                if (mpickobj(invent_carrying_monster, otmp)) 
+                {
+                    if (inuse > -1) 
+                    {
                         impossible(
                      "container given to monster was merged or deallocated.");
                         for (ci = inuse; ci < container_idx - 1; ci++)
@@ -2537,15 +2554,23 @@ struct mkroom *croom;
                     /* we lost track of it. */
                     return;
                 }
+                added_to_monster_inventory = TRUE;
             }
-        } else {
+        } 
+        else
+        {
             struct obj *cobj = container_obj[container_idx - 1];
 
             remove_object(otmp);
-            if (cobj) {
-                (void) add_to_container(cobj, otmp);
+            if (cobj) 
+            {
+                otmp = add_to_container(cobj, otmp); /* note that otmp may have merged with another item in the container */
                 cobj->owt = weight(cobj);
-            } else {
+                added_to_container = TRUE;
+            }
+            else 
+            {
+                Strcpy(debug_buf_2, "create_object1");
                 obj_extract_self(otmp);
                 obfree(otmp, NULL);
                 return;
@@ -2553,12 +2578,15 @@ struct mkroom *croom;
         }
     }
     /* container */
-    if (o->containment & SP_OBJ_CONTAINER) {
+    if (o->containment & SP_OBJ_CONTAINER)
+    {
         delete_contents(otmp);
-        if (container_idx < MAX_CONTAINMENT) {
+        if (container_idx < MAX_CONTAINMENT) 
+        {
             container_obj[container_idx] = otmp;
             container_idx++;
-        } else
+        } 
+        else
             impossible("create_object: too deeply nested containers.");
     }
 
@@ -2566,7 +2594,8 @@ struct mkroom *croom;
      * are not stone-resistant and have monster inventory.  They also lack
      * other contents, but that can be specified as an empty container.
      */
-    if (o->id == STATUE && Is_medusa_level(&u.uz) && o->corpsenm == NON_PM) {
+    if (o->id == STATUE && Is_medusa_level(&u.uz) && o->corpsenm == NON_PM) 
+    {
         struct monst *was = NULL;
         struct obj *obj;
         int wastyp;
@@ -2576,11 +2605,14 @@ struct mkroom *croom;
          * resistant (if they were, we'd have to reset the name as well as
          * setting corpsenm).
          */
-        for (wastyp = otmp->corpsenm; i < 1000; i++, wastyp = rndmonnum()) {
+        for (wastyp = otmp->corpsenm; i < 1000; i++, wastyp = rndmonnum())
+        {
             /* makemon without rndmonst() might create a group */
             was = makemon(&mons[wastyp], 0, 0, MM_NOCOUNTBIRTH);
-            if (was) {
-                if (!resists_ston(was)) {
+            if (was)
+            {
+                if (!resists_ston(was)) 
+                {
                     (void) propagate(wastyp, TRUE, FALSE);
                     break;
                 }
@@ -2588,11 +2620,14 @@ struct mkroom *croom;
                 was = NULL;
             }
         }
-        if (was) {
+        if (was) 
+        {
             set_corpsenm(otmp, wastyp);
-            while (was->minvent) {
+            while (was->minvent) 
+            {
                 obj = was->minvent;
                 obj->owornmask = 0;
+                Strcpy(debug_buf_2, "create_object2");
                 obj_extract_self(obj);
                 (void) add_to_container(otmp, obj);
             }
@@ -2601,7 +2636,8 @@ struct mkroom *croom;
         }
     }
 
-    if (o->id != -1) {
+    if (o->id != -1) 
+    {
         static const char prize_warning[] = "multiple prizes on %s level";
 
         /* if this is a specific item of the right type and it is being
@@ -2609,21 +2645,28 @@ struct mkroom *croom;
            used to detect a special achievement (to whit, reaching and
            exploring the target level, although the exploration part
            might be short-circuited if a monster brings object to hero) */
-        if (Is_mineend_level(&u.uz)) {
-            if (otmp->otyp == iflags.mines_prize_type && otmp->oartifact == iflags.mines_prize_oartifact) {
+        if (Is_mineend_level(&u.uz)) 
+        {
+            if (otmp->otyp == iflags.mines_prize_type && otmp->oartifact == iflags.mines_prize_oartifact) 
+            {
                 otmp->speflags |= SPEFLAGS_MINES_PRIZE;
                 /* prevent stacking; cleared when achievement is recorded */
                 otmp->nomerge = 1;
                 if (++mines_prize_count > 1)
                     impossible(prize_warning, "mines end");
             }
-        } else if (Is_sokoend_level(&u.uz)) {
-            if (otmp->otyp == iflags.soko_prize_type1) {
+        }
+        else if (Is_sokoend_level(&u.uz)) 
+        {
+            if (otmp->otyp == iflags.soko_prize_type1)
+            {
                 otmp->speflags |= SPEFLAGS_SOKO_PRIZE1;
                 otmp->nomerge = 1; /* redundant; Sokoban prizes don't stack */
                 if (++soko_prize_count > 1)
                     impossible(prize_warning, "sokoban end");
-            } else if (otmp->otyp == iflags.soko_prize_type2) {
+            } 
+            else if (otmp->otyp == iflags.soko_prize_type2) 
+            {
                 otmp->speflags |= SPEFLAGS_SOKO_PRIZE2;
                 otmp->nomerge = 1; /* redundant; Sokoban prizes don't stack */
                 if (++soko_prize_count > 1)
@@ -2631,18 +2674,30 @@ struct mkroom *croom;
             }
         }
     }
-    otmp->owt = weight(otmp);
-    stackobj(otmp);
 
-    if (o->lit) {
+    if(added_to_container)
+        return; /* The rest is not appropriate anymore for an item in a container */
+
+    otmp->owt = weight(otmp);
+
+    if(!added_to_monster_inventory)
+        stackobj(otmp);
+
+    if (o->lit) 
+    {
         begin_burn(otmp, FALSE);
     }
 
-    if (o->buried) {
+    if (added_to_monster_inventory)
+        return; /* The rest is not appropriate anymore for an item in monster inventory */
+
+    if (o->buried)
+    {
         boolean dealloced;
 
         (void) bury_an_obj(otmp, &dealloced);
-        if (dealloced && container_idx) {
+        if (dealloced && container_idx)
+        {
             container_obj[container_idx - 1] = NULL;
         }
     }
@@ -3848,7 +3903,7 @@ spo_end_moninvent(coder)
 struct sp_coder *coder UNUSED;
 {
     if (invent_carrying_monster)
-        m_dowear(invent_carrying_monster, TRUE);
+        m_dowear(invent_carrying_monster, TRUE, FALSE);
     invent_carrying_monster = NULL;
 }
 

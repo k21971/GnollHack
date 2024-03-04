@@ -14,6 +14,7 @@
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PlatformToolset>v143</PlatformToolset>
+    <EnableASAN>true</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <PlatformToolset>v143</PlatformToolset>
@@ -29,6 +30,9 @@
   <Import Project="files.props" />
   <PropertyGroup>
     <OutDir>$(BinDir)</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="Exists('$(PDCURSES)')">
     <ClCompile>
@@ -49,7 +53,7 @@
       <OmitFramePointers>true</OmitFramePointers>
       <AdditionalIncludeDirectories>$(WinWin32Dir);$(IncDir);$(SysWinntDir);$(SysShareDir);$(WinShareDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NO_TILES;WIN32CON;DLB;MSWIN_GRAPHICS;SAFEPROCS;_LIB;GNOLLHACK_MAIN_PROGRAM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">EnableFastChecks</BasicRuntimeChecks>
+      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
       <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -284,12 +288,12 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="AfterBuild">
-	  <Message Text="Start building aftergnollhack.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start building aftergnollhack.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
   </Target>
   <Target Name="AfterClean">
-	  <Message Text="Start cleaning aftergnollhack.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhack.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start cleaning aftergnollhack.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhack.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
   </Target>
   <!--<Target Name="AfterRebuild">
 	  <Message Text="Start rebuilding aftergnollhack.proj" Importance="High" />

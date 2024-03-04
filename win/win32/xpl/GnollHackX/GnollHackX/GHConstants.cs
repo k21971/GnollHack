@@ -80,6 +80,7 @@ namespace GnollHackX
         IndentPeriod =  0x00001800,
         IndentDoubleSpace = 0x00004800,
         IndentBracketOrDoubleSpace = 0x0000C800,
+        IndentMask =    0x0000F800,
         AlignCenter =   0x00010000,
         AlignRight =    0x00020000,
         Inactive =      0x00040000,
@@ -211,8 +212,9 @@ namespace GnollHackX
         FullVersion =           0x00000004,
         ModernMode =            0x00000008, /* Upon death, the character teleports back to starting altar */
         CasualMode =            0x00000010, /* Save games are preserved */
-        DisableBones =          0x00000020, /* Force iflags.bones to off */
+        DisableBones =          0x00000020, /* Force flags.bones to off */
         ForceLastPlayerName =   0x00000040, /* Use LastUsedPlayerName as preset player name */
+        PlayingReplay =         0x00000080, /* Game is a replay */
     }
 
     [Flags]
@@ -292,7 +294,7 @@ namespace GnollHackX
         LMFLAGS_LEVITATING =                0x02000000UL,
         LMFLAGS_BLOBBY_ANIMATION =          0x04000000UL,
         LMFLAGS_SWIM_ANIMATION =            0x08000000UL,
-        LMFLAGS_SHARK_ANIMATION =           0x10000000UL,
+        LMFLAGS_SPECIAL_ANIMATION =         0x10000000UL,
         LMFLAGS_HUMAN_BREATHE_ANIMATION =   0x20000000UL,
         LMFLAGS_ANIMAL_BREATHE_ANIMATION =  0x40000000UL,
         LMFLAGS_STONED =                    0x80000000UL,
@@ -1004,6 +1006,11 @@ namespace GnollHackX
             get { return (bitfields >> 30) & 0x00000001U; }
             set { bitfields = (bitfields & ~(0x00000001U << 30)) | ((value & 0x00000001U) << 30); }
         }
+        public uint rotknown
+        {
+            get { return (bitfields >> 31) & 0x00000001U; }
+            set { bitfields = (bitfields & ~(0x00000001U << 31)) | ((value & 0x00000001U) << 31); }
+        }
 
         public int corpsenm;         /* type of corpse is mons[corpsenm] */
         public int usecount;           /* overloaded for various things that tally */
@@ -1119,7 +1126,7 @@ namespace GnollHackX
         SPEFLAGS_MALE                          = 0x00000004UL,
         SPEFLAGS_FACING_RIGHT                  = 0x00000008UL,
         SPEFLAGS_SCHROEDINGERS_BOX             = 0x00000010UL,
-        SPEFLAGS_STATUE_HISTORIC               = 0x00000020UL,
+        SPEFLAGS_INTENDED_FOR_SALE             = 0x00000020UL,
         SPEFLAGS_CORPSE_ON_ICE                 = 0x00000040UL,
         SPEFLAGS_DETECTED                      = 0x00000080UL,
         SPEFLAGS_SERVICED_SPELL                = 0x00000100UL,
@@ -1134,13 +1141,13 @@ namespace GnollHackX
         SPEFLAGS_LID_OPENED                    = 0x00020000UL,
         SPEFLAGS_GRABBED_FROM_YOU              = 0x00040000UL,
         SPEFLAGS_ADDED_TO_YOUR_BILL            = 0x00080000UL,
-        SPEFLAGS_WILL_TURN_TO_DUST_ON_PICKUP   = 0x00100000UL,
+        SPEFLAGS_CERTAIN_WISH                  = 0x00100000UL,
         SPEFLAGS_CAUGHT_IN_LEAVES              = 0x00200000UL,
         SPEFLAGS_CLONED_ITEM                   = 0x00400000UL,
-        SPEFLAGS_INSCRIPTION_REVEALED          = 0x00800000UL,
+        SPEFLAGS_NO_PREVIOUS_WEAPON            = 0x00800000UL,
         SPEFLAGS_ALTERNATIVE_APPEARANCE        = 0x01000000UL, /* Alternative glyph is used for the object */
-        SPEFLAGS_ROTTING_STATUS_KNOWN          = 0x02000000UL,
-        SPEFLAGS_FAVORITE                     = 0x04000000UL,
+        SPEFLAGS_PREVIOUSLY_WIELDED            = 0x02000000UL,
+        SPEFLAGS_FAVORITE                      = 0x04000000UL,
         SPEFLAGS_EMPTY_NOTICED                 = 0x08000000UL,
         SPEFLAGS_BEING_BROKEN                  = 0x10000000UL,
         SPEFLAGS_GIVEN_OUT_BLUE_SMOKE          = 0x20000000UL,
@@ -1151,36 +1158,36 @@ namespace GnollHackX
     [Flags]
     public enum obj_bitfield_types : uint
     {
-        cursed =        0x00000001,
-        blessed =       0x00000002,
-        unpaid =        0x00000004,
-        no_charge =     0x00000008,
-        known =         0x00000010,
-        dknown =        0x00000020,
-        bknown =        0x00000040,
-        rknown =        0x00000080,
-        oeroded =       0x00000100 | 0x00000200,
-        oeroded2 =      0x00000400 | 0x00000800,
-        oerodeproof =   0x00001000,
-        olocked =       0x00002000,
-        degraded_horn = 0x00004000,
-        otrapped =      0x00008000,  /* Monsters will not pick up this item */
-        lamplit =       0x00010000,
-        makingsound =   0x00020000,
-        globby =        0x00040000,
-        greased =       0x00080000,
-        nomerge =       0x00100000,
-        was_thrown =    0x00200000,
-        has_special_tileset = 0x00400000,
-        in_use =        0x00800000,
-        bypass =        0x01000000,
-        cknown =        0x02000000,
-        lknown =        0x04000000,
-        tknown =        0x08000000,
-        nknown =        0x10000000,
-        aknown =        0x20000000,
-        mknown =        0x40000000
-        /* 1 free bit to 32-bit integer */
+        cursed =        0x00000001U,
+        blessed =       0x00000002U,
+        unpaid =        0x00000004U,
+        no_charge =     0x00000008U,
+        known =         0x00000010U,
+        dknown =        0x00000020U,
+        bknown =        0x00000040U,
+        rknown =        0x00000080U,
+        oeroded =       0x00000100U | 0x00000200U,
+        oeroded2 =      0x00000400U | 0x00000800U,
+        oerodeproof =   0x00001000U,
+        olocked =       0x00002000U,
+        degraded_horn = 0x00004000U,
+        otrapped =      0x00008000U,  /* Monsters will not pick up this item */
+        lamplit =       0x00010000U,
+        makingsound =   0x00020000U,
+        globby =        0x00040000U,
+        greased =       0x00080000U,
+        nomerge =       0x00100000U,
+        was_thrown =    0x00200000U,
+        has_special_tileset = 0x00400000U,
+        in_use =        0x00800000U,
+        bypass =        0x01000000U,
+        cknown =        0x02000000U,
+        lknown =        0x04000000U,
+        tknown =        0x08000000U,
+        nknown =        0x10000000U,
+        aknown =        0x20000000U,
+        mknown =        0x40000000U,
+        rotknown =      0x80000000U
     }
 
     [Flags]
@@ -1205,6 +1212,8 @@ namespace GnollHackX
         OBJDATA_FLAGS_FOUND_THIS_TURN = 0x00008000UL,
         OBJDATA_FLAGS_IS_AMMO =         0x00010000UL, /* is_ammo is TRUE */
         OBJDATA_FLAGS_THROWING_WEAPON = 0x00020000UL, /* throwing_weapon is TRUE */
+        OBJDATA_FLAGS_PREV_WEP_FOUND =  0x00040000UL,
+        OBJDATA_FLAGS_PREV_UNWIELD =    0x00080000UL,
     }
 
     [Flags]
@@ -1272,6 +1281,8 @@ namespace GnollHackX
         GUI_CMD_REPORT_PLAY_TIME,
         GUI_CMD_POST_GAME_STATUS,
         GUI_CMD_POST_DIAGNOSTIC_DATA,
+        GUI_CMD_POST_XLOG_ENTRY,
+        GUI_CMD_POST_BONES_FILE,
         GUI_CMD_LIBRARY_MANUAL,
         GUI_CMD_DEBUGLOG,
         GUI_CMD_GAME_START,
@@ -1430,7 +1441,7 @@ namespace GnollHackX
 
     public class GHConstants
     {
-        public const int MinimumFileDescriptorLimit = 4096;
+        public const int MinimumFileDescriptorLimit = 16384;
         public const int InputBufferLength = 32;
         public const int BUFSZ = 256;
         public const int UTF8BUFSZ = 256 * 4;
@@ -1438,7 +1449,12 @@ namespace GnollHackX
         public const int MapCols = 80;
         public const int MapRows = 21;
         public const int DelayOutputDurationInMilliseconds = 50;
+        public const int ExitWindowsWithStringDelay = 1100;
+        public const int FadeToBlackDelay = 325;
+        public const int FadeToBlackDuration = 200;
+        public const int FadeFromBlackDuration = 200;
         public const int MaxMessageHistoryLength = 256;
+        public const int MaxLongerMessageHistoryLength = 16384;
         public const float MoveDistanceThreshold = 25.0f;
         public const long MoveOrPressTimeThreshold = 200; /* Milliseconds */
         public const long SwipeTimeThreshold = 300; /* Milliseconds */
@@ -1477,6 +1493,8 @@ namespace GnollHackX
         public const int MaxLongImmediateSoundInstances = 48;
         public const int MaxChannels = 512;
         public const int MaxBitmapCacheSize = 64;
+        public const int MaxDarkenedBitmapCacheSize = 256;
+        public const int MaxDarkenedAutodrawBitmapCacheSize = 64;
         public const int PIT_BOTTOM_BORDER = 2;
         public const int SPECIAL_HEIGHT_IN_PIT = -32;
         public const int SPECIAL_HEIGHT_LEVITATION = 16;
@@ -1572,14 +1590,77 @@ namespace GnollHackX
         public const string InstallTimePackName = "installtimepack";
         public const string OnDemandPackName = "ondemandpack";
         public const string UserDataDirectory = "usrdata";
-        public const string ManualFilePrefix = "manual_id_";    
+        public const string AppLogDirectory = "log";
+        public const string AppLogFileName = "ghlog.txt";
+        public const string SaveDirectory = "save";
+        public const string DumplogDirectory = "dumplog";
+        public const string ReplayDirectory = "replay";
+        public const string ArchiveDirectory = "archive"; /* Directory for sharable archives and files; cleaned and deleted at program start */
+        public const string UploadDirectory = "upload"; /* Directory for uploadable files; files are never cleaned automatically, only upon successful upload */
+        public const string TempDirectory = "temp";  /* Created and deleted on the go */
+        public const string ZipDirectory = "zip";
+        public const string UnzipTempSubDirectory = "temp";
+        public const string UnzipZipSubDirectory = "zip";
+        public const string GenericZipFileNameSuffix = ".zip";
+        public const string SavedGameSharedZipFileNameSuffix = ".zip";
+        public const string ManualFilePrefix = "manual_id_";
         public const bool DefaultReadStreamingBankToMemory = false;
+        public const ulong AndroidBanksToMemoryThreshold = 3500000000UL;
         public const bool DefaultCopyStreamingBankToDisk = false;
         public const bool DefaultDrawWallEnds = true;
         public const bool DefaultBreatheAnimations = true;
-        public const bool DefaultShowPickNStashContextCommand = true;        
+        //public const bool DefaultShowPickNStashContextCommand = true;
+        //public const bool DefaultShowPrevWepContextCommand = true;
         public const bool DefaultLighterDarkening = true;
         public const bool DefaultAlternativeLayerDrawing = false;
+        public const float CriticalBatteryChargeLevel = 0.15f;
+        public const string ForumPostQueueDirectory = "forumpost";
+        public const string ForumPostFileNamePrefix = "queued_forum_post_";
+        public const string ForumPostFileNameSuffix = ".txt";
+        public const string XlogPostQueueDirectory = "xlogpost";
+        public const string XlogPostFileNamePrefix = "queued_xlog_post_";
+        public const string XlogPostFileNameSuffix = ".txt";
+        public const string XlogTopScorePage = "TopScores";
+        public const string BonesPostQueueDirectory = "bonespost";
+        public const string BonesPostFileNamePrefix = "queued_bones_post_";
+        public const string BonesPostFileNameSuffix = ".txt";
+        public const string BonesPostPage = "bones";
+        public const double BonesPostBaseChance = 2.0 / 3.0;
+        public const double MainScreenGeneralCounterIntervalInSeconds = 2.0;
+        public const long MaxGHLogSize = 4194304;
+        public const int LineBuilderInitialCapacity = 256;
+        public const ulong LowFreeDiskSpaceThresholdInBytes = 1024 * 1024 * 2024;
+        public const ulong VeryLowFreeDiskSpaceThresholdInBytes = 512 * 1024 * 2024;
+        public const ulong CritiallyLowFreeDiskSpaceThresholdInBytes = 64 * 1024 * 2024;
+        public const long MaxSingleReplayFileSizeInBytes = 8 * 1024 * 2024;
+        public const string ReplayFileNamePrefix = "replay-";
+        public const string ReplayContinuationFileNamePrefix = "rpcont-";
+        public const string ReplayFileNameMiddleDivisor = "-";
+        public const string ReplayFileContinuationNumberDivisor = "_";
+        public const string ReplayFileNameSuffix = ".gnhrec";
+        public const string ReplayZipFileNameSuffix = ".zip";
+        public const string ReplayGZipFileNameSuffix = ".gz";
+        public const string ReplaySharedZipFileNamePrefix = "shared-replay-";
+        public const string ReplaySharedZipFileNameSuffix = ".zip";
+        public const string ReplayAllSharedZipFileNamePrefix = "shared-replays-";
+        public const bool GZipIsDefaultReplayCompression = true;
+        public const int ReplayStandardDelay = 128; /* Milliseconds */
+        public const int ReplayGetEventDelay = 16; /* Milliseconds */
+        public const int ReplayOutripDelay = 1024; /* Milliseconds */
+        public const int ReplayAskNameDelay1 = 512; /* Milliseconds */
+        public const int ReplayAskNameDelay2 = 1536; /* Milliseconds */
+        public const int ReplayPopupDelay = 512; /* Milliseconds */
+        public const int ReplayYnDelay = 512; /* Milliseconds */
+        public const int ReplayMenuDelay = 512; /* Milliseconds */
+        public const int ReplayGetLineDelay1 = 512; /* Milliseconds */
+        public const int ReplayGetLineDelay2 = 1024; /* Milliseconds */
+        public const int ReplayDisplayWindowDelay = 512; /* Milliseconds */
+
+#if GNH_MAUI
+        public const string PortName = "GnollHackM";
+#else
+        public const string PortName = "GnollHackX";
+#endif
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1609,4 +1690,196 @@ namespace GnollHackX
         Custom
     }
 
+    public enum EngravingType
+    {
+        DUST = 1,
+        ENGRAVE,
+        BURN,
+        MARK,
+        ENGR_BLOOD,
+        ENGR_HEADSTONE,
+        ENGR_SIGNPOST
+    }
+
+    public struct EngravingInfo
+    {
+        public bool HasEngraving;
+        public string Text;
+        public int EngrType;
+        public ulong EngrFlags;
+        public ulong GeneralFlags;
+        public string[] RowSplit;
+
+        public EngravingInfo(string text, int etype, ulong eflags, ulong gflags)
+        {
+            HasEngraving = true;
+            Text = text;
+            EngrType = etype;
+            EngrFlags = eflags;
+            GeneralFlags = gflags;
+
+            string[] TextSplit;
+            if(text != null)
+               TextSplit = text.Split();
+            else
+                TextSplit = null;
+            if (TextSplit != null)
+            {
+                int defmaxrowlen = 5;
+                int maxrows = 6;
+                int currows = (text.Length - 1) / defmaxrowlen + 1;
+                int usedmaxrowlen = defmaxrowlen;
+                if (currows > maxrows)
+                    usedmaxrowlen = (int)Math.Ceiling((double)defmaxrowlen * (double)currows / (double)maxrows);
+
+                List<string> list = new List<string>();
+                string builtString = "";
+                for(int i = 0; i < TextSplit.Length; i++)
+                {
+                    string str = TextSplit[i].Trim();
+                    if (string.IsNullOrWhiteSpace(str))
+                    {
+                        if(i == TextSplit.Length - 1)
+                        {
+                            list.Add(str);
+                            builtString = "";
+                        }
+                        continue;
+                    }
+
+                    if (builtString.Length >= (usedmaxrowlen * 4) / 5 && builtString.Length + str.Length >= (usedmaxrowlen * 9) / 5)
+                    {
+                        list.Add(builtString);
+                        if (str.Length >= usedmaxrowlen || i == TextSplit.Length - 1)
+                        {
+                            list.Add(str);
+                            builtString = "";
+                        }
+                        else
+                        {
+                            builtString = str;
+                        }
+                    }
+                    else
+                    {
+                        if(builtString != "")
+                            builtString += " " + str;
+                        else
+                            builtString = str;
+
+                        if (str.Length >= usedmaxrowlen || i == TextSplit.Length - 1)
+                        {
+                            list.Add(builtString);
+                            builtString = "";
+                        }
+                    }
+                }
+                RowSplit = list.ToArray();
+            }
+            else
+                RowSplit = null;
+        }
+    }
+
+    public enum RecordedFunctionID
+    {
+        Undefined = 0,
+        EndOfFile,
+        ContinueToNextFile,
+        Reserved1,
+        Reserved2,
+        Reserved3,
+        Reserved4,
+        Reserved5,
+        Reserved6,
+        Reserved7,
+
+        InitializeWindows,
+        CreateWindow,
+        DestroyWindow,
+        ClearWindow,
+        DisplayWindow,
+        ExitWindows,
+        PlayerSelection,
+        Curs,
+        PrintGlyph,
+        AskName,
+        GetEvent,
+        GetChar,
+        PosKey,
+        YnFunction,
+        ClipAround,
+        RawPrint,
+        RawPrintBold,
+        PutStrEx,
+        PutStrEx2,
+        DelayOutput,
+        DelayOutputMilliseconds,
+        DelayOutputIntervals,
+        PreferenceUpdate,
+        StatusInit,
+        StatusFinish,
+        StatusEnable,
+        StatusUpdate,
+        GetMsgHistory,
+        PutMsgHistory,
+        StartMenu,
+        AddExtendedMenu,
+        EndMenu,
+        SelectMenu,
+        FreeMemory,
+        ReportPlayerName,
+        ReportPlayTime,
+        SendObjectData,
+        SendMonsterData,
+        SendEngravingData,
+        GetLine,
+        ClearContextMenu,
+        AddContextMenu,
+        UpdateStatusButton,
+        ToggleAnimationTimer,
+        DisplayFloatingText,
+        DisplayScreenText,
+        DisplayPopupText,
+        DisplayGUIEffect,
+        UpdateCursor,
+        PlayImmediateSound,
+        PlayMusic,
+        PlayLevelAmbient,
+        PlayEnvironmentAmbient,
+        PlayOccupationAmbient,
+        PlayEffectAmbient,
+        SetEffectAmbientVolume,
+        AddAmbientSound,
+        DeleteAmbientSound,
+        SetAmbientSoundVolume,
+        StopAllSounds,
+        IssueGuiCommand,
+        OutRip,
+        UIHasInput,
+        OpenSpecialView,
+        ExitHack,
+        NumberOfFunctionCalls
+    }
+
+    public enum GHPlatform
+    {
+        Unknown = 0,
+        Android = 1,
+        iOS = 2,
+        Windows = 3,
+        MacOS = 4,
+        Unix = 5,
+    }
+
+    public enum PlayReplayResult
+    {
+        Success = 0,
+        Error = 1,
+        GameIsNull = 2,
+        FilePathIsNullOrEmpty = 3,
+        FileDoesNotExist = 4,
+        InvalidVersion = 5,
+        Restarting = 6,
+    }
 }

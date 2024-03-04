@@ -20,9 +20,6 @@ STATIC_DCL int FDECL(do_chat_rumors, (struct monst*));
 STATIC_DCL struct monst* FDECL(ask_target_monster, (struct monst*));
 
 STATIC_DCL void FDECL(hermit_talk, (struct monst*, const char**, enum ghsound_types));
-#if 0
-STATIC_DCL void FDECL(hermit_talk_with_startindex, (struct monst*, const char**, enum ghsound_types, UCHAR_P, int));
-#endif
 STATIC_DCL void FDECL(popup_talk, (struct monst*, const char**, enum ghsound_types, int, int, BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL void FDECL(popup_talk_core, (struct monst*, const char**, enum ghsound_types, UCHAR_P, int, int, int, BOOLEAN_P, BOOLEAN_P));
 
@@ -30,7 +27,6 @@ STATIC_DCL int FDECL(do_chat_hermit_dungeons, (struct monst*));
 STATIC_DCL int FDECL(do_chat_hermit_quests, (struct monst*));
 STATIC_DCL int FDECL(do_chat_hermit_gnomish_mines, (struct monst*));
 STATIC_DCL int FDECL(do_chat_hermit_sokoban, (struct monst*));
-//STATIC_DCL int FDECL(do_chat_hermit_sokoprizes, (struct monst*));
 STATIC_DCL int FDECL(do_chat_hermit_further_advice, (struct monst*));
 STATIC_DCL int FDECL(do_chat_hermit_castle, (struct monst*));
 STATIC_DCL int FDECL(do_chat_hermit_gehennom, (struct monst*));
@@ -2289,7 +2285,9 @@ struct monst* mtmp;
     }
 
     unsigned was_ritual_known = u.uevent.invocation_ritual_known;
+    unsigned had_heard_of_ritual = u.uevent.heard_of_invocation_ritual;
     unsigned was_elbereth_known = u.uevent.elbereth_known;
+    boolean hint_shown_already = FALSE;
 
     if (!canspotmon(mtmp) && is_tame(mtmp))
         pline("You cannot see anyone but then you feel %s's familiar presence there.", noit_mon_nam(mtmp));
@@ -2409,7 +2407,7 @@ struct monst* mtmp;
 
         chatnum++;
 
-        if (is_speaking(mtmp->data) && is_mon_talkative(mtmp))
+        if (is_mon_talkative(mtmp))
         {
             /* Who are you? */
             Strcpy(available_chat_list[chatnum].name, "\"Who are you?\"");
@@ -2651,23 +2649,6 @@ struct monst* mtmp;
 
                 chatnum++;
             }
-
-            //if (mtmp->hermit_told_sokoban)
-            //{
-            //    Strcpy(available_chat_list[chatnum].name, "Ask about the prizes in Sokoban");
-            //    available_chat_list[chatnum].function_ptr = &do_chat_hermit_sokoprizes;
-            //    available_chat_list[chatnum].charnum = 'a' + chatnum;
-
-            //    any = zeroany;
-            //    any.a_char = available_chat_list[chatnum].charnum;
-
-            //    add_menu(win, NO_GLYPH, &any,
-            //        any.a_char, 0, ATR_NONE, NO_COLOR,
-            //        available_chat_list[chatnum].name, MENU_UNSELECTED);
-
-            //    chatnum++;
-            //}
-
         }
 
         if (is_speaking(mtmp->data) && is_peaceful(mtmp) && has_enpc(mtmp) && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_GIVE_ADVANCED_QUESTS) != 0)
@@ -2918,7 +2899,7 @@ struct monst* mtmp;
                 chatnum++;
             }
 
-            if (mtmp->data->mlet == S_DOG && !mtmp->mstaying && mtmp->mwantstomove)
+            if (mtmp->data->mlet == S_DOG && !mtmp->mstaying && mtmp->mwantstomove && mtmp != u.usteed)
             {
                 Strcpy(available_chat_list[chatnum].name, "Command to sit down");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_sit;
@@ -2935,7 +2916,7 @@ struct monst* mtmp;
                 chatnum++;
             }
 
-            if (mtmp->data->mlet == S_DOG)
+            if (mtmp->data->mlet == S_DOG && mtmp != u.usteed)
             {
                 Strcpy(available_chat_list[chatnum].name, "Command to give paw");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_givepaw;
@@ -2950,10 +2931,9 @@ struct monst* mtmp;
                     available_chat_list[chatnum].name, MENU_UNSELECTED);
 
                 chatnum++;
-
             }
 
-            if (!mtmp->mstaying && mtmp->mwantstomove)
+            if (!mtmp->mstaying && mtmp->mwantstomove && mtmp != u.usteed)
             {
 
                 if (is_animal(mtmp->data))
@@ -2977,8 +2957,7 @@ struct monst* mtmp;
                 chatnum++;
             }
 
-
-            if (mtmp->mstaying || !mtmp->mwantstomove)
+            if ((mtmp->mstaying || !mtmp->mwantstomove) && mtmp != u.usteed)
             {
                 if (is_animal(mtmp->data))
                     Strcpy(available_chat_list[chatnum].name, "Command to stop staying put");
@@ -3002,7 +2981,7 @@ struct monst* mtmp;
             }
 
 
-            if (!mtmp->mcomingtou)
+            if (!mtmp->mcomingtou && mtmp != u.usteed)
             {
 
                 Strcpy(available_chat_list[chatnum].name, "Command to follow you");
@@ -3020,30 +2999,12 @@ struct monst* mtmp;
                 chatnum++;
             }
 
-            if (mtmp->mcomingtou)
+            if (mtmp->mcomingtou && mtmp != u.usteed)
             {
                 Strcpy(available_chat_list[chatnum].name, "Command to stop following you");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_unfollow;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
                 available_chat_list[chatnum].stops_dialogue = TRUE;
-
-                any = zeroany;
-                any.a_char = available_chat_list[chatnum].charnum;
-
-                add_menu(win, NO_GLYPH, &any,
-                    any.a_char, 0, ATR_NONE, NO_COLOR,
-                    available_chat_list[chatnum].name, MENU_UNSELECTED);
-
-                chatnum++;
-            }
-
-
-
-            if (mtmp->minvent)
-            {
-                Strcpy(available_chat_list[chatnum].name, "Display inventory");
-                available_chat_list[chatnum].function_ptr = &do_chat_pet_display_inventory;
-                available_chat_list[chatnum].charnum = 'a' + chatnum;
 
                 any = zeroany;
                 any.a_char = available_chat_list[chatnum].charnum;
@@ -3074,7 +3035,6 @@ struct monst* mtmp;
 
             if (OBJ_AT(mtmp->mx, mtmp->my) && !mtmp->issummoned && !mtmp->ispartymember)
             {
-            
                 Strcpy(available_chat_list[chatnum].name, "Command to pick the items on the ground");
                 available_chat_list[chatnum].function_ptr = &do_chat_pet_pickitems;
                 available_chat_list[chatnum].charnum = 'a' + chatnum;
@@ -3090,6 +3050,62 @@ struct monst* mtmp;
                 chatnum++;
             }
 
+            /* Commands to the steed */
+            if (mtmp == u.usteed)
+            {
+                if (can_breathe(mtmp->data))
+                {
+                    int mcolor = NO_COLOR;
+                    any = zeroany;
+                    available_chat_list[chatnum].function_ptr = &dosteedbreathemon;
+                    available_chat_list[chatnum].charnum = 'a' + chatnum;
+                    available_chat_list[chatnum].stops_dialogue = TRUE;
+                    if (mtmp->mspec_used > 0)
+                    {
+                        Sprintf(available_chat_list[chatnum].name, "Breath weapon cooling down (%u round%s left)", mtmp->mspec_used, plur(mtmp->mspec_used));
+                        mcolor = CLR_GRAY;
+                    }
+                    else
+                    {
+                        char cooldownbuf[BUFSZ];
+                        struct attack* mattk = attacktype_fordmg(mtmp->data, AT_BREA, AD_ANY);
+                        int typ = get_ray_adtyp(mattk->adtyp);
+                        if (typ == AD_SLEE)
+                            Sprintf(cooldownbuf, "%dd%d+%d", MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT);
+                        else
+                            Sprintf(cooldownbuf, "%dd%d+%d", MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT);
+                        const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
+                            "%s (&cool; %s after use)" : "%s (%s round cooldown after use)";
+                        Sprintf(available_chat_list[chatnum].name, steedbreathefmt, "Command the steed to use breath weapon", cooldownbuf);
+                        any.a_char = available_chat_list[chatnum].charnum;
+                    }
+
+                    struct extended_menu_info minfo = zeroextendedmenuinfo;
+                    minfo.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+                    add_extended_menu(win, NO_GLYPH, &any,
+                        any.a_char, 0, ATR_NONE, mcolor,
+                        available_chat_list[chatnum].name, MENU_UNSELECTED, minfo);
+
+                    chatnum++;
+                }
+            }
+
+            /* Last, display inventory */
+            if (mtmp->minvent)
+            {
+                Strcpy(available_chat_list[chatnum].name, "Display inventory");
+                available_chat_list[chatnum].function_ptr = &do_chat_pet_display_inventory;
+                available_chat_list[chatnum].charnum = 'a' + chatnum;
+
+                any = zeroany;
+                any.a_char = available_chat_list[chatnum].charnum;
+
+                add_menu(win, NO_GLYPH, &any,
+                    any.a_char, 0, ATR_NONE, NO_COLOR,
+                    available_chat_list[chatnum].name, MENU_UNSELECTED);
+
+                chatnum++;
+            }
         }
 
         /* These are available also for hostile creatures */
@@ -4307,14 +4323,15 @@ end_of_chat_here:
     if (!was_elbereth_known && u.uevent.elbereth_known)
     {
         standard_hint("You can engrave \'Elbereth\' on the ground to protect yourself against attacking monsters.", &u.uhint.elbereth);
+        hint_shown_already = TRUE;
     }
     
-    if (!was_ritual_known && u.uevent.invocation_ritual_known && !u.uevent.invoked && !(u.uachieve.bell && u.uachieve.book && u.uachieve.menorah))
+    if (!u.uevent.invoked && !(u.uachieve.bell && u.uachieve.book && u.uachieve.menorah))
     {
-        if (!was_elbereth_known && u.uevent.elbereth_known)
-            delay_output_milliseconds(500);
-        play_sfx_sound(SFX_HINT);
-        custompline_ex_prefix(ATR_NONE, CLR_MSG_HINT, "QUEST UPDATE", ATR_NONE, NO_COLOR, " - ", ATR_BOLD, CLR_WHITE, 0, "Find the Candelabrum of Invocation, Silver Bell, and the Book of the Dead");
+        if (!was_ritual_known && !had_heard_of_ritual && (u.uevent.invocation_ritual_known || u.uevent.heard_of_invocation_ritual))
+        {
+            invocation_ritual_quest_update(hint_shown_already);
+        }
     }
     return result;
 }
@@ -4784,7 +4801,8 @@ struct monst* mtmp;
         {
             isspeaking = FALSE;
             pline("(%s hands a note over to you.)  It reads:", noittame_Monnam(mtmp));
-            u.uconduct.literate++;
+            if (!u.uconduct.literate++)
+                livelog_printf(LL_CONDUCT, "became literate by reading a note handed over by %s.", noittame_mon_nam(mtmp));
         }
         if (is_death && isspeaking)
         {
@@ -5257,6 +5275,7 @@ struct monst* mtmp;
                         pline("%s picks up %s.", noittame_Monnam(mtmp),
                             distant_name(otmp, doname));
 
+                    Strcpy(debug_buf_2, "do_chat_pet_pickitems");
                     obj_extract_self(otmp);
                     newsym(omx, omy);
                     (void)mpickobj(mtmp, otmp);
@@ -5301,7 +5320,7 @@ struct monst* mtmp;
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist(qbuf, &invent,
-        (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ANY,
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
         allow_all, 3);
     if (n > 0) 
     {
@@ -5974,7 +5993,7 @@ struct monst* mtmp;
     if (!mtmp)
         return 0;
 
-    m_dowear(mtmp, FALSE);
+    m_dowear(mtmp, FALSE, TRUE);
     return 1;
 }
 
@@ -6521,6 +6540,7 @@ struct monst* mtmp;
                     if (quan < item_to_buy->quan)
                         item_to_buy = splitobj(item_to_buy, quan);
                     
+                    Strcpy(debug_buf_2, "do_chat_buy_items");
                     obj_extract_self(item_to_buy);
                     hold_another_object(item_to_buy, "Oops!  %s out of your grasp!",
                         The(aobjnam(item_to_buy, "slip")),
@@ -6673,6 +6693,7 @@ struct monst* mtmp;
                     if (item_to_take->quan > 1 && pick_list[i].count > 0 && pick_list[i].count < item_to_take->quan)
                         item_to_take = splitobj(item_to_take, pick_list[i].count);
 
+                    Strcpy(debug_buf_2, "do_chat_pet_take_items");
                     obj_extract_self(item_to_take);
 
                     play_simple_object_sound_at_location(item_to_take, mtmp->mx, mtmp->my, OBJECT_SOUND_TYPE_GIVE);
@@ -6790,7 +6811,7 @@ struct monst* mtmp;
 
     if (!otmp->owornmask 
         && otmp->oclass != COIN_CLASS
-        && ((otmp->speflags & SPEFLAGS_GRABBED_FROM_YOU) || mtmp->isnpc || mtmp->issmith ||
+        && ((otmp->speflags & (SPEFLAGS_GRABBED_FROM_YOU | SPEFLAGS_INTENDED_FOR_SALE)) || mtmp->isnpc || mtmp->issmith ||
                (otmp->oclass != WEAPON_CLASS /* monsters do not currently sell their weapons */
             && otmp->oclass != ROCK_CLASS /* or giants their boulders */
             && !(is_pick(otmp) && needspick(mtmp->data)) /* or dwarves their picks */
@@ -7408,11 +7429,11 @@ struct monst* mtmp;
     char qbuf[QBUFSZ];
 
     multi = 0;
-    umoney = money_cnt(invent);
+    umoney = money_cnt(invent) + ESHK(mtmp)->credit - ESHK(mtmp)->debit;
 
     if (!m_general_talk_check(mtmp, "doing any services") || !m_speak_check(mtmp))
         return 0;
-    else if (!umoney) 
+    else if (umoney <= 0) 
     {
         play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
         You_ex1_popup("have no money.", "No Money", ATR_NONE, CLR_MSG_ATTENTION, NO_GLYPH, POPUP_FLAGS_NONE);
@@ -8140,7 +8161,7 @@ boolean FDECL((*allow), (OBJ_P)); /* allow function */
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist("What would you like to sell?", &invent,
-        (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ANY, allow, 3);
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY, allow, 3);
 
     if (n > 0 && pick_list)
     {
@@ -8431,7 +8452,6 @@ struct monst* mtmp;
     return 1;
 }
 
-
 STATIC_OVL int
 do_chat_quantum_mechanic_research_support(mtmp)
 struct monst* mtmp;
@@ -8652,7 +8672,6 @@ struct monst* mtmp;
     return 1;
 }
 
-
 STATIC_OVL int
 do_chat_npc_reconciliation(mtmp)
 struct monst* mtmp;
@@ -8744,7 +8763,6 @@ struct monst* mtmp;
     return general_service_query_with_item_cost_adjustment_and_extra(mtmp, recharge_item_func, "charge", "recharging", cost, objects[WAN_WISHING].oc_cost, 50L, "recharging an item", QUERY_STYLE_COMPONENTS, (char*)0, NPC_LINE_WHAT_WOULD_YOU_LIKE_TO_CHARGE);
 }
 
-
 STATIC_OVL int
 do_chat_npc_blessed_recharge(mtmp)
 struct monst* mtmp;
@@ -8764,24 +8782,53 @@ struct monst* mtmp;
     if (!mtmp || !mtmp->isnpc || !mtmp->mextra || !ENPC(mtmp))
         return 0;
 
-    int spell_otyps[MAX_SPECIAL_TEACH_SPELLS + 3 + 1] = { 0 };
+    int spell_otyps[MAX_SPECIAL_TEACH_SPELLS + 16 + 1] = { 0 };
     int teach_num = 0;
-    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_TEACH_SPELL_LIGHTNING_BOLT)
+
+    /* Non-random arcane spells first */
+    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_TEACH_WIZARD_SPELLS)
     {
+        spell_otyps[teach_num] = SPE_MAGIC_ARROW;
+        teach_num++;
+        spell_otyps[teach_num] = SPE_FORCE_BOLT;
+        teach_num++;
         spell_otyps[teach_num] = SPE_LIGHTNING_BOLT;
         teach_num++;
-    }
-    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_TEACH_SPELL_CONE_OF_COLD)
-    {
         spell_otyps[teach_num] = SPE_CONE_OF_COLD;
         teach_num++;
     }
-    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_TEACH_SPELL_FORCE_BOLT)
+
+    /* Spells that are always present are here; random ones are in ENPC(mtmp)->special_teach_spells */
+    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_TEACH_SPECIAL_SPELLS)
     {
-        spell_otyps[teach_num] = SPE_FORCE_BOLT;
-        teach_num++;
+        switch (ENPC(mtmp)->npc_typ)
+        {
+        case NPC_QUANTUM_MECHANIC:
+            spell_otyps[teach_num] = SPE_FORCE_BOLT;
+            teach_num++;
+            spell_otyps[teach_num] = SPE_MAGICAL_IMPLOSION;
+            teach_num++;
+            spell_otyps[teach_num] = SPE_DISINTEGRATE;
+            teach_num++;
+            spell_otyps[teach_num] = SPE_SLOW_MONSTER;
+            teach_num++;
+            break;
+        case NPC_ORC_HERMIT3:
+            spell_otyps[teach_num] = SPE_FIRE_BOLT;
+            teach_num++;
+            spell_otyps[teach_num] = SPE_FIREBALL;
+            teach_num++;
+            spell_otyps[teach_num] = SPE_CREATE_IRON_GOLEM;
+            teach_num++;
+            spell_otyps[teach_num] = SPE_SPHERE_OF_CHARMING;
+            teach_num++;
+            break;
+        default:
+            break;
+        }
     }
-    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & (NPC_SERVICE_TEACH_SPECIAL_SPELLS | NPC_SERVICE_TEACH_RANDOM_ARCANE_SPELLS))
+
+    if (npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & (NPC_SERVICE_TEACH_SPECIAL_SPELLS | NPC_SERVICE_TEACH_WIZARD_SPELLS))
     {
         int i;
         for (i = 0; i < MAX_SPECIAL_TEACH_SPELLS && ENPC(mtmp)->special_teach_spells[i] > STRANGE_OBJECT; i++)
@@ -8812,7 +8859,7 @@ struct monst* mtmp;
     case A_LAWFUL:
         spell_otyps[4] = SPE_CURE_SICKNESS;
         spell_otyps[5] = SPE_CURE_BLINDNESS;
-        spell_otyps[6] = SPE_CELESTIAL_DOVE;
+        spell_otyps[6] = SPE_SUMMON_CELESTIAL_DOVE;
         break;
     case A_NEUTRAL:
         spell_otyps[4] = SPE_STICK_TO_SNAKE;
@@ -8830,7 +8877,6 @@ struct monst* mtmp;
 
     return spell_teaching(mtmp, spell_otyps);
 }
-
 
 STATIC_OVL int
 do_chat_watchman_reconciliation(mtmp)
@@ -8906,7 +8952,6 @@ struct monst* mtmp;
     return 1; 
 }
 
-
 STATIC_OVL int
 do_chat_npc_identify_gems_and_stones(mtmp)
 struct monst* mtmp;
@@ -8915,7 +8960,6 @@ struct monst* mtmp;
         max(1L, (long)((double)(100 + 10 * u.ulevel) * service_cost_charisma_adjustment(ACURR(A_CHA)))),
         NPC_LINE_WOULD_YOU_LIKE_TO_IDENTIFY_A_GEM_OR_STONE, NPC_LINE_WOULD_YOU_LIKE_TO_IDENTIFY_ONE_MORE_GEM_OR_STONE);
 }
-
 
 STATIC_OVL int
 do_chat_npc_sell_gems_and_stones(mtmp)
@@ -8939,9 +8983,6 @@ struct obj* otmp;
 {
     if (!otmp)
         return FALSE;
-
-    //if(objects[otmp->otyp].oc_name_known)
-    //    return (otmp->otyp == DILITHIUM_CRYSTAL);
 
     return maybe_gem(otmp);
 }
@@ -9049,44 +9090,8 @@ long minor_id_cost;
     res = service_identify(mtmp, minor_id_cost);
     context.npc_identify_type = 0;
 
-
-    //int cnt = 0, unided = 0;
-
-    //do
-    //{
-        //if (!cnt)
-        //{
-            //play_monster_special_dialogue_line(mtmp, spdialogue1);
-            //Sprintf(qbuf, "Would you like to identify %s? (%d %s)", an(identify_item_str), minor_id_cost, currency((long)minor_id_cost));
-        //}
-        //else
-        //{
-        //    play_monster_special_dialogue_line_with_flags(mtmp, spdialogue2, PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING_OR_QUEUED);
-        //    Sprintf(qbuf, "Would you like to identify one more %s? (%d %s)", identify_item_str, minor_id_cost, currency((long)minor_id_cost));
-        //}
-
-        //switch (yn_query_mon(mtmp, qbuf)) {
-        //default:
-        //    return 0;
-        //case 'y':
-        //    if (umoney < (long)minor_id_cost) {
-        //        play_sfx_sound(SFX_NOT_ENOUGH_MONEY);
-        //        You("don't have enough money for that!");
-        //        return 0;
-        //    }
-        //    break;
-        //}
-
-        //context.npc_identify_type = id_idx;
-        //res = identify_pack(1, FALSE);
-        //context.npc_identify_type = 0;
-
-    //} while (res > 0 && unided > 0 && umoney >= (long)minor_id_cost && cnt < 100); /* Paranoid limit */
-
     return (res > 0);
 }
-
-
 
 /* menu of unidentified objects */
 int
@@ -9098,12 +9103,16 @@ long id_cost;
     int n, i;
     char buf[BUFSZ];
     int res = 0, id_res = 0;
-    long umoney = money_cnt(invent);
+    long uinvgold = money_cnt(invent);
+    long shkcredit = 0L;
+    if (mtmp->isshk && has_eshk(mtmp))
+        shkcredit += ESHK(mtmp)->credit - ESHK(mtmp)->debit;
+    long umoney = uinvgold + shkcredit;
 
     Strcpy(buf, "What would you like to identify?");
 
     n = query_objlist(buf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE
-        | USE_INVLET | INVORDER_SORT),
+        | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON),
         &pick_list, PICK_ANY, not_fully_identified, 0);
 
     if (n > 0)
@@ -9161,11 +9170,44 @@ long id_cost;
             }
 
             play_sfx_sound(SFX_IDENTIFY_SUCCESS);
-            money2mon(mtmp, id_cost);
-            umoney = money_cnt(invent);
+
+            boolean skipmoney = FALSE;
+            long charged_id_cost = id_cost;
+            long deducted_credit_amount = 0L;
+            if (shkcredit > 0L && mtmp->isshk && has_eshk(mtmp))
+            {
+                long oldshkcredit = shkcredit;
+                ESHK(mtmp)->credit -= charged_id_cost;
+                if (ESHK(mtmp)->credit < 0)
+                {
+                    charged_id_cost = charged_id_cost + ESHK(mtmp)->credit;
+                    ESHK(mtmp)->credit = 0L;
+                    if (charged_id_cost <= 0)
+                        skipmoney = TRUE;
+                }
+                else
+                {
+                    skipmoney = TRUE;
+                }
+                shkcredit = ESHK(mtmp)->credit - ESHK(mtmp)->debit;
+                deducted_credit_amount = oldshkcredit - shkcredit;
+            }
+
+            if(!skipmoney)
+                money2mon(mtmp, charged_id_cost);
+            uinvgold = money_cnt(invent);
+            umoney = uinvgold + shkcredit;
             bot();
             id_res = identify(otmp);
             res += id_res;
+            if (deducted_credit_amount > 0)
+            {
+                pline("%ld %s has been deducted from your credit.", deducted_credit_amount, currency(deducted_credit_amount));
+                if(!shkcredit)
+                    pline1("Your credit has now been used up.");
+                else
+                    pline("%ld %s of net credit is remaining.", shkcredit, currency(shkcredit));
+            }
             if (itemize)
                 update_inventory();
         }
@@ -9176,7 +9218,6 @@ long id_cost;
     }
     return res;
 }
-
 
 STATIC_OVL int
 sell_to_npc(obj, mtmp, items_left_in_list, auto_yes)
@@ -9364,7 +9405,6 @@ merge_obj_back:
     return res;
 }
 
-
 STATIC_OVL int
 do_chat_quest_chat(mtmp)
 struct monst* mtmp;
@@ -9375,7 +9415,6 @@ struct monst* mtmp;
     (void)quest_chat(mtmp, TRUE); /* To avoid two consecutive hints */
     return 0;
 }
-
 
 double
 service_cost_charisma_adjustment(cha)
@@ -9415,7 +9454,6 @@ const char* line;
     popup_talk(mtmp, linearray, GHSOUND_NONE, ATR_NONE, NO_COLOR, TRUE, FALSE);
 }
 
-
 void
 popup_talk_line_ex(mtmp, line, attr, color, printtext, addquotes)
 struct monst* mtmp;
@@ -9448,19 +9486,6 @@ enum ghsound_types soundid;
 {
     popup_talk(mtmp, linearray, soundid, ATR_NONE, CLR_MSG_TALK_NORMAL, TRUE, TRUE);
 }
-
-#if 0
-STATIC_OVL void
-hermit_talk_with_startindex(mtmp, linearray, soundid, soundindextype, startindex)
-struct monst* mtmp;
-const char** linearray;
-enum ghsound_types soundid;
-uchar soundindextype; /* 0 = LineIndex, 1 = MsgIndex */
-int startindex;
-{
-    popup_talk_core(mtmp, linearray, soundid, soundindextype, startindex, ATR_NONE, NO_COLOR, TRUE, TRUE);
-}
-#endif
 
 STATIC_OVL void
 popup_talk(mtmp, linearray, soundid, attr, color, printtext, addquotes)
@@ -9549,7 +9574,6 @@ struct monst* mtmp;
     return 1;
 }
 
-
 STATIC_OVL int
 do_chat_quantum_special_wand(mtmp)
 struct monst* mtmp;
@@ -9605,7 +9629,6 @@ struct monst* mtmp;
     return 1;
 }
 
-
 STATIC_OVL int 
 do_chat_hermit_dungeons(mtmp)
 struct monst* mtmp;
@@ -9639,8 +9662,11 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT1_QUESTS);
 
     mtmp->hermit_told_quests = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_AMULET_IN_GEHENNOM;
+
     return 1;
 }
+
 STATIC_OVL int
 do_chat_hermit_gnomish_mines(mtmp)
 struct monst* mtmp;
@@ -9659,7 +9685,6 @@ struct monst* mtmp;
     mtmp->hermit_told_gnomish_mines = 1;
     return 1;
 }
-
 
 STATIC_OVL int
 do_chat_hermit3_gnomish_mines(mtmp)
@@ -9731,7 +9756,6 @@ struct monst* mtmp;
     return 1;
 }
 
-
 STATIC_OVL int
 do_chat_hermit_sokoban(mtmp)
 struct monst* mtmp;
@@ -9750,23 +9774,6 @@ struct monst* mtmp;
     return 1;
 }
 
-
-//STATIC_OVL int
-//do_chat_hermit_sokoprizes(mtmp)
-//struct monst* mtmp;
-//{
-//    if (!m_speak_check(mtmp))
-//        return 0;
-//
-//    const char* linearray[2] = {
-//        "They say that the wizard will gift either an amulet of reflection or a bag of holding to whomever passes the tests.",
-//        0 };
-//    hermit_talk(mtmp, linearray);
-//
-//    return 1;
-//}
-
-
 STATIC_OVL int
 do_chat_hermit_castle(mtmp)
 struct monst* mtmp;
@@ -9784,6 +9791,7 @@ struct monst* mtmp;
 
     return 1;
 }
+
 STATIC_OVL int
 do_chat_hermit_gehennom(mtmp)
 struct monst* mtmp;
@@ -9799,6 +9807,7 @@ struct monst* mtmp;
 
     return 1;
 }
+
 STATIC_OVL int
 do_chat_hermit_wizard_of_yendor(mtmp)
 struct monst* mtmp;
@@ -9866,6 +9875,8 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT2_VAMPIRE_LORD);
 
     mtmp->hermit2_told_vampire_lord = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_MENORAH | QUEST_FLAGS_HEARD_OF_MENORAH_OWNER | QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM;
+
     return 1;
 }
 STATIC_OVL int
@@ -9883,6 +9894,8 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT2_WIZARD_OF_YENDOR);
 
     mtmp->hermit2_told_wizard_of_yendor = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_BOOK | QUEST_FLAGS_HEARD_OF_BOOK_OWNER | QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM;
+
     return 1;
 }
 STATIC_OVL int
@@ -9906,6 +9919,8 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT2_SILVER_BELL);
 
     mtmp->hermit2_told_silver_bell = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_BELL | QUEST_FLAGS_HEARD_OF_BELL_OWNER | QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM;
+
     return 1;
 }
 STATIC_OVL int
@@ -9922,6 +9937,8 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT2_CANDELABRUM);
 
     mtmp->hermit2_told_candelabrum = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_MENORAH | QUEST_FLAGS_HEARD_OF_MENORAH_OWNER | QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM;
+
     return 1;
 }
 STATIC_OVL int
@@ -9938,6 +9955,8 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT2_BOOK_OF_THE_DEAD);
 
     mtmp->hermit2_told_book_of_the_dead = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_BOOK | QUEST_FLAGS_HEARD_OF_BOOK_OWNER;
+
     return 1;
 }
 STATIC_OVL int
@@ -9955,6 +9974,9 @@ struct monst* mtmp;
     hermit_talk(mtmp, linearray, GHSOUND_HERMIT2_RITUAL);
 
     mtmp->hermit2_told_ritual = 1;
+    u.uevent.heard_of_invocation_ritual = 1;
+    context.quest_flags |= QUEST_FLAGS_HEARD_OF_BOOK | QUEST_FLAGS_HEARD_OF_BELL | QUEST_FLAGS_HEARD_OF_MENORAH | QUEST_FLAGS_HEARD_OF_RITUAL | QUEST_FLAGS_HEARD_OF_AMULET_IN_SANCTUM | QUEST_FLAGS_HEARD_ORACLE_KNOWS_MORE_DETAILS;
+
     return 1;
 }
 STATIC_OVL int
@@ -10493,7 +10515,7 @@ struct monst* mtmp;
     popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
 
     otmp->age = MAX_OIL_IN_LAMP;
-    otmp->special_quality = 1;
+    otmp->special_quality = SPEQUAL_LIGHT_SOURCE_FUNCTIONAL;
     update_inventory();
 
     play_monster_special_dialogue_line(mtmp, SMITH_LINE_THANK_YOU_FOR_USING_MY_SERVICES);
@@ -10757,7 +10779,7 @@ boolean initialize;
         otmp = 0;
     }
 
-    struct obj* craftedobj = mksobj_with_flags(forge_dest_otyp, initialize, FALSE, 3, (struct monst*)0, material, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
+    struct obj* craftedobj = mksobj_with_flags(forge_dest_otyp, initialize, FALSE, MKOBJ_TYPE_CRAFTING, (struct monst*)0, material, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
     if (craftedobj)
     {
         if (quan > 0)
@@ -10901,18 +10923,20 @@ int* spell_otyps;
             char buf[BUFSIZ] = "";
             char buf2[BUFSIZ] = "";
             char bufc[BUFSIZ] = "";
+            char lvlbuf[BUFSIZ] = "";
+            print_spell_level_text(lvlbuf, spell_to_learn, TRUE, 0, FALSE);
             if (iflags.using_gui_sounds)
             {
-                Sprintf(buf, "learn a new spell");
-                Sprintf(buf2, "learning the spell '%s'", OBJ_NAME(objects[spell_to_learn]));
-                Sprintf(bufc, "'%s'", OBJ_NAME(objects[spell_to_learn]));
+                Strcpy(buf, "learn a new spell");
+                Sprintf(buf2, "teaching '%s'", OBJ_NAME(objects[spell_to_learn]));
+                Sprintf(bufc, "'%s', %s,", OBJ_NAME(objects[spell_to_learn]), *lvlbuf ? an(lvlbuf) : "a spell of unknown type");
                 *(bufc + 1) = highc(*(bufc + 1));
                 txt = bufc;
             }
             else
             {
-                Sprintf(buf, "learn the spell '%s'", OBJ_NAME(objects[spell_to_learn]));
-                Sprintf(buf2, "learning the spell '%s'", OBJ_NAME(objects[spell_to_learn]));
+                Sprintf(buf, "learn '%s', %s", OBJ_NAME(objects[spell_to_learn]), *lvlbuf ? an(lvlbuf) : "a spell of unknown type");
+                Sprintf(buf2, "teaching '%s'", OBJ_NAME(objects[spell_to_learn]));
                 txt = 0;
             }
             context.spbook.book = &pseudo;

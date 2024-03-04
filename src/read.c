@@ -535,7 +535,7 @@ struct obj* otmp;
     if (!otmp || otmp->oartifact != ART_RULING_RING_OF_YENDOR)
         return;
 
-    boolean revealed = (otmp->speflags & SPEFLAGS_INSCRIPTION_REVEALED) != 0;
+    boolean revealed = otmp->special_quality == SPEQUAL_RULING_RING_INSCRIPTION_READ;
 
     if (Blind)
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "You feel that an inscription appears%s on %s, but you cannot see it.", revealed ? " again" : "", yname(otmp));
@@ -543,7 +543,7 @@ struct obj* otmp;
     {
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s, an inscription appears on %s in fiery letters:", revealed ? "Again" : "Suddenly", yname(otmp));
         verbalize_ex(ATR_NONE, CLR_ORANGE, "Ash na... dur...");
-        if (otmp->speflags & SPEFLAGS_INSCRIPTION_REVEALED)
+        if (revealed)
         {
             You("still couldn't make much sense of it.");
         }
@@ -561,9 +561,10 @@ struct obj* otmp;
             {
                 You("quite couldn't make sense of what it said.");
             }
+            otmp->special_quality = SPEQUAL_RULING_RING_INSCRIPTION_READ;
         }
-        otmp->speflags |= SPEFLAGS_INSCRIPTION_REVEALED;
-        u.uconduct.literate++;
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT, "became literate by reading an inscription on %s.", acxname(otmp));
     }
 }
 
@@ -788,7 +789,6 @@ boolean verbose, dopopup;
                 alter_cost(obj, 0L);
 #endif
         }
-
     }
     else if (objects[obj->otyp].oc_charged && rtype > 0)  // obj->oclass == WEAPON_CLASS)
     {
@@ -911,13 +911,13 @@ boolean verbose, dopopup;
             }
         }
             else if (is_blessed) {
-                obj->special_quality = 1;
+                obj->special_quality = SPEQUAL_LIGHT_SOURCE_FUNCTIONAL;
                 obj->age = 1500;
                 if (verbose)
                     p_glow2(obj, NH_BLUE, ATR_NONE, CLR_MSG_POSITIVE, title, dopopup);
             }
             else {
-                obj->special_quality = 1;
+                obj->special_quality = SPEQUAL_LIGHT_SOURCE_FUNCTIONAL;
                 obj->age += 750;
                 if (obj->age > 1500)
                     obj->age = 1500;
@@ -1504,6 +1504,7 @@ int howmuch;
 
     forget_map(howmuch);
     forget_traps();
+    forget_engravings();
 
     /* 1 in 3 chance of forgetting some levels */
     if (!rn2(3))
@@ -1737,7 +1738,7 @@ struct monst* targetmonst;
     switch (otyp) {
     case SCR_MAIL:
         known = TRUE;
-        if (sobj->special_quality == 2)
+        if (sobj->special_quality == SPEQUAL_MAIL_FROM_MAGIC_MARKER)
             /* "stamped scroll" created via magic marker--without a stamp */
             pline("This scroll is marked \"postage due\".");
         else if (sobj->special_quality)
@@ -2650,6 +2651,7 @@ struct monst* targetmonst;
         if (invent)
         {
             int res = identify_pack(cval, !already_known);
+            update_inventory();
             if (res > 0)
             {
                 pline_ex(ATR_NONE, NO_COLOR, "The scroll disappears.");
@@ -2672,7 +2674,8 @@ struct monst* targetmonst;
         else if (invent)
         {
             (void)identify_pack(cval, !already_known);
-        } 
+            update_inventory();
+        }
         else
         {
             /* when casting a spell we know we're not confused,
@@ -3351,12 +3354,12 @@ boolean confused, helmet_protects, byu, skip_uswallow;
         play_object_hit_sound(otmp2, HIT_SURFACE_SOURCE_MONSTER, monst_to_any(&youmonst), dmg, HMON_THROWN);
         You("are hit by %s!", doname(otmp2));
         if (uarmh && helmet_protects) {
-            if (is_metallic(uarmh)) {
-                pline("Fortunately, you are wearing a hard helmet.");
+            if (is_hard_helmet(uarmh)) {
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately, you are wearing a hard helmet.");
                 if (dmg > 2)
                     dmg = 2;
             } else if (flags.verbose) {
-                pline("%s does not protect you.", Yname2(uarmh));
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s does not protect you.", Yname2(uarmh));
             }
         }
     } else
@@ -3412,9 +3415,9 @@ boolean confused, byu;
                      body_part(HEAD));
 
         if (helmet) {
-            if (is_metallic(helmet)) {
+            if (is_hard_helmet(helmet)) {
                 if (canspotmon(mtmp))
-                    pline("Fortunately, %s is wearing a hard helmet.",
+                    pline_ex(ATR_NONE, is_tame(mtmp) ? CLR_MSG_SUCCESS : CLR_MSG_ATTENTION, "Fortunately, %s is wearing a hard helmet.",
                           mon_nam(mtmp));
                 else if (!Deaf)
                     You_hear("a clanging sound.");
@@ -3422,7 +3425,7 @@ boolean confused, byu;
                     mdmg = 2;
             } else {
                 if (canspotmon(mtmp))
-                    pline("%s's %s does not protect %s.", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s's %s does not protect %s.", Monnam(mtmp),
                           xname(helmet), mhim(mtmp));
             }
         }
@@ -4146,7 +4149,7 @@ struct obj *sobj;
         setworn(reuse_ball, W_BALL);
 
     if(Punished) /* Check that punishment succeeded */
-        uball->special_quality = 1; /* special ball (see save) */
+        uball->special_quality = SPEQUAL_UBALL_SPECIAL; /* special ball (see save) */
 
     /*
      *  Place ball & chain if not swallowed.  If swallowed, the ball & chain
@@ -4166,6 +4169,7 @@ unpunish()
 {
     struct obj *savechain = uchain;
 
+    Strcpy(debug_buf_2, "unpunish");
     obj_extract_self(uchain);
     newsym(uchain->ox, uchain->oy);
     setworn((struct obj *) 0, W_CHAIN);
@@ -4511,7 +4515,7 @@ boolean confused; /* Is caster confused */
     {
         char qbuf[BUFSZ];
         Sprintf(qbuf, "What would you like to %s?", (otyp == SPE_BLESS ? "bless" : "curse"));
-        n = query_objlist(qbuf, &objchn, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT),
+        n = query_objlist(qbuf, &objchn, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON),
             &pick_list, PICK_ONE, allow_all_but_coins, 0);
         if (n && pick_list && pick_list[0].item.a_obj)
         {

@@ -778,15 +778,21 @@ VA_DECL(const char *, str)
         raw_print(buf);
         paniclog("panic", buf);
 #ifdef GNOLLHACK_MAIN_PROGRAM
-        if (issue_gui_command)
-            issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, 0, buf);
         if (open_special_view)
         {
+            /* Add mode to posted panic */
+            char mbuf[BUFSZ] = "";
+            (void)describe_mode(mbuf);
+            Sprintf(eos(buf), " [%s]", mbuf);
+
             struct special_view_info info = { 0 };
             info.viewtype = SPECIAL_VIEW_PANIC;
             info.text = buf;
             (void)open_special_view(info);
         }
+        /* Special view now handles both sending the crash report and forum posting */
+        //if (issue_gui_command)
+        //    issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, 0, buf);
 #endif
     }
 #ifdef WIN32
@@ -918,9 +924,9 @@ time_t when; /* date+time at end of game */
     /* character name and basic role info */
     Sprintf(pbuf, "%s, %s %s %s %s", plname,
             aligns[1 - u.ualign.type].adj,
-            genders[flags.female].adj,
+            genders[Ufemale].adj,
             urace.adj,
-            (flags.female && urole.name.f) ? urole.name.f : urole.name.m);
+            (Ufemale && urole.name.f) ? urole.name.f : urole.name.m);
     putstr(0, ATR_SUBHEADING, pbuf);
     putstr(NHW_DUMPTXT, 0, "");
 
@@ -1561,6 +1567,8 @@ int how;
     }
     update_game_music();
 
+    issue_simple_gui_command(GUI_CMD_GAME_ENDED);
+
     const char* endtext = 0;
     const char* endinfotext = 0;
     int screentextstyle = 0;
@@ -1827,36 +1835,10 @@ int how;
        (bones creation isn't a factor, but pline() messaging is; used to
        be done even sooner, but we need it to come after dump_everything()
        so that any accompanying pets are still on the map during dump) */
-    if (how == ESCAPED || how == ASCENDED)
-        keepdogs(TRUE);
-
-    /* finish_paybill should be called after disclosure but before bones */
-    if (bones_ok && taken)
-        finish_paybill();
-
-    /* grave creation should be after disclosure so it doesn't have
-       this grave in the current level's features for #overview */
-    if (bones_ok && u.ugrave_arise == NON_PM
-        && !(mvitals[u.umonnum].mvflags & MV_NOCORPSE))
-    {
-        int mnum = u.umonnum;
-
-        if (!Upolyd) 
-        {
-            /* Base corpse on race when not poly'd since original
-             * u.umonnum is based on role, and all role monsters
-             * are human.
-             */
-            mnum = urace.monsternum;
-        }
-        corpse = mk_named_object(CORPSE, &mons[mnum], u.ux, u.uy, plname);
-        corpse->nknown = 1;
-        Sprintf(pbuf, "%s, ", plname);
-        formatkiller(eos(pbuf), sizeof pbuf - strlen(pbuf), how, TRUE);
-        make_grave(u.ux, u.uy, pbuf, TRUE);
-    }
-
-    pbuf[0] = '\0'; /* clear grave text; also lint suppression */
+    if (how == ESCAPED)
+        keepdogs(TRUE, TRUE); /* Just nearby pets following to the ground level */
+    else if (how == ASCENDED)
+        keepdogs(TRUE, FALSE); /* All pets surviving to the point of ascension */
 
     /* calculate score, before creating bones [container gold] */
     {
@@ -1907,15 +1889,6 @@ int how;
                  : "revenant persists",
              an(pm_monster_name(&mons[u.ugrave_arise], flags.female)));
         display_nhwindow(WIN_MESSAGE, FALSE);
-    }
-
-    if (bones_ok) 
-    {
-        if (!wizard || paranoid_query_ex(ATR_NONE, NO_COLOR, ParanoidBones, (char*)0, "Save bones?"))
-            savebones(how, endtime, corpse);
-        /* corpse may be invalid pointer now so
-            ensure that it isn't used again */
-        corpse = (struct obj *) 0;
     }
 
     /* update gold for the rip output, which can't use hidden_gold()
@@ -2036,25 +2009,26 @@ int how;
             Strcpy(pbuf, "You");
             if (mtmp || Schroedingers_cat)
             {
+                dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
                 int petindex = 0;
                 while (mtmp)
                 {
-                    Sprintf(eos(pbuf), "%s %s",
+                    Sprintf(pbuf, "%s %s",
                         petcount == 1 ? " and" : petindex < petcount - 1 ? "," : ", and",
                        mon_nam(mtmp));
                     mtmp = mtmp->nmon;
                     petindex++;
+                    dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
                 }
 
                 /* [it might be more robust to create a housecat and add it to
                    mydogs; it doesn't have to be placed on the map for that] */
+                pbuf[0] = '\0';
                 if (Schroedingers_cat)
                 {
-                    Sprintf(eos(pbuf), "%s Schroedinger's cat", petcount == 1 ? " and" : ", and");
+                    Sprintf(pbuf, "%s Schroedinger's cat", petcount == 1 ? " and" : ", and");
                 }
                 Strcat(pbuf, " ");
-                dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
-                pbuf[0] = '\0';
             }
             else
             {
@@ -2178,12 +2152,15 @@ int how;
             char dlbuf[BUFSZ * 4];
             char* dlfilename = print_dumplog_filename_to_buffer(dlbuf);
             if (dlfilename)
+            {
                 issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT, GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT, dlfilename);
-
+            }
     #if defined(DUMPHTML)
             dlfilename = print_dumphtml_filename_to_buffer(dlbuf);
             if (dlfilename)
+            {
                 issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT_ATTACHMENT, GAME_STATUS_ATTACHMENT_DUMPLOG_HTML, dlfilename);
+            }
     #endif
     #endif
             char totalpostbuf[BUFSZ * 4];
@@ -2199,6 +2176,42 @@ int how;
         }
     }
 
+    /* finish_paybill should be called after disclosure but before bones */
+    if (bones_ok && taken)
+        finish_paybill();
+
+    /* grave creation should be after disclosure so it doesn't have
+       this grave in the current level's features for #overview */
+    if (bones_ok && u.ugrave_arise == NON_PM
+        && !(mvitals[u.umonnum].mvflags & MV_NOCORPSE))
+    {
+        int mnum = u.umonnum;
+
+        if (!Upolyd)
+        {
+            /* Base corpse on race when not poly'd since original
+             * u.umonnum is based on role, and all role monsters
+             * are human.
+             */
+            mnum = urace.monsternum;
+        }
+        corpse = mk_named_object(CORPSE, &mons[mnum], u.ux, u.uy, plname);
+        corpse->nknown = 1;
+        Sprintf(pbuf, "%s, ", plname);
+        formatkiller(eos(pbuf), sizeof pbuf - strlen(pbuf), how, TRUE);
+        make_grave(u.ux, u.uy, pbuf, TRUE);
+        pbuf[0] = '\0'; /* clear grave text; also lint suppression */
+    }
+
+    if (bones_ok)
+    {
+        if (!wizard || paranoid_query_ex(ATR_NONE, NO_COLOR, ParanoidBones, (char*)0, "Save bones?"))
+            savebones(how, endtime, corpse);
+        /* corpse may be invalid pointer now so
+            ensure that it isn't used again */
+        corpse = (struct obj*)0;
+    }
+
     /* "So when I die, the first thing I will see in Heaven is a
      * score list?" */
     if (have_windows && !iflags.toptenwin)
@@ -2211,8 +2224,6 @@ int how;
 
     if (CasualMode && how == ASCENDED && has_existing_save_file)
         (void)delete_savefile(); /* The casual mode character gets deleted only upon ascension */
-
-    issue_simple_gui_command(GUI_CMD_GAME_ENDED);
 
     if (have_windows)
         exit_nhwindows((char*)0);
@@ -3018,6 +3029,7 @@ restore_killers(fd)
 int fd;
 {
     struct kinfo *kptr;
+    Strcpy(debug_buf_4, "restore_killers");
 
     for (kptr = &killer; kptr != (struct kinfo *) 0; kptr = kptr->next) {
         mread(fd, (genericptr_t) kptr, sizeof (struct kinfo));
@@ -3123,9 +3135,8 @@ get_current_game_score()
     long utotal = 0;
     long Deepest_Dungeon_Level = deepest_lev_reached(FALSE);
     long Achievements_Score = (long)(u.uachieve.amulet + u.uachieve.ascended + u.uachieve.bell + u.uachieve.book + u.uachieve.enter_gehennom + u.uachieve.finish_sokoban +
-        u.uachieve.killed_medusa + u.uachieve.killed_yacc + u.uachieve.menorah + u.uachieve.prime_codex + u.uachieve.mines_luckstone +
+        u.uachieve.killed_medusa + u.uachieve.killed_yacc + u.uachieve.killed_demogorgon + u.uachieve.menorah + u.uachieve.prime_codex + u.uachieve.mines_luckstone +
         !!In_endgame(&u.uz) + !!Is_astralevel(&u.uz) + u.uevent.invoked 
-        + u.uhave.prime_codex /* Various things that yield points when carried out of the Dungeons of Doom */
         + u.uachieve.role_achievement /* Special role-specific achievement */
         + u.uachieve.crowned
         );
@@ -3419,7 +3430,7 @@ reset_gamestate(VOID_ARGS)
 }
 
 STATIC_DCL void
-reset_remaining_static_variables()
+reset_remaining_static_variables(VOID_ARGS)
 {
 #ifdef PANICTRACE
     aborting = FALSE;
@@ -3460,7 +3471,7 @@ reset_remaining_static_variables()
 }
 
 STATIC_DCL void
-reset_remaining_dynamic_data()
+reset_remaining_dynamic_data(VOID_ARGS)
 {
     free_dynamic_data_A();
     free_dynamic_data_B();

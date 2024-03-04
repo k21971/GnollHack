@@ -782,7 +782,6 @@ dodrink()
             play_sfx_sound(SFX_GENERAL_THATS_SILLY);
             pline_ex(ATR_NONE, CLR_MSG_FAIL, "That's a silly thing to drink!");
             return 0;
-            break;
         }
     }
 
@@ -809,10 +808,13 @@ dodrink()
        that led to an "object lost" panic since subsequent useup()
        was no longer dealing with an inventory item.  Unwearing
        the current potion is intended to keep it in inventory.] */
-    if (otmp->quan > 1L) {
+    if (otmp->quan > 1L) 
+    {
         otmp = splitobj(otmp, 1L);
         otmp->owornmask = 0L; /* rest of original stuck unaffected */
-    } else if (otmp->owornmask) {
+    }
+    else if (otmp->owornmask) 
+    {
         remove_worn_item(otmp, FALSE);
     }
 
@@ -840,10 +842,12 @@ dodrink()
     }
 
     potion_descr = OBJ_DESCR(objects[otmp->otyp]);
-    if (potion_descr) {
+    if (potion_descr)
+    {
         if (!strcmp(potion_descr, "milky")
             && !(mvitals[PM_GHOST].mvflags & MV_GONE)
-            && !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_GHOST].born))) {
+            && !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_GHOST].born)))
+        {
             ghost_from_bottle();
             useup(otmp);
             gone = TRUE;
@@ -851,9 +855,11 @@ dodrink()
                 update_u_action_revert(ACTION_TILE_NO_ACTION);
             goto check_add_to_bill_here;
 
-        } else if (!strcmp(potion_descr, "smoky")
+        }
+        else if (!strcmp(potion_descr, "smoky")
                    && !(mvitals[PM_DJINNI].mvflags & MV_GONE)
-                   && !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_DJINNI].born))) {
+                   && ((otmp->speflags & SPEFLAGS_CERTAIN_WISH) != 0 || !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_DJINNI].born))))
+        {
             djinni_from_bottle(otmp);
             useup(otmp);
             gone = TRUE;
@@ -1304,7 +1310,7 @@ struct obj *otmp;
         }
         break;
     case POT_SLEEPING:
-        if (Sleep_resistance || Free_action)
+        if (Sleep_resistance) // || Free_action
         {
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "yawn.");
         } 
@@ -1383,7 +1389,7 @@ struct obj *otmp;
 
             if (Sick_resistance || Role_if(PM_HEALER))
             {
-                pline("Fortunately, you have been immunized.");
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately, you have been immunized.");
             } 
             else
             {
@@ -1804,7 +1810,7 @@ struct obj *otmp;
             } 
             else if (has_ceiling(&u.uz))
             {
-                int dmg = rnd(!uarmh ? 10 : !is_metallic(uarmh) ? 6 : 3);
+                int dmg = rnd(!uarmh ? 10 : !is_hard_helmet(uarmh) ? 6 : 3);
 
                 You("hit your %s on the %s.", body_part(HEAD),
                     ceiling(u.ux, u.uy));
@@ -1969,38 +1975,41 @@ healup(nhp, nxtra, curesick, cureblind, curehallucination, curestun, cureconfusi
 int nhp, nxtra;
 register boolean curesick, cureblind, curehallucination, curestun, cureconfusion;
 {
-    if (nxtra > 0) 
+    int cur_hp_before = (Upolyd ? u.mh : u.uhp);
+    int max_hp_before = (Upolyd ? u.mhmax : u.uhpmax);
+    int nxtra_limit = max(0, cur_hp_before + nhp - max_hp_before);
+    int gained_nxtra = min(nxtra_limit, nxtra);
+    if (gained_nxtra > 0)
     {
-        int max_hp_before = (Upolyd ? u.mhmax : u.uhpmax);
         if (Upolyd)
         {
             if (u.basemhdrain < 0)
             {
-                u.basemhdrain += nxtra;
+                u.basemhdrain += gained_nxtra;
                 if (u.basemhdrain > 0)
                 {
-                    nxtra = u.basemhdrain;
+                    gained_nxtra = u.basemhdrain;
                     u.basemhdrain = 0;
                 }
                 else
-                    nxtra = 0;
+                    gained_nxtra = 0;
             }
-            u.basemhmax += nxtra;
+            u.basemhmax += gained_nxtra;
         }
         else 
         {
             if (u.ubasehpdrain < 0)
             {
-                u.ubasehpdrain += nxtra;
+                u.ubasehpdrain += gained_nxtra;
                 if (u.ubasehpdrain > 0)
                 {
-                    nxtra = u.ubasehpdrain;
+                    gained_nxtra = u.ubasehpdrain;
                     u.ubasehpdrain = 0;
                 }
                 else
-                    nxtra = 0;
+                    gained_nxtra = 0;
             }
-            u.ubasehpmax += nxtra;
+            u.ubasehpmax += gained_nxtra;
         }
         updatemaxhp();
         int max_hp_after = (Upolyd ? u.mhmax : u.uhpmax);
@@ -2011,7 +2020,6 @@ register boolean curesick, cureblind, curehallucination, curestun, cureconfusion
             Sprintf(fbuf, "+%d max HP", max_hp_gain);
             display_floating_text(u.ux, u.uy, fbuf, FLOATING_TEXT_ATTRIBUTE_GAIN, ATR_NONE, NO_COLOR, 0UL);
         }
-
     }
 
     if (nhp > 0)
@@ -2831,7 +2839,7 @@ const char* introline;
             incr_itimeout(&HParalyzed, duration);
             refresh_u_tile_gui_info(TRUE);
             context.botl = context.botlx = 1;
-            standard_hint("You should acquire free action as early as possible. Keep pets around to protect you while paralyzed.", &u.uhint.paralyzed_by_thrown_potion);
+            standard_hint("You should acquire paralysis resistance as early as possible. Keep pets around to protect you while paralyzed.", &u.uhint.paralyzed_by_thrown_potion);
 #if 0
             nomul(-d(3 - 1 * bcsign(obj), 4)); // rnd(5));
             multi_reason = "frozen by a potion";
@@ -2848,7 +2856,8 @@ const char* introline;
         break;
     case POT_SLEEPING:
         kn++;
-        if (!Free_action && !Sleep_resistance) {
+        if (!Sleep_resistance) // !Free_action && 
+        {
             play_sfx_sound(SFX_ACQUIRE_SLEEP);
             Strcpy(dcbuf, "You feel rather tired.");
             pline_ex1(ATR_NONE, CLR_MSG_WARNING, dcbuf);
@@ -4123,6 +4132,7 @@ dodip()
                 docall(&fakeobj, (char*)0);
             }
         }
+        Strcpy(debug_buf_2, "dodip");
         obj_extract_self(singlepotion);
         singlepotion = hold_another_object(singlepotion,
                                            "You juggle and drop %s!",
@@ -4188,7 +4198,6 @@ struct obj* obj, * potion;
         exercise(A_WIS, TRUE);
     }
     makeknown(POT_OIL);
-    //obj->special_quality = 1;
     update_inventory();
     return 1;
 }
@@ -4222,6 +4231,9 @@ void
 djinni_from_bottle(obj)
 struct obj *obj;
 {
+    if (!obj)
+        return;
+
     struct monst *mtmp;
     int chance;
 
@@ -4243,21 +4255,28 @@ struct obj *obj;
         chance = (chance == 4) ? rnd(4) : 0;
     else if (obj->cursed)
         chance = (chance == 0) ? rn2(4) : 4;
+    if (obj->speflags & SPEFLAGS_CERTAIN_WISH)
+        chance = 0;
     /* 0,1,2,3,4:  b=80%,5,5,5,5; nc=20%,20,20,20,20; c=5%,5,5,5,80 */
 
     switch (chance) {
     case 0:
+        obj->speflags |= SPEFLAGS_CERTAIN_WISH;
+        wish_insurance_check(TRUE);
+        convert_magic_lamp_to_oil_lamp(obj);
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_GRANT_ONE_WISH);
         verbalize_happy1("I am in your debt.  I will grant one wish!");
         /* give a wish and discard the monster (mtmp set to null) */
         mongrantswish(&mtmp);
         break;
     case 1:
+        convert_magic_lamp_to_oil_lamp(obj);
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_THANK_YOU_FOR_FREEING);
         verbalize_talk1("Thank you for freeing me!");
         (void) tamedog(mtmp, (struct obj *) 0, TAMEDOG_FORCE_NON_UNIQUE, FALSE, 0, FALSE, FALSE);
         break;
     case 2:
+        convert_magic_lamp_to_oil_lamp(obj);
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_YOU_FREED_ME);
         verbalize_talk1("You freed me!");
         mtmp->mpeaceful = TRUE;
@@ -4265,6 +4284,7 @@ struct obj *obj;
         newsym(mtmp->mx, mtmp->my);
         break;
     case 3:
+        convert_magic_lamp_to_oil_lamp(obj);
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_IT_IS_ABOUT_TIME);
         verbalize_talk1("It is about time!");
         play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, mtmp->mx, mtmp->my);
@@ -4276,12 +4296,36 @@ struct obj *obj;
         special_effect_wait_until_end(0);
         break;
     default:
+        convert_magic_lamp_to_oil_lamp(obj);
         play_monster_special_dialogue_line(mtmp, DJINN_LINE_YOU_DISTURBED);
         verbalize_angry1("You disturbed me, fool!");
         mtmp->mpeaceful = FALSE;
         set_mhostility(mtmp);
         newsym(mtmp->mx, mtmp->my);
         break;
+    }
+}
+
+void
+convert_magic_lamp_to_oil_lamp(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return;
+
+    if (obj->otyp == MAGIC_LAMP)
+    {
+        /* bones preparation:  perform the lamp transformation
+       before releasing the djinni in case the latter turns out
+       to be fatal (a hostile djinni has no chance to attack yet,
+       but an indebted one who grants a wish might bestow an
+       artifact which blasts the hero with lethal results) */
+        obj->otyp = OIL_LAMP;
+        obj->special_quality = 0; /* for safety */
+        obj->speflags &= ~SPEFLAGS_CERTAIN_WISH;
+        obj->age = rn1(500, 1000);
+        if (obj->lamplit)
+            begin_burn(obj, TRUE);
     }
 }
 

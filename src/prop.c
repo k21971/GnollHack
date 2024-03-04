@@ -9,6 +9,10 @@
 #define PCLR_NONE  {0, 0, 0}
 #define PCLR_WHITE {255, 255, 255}
 
+#define PROP_DESC_STR(A) #A
+#define PROP_DESC_XSTR(A) PROP_DESC_STR(A)
+#define AC_MC_DESC(acbon, mcbon) PROP_DESC_XSTR(-acbon) " AC, +" PROP_DESC_XSTR(mcbon) " MC"
+
 /* Moved from timeout.c */
 const struct propname propertynames[] = {
     { INVULNERABLE, "invulnerable", "invulnerability" },
@@ -73,7 +77,7 @@ const struct propname propertynames[] = {
     { HALF_PHYSICAL_DAMAGE, "receiving half normal physical damage", "half received physical damage" },
     { REGENERATION, "regenerating", "regeneration" },
     { ENERGY_REGENERATION, "regenerating mana", "mana regeneration" },
-    { MAGICAL_PROTECTION, "magically protected", "magical protection" },
+    { MAGICAL_PROTECTION, "magically protected", "magical protection", AC_MC_DESC(MAGICAL_PROTECTION_AC_BONUS, MAGICAL_PROTECTION_MC_BONUS) },
     { PROT_FROM_SHAPE_CHANGERS, "protected from shape changers", "protection from shape changers" },
     { POLYMORPH_CONTROL, "controlling polymorphing", "polymorph control" },
     { UNCHANGING, "unchanging", "unchange" },
@@ -110,9 +114,9 @@ const struct propname propertynames[] = {
     { BLOCKS_BLINDNESS, "blocking blindness", "blocks blindness"  },
     { BLOCKS_CLAIRVOYANCE, "blocking clairvoyance", "blocks clairvoyance" },
     { HALF_PHYSICAL_DAMAGE_AGAINST_UNDEAD_AND_DEMONS, "receiving half physical damage from undead and demons", "half physical damage from undead and demons" },
-    { MAGICAL_SHIELDING, "magically shielded", "magical shielding" },
-    { MAGICAL_BARKSKIN, "magically barkskinned", "magical barkskin" },
-    { MAGICAL_STONESKIN, "magically stoneskinned", "magical stoneskin" },
+    { MAGICAL_SHIELDING, "magically shielded", "magical shielding", AC_MC_DESC(MAGICAL_SHIELDING_AC_BONUS, MAGICAL_SHIELDING_MC_BONUS) },
+    { MAGICAL_BARKSKIN, "magically barkskinned", "magical barkskin", AC_MC_DESC(MAGICAL_BARKSKIN_AC_BONUS, MAGICAL_BARKSKIN_MC_BONUS) },
+    { MAGICAL_STONESKIN, "magically stoneskinned", "magical stoneskin", AC_MC_DESC(MAGICAL_STONESKIN_AC_BONUS, MAGICAL_STONESKIN_MC_BONUS) },
     { XRAY_VISION, "having X-ray vision", "X-ray vision" },
     { VERY_FAST, "very fast", "very fast speed" },
     { SLOWED, "slowed", "slow speed" },
@@ -166,7 +170,7 @@ const struct propname propertynames[] = {
     { RAPID_ENERGY_REGENERATION, "rapidly regenerating mana", "rapid mana regeneration" },
     { RAPIDER_ENERGY_REGENERATION, "very rapidly regenerating mana", "very rapid mana regeneration" },
     { RAPIDEST_ENERGY_REGENERATION, "very very rapidly regenerating mana", "very very rapid mana regeneration" },
-    { MELEE_LIFE_LEECH, "having melee life leech", "melee life leech" },
+    { WOUNDING_RESISTANCE, "resistant to wounding", "wounding resistance" },
     { CRAZED, "crazed", "crazedness" },
     { DIVINE_REGENERATION, "extremely rapidly regenerating", "extremely rapid regeneration" },
     { IMPROVED_FIRE_RESISTANCE, "75% resistant to fire", "75% fire resistance" },
@@ -341,7 +345,7 @@ NEARDATA struct prop_info property_definitions[MAX_PROPS] =
     { "rapid-energy-regeneration",    1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* RAPID_ENERGY_REGENERATION = 151 */
     { "rapider-energy-regeneration",  1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* RAPIDER_ENERGY_REGENERATION = 152 */
     { "rapidest-energy-regeneration", 1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* RAPIDEST_ENERGY_REGENERATION = 153 */
-    { "melee-life-leech",             1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* MELEE_LIFE_LEECH = 154 */
+    { "wounding-resistance",          1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* WOUNDING_RESISTANCE = 154 */
     { "crazed",                       1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* CRAZED = 155 */
     { "divine-regeneration",          1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* DIVINE_REGENERATION = 156 */
     { "improved-fire-resistance",     1, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_BUFF_CANCELLABLE},  /* IMPROVED_FIRE_RESISTANCE = 157 */
@@ -436,6 +440,24 @@ int prop_index;
 
     return "";
 }
+
+struct propname
+get_property_name_ex(prop_index)
+int prop_index;
+{
+    int idx;
+    for (idx = 0; propertynames[idx].prop_num; idx++)
+    {
+        if (propertynames[idx].prop_num == prop_index)
+        {
+            return propertynames[idx];
+        }
+    }
+
+    struct propname res = { 0 };
+    return res;
+}
+
 
 const char*
 get_status_name(mtmp, status_index)

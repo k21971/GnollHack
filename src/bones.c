@@ -35,6 +35,7 @@ d_level *lev;
                          in any dungeon (level 1 isn't multiway) */
                       || Is_botlevel(lev)
                       || (Is_branchlev(lev) && lev->dlevel > 1)
+                      || (u.uz.dnum == main_dungeon_dnum && u.uz.dlevel == 1)
                       /* no bones in the invocation level */
                       || (In_hell(lev)
                           && lev->dlevel == dunlevs_in_dungeon(lev) - 1));
@@ -70,6 +71,7 @@ boolean restore;
         
         if (otmp->in_use) 
         {
+            Strcpy(debug_buf_2, "resetobjs");
             obj_extract_self(otmp);
             dealloc_obj(otmp);
             continue;
@@ -90,16 +92,35 @@ boolean restore;
                 {
                     /* prevent duplicate--revert to ordinary obj */
                     /* Non-generable base item*/
-                    if (objects[otmp->otyp].oc_prob == 0 || objects[otmp->otyp].oc_flags3 & O3_NO_GENERATION)
+                    if (objects[otmp->otyp].oc_prob == 0 || (objects[otmp->otyp].oc_flags3 & O3_NO_GENERATION) != 0)
                     {
                         if (artilist[otmp->oartifact].maskotyp && objects[artilist[otmp->oartifact].maskotyp].oc_prob > 0 && !(objects[artilist[otmp->oartifact].maskotyp].oc_flags3 & O3_NO_GENERATION))
                         {
                             otmp->otyp = artilist[otmp->oartifact].maskotyp;
-                            otmp->material = objects[otmp->otyp].oc_material;
+                            /* Keep the artifact's material for weapons or armor; should not create particularly odd situations with artifacts of these classes */
+                            if(objects[otmp->otyp].oc_class != WEAPON_CLASS && objects[otmp->otyp].oc_class != ARMOR_CLASS)
+                                otmp->material = objects[otmp->otyp].oc_material;
+                            if (otmp->charges != 0 && objects[otmp->otyp].oc_charged == CHARGED_NOT_CHARGED)
+                            {
+                                if (objects[otmp->otyp].oc_enchantable > ENCHTYPE_NO_ENCHANTMENT)
+                                {
+                                    int maxench = get_max_enchantment(objects[otmp->otyp].oc_enchantable);
+                                    otmp->enchantment = max(-maxench, min(maxench, otmp->enchantment + otmp->charges));
+                                }
+                                otmp->charges = 0;
+                            }
+                            if (otmp->enchantment != 0 && objects[otmp->otyp].oc_enchantable == ENCHTYPE_NO_ENCHANTMENT)
+                            {
+                                if (objects[otmp->otyp].oc_charged > CHARGED_NOT_CHARGED)
+                                {
+                                    short maxcharges = get_max_charge(objects[otmp->otyp].oc_charged);
+                                    otmp->charges = max(0, min(maxcharges, otmp->enchantment + otmp->charges));
+                                }
+                                otmp->enchantment = 0;
+                            }
                         }
                         else
                         {
-                            Strcpy(debug_buf_1, "resetobjs");
                             otmp->otyp = random_objectid_from_class(otmp->oclass, (struct monst*)0, MKOBJ_FLAGS_ALSO_RARE);
                             otmp->elemental_enchantment = 0;
                             otmp->exceptionality = 0;
@@ -148,6 +169,7 @@ boolean restore;
             otmp->aknown = 0;
             otmp->nknown = 0;
             otmp->mknown = 0;
+            otmp->rotknown = 0;
             otmp->invlet = 0;
             otmp->no_charge = 0;
             otmp->was_thrown = 0;
@@ -182,7 +204,7 @@ boolean restore;
                 /* 0: delivered in-game via external event;
                    1: from bones or wishing; 2: written with marker */
                 if (otmp->special_quality == 0)
-                    otmp->special_quality = 1;
+                    otmp->special_quality = SPEQUAL_MAIL_FROM_BONES_OR_WISHING;
 #endif
             } 
             else if (otmp->otyp == EGG) 
@@ -311,6 +333,7 @@ int x, y;
     u.twoweap = 0; /* ensure curse() won't cause swapwep to drop twice */
     while ((otmp = invent) != 0) 
     {
+        Strcpy(debug_buf_2, "drop_upon_death");
         obj_extract_self(otmp);
         /* when turning into green slime, all gear remains held;
            other types "arise from the dead" do aren't holding
@@ -408,19 +431,27 @@ struct monst *oracle;
 
 /* check whether bones are feasible */
 boolean
-can_make_bones()
+can_make_bones(VOID_ARGS)
 {
     register struct trap *ttmp;
 
+    /* don't let multiple restarts generate multiple copies of objects
+       in bones files */
+    if (discover || ModernMode || CasualMode || flags.non_scoring) // In ModernMode bones files could work, but the player is not supposed to die in that mode, so something odd would have happened to get here
+        return FALSE;
+#if !defined(DEBUG) && defined(GNH_MOBILE)
+    if (wizard)
+        return FALSE;
+#endif
     if (!flags.bones)
         return FALSE;
     if (ledger_no(&u.uz) <= 0 || ledger_no(&u.uz) > maxledgerno())
         return FALSE;
     if (no_bones_level(&u.uz))
         return FALSE; /* no bones for specific levels */
-    if (u.uswallow) {
+    if (u.uswallow) 
         return FALSE; /* no bones when swallowed */
-    }
+
     if (!Is_branchlev(&u.uz)) {
         /* no bones on non-branches with portals */
         for (ttmp = ftrap; ttmp; ttmp = ttmp->ntrap)
@@ -431,10 +462,6 @@ can_make_bones()
     if (depth(&u.uz) <= 0                 /* bulletproofing for endgame */
         || (!rn2(1 + (depth(&u.uz) >> 2)) /* fewer ghosts on low levels */
             && !wizard))
-        return FALSE;
-    /* don't let multiple restarts generate multiple copies of objects
-       in bones files */
-    if (discover || ModernMode || CasualMode || flags.non_scoring) // In ModernMode bones files could work, but the player is not supposed to die in that mode, so something odd would have happened to get here
         return FALSE;
     return TRUE;
 }
@@ -488,14 +515,19 @@ make_bones:
         if (((mptr->difficulty > maxmlev || (mptr->geno & G_UNIQ) != 0)
             && !(mtmp->mon_flags & MON_FLAGS_SPLEVEL_RESIDENT)
             && !(Invocation_lev(&u.uz) && mptr == &mons[PM_BAPHOMET])
+            && !(Is_sanctum(&u.uz) && mptr == &mons[PM_HIGH_PRIEST])
             && !(Inhell && mptr == &mons[PM_DEMOGORGON])
             && !(Inhell && mptr == &mons[PM_ASMODEUS])
+            && !((mtmp->mpeaceful && (mptr->geno & G_UNIQ) == 0) || mtmp->isshk || mtmp->issmith || mtmp->isnpc || mtmp->ispriest)
             )
-            || mtmp->iswiz || is_medusa(mptr)
+            || mtmp->iswiz 
+            || (is_medusa(mptr) && !Is_medusa_level(&u.uz))
             || mptr->msound == MS_NEMESIS || mptr->msound == MS_LEADER
             || mptr == &mons[PM_VLAD_THE_IMPALER]
             || (mptr == &mons[PM_ORACLE] && !fixuporacle(mtmp)))
             mongone(mtmp);
+        else if (!mtmp->mpeaceful && (is_watch(mptr) || mptr->msound == MS_LEADER || mtmp->isshk || mtmp->issmith || mtmp->isnpc || mtmp->ispriest)) /* Shopkeepers are pacified upon loading */
+            mtmp->mpeaceful = 1;
     }
     if (u.usteed)
         dismount_steed(DISMOUNT_BONES);
@@ -559,7 +591,7 @@ make_bones:
            a wrapping unless already carrying one */
         if (mtmp->data->mlet == S_GREATER_UNDEAD && !m_carrying(mtmp, MUMMY_WRAPPING))
             (void) mongets(mtmp, MUMMY_WRAPPING);
-        m_dowear(mtmp, TRUE);
+        m_dowear(mtmp, TRUE, FALSE);
     }
     if (mtmp) {
         mtmp->m_lev = (u.ulevel ? u.ulevel : 1);
@@ -586,6 +618,7 @@ make_bones:
         //ttmp->madeby_mon = 0; //Keep madeby_mon flags to indicate that the traps are not original (mostly relevant in Sokoban)
         ttmp->tseen = (ttmp->ttyp == HOLE);
     }
+    unsee_engravings();
     resetobjs(fobj, FALSE);
     resetobjs(level.buriedobjlist, FALSE);
 
@@ -678,16 +711,23 @@ make_bones:
     store_savefileinfo(fd);
     bwrite(fd, (genericptr_t) &c, sizeof c);
     bwrite(fd, (genericptr_t) bonesid, (size_t) c); /* DD.nnn */
-    savefruitchn(fd, WRITE_SAVE | FREE_SAVE);
+    savefruitchn(fd, WRITE_SAVE);
     update_mlstmv(); /* update monsters for eventual restoration */
-    savelev(fd, ledger_no(&u.uz), WRITE_SAVE | FREE_SAVE);
+    savelev(fd, ledger_no(&u.uz), WRITE_SAVE);
     bclose(fd);
     commit_bonesfile(&u.uz);
     compress_bonesfile();
+#if !defined(COMPRESS) && !defined(ZLIB_COMP)
+    if (issue_gui_command)
+    {
+        const char* fq_bones = fqname(bones, BONESPREFIX, 0);
+        issue_gui_command(GUI_CMD_POST_BONES_FILE, context.game_difficulty - MIN_DIFFICULTY_LEVEL, 0, fq_bones);
+    }
+#endif
 }
 
 int
-getbones()
+getbones(VOID_ARGS)
 {
     register int fd;
     register int ok;
@@ -698,6 +738,7 @@ getbones()
 
     if (!flags.bones)
         return 0;
+
     /* wizard check added by GAN 02/05/87 */
     if (rn2(3) /* only once in three times do we find bones */
         && !wizard)
@@ -722,6 +763,10 @@ getbones()
                 return 0;
             }
         }
+        Strcpy(debug_buf_1, "getbones");
+        Strcpy(debug_buf_2, "getbones");
+        Strcpy(debug_buf_3, "getbones");
+        Strcpy(debug_buf_4, "getbones");
         mread(fd, (genericptr_t) &c, sizeof c); /* length incl. '\0' */
         mread(fd, (genericptr_t) oldbonesid, (size_t) c); /* DD.nnn */
         if (strcmp(bonesid, oldbonesid) != 0

@@ -158,7 +158,7 @@ struct extended_create_window_info {
 
 #define WINDOW_CREATE_FLAGS_NONE                0x00000000
 #define WINDOW_CREATE_FLAGS_ACTIVE              0x00000001
-#define WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS 0x00000002 //For text window only; use menu flags for menu window
+#define WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS 0x00000002 /* For text window only; use menu flags for menu window */
 #define WINDOW_CREATE_FLAGS_ASCENDED            0x00000004
 
 #define MENU_FLAGS_NONE                         0x00000000
@@ -596,6 +596,8 @@ enum context_menu_styles {
 #define DEFAULT_MAX_HINT_DIFFICULTY -1
 
 #define NO_SECRET_DOORS_DUNGEON_LEVEL_THRESHOLD 2
+#define DEFAULT_RUN_SPOT_DISTANCE 10
+#define RUN_SPOT_NEARBY_DISTANCE 6
 
 /* Moved from spell.c */
 /* spell retention period, in turns; at 10% of this value, player becomes
@@ -622,6 +624,18 @@ enum context_menu_styles {
 #define TAMEDOG_FORCE_NON_UNIQUE    1
 #define TAMEDOG_FORCE_ALL           2
 
+#define MKOBJ_TYPE_NORMAL           0  /* Floor and hostile monster inventory */
+#define MKOBJ_TYPE_CONTAINER        1  /* Less restrictions than normal */
+#define MKOBJ_TYPE_WISHING          2  /* No random unrequested properties */
+#define MKOBJ_TYPE_CRAFTING         3  /* No random unrequested properties */
+#define MKOBJ_TYPE_ARTIFACT_BASE    4  /* No random unrequested properties */
+#define MKOBJ_TYPE_GENERATED        5  /* No random unrequested properties */
+#define MKOBJ_TYPE_INITIAL          6  /* No random unrequested properties; no overly powerful items */
+#define MKOBJ_TYPE_SPLEV_PRESET     -1 /* Preset item in a special level */
+#define MKOBJ_TYPE_NPC_SELLING      -2 /* Random item sellable in NPC inventory */
+#define MKOBJ_TYPE_DIVINE_GIFT      -3 /* Gifted by god */
+
+#define MKOBJ_RANDOM_PROPERTY_MAX_TYPE 1
 
 #define MKOBJ_FLAGS_OPEN_COFFIN                        0x00000001
 #define MKOBJ_FLAGS_MONSTER_SPECIFIED                  0x00000002
@@ -656,6 +670,7 @@ enum context_menu_styles {
 #define DONAME_LOADSTONE_CORRECTLY          0x0010
 #define DONAME_LIT_IN_FRONT                 0x0020
 #define DONAME_HIDE_REMAINING_LIT_TURNS     0x0040
+#define DONAME_COMPARISON                   0x0080
 
 /* Moved from shk.c */
 #define NOTANGRY(mon) ((mon)->mpeaceful)
@@ -711,6 +726,8 @@ enum gui_command_types {
     GUI_CMD_REPORT_PLAY_TIME,
     GUI_CMD_POST_GAME_STATUS,
     GUI_CMD_POST_DIAGNOSTIC_DATA,
+    GUI_CMD_POST_XLOG_ENTRY,
+    GUI_CMD_POST_BONES_FILE,
     GUI_CMD_LIBRARY_MANUAL,
     GUI_CMD_DEBUGLOG,
     GUI_CMD_GAME_START,
@@ -808,6 +825,8 @@ enum yn_function_styles {
 #define OBJDATA_FLAGS_FOUND_THIS_TURN   0x00008000UL
 #define OBJDATA_FLAGS_IS_AMMO           0x00010000UL /* is_ammo is TRUE */
 #define OBJDATA_FLAGS_THROWING_WEAPON   0x00020000UL /* throwing_weapon is TRUE */
+#define OBJDATA_FLAGS_PREV_WEP_FOUND    0x00040000UL
+#define OBJDATA_FLAGS_PREV_UNWIELD      0x00080000UL
 
 /* Monster abilities */
 #define BREATH_WEAPON_MANA_COST 15
@@ -944,6 +963,31 @@ enum cat_breeds {
 #define UTOFLAGS_AT_ALTAR           0x0200
 #define UTOFLAGS_INSIDE_TOWER       0x0400
 
+#define MAGICAL_PROTECTION_AC_BONUS 3
+#define MAGICAL_SHIELDING_AC_BONUS 6
+#define MAGICAL_BARKSKIN_AC_BONUS 12
+#define MAGICAL_STONESKIN_AC_BONUS 18
+
+#define MAGICAL_PROTECTION_MC_BONUS 1
+#define MAGICAL_SHIELDING_MC_BONUS 2
+#define MAGICAL_BARKSKIN_MC_BONUS 4
+#define MAGICAL_STONESKIN_MC_BONUS 6
+
+#define MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE 1
+#define MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE 12
+#define MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT 5
+
+#define MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE 2
+#define MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE 12
+#define MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT 5
+
+#define PET_INITIAL_NUTRITION 1000
+#define PET_VERY_HUNGRY_TIME 200
+#define PET_EXTREMELY_HUNGRY_TIME 400
+#define PET_WEAK_TIME 500
+#define PET_STARVING_TIME 750
+#define PET_SATIATED_NUTRITION 3000
+#define PET_NONEATER_NUTRITION 800
 
 #endif /* GENERAL_H */
 

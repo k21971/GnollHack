@@ -8,22 +8,14 @@
 #ifndef YOU_H
 #define YOU_H
 
-#ifndef CONFIG_H
 #include "config.h"
-#endif
-
-#ifndef DUNGEON_H
 #include "dungeon.h"
-#endif
-
 #include "attrib.h"
 #include "monst.h"
-#ifndef PROP_H
 #include "prop.h" /* (needed here for util/makedefs.c) */
-#endif
 #include "skills.h"
 #include "general.h"
-
+#include "flag.h"
 #include <time.h>
 
 enum role_types
@@ -115,7 +107,8 @@ struct u_event {
     Bitfield(role_achievement_2, 1);  /* passed the second requirement of the role achievement */
 
     Bitfield(elbereth_known, 1);      /* has learned of Elbereth */
-    Bitfield(invocation_ritual_known, 1); /* has learned of the invocation ritual */
+    Bitfield(invocation_ritual_known, 1); /* has learned how to conduct the invocation ritual from the Oracle */
+    Bitfield(heard_of_invocation_ritual, 1); /* has heard of the invocation ritual and the items necessary for it; enables the quest update */
 
     unsigned short ranks_attained;
 };
@@ -153,6 +146,7 @@ struct u_achieve {
     /* Other Achievements */
     Bitfield(role_achievement, 1); /* Special achievement for the role */
     Bitfield(crowned, 1); /* Became Hand of Elbereth, Envoy of Balance, or Glory of Arioch */
+    Bitfield(killed_demogorgon, 1);
 };
 
 enum kill_hints
@@ -622,6 +616,8 @@ struct you {
 }; /* end of `struct you' */
 
 #define Upolyd (u.umonnum != u.umonster)
+#define Ufemale (Upolyd ? u.mfemale : flags.female) /* Your original true gender (before polymorph) */
+
 #define SUM_INIT_ATTRIBUTES 75
 
 #endif /* YOU_H */

@@ -10,7 +10,6 @@
 
 STATIC_VAR NEARDATA struct obj *mon_currwep = (struct obj *) 0;
 
-STATIC_DCL boolean FDECL(u_slip_free, (struct monst *, struct attack *));
 STATIC_DCL int FDECL(passiveum, (struct permonst *, struct monst *,
                                  struct attack *));
 STATIC_DCL void FDECL(mayberem, (struct monst *, const char *,
@@ -24,6 +23,7 @@ STATIC_DCL void FDECL(missmu, (struct monst *, BOOLEAN_P, struct attack *));
 STATIC_DCL void FDECL(mswings, (struct monst *, struct obj *, int));
 STATIC_DCL void FDECL(wildmiss, (struct monst *, struct attack *));
 STATIC_DCL void FDECL(hitmsg, (struct monst *, struct attack *, int, BOOLEAN_P));
+STATIC_DCL boolean FDECL(u_slip_free_core, (struct monst*, struct attack*, BOOLEAN_P));
 
 /* See comment in mhitm.c.  If we use this a lot it probably should be */
 /* changed to a parameter to mhitu. */
@@ -567,7 +567,7 @@ register struct monst *mtmp;
                 return 0; /* lurkers don't attack */
 
             obj = which_armor(mtmp, WORN_HELMET);
-            if (obj && is_metallic(obj)) {
+            if (obj && is_hard_helmet(obj)) {
                 Your("blow glances off %s %s.", s_suffix(mon_nam(mtmp)),
                      helm_simple_name(obj));
             } else {
@@ -1368,11 +1368,33 @@ struct monst* mtmp;
     }
 }
 
+boolean
+check_stuck_and_slip(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return FALSE;
+
+    struct attack* atk = dmgtype_fromattack(mtmp->data, AD_STCK, AT_ANY);
+    if (!atk)
+        return FALSE;
+    return !u_slip_free_core(mtmp, atk, TRUE);
+}
+
 /* check whether slippery clothing protects from hug or wrap attack */
-STATIC_OVL boolean
+boolean
 u_slip_free(mtmp, mattk)
+struct monst* mtmp;
+struct attack* mattk;
+{
+    return u_slip_free_core(mtmp, mattk, FALSE);
+}
+
+STATIC_OVL boolean
+u_slip_free_core(mtmp, mattk, stuck)
 struct monst *mtmp;
 struct attack *mattk;
+boolean stuck;
 {
     struct obj *obj = (uarmc ? uarmc : (uarmo ? uarmo : uarm));
 
@@ -1383,11 +1405,11 @@ struct attack *mattk;
 
     /* if your cloak/armor is greased, monster slips off; this
        protection might fail (33% chance) when the armor is cursed */
-    if (obj && (obj->greased || obj->otyp == OILSKIN_CLOAK)
+    if (obj && (obj->greased || (objects[obj->otyp].oc_flags5 & O5_PERMANENTLY_GREASED) != 0 || obj->otyp == OILSKIN_CLOAK)
         && (!obj->cursed || rn2(3))) {
         pline("%s %s your %s %s!", Monnam(mtmp),
               (mattk->adtyp == AD_WRAP) ? "slips off of"
-                                        : "grabs you, but cannot hold onto",
+                                        : (stuck ? "tries to stick to you, but fails to attach onto" : "grabs you, but cannot hold onto"),
               obj->greased ? "greased" : "slippery",
               /* avoid "slippery slippery cloak"
                  for undiscovered oilskin cloak */
@@ -1600,13 +1622,13 @@ struct monst *mon;
     if (is_you)
     {
         if (Magical_stoneskin)
-            mc += 6;
+            mc += MAGICAL_STONESKIN_MC_BONUS;
         else if (Magical_barkskin)
-            mc += 4;
+            mc += MAGICAL_BARKSKIN_MC_BONUS;
         else if (Magical_shielding)
-            mc += 2;
+            mc += MAGICAL_SHIELDING_MC_BONUS;
         else if (Magical_protection)
-            mc += 1;
+            mc += MAGICAL_PROTECTION_MC_BONUS;
 
         /* Divine protection */
         mc += u.ublessed / 3;
@@ -1617,13 +1639,13 @@ struct monst *mon;
     else
     {
         if (mon->mprops[MAGICAL_STONESKIN] != 0)
-            mc += 6;
+            mc += MAGICAL_STONESKIN_MC_BONUS;
         else if (mon->mprops[MAGICAL_BARKSKIN] != 0)
-            mc += 4;
+            mc += MAGICAL_BARKSKIN_MC_BONUS;
         else if (mon->mprops[MAGICAL_SHIELDING] != 0)
-            mc += 2;
+            mc += MAGICAL_SHIELDING_MC_BONUS;
         else if (mon->mprops[MAGICAL_PROTECTION] != 0)
-            mc += 1;
+            mc += MAGICAL_PROTECTION_MC_BONUS;
     }
 
     return mc;
@@ -1983,7 +2005,7 @@ register struct obj* omonwep;
                 }
 
                 boolean silvermsg = FALSE;
-                if (otmp->material == MAT_SILVER && Hate_silver)
+                if (obj_counts_as_silver(otmp) && Hate_silver)
                 {
                     damage += adjust_damage(rnd(20), mtmp, &youmonst, objects[otmp->otyp].oc_damagetype, ADFLAGS_NONE);
                     silvermsg = TRUE;
@@ -2300,7 +2322,7 @@ register struct obj* omonwep;
                 incr_itimeout(&HParalyzed, (rnd(8) + 2));
                 context.botl = context.botlx = 1;
                 refresh_u_tile_gui_info(TRUE);
-                standard_hint("Get free action as early as possible. Avoid engaging in close combat with paralyzing monsters before that.", &u.uhint.paralyzed_by_monster);
+                standard_hint("Get paralysis resistance as early as possible. Avoid engaging in close combat with paralyzing monsters before that.", &u.uhint.paralyzed_by_monster);
                 /* No new paralysis for a while */
                 set_itimeout(&HFree_action, 20);
                 refresh_u_tile_gui_info(TRUE);
@@ -2424,7 +2446,7 @@ register struct obj* omonwep;
         break;
     case AD_STCK:
         hitmsg(mtmp, mattk, damagedealt, TRUE);
-        if (!is_cancelled(mtmp) && !u.ustuck && !sticks(youmonst.data))
+        if (!is_cancelled(mtmp) && !u.ustuck && !sticks(youmonst.data) && check_stuck_and_slip(mtmp))
         {
             play_sfx_sound(SFX_ACQUIRE_GRAB);
             u.ustuck = mtmp;
@@ -3069,12 +3091,19 @@ register struct obj* omonwep;
             if (objects[omonwep->otyp].oc_aflags & A1_USE_FULL_DAMAGE_INSTEAD_OF_EXTRA)
                 extradmg = (int)ceil(damage);
 
-            permdmg2 += extradmg;
-
+            if (!resists_wounding(&youmonst) && !Wounding_resistance)
+                permdmg2 += extradmg;
         }
 
         if (has_obj_mythic_wounding(omonwep))
-            permdmg2 += mythic_wounding_amount(omonwep);
+        {
+            int mythicdmg = mythic_wounding_amount(omonwep);
+            if (mythicdmg > 0)
+            {
+                if(!resists_wounding(&youmonst) && !Wounding_resistance)
+                    permdmg2 += mythicdmg;
+            }
+        }
 
         if (permdmg2 > 0)
         {
@@ -3117,11 +3146,12 @@ register struct obj* omonwep;
             deduct_monster_hp(mtmp, (double)-life_leech);
 
             if (mtmp->mhp > hpbefore)
-
-            if (extradmg > 0)
             {
-                play_sfx_sound(SFX_LIFE_LEECH);
-                pline("%s's %s %s your life energy!", Monnam(mtmp), cxname(omonwep), otense(omonwep, "leech"));
+                if (extradmg > 0)
+                {
+                    play_sfx_sound(SFX_LIFE_LEECH);
+                    pline("%s's %s %s your life energy!", Monnam(mtmp), cxname(omonwep), otense(omonwep, "leech"));
+                }
             }
         }
     }
@@ -4194,7 +4224,6 @@ struct monst *mon;
     boolean seewho, naked; /* True iff no armor */
     int attr_tot, tried_gloves = 0;
     char qbuf[QBUFSZ], Who[QBUFSZ];
-    Strcpy(debug_buf_4, "doseduce");
 
     if (is_cancelled(mon) || mon->mspec_used) {
         pline("%s acts as though %s has got a %sheadache.", Monnam(mon),

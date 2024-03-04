@@ -1061,8 +1061,8 @@ nh_timeout()
                 You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are starting to gain mana %sless rapidly than before.",
                     Rapider_energy_regeneration || Rapid_energy_regeneration || Energy_regeneration ? "" : "much ");
                 break;
-            case MELEE_LIFE_LEECH:
-                You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are starting to lose your ability to leech life in melee.");
+            case WOUNDING_RESISTANCE:
+                You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "you are starting to feel more vulnerable to wounding.");
                 break;
             case CRAZED:
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel more sane than before.");
@@ -1588,6 +1588,7 @@ long timeout;
             useup(egg);
         } else {
             /* free egg here because we use it above */
+            Strcpy(debug_buf_2, "hatch_egg");
             obj_extract_self(egg);
             obfree(egg, (struct obj *) 0);
         }
@@ -1899,6 +1900,7 @@ long timeout;
                 /* get rid of candles and burning oil potions;
                    we know this object isn't carried by hero,
                    nor is it migrating */
+                Strcpy(debug_buf_2, "burn_object1");
                 obj_extract_self(obj);
                 obfree(obj, (struct obj *) 0);
                 obj = (struct obj *) 0;
@@ -1949,6 +1951,7 @@ long timeout;
                to avoid false complaint of deleting worn item */
             if (obj->where == OBJ_MIGRATING)
                 obj->owornmask = 0L;
+            Strcpy(debug_buf_2, "burn_object2");
             obj_extract_self(obj);
             obfree(obj, (struct obj *) 0);
         }
@@ -2111,6 +2114,7 @@ long timeout;
                     so obfree won't think this item is worn */
                 if (obj->where == OBJ_MIGRATING)
                     obj->owornmask = 0L;
+                Strcpy(debug_buf_2, "burn_object3");
                 obj_extract_self(obj);
                 obfree(obj, (struct obj*)0);
             }
@@ -2236,6 +2240,7 @@ long timeout;
                        so obfree won't think this item is worn */
                     if (obj->where == OBJ_MIGRATING)
                         obj->owornmask = 0L;
+                    Strcpy(debug_buf_2, "burn_object4");
                     obj_extract_self(obj);
                     obfree(obj, (struct obj *) 0);
                 }
@@ -2320,8 +2325,8 @@ boolean already_lit;
 
         if (obj->otyp == MAGIC_CANDLE)
         {
-            if (obj->special_quality == 2)
-                obj->special_quality = 1;
+            if (obj->special_quality == SPEQUAL_MAGIC_CANDLE_UNUSED)
+                obj->special_quality = SPEQUAL_MAGIC_CANDLE_PARTLY_USED;
         }
     }
     else
@@ -2333,8 +2338,8 @@ boolean already_lit;
             break;
         case MAGIC_CANDLE:
             //obj->lamplit = 1;
-            if (obj->special_quality == 2)
-                obj->special_quality = 1;
+            if (obj->special_quality == SPEQUAL_MAGIC_CANDLE_UNUSED)
+                obj->special_quality = SPEQUAL_MAGIC_CANDLE_PARTLY_USED;
             //do_timer = FALSE;
             break;
         case POT_OIL:
@@ -2561,6 +2566,7 @@ long timeout;
     else {
         /* clear migrating obj's destination code
            so obfree won't think this item is worn */
+        Strcpy(debug_buf_2, "unsummon_item");
         obj_extract_self(obj);
         obfree(obj, (struct obj*) 0);
     }
@@ -3566,6 +3572,7 @@ long adjust;     /* how much to adjust timeout */
 {
     int count;
     timer_element *curr;
+    Strcpy(debug_buf_4, "restore_timers");
 
     if (range == RANGE_GLOBAL)
         mread(fd, (genericptr_t) &timer_id, sizeof timer_id);
@@ -4242,11 +4249,11 @@ boolean was_flying;
                 Rapider_energy_regeneration || Rapid_energy_regeneration || Energy_regeneration ? "" : "much ");
         }
         break;
-    case MELEE_LIFE_LEECH:
-        if (!Melee_life_leech)
+    case WOUNDING_RESISTANCE:
+        if (!Wounding_resistance)
         {
             play_sfx_sound(SFX_PROTECTION_END_WARNING);
-            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "have lost your ability to leech life in melee!");
+            You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "vulnerable to wounding!");
         }
         break;
     case CRAZED:

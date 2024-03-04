@@ -227,6 +227,7 @@ picklock(VOID_ARGS)
             {
                 xlock.door->doormask &= ~D_MASK;
                 xlock.door->doormask |= D_NODOOR;
+                xlock.door->subtyp = 0;
                 unblock_vision_and_hearing_at_point(u.ux + u.dx, u.uy + u.dy);
             }
             if (*in_rooms(u.ux + u.dx, u.uy + u.dy, SHOPBASE))
@@ -342,6 +343,7 @@ boolean destroyit;
         /* Put the contents on ground at the hero's feet. */
         while ((otmp = box->cobj) != 0) 
         {
+            Strcpy(debug_buf_2, "breakchestlock");
             obj_extract_self(otmp);
             if (!rn2(3) || otmp->oclass == POTION_CLASS) 
             {
@@ -446,7 +448,7 @@ forcelock(VOID_ARGS)
 }
 
 void
-reset_pick()
+reset_pick(VOID_ARGS)
 {
     xlock.usedtime = xlock.chance = xlock.picktyp = 0;
     xlock.magic_key = FALSE;
@@ -1130,6 +1132,7 @@ int x, y;
             {
                 door->doormask &= ~D_MASK;
                 door->doormask |= D_NODOOR;
+                door->subtyp = 0;
                 if (*in_rooms(cc.x, cc.y, SHOPBASE))
                     add_damage(cc.x, cc.y, SHOP_DOOR_COST);
             }
@@ -1451,6 +1454,7 @@ int x, y;
             door->typ = SDOOR;
             door->doormask &= ~D_MASK;
             door->doormask |= D_NODOOR;
+            door->subtyp = 0;
             if (vis)
             {
                 play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, x, y);
@@ -1570,6 +1574,7 @@ int x, y;
                 {
                     door->doormask &= ~D_MASK;
                     door->doormask |= D_NODOOR;
+                    door->subtyp = 0;
                     unblock_vision_and_hearing_at_point(x, y);
                     newsym(x, y);
                 }

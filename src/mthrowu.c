@@ -158,10 +158,13 @@ const char* verb_in_past_tense;
 
                 display_u_being_hit(HIT_GENERAL, damagedealt, 0UL);
             }
-            if (obj && obj->material == MAT_SILVER && Hate_silver)
+            if (obj && obj_counts_as_silver(obj) && Hate_silver)
             {
                 /* extra damage already applied by weapon_dmg_value() */
-                pline_The("silver sears your flesh!");
+                if(obj->material == MAT_SILVER)
+                    pline_The("silver sears your flesh!");
+                else
+                    pline("%s your flesh!", Tobjnam(obj, "sear"));
                 exercise(A_CON, FALSE);
             }
             if (is_acid)
@@ -662,11 +665,13 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
             }
         }
 
-        if (otmp->material == MAT_SILVER
+        if (obj_counts_as_silver(otmp)
             && mon_hates_silver(mtmp))
         {
-            if (vis)
+            if (vis && otmp->material == MAT_SILVER)
                 pline_The_ex(ATR_NONE, CLR_MSG_MYSTICAL, "silver sears %s flesh!", s_suffix(mon_nam(mtmp)));
+            else if (vis)
+                pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s %s flesh!", Tobjnam(otmp, "sear"), s_suffix(mon_nam(mtmp)));
             else if (verbose && !target)
                 pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "Its flesh is seared!");
         }
@@ -744,6 +749,7 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
 
         if (!objgone && range == -1)
         { /* special case */
+            Strcpy(debug_buf_2, "ohitmon");
             obj_extract_self(otmp);    /* free it for motion again */
             return 0;
         }
@@ -800,11 +806,13 @@ struct obj *obj;         /* missile (or stack providing it) */
         /* location, not its existence */
         if (MON_WEP(mon) == obj)
             setmnotwielded(mon, obj);
+        Strcpy(debug_buf_2, "m_throw1");
         obj_extract_self(obj);
         singleobj = obj;
         obj = (struct obj *) 0;
     } else {
         singleobj = splitobj(obj, 1L);
+        Strcpy(debug_buf_2, "m_throw2");
         obj_extract_self(singleobj);
     }
 
@@ -1268,7 +1276,10 @@ struct attack  *mattk;
                 /* breath runs out sometimes. Also, give monster some
                  * cunning; don't breath if the target fell asleep.
                  */
-                mtmp->mspec_used = (5 + rn2(10));
+                if (typ == AD_SLEE)
+                    mtmp->mspec_used += (MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE));
+                else
+                    mtmp->mspec_used = (MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE));
 
                 /* If this is a pet, it'll get hungry. Minions and
                  * spell beings won't hunger */
@@ -1584,6 +1595,7 @@ m_useupall(mon, obj)
 struct monst *mon;
 struct obj *obj;
 {
+    Strcpy(debug_buf_2, "m_useupall");
     obj_extract_self(obj);
     if (obj->owornmask) {
         if (obj == MON_WEP(mon))
@@ -1766,6 +1778,7 @@ struct attack *mattk;
         }
         else 
         {
+            Strcpy(debug_buf_2, "spitmu");
             obj_extract_self(otmp);
             obfree(otmp, (struct obj *) 0);
         }
@@ -1878,12 +1891,11 @@ struct attack* mattk;
                 /* breath runs out sometimes. Also, give monster some
                  * cunning; don't breath if the player fell asleep.
                  */
-                //if (!rn2(3))
-                mtmp->mspec_used = (5 + rn2(10));
-                
-                if (typ == AD_SLEE && !Sleep_resistance)
-                    mtmp->mspec_used += rnd(20);
-                
+                if (typ == AD_SLEE)
+                    mtmp->mspec_used += (MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE));
+                else
+                    mtmp->mspec_used = (MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE));
+
                 if (action_taken)
                     update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
             }
@@ -2102,6 +2114,11 @@ boolean your_fault, from_invent;
              || otmp->material == MAT_GOLD
              || otmp->material == MAT_SILVER
              || otmp->material == MAT_PLATINUM
+             || otmp->material == MAT_BRONZE
+             || otmp->material == MAT_BRASS
+             || otmp->material == MAT_COPPER
+             || otmp->material == MAT_ORICHALCUM
+             || otmp->material == MAT_MITHRIL
         )
         pline("Clink!");
     else

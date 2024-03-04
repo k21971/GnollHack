@@ -166,7 +166,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
                            to skip dead monsters here because they will have
                            been purged at end of their previous round of moving */
                         for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
-                            mtmp->movement += mcalcmove(mtmp);
+                            mtmp->movement += mcalcmove(mtmp, FALSE);
 
                         /* occasionally add another monster; since this takes
                            place after movement has been allotted, the new
@@ -596,7 +596,7 @@ struct monst* mtmp;
 }
 
 void
-reset_all_monster_origin_coordinates()
+reset_all_monster_origin_coordinates(VOID_ARGS)
 {
     struct monst* mtmp;
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
@@ -619,10 +619,14 @@ struct obj* obj;
 }
 
 void
-reset_all_object_origin_coordinates()
+reset_all_object_origin_coordinates(VOID_ARGS)
 {
     struct obj* obj;
     for (obj = fobj; obj; obj = obj->nobj)
+    {
+        reset_object_origin_coordinates(obj);
+    }
+    for (obj = memoryobjs; obj; obj = obj->nobj)
     {
         reset_object_origin_coordinates(obj);
     }
@@ -762,7 +766,7 @@ maybe_create_rwraith()
 
 /* maybe recover some lost health (or lose some when an eel out of water) */
 STATIC_OVL void
-regenerate_hp()
+regenerate_hp(VOID_ARGS)
 {
     /* regenerate hp */
     int relevant_hpmax = Upolyd ? u.mhmax : u.uhpmax;
@@ -776,7 +780,6 @@ regenerate_hp()
     int fixedhpperround = relevant_hpmax / roundstofull;
     int fractional_hp = (10000 * (relevant_hpmax % roundstofull)) / roundstofull;
     int added_hp = 0;
-
 
     /* Mummy rot here */
     if (MummyRot && !Sick_resistance)
@@ -1016,29 +1019,18 @@ regenerate_hp()
 #endif
 }
 
-
 STATIC_OVL void
-regenerate_mana()
+regenerate_mana(VOID_ARGS)
 {
-
     /* regenerate mana */
     int roundstofull =
-        Rapidest_energy_regeneration ? max(1, min(u.uenmax / 8, 40)) :
-        Rapider_energy_regeneration ? max(1, min(u.uenmax / 4, 80)) :
-        Rapid_energy_regeneration ? max(1, min(u.uenmax / 2, 160)) :
-        Energy_regeneration ? max(1, min(u.uenmax, 320)) :
-        640;
+        Rapidest_energy_regeneration ? max(1, min(u.uenmax / 12, 15)) :
+        Rapider_energy_regeneration ? max(1, min(u.uenmax / 6, 30)) :
+        Rapid_energy_regeneration ? max(1, min(u.uenmax / 3, 60)) :
+        Energy_regeneration ? max(1, min((2 * u.uenmax) / 3, 120)) :
+        240;
     int fixedmanaperround = u.uenmax / roundstofull;
     int fractional_mana = (10000 * (u.uenmax % roundstofull)) / roundstofull;
-
-    /*
-    && ((wtcap < MOD_ENCUMBER
-        && (!(moves % ((MAXULEV + 8 - u.ulevel)
-            * (Role_if(PM_WIZARD) ? 3 : 4)
-            / 6)))) || Energy_regeneration)
-        u.uen += rn1(
-            (int) (max(ACURR(A_WIS), ACURR(A_INT))) / 15 + 1, 1);
-    */
 
     if (u.uenmax > 0 && u.uen < u.uenmax)
     {
@@ -1502,7 +1494,7 @@ welcome(new_game)
 boolean new_game; /* false => restoring an old game */
 {
     char buf[BUFSZ];
-    boolean currentgend = Upolyd ? u.mfemale : flags.female;
+    boolean currentgend = Ufemale;
 
     /* skip "welcome back" if restoring a doomed character */
     if (!new_game && Upolyd && ugenocided()) {
@@ -1794,10 +1786,10 @@ boolean return_expected_value;
     int moveamt = 0;
 
     /* calculate how much time passed. */
-    if (u.usteed && u.umoved)
+    if (u.usteed && (u.umoved || return_expected_value))
     {
         /* your speed doesn't augment steed's speed */
-        moveamt = mcalcmove(u.usteed);
+        moveamt = mcalcmove(u.usteed, return_expected_value);
     }
     else
     {

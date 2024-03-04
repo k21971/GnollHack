@@ -70,6 +70,7 @@ STATIC_DCL void FDECL(discardexcess, (FILE *));
 STATIC_DCL void FDECL(readentry, (FILE *, struct toptenentry *));
 STATIC_DCL void FDECL(writeentry, (FILE *, struct toptenentry *));
 #ifdef XLOGFILE
+STATIC_DCL void FDECL(print_xlog_entry, (char*, struct toptenentry*, int));
 STATIC_DCL void FDECL(writexlentry, (FILE *, struct toptenentry *, int));
 STATIC_DCL long NDECL(encodexlogflags);
 STATIC_DCL void FDECL(add_achieveX, (char*, const char*, BOOLEAN_P));
@@ -442,11 +443,81 @@ encodeachieve()
         r |= 1L << 28;
     if (u.uachieve.crowned)
         r |= 1L << 29;
+    if (u.uachieve.killed_demogorgon)
+        r |= 1L << 30;
 
     return r;
 }
 
 #ifdef XLOGFILE
+STATIC_OVL void
+print_xlog_entry(buffer, tt, how)
+char* buffer;
+struct toptenentry* tt;
+int how;
+{
+    if (!buffer)
+        return;
+
+    *buffer = 0;
+
+#define XLOG_SEP '\t' /* xlogfile field separator. */
+    char tmpbuf[DTHSZ + 1];
+
+    Sprintf(buffer, "version=%d.%d.%d", tt->ver_major, tt->ver_minor,
+        tt->patchlevel);
+    Sprintf(eos(buffer), "%cedit=%d", XLOG_SEP, EDITLEVEL);
+//#if defined(GNH_ANDROID) || defined(ANDROID)
+//    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "android");
+//#elif defined(GNH_IOS)
+//    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "ios");
+//#elif defined(WIN32)
+//    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "windows");
+//#elif defined(MAC)
+//    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "mac");
+//#elif defined(UNIX)
+//    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "unix");
+//#else
+//    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "unknown");
+//#endif
+    Sprintf(eos(buffer), "%cpoints=%ld%cdeathdnum=%d%cdeathlev=%d", XLOG_SEP,
+        tt->points, XLOG_SEP, tt->deathdnum, XLOG_SEP, tt->deathlev);
+    Sprintf(eos(buffer), "%cmaxlvl=%d%chp=%d%cmaxhp=%d", XLOG_SEP, tt->maxlvl,
+        XLOG_SEP, tt->hp, XLOG_SEP, tt->maxhp);
+    Sprintf(eos(buffer), "%cdeaths=%d%cdeathdate=%ld%cbirthdate=%ld%cuid=%d",
+        XLOG_SEP, tt->deaths, XLOG_SEP, tt->deathdate, XLOG_SEP,
+        tt->birthdate, XLOG_SEP, tt->uid);
+    Sprintf(eos(buffer), "%crole=%s%crace=%s%cgender=%s%calign=%s", XLOG_SEP,
+        tt->plrole, XLOG_SEP, tt->plrace, XLOG_SEP, tt->plgend, XLOG_SEP,
+        tt->plalign);
+    /* make a copy of death reason that doesn't include ", while helpless" */
+    formatkiller(tmpbuf, sizeof tmpbuf, how, FALSE);
+    Sprintf(eos(buffer), "%cname=%s%ccname=%s%cdeath=%s",
+        XLOG_SEP, plname, XLOG_SEP, plname, XLOG_SEP, tmpbuf);
+    if (multi)
+        Sprintf(eos(buffer), "%cwhile=%s", XLOG_SEP,
+            multi_reason ? multi_reason : "helpless");
+    Sprintf(eos(buffer), "%cconduct=0x%lx%cturns=%ld%cachieve=0x%lx", XLOG_SEP,
+        encodeconduct(), XLOG_SEP, moves, XLOG_SEP, encodeachieve());
+    Sprintf(eos(buffer), "%cachieveX=%s", XLOG_SEP, encode_extended_achievements());
+    Sprintf(eos(buffer), "%cconductX=%s", XLOG_SEP, encode_extended_conducts());
+    lock_thread_lock();
+    Sprintf(eos(buffer), "%crealtime=%ld%cstarttime=%ld%cendtime=%ld%cstarttimeUTC=%ld%cendtimeUTC=%ld", XLOG_SEP,
+        (long)urealtime.realtime, XLOG_SEP,
+        (long)ubirthday, XLOG_SEP, (long)urealtime.finish_time, XLOG_SEP, (long)convert2UTC(ubirthday), XLOG_SEP, (long)convert2UTC(urealtime.finish_time));
+    unlock_thread_lock();
+    Sprintf(eos(buffer), "%cgender0=%s%calign0=%s", XLOG_SEP,
+        genders[flags.initgend].filecode, XLOG_SEP,
+        aligns[1 - u.ualignbase[A_ORIGINAL]].filecode);
+    Sprintf(eos(buffer), "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
+    Sprintf(eos(buffer), "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
+    Sprintf(eos(buffer), "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
+    Sprintf(eos(buffer), "%cscoring=%s", XLOG_SEP, discover || CasualMode || flags.non_scoring ? "no" : "yes");
+    Sprintf(eos(buffer), "%ccollapse=%lu", XLOG_SEP, n_game_recoveries);
+    Strcat(buffer, "\n");
+#undef XLOG_SEP
+}
+
 /* as tab is never used in eg. plname or death, no need to mangle those. */
 STATIC_OVL void
 writexlentry(rfile, tt, how)
@@ -455,48 +526,70 @@ struct toptenentry *tt;
 int how;
 {
 #define Fprintf (void) fprintf
-#define XLOG_SEP '\t' /* xlogfile field separator. */
-    char buf[BUFSZ], tmpbuf[DTHSZ + 1];
-
-    Sprintf(buf, "version=%d.%d.%d", tt->ver_major, tt->ver_minor,
-            tt->patchlevel);
-    Sprintf(eos(buf), "%cpoints=%ld%cdeathdnum=%d%cdeathlev=%d", XLOG_SEP,
-            tt->points, XLOG_SEP, tt->deathdnum, XLOG_SEP, tt->deathlev);
-    Sprintf(eos(buf), "%cmaxlvl=%d%chp=%d%cmaxhp=%d", XLOG_SEP, tt->maxlvl,
-            XLOG_SEP, tt->hp, XLOG_SEP, tt->maxhp);
-    Sprintf(eos(buf), "%cdeaths=%d%cdeathdate=%ld%cbirthdate=%ld%cuid=%d",
-            XLOG_SEP, tt->deaths, XLOG_SEP, tt->deathdate, XLOG_SEP,
-            tt->birthdate, XLOG_SEP, tt->uid);
+    char buf[BUFSZ * 8 + PL_NSIZ * 2 + DTHSZ + 1];
+    print_xlog_entry(buf, tt, how);
     Fprintf(rfile, "%s", buf);
-    Sprintf(buf, "%crole=%s%crace=%s%cgender=%s%calign=%s", XLOG_SEP,
-            tt->plrole, XLOG_SEP, tt->plrace, XLOG_SEP, tt->plgend, XLOG_SEP,
-            tt->plalign);
-    /* make a copy of death reason that doesn't include ", while helpless" */
-    formatkiller(tmpbuf, sizeof tmpbuf, how, FALSE);
-    Fprintf(rfile, "%s%cname=%s%cdeath=%s",
-            buf, /* (already includes separator) */
-            XLOG_SEP, plname, XLOG_SEP, tmpbuf);
-    if (multi)
-        Fprintf(rfile, "%cwhile=%s", XLOG_SEP,
-                multi_reason ? multi_reason : "helpless");
-    Fprintf(rfile, "%cconduct=0x%lx%cturns=%ld%cachieve=0x%lx", XLOG_SEP,
-            encodeconduct(), XLOG_SEP, moves, XLOG_SEP, encodeachieve());
-    Fprintf(rfile, "%cachieveX=%s", XLOG_SEP, encode_extended_achievements());
-    Fprintf(rfile, "%cconductX=%s", XLOG_SEP, encode_extended_conducts());
-    lock_thread_lock();
-    Fprintf(rfile, "%crealtime=%ld%cstarttime=%ld%cendtime=%ld", XLOG_SEP,
-            (long) urealtime.realtime, XLOG_SEP,
-            (long) ubirthday, XLOG_SEP, (long) urealtime.finish_time);
-    unlock_thread_lock();
-    Fprintf(rfile, "%cgender0=%s%calign0=%s", XLOG_SEP,
-            genders[flags.initgend].filecode, XLOG_SEP,
-            aligns[1 - u.ualignbase[A_ORIGINAL]].filecode);
-    Fprintf(rfile, "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
-    Fprintf(rfile, "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
-    Fprintf(rfile, "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
-    Fprintf(rfile, "%cscoring=%s", XLOG_SEP, discover || CasualMode || flags.non_scoring ? "no" : "yes");
-    Fprintf(rfile, "\n");
-#undef XLOG_SEP
+
+    if (issue_gui_command && ModeAllowsPostToForum && !flags.non_scoring) /* Modern mode is accepted, but should only happen upon ascension, escape, or quit */
+    {
+#if defined (DUMPLOG) || defined (DUMPHTML)
+        char dlbuf[BUFSZ * 4];
+        char* dlfilename = print_dumplog_filename_to_buffer(dlbuf);
+        if (dlfilename)
+        {
+            issue_gui_command(GUI_CMD_POST_XLOG_ENTRY, GAME_STATUS_RESULT_ATTACHMENT, GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT, dlfilename);
+        }
+#if defined(DUMPHTML)
+        dlfilename = print_dumphtml_filename_to_buffer(dlbuf);
+        if (dlfilename)
+        {
+            issue_gui_command(GUI_CMD_POST_XLOG_ENTRY, GAME_STATUS_RESULT_ATTACHMENT, GAME_STATUS_ATTACHMENT_DUMPLOG_HTML, dlfilename);
+        }
+#endif
+#endif
+        issue_gui_command(GUI_CMD_POST_XLOG_ENTRY, GAME_STATUS_RESULT, 0, buf);
+    }
+
+//#define XLOG_SEP '\t' /* xlogfile field separator. */
+//    Sprintf(buf, "version=%d.%d.%d", tt->ver_major, tt->ver_minor,
+//            tt->patchlevel);
+//    Sprintf(eos(buf), "%cpoints=%ld%cdeathdnum=%d%cdeathlev=%d", XLOG_SEP,
+//            tt->points, XLOG_SEP, tt->deathdnum, XLOG_SEP, tt->deathlev);
+//    Sprintf(eos(buf), "%cmaxlvl=%d%chp=%d%cmaxhp=%d", XLOG_SEP, tt->maxlvl,
+//            XLOG_SEP, tt->hp, XLOG_SEP, tt->maxhp);
+//    Sprintf(eos(buf), "%cdeaths=%d%cdeathdate=%ld%cbirthdate=%ld%cuid=%d",
+//            XLOG_SEP, tt->deaths, XLOG_SEP, tt->deathdate, XLOG_SEP,
+//            tt->birthdate, XLOG_SEP, tt->uid);
+//    Fprintf(rfile, "%s", buf);
+//    Sprintf(buf, "%crole=%s%crace=%s%cgender=%s%calign=%s", XLOG_SEP,
+//            tt->plrole, XLOG_SEP, tt->plrace, XLOG_SEP, tt->plgend, XLOG_SEP,
+//            tt->plalign);
+//    /* make a copy of death reason that doesn't include ", while helpless" */
+//    formatkiller(tmpbuf, sizeof tmpbuf, how, FALSE);
+//    Fprintf(rfile, "%s%cname=%s%cdeath=%s",
+//            buf, /* (already includes separator) */
+//            XLOG_SEP, plname, XLOG_SEP, tmpbuf);
+//    if (multi)
+//        Fprintf(rfile, "%cwhile=%s", XLOG_SEP,
+//                multi_reason ? multi_reason : "helpless");
+//    Fprintf(rfile, "%cconduct=0x%lx%cturns=%ld%cachieve=0x%lx", XLOG_SEP,
+//            encodeconduct(), XLOG_SEP, moves, XLOG_SEP, encodeachieve());
+//    Fprintf(rfile, "%cachieveX=%s", XLOG_SEP, encode_extended_achievements());
+//    Fprintf(rfile, "%cconductX=%s", XLOG_SEP, encode_extended_conducts());
+//    lock_thread_lock();
+//    Fprintf(rfile, "%crealtime=%ld%cstarttime=%ld%cendtime=%ld", XLOG_SEP,
+//            (long) urealtime.realtime, XLOG_SEP,
+//            (long) ubirthday, XLOG_SEP, (long) urealtime.finish_time);
+//    unlock_thread_lock();
+//    Fprintf(rfile, "%cgender0=%s%calign0=%s", XLOG_SEP,
+//            genders[flags.initgend].filecode, XLOG_SEP,
+//            aligns[1 - u.ualignbase[A_ORIGINAL]].filecode);
+//    Fprintf(rfile, "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
+//    Fprintf(rfile, "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
+//    Fprintf(rfile, "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
+//    Fprintf(rfile, "%cscoring=%s", XLOG_SEP, discover || CasualMode || flags.non_scoring ? "no" : "yes");
+//    Fprintf(rfile, "\n");
+//#undef XLOG_SEP
 }
 
 STATIC_OVL long
@@ -555,6 +648,7 @@ encode_extended_achievements()
     add_achieveX(buf, "obtained_the_sokoban_prize", u.uachieve.finish_sokoban);
     add_achieveX(buf, "defeated_medusa", u.uachieve.killed_medusa);
     add_achieveX(buf, "defeated_yacc", u.uachieve.killed_yacc);
+    add_achieveX(buf, "defeated_demogorgon", u.uachieve.killed_demogorgon);
     add_achieveX(buf, "obtained_the_prime_codex", u.uachieve.prime_codex);
     add_achieveX(buf, "consulted_the_oracle", u.uachieve.consulted_oracle);
     add_achieveX(buf, "read_a_discworld_novel", u.uachieve.read_discworld_novel);
@@ -699,7 +793,7 @@ time_t when;
     t0->uid = uid;
     copynchars(t0->plrole, urole.filecode, ROLESZ);
     copynchars(t0->plrace, urace.filecode, ROLESZ);
-    copynchars(t0->plgend, genders[flags.female].filecode, ROLESZ);
+    copynchars(t0->plgend, genders[Ufemale].filecode, ROLESZ);
     copynchars(t0->plalign, aligns[1 - u.ualign.type].filecode, ROLESZ);
     copynchars(t0->name, plname, NAMSZ);
     formatkiller(t0->death, sizeof t0->death, how, TRUE);
@@ -722,12 +816,16 @@ time_t when;
     }
 #endif /* LOGFILE */
 #ifdef XLOGFILE
-    if (lock_file(XLOGFILE, SCOREPREFIX, 10)) {
-        if (!(xlfile = fopen_datafile(XLOGFILE, "a", SCOREPREFIX))) {
+    if (lock_file(XLOGFILE, SCOREPREFIX, 10)) 
+    {
+        if (!(xlfile = fopen_datafile(XLOGFILE, "a", SCOREPREFIX))) 
+        {
             HUP raw_print("Cannot open extended log file!");
-        } else {
+        }
+        else 
+        {
             writexlentry(xlfile, t0, how);
-            (void) fclose(xlfile);
+            (void)fclose(xlfile);
         }
         unlock_file(XLOGFILE);
     }

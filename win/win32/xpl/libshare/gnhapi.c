@@ -116,9 +116,41 @@ void GetReplacementOffsets(int** reoff_ptr, int* size_ptr)
     *size_ptr = 0;
 #endif
 }
+
 int CountTotalTiles()
 {
     return process_tiledata(2, (const char*)0, (int*)0, (uchar*)0);
+}
+
+void LibSetArrays(int* gl2ti, int size_gl2ti, uchar* gltifl, int size_gltifl, short* ti2an, int size_ti2an)
+{
+#ifdef USE_TILES
+    int i;
+    if (gl2ti)
+    {
+        int arrsiz_gl2ti = min(size_gl2ti, (int)SIZE(glyph2tile));
+        for (i = 0; i < arrsiz_gl2ti; i++)
+        {
+            glyph2tile[i] = gl2ti[i];
+        }
+    }
+    if (gltifl)
+    {
+        int arrsiz_gltifl = min(size_gltifl, (int)SIZE(glyphtileflags));
+        for (i = 0; i < arrsiz_gltifl; i++)
+        {
+            glyphtileflags[i] = gltifl[i];
+        }
+    }
+    if (ti2an)
+    {
+        int arrsiz_ti2an = min(size_ti2an, (int)SIZE(tile2animation));
+        for (i = 0; i < arrsiz_ti2an; i++)
+        {
+            tile2animation[i] = ti2an[i];
+        }
+    }
+#endif
 }
 
 int LibGetUnexploredGlyph()
@@ -335,15 +367,20 @@ void
 LibSaveAndRestoreSavedGame(int save_style)
 {
     if (program_state.something_worth_saving 
-        && !program_state.gameover && !program_state.panicking 
+        && !program_state.gameover && !program_state.panicking && !program_state.in_tricked
         && !program_state.exiting && !program_state.freeing_dynamic_data
-        && !saving && !restoring && !reseting && !check_pointing)
+        && !saving && !restoring && !reseting && !check_pointing && !ignore_onsleep_autosave)
     {
         switch (save_style)
         {
-        case 1: /* Checkpoint only */
+        case 2: /* Checkpoint only and no wait */
 #ifdef INSURANCE
-            save_currentstate(); /* In the case save fails */
+            save_currentstate();
+#endif
+            break;
+        case 1: /* Checkpoint only and wait for resume */
+#ifdef INSURANCE
+            save_currentstate();
 #endif
             issue_parametered_gui_command(GUI_CMD_WAIT_FOR_RESUME, 0);
             break;
@@ -485,7 +522,7 @@ LibCheckCurrentFileDescriptor(const char* dir)
 void
 LibReportFileDescriptors()
 {
-    maybe_report_file_descriptors("Process Report Requested", 24);
+    maybe_report_file_descriptors("File Descriptor Report Requested", 24);
 }
 
 int
@@ -660,7 +697,8 @@ int RunGnollHack(
     ReportPlayerNameCallback callback_report_player_name,
     ReportPlayTimeCallback callback_report_play_time,
     SendObjectDataCallback callback_send_object_data,
-    SendMonsterDataCallback callback_send_monster_data
+    SendMonsterDataCallback callback_send_monster_data,
+    SendEngravingDataCallback callback_send_engraving_data
 )
 {
     char cmdbuf[BUFSZ] = "";
@@ -824,6 +862,7 @@ int RunGnollHack(
     lib_callbacks.callback_report_play_time = callback_report_play_time;
     lib_callbacks.callback_send_object_data = callback_send_object_data;
     lib_callbacks.callback_send_monster_data = callback_send_monster_data;
+    lib_callbacks.callback_send_engraving_data = callback_send_engraving_data;
 
     windowprocs.win_raw_print = libdef_raw_print;
     windowprocs.win_raw_print_bold = libdef_raw_print_bold;

@@ -18,11 +18,14 @@ using System.Net.Http;
 using Newtonsoft.Json;
 using System.Net.Http.Headers;
 using System.Collections;
+using System.Data;
+using System.Xml.Linq;
 
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
 using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
+using Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific;
 using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
 
@@ -32,8 +35,9 @@ using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
 using Xamarin.Essentials;
 using GnollHackX.Controls;
-using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.PlatformConfiguration;
+using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
+using Xamarin.Forms.PlatformConfiguration.AndroidSpecific;
 using SkiaSharp.Views.Forms;
 using static Xamarin.Essentials.Permissions;
 
@@ -76,6 +80,11 @@ namespace GnollHackX.Pages.Game
         private readonly object _mapDataLock = new object();
         private int _mapCursorX;
         private int _mapCursorY;
+
+        private readonly object _darkenedBitmapLock = new object();
+        private ConcurrentDictionary<SavedDarkenedBitmap, SKBitmap> _darkenedBitmaps = new ConcurrentDictionary<SavedDarkenedBitmap, SKBitmap>();
+        private readonly object _darkenedAutoDrawBitmapLock = new object();
+        private ConcurrentDictionary<SavedDarkenedAutodrawBitmap, SKBitmap> _darkenedAutodrawBitmaps = new ConcurrentDictionary<SavedDarkenedAutodrawBitmap, SKBitmap>();
 
         private readonly object _uLock = new object();
         private int _ux = 0;
@@ -391,7 +400,25 @@ namespace GnollHackX.Pages.Game
 
         private readonly object _forceAllMessagesLock = new object();
         private bool _forceAllMessages = false;
-        public bool ForceAllMessages { get { lock (_forceAllMessagesLock) { return _forceAllMessages; } } set { lock (_forceAllMessagesLock) { _forceAllMessages = value; } } }
+        public bool ForceAllMessages 
+        { 
+            get { lock (_forceAllMessagesLock) { return _forceAllMessages; } } 
+            set 
+            { 
+                lock (_forceAllMessagesLock) 
+                { 
+                    _forceAllMessages = value; 
+                }
+                MessageFilterFrame.IsVisible = LongerMessageHistory && value;
+                if (MessageFilterEntry.Text != "")
+                {
+                    MessageFilterEntry.Text = "";
+                    UpdateMessageFilter();
+                }
+                else
+                    RefreshMsgHistoryRowCounts = true;
+            }
+        }
 
         public bool HasAllMessagesTransparentBackground { get; set; } = true;
 
@@ -401,7 +428,29 @@ namespace GnollHackX.Pages.Game
 
         private readonly object _lighterDarkeningLock = new object();
         private bool _lighterDarkening = false;
-        public bool LighterDarkening { get { lock (_lighterDarkeningLock) { return _lighterDarkening; } } set { lock (_lighterDarkeningLock) { _lighterDarkening = value; } } }
+        public bool LighterDarkening 
+        { 
+            get { lock (_lighterDarkeningLock) { return _lighterDarkening; } } 
+            set 
+            { 
+                lock (_lighterDarkeningLock) 
+                { 
+                    _lighterDarkening = value; 
+                }
+                lock (_darkenedBitmapLock)
+                {
+                    foreach (SKBitmap bmp in _darkenedBitmaps.Values)
+                        bmp.Dispose();
+                    _darkenedBitmaps.Clear();
+                }
+                lock (_darkenedAutoDrawBitmapLock)
+                {
+                    foreach (SKBitmap bmp in _darkenedAutodrawBitmaps.Values)
+                        bmp.Dispose();
+                    _darkenedAutodrawBitmaps.Clear();
+                }
+            }
+        }
 
         private readonly object _drawWallEndsLock = new object();
         private bool _drawWallEnds = false;
@@ -411,10 +460,39 @@ namespace GnollHackX.Pages.Game
         private bool _breatheAnimations = false;
         public bool BreatheAnimations { get { lock (_breatheAnimationLock) { return _breatheAnimations; } } set { lock (_breatheAnimationLock) { _breatheAnimations = value; } } }
 
-        private readonly object _showPut2BagContextCommandLock = new object();
-        private bool _showPut2BagContextCommand = false;
-        public bool ShowPut2BagContextCommand { get { lock (_showPut2BagContextCommandLock) { return _showPut2BagContextCommand; } } set { lock (_showPut2BagContextCommandLock) { _showPut2BagContextCommand = value; } } }
-        
+        private readonly object _longerMessageHistoryLock = new object();
+        bool _longerMessageHistory = false;
+        public bool LongerMessageHistory
+        {
+            get
+            {
+                lock (_longerMessageHistoryLock) { return _longerMessageHistory; };
+            }
+            set
+            {
+                lock(_longerMessageHistoryLock) 
+                {
+                    _longerMessageHistory = value; 
+                }
+                MessageFilterFrame.IsVisible = value && ForceAllMessages;
+                if (MessageFilterEntry.Text != "")
+                {
+                    MessageFilterEntry.Text = "";
+                    UpdateMessageFilter();
+                }
+                else
+                    RefreshMsgHistoryRowCounts = true;
+                if (_currentGame != null)
+                {
+                    ConcurrentQueue<GHResponse> queue;
+                    if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                    {
+                        queue.Enqueue(new GHResponse(_currentGame, GHRequestType.UseLongerMessageHistory, value));
+                    }
+                }
+            }
+        }
+
         private readonly object _accurateLayerDrawingLock = new object();
         private bool _accurateLayerDrawing = false;
         public bool AlternativeLayerDrawing { get { lock (_accurateLayerDrawingLock) { return _accurateLayerDrawing; } } set { lock (_accurateLayerDrawingLock) { _accurateLayerDrawing = value; } } }
@@ -445,7 +523,7 @@ namespace GnollHackX.Pages.Game
 
         private int _shownMessageRows = GHConstants.DefaultMessageRows;
         public int NumDisplayedMessages { get { return _shownMessageRows; } set { _shownMessageRows = value; } }
-        public int ActualDisplayedMessages { get { return ForceAllMessages ? GHConstants.AllMessageRows : NumDisplayedMessages; } }
+        public int ActualDisplayedMessages { get { return ForceAllMessages ? (LongerMessageHistory ? GHConstants.MaxLongerMessageHistoryLength : GHConstants.AllMessageRows) : NumDisplayedMessages; } }
 
         private int _shownPetRows = GHConstants.DefaultPetRows;
         public int NumDisplayedPetRows { get { return _shownPetRows; } set { _shownPetRows = value; } }
@@ -502,9 +580,18 @@ namespace GnollHackX.Pages.Game
         }
         public StackLayout UsedButtonRowStack { get { return UseSimpleCmdLayout ? SimpleButtonRowStack : ButtonRowStack; } }
 
-        public bool ShowBattery { get; set; }
+        private readonly object _showBatteryLock = new object();
+        private bool _showBattery;
+        public bool ShowBattery { get { lock (_showBatteryLock) { return _showBattery; } } set { lock (_showBatteryLock) { _showBattery = value; } } }
 
-        public bool ShowFPS { get; set; }
+        private readonly object _showFPSLock = new object();
+        private bool _showFPS;
+        public bool ShowFPS { get { lock (_showFPSLock) { return _showFPS; } } set { lock (_showFPSLock) { _showFPS = value; } } }
+
+        private readonly object _showRecordingLock = new object();
+        private bool _showRecording = true;
+        public bool ShowRecording { get { lock (_showRecordingLock) { return _showRecording; } } set { lock (_showRecordingLock) { _showRecording = value; } } }
+
         private double _fps;
         private long _counterValueDiff;
         private long _previousMainFPSCounterValue = 0L;
@@ -575,6 +662,11 @@ namespace GnollHackX.Pages.Game
         public SKRect SkillRect { get { lock (_skillRectLock) { return _skillRect; } } set { lock (_skillRectLock) { _skillRect = value; } } }
         private bool _skillRectDrawn = false;
 
+        private readonly object _prevWepRectLock = new object();
+        private SKRect _prevWepRect = new SKRect();
+        public SKRect PrevWepRect { get { lock (_prevWepRectLock) { return _prevWepRect; } } set { lock (_prevWepRectLock) { _prevWepRect = value; } } }
+        private bool _prevWepRectDrawn = false;
+
         private readonly object _healthRectLock = new object();
         private SKRect _healthRect = new SKRect();
         public SKRect HealthRect { get { lock (_healthRectLock) { return _healthRect; } } set { lock (_healthRectLock) { _healthRect = value; } } }
@@ -593,7 +685,11 @@ namespace GnollHackX.Pages.Game
         private readonly object _youRectLock = new object();
         private SKRect _youRect = new SKRect();
         public SKRect YouRect { get { lock (_youRectLock) { return _youRect; } } set { lock (_youRectLock) { _youRect = value; } } }
+
+        private readonly object _youRectDrawnLock = new object();
+
         private bool _youRectDrawn = false;
+        public bool YouRectDrawn { get { lock (_youRectDrawnLock) { return _youRectDrawn; } } set { lock (_youRectDrawnLock) { _youRectDrawn = value; } } }
 
         public readonly object TargetClipLock = new object();
         public float _originMapOffsetWithNewClipX;
@@ -611,14 +707,6 @@ namespace GnollHackX.Pages.Game
         private readonly object _mapNoClipModeLock = new object();
         private bool _mapNoClipMode = false;
         public bool MapNoClipMode { get { lock (_mapNoClipModeLock) { return _mapNoClipMode; } } set { lock (_mapNoClipModeLock) { _mapNoClipMode = value; } } }
-
-        //private object _mapAlternateNoClipModeLock = new object();
-        //private bool _mapAlternateNoClipMode = false;
-        //public bool MapAlternateNoClipMode { get { lock (_mapAlternateNoClipModeLock) { return _mapAlternateNoClipMode; } } set { lock (_mapAlternateNoClipModeLock) { _mapAlternateNoClipMode = value; } } }
-
-        //private object _zoomChangeCenterModeLock = new object();
-        //private bool _zoomChangeCenterMode = false;
-        //public bool ZoomChangeCenterMode { get { lock (_zoomChangeCenterModeLock) { return _zoomChangeCenterMode; } } set { lock (_zoomChangeCenterModeLock) { _zoomChangeCenterMode = value; } } }
 
         private readonly object _mapLookModeLock = new object();
         private bool _mapLookMode = false;
@@ -703,6 +791,7 @@ namespace GnollHackX.Pages.Game
             MapRefreshRate = (MapRefreshRateStyle)Preferences.Get("MapRefreshRate", (int)UIUtils.GetDefaultMapFPS());
             ShowFPS = Preferences.Get("ShowFPS", false);
             ShowBattery = Preferences.Get("ShowBattery", false);
+            ShowRecording = Preferences.Get("ShowRecording", true);
             UseMainGLCanvas = Preferences.Get("UseMainGLCanvas", GHApp.IsGPUDefault);
             UseSimpleCmdLayout = Preferences.Get("UseSimpleCmdLayout", true);
             ShowMemoryUsage = Preferences.Get("ShowMemoryUsage", false);
@@ -719,8 +808,8 @@ namespace GnollHackX.Pages.Game
             LighterDarkening = Preferences.Get("LighterDarkening", GHConstants.DefaultLighterDarkening);
             DrawWallEnds = Preferences.Get("DrawWallEnds", GHConstants.DefaultDrawWallEnds);
             BreatheAnimations = Preferences.Get("BreatheAnimations", GHConstants.DefaultBreatheAnimations);
-            ShowPut2BagContextCommand = Preferences.Get("ShowPut2BagContextCommand", GHConstants.DefaultShowPickNStashContextCommand);
             AlternativeLayerDrawing = Preferences.Get("AlternativeLayerDrawing", GHConstants.DefaultAlternativeLayerDrawing);
+            _longerMessageHistory = GHApp.SavedLongerMessageHistory; /* Cannot send response command yet, hence using private variable */
 
             float deffontsize = GetDefaultMapFontSize();
             MapFontSize = Preferences.Get("MapFontSize", deffontsize);
@@ -732,8 +821,6 @@ namespace GnollHackX.Pages.Game
                 _mapMiniOffsetY = Preferences.Get("MapMiniOffsetY", 0.0f);
             }
             MapNoClipMode = Preferences.Get("DefaultMapNoClipMode", GHConstants.DefaultMapNoClipMode);
-            //MapAlternateNoClipMode = Preferences.Get("MapAlternateNoClipMode", GHConstants.DefaultMapAlternateNoClipMode);
-            //ZoomChangeCenterMode = Preferences.Get("ZoomChangeCenterMode", GHConstants.DefaultZoomChangeCenterMode);
 
             for (int i = 0; i < 6; i++)
             {
@@ -774,8 +861,24 @@ namespace GnollHackX.Pages.Game
             return GHConstants.MapFontDefaultSize * (density * c_numerator) / c_denominator;
         }
 
-        public async void StartGame()
+        public async void StartNewGame()
         {
+            await StartGame(null, -1);
+        }
+
+        public async void StartReplay(string replayFileName, int fromTurn)
+        {
+            await StartGame(replayFileName, fromTurn);
+        }
+
+        private readonly object _replayLock = new object();
+        private string _replayFileName = null;
+        public string ReplayFileName { get { lock (_replayLock) { return _replayFileName; } } set { lock (_replayLock) { _replayFileName = value; } } }
+        public bool PlayingReplay { get { lock (_replayLock) { return _replayFileName != null; } } }
+
+        public async Task StartGame(string replayFileName, int fromTurn)
+        {
+            ReplayFileName = replayFileName;
             _mainPage.GameStarted = true;
             LoadingProgressBar.Progress = 0.0;
 
@@ -829,6 +932,16 @@ namespace GnollHackX.Pages.Game
                     {
                         GHApp._skillBitmap = SKBitmap.Decode(stream);
                         GHApp._skillBitmap.SetImmutable();
+                    }
+                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.UI.wield.png"))
+                    {
+                        GHApp._prevWepBitmap = SKBitmap.Decode(stream);
+                        GHApp._prevWepBitmap.SetImmutable();
+                    }
+                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.UI.unwield.png"))
+                    {
+                        GHApp._prevUnwieldBitmap = SKBitmap.Decode(stream);
+                        GHApp._prevUnwieldBitmap.SetImmutable();
                     }
 
                     GHApp.InitializeArrowButtons(assembly);
@@ -901,7 +1014,45 @@ namespace GnollHackX.Pages.Game
 
             await LoadingProgressBar.ProgressTo(0.95, 50, Easing.Linear);
 
-            Thread t = new Thread(new ThreadStart(GNHThreadProc));
+            if (PlayingReplay)
+            {
+                //MainGrid.IsEnabled = false;
+                lWornItemsButton.IsEnabled = false;
+                lAbilitiesButton.IsEnabled = false;
+                ContextLayout.IsEnabled = false;
+
+                GameMenuButton.IsEnabled = false;
+                ESCButton.IsEnabled = false;
+                LookModeButton.IsEnabled = false;
+                ToggleTravelModeButton.IsEnabled = false;
+                ButtonRowStack.IsEnabled = false;
+
+                SimpleGameMenuButton.IsEnabled = false;
+                SimpleESCButton.IsEnabled = false;
+                SimpleLookModeButton.IsEnabled = false;
+                SimpleButtonRowStack.IsEnabled = false;
+
+                MenuGrid.IsEnabled = false;
+                TextGrid.IsEnabled = false;
+                GetLineGrid.IsEnabled = false;
+                YnGrid.IsEnabled = false;
+                PopupGrid.IsEnabled = false;
+                MoreCommandsGrid.IsEnabled = false;
+                TipView.IsEnabled = false;
+                ReplayRealTimeLabel.Text = "";
+                ReplayHeaderLabel.Text = "";
+                GHApp.ResetReplay();
+                GHApp.GoToTurn = fromTurn;
+                UpdateReplaySpeedButtons();
+                UpdateReplayPauseButton();
+                ReplayGrid.IsVisible = true;
+            }
+
+            Thread t;
+            if(PlayingReplay)
+                t = new Thread(new ThreadStart(GNHThreadProcForReplay));
+            else
+                t = new Thread(new ThreadStart(GNHThreadProc));
             _gnhthread = t;
             _gnhthread.Start();
 
@@ -934,6 +1085,7 @@ namespace GnollHackX.Pages.Game
 
             IsGameOn = true;
 
+            /* Polling timer */
             Device.StartTimer(TimeSpan.FromSeconds(1.0 / GHConstants.PollingFrequency), () =>
             {
                 if(!StartingPositionsSet && !canvasView.CanvasSize.IsEmpty && IsSizeAllocatedProcessed && lAbilitiesButton.Width > 0)
@@ -951,6 +1103,7 @@ namespace GnollHackX.Pages.Game
                 return IsGameOn;
             });
 
+            /* Cursor and FPS update timer */
             Device.StartTimer(TimeSpan.FromSeconds(0.5), () =>
             {
                 _cursorIsOn = !_cursorIsOn;
@@ -1001,6 +1154,16 @@ namespace GnollHackX.Pages.Game
                     if (_stopWatch.IsRunning)
                         _stopWatch.Stop();
                 }
+                if(PlayingReplay)
+                {
+                    string realTime = GHApp.ReplayRealTime;
+                    if (string.IsNullOrEmpty(realTime))
+                        ReplayRealTimeLabel.Text = "";
+                    else if (realTime != ReplayRealTimeLabel.Text)
+                        ReplayRealTimeLabel.Text = realTime;
+
+                    UpdateReplayHeaderLabel();
+                }
                 return IsGameOn;
             });
 
@@ -1020,6 +1183,22 @@ namespace GnollHackX.Pages.Game
             await Task.Delay(50);
 
             Thread t = new Thread(new ThreadStart(GNHThreadProcForRestart));
+            _gnhthread = t;
+            _gnhthread.Start();
+        }
+
+        public async void RestartReplay()
+        {
+            _currentGame = null;
+            GHApp.CurrentGHGame = null;
+            _gnhthread = null;
+
+            /* Collect garbage at this point */
+            await Task.Delay(50);
+            GHApp.CollectGarbage();
+            await Task.Delay(50);
+
+            Thread t = new Thread(new ThreadStart(GNHThreadProcForReplay));
             _gnhthread = t;
             _gnhthread.Start();
         }
@@ -1354,27 +1533,48 @@ namespace GnollHackX.Pages.Game
         {
             long counter_increment = 1;
             int subCounterMax = 0;
+            double framespeed = 1.0;
             switch (MapRefreshRate)
             {
                 case MapRefreshRateStyle.MapFPS20:
-                    counter_increment = 2; /* Animations skip at every other frame at 20fps to get 40fps */
+                    framespeed = 2.0; /* Animations skip at every other frame at 20fps to get 40fps */
                     break;
                 case MapRefreshRateStyle.MapFPS30:
                     break;
                 case MapRefreshRateStyle.MapFPS40:
                     break;
                 case MapRefreshRateStyle.MapFPS60:
-                    subCounterMax = 1; /* Animations proceed at every other frame at 60fps to get 30fps */
+                    framespeed = 0.5;
+                    //subCounterMax = 1; /* Animations proceed at every other frame at 60fps to get 30fps */
                     break;
                 case MapRefreshRateStyle.MapFPS80:
-                    subCounterMax = 1; /* Animations proceed at every other frame at 80fps to get 40fps */
+                    framespeed = 0.5;
+                    //subCounterMax = 1; /* Animations proceed at every other frame at 80fps to get 40fps */
                     break;
                 case MapRefreshRateStyle.MapFPS90:
-                    subCounterMax = 2; /* Animations proceed at every third frame at 90fps to get 30fps */
+                    framespeed = 1.0 / 3.0;
+                    //subCounterMax = 2; /* Animations proceed at every third frame at 90fps to get 30fps */
                     break;
                 case MapRefreshRateStyle.MapFPS120:
-                    subCounterMax = 2; /* Animations proceed at every third frame at 120fps to get 40fps */
+                    framespeed = 1.0 / 3.0;
+                    //subCounterMax = 2; /* Animations proceed at every third frame at 120fps to get 40fps */
                     break;
+            }
+            if(PlayingReplay)
+            {
+                double rpspeed = GHApp.ReplaySpeed;
+                framespeed = framespeed * rpspeed;
+            }
+            if(framespeed >= 1)
+            {
+                counter_increment = (long)Math.Round(framespeed);
+                subCounterMax = 0;
+            }
+            else if(framespeed > 0)
+            {
+                double inverse = 1.0 / framespeed;
+                counter_increment = 1L;
+                subCounterMax = Math.Max(1, (int)Math.Round(inverse) - 1);
             }
             if(subCounterMax > 0)
             {
@@ -1548,9 +1748,12 @@ namespace GnollHackX.Pages.Game
             int DigCmd = GHUtils.Ctrl('g');
             int SitCmd = GHUtils.Ctrl('s');
             int RideCmd = GHUtils.Meta('R');
-            int PickToBagCmd = ';';
-            if (cmddefchar == PickToBagCmd && !ShowPut2BagContextCommand)
-                return; /* Do not add */
+            //int PrevWepCmd = GHUtils.Meta(16);
+            //int PickNStashCmd = ';';
+            //if (cmddefchar == PickNStashCmd && !ShowPut2BagContextCommand)
+            //    return; /* Do not add */
+            //if (cmddefchar == PrevWepCmd && !ShowPrevWepContextCommand)
+            //    return; /* Do not add */
 
             _contextMenuData.Add(data);
 
@@ -1682,6 +1885,9 @@ namespace GnollHackX.Pages.Game
                     else
                         icon_string = GHApp.AppResourceName + ".Assets.UI.chat.png";
                     break;
+                case ';':
+                    icon_string = GHApp.AppResourceName + ".Assets.UI.picktobag.png";
+                    break;
                 default:
                     if (cmddefchar == LastPickedCmd)
                         icon_string = GHApp.AppResourceName + ".Assets.UI.lastitem.png";
@@ -1697,8 +1903,10 @@ namespace GnollHackX.Pages.Game
                         icon_string = GHApp.AppResourceName + ".Assets.UI.sit.png";
                     else if (cmddefchar == RideCmd)
                         icon_string = GHApp.AppResourceName + ".Assets.UI.ride.png";
-                    else if (cmddefchar == PickToBagCmd)
-                        icon_string = GHApp.AppResourceName + ".Assets.UI.picktobag.png";
+                    //else if (cmddefchar == PickNStashCmd)
+                    //    icon_string = GHApp.AppResourceName + ".Assets.UI.picktobag.png";
+                    //else if (cmddefchar == PrevWepCmd)
+                    //    icon_string = GHApp.AppResourceName + ".Assets.UI.wield.png";
                     else
                         icon_string = GHApp.AppResourceName + ".Assets.UI.missing_icon.png";
                     break;
@@ -2014,6 +2222,14 @@ namespace GnollHackX.Pages.Game
             _gnollHackService.StartGnollHack(_currentGame);
         }
 
+        protected void GNHThreadProcForReplay()
+        {
+            _currentGame = new GHGame(this);
+            _currentGame.StartFlags = RunGnollHackFlags.PlayingReplay;
+            GHApp.CurrentGHGame = _currentGame;
+            GHApp.PlayReplay(_currentGame, ReplayFileName);
+        }
+
         private void pollRequestQueue()
         {
             if (_currentGame != null)
@@ -2048,10 +2264,19 @@ namespace GnollHackX.Pages.Game
                                 GetChar();
                                 break;
                             case GHRequestType.AskName:
-                                AskName(req.RequestString, req.RequestString2);
+                                AskName(req.RequestString, req.RequestString2, req.RequestString3);
+                                break;
+                            case GHRequestType.HideAskNamePage:
+                                HideAskNamePage();
                                 break;
                             case GHRequestType.GetLine:
                                 GetLine(req.RequestString, req.PlaceHolderString, req.DefValueString, req.IntroLineString, req.RequestInt, req.RequestAttr, req.RequestNhColor);
+                                break;
+                            case GHRequestType.HideGetLine:
+                                HideGetLine();
+                                break;
+                            case GHRequestType.EnterGetLineText:
+                                EnterGetLineText(req.RequestString);
                                 break;
                             case GHRequestType.ReturnToMainMenu:
                                 IsGameOn = false;
@@ -2073,6 +2298,9 @@ namespace GnollHackX.Pages.Game
                             case GHRequestType.RestartGame:
                                 RestartGame();
                                 break;
+                            case GHRequestType.RestartReplay:
+                                RestartReplay();
+                                break;
                             case GHRequestType.ShowMenuPage:
                                 ShowMenuCanvas(req.RequestMenuInfo != null ? req.RequestMenuInfo : new GHMenuInfo(ghmenu_styles.GHMENU_STYLE_GENERAL), req.RequestingGHWindow);
                                 break;
@@ -2081,6 +2309,9 @@ namespace GnollHackX.Pages.Game
                                 break;
                             case GHRequestType.ShowOutRipPage:
                                 ShowOutRipPage(req.RequestOutRipInfo != null ? req.RequestOutRipInfo : new GHOutRipInfo("", 0, "", ""), req.RequestingGHWindow);
+                                break;
+                            case GHRequestType.HideOutRipPage:
+                                HideOutRipPage();
                                 break;
                             case GHRequestType.CreateWindowView:
                                 CreateWindowView(req.RequestInt);
@@ -2093,6 +2324,9 @@ namespace GnollHackX.Pages.Game
                                 break;
                             case GHRequestType.DisplayWindowView:
                                 DisplayWindowView(req.RequestInt, req.RequestPutStrItems);
+                                break;
+                            case GHRequestType.HideTextWindow:
+                                DelayedTextHide();
                                 break;
                             case GHRequestType.HideLoadingScreen:
                                 HideLoadingScreen();
@@ -2170,8 +2404,16 @@ namespace GnollHackX.Pages.Game
                                     ToggleTravelModeButton_Clicked(ToggleTravelModeButton, new EventArgs());
                                 break;
                             case GHRequestType.PostDiagnosticData:
+                                _mainPage.EnqueuePost(new GHPost(0, req.RequestType == GHRequestType.PostGameStatus, req.RequestInt, req.RequestInt2, req.RequestString, null, false));
+                                break;
                             case GHRequestType.PostGameStatus:
-                                PostToForum(req.RequestType == GHRequestType.PostGameStatus, req.RequestInt, req.RequestInt2, req.RequestString);
+                                _mainPage.EnqueuePost(new GHPost(0, req.RequestType == GHRequestType.PostGameStatus, req.RequestInt, req.RequestInt2, req.RequestString, null, false));
+                                break;
+                            case GHRequestType.PostXlogEntry:
+                                _mainPage.EnqueuePost(new GHPost(1, true, req.RequestInt, req.RequestInt2, req.RequestString, null, false));
+                                break;
+                            case GHRequestType.PostBonesFile:
+                                _mainPage.EnqueuePost(new GHPost(2, true, req.RequestInt, req.RequestInt2, req.RequestString, null, false));
                                 break;
                             case GHRequestType.DebugLog:
                                 DisplayDebugLog(req.RequestString, req.RequestInt, req.RequestInt2);
@@ -2179,10 +2421,24 @@ namespace GnollHackX.Pages.Game
                             case GHRequestType.CloseAllDialogs:
                                 CloseAllDialogs();
                                 break;
+                            case GHRequestType.UseLongerMessageHistory:
+                                LongerMessageHistory = req.RequestBool;
+                                GHApp.SavedLongerMessageHistory = req.RequestBool;
+                                break;
+                            case GHRequestType.InformRecordingWentOff:
+                                GHApp.RecordGame = false;
+                                Preferences.Set("RecordGame", false);
+                                InformRecordingWentOff();
+                                break;
                         }
                     }
                 }
             }
+        }
+
+        private async void InformRecordingWentOff()
+        {
+            await DisplayAlert("Recording Switched Off", "Game recording has been switched off due to critically low disk space.", "OK");
         }
 
         private void CloseAllDialogs()
@@ -2200,6 +2456,7 @@ namespace GnollHackX.Pages.Game
             PopupGrid.IsVisible = false;
             TextWindowGlyphImage.StopAnimation();
             YnGrid.IsVisible = false;
+            HideDirections();
 
             if (!LoadingGrid.IsVisible && (!MainGrid.IsVisible || !canvasView.AnimationIsRunning("GeneralAnimationCounter")))
             {
@@ -2241,254 +2498,6 @@ namespace GnollHackX.Pages.Game
                         break;
                 }
             }
-        }
-
-        private List<ForumPostAttachment> _forumPostAttachments = new List<ForumPostAttachment>();
-
-        private async void PostToForum(bool is_game_status, int status_type, int status_datatype, string status_string)
-        {
-            if(!is_game_status && 
-                (status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT 
-                 || status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_ATTACHMENT))
-            {
-                /* Bypass send checks */
-            }
-            else if (!is_game_status && !GHApp.PostingDiagnosticData && status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_CRITICAL )
-            {
-                /* Critical information -- Ask the player */
-                bool sendok = await DisplayAlert("Critical Diagnostic Data", "GnollHack would like to send critical diagnostic data to the development team. Allow?", "Yes", "No");
-                if (!sendok)
-                {
-                    goto cleanup;
-                }
-            }
-            else
-            {
-                if (is_game_status ? !GHApp.PostingGameStatus : !GHApp.PostingDiagnosticData)
-                    return;
-            }
-
-            if (is_game_status && status_string != null && status_string != "" && status_type == (int)game_status_types.GAME_STATUS_RESULT_ATTACHMENT)
-            {
-                switch(status_datatype)
-                {
-                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_GENERIC:
-                        _forumPostAttachments.Add(new ForumPostAttachment(status_string, "application/zip", "game data", !is_game_status, status_type, false));
-                        break;
-                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT:
-                        _forumPostAttachments.Add(new ForumPostAttachment(status_string, "text/plain", "dumplog", !is_game_status, status_type, false));
-                        break;
-                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_HTML:
-                        _forumPostAttachments.Add(new ForumPostAttachment(status_string, "text/html", "HTML dumplog", !is_game_status, status_type, false));
-                        break;
-                }
-                return;
-            }
-            else if(!is_game_status && status_string != null && status_string != "" && status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_ATTACHMENT)
-            {
-                switch (status_datatype)
-                {
-                    case (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_GENERIC:
-                        _forumPostAttachments.Add(new ForumPostAttachment(status_string, "application/zip", "diagnostic data", !is_game_status, status_type, false));
-                        break;
-                    case (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST:
-                        _forumPostAttachments.Add(new ForumPostAttachment(status_string, "text/plain", "file descriptor list", !is_game_status, status_type, true));
-                        break;
-                }
-                return;
-            }
-            else if (!is_game_status && status_string != null && status_string != "" && status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT)
-            {
-                if (status_datatype == (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST)
-                    status_string = status_string.Replace(" | ", Environment.NewLine);
-
-                string tempdirpath = Path.Combine(GHApp.GHPath, "temp");
-                if (!Directory.Exists(tempdirpath))
-                   GHApp.CheckCreateDirectory(tempdirpath);
-                int number = 0;
-                string temp_string;
-                do
-                {
-                    temp_string = Path.Combine(tempdirpath, "tmp_attachment_" + number + ".txt");
-                    number++;
-                } while (File.Exists(temp_string));
-
-                GHApp.GnollHackService.Chmod(tempdirpath, (uint)ChmodPermissions.S_IALL);
-                try
-                {
-                    using (FileStream fs = new FileStream(temp_string, FileMode.Create))
-                    {
-                        using (StreamWriter sw = new StreamWriter(fs))
-                        {
-                            sw.Write(status_string);
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine(e.Message);
-                }
-                _forumPostAttachments.Add(new ForumPostAttachment(temp_string, "text/plain", "diagnostic data", !is_game_status, status_type, true));
-                return;
-            }
-
-            string message = "";
-            if (status_string != null)
-                message = status_string;
-            if (message == "")
-                return;
-
-            if (!is_game_status)
-            {
-                string ver = GHApp.GHVersionString + " / " + VersionTracking.CurrentVersion + " / " + VersionTracking.CurrentBuild;
-                string manufacturer = DeviceInfo.Manufacturer;
-                if (manufacturer.Length > 0)
-                    manufacturer = manufacturer.Substring(0, 1).ToUpper() + manufacturer.Substring(1);
-                string device_model = manufacturer + " " + DeviceInfo.Model;
-                string platform = DeviceInfo.Platform + " " + DeviceInfo.VersionString;
-
-                ulong TotalMemInBytes = GHApp.PlatformService.GetDeviceMemoryInBytes();
-                ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
-                ulong FreeDiskSpaceInBytes = GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes();
-                ulong FreeDiskSpaceInGB = ((FreeDiskSpaceInBytes / 1024) / 1024) / 1024;
-                ulong TotalDiskSpaceInBytes = GHApp.PlatformService.GetDeviceTotalDiskSpaceInBytes();
-                ulong TotalDiskSpaceInGB = ((TotalDiskSpaceInBytes / 1024) / 1024) / 1024;
-
-                string totmem = TotalMemInMB + " MB";
-                string diskspace = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
-
-                string player_name = Preferences.Get("LastUsedPlayerName", "Unknown Player");
-                string info = ver + ", " + platform + ", " + device_model + ", " + totmem + ", " + diskspace;
-
-                switch(status_type)
-                {
-                    case (int)diagnostic_data_types.DIAGNOSTIC_DATA_PANIC:
-                        message = player_name + " - Panic: " + message + " [" + info + "]";
-                        break;
-                    case (int)diagnostic_data_types.DIAGNOSTIC_DATA_IMPOSSIBLE:
-                        message = player_name + " - Impossible: " + message + " [" + info + "]";
-                        break;
-                    case (int)diagnostic_data_types.DIAGNOSTIC_DATA_CRITICAL:
-                        message = player_name + " - Critical:\n" + message + "\n[" + info + "]";
-                        break;
-                    default:
-                        message = player_name + " - Diagnostics: " + message + " [" + info + "]";
-                        break;
-                }
-            }
-            else
-            {
-                string portver = VersionTracking.CurrentVersion;
-                DevicePlatform platform = DeviceInfo.Platform;
-                string platstr = platform != null ? platform.ToString() : "";
-                if (platstr == null)
-                    platstr = "";
-                string platid;
-                if (platstr.Length > 0)
-                    platid = platstr.Substring(0, 1).ToLower();
-                else
-                    platid = "";
-
-                switch (status_type)
-                {
-                    default:
-                        message = message + " [" + portver + platid + "]";
-                        break;
-                }
-            }
-
-            try
-            {
-                string postaddress = is_game_status ? GHApp.GetGameStatusPostAddress() : GHApp.GetDiagnosticDataPostAddress();
-                if (postaddress != null && postaddress.Length > 8 && postaddress.Substring(0, 8) == "https://" && Uri.IsWellFormedUriString(postaddress, UriKind.Absolute))
-                {
-                    using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
-                    {
-                        HttpContent content = null;
-                        if (_forumPostAttachments.Count > 0)
-                        {
-                            DiscordWebHookPostWithAttachment post = new DiscordWebHookPostWithAttachment(message);
-                            foreach (ForumPostAttachment attachment in _forumPostAttachments)
-                            {
-                                FileInfo fileinfo = new FileInfo(attachment.FullPath);
-                                string filename = fileinfo.Name;
-                                if (File.Exists(attachment.FullPath))
-                                    post.AddAttachment(attachment.Description, filename);
-                            }
-                            string json = JsonConvert.SerializeObject(post);
-                            MultipartFormDataContent multicontent = new MultipartFormDataContent("--boundary");
-                            StringContent content1 = new StringContent(json, Encoding.UTF8, "application/json");
-                            ContentDispositionHeaderValue cdhv = new ContentDispositionHeaderValue("form-data");
-                            cdhv.Name = "payload_json";
-                            content1.Headers.ContentDisposition = cdhv;
-                            multicontent.Add(content1);
-                            int aidx = 0;
-                            foreach (ForumPostAttachment attachment in _forumPostAttachments)
-                            {
-                                bool fileexists = File.Exists(attachment.FullPath);
-                                if (fileexists)
-                                {
-                                    FileInfo fileinfo = new FileInfo(attachment.FullPath);
-                                    string filename = fileinfo.Name;
-                                    var stream = new FileStream(attachment.FullPath, FileMode.Open);
-                                    StreamContent content2 = new StreamContent(stream);
-                                    //byte[] bytes = new byte[stream.Length];
-                                    //int bytesread = await stream.ReadAsync(bytes, 0, bytes.Length);
-                                    //ByteArrayContent content2 = new ByteArrayContent(bytes);
-                                    ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
-                                    cdhv2.Name = "files[" + aidx + "]";
-                                    cdhv2.FileName = filename;
-                                    content2.Headers.ContentDisposition = cdhv2;
-                                    content2.Headers.ContentType = new MediaTypeHeaderValue(attachment.ContentType);
-                                    multicontent.Add(content2);
-                                    aidx++;
-                                }
-                            }
-                            content = multicontent;
-                        }
-                        else
-                        {
-                            DiscordWebHookPost post = new DiscordWebHookPost(message);
-                            string json = JsonConvert.SerializeObject(post);
-                            content = new StringContent(json, Encoding.UTF8, "application/json");
-                        }
-
-                        using (var cts = new CancellationTokenSource())
-                        {
-                            cts.CancelAfter(is_game_status || _forumPostAttachments.Count == 0 ? 10000 : 120000);
-                            string jsonResponse = "";
-                            using (HttpResponseMessage response = await client.PostAsync(postaddress, content, cts.Token))
-                            {
-                                jsonResponse = await response.Content.ReadAsStringAsync();
-                                Debug.WriteLine(jsonResponse);
-                            }
-                        }
-                        content.Dispose();
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine(e.Message);
-            }
-
-        cleanup:
-            foreach(var attachment in _forumPostAttachments)
-            {
-                if(attachment.IsTemporary)
-                {
-                    try
-                    {
-                        File.Delete(attachment.FullPath);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.WriteLine(e.Message);
-                    }
-                }
-            }
-            _forumPostAttachments.Clear();
-            return;
         }
 
         private void CreateWindowView(int winid)
@@ -2582,6 +2591,13 @@ namespace GnollHackX.Pages.Game
                 TextCanvas.GHWindow = window;
 
                 TextCanvas.PutStrItems = items;
+            }
+
+            if(PlayingReplay)
+            {
+                TextStack.IsEnabled = false;
+                TextCanvas.IsEnabled = false;
+                TextCanvas.EnableTouchEvents = false;
             }
 
             if (GHApp.IsiOS)
@@ -2710,12 +2726,13 @@ namespace GnollHackX.Pages.Game
                 YnQuestionLabel.Text = "";
             else
                 YnQuestionLabel.Text = introline + " ";
-
-            YnQuestionLabel.Text += question;
+            
+            if(question != null)
+                YnQuestionLabel.Text += question;
 
             /* Buttons */
             LabeledImageButton[] btnList = { ZeroButton, FirstButton, SecondButton, ThirdButton, FourthButton };
-            if (responses.Length == 0)
+            if (responses == null || responses.Length == 0)
                 return;
             else
             {
@@ -2724,7 +2741,7 @@ namespace GnollHackX.Pages.Game
                     if (i < responses.Length)
                     {
                         btnList[i].BtnLetter = responses[i];
-                        if (descriptions != null && descr_list.Length > i)
+                        if (descriptions != null && descr_list != null && descr_list.Length > i)
                             btnList[i].LblText = descr_list[i];
                         else
                             btnList[i].LblText = btnList[i].BtnLetter.ToString();
@@ -2737,6 +2754,8 @@ namespace GnollHackX.Pages.Game
                         btnList[i].IsVisible = false;
                     }
                     btnList[i].ImgSourcePath = GetYnImgSourcePath(btnList[i].BtnLetter, btnList[i].LblText);
+                    if (PlayingReplay)
+                        btnList[i].IsEnabled = false;
                 }
             }
 
@@ -2834,18 +2853,19 @@ namespace GnollHackX.Pages.Game
             TipView.InvalidateSurface();
         }
         private readonly object _msgHistoryLock = new object();
-        private List<GHMsgHistoryItem> _msgHistory = null;
-        private void PrintHistory(List<GHMsgHistoryItem> msgHistory)
+        private GHMsgHistoryItem[] _msgHistory = null;
+        private void PrintHistory(GHMsgHistoryItem[] msgHistory)
         {
             lock (_msgHistoryLock)
             {
                 _msgHistory = msgHistory;
             }
+            RefreshMsgHistoryRowCounts = true;
         }
 
-        private async void AskName(string modeName, string modeDescription)
+        private async void AskName(string modeName, string modeDescription, string replayEnteredPlayerName)
         {
-            var namePage = new NamePage(this, modeName, modeDescription);
+            var namePage = new NamePage(this, modeName, modeDescription, replayEnteredPlayerName);
             await App.Current.MainPage.Navigation.PushModalAsync(namePage);
         }
 
@@ -2886,6 +2906,7 @@ namespace GnollHackX.Pages.Game
 
             _getLineStyle = style;
             _getLineRegex = null;
+            GetLineCancelButton.Text = "Cancel";
 
             switch (style)
             {
@@ -2921,7 +2942,8 @@ namespace GnollHackX.Pages.Game
                     break;
                 case (int)getline_types.GETLINE_WISHING:
                     GetLineEntryText.Placeholder = "Type your wish here";
-                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \(\:\)\+\-]{0,128}$");
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \(\:\)\+\-\']{0,128}$");
+                    GetLineCancelButton.Text = "Random";
                     break;
                 case (int)getline_types.GETLINE_GENESIS:
                 case (int)getline_types.GETLINE_POLYMORPH:
@@ -2944,7 +2966,7 @@ namespace GnollHackX.Pages.Game
                     break;
                 case (int)getline_types.GETLINE_QUESTION:
                     GetLineEntryText.Placeholder = "Type the answer here";
-                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \$\*\&\.\,\<\>\=\?\!\#\(\:\;\)\+\-]{0,128}$");
+                    _getLineRegex = new Regex(@"^[A-Za-z0-9_ \$\*\&\.\,\<\>\=\?\!\#\(\:\;\)\+\-\']{0,128}$");
                     break;
                 case (int)getline_types.GETLINE_MENU_SEARCH:
                     GetLineEntryText.Placeholder = "Type the search here";
@@ -2958,7 +2980,30 @@ namespace GnollHackX.Pages.Game
                     _getLineRegex = new Regex(@"^[A-Za-z0-9_ åäöÅÄÖ\$\*\&\.\,\<\>\=\?\!\#\(\:\;\)\+\-]{0,128}$");
                     break;
             }
+
+            if(PlayingReplay)
+            {
+                GetLineOkButton.IsEnabled = false;
+                GetLineCancelButton.IsEnabled = false;
+                GetLineQuestionMarkButton.IsEnabled = false;
+                //GetLineEntryText.IsEnabled = false;
+            }
             GetLineGrid.IsVisible = true;
+        }
+
+        private void HideGetLine()
+        {
+            GetLineGrid.IsVisible = false;
+            GetLineEntryText.Text = "";
+            GetLineCaption.Text = "";
+        }
+
+        private void EnterGetLineText(string enteredLine)
+        {
+            if(enteredLine != null)
+            {
+                GetLineEntryText.Text = enteredLine;
+            }
         }
 
         private void GetLineOkButton_Clicked(object sender, EventArgs e)
@@ -2999,6 +3044,10 @@ namespace GnollHackX.Pages.Game
                 case (int)getline_types.GETLINE_EXTENDED_COMMAND:
                     res = res.ToLower();
                     break;
+                case (int)getline_types.GETLINE_WISHING:
+                    if (GHApp.EmptyWishIsNothing && (res == "" || res == " "))
+                        res = "nothing";
+                    break;
                 default:
                     break;
             }
@@ -3009,9 +3058,7 @@ namespace GnollHackX.Pages.Game
                 queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetLine, res));
             }
 
-            GetLineGrid.IsVisible = false;
-            GetLineEntryText.Text = "";
-            GetLineCaption.Text = "";
+            HideGetLine();
         }
 
         private void GetLineQuestionMarkButton_Clicked(object sender, EventArgs e)
@@ -3028,9 +3075,7 @@ namespace GnollHackX.Pages.Game
                 queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetLine, res));
             }
 
-            GetLineGrid.IsVisible = false;
-            GetLineEntryText.Text = "";
-            GetLineCaption.Text = "";
+            HideGetLine();
         }
 
         private void GetLineCancelButton_Clicked(object sender, EventArgs e)
@@ -3046,9 +3091,7 @@ namespace GnollHackX.Pages.Game
                 queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetLine, '\x1B'.ToString()));
             }
 
-            GetLineGrid.IsVisible = false;
-            GetLineEntryText.Text = "";
-            GetLineCaption.Text = "";
+            HideGetLine();
         }
 
         private void GetChar()
@@ -3067,6 +3110,7 @@ namespace GnollHackX.Pages.Game
             }
             _mainPage.ActivateLocalGameButton();
             _mainPage.PlayMainScreenVideoAndMusic(); /* Just to be doubly sure */
+            _mainPage.StartGeneralTimer(); /* Just to be doubly sure */
             if (GHApp.GameMuteMode)
                 GHApp.GameMuteMode = false;
             GHApp.CurrentGamePage = null;
@@ -3225,7 +3269,6 @@ namespace GnollHackX.Pages.Game
                     MenuCanvas.AllowHighlight = true;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_GENERAL_COMMAND:
-                case ghmenu_styles.GHMENU_STYLE_ITEM_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_SPELL_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_SKILL_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_CHARACTER:
@@ -3272,6 +3315,7 @@ namespace GnollHackX.Pages.Game
                     MenuCanvas.AllowLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
+                case ghmenu_styles.GHMENU_STYLE_ITEM_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_PICK_ITEM_LIST:
                     MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
                     MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
@@ -3301,9 +3345,15 @@ namespace GnollHackX.Pages.Game
             }
 
             if (MenuCanvas.ClickOKOnSelection && !MenuCanvas.MenuButtonStyle)
+            {
                 MenuOKButton.Text = "Auto";
+                MenuOKButton.Opacity = 0.5;
+            }
             else
+            {
                 MenuOKButton.Text = "OK";
+                MenuOKButton.Opacity = 1.0;
+            }
 
             /* Reset glyph */
             MenuWindowGlyphImage.Source = null;
@@ -3341,6 +3391,16 @@ namespace GnollHackX.Pages.Game
             {
                 _menuDrawOnlyClear = false;
                 _menuRefresh = true;
+            }
+
+            if(PlayingReplay)
+            {
+                MenuOKButton.IsEnabled = false;
+                MenuCancelButton.IsEnabled = false;
+                MenuHeaderLabel.IsEnabled = false;
+                MenuStack.IsEnabled = false;
+                MenuCanvas.IsEnabled = false;
+                MenuCanvas.EnableTouchEvents = false;
             }
 
             if (GHApp.IsiOS)
@@ -3389,6 +3449,14 @@ namespace GnollHackX.Pages.Game
         {
             var outRipPage = new OutRipPage(this, ghwindow, outripinfo);
             await App.Current.MainPage.Navigation.PushModalAsync(outRipPage);
+        }
+        private async void HideOutRipPage()
+        {
+            await App.Current.MainPage.Navigation.PopModalAsync();
+        }
+        private async void HideAskNamePage()
+        {
+            await App.Current.MainPage.Navigation.PopModalAsync();
         }
 
         private async Task<bool> BackButtonPressed(object sender, EventArgs e)
@@ -3585,7 +3653,7 @@ namespace GnollHackX.Pages.Game
                     textPaint.Typeface = GHApp.LatoBold;
                     textPaint.TextSize = 26;
                     textWidth = textPaint.MeasureText(str, ref textBounds);
-                    yText = -textPaint.FontMetrics.Ascent + 5 + (ShowFPS ? textPaint.FontSpacing : 0);
+                    yText = -textPaint.FontMetrics.Ascent + 5; // + (ShowFPS ? textPaint.FontSpacing : 0);
                     xText = canvaswidth - textWidth - 5;
                     textPaint.Color = SKColors.Black.WithAlpha(128);
                     float textmargin = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
@@ -3595,40 +3663,40 @@ namespace GnollHackX.Pages.Game
                     canvas.DrawText(str, xText, yText, textPaint);
                 }
 
-                if (ShowFPS)
-                {
-                    lock (_fpslock)
-                    {
-                        str = "FPS: " + string.Format("{0:0.0}", _fps) + ", D:" + _counterValueDiff;
-                    }
-                    textPaint.Typeface = GHApp.LatoBold;
-                    textPaint.TextSize = 26;
-                    textWidth = textPaint.MeasureText(str, ref textBounds);
-                    yText = -textPaint.FontMetrics.Ascent + 5.0f;
-                    xText = canvaswidth - textWidth - 5.0f;
-                    textPaint.Color = SKColors.Black.WithAlpha(128);
-                    float textmargin = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
-                    SKRect bkrect = new SKRect(xText - textmargin, 5.0f - textmargin, xText + textWidth + textmargin, 5.0f - textmargin + textPaint.FontSpacing);
-                    canvas.DrawRect(bkrect, textPaint);
-                    textPaint.Color = SKColors.Yellow;
-                    canvas.DrawText(str, xText, yText, textPaint);
-                }
+                //if (ShowFPS)
+                //{
+                //    lock (_fpslock)
+                //    {
+                //        str = "FPS: " + string.Format("{0:0.0}", _fps) + ", D:" + _counterValueDiff;
+                //    }
+                //    textPaint.Typeface = GHApp.LatoBold;
+                //    textPaint.TextSize = 26;
+                //    textWidth = textPaint.MeasureText(str, ref textBounds);
+                //    yText = -textPaint.FontMetrics.Ascent + 5.0f;
+                //    xText = canvaswidth - textWidth - 5.0f;
+                //    textPaint.Color = SKColors.Black.WithAlpha(128);
+                //    float textmargin = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
+                //    SKRect bkrect = new SKRect(xText - textmargin, 5.0f - textmargin, xText + textWidth + textmargin, 5.0f - textmargin + textPaint.FontSpacing);
+                //    canvas.DrawRect(bkrect, textPaint);
+                //    textPaint.Color = SKColors.Yellow;
+                //    canvas.DrawText(str, xText, yText, textPaint);
+                //}
 
-                if (ShowBattery)
-                {
-                    str = "Battery: " + string.Format("{0:0.0}", GHApp.BatteryChargeLevel) + "%" + ", " + string.Format("{0:0.0}", GHApp.BatteryConsumption);
-                    textPaint.Typeface = GHApp.LatoBold;
-                    textPaint.TextSize = 26;
-                    textWidth = textPaint.MeasureText(str, ref textBounds);
-                    yText = -textPaint.FontMetrics.Ascent + 5.0f + (ShowFPS ? textPaint.FontSpacing : 0) + (ShowMemoryUsage ? textPaint.FontSpacing : 0);
-                    xText = canvaswidth - textWidth - 5.0f;
-                    textPaint.Color = SKColors.Black.WithAlpha(128);
-                    float textmargin = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
-                    SKRect bkrect = new SKRect(xText - textmargin, yText + textPaint.FontMetrics.Ascent - textmargin, xText + textWidth + textmargin, yText + textPaint.FontMetrics.Ascent - textmargin + textPaint.FontSpacing);
-                    canvas.DrawRect(bkrect, textPaint);
-                    textPaint.Color = SKColors.Yellow;
-                    canvas.DrawText(str, xText, yText, textPaint);
-                }
+                //if (ShowBattery)
+                //{
+                //    str = "Battery: " + string.Format("{0:0.0}", GHApp.BatteryChargeLevel) + "%" + ", " + string.Format("{0:0.0}", GHApp.BatteryConsumption);
+                //    textPaint.Typeface = GHApp.LatoBold;
+                //    textPaint.TextSize = 26;
+                //    textWidth = textPaint.MeasureText(str, ref textBounds);
+                //    yText = -textPaint.FontMetrics.Ascent + 5.0f + (ShowFPS ? textPaint.FontSpacing : 0) + (ShowMemoryUsage ? textPaint.FontSpacing : 0);
+                //    xText = canvaswidth - textWidth - 5.0f;
+                //    textPaint.Color = SKColors.Black.WithAlpha(128);
+                //    float textmargin = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
+                //    SKRect bkrect = new SKRect(xText - textmargin, yText + textPaint.FontMetrics.Ascent - textmargin, xText + textWidth + textmargin, yText + textPaint.FontMetrics.Ascent - textmargin + textPaint.FontSpacing);
+                //    canvas.DrawRect(bkrect, textPaint);
+                //    textPaint.Color = SKColors.Yellow;
+                //    canvas.DrawText(str, xText, yText, textPaint);
+                //}
             }
 
             lock (_mainFPSCounterLock)
@@ -3646,7 +3714,7 @@ namespace GnollHackX.Pages.Game
 
         public float GetTextScale()
         {
-            return (float)((lAbilitiesButton.Width <= 0 ? lAbilitiesButton.WidthRequest : lAbilitiesButton.Width) / 50.0f) / (float)GetCanvasScale();
+            return (float)((lWornItemsButton.Width <= 0 ? lWornItemsButton.WidthRequest : lWornItemsButton.Width) / 50.0f) / (float)GetCanvasScale();
         }
 
 #if GNH_MAP_PROFILING && DEBUG
@@ -4279,20 +4347,23 @@ namespace GnollHackX.Pages.Game
                     }
                     else if ((_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_SWIM_ANIMATION) != 0)
                     {
-                        long animationframe = generalcountervalue % _swimAnimation.Length;
-                        move_offset_x += _swimAnimation[animationframe].X * scale * targetscale;
-                        move_offset_y += _swimAnimation[animationframe].Y * scale * targetscale;
-                    }
-                    else if ((_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_SHARK_ANIMATION) != 0)
-                    {
-                        long animationframe = generalcountervalue % _sharkAnimation.Length;
-                        float target_y_change = _sharkAnimation[animationframe].Y * scale * targetscale;
-                        move_offset_x += _sharkAnimation[animationframe].X * scale * targetscale;
-                        move_offset_y += target_y_change;
-                        if(mapy == draw_map_y)
+                        if ((_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_SPECIAL_ANIMATION) != 0)
                         {
-                            scaled_tile_height -= target_y_change;
-                            sourcerect = new SKRect(sourcerect.Left, sourcerect.Top, sourcerect.Right, sourcerect.Bottom - _sharkAnimation[animationframe].Y);
+                            long animationframe = generalcountervalue % _sharkAnimation.Length;
+                            float target_y_change = _sharkAnimation[animationframe].Y * scale * targetscale;
+                            move_offset_x += _sharkAnimation[animationframe].X * scale * targetscale;
+                            move_offset_y += target_y_change;
+                            if (mapy == draw_map_y)
+                            {
+                                scaled_tile_height -= target_y_change;
+                                sourcerect = new SKRect(sourcerect.Left, sourcerect.Top, sourcerect.Right, sourcerect.Bottom - _sharkAnimation[animationframe].Y);
+                            }
+                        }
+                        else
+                        {
+                            long animationframe = generalcountervalue % _swimAnimation.Length;
+                            move_offset_x += _swimAnimation[animationframe].X * scale * targetscale;
+                            move_offset_y += _swimAnimation[animationframe].Y * scale * targetscale;
                         }
                     }
                 }
@@ -4414,7 +4485,7 @@ namespace GnollHackX.Pages.Game
                 paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
                 if (is_monster_like_layer && (_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_RADIAL_TRANSPARENCY) != 0)
                 {
-                    DrawTileWithRadialTransparency(canvas, delayedDraw, TileMap[sheet_idx], sourcerect, targetrect, _mapData[mapx, mapy].Layers, splitY, opaqueness, paint);
+                    DrawTileWithRadialTransparency(canvas, delayedDraw, TileMap[sheet_idx], sourcerect, targetrect, _mapData[mapx, mapy].Layers, splitY, opaqueness, paint, mapx, mapy);
                         //, ref baseUpdateRect, ref enlUpdateRect);
                 }
                 else
@@ -4422,7 +4493,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                     StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                    DrawSplitBitmap(canvas, delayedDraw, splitY, TileMap[sheet_idx], sourcerect, targetrect, paint); //, ref baseUpdateRect, ref enlUpdateRect);
+                    DrawSplitBitmap(canvas, delayedDraw, splitY, TileMap[sheet_idx], sourcerect, targetrect, paint, mapx, mapy); //, ref baseUpdateRect, ref enlUpdateRect);
                     //canvas.DrawBitmap(TileMap[sheet_idx], sourcerect, targetrect, paint);
 #if GNH_MAP_PROFILING && DEBUG
                     StopProfiling(GHProfilingStyle.Bitmap);
@@ -4439,7 +4510,7 @@ namespace GnollHackX.Pages.Game
                 //    enlRestore.Dispose();
             }
 
-            DrawAutoDraw(autodraw, canvas, paint, otmp_round,
+            DrawAutoDraw(autodraw, canvas, delayedDraw, paint, otmp_round,
                 layer_idx, mapx, mapy,
                 tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem,
                 tx, ty, width, height,
@@ -4469,8 +4540,10 @@ namespace GnollHackX.Pages.Game
                 Rect = rect;
             }
         }
-        Dictionary<SavedRect, SKBitmap> _savedRects = new Dictionary<SavedRect, SKBitmap>();
-        public void DrawTileWithRadialTransparency(SKCanvas canvas, bool delayedDraw, SKBitmap tileSheet, SKRect sourcerect, SKRect targetrect, LayerInfo layers, float destSplitY, float opaqueness, SKPaint paint)
+
+        private readonly object _saveRectLock = new object();
+        ConcurrentDictionary<SavedRect, SKBitmap> _savedRects = new ConcurrentDictionary<SavedRect, SKBitmap>();
+        public void DrawTileWithRadialTransparency(SKCanvas canvas, bool delayedDraw, SKBitmap tileSheet, SKRect sourcerect, SKRect targetrect, LayerInfo layers, float destSplitY, float opaqueness, SKPaint paint, int mapX, int mapY)
             //, ref SKRect baseUpdateRect, ref SKRect enlUpdateRect)
         {
             bool cache = false;
@@ -4482,10 +4555,15 @@ namespace GnollHackX.Pages.Game
             {
                 SavedRect sr = new SavedRect(tileSheet, sourcerect);
                 SKBitmap bmp = null;
-                if (_savedRects.TryGetValue(sr, out bmp) && bmp != null)
+                bool getsuccessful;
+                lock (_saveRectLock)
+                {
+                    getsuccessful = _savedRects.TryGetValue(sr, out bmp);
+                }
+                if (getsuccessful && bmp != null)
                 {
                     SKRect bmpsourcerect = new SKRect(0, 0, (float)bmp.Width, (float)bmp.Height);
-                    DrawSplitBitmap(canvas, delayedDraw, destSplitY, bmp, bmpsourcerect, targetrect, paint);
+                    DrawSplitBitmap(canvas, delayedDraw, destSplitY, bmp, bmpsourcerect, targetrect, paint, mapX, mapY);
                     return;
                 }
             }
@@ -4536,22 +4614,29 @@ namespace GnollHackX.Pages.Game
             if (cache)
             {
                 SavedRect sr = new SavedRect(tileSheet, sourcerect);
-                if (!_savedRects.ContainsKey(sr))
+                bool containskey;
+                lock (_saveRectLock)
+                {
+                    containskey = _savedRects.ContainsKey(sr);
+                }
+                if (!containskey)
                 {
                     try
                     {
-                        if (_savedRects.Count >= GHConstants.MaxBitmapCacheSize)
-                        {
-                            foreach (SKBitmap bmp in _savedRects.Values)
-                                bmp.Dispose();
-                            _savedRects.Clear(); /* Clear the whole dictonary for the sake of ease; should almost never happen normally anyway */
-                        }
-
                         SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight, SKColorType.Rgba8888, SKAlphaType.Unpremul);
                         _tempBitmap.CopyTo(newbmp);
                         newbmp.SetImmutable();
-                        _savedRects.Add(sr, newbmp);
-                        DrawSplitBitmap(canvas, delayedDraw, destSplitY, newbmp, tempsourcerect, targetrect, paint); //, ref baseUpdateRect, ref enlUpdateRect);
+                        lock (_saveRectLock)
+                        {
+                            if (_savedRects.Count >= GHConstants.MaxBitmapCacheSize)
+                            {
+                                foreach (SKBitmap bmp in _savedRects.Values)
+                                    bmp.Dispose();
+                                _savedRects.Clear(); /* Clear the whole dictionary for the sake of ease; should almost never happen normally anyway */
+                            }
+                            _savedRects.TryAdd(sr, newbmp);
+                        }
+                        DrawSplitBitmap(canvas, delayedDraw, destSplitY, newbmp, tempsourcerect, targetrect, paint, mapX, mapY); //, ref baseUpdateRect, ref enlUpdateRect);
                     }
                     catch (Exception ex)
                     {
@@ -4564,7 +4649,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                DrawSplitBitmap(canvas, delayedDraw, destSplitY, _tempBitmap, tempsourcerect, targetrect, paint); //, ref baseUpdateRect, ref enlUpdateRect);
+                DrawSplitBitmap(canvas, delayedDraw, destSplitY, _tempBitmap, tempsourcerect, targetrect, paint, mapX, mapY); //, ref baseUpdateRect, ref enlUpdateRect);
                                                                                                                   //canvas.DrawBitmap(_tempBitmap, tempsourcerect, targetrect, paint);
 #if GNH_MAP_PROFILING && DEBUG
             StopProfiling(GHProfilingStyle.Bitmap);
@@ -4574,12 +4659,12 @@ namespace GnollHackX.Pages.Game
 
         private List<GHDrawCommand> _drawCommandList = new List<GHDrawCommand>();
 
-        public void DrawSplitBitmap(SKCanvas canvas, bool delayedDraw, float destSplitY, SKBitmap bitmap, SKRect source, SKRect dest, SKPaint paint) //, ref SKRect baseUpdateRect, ref SKRect enlUpdateRect)
+        public void DrawSplitBitmap(SKCanvas canvas, bool delayedDraw, float destSplitY, SKBitmap bitmap, SKRect source, SKRect dest, SKPaint paint, int mapX, int mapY) //, ref SKRect baseUpdateRect, ref SKRect enlUpdateRect)
         {
             if (destSplitY <= dest.Top || delayedDraw)
             {
                 if(delayedDraw)
-                    _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, source, dest, bitmap, paint.Color));
+                    _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, source, dest, bitmap, paint.Color, mapX, mapY));
                 else
                     canvas.DrawBitmap(bitmap, source, dest, paint);
                 //baseUpdateRect = dest;
@@ -4587,7 +4672,7 @@ namespace GnollHackX.Pages.Game
             }
             else if (destSplitY >= dest.Bottom)
             {
-                _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, source, dest, bitmap, paint.Color));
+                _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, source, dest, bitmap, paint.Color, mapX, mapY));
                 //enlCanvas.DrawBitmap(bitmap, source, dest, paint);
                 //baseUpdateRect = new SKRect();
                 //enlUpdateRect = dest;
@@ -4605,7 +4690,7 @@ namespace GnollHackX.Pages.Game
                 SKRect baseSource = new SKRect(source.Left, sourceSplitY, source.Right, source.Bottom);
                 canvas.DrawBitmap(bitmap, baseSource, baseDest, paint);
                 //enlCanvas.DrawBitmap(bitmap, enlSource, enlDest, paint);
-                _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, enlSource, enlDest, bitmap, paint.Color));
+                _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, enlSource, enlDest, bitmap, paint.Color, mapX, mapY));
                 //baseUpdateRect = baseDest;
                 //enlUpdateRect = enlDest;
             }
@@ -5257,6 +5342,270 @@ namespace GnollHackX.Pages.Game
             }
         }
 
+        SKColor _dustColor = new SKColor(64, 64, 64, 127);
+        SKColor _engraveOutlineColor = new SKColor(96, 96, 96, 63);
+        SKColor _engraveFillColor = new SKColor(64, 64, 64, 191);
+        SKColor _burnOutlineColor = SKColors.Black.WithAlpha(63);
+        SKColor _burnFillColor = SKColors.Black.WithAlpha(191);
+        SKColor _bloodOutlineColor = SKColors.Red.WithAlpha(63);
+        SKColor _bloodFillColor = SKColors.Red.WithAlpha(191);
+        SKColor _headStoneFillColor = new SKColor(96, 96, 96, 191);
+        SKColor _headStoneOutlineColor = new SKColor(160, 160, 160, 191);
+        SKColor _signPostFillColor = SKColors.Brown.WithAlpha(191);
+        SKColor _signPostOutlineColor = SKColors.SandyBrown.WithAlpha(191);
+        SKColor _magicShineOutlineColor = SKColors.Cyan;
+        float[] _shineAnimation = new float[]
+        {
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0025f,
+            0.005f,
+            0.0075f,
+            0.01f,
+            0.0125f,
+            0.015f,
+            0.0175f,
+            0.02f,
+            0.0275f,
+            0.035f,
+            0.0425f,
+            0.05f,
+            0.0625f,
+            0.0750f,
+            0.0875f,
+            0.1f,
+            0.125f,
+            0.15f,
+            0.175f,
+            0.2f,
+            0.225f,
+            0.25f,
+            0.275f,
+            0.3f,
+            0.325f,
+            0.35f,
+            0.375f,
+            0.4f,
+            0.425f,
+            0.45f,
+            0.475f,
+            0.5f,
+            0.525f,
+            0.55f,
+            0.575f,
+            0.6f,
+            0.625f,
+            0.65f,
+            0.675f,
+            0.7f,
+            0.725f,
+            0.75f,
+            0.775f,
+            0.8f,
+            0.825f,
+            0.875f,
+            0.875f,
+            0.9f,
+            0.9125f,
+            0.925f,
+            0.9375f,
+            0.95f,
+            0.9575f,
+            0.965f,
+            0.9725f,
+            0.98f,
+            0.9825f,
+            0.985f,
+            0.9875f,
+            0.99f,
+            0.9925f,
+            0.995f,
+            0.9975f,
+            1.0f,
+            0.9975f,
+            0.995f,
+            0.9925f,
+            0.99f,
+            0.9875f,
+            0.985f,
+            0.9825f,
+            0.98f,
+            0.9725f,
+            0.965f,
+            0.9575f,
+            0.95f,
+            0.9375f,
+            0.925f,
+            0.9125f,
+            0.9f,
+            0.875f,
+            0.875f,
+            0.825f,
+            0.8f,
+            0.775f,
+            0.775f,
+            0.725f,
+            0.7f,
+            0.675f,
+            0.675f,
+            0.625f,
+            0.6f,
+            0.575f,
+            0.575f,
+            0.525f,
+            0.5f,
+            0.475f,
+            0.475f,
+            0.425f,
+            0.4f,
+            0.375f,
+            0.375f,
+            0.325f,
+            0.3f,
+            0.275f,
+            0.275f,
+            0.225f,
+            0.2f,
+            0.175f,
+            0.175f,
+            0.125f,
+            0.1f,
+            0.0875f,
+            0.0750f,
+            0.0625f,
+            0.05f,
+            0.0425f,
+            0.035f,
+            0.0275f,
+            0.02f,
+            0.0175f,
+            0.015f,
+            0.0125f,
+            0.01f,
+            0.0075f,
+            0.005f,
+            0.0025f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+        };
+
+        void DrawEngraving(SKCanvas canvas, SKPaint textPaint, int mapx, int mapy, float offsetX, float offsetY, float usedOffsetX, float usedOffsetY, float mapFontAscent,
+            float width, float height, long generalcountervalue)
+        {
+            /* Skip drawing certain engravings */
+            switch (_mapData[mapx, mapy].Engraving.EngrType)
+            {
+                case (int)EngravingType.ENGR_HEADSTONE:
+                case (int)EngravingType.ENGR_SIGNPOST:
+                    return;
+                default:
+                    break;
+            }
+
+            /* Draw engraving */
+            if (_mapData[mapx, mapy].Engraving.Text != null && _mapData[mapx, mapy].Engraving.Text != "" && _mapData[mapx, mapy].Engraving.RowSplit != null)
+            {
+                int len = _mapData[mapx, mapy].Engraving.Text.Length;
+                SKColor oldcolor = textPaint.Color;
+                SKTypeface oldtypeface = textPaint.Typeface;
+                float oldtextsize = textPaint.TextSize;
+                textPaint.TextSize = 10;
+                if ((_mapData[mapx, mapy].Engraving.GeneralFlags & 1) != 0)
+                    textPaint.Typeface = GHApp.EndorTypeface;
+                else
+                    textPaint.Typeface = GHApp.EndorTypeface;
+
+                SKColor outlineColor = SKColors.Black;
+                SKColor fillColor = SKColors.Black;
+                bool hasOutline = false;
+                switch (_mapData[mapx, mapy].Engraving.EngrType)
+                {
+                    case (int)EngravingType.DUST:
+                        fillColor = _dustColor;
+                        break;
+                    case (int)EngravingType.ENGRAVE:
+                        hasOutline = true;
+                        fillColor = _engraveFillColor;
+                        outlineColor = _engraveOutlineColor;
+                        break;
+                    case (int)EngravingType.BURN:
+                        hasOutline = true;
+                        fillColor = _burnFillColor;
+                        outlineColor = _burnOutlineColor;
+                        break;
+                    case (int)EngravingType.ENGR_BLOOD:
+                        hasOutline = true;
+                        fillColor = _bloodFillColor;
+                        outlineColor = _bloodOutlineColor;
+                        break;
+                    case (int)EngravingType.ENGR_HEADSTONE:
+                        hasOutline = true;
+                        fillColor = _headStoneFillColor;
+                        outlineColor = _headStoneOutlineColor;
+                        break;
+                    case (int)EngravingType.ENGR_SIGNPOST:
+                        hasOutline = true;
+                        fillColor = _signPostFillColor;
+                        outlineColor = _signPostOutlineColor;
+                        break;
+                    default:
+                        textPaint.Color = SKColors.Black;
+                        break;
+                }
+
+                float atwidth = textPaint.MeasureText("A");
+                if (atwidth > 0)
+                {
+                    float wpadding = width / 32;
+                    float stwidth = atwidth * 4;
+                    int rowcnt = _mapData[mapx, mapy].Engraving.RowSplit.Length;
+                    int rowidx = -1;
+                    float rscale = (width - 2 * wpadding) / stwidth;
+                    float prerowheight = textPaint.FontSpacing * rscale;
+                    float rowhscale = prerowheight * rowcnt > height ? height / (prerowheight * rowcnt) : 1.0f;
+                    float rowheight = prerowheight * rowhscale;
+                    foreach (string str in _mapData[mapx, mapy].Engraving.RowSplit)
+                    {
+                        rowidx++;
+                        textPaint.TextSize = 10;
+                        float twidth = textPaint.MeasureText(str);
+                        float usedtwidth = twidth > stwidth ? twidth : stwidth;
+                        float tscale = rowhscale * (width - 2 * wpadding) / usedtwidth;
+                        textPaint.TextSize = tscale * 10;
+                        float act_text_width = twidth * tscale;
+                        float tx = offsetX + usedOffsetX + width * (float)mapx + wpadding + (width - act_text_width) / 2;
+                        float ty = offsetY + usedOffsetY + height * (float)mapy + mapFontAscent - textPaint.FontMetrics.Ascent
+                            + (height - rowheight * rowcnt) / 2 + rowidx * rowheight + (rowheight - textPaint.FontSpacing) / 2;
+                        textPaint.Style = SKPaintStyle.Fill;
+                        textPaint.Color = fillColor;
+                        canvas.DrawText(str, tx, ty, textPaint);
+                        if (hasOutline)
+                        {
+                            textPaint.Style = SKPaintStyle.Stroke;
+                            textPaint.Color = outlineColor;
+                            textPaint.StrokeWidth = textPaint.TextSize / 5;
+                            canvas.DrawText(str, tx, ty, textPaint);
+                        }
+                        if ((_mapData[mapx, mapy].Engraving.GeneralFlags & 1) != 0)
+                        {
+                            textPaint.Style = SKPaintStyle.Fill;
+                            int alen = _shineAnimation.Length;
+                            textPaint.Color = _magicShineOutlineColor.WithAlpha((byte)(_shineAnimation[generalcountervalue % alen] * 255));
+                            canvas.DrawText(str, tx, ty, textPaint);
+                        }
+                    }
+                }
+                textPaint.Color = oldcolor;
+                textPaint.Typeface = oldtypeface;
+                textPaint.TextSize = oldtextsize;
+                textPaint.Style = SKPaintStyle.Fill;
+            }
+        }
+
         void GetBaseMoveOffsets(int mapx, int mapy, sbyte monster_origin_x, sbyte monster_origin_y, float width, float height, long maincounterdiff, long moveIntervals, ref float base_move_offset_x, ref float base_move_offset_y)
         {
             int movediffx = (int)monster_origin_x - mapx;
@@ -5394,10 +5743,12 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
         long _totalFrames = 0L;
 #endif
+        StringBuilder _lineBuilder = new StringBuilder(GHConstants.LineBuilderInitialCapacity);
+        string[] _attributeStrings = new string[6] { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma" };
 
         private void PaintMainGamePage(object sender, SKPaintSurfaceEventArgs e)
         {
-            if (!MainGrid.IsVisible)
+            if (!MainGrid.IsVisible || GHApp.GoToTurn >= 0)
                 return;
 
             SKImageInfo info = e.Info;
@@ -5773,317 +6124,424 @@ namespace GnollHackX.Pages.Game
                                             }
                                             else
                                             {
-                                                //using (SKCanvas enlCanvas = new SKCanvas(_enlargementBitmap))
-                                                //{
-                                                //    enlCanvas.Clear(SKColors.Transparent);
-                                                //    float _enlBmpMinX, _enlBmpMinY, _enlBmpMaxX, _enlBmpMaxY;
-                                                //    _enlBmpMaxX = _enlBmpMaxY = 0;
-                                                //    _enlBmpMinX = (float)_enlargementBitmap.Width;
-                                                //    _enlBmpMinY = (float)_enlargementBitmap.Height;
-
-                                                    for (int layer_idx = 0; layer_idx < (int)layer_types.MAX_LAYERS + 2; layer_idx++)
+                                                for (int layer_idx = 0; layer_idx < (int)layer_types.MAX_LAYERS + 2; layer_idx++)
+                                                {
+                                                    bool is_monster_or_shadow_layer = (layer_idx == (int)layer_types.LAYER_MONSTER || layer_idx == (int)layer_types.MAX_LAYERS);
+                                                    bool is_monster_like_layer = (is_monster_or_shadow_layer || layer_idx == (int)layer_types.LAYER_MONSTER_EFFECT);
+                                                    bool is_object_like_layer = (layer_idx == (int)layer_types.LAYER_OBJECT || layer_idx == (int)layer_types.LAYER_COVER_OBJECT);
+                                                    bool is_missile_layer = (layer_idx == (int)layer_types.LAYER_MISSILE);
+                                                    for (int mapy = startY; mapy <= endY; mapy++)
                                                     {
-                                                        bool is_monster_or_shadow_layer = (layer_idx == (int)layer_types.LAYER_MONSTER || layer_idx == (int)layer_types.MAX_LAYERS);
-                                                        bool is_monster_like_layer = (is_monster_or_shadow_layer || layer_idx == (int)layer_types.LAYER_MONSTER_EFFECT);
-                                                        bool is_object_like_layer = (layer_idx == (int)layer_types.LAYER_OBJECT || layer_idx == (int)layer_types.LAYER_COVER_OBJECT);
-                                                        bool is_missile_layer = (layer_idx == (int)layer_types.LAYER_MISSILE);
-                                                        for (int mapy = startY; mapy <= endY; mapy++)
+                                                        for (int mapx = startX; mapx <= endX; mapx++)
                                                         {
+                                                            if (layer_idx == (int)layer_types.LAYER_FEATURE_DOODAD && _mapData[mapx, mapy].Engraving.HasEngraving)
+                                                                DrawEngraving(canvas, textPaint, mapx, mapy, offsetX, offsetY, usedOffsetX, usedOffsetY, mapFontAscent, width, height, generalcountervalue);
+
+                                                            if (_mapData[mapx, mapy].Layers.layer_glyphs == null || _mapData[mapx, mapy].Layers.layer_gui_glyphs == null)
+                                                                continue;
+
+                                                            if (layer_idx == (int)layer_types.MAX_LAYERS
+                                                                && (draw_shadow[mapx, mapy] == 0 || _mapData[mapx, mapy].Layers.layer_gui_glyphs[(int)layer_types.LAYER_MONSTER] == GHApp.NoGlyph)
+                                                                )
+                                                                continue;
+
+                                                            bool loc_is_you = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0;
+                                                            bool showing_detection = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_SHOWING_DETECTION) != 0;
+                                                            bool canspotself = (_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_CAN_SPOT_SELF) != 0;
+                                                            sbyte monster_height = _mapData[mapx, mapy].Layers.special_monster_layer_height;
+                                                            sbyte feature_doodad_height = _mapData[mapx, mapy].Layers.special_feature_doodad_layer_height;
+                                                            short missile_special_quality = _mapData[mapx, mapy].Layers.missile_special_quality;
+                                                            sbyte monster_origin_x = _mapData[mapx, mapy].Layers.monster_origin_x;
+                                                            sbyte monster_origin_y = _mapData[mapx, mapy].Layers.monster_origin_y;
+                                                            long glyphprintmaincountervalue = _mapData[mapx, mapy].GlyphPrintMainCounterValue;
+                                                            long maincounterdiff = maincountervalue - glyphprintmaincountervalue;
+                                                            long glyphobjectprintmaincountervalue = _mapData[mapx, mapy].GlyphObjectPrintMainCounterValue;
+                                                            long objectcounterdiff = maincountervalue - glyphobjectprintmaincountervalue;
+                                                            long glyphgeneralprintmaincountervalue = _mapData[mapx, mapy].GlyphGeneralPrintMainCounterValue;
+                                                            long generalcounterdiff = maincountervalue - glyphgeneralprintmaincountervalue;
+                                                            short missile_height = _mapData[mapx, mapy].Layers.missile_height;
+                                                            bool obj_in_pit = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_O_IN_PIT) != 0;
+
+                                                            float base_move_offset_x = 0, base_move_offset_y = 0;
+                                                            GetBaseMoveOffsets(mapx, mapy, monster_origin_x, monster_origin_y, width, height, maincounterdiff, moveIntervals, ref base_move_offset_x, ref base_move_offset_y);
+
+                                                            lock (_objectDataLock)
+                                                            {
+                                                                if (layer_idx == (int)layer_types.MAX_LAYERS + 1)
+                                                                {
+                                                                    PaintMapUIElements(canvas, textPaint, paint, pathEffect, mapx, mapy, width, height, offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, targetscale, generalcountervalue, usedFontSize, monster_height, loc_is_you, canspotself);
+                                                                }
+                                                                else
+                                                                {
+                                                                    bool is_source_dir;
+                                                                    int sub_layer_cnt = GetSubLayerCount(mapx, mapy, layer_idx, out is_source_dir);
+                                                                    for (int sub_layer_idx = sub_layer_cnt - 1; sub_layer_idx >= 0; sub_layer_idx--)
+                                                                    {
+                                                                        int signed_glyph = GHApp.NoGlyph; //Default
+                                                                        short obj_height = _mapData[mapx, mapy].Layers.object_height; //Default
+                                                                        sbyte object_origin_x = 0; //Default
+                                                                        sbyte object_origin_y = 0; //Default
+                                                                        ObjectDataItem otmp_round = null;
+
+                                                                        int source_dir_main_idx = sub_layer_idx;
+                                                                        int source_dir_idx = is_source_dir ? GetSourceDirIndex(layer_idx, source_dir_main_idx) : 0;
+
+                                                                        bool manual_hflip = false;
+                                                                        bool manual_vflip = false;
+                                                                        int adj_x = mapx;
+                                                                        int adj_y = mapy;
+                                                                        bool foundthisturn = false;
+
+                                                                        if (!GetLayerGlyph(mapx, mapy, layer_idx, sub_layer_idx, source_dir_idx, ref signed_glyph,
+                                                                            ref adj_x, ref adj_y, ref manual_hflip, ref manual_vflip, ref otmp_round, ref obj_height,
+                                                                            ref object_origin_x, ref object_origin_y, ref foundthisturn))
+                                                                            continue;
+
+                                                                        int glyph = Math.Abs(signed_glyph);
+                                                                        if (glyph == 0 || glyph >= GHApp.Glyph2Tile.Length)
+                                                                            continue;
+
+                                                                        float object_move_offset_x = 0, object_move_offset_y = 0;
+                                                                        GetObjectMoveOffsets(mapx, mapy, object_origin_x, object_origin_y, width, height, objectcounterdiff, moveIntervals, generalcounterdiff,
+                                                                            foundthisturn, sub_layer_idx, sub_layer_cnt, targetscale, loc_is_you, obj_height, otmp_round, ref object_move_offset_x, ref object_move_offset_y);
+
+                                                                        bool vflip_glyph = false;
+                                                                        bool hflip_glyph = false;
+                                                                        GetFlips(signed_glyph, manual_hflip, manual_vflip, ref hflip_glyph, ref vflip_glyph);
+
+                                                                        /* Tile flags */
+                                                                        bool tileflag_halfsize = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_HALF_SIZED_TILE) != 0;
+                                                                        bool tileflag_floortile = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_HAS_FLOOR_TILE) != 0;
+                                                                        bool tileflag_normalobjmissile = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_NORMAL_ITEM_AS_MISSILE) != 0 && layer_idx == (int)layer_types.LAYER_MISSILE;
+                                                                        bool tileflag_fullsizeditem = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_FULL_SIZED_ITEM) != 0;
+                                                                        bool tileflag_height_is_clipping = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_HEIGHT_IS_CLIPPING) != 0;
+
+                                                                        /* All items are big when showing detection */
+                                                                        CheckShowingDetection(showing_detection, ref obj_height, ref tileflag_floortile, ref tileflag_height_is_clipping);
+
+                                                                        /*Determine y move for tiles */
+                                                                        float scaled_y_height_change = GetScaledYHeightChange(layer_idx, sub_layer_idx, sub_layer_cnt, height, monster_height, feature_doodad_height, targetscale, is_monster_like_layer, tileflag_halfsize, otmp_round);
+
+                                                                        int ntile = GHApp.Glyph2Tile[glyph];
+                                                                        int autodraw = GHApp.Tile2Autodraw[ntile];
+
+                                                                        /* Determine animation tile here */
+                                                                        int anim_frame_idx = 0, main_tile_idx = 0;
+                                                                        ntile = GetTileFromAnimation(ntile, glyph, mapx, mapy, layer_idx, generalcountervalue, is_monster_or_shadow_layer, ref anim_frame_idx, ref main_tile_idx, ref autodraw);
+
+                                                                        /* Draw enlargement tiles */
+                                                                        int enlargement = GHApp.Tile2Enlargement[ntile];
+                                                                        for (int order_idx = -1; order_idx < 5; order_idx++)
+                                                                        {
+                                                                            if (enlargement == 0 && order_idx >= 0)
+                                                                                break;
+                                                                            int enl_idx = GetUsedEnlargementIndex(order_idx);
+                                                                            int dx = 0, dy = 0;
+                                                                            if (!GetEnlargementTileB(enlargement, enl_idx, hflip_glyph, vflip_glyph, main_tile_idx, anim_frame_idx, ref ntile, ref autodraw, ref dx, ref dy))
+                                                                                continue;
+
+                                                                            int draw_map_x = mapx + dx + (adj_x - mapx);
+                                                                            int draw_map_y = mapy + dy + (adj_y - mapy);
+
+                                                                            if ((enlargement > 0 && enl_idx >= 0 && enl_idx <= 2) || layer_idx == (int)layer_types.MAX_LAYERS)
+                                                                            {
+                                                                                PaintMapTile(canvas, true, textPaint, paint, layer_idx, mapx, mapy, draw_map_x, draw_map_y, dx, dy, ntile, width, height,
+                                                                                    offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, object_move_offset_x, object_move_offset_y,
+                                                                                    scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
+                                                                                    monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
+                                                                                    loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
+                                                                                    hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement,
+                                                                                    ref draw_shadow); //, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                //float minDrawX = 0, maxDrawX = 0, minDrawY = 0, maxDrawY = 0;
+                                                                                PaintMapTile(canvas, false, textPaint, paint, layer_idx, mapx, mapy, draw_map_x, draw_map_y, dx, dy, ntile, width, height,
+                                                                                    offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, object_move_offset_x, object_move_offset_y,
+                                                                                    scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
+                                                                                    monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
+                                                                                    loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
+                                                                                    hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement,
+                                                                                    ref draw_shadow); //, ref minDrawX, ref maxDrawX, ref minDrawY, ref maxDrawY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    switch (layer_idx)
+                                                    {
+                                                        /* Darkening at the end of layers */
+                                                        case (int)layer_types.LAYER_OBJECT:
+                                                        {
+                                                            _drawCommandList.Add(new GHDrawCommand(true));
                                                             for (int mapx = startX; mapx <= endX; mapx++)
                                                             {
-                                                                if (_mapData[mapx, mapy].Layers.layer_glyphs == null || _mapData[mapx, mapy].Layers.layer_gui_glyphs == null)
-                                                                    continue;
-
-                                                                if (layer_idx == (int)layer_types.MAX_LAYERS
-                                                                    && (draw_shadow[mapx, mapy] == 0 || _mapData[mapx, mapy].Layers.layer_gui_glyphs[(int)layer_types.LAYER_MONSTER] == GHApp.NoGlyph)
-                                                                    )
-                                                                    continue;
-
-                                                                bool loc_is_you = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0;
-                                                                bool showing_detection = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_SHOWING_DETECTION) != 0;
-                                                                bool canspotself = (_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_CAN_SPOT_SELF) != 0;
-                                                                sbyte monster_height = _mapData[mapx, mapy].Layers.special_monster_layer_height;
-                                                                sbyte feature_doodad_height = _mapData[mapx, mapy].Layers.special_feature_doodad_layer_height;
-                                                                short missile_special_quality = _mapData[mapx, mapy].Layers.missile_special_quality;
-                                                                sbyte monster_origin_x = _mapData[mapx, mapy].Layers.monster_origin_x;
-                                                                sbyte monster_origin_y = _mapData[mapx, mapy].Layers.monster_origin_y;
-                                                                long glyphprintmaincountervalue = _mapData[mapx, mapy].GlyphPrintMainCounterValue;
-                                                                long maincounterdiff = maincountervalue - glyphprintmaincountervalue;
-                                                                long glyphobjectprintmaincountervalue = _mapData[mapx, mapy].GlyphObjectPrintMainCounterValue;
-                                                                long objectcounterdiff = maincountervalue - glyphobjectprintmaincountervalue;
-                                                                long glyphgeneralprintmaincountervalue = _mapData[mapx, mapy].GlyphGeneralPrintMainCounterValue;
-                                                                long generalcounterdiff = maincountervalue - glyphgeneralprintmaincountervalue;
-                                                                short missile_height = _mapData[mapx, mapy].Layers.missile_height;
-                                                                bool obj_in_pit = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_O_IN_PIT) != 0;
-
-                                                                float base_move_offset_x = 0, base_move_offset_y = 0;
-                                                                GetBaseMoveOffsets(mapx, mapy, monster_origin_x, monster_origin_y, width, height, maincounterdiff, moveIntervals, ref base_move_offset_x, ref base_move_offset_y);
-
-                                                                lock (_objectDataLock)
+                                                                for (int mapy = startY; mapy <= endY; mapy++)
                                                                 {
-                                                                    if (layer_idx == (int)layer_types.MAX_LAYERS + 1)
+                                                                    bool darken = DarkenedPos(mapx, mapy);
+                                                                    bool validpos = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_L_LEGAL) != 0 && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) != 0;
+                                                                    bool invalidpos = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_L_ILLEGAL) != 0 && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) != 0;
+
+                                                                    // Draw rectangle with blend mode in bottom half
+                                                                    if (darken)
                                                                     {
-                                                                        PaintMapUIElements(canvas, textPaint, paint, pathEffect, mapx, mapy, width, height, offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, targetscale, generalcountervalue, usedFontSize, monster_height, loc_is_you, canspotself);
+                                                                        tx = (offsetX + usedOffsetX + width * (float)mapx);
+                                                                        ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
+                                                                        DoDarkening(canvas, paint, tx, ty, width, height, GetDarkenPercentage(mapx, mapy, lighter_darkening));
                                                                     }
-                                                                    else
+                                                                    if (validpos)
                                                                     {
-                                                                        bool is_source_dir;
-                                                                        int sub_layer_cnt = GetSubLayerCount(mapx, mapy, layer_idx, out is_source_dir);
-                                                                        for (int sub_layer_idx = sub_layer_cnt - 1; sub_layer_idx >= 0; sub_layer_idx--)
+                                                                        paint.Color = new SKColor((byte)0, (byte)255, (byte)0, (byte)72);
+                                                                        SKBlendMode old_bm = paint.BlendMode;
+                                                                        paint.BlendMode = SKBlendMode.SrcOver;
+                                                                        tx = (offsetX + usedOffsetX + width * (float)mapx);
+                                                                        ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
+                                                                        SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
+#if GNH_MAP_PROFILING && DEBUG
+                                                                        StartProfiling(GHProfilingStyle.Rect);
+#endif
+                                                                        canvas.DrawRect(targetrect, paint);
+                                                                        //enlCanvas.DrawRect(targetrect, paint);
+#if GNH_MAP_PROFILING && DEBUG
+                                                                        StopProfiling(GHProfilingStyle.Rect);
+#endif
+                                                                        paint.BlendMode = old_bm;
+                                                                    }
+                                                                    if (invalidpos)
+                                                                    {
+                                                                        paint.Color = new SKColor((byte)255, (byte)0, (byte)0, (byte)72);
+                                                                        SKBlendMode old_bm = paint.BlendMode;
+                                                                        paint.BlendMode = SKBlendMode.SrcOver;
+                                                                        tx = (offsetX + usedOffsetX + width * (float)mapx);
+                                                                        ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
+                                                                        SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
+#if GNH_MAP_PROFILING && DEBUG
+                                                                        StartProfiling(GHProfilingStyle.Rect);
+#endif
+                                                                        canvas.DrawRect(targetrect, paint);
+                                                                        //enlCanvas.DrawRect(targetrect, paint);
+#if GNH_MAP_PROFILING && DEBUG
+                                                                        StopProfiling(GHProfilingStyle.Rect);
+#endif
+                                                                        paint.BlendMode = old_bm;
+                                                                    }
+                                                                }
+                                                            }
+                                                            break;
+                                                        }
+                                                        /* Enlargement bitmaps */
+                                                        case (int)layer_types.MAX_LAYERS:
+                                                        using (new SKAutoCanvasRestore(canvas))
+                                                        {
+                                                            bool dodarkening = true;
+                                                            using (SKCanvas darkeningCanvas = new SKCanvas(_paintBitmap))
+                                                            {
+                                                                foreach (GHDrawCommand dc in _drawCommandList)
+                                                                {
+                                                                    if (dc.EndDarkening)
+                                                                    {
+                                                                        dodarkening = false;
+                                                                        continue;
+                                                                    }
+                                                                    if (dodarkening && DarkenedPos(dc.MapX, dc.MapY))
+                                                                    {
+                                                                        darkeningCanvas.Clear(SKColors.Transparent);
+                                                                        lock (_lighterDarkeningLock)
                                                                         {
-                                                                            int signed_glyph = GHApp.NoGlyph; //Default
-                                                                            short obj_height = _mapData[mapx, mapy].Layers.object_height; //Default
-                                                                            sbyte object_origin_x = 0; //Default
-                                                                            sbyte object_origin_y = 0; //Default
-                                                                            ObjectDataItem otmp_round = null;
-
-                                                                            int source_dir_main_idx = sub_layer_idx;
-                                                                            int source_dir_idx = is_source_dir ? GetSourceDirIndex(layer_idx, source_dir_main_idx) : 0;
-
-                                                                            bool manual_hflip = false;
-                                                                            bool manual_vflip = false;
-                                                                            int adj_x = mapx;
-                                                                            int adj_y = mapy;
-                                                                            bool foundthisturn = false;
-
-                                                                            if (!GetLayerGlyph(mapx, mapy, layer_idx, sub_layer_idx, source_dir_idx, ref signed_glyph,
-                                                                                ref adj_x, ref adj_y, ref manual_hflip, ref manual_vflip, ref otmp_round, ref obj_height,
-                                                                                ref object_origin_x, ref object_origin_y, ref foundthisturn))
-                                                                                continue;
-
-                                                                            int glyph = Math.Abs(signed_glyph);
-                                                                            if (glyph == 0 || glyph >= GHApp.Glyph2Tile.Length)
-                                                                                continue;
-
-                                                                            float object_move_offset_x = 0, object_move_offset_y = 0;
-                                                                            GetObjectMoveOffsets(mapx, mapy, object_origin_x, object_origin_y, width, height, objectcounterdiff, moveIntervals, generalcounterdiff, 
-                                                                                foundthisturn, sub_layer_idx, sub_layer_cnt, targetscale, loc_is_you, obj_height, otmp_round, ref object_move_offset_x, ref object_move_offset_y);
-
-                                                                            bool vflip_glyph = false;
-                                                                            bool hflip_glyph = false;
-                                                                            GetFlips(signed_glyph, manual_hflip, manual_vflip, ref hflip_glyph, ref vflip_glyph);
-
-                                                                            /* Tile flags */
-                                                                            bool tileflag_halfsize = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_HALF_SIZED_TILE) != 0;
-                                                                            bool tileflag_floortile = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_HAS_FLOOR_TILE) != 0;
-                                                                            bool tileflag_normalobjmissile = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_NORMAL_ITEM_AS_MISSILE) != 0 && layer_idx == (int)layer_types.LAYER_MISSILE;
-                                                                            bool tileflag_fullsizeditem = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_FULL_SIZED_ITEM) != 0;
-                                                                            bool tileflag_height_is_clipping = (GHApp.GlyphTileFlags[glyph] & (byte)glyph_tile_flags.GLYPH_TILE_FLAG_HEIGHT_IS_CLIPPING) != 0;
-
-                                                                            /* All items are big when showing detection */
-                                                                            CheckShowingDetection(showing_detection, ref obj_height, ref tileflag_floortile, ref tileflag_height_is_clipping);
-
-                                                                            /*Determine y move for tiles */
-                                                                            float scaled_y_height_change = GetScaledYHeightChange(layer_idx, sub_layer_idx, sub_layer_cnt, height, monster_height, feature_doodad_height, targetscale, is_monster_like_layer, tileflag_halfsize, otmp_round);
-
-                                                                            int ntile = GHApp.Glyph2Tile[glyph];
-                                                                            int autodraw = GHApp.Tile2Autodraw[ntile];
-
-                                                                            /* Determine animation tile here */
-                                                                            int anim_frame_idx = 0, main_tile_idx = 0;
-                                                                            ntile = GetTileFromAnimation(ntile, glyph, mapx, mapy, layer_idx, generalcountervalue, is_monster_or_shadow_layer, ref anim_frame_idx, ref main_tile_idx, ref autodraw);
-
-                                                                            /* Draw enlargement tiles */
-                                                                            int enlargement = GHApp.Tile2Enlargement[ntile];
-                                                                            for (int order_idx = -1; order_idx < 5; order_idx++)
+                                                                            if (dc.IsAutoDraw)
                                                                             {
-                                                                                if (enlargement == 0 && order_idx >= 0)
-                                                                                    break;
-                                                                                int enl_idx = GetUsedEnlargementIndex(order_idx);
-                                                                                int dx = 0, dy = 0;
-                                                                                if (!GetEnlargementTileB(enlargement, enl_idx, hflip_glyph, vflip_glyph, main_tile_idx, anim_frame_idx, ref ntile, ref autodraw, ref dx, ref dy))
-                                                                                    continue;
+                                                                                SKBitmap usedDarkenedBitmap = null;
+                                                                                int darken_percentage = GetDarkenPercentage(dc.MapX, dc.MapY, lighter_darkening);
+                                                                                AutoDrawParameterDefinition modadparams = dc.AutoDrawParameters;
+                                                                                modadparams.tx = 0;
+                                                                                modadparams.ty = 0;
+                                                                                modadparams.scaled_x_padding = 0;
+                                                                                modadparams.scaled_y_padding = 0;
+                                                                                modadparams.scale = 1;
+                                                                                modadparams.targetscale = 1;
+                                                                                SavedDarkenedAutodrawBitmap cachekey = new SavedDarkenedAutodrawBitmap(modadparams, darken_percentage);
+                                                                                SKRect sourceRect = new SKRect(0, 0, dc.AutoDrawParameters.width, dc.AutoDrawParameters.height);
+                                                                                SKRect destRect = new SKRect(dc.AutoDrawParameters.tx + dc.AutoDrawParameters.scaled_x_padding,
+                                                                                    dc.AutoDrawParameters.ty + dc.AutoDrawParameters.scaled_y_padding,
+                                                                                    dc.AutoDrawParameters.tx + dc.AutoDrawParameters.scaled_x_padding + dc.AutoDrawParameters.width * dc.AutoDrawParameters.scale * dc.AutoDrawParameters.targetscale,
+                                                                                    dc.AutoDrawParameters.ty + dc.AutoDrawParameters.scaled_y_padding + dc.AutoDrawParameters.height * dc.AutoDrawParameters.scale * dc.AutoDrawParameters.targetscale);
 
-                                                                                int draw_map_x = mapx + dx + (adj_x - mapx);
-                                                                                int draw_map_y = mapy + dy + (adj_y - mapy);
-
-                                                                                if ((enlargement > 0 && enl_idx >= 0 && enl_idx <= 2) || layer_idx == (int)layer_types.MAX_LAYERS)
+                                                                                bool getsuccessful;
+                                                                                lock(_darkenedAutoDrawBitmapLock)
                                                                                 {
-                                                                                    PaintMapTile(canvas, true, textPaint, paint, layer_idx, mapx, mapy, draw_map_x, draw_map_y, dx, dy, ntile, width, height,
-                                                                                        offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, object_move_offset_x, object_move_offset_y,
-                                                                                        scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
-                                                                                        monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
-                                                                                        loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
-                                                                                        hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement,
-                                                                                        ref draw_shadow); //, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
+                                                                                    getsuccessful = _darkenedAutodrawBitmaps.ContainsKey(cachekey) && _darkenedAutodrawBitmaps.TryGetValue(cachekey, out usedDarkenedBitmap);
+                                                                                }
+                                                                                if (getsuccessful && usedDarkenedBitmap != null)
+                                                                                {
+                                                                                    paint.Color = dc.PaintColor;
+                                                                                    canvas.SetMatrix(dc.Matrix);
+                                                                                    canvas.DrawBitmap(usedDarkenedBitmap, sourceRect, destRect, paint);
                                                                                 }
                                                                                 else
                                                                                 {
-                                                                                    //float minDrawX = 0, maxDrawX = 0, minDrawY = 0, maxDrawY = 0;
-                                                                                    PaintMapTile(canvas, false, textPaint, paint, layer_idx, mapx, mapy, draw_map_x, draw_map_y, dx, dy, ntile, width, height,
-                                                                                        offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, object_move_offset_x, object_move_offset_y,
-                                                                                        scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
-                                                                                        monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
-                                                                                        loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
-                                                                                        hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement,
-                                                                                        ref draw_shadow); //, ref minDrawX, ref maxDrawX, ref minDrawY, ref maxDrawY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
+
+                                                                                    paint.Color = dc.PaintColor;
+                                                                                    canvas.SetMatrix(dc.Matrix);
+                                                                                    DrawAutoDraw(dc.AutoDrawParameters.autodraw, darkeningCanvas, false, paint, dc.AutoDrawParameters.otmp_round,
+                                                                                        dc.AutoDrawParameters.layer_idx, dc.MapX, dc.MapY, dc.AutoDrawParameters.tileflag_halfsize,
+                                                                                        dc.AutoDrawParameters.tileflag_normalobjmissile, dc.AutoDrawParameters.tileflag_fullsizeditem, 0, 0,
+                                                                                        dc.AutoDrawParameters.width, dc.AutoDrawParameters.height, 1, 1,
+                                                                                        0, 0, height, dc.AutoDrawParameters.is_inventory,
+                                                                                        dc.AutoDrawParameters.drawwallends);
+                                                                                    DoDarkening(darkeningCanvas, paint, 0, 0, dc.AutoDrawParameters.width, dc.AutoDrawParameters.height, darken_percentage);
+
+                                                                                    /* Save to cache as immutable */
+                                                                                    try
+                                                                                    {
+                                                                                        SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight);
+                                                                                        _paintBitmap.CopyTo(newbmp);
+                                                                                        newbmp.SetImmutable();
+                                                                                        usedDarkenedBitmap = newbmp;
+                                                                                        lock(_darkenedAutoDrawBitmapLock)
+                                                                                        {
+                                                                                            if (_darkenedAutodrawBitmaps.Count >= GHConstants.MaxDarkenedAutodrawBitmapCacheSize)
+                                                                                            {
+                                                                                                foreach (SKBitmap bmp in _darkenedAutodrawBitmaps.Values)
+                                                                                                    bmp.Dispose();
+                                                                                                _darkenedAutodrawBitmaps.Clear(); /* Clear the whole dictionary for the sake of ease; should almost never happen normally anyway */
+                                                                                            }
+                                                                                            _darkenedAutodrawBitmaps.TryAdd(cachekey, newbmp);
+                                                                                        }
+                                                                                    }
+                                                                                    catch (Exception ex)
+                                                                                    {
+                                                                                        Debug.WriteLine(ex.Message);
+                                                                                        usedDarkenedBitmap = _paintBitmap;
+                                                                                    }
+
+                                                                                    canvas.DrawBitmap(usedDarkenedBitmap, sourceRect, destRect, paint);
+                                                                                }
+                                                                            }
+                                                                            else
+                                                                            { 
+                                                                                SKBitmap usedDarkenedBitmap = null;
+                                                                                int darken_percentage = GetDarkenPercentage(dc.MapX, dc.MapY, lighter_darkening);
+                                                                                SavedDarkenedBitmap cachekey = new SavedDarkenedBitmap(dc.SourceBitmap, dc.SourceRect, darken_percentage);
+                                                                                SKRect cacheRect = new SKRect(0, 0, dc.SourceRect.Width, dc.SourceRect.Height);
+                                                                                bool getsuccessful;
+                                                                                lock(_darkenedBitmapLock)
+                                                                                {
+                                                                                    getsuccessful = _darkenedBitmaps.ContainsKey(cachekey) && _darkenedBitmaps.TryGetValue(cachekey, out usedDarkenedBitmap);
+                                                                                }
+                                                                                if (getsuccessful && usedDarkenedBitmap != null)
+                                                                                {
+                                                                                    paint.Color = dc.PaintColor;
+                                                                                    canvas.SetMatrix(dc.Matrix);
+                                                                                    canvas.DrawBitmap(usedDarkenedBitmap, cacheRect, dc.DestinationRect, paint);
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                    /* Copy source bitmap to _paintCanvas and darken it */
+                                                                                    paint.Color = SKColors.Black;
+                                                                                    darkeningCanvas.DrawBitmap(dc.SourceBitmap, dc.SourceRect, cacheRect, paint);
+                                                                                    DoDarkening(darkeningCanvas, paint, cacheRect.Left, cacheRect.Top, cacheRect.Width, cacheRect.Height, darken_percentage);
+
+                                                                                    /* Save to cache as immutable */
+                                                                                    try
+                                                                                    {
+                                                                                        SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight);
+                                                                                        _paintBitmap.CopyTo(newbmp);
+                                                                                        newbmp.SetImmutable();
+                                                                                        usedDarkenedBitmap = newbmp;
+                                                                                        lock(_darkenedBitmapLock)
+                                                                                        {
+                                                                                            if (_darkenedBitmaps.Count >= GHConstants.MaxDarkenedBitmapCacheSize)
+                                                                                            {
+                                                                                                foreach (SKBitmap bmp in _darkenedBitmaps.Values)
+                                                                                                    bmp.Dispose();
+                                                                                                _darkenedBitmaps.Clear(); /* Clear the whole dictionary for the sake of ease; should almost never happen normally anyway */
+                                                                                            }
+                                                                                            _darkenedBitmaps.TryAdd(cachekey, newbmp);
+                                                                                        }
+                                                                                    }
+                                                                                    catch (Exception ex)
+                                                                                    {
+                                                                                        Debug.WriteLine(ex.Message);
+                                                                                        usedDarkenedBitmap = _paintBitmap;
+                                                                                    }
+
+                                                                                    paint.Color = dc.PaintColor;
+                                                                                    canvas.SetMatrix(dc.Matrix);
+                                                                                    canvas.DrawBitmap(usedDarkenedBitmap, cacheRect, dc.DestinationRect, paint);
                                                                                 }
                                                                             }
                                                                         }
                                                                     }
-                                                                }
-                                                            }
-                                                        }
-
-                                                        switch(layer_idx)
-                                                        {
-                                                            /* Darkening at the end of layers */
-                                                            case (int)layer_types.LAYER_OBJECT:
-                                                            {
-                                                                for (int mapx = startX; mapx <= endX; mapx++)
-                                                                {
-                                                                    for (int mapy = startY; mapy <= endY; mapy++)
-                                                                    {
-                                                                        bool showing_detection = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_SHOWING_DETECTION) != 0;
-                                                                        bool darken = (!showing_detection && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) == 0);
-                                                                        bool validpos = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_L_LEGAL) != 0 && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) != 0;
-                                                                        bool invalidpos = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_L_ILLEGAL) != 0 && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) != 0;
-
-                                                                        if (_mapData[mapx, mapy].Layers.layer_gui_glyphs != null
-                                                                            && (_mapData[mapx, mapy].Layers.layer_gui_glyphs[(int)layer_types.LAYER_FLOOR] == GHApp.UnexploredGlyph
-                                                                                || _mapData[mapx, mapy].Layers.layer_gui_glyphs[(int)layer_types.LAYER_FLOOR] == GHApp.NoGlyph)
-                                                                            )
-                                                                            darken = false;
-
-                                                                        // Draw rectangle with blend mode in bottom half
-                                                                        if (darken)
-                                                                        {
-                                                                            bool uloc = ((_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0);
-                                                                            bool unlit = ((_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_APPEARS_UNLIT) != 0);
-                                                                            // Get values from XAML controls
-                                                                            int darken_percentage = lighter_darkening ? (uloc ? 90 : unlit ? 65 : 80) : (uloc ? 85 : unlit ? 40 : 65);
-                                                                            int val = (darken_percentage * 255) / 100;
-                                                                            SKColor color = new SKColor((byte)val, (byte)val, (byte)val);
-
-                                                                            paint.Color = color;
-                                                                            SKBlendMode old_bm = paint.BlendMode;
-                                                                            paint.BlendMode = SKBlendMode.Modulate;
-                                                                            tx = (offsetX + usedOffsetX + width * (float)mapx);
-                                                                            ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
-                                                                            SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
-#if GNH_MAP_PROFILING && DEBUG
-                                                                            StartProfiling(GHProfilingStyle.Rect);
-#endif
-                                                                            canvas.DrawRect(targetrect, paint);
-                                                                            //enlCanvas.DrawRect(targetrect, paint);
-#if GNH_MAP_PROFILING && DEBUG
-                                                                            StopProfiling(GHProfilingStyle.Rect);
-#endif
-                                                                            paint.BlendMode = old_bm;
-                                                                        }
-                                                                        if (validpos)
-                                                                        {
-                                                                            paint.Color = new SKColor((byte)0, (byte)255, (byte)0, (byte)72);
-                                                                            SKBlendMode old_bm = paint.BlendMode;
-                                                                            paint.BlendMode = SKBlendMode.SrcOver;
-                                                                            tx = (offsetX + usedOffsetX + width * (float)mapx);
-                                                                            ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
-                                                                            SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
-#if GNH_MAP_PROFILING && DEBUG
-                                                                            StartProfiling(GHProfilingStyle.Rect);
-#endif
-                                                                            canvas.DrawRect(targetrect, paint);
-                                                                            //enlCanvas.DrawRect(targetrect, paint);
-#if GNH_MAP_PROFILING && DEBUG
-                                                                            StopProfiling(GHProfilingStyle.Rect);
-#endif
-                                                                            paint.BlendMode = old_bm;
-                                                                        }
-                                                                        if (invalidpos)
-                                                                        {
-                                                                            paint.Color = new SKColor((byte)255, (byte)0, (byte)0, (byte)72);
-                                                                            SKBlendMode old_bm = paint.BlendMode;
-                                                                            paint.BlendMode = SKBlendMode.SrcOver;
-                                                                            tx = (offsetX + usedOffsetX + width * (float)mapx);
-                                                                            ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
-                                                                            SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
-#if GNH_MAP_PROFILING && DEBUG
-                                                                            StartProfiling(GHProfilingStyle.Rect);
-#endif
-                                                                            canvas.DrawRect(targetrect, paint);
-                                                                            //enlCanvas.DrawRect(targetrect, paint);
-#if GNH_MAP_PROFILING && DEBUG
-                                                                            StopProfiling(GHProfilingStyle.Rect);
-#endif
-                                                                            paint.BlendMode = old_bm;
-                                                                        }
-                                                                    }
-                                                                }
-                                                                break;
-                                                            }
-                                                            /* Enlargement bitmaps */
-                                                            case (int)layer_types.MAX_LAYERS:
-                                                                //paint.Color = SKColors.Black;
-//                                                                if (_enlargementBitmap != null && _enlBmpMinX < _enlBmpMaxX && _enlBmpMinY < _enlBmpMaxY)
-//                                                                {
-//                                                                    SKRect _copyRect = new SKRect(_enlBmpMinX, _enlBmpMinY, _enlBmpMaxX, _enlBmpMaxY);
-//#if GNH_MAP_PROFILING && DEBUG
-//                                                                    StartProfiling(GHProfilingStyle.Bitmap);
-//#endif
-//                                                                    canvas.DrawBitmap(_enlargementBitmap, _copyRect, _copyRect, paint);
-//#if GNH_MAP_PROFILING && DEBUG
-//                                                                    StopProfiling(GHProfilingStyle.Bitmap);
-//#endif
-//                                                                }
-
-                                                                using(new SKAutoCanvasRestore(canvas))
-                                                                {
-                                                                    foreach (GHDrawCommand dc in _drawCommandList)
+                                                                    else
                                                                     {
                                                                         paint.Color = dc.PaintColor;
                                                                         canvas.SetMatrix(dc.Matrix);
-                                                                        canvas.DrawBitmap(dc.SourceBitmap, dc.SourceRect, dc.DestinationRect, paint);
+                                                                        if(dc.IsAutoDraw)
+                                                                        {
+                                                                                DrawAutoDraw(dc.AutoDrawParameters.autodraw, canvas, false, paint, dc.AutoDrawParameters.otmp_round,
+                                                                                    dc.AutoDrawParameters.layer_idx, dc.MapX, dc.MapY, dc.AutoDrawParameters.tileflag_halfsize,
+                                                                                    dc.AutoDrawParameters.tileflag_normalobjmissile, dc.AutoDrawParameters.tileflag_fullsizeditem, dc.AutoDrawParameters.tx, dc.AutoDrawParameters.ty,
+                                                                                    dc.AutoDrawParameters.width, dc.AutoDrawParameters.height, dc.AutoDrawParameters.scale, dc.AutoDrawParameters.targetscale,
+                                                                                    dc.AutoDrawParameters.scaled_x_padding, dc.AutoDrawParameters.scaled_y_padding, dc.AutoDrawParameters.scaled_tile_height, dc.AutoDrawParameters.is_inventory,
+                                                                                    dc.AutoDrawParameters.drawwallends);
+                                                                        }
+                                                                        else
+                                                                            canvas.DrawBitmap(dc.SourceBitmap, dc.SourceRect, dc.DestinationRect, paint);
                                                                     }
                                                                 }
-                                                                _drawCommandList.Clear();
+                                                            }
+                                                            _drawCommandList.Clear();
 
-                                                                paint.Color = SKColors.Black;
-                                                                for (int mapx = startX; mapx <= endX; mapx++)
+                                                            paint.Color = SKColors.Black;
+                                                            for (int mapx = startX; mapx <= endX; mapx++)
+                                                            {
+                                                                for (int mapy = startY; mapy <= endY; mapy++)
                                                                 {
-                                                                    for (int mapy = startY; mapy <= endY; mapy++)
+                                                                    bool ascension_radiance = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_ASCENSION_RADIANCE) != 0
+                                                                        && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) != 0;
+                                                                    if (ascension_radiance)
                                                                     {
-                                                                        bool ascension_radiance = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_ASCENSION_RADIANCE) != 0
-                                                                            && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) != 0;
-                                                                        if (ascension_radiance)
-                                                                        {
-                                                                            float multiplier = 1.0f - Math.Min(1.0f, 0.3f + (float)Math.Sqrt(Math.Pow(mapx - u_x, 2) + Math.Pow(mapy - u_y, 2)) / 6.0f);
-                                                                            int val = (int)(multiplier * 255);
-                                                                            SKColor color = new SKColor((byte)val, (byte)val, (byte)val);
+                                                                        float multiplier = 1.0f - Math.Min(1.0f, 0.3f + (float)Math.Sqrt(Math.Pow(mapx - u_x, 2) + Math.Pow(mapy - u_y, 2)) / 6.0f);
+                                                                        int val = (int)(multiplier * 255);
+                                                                        SKColor color = new SKColor((byte)val, (byte)val, (byte)val);
 
-                                                                            paint.Color = color;
-                                                                            SKBlendMode old_bm = paint.BlendMode;
-                                                                            paint.BlendMode = SKBlendMode.Screen;
-                                                                            tx = (offsetX + usedOffsetX + width * (float)mapx);
-                                                                            ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
-                                                                            SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
+                                                                        paint.Color = color;
+                                                                        SKBlendMode old_bm = paint.BlendMode;
+                                                                        paint.BlendMode = SKBlendMode.Screen;
+                                                                        tx = (offsetX + usedOffsetX + width * (float)mapx);
+                                                                        ty = (offsetY + usedOffsetY + mapFontAscent + height * (float)mapy);
+                                                                        SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
 #if GNH_MAP_PROFILING && DEBUG
                                                                             StartProfiling(GHProfilingStyle.Rect);
 #endif
-                                                                            canvas.DrawRect(targetrect, paint);
-                                                                            //enlCanvas.DrawRect(targetrect, paint);
+                                                                        canvas.DrawRect(targetrect, paint);
+                                                                        //enlCanvas.DrawRect(targetrect, paint);
 #if GNH_MAP_PROFILING && DEBUG
                                                                             StopProfiling(GHProfilingStyle.Rect);
 #endif
-                                                                            paint.BlendMode = old_bm;
-                                                                            if((_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0)
-                                                                            {
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.5f * width, ty + 0.5f * height, 15f * targetscale, generalcountervalue, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.25f * width, ty + 0.25f * height, 10f * targetscale, generalcountervalue - 10, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.75f * width, ty + 0.25f * height, 10f * targetscale, generalcountervalue - 20, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.25f * width, ty + 0.75f * height, 10f * targetscale, generalcountervalue - 30, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.75f * width, ty + 0.75f * height, 10f * targetscale, generalcountervalue - 40, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.5f * width, ty, 7f * targetscale, generalcountervalue - 50, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + 0.5f * width, ty + height, 7f * targetscale, generalcountervalue - 60, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx, ty + 0.5f * height, 7f * targetscale, generalcountervalue - 70, true);
-                                                                                UIUtils.DrawSparkle(canvas, paint, tx + width, ty + 0.5f * height, 7f * targetscale, generalcountervalue - 80, true);
-                                                                            }
+                                                                        paint.BlendMode = old_bm;
+                                                                        if ((_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0)
+                                                                        {
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.5f * width, ty + 0.5f * height, 15f * targetscale, generalcountervalue, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.25f * width, ty + 0.25f * height, 10f * targetscale, generalcountervalue - 10, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.75f * width, ty + 0.25f * height, 10f * targetscale, generalcountervalue - 20, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.25f * width, ty + 0.75f * height, 10f * targetscale, generalcountervalue - 30, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.75f * width, ty + 0.75f * height, 10f * targetscale, generalcountervalue - 40, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.5f * width, ty, 7f * targetscale, generalcountervalue - 50, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + 0.5f * width, ty + height, 7f * targetscale, generalcountervalue - 60, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx, ty + 0.5f * height, 7f * targetscale, generalcountervalue - 70, true);
+                                                                            UIUtils.DrawSparkle(canvas, paint, tx + width, ty + 0.5f * height, 7f * targetscale, generalcountervalue - 80, true);
                                                                         }
                                                                     }
                                                                 }
-                                                                break;
+                                                            }
+                                                            break;
                                                         }
                                                     }
-                                                //}
+                                                }
                                             }
                                         }
                                     }
@@ -6837,6 +7295,8 @@ namespace GnollHackX.Pages.Game
                 /* Window strings */
                 float lastStatusRowPrintY = 0.0f;
                 float lastStatusRowFontSpacing = 0.0f;
+                float herewindowtop = canvasheight;
+                float messagewindowtop = canvasheight;
 
                 lock (_canvasButtonLock)
                 {
@@ -6890,6 +7350,18 @@ namespace GnollHackX.Pages.Game
                                         float addition = newleft - winRect.Left;
                                         winRect.Left += addition;
                                         winRect.Right += addition;
+                                    }
+
+                                    switch (_currentGame.Windows[i].WindowType)
+                                    {
+                                        case GHWinType.Here:
+                                            herewindowtop = winRect.Top;
+                                            break;
+                                        case GHWinType.Message:
+                                            messagewindowtop = winRect.Top;
+                                            break;
+                                        default:
+                                            break;
                                     }
 
                                     using (SKPaint winPaint = new SKPaint())
@@ -6995,8 +7467,8 @@ namespace GnollHackX.Pages.Game
 
                                                 lock (_refreshMsgHistoryRowCountLock)
                                                 {
-                                                    bool refreshsmallesttop = true;
-                                                    for (idx = _msgHistory.Count - 1; idx >= 0 && j >= 0; idx--)
+                                                    bool refreshsmallesttop = false;
+                                                    for (idx = _msgHistory.Length - 1; idx >= 0 && j >= 0; idx--)
                                                     {
                                                         GHMsgHistoryItem msgHistoryItem = _msgHistory[idx];
                                                         //longLine = msgHistoryItem.Text;
@@ -7012,31 +7484,40 @@ namespace GnollHackX.Pages.Game
                                                             refreshsmallesttop = true;
                                                             msgHistoryItem.WrappedTextRows.Clear();
                                                             float lineLength = 0.0f;
-                                                            string line = "";
+                                                            //string line = "";
+                                                            _lineBuilder.Clear();
                                                             string[] txtsplit = msgHistoryItem.TextSplit;
                                                             bool firstonline = true;
                                                             for (int widx = 0; widx < txtsplit.Length; widx++)
                                                             {
                                                                 string word = txtsplit[widx];
-                                                                string wordWithSpace = word + " ";
-                                                                float wordLength = textPaint.MeasureText(wordWithSpace);
+                                                                //string wordWithSpace = word + " ";
+                                                                float wordLength = textPaint.MeasureText(word);
                                                                 float wordWithSpaceLength = wordLength + spaceLength;
                                                                 if (lineLength + wordLength > lineLengthLimit && !firstonline)
                                                                 {
-                                                                    msgHistoryItem.WrappedTextRows.Add(line);
-                                                                    line = wordWithSpace;
+                                                                    msgHistoryItem.WrappedTextRows.Add(_lineBuilder.ToString());
+                                                                    //line = wordWithSpace;
+                                                                    _lineBuilder.Clear();
+                                                                    _lineBuilder.Append(word);
+                                                                    _lineBuilder.Append(" ");
                                                                     lineLength = wordWithSpaceLength;
                                                                     firstonline = true;
                                                                 }
                                                                 else
                                                                 {
-                                                                    line += wordWithSpace;
+                                                                    //line += wordWithSpace;
+                                                                    _lineBuilder.Append(word);
+                                                                    _lineBuilder.Append(" ");
                                                                     lineLength += wordWithSpaceLength;
                                                                     firstonline = false;
                                                                 }
                                                             }
-                                                            msgHistoryItem.WrappedTextRows.Add(line);
+                                                            msgHistoryItem.WrappedTextRows.Add(_lineBuilder.ToString());
                                                         }
+
+                                                        if(!msgHistoryItem.MatchFilter)
+                                                            continue;
 
                                                         int lineidx;
                                                         for (lineidx = 0; lineidx < msgHistoryItem.WrappedTextRows.Count; lineidx++)
@@ -7144,9 +7625,11 @@ namespace GnollHackX.Pages.Game
                                                         {
                                                             _messageSmallestTop = canvasheight;
                                                             j = ActualDisplayedMessages - 1;
-                                                            for (idx = _msgHistory.Count - 1; idx >= 0 && j >= 0; idx--)
+                                                            for (idx = _msgHistory.Length - 1; idx >= 0 && j >= 0; idx--)
                                                             {
                                                                 GHMsgHistoryItem msgHistoryItem = _msgHistory[idx];
+                                                                if (!msgHistoryItem.MatchFilter)
+                                                                    continue;
                                                                 int lineidx;
                                                                 for (lineidx = 0; lineidx < msgHistoryItem.WrappedTextRows.Count; lineidx++)
                                                                 {
@@ -7159,6 +7642,14 @@ namespace GnollHackX.Pages.Game
                                                                         _messageSmallestTop = ty + textPaint.FontMetrics.Ascent;
                                                                 }
                                                                 j -= msgHistoryItem.WrappedTextRows.Count;
+                                                            }
+                                                            float topScrollLimit = Math.Max(0, -_messageSmallestTop);
+                                                            if (_messageScrollOffset > topScrollLimit)
+                                                            {
+                                                                _messageScrollOffset = topScrollLimit;
+                                                                _messageScrollSpeed = 0;
+                                                                _messageScrollSpeedOn = false;
+                                                                _messageScrollSpeedRecords.Clear();
                                                             }
                                                         }
                                                     }
@@ -7188,6 +7679,7 @@ namespace GnollHackX.Pages.Game
                     _healthRectDrawn = false;
                     _manaRectDrawn = false;
                     _skillRectDrawn = false;
+                    _prevWepRectDrawn = false;
                     float orbleft = 5.0f;
                     float orbbordersize = (float)(lAbilitiesButton.Width / canvasView.Width) * canvaswidth;
 
@@ -8264,6 +8756,8 @@ namespace GnollHackX.Pages.Game
                                 textPaint.Color = SKColors.White;
                             }
 
+                            /* Right aligned */
+                            float dungeonleft = canvaswidth - hmargin;
                             /* Dungeon level */
                             valtext = "";
                             lock (StatusFieldLock)
@@ -8287,6 +8781,7 @@ namespace GnollHackX.Pages.Game
                                 target_height = target_scale * GHApp._statusDungeonLevelBitmap.Height;
                                 float print_width = textPaint.MeasureText(printtext);
                                 curx = canvaswidth - hmargin - print_width - innerspacing - target_width;
+                                dungeonleft = curx;
                                 statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
 #if GNH_MAP_PROFILING && DEBUG
                                 StartProfiling(GHProfilingStyle.Bitmap);
@@ -8305,6 +8800,105 @@ namespace GnollHackX.Pages.Game
                                 StopProfiling(GHProfilingStyle.Text);
 #endif
                                 curx += print_width;
+                            }
+
+                            float batteryleft = dungeonleft;
+                            double chargeLevel = GHApp.BatteryChargeLevel;
+                            float chargePercentage = (float)chargeLevel / 100;
+                            if (ShowBattery || chargePercentage <= GHConstants.CriticalBatteryChargeLevel)
+                            {
+                                target_width = target_scale * GHApp._batteryFrameBitmap.Width;
+                                target_height = target_scale * GHApp._batteryFrameBitmap.Height;
+                                curx = dungeonleft - innerspacing * 5 - target_width;
+                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                canvas.DrawBitmap(GHApp._batteryFrameBitmap, statusDest, textPaint);
+                                batteryleft = curx;
+
+                                int alen = _shineAnimation.Length;
+                                if (chargePercentage <= GHConstants.CriticalBatteryChargeLevel)
+                                {
+                                    textPaint.Color = _magicShineOutlineColor.WithAlpha((byte)(_shineAnimation[generalcountervalue % alen] * 255));
+                                    canvas.DrawBitmap(GHApp._batteryRedFrameBitmap, statusDest, textPaint);
+                                }
+
+                                const int topMargin = 12, bottomMargin = 5, hMargin = 6;
+
+                                if (chargeLevel <= 9)
+                                {
+                                    string drawtext = ((int)chargeLevel).ToString();
+                                    textPaint.TextSize = diffontsize;
+                                    textPaint.TextAlign = SKTextAlign.Center;
+                                    float alpha = _shineAnimation[generalcountervalue % alen];
+                                    textPaint.Color = new SKColor(255, (byte)(alpha * 0 + (1 - alpha) * 255), (byte)(alpha * 0 + (1 - alpha) * 255));
+                                    float vsize = target_height - (topMargin + bottomMargin) * target_scale;
+                                    float fsize = textPaint.FontSpacing;
+                                    float vpadding = (vsize - fsize) / 2;
+                                    SKPoint drawpoint = new SKPoint(curx + target_width / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
+                                    canvas.DrawText(drawtext, drawpoint, textPaint);
+                                    textPaint.TextAlign = SKTextAlign.Left;
+                                    textPaint.TextSize = basefontsize;
+                                    textPaint.Color = SKColors.White;
+                                }
+
+                                int totalHeight = GHApp._batteryFrameBitmap.Height;
+                                int fillHeight = totalHeight - topMargin - bottomMargin;
+                                float calcFillHeight = fillHeight * chargePercentage;
+                                float addedFillTop = fillHeight - calcFillHeight;
+
+                                float r_mult = chargePercentage <= 0.25f ? chargePercentage * 2.0f + 0.5f : chargePercentage <= 0.5f ? 1.0f : (1.0f - chargePercentage) * 2.0f;
+                                float g_mult = chargePercentage <= 0.25f ? 0 : chargePercentage <= 0.5f ? (chargePercentage - 0.25f) * 4.0f : 1.0f;
+                                textPaint.Color = new SKColor((byte)(255 * r_mult), (byte)(255 * g_mult), 0);
+
+                                statusDest = new SKRect(curx + hMargin * target_scale, cury + (topMargin + addedFillTop) * target_scale, curx + target_width - hMargin * target_scale, cury + target_height - bottomMargin * target_scale);
+                                canvas.DrawRect(statusDest, textPaint);
+                                textPaint.Color = SKColors.White;
+
+                                curx += target_width;
+                            }
+
+                            float fpsleft = batteryleft;
+                            if(ShowFPS)
+                            {
+                                target_width = target_scale * GHApp._fpsBitmap.Width;
+                                target_height = target_scale * GHApp._fpsBitmap.Height;
+                                curx = batteryleft - innerspacing * 5 - target_width;
+                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                canvas.DrawBitmap(GHApp._fpsBitmap, statusDest, textPaint);
+                                fpsleft = curx;
+
+                                string drawtext;
+                                lock (_fpslock)
+                                {
+                                    drawtext = string.Format("{0:0.0}", _fps);
+                                }
+
+                                const int topMargin = 4, bottomMargin = 16;
+                                textPaint.Color = SKColors.White;
+                                textPaint.TextSize = diffontsize;
+                                textPaint.TextAlign = SKTextAlign.Center;
+                                float vsize = target_height - (topMargin + bottomMargin) * target_scale;
+                                float fsize = textPaint.FontSpacing;
+                                float vpadding = (vsize - fsize) / 2;
+                                SKPoint drawpoint = new SKPoint(curx + target_width / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
+                                canvas.DrawText(drawtext, drawpoint, textPaint);
+                                textPaint.TextAlign = SKTextAlign.Left;
+                                textPaint.TextSize = basefontsize;
+                            }
+
+                            if(ShowRecording)
+                            {
+                                if (GHApp.RecordGame && !PlayingReplay)
+                                {
+                                    target_width = rowheight / 4;
+                                    target_height = rowheight;
+                                    curx = fpsleft - innerspacing * 6 - target_width;
+                                    SKPoint dotpoint = new SKPoint(curx + target_width / 2, cury + target_height / 2);
+                                    float dotradius = target_width / 2;
+                                    textPaint.Color = SKColors.Red;
+                                    textPaint.Style = SKPaintStyle.Fill;
+                                    canvas.DrawCircle(dotpoint, dotradius, textPaint);
+                                    curx += target_width;
+                                }
                             }
 
                             /* Pets */
@@ -8587,16 +9181,27 @@ namespace GnollHackX.Pages.Game
                         }
 
                         bool orbsok = false;
+                        bool prevwepok = false;
+                        bool isunwield = false;
                         bool skillbuttonok = false;
                         lock (StatusFieldLock)
                         {
                             orbsok = StatusFields[(int)statusfields.BL_HPMAX] != null && StatusFields[(int)statusfields.BL_HPMAX].Text != "" && StatusFields[(int)statusfields.BL_HPMAX].Text != "0";
                             skillbuttonok = StatusFields[(int)statusfields.BL_SKILL] != null && StatusFields[(int)statusfields.BL_SKILL].Text != null && StatusFields[(int)statusfields.BL_SKILL].Text == "Skill";
                         }
-
+                        lock (_weaponStyleObjDataItemLock)
+                        {
+                            if(_weaponStyleObjDataItem[0] != null)
+                            {
+                                prevwepok = _weaponStyleObjDataItem[0].PreviousWeaponFound || _weaponStyleObjDataItem[0].PreviousUnwield;
+                                isunwield = _weaponStyleObjDataItem[0].PreviousUnwield;
+                            }
+                        }
                         float lastdrawnrecty = ClassicStatusBar ? Math.Max(abilitybuttonbottom, lastStatusRowPrintY + 0.0f * lastStatusRowFontSpacing) : statusbarheight;
                         tx = orbleft;
                         ty = lastdrawnrecty + 5.0f;
+                        if (orbsok && skillbuttonok && prevwepok && ty + orbbordersize * 4 + 5 + 15 + 15 > Math.Min(herewindowtop, messagewindowtop))
+                            skillbuttonok = false;
 
                         /* HP and MP */
                         if ((ShowOrbs | !ClassicStatusBar) && orbsok)
@@ -8681,6 +9286,35 @@ namespace GnollHackX.Pages.Game
                             StopProfiling(GHProfilingStyle.Text);
 #endif
                             textPaint.TextAlign = SKTextAlign.Left;
+                            lastdrawnrecty = skillDest.Bottom + textPaint.FontSpacing;
+                        }
+
+                        if (prevwepok)
+                        {
+                            SKRect prevWepDest = new SKRect(tx, lastdrawnrecty + 15.0f, tx + orbbordersize, lastdrawnrecty + 15.0f + orbbordersize);
+                            PrevWepRect = prevWepDest;
+                            _prevWepRectDrawn = true;
+                            textPaint.Color = SKColors.White;
+                            textPaint.Typeface = GHApp.LatoRegular;
+                            textPaint.TextSize = 9.5f * prevWepDest.Width / 50.0f;
+                            textPaint.TextAlign = SKTextAlign.Center;
+#if GNH_MAP_PROFILING && DEBUG
+                            StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                            canvas.DrawBitmap(isunwield ? GHApp._prevUnwieldBitmap : GHApp._prevWepBitmap, prevWepDest, textPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                            StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                            float text_x = (prevWepDest.Left + prevWepDest.Right) / 2;
+                            float text_y = prevWepDest.Bottom - textPaint.FontMetrics.Ascent;
+#if GNH_MAP_PROFILING && DEBUG
+                            StartProfiling(GHProfilingStyle.Text);
+#endif
+                            canvas.DrawText(isunwield ? "Unwield" : "Wield Last", text_x, text_y, textPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                            StopProfiling(GHProfilingStyle.Text);
+#endif
+                            textPaint.TextAlign = SKTextAlign.Left;
                         }
                     }
                     
@@ -8692,6 +9326,8 @@ namespace GnollHackX.Pages.Game
                         ManaRect = new SKRect();
                     if (!_skillRectDrawn)
                         SkillRect = new SKRect();
+                    if (!_prevWepRectDrawn)
+                        PrevWepRect = new SKRect();
 
                     /* Number Pad and Direction Arrows */
                     _canvasButtonRect.Right = canvaswidth * (float)(0.8);
@@ -8856,7 +9492,7 @@ namespace GnollHackX.Pages.Game
                     textPaint.Style = SKPaintStyle.Fill;
                 }
 
-                _youRectDrawn = false;
+                YouRectDrawn = false;
                 /* Status Screen */
                 if (ShowExtendedStatusBar)
                 {
@@ -8889,7 +9525,7 @@ namespace GnollHackX.Pages.Game
                     SKRect utouchrect = new SKRect(urect.Left - youtouchmargin, urect.Top - youtouchmargin, urect.Right + youtouchmargin, urect.Bottom + youtouchmargin);
                     canvas.DrawBitmap(GHApp.YouBitmap, urect, textPaint);
                     YouRect = utouchrect;
-                    _youRectDrawn = true;
+                    YouRectDrawn = true;
 
                     textPaint.Style = SKPaintStyle.Fill;
                     textPaint.Typeface = GHApp.UnderwoodTypeface;
@@ -8974,8 +9610,7 @@ namespace GnollHackX.Pages.Game
                             }
                             if (valtext != "" && ty < box_bottom_draw_threshold)
                             {
-                                string[] statstring = new string[6] { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma" };
-                                string printtext = statstring[i] + ":";
+                                string printtext = _attributeStrings[i] + ":";
                                 canvas.DrawText(printtext, tx, ty, textPaint);
                                 textPaint.Color = UIUtils.NHColor2SKColorCore(valcolor, 0, true, false);
                                 canvas.DrawText(valtext, tx + indentation, ty, textPaint);
@@ -9410,7 +10045,7 @@ namespace GnollHackX.Pages.Game
                         }
                     }                   
 
-                    if(!_youRectDrawn)
+                    if(!YouRectDrawn)
                         YouRect = new SKRect();
                 }
 
@@ -9429,6 +10064,45 @@ namespace GnollHackX.Pages.Game
 #endif
         }
 
+        bool DarkenedPos(int mapx, int mapy)
+        {
+            bool darken;
+            if (_mapData[mapx, mapy].Layers.layer_gui_glyphs != null
+                && (_mapData[mapx, mapy].Layers.layer_gui_glyphs[(int)layer_types.LAYER_FLOOR] == GHApp.UnexploredGlyph
+                    || _mapData[mapx, mapy].Layers.layer_gui_glyphs[(int)layer_types.LAYER_FLOOR] == GHApp.NoGlyph)
+                )
+            {
+                darken = false;
+            }
+            else
+            {
+                bool showing_detection = (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_SHOWING_DETECTION) != 0;
+                darken = (!showing_detection && (_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_CAN_SEE) == 0);
+            }
+            return darken;
+        }
+
+        int GetDarkenPercentage(int mapx, int mapy, bool lighter_darkening)
+        {
+            bool uloc = ((_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0);
+            bool unlit = ((_mapData[mapx, mapy].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_APPEARS_UNLIT) != 0);
+            // Get values from XAML controls
+            int darken_percentage = lighter_darkening ? (uloc ? 90 : unlit ? 65 : 80) : (uloc ? 85 : unlit ? 40 : 65);
+            return darken_percentage;
+        }
+
+        void DoDarkening(SKCanvas canvas, SKPaint paint, float tx, float ty, float width, float height, int darken_percentage)
+        {
+            int val = (darken_percentage * 255) / 100;
+            SKColor color = new SKColor((byte)val, (byte)val, (byte)val);
+            paint.Color = color;
+            SKBlendMode old_bm = paint.BlendMode;
+            paint.BlendMode = SKBlendMode.Modulate;
+            SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
+            canvas.DrawRect(targetrect, paint);
+            paint.BlendMode = old_bm;
+        }
+
         bool IsNoWallEndAutoDraw(int x, int y)
         {
             if (!GHUtils.isok(x, y))
@@ -9442,6 +10116,30 @@ namespace GnollHackX.Pages.Game
                 return true;
 
             return false;
+        }
+
+        struct SavedDarkenedAutodrawBitmap
+        {
+            AutoDrawParameterDefinition AutodrawParameters;
+            float DarkenPercentage;
+            public SavedDarkenedAutodrawBitmap(AutoDrawParameterDefinition autodrawParameters, float darkenPercentage)
+            {
+                AutodrawParameters = autodrawParameters;
+                DarkenPercentage = darkenPercentage;
+            }
+        }
+
+        struct SavedDarkenedBitmap
+        {
+            SKBitmap Bitmap;
+            SKRect SourceRect;
+            float DarkenPercentage;
+            public SavedDarkenedBitmap(SKBitmap bitmap, SKRect skrect, float darkenPercentage)
+            {
+                Bitmap = bitmap;
+                SourceRect = skrect;
+                DarkenPercentage = darkenPercentage;
+            }
         }
 
         struct SavedAutodrawBitmap
@@ -9458,15 +10156,47 @@ namespace GnollHackX.Pages.Game
             }
         }
 
-        Dictionary<SavedAutodrawBitmap, SKBitmap> _savedAutoDrawBitmaps = new Dictionary<SavedAutodrawBitmap, SKBitmap>();
+        private readonly object _saveAutoDrawLock = new object();
+        ConcurrentDictionary<SavedAutodrawBitmap, SKBitmap> _savedAutoDrawBitmaps = new ConcurrentDictionary<SavedAutodrawBitmap, SKBitmap>();
 
-        public void DrawAutoDraw(int autodraw, SKCanvas canvas, SKPaint paint, ObjectDataItem otmp_round,
+        public void DrawAutoDraw(int autodraw, SKCanvas canvas, bool delayedDraw, SKPaint paint, ObjectDataItem otmp_round,
             int layer_idx, int mapx, int mapy,
             bool tileflag_halfsize, bool tileflag_normalobjmissile, bool tileflag_fullsizeditem,
             float tx, float ty, float width, float height,
             float scale, float targetscale, float scaled_x_padding, float scaled_y_padding, float scaled_tile_height,
             bool is_inventory, bool drawwallends)
         {
+            if (delayedDraw)
+            {
+                ulong contents_no = 0;
+                ulong contents_id_sum = 0;
+                int item_charges = 0;
+                int item_special_quality = 0;
+                bool item_lit = false;
+                if (otmp_round != null)
+                {
+                    item_charges = otmp_round.ObjData.charges;
+                    item_special_quality = otmp_round.ObjData.special_quality;
+                    item_lit = otmp_round.LampLit;
+                    if(otmp_round.ContainedObjs != null)
+                    {
+                        foreach (ObjectDataItem otmp in otmp_round.ContainedObjs)
+                        {
+                            if(otmp != null)
+                            {
+                                contents_no++;
+                                contents_id_sum += otmp.ObjData.o_id;
+                            }
+                        }
+                    }
+                }
+                _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, paint.Color, mapx, mapy, new AutoDrawParameterDefinition(autodraw, otmp_round, layer_idx, 
+                     tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem,
+                     tx, ty, width, height, scale, targetscale, scaled_x_padding, scaled_y_padding, scaled_tile_height,
+                     is_inventory, drawwallends, contents_no, contents_id_sum, item_charges, item_special_quality, item_lit)));
+                return;
+            }
+
             /******************/
             /* AUTODRAW START */
             /******************/
@@ -10159,9 +10889,14 @@ namespace GnollHackX.Pages.Game
                             semi_transparency = 0.0;
 
                             SavedAutodrawBitmap cachekey = new SavedAutodrawBitmap(autodraw, fill_percentage, 0);
-                            SKBitmap usedContentsBitmap;
-                            SKBitmap cachedBitmap;
-                            if (_savedAutoDrawBitmaps.TryGetValue(cachekey, out cachedBitmap) && cachedBitmap != null)
+                            SKBitmap usedContentsBitmap = null;
+                            SKBitmap cachedBitmap = null;
+                            bool getsuccessful1;
+                            lock (_saveAutoDrawLock)
+                            {
+                                getsuccessful1 = _savedAutoDrawBitmaps.TryGetValue(cachekey, out cachedBitmap);
+                            }
+                            if (getsuccessful1 && cachedBitmap != null)
                             {
                                 usedContentsBitmap = cachedBitmap;
                             }
@@ -10182,22 +10917,29 @@ namespace GnollHackX.Pages.Game
                                 }
                                 paint.BlendMode = oldbm;
                                 paint.Color = SKColors.Black;
-                                if (!_savedAutoDrawBitmaps.ContainsKey(cachekey))
+                                bool containskey1;
+                                lock (_saveAutoDrawLock)
+                                {
+                                    containskey1 = _savedAutoDrawBitmaps.ContainsKey(cachekey);
+                                }
+                                if (!containskey1)
                                 {
                                     try
                                     {
-                                        if (_savedAutoDrawBitmaps.Count >= GHConstants.MaxBitmapCacheSize)
-                                        {
-                                            foreach (SKBitmap bmp in _savedAutoDrawBitmaps.Values)
-                                                bmp.Dispose();
-                                            _savedAutoDrawBitmaps.Clear(); /* Clear the whole dictonary for the sake of ease; should almost never happen normally anyway */
-                                        }
-
                                         SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight);
                                         _paintBitmap.CopyTo(newbmp);
                                         newbmp.SetImmutable();
-                                        _savedAutoDrawBitmaps.Add(cachekey, newbmp);
                                         usedContentsBitmap = newbmp;
+                                        lock (_saveAutoDrawLock)
+                                        {
+                                            if (_savedAutoDrawBitmaps.Count >= GHConstants.MaxBitmapCacheSize)
+                                            {
+                                                foreach (SKBitmap bmp in _savedAutoDrawBitmaps.Values)
+                                                    bmp.Dispose();
+                                                _savedAutoDrawBitmaps.Clear(); /* Clear the whole dictionary for the sake of ease; should almost never happen normally anyway */
+                                            }
+                                            _savedAutoDrawBitmaps.TryAdd(cachekey, newbmp);
+                                        }
                                     }
                                     catch (Exception ex)
                                     {
@@ -10346,8 +11088,13 @@ namespace GnollHackX.Pages.Game
                         /* Draw to _paintBitmap */
                         SavedAutodrawBitmap cachekey2 = new SavedAutodrawBitmap(autodraw, fill_percentage, 1);
                         SKBitmap usedForegroundBitmap;
-                        SKBitmap cachedFGBitmap;
-                        if (_savedAutoDrawBitmaps.TryGetValue(cachekey2, out cachedFGBitmap) && cachedFGBitmap != null)
+                        SKBitmap cachedFGBitmap = null;
+                        bool getsuccessful2;
+                        lock(_saveAutoDrawLock)
+                        {
+                            getsuccessful2 = _savedAutoDrawBitmaps.TryGetValue(cachekey2, out cachedFGBitmap);
+                        }
+                        if (getsuccessful2 && cachedFGBitmap != null)
                         {
                             usedForegroundBitmap = cachedFGBitmap;
                         }
@@ -10369,22 +11116,29 @@ namespace GnollHackX.Pages.Game
                             }
                             paint.BlendMode = oldbm;
                             paint.Color = SKColors.Black;
-                            if (!_savedAutoDrawBitmaps.ContainsKey(cachekey2))
+                            bool containskey2;
+                            lock (_saveAutoDrawLock)
+                            {
+                                containskey2 = _savedAutoDrawBitmaps.ContainsKey(cachekey2);
+                            }
+                            if (!containskey2)
                             {
                                 try
                                 {
-                                    if (_savedAutoDrawBitmaps.Count >= GHConstants.MaxBitmapCacheSize)
-                                    {
-                                        foreach(SKBitmap bmp in _savedAutoDrawBitmaps.Values)
-                                            bmp.Dispose();
-                                        _savedAutoDrawBitmaps.Clear(); /* Clear the whole dictonary for the sake of ease; should almost never happen normally anyway */
-                                    }
-
                                     SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight);
                                     _paintBitmap.CopyTo(newbmp);
                                     newbmp.SetImmutable();
-                                    _savedAutoDrawBitmaps.Add(cachekey2, newbmp);
                                     usedForegroundBitmap = newbmp;
+                                    lock (_saveAutoDrawLock)
+                                    {
+                                        if (_savedAutoDrawBitmaps.Count >= GHConstants.MaxBitmapCacheSize)
+                                        {
+                                            foreach (SKBitmap bmp in _savedAutoDrawBitmaps.Values)
+                                                bmp.Dispose();
+                                            _savedAutoDrawBitmaps.Clear(); /* Clear the whole dictionary for the sake of ease; should almost never happen normally anyway */
+                                        }
+                                        _savedAutoDrawBitmaps.TryAdd(cachekey2, newbmp);
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -11026,7 +11780,7 @@ namespace GnollHackX.Pages.Game
             return sb_xheight;
         }
 
-        private Dictionary<long, TouchEntry> TouchDictionary = new Dictionary<long, TouchEntry>();
+        private ConcurrentDictionary<long, TouchEntry> TouchDictionary = new ConcurrentDictionary<long, TouchEntry>();
         private readonly object _mapOffsetLock = new object();
         public float _mapOffsetX = 0;
         public float _mapOffsetY = 0;
@@ -11037,6 +11791,7 @@ namespace GnollHackX.Pages.Game
         public float _statusClipBottom = 0;
         private bool _touchMoved = false;
         private bool _touchWithinSkillButton = false;
+        private bool _touchWithinPrevWepButton = false;
         private bool _touchWithinHealthOrb = false;
         private bool _touchWithinManaOrb = false;
         private bool _touchWithinStatusBar = false;
@@ -11078,6 +11833,7 @@ namespace GnollHackX.Pages.Game
                         _savedSender = null;
                         _savedEventArgs = null;
                         _touchWithinSkillButton = false;
+                        _touchWithinPrevWepButton = false;
                         _touchWithinHealthOrb = false;
                         _touchWithinManaOrb = false;
                         _touchWithinStatusBar = false;
@@ -11087,7 +11843,7 @@ namespace GnollHackX.Pages.Game
                         if (TouchDictionary.ContainsKey(e.Id))
                             TouchDictionary[e.Id] = new TouchEntry(e.Location, DateTime.Now);
                         else
-                            TouchDictionary.Add(e.Id, new TouchEntry(e.Location, DateTime.Now));
+                            TouchDictionary.TryAdd(e.Id, new TouchEntry(e.Location, DateTime.Now));
 
                         if (TouchDictionary.Count > 1)
                             _touchMoved = true;
@@ -11097,6 +11853,10 @@ namespace GnollHackX.Pages.Game
                             if (SkillRect.Contains(e.Location))
                             {
                                 _touchWithinSkillButton = true;
+                            }
+                            else if (PrevWepRect.Contains(e.Location))
+                            {
+                                _touchWithinPrevWepButton = true;
                             }
                             else if (HealthRect.Contains(e.Location))
                             {
@@ -11161,7 +11921,7 @@ namespace GnollHackX.Pages.Game
 
                                 if (TouchDictionary.Count == 1)
                                 {
-                                    if (_touchWithinSkillButton || _touchWithinHealthOrb || _touchWithinManaOrb || _touchWithinStatusBar || (_touchWithinPet > 0 && !_showDirections && !_showNumberPad) || _touchWithinYouButton)
+                                    if (_touchWithinSkillButton || _touchWithinPrevWepButton || _touchWithinHealthOrb || _touchWithinManaOrb || _touchWithinStatusBar || (_touchWithinPet > 0 && !_showDirections && !_showNumberPad) || _touchWithinYouButton)
                                     {
                                         /* Do nothing */
                                     }
@@ -11335,6 +12095,7 @@ namespace GnollHackX.Pages.Game
                                     _savedSender = null;
                                     _savedEventArgs = null;
                                     _touchWithinSkillButton = false;
+                                    _touchWithinPrevWepButton = false;
                                     _touchWithinHealthOrb = false;
                                     _touchWithinManaOrb = false;
                                     _touchWithinStatusBar = false;
@@ -11345,7 +12106,7 @@ namespace GnollHackX.Pages.Game
                                     SKPoint curloc = e.Location;
                                     SKPoint otherloc;
 
-                                    Dictionary<long, TouchEntry>.KeyCollection keys = TouchDictionary.Keys;
+                                    var keys = TouchDictionary.Keys;
                                     long other_key = 0;
                                     foreach (long key in keys)
                                     {
@@ -11512,9 +12273,13 @@ namespace GnollHackX.Pages.Game
                                     }
                                 }
                             }
-                            else if (_touchWithinSkillButton)
+                            else if (_touchWithinSkillButton && !PlayingReplay)
                             {
                                 GenericButton_Clicked(sender, e, (int)'S');
+                            }
+                            else if (_touchWithinPrevWepButton && !PlayingReplay)
+                            {
+                                GenericButton_Clicked(sender, e, GHUtils.Meta(16));
                             }
                             else if (_touchWithinHealthOrb)
                             {
@@ -11532,12 +12297,12 @@ namespace GnollHackX.Pages.Game
                                     _statusOffsetY = 0.0f;
                                 }
                             }
-                            else if (_touchWithinYouButton)
+                            else if (_touchWithinYouButton && !PlayingReplay)
                             {
                                 ShowExtendedStatusBar = false;
                                 GenericButton_Clicked(sender, e, (int)'}');
                             }
-                            else if (_touchWithinPet > 0 && !_showDirections && !_showNumberPad)
+                            else if (_touchWithinPet > 0 && !_showDirections && !_showNumberPad && !PlayingReplay)
                             {
                                 ConcurrentQueue<GHResponse> queue;
                                 if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
@@ -11546,7 +12311,7 @@ namespace GnollHackX.Pages.Game
                                     queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetChar, (int)'{'));
                                 }
                             }
-                            else
+                            else if (!PlayingReplay || ShowExtendedStatusBar)
                             {
                                 TouchEntry entry;
                                 bool res = TouchDictionary.TryGetValue(e.Id, out entry);
@@ -11570,7 +12335,10 @@ namespace GnollHackX.Pages.Game
                                 }
                             }
                             if (TouchDictionary.ContainsKey(e.Id))
-                                TouchDictionary.Remove(e.Id);
+                            {
+                                TouchEntry removedEntry;
+                                TouchDictionary.TryRemove(e.Id, out removedEntry);
+                            }
                             else
                                 TouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -11582,7 +12350,10 @@ namespace GnollHackX.Pages.Game
                         break;
                     case SKTouchAction.Cancelled:
                         if (TouchDictionary.ContainsKey(e.Id))
-                            TouchDictionary.Remove(e.Id);
+                        {
+                            TouchEntry removedEntry;
+                            TouchDictionary.TryRemove(e.Id, out removedEntry);
+                        }
                         else
                             TouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -12009,6 +12780,8 @@ namespace GnollHackX.Pages.Game
                 bool notweapon = is_uwep ? notweapon1 : is_uwep2 ? notweapon2 : false;
                 bool isammo = (oflags & (ulong)objdata_flags.OBJDATA_FLAGS_IS_AMMO) != 0UL;
                 bool isthrowingweapon = (oflags & (ulong)objdata_flags.OBJDATA_FLAGS_THROWING_WEAPON) != 0UL;
+                bool prevwepfound = (oflags & (ulong)objdata_flags.OBJDATA_FLAGS_PREV_WEP_FOUND) != 0UL;
+                bool prevunwield = (oflags & (ulong)objdata_flags.OBJDATA_FLAGS_PREV_UNWIELD) != 0UL;
 
                 int idx = is_uwep ? 0 : is_uwep2 ? 1 : 2;
                 lock (_weaponStyleObjDataItemLock)
@@ -12019,7 +12792,7 @@ namespace GnollHackX.Pages.Game
                             _weaponStyleObjDataItem[idx] = null;
                             break;
                         case 2: /* Add item */
-                            _weaponStyleObjDataItem[idx] = new ObjectDataItem(otmp, otypdata, hallucinated, outofammo, wrongammo, notbeingused, notweapon, foundthisturn, isammo, isthrowingweapon);
+                            _weaponStyleObjDataItem[idx] = new ObjectDataItem(otmp, otypdata, hallucinated, outofammo, wrongammo, notbeingused, notweapon, foundthisturn, isammo, isthrowingweapon, prevwepfound, prevunwield);
                             break;
                         case 3: /* Add container item to previous item */
                             _weaponStyleObjDataItem[idx].ContainedObjs.Add(new ObjectDataItem(otmp, otypdata, hallucinated));
@@ -12090,6 +12863,24 @@ namespace GnollHackX.Pages.Game
                         }
                     }
                 }
+            }
+        }
+
+        public void ClearEngravingData(int x, int y)
+        {
+            lock (_mapDataLock)
+            {
+                if (GHUtils.isok(x, y))
+                    _mapData[x, y].Engraving = new EngravingInfo();
+            }
+        }
+
+        public void AddEngravingData(int x, int y, string engraving_text, int etype, ulong eflags, ulong gflags)
+        {
+            lock(_mapDataLock)
+            {
+                if (GHUtils.isok(x, y))
+                    _mapData[x, y].Engraving = new EngravingInfo(engraving_text, etype, eflags, gflags);
             }
         }
 
@@ -12512,6 +13303,10 @@ namespace GnollHackX.Pages.Game
                 float topPadding = 0;
                 float maintext_x_start = 0;
                 float fontspacingpadding = 0;
+                bool wrapglyph = MenuCanvas.GHWindow != null ? MenuCanvas.GHWindow.WrapGlyph : false;
+                float glyphpadding = 0;
+                float glyphystart = scale * (float)Math.Max(0.0, MenuWindowGlyphImage.Y - MenuCanvas.Y);
+                float glyphyend = scale * (float)Math.Max(0.0, MenuWindowGlyphImage.Y + MenuWindowGlyphImage.Height - MenuCanvas.Y);
                 lock (MenuCanvas.MenuItemLock)
                 {
                     bool has_pictures = false;
@@ -12557,6 +13352,11 @@ namespace GnollHackX.Pages.Game
                             textPaint.Typeface = GHApp.GetTypefaceByName(mi.FontFamily);
                             textPaint.TextSize = mainfontsize;
                             textPaint.TextAlign = SKTextAlign.Left;
+
+                            if (MenuWindowGlyphImage.IsVisible && wrapglyph)
+                                glyphpadding = scale * (float)Math.Max(0.0, MenuCanvas.X + MenuCanvas.Width - MenuWindowGlyphImage.X);
+                            else
+                                glyphpadding = 0;
 
                             mi.DrawBounds.Top = y;
                             //if (mi.DrawBounds.Top >= canvasheight)
@@ -12715,7 +13515,7 @@ namespace GnollHackX.Pages.Game
                                 {
                                     indent_start_x += textPaint.MeasureText(indentstr);
                                 }
-                                DrawTextSplit(canvas, maintextsplit, mainrowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, 0, 0, 0, 0);
+                                DrawTextSplit(canvas, maintextsplit, mainrowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
                                 /* Rewind and next line */
                                 x = start_x;
                                 y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -12728,7 +13528,7 @@ namespace GnollHackX.Pages.Game
                                     textPaint.TextSize = suffixfontsize;
                                     y += fontspacingpadding;
                                     y -= textPaint.FontMetrics.Ascent;
-                                    DrawTextSplit(canvas, suffixtextsplit, suffixrowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, 0, 0, 0, 0);
+                                    DrawTextSplit(canvas, suffixtextsplit, suffixrowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
                                     /* Rewind and next line */
                                     x = start_x;
                                     y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -12743,7 +13543,7 @@ namespace GnollHackX.Pages.Game
                                     fontspacingpadding = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
                                     y += fontspacingpadding;
                                     y -= textPaint.FontMetrics.Ascent;
-                                    DrawTextSplit(canvas, suffix2textsplit, suffix2rowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, 0, 0, 0, 0);
+                                    DrawTextSplit(canvas, suffix2textsplit, suffix2rowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
                                     /* Rewind and next line */
                                     x = start_x;
                                     y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -12967,6 +13767,8 @@ namespace GnollHackX.Pages.Game
             float spacelength = textPaint.MeasureText(" ");
             int idx = 0;
             int rowidx = 0;
+            int special_coloring = 0;
+            SKColor orig_color = textPaint.Color;
             foreach (string split_str in textsplit)
             {
                 bool nowrap = false;
@@ -12992,6 +13794,8 @@ namespace GnollHackX.Pages.Game
                 SKRect source_rect = new SKRect();
                 if(usespecialsymbols && (symbolbitmap = GetGameSpecialSymbol(split_str, out source_rect)) != null)
                 {
+                    special_coloring = 0;
+                    textPaint.Color = orig_color;
                     float bmpheight = textPaint.FontMetrics.Descent / 2 - textPaint.FontMetrics.Ascent;
                     float bmpwidth = bmpheight * (float)symbolbitmap.Width / (float)Math.Max(1, symbolbitmap.Height);
                     float bmpmargin = bmpheight / 8;
@@ -13011,6 +13815,10 @@ namespace GnollHackX.Pages.Game
                         SKRect bmptargetrect = new SKRect(bmpx, bmpy, bmpx + bmpwidth, bmpy + bmpheight);
                         canvas.DrawBitmap(symbolbitmap, source_rect, bmptargetrect, textPaint);
                     }
+                    if (split_str == "&damage;" || split_str == "&MC;")
+                        special_coloring = 1;
+                    else if (split_str == "&AC;")
+                        special_coloring = -1;
                     isfirstprintonrow = false;
                 }
                 else
@@ -13050,9 +13858,30 @@ namespace GnollHackX.Pages.Game
                             textPaint.Style = SKPaintStyle.Fill;
                             textPaint.StrokeWidth = 0;
                         }
+                        if (special_coloring != 0)
+                        {
+                            double res;
+                            if(double.TryParse(split_str, NumberStyles.Any, CultureInfo.InvariantCulture, out res))
+                            {
+                                res = res * special_coloring;
+                                if (res > 0)
+                                    textPaint.Color = UIUtils.NHColor2SKColorCore((int)nhcolor.CLR_BRIGHT_GREEN, (int)MenuItemAttributes.None, revertblackandwhite, false);
+                                else if (res < 0)
+                                    textPaint.Color = UIUtils.NHColor2SKColorCore((int)nhcolor.CLR_RED, (int)MenuItemAttributes.None, revertblackandwhite, false);
+                                else
+                                    textPaint.Color = orig_color;
+                            }
+                            else
+                                textPaint.Color = orig_color;
+                        }
                         canvas.DrawText(split_str, x, y, textPaint);
                     }
 
+                    if(special_coloring != 0)
+                    {
+                        special_coloring = 0;
+                        textPaint.Color = orig_color;
+                    }
                     isfirstprintonrow = false;
                 }
 
@@ -13071,7 +13900,7 @@ namespace GnollHackX.Pages.Game
         private bool _menuScrollSpeedOn = false;
         private DateTime _menuScrollSpeedReleaseStamp;
 
-        private Dictionary<long, TouchEntry> MenuTouchDictionary = new Dictionary<long, TouchEntry>();
+        private ConcurrentDictionary<long, TouchEntry> MenuTouchDictionary = new ConcurrentDictionary<long, TouchEntry>();
         private object _savedMenuSender = null;
         private SKTouchEventArgs _savedMenuEventArgs = null;
         private DateTime _savedMenuTimeStamp;
@@ -13096,7 +13925,7 @@ namespace GnollHackX.Pages.Game
                     if (MenuTouchDictionary.ContainsKey(e.Id))
                         MenuTouchDictionary[e.Id] = new TouchEntry(e.Location, DateTime.Now);
                     else
-                        MenuTouchDictionary.Add(e.Id, new TouchEntry(e.Location, DateTime.Now));
+                        MenuTouchDictionary.TryAdd(e.Id, new TouchEntry(e.Location, DateTime.Now));
 
                     lock(_menuScrollLock)
                     {
@@ -13255,7 +14084,10 @@ namespace GnollHackX.Pages.Game
                                 MenuCanvas_NormalClickRelease(sender, e);
                             }
                             if (MenuTouchDictionary.ContainsKey(e.Id))
-                                MenuTouchDictionary.Remove(e.Id);
+                            {
+                                TouchEntry removedEntry;
+                                MenuTouchDictionary.TryRemove(e.Id, out removedEntry);
+                            }
                             else
                                 MenuTouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -13304,7 +14136,10 @@ namespace GnollHackX.Pages.Game
                     break;
                 case SKTouchAction.Cancelled:
                     if (MenuTouchDictionary.ContainsKey(e.Id))
-                        MenuTouchDictionary.Remove(e.Id);
+                    {
+                        TouchEntry removedEntry;
+                        MenuTouchDictionary.TryRemove(e.Id, out removedEntry);
+                    }
                     else
                         MenuTouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -13743,6 +14578,9 @@ namespace GnollHackX.Pages.Game
         private bool unselect_on_tap = false;
         private void MenuTapGestureRecognizer_Tapped(object sender, EventArgs e)
         {
+            if (PlayingReplay)
+                return;
+
             if (MenuCanvas.SelectionHow == SelectionMode.Multiple)
             {
                 lock (MenuCanvas.MenuItemLock)
@@ -13870,7 +14708,7 @@ namespace GnollHackX.Pages.Game
         private bool _textScrollSpeedOn = false;
         private DateTime _textScrollSpeedReleaseStamp;
 
-        private Dictionary<long, TouchEntry> TextTouchDictionary = new Dictionary<long, TouchEntry>();
+        private ConcurrentDictionary<long, TouchEntry> TextTouchDictionary = new ConcurrentDictionary<long, TouchEntry>();
         private object _savedTextSender = null;
         private SKTouchEventArgs _savedTextEventArgs = null;
         private DateTime _savedTextTimeStamp;
@@ -14050,7 +14888,7 @@ namespace GnollHackX.Pages.Game
                         if (TextTouchDictionary.ContainsKey(e.Id))
                             TextTouchDictionary[e.Id] = new TouchEntry(e.Location, DateTime.Now);
                         else
-                            TextTouchDictionary.Add(e.Id, new TouchEntry(e.Location, DateTime.Now));
+                            TextTouchDictionary.TryAdd(e.Id, new TouchEntry(e.Location, DateTime.Now));
 
                         lock (_textScrollLock)
                         {
@@ -14200,7 +15038,10 @@ namespace GnollHackX.Pages.Game
                                     DelayedTextHide();
                                 }
                                 if (TextTouchDictionary.ContainsKey(e.Id))
-                                    TextTouchDictionary.Remove(e.Id);
+                                {
+                                    TouchEntry removedEntry;
+                                    TextTouchDictionary.TryRemove(e.Id, out removedEntry);
+                                }
                                 else
                                     TextTouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -14252,7 +15093,10 @@ namespace GnollHackX.Pages.Game
                         break;
                     case SKTouchAction.Cancelled:
                         if (TextTouchDictionary.ContainsKey(e.Id))
-                            TextTouchDictionary.Remove(e.Id);
+                        {
+                            TouchEntry removedEntry;
+                            TextTouchDictionary.TryRemove(e.Id, out removedEntry);
+                        }
                         else
                             TextTouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -14299,7 +15143,7 @@ namespace GnollHackX.Pages.Game
 
 
         public readonly object CommandButtonLock = new object();
-        private Dictionary<long, TouchEntry> CommandTouchDictionary = new Dictionary<long, TouchEntry>();
+        private ConcurrentDictionary<long, TouchEntry> CommandTouchDictionary = new ConcurrentDictionary<long, TouchEntry>();
         private object _savedCommandSender = null;
         private SKTouchEventArgs _savedCommandEventArgs = null;
         private DateTime _savedCommandTimeStamp;
@@ -14436,20 +15280,33 @@ namespace GnollHackX.Pages.Game
 
                 if (ShowFPS)
                 {
-                    string str;
-                    float textWidth, xText, yText;
+                    float textscale = GetTextScale();
+                    textPaint.TextSize = _statusbar_basefontsize * textscale;
+                    float target_scale = textPaint.FontSpacing / GHApp._statusWizardBitmap.Height; // All are 64px high
+                    float target_width = target_scale * GHApp._fpsBitmap.Width;
+                    float target_height = target_scale * GHApp._fpsBitmap.Height;
+                    float curx = canvaswidth - target_width - 24 * target_scale;
+                    float cury = 16 * target_scale;
+                    SKRect statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                    canvas.DrawBitmap(GHApp._fpsBitmap, statusDest, textPaint);
 
+                    string drawtext;
                     lock (_fpslock)
                     {
-                        str = "FPS: " + string.Format("{0:0.0}", _fps) + ", D:" + _counterValueDiff;
+                        drawtext = string.Format("{0:0.0}", _fps);
                     }
-                    textPaint.Typeface = GHApp.LatoBold;
-                    textPaint.TextSize = 26;
-                    textPaint.Color = SKColors.Yellow;
-                    textWidth = textPaint.MeasureText(str);
-                    yText = -textPaint.FontMetrics.Ascent + 5;
-                    xText = canvaswidth - textWidth - 5;
-                    canvas.DrawText(str, xText, yText, textPaint);
+
+                    const int topMargin = 4, bottomMargin = 16;
+                    textPaint.Color = SKColors.White;
+                    textPaint.TextSize = _statusbar_diffontsize * textscale;
+                    textPaint.TextAlign = SKTextAlign.Center;
+                    float vsize = target_height - (topMargin + bottomMargin) * target_scale;
+                    float fsize = textPaint.FontSpacing;
+                    float vpadding = (vsize - fsize) / 2;
+                    SKPoint drawpoint = new SKPoint(curx + target_width / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
+                    canvas.DrawText(drawtext, drawpoint, textPaint);
+                    textPaint.TextAlign = SKTextAlign.Left;
+                    textPaint.TextSize = _statusbar_basefontsize * textscale;
                 }
             }
             lock (_commandFPSCounterLock)
@@ -14486,7 +15343,7 @@ namespace GnollHackX.Pages.Game
                         if (CommandTouchDictionary.ContainsKey(e.Id))
                             CommandTouchDictionary[e.Id] = new TouchEntry(e.Location, DateTime.Now);
                         else
-                            CommandTouchDictionary.Add(e.Id, new TouchEntry(e.Location, DateTime.Now));
+                            CommandTouchDictionary.TryAdd(e.Id, new TouchEntry(e.Location, DateTime.Now));
 
                         if (CommandTouchDictionary.Count > 1)
                             _commandTouchMoved = true;
@@ -14697,7 +15554,10 @@ namespace GnollHackX.Pages.Game
                                 }
 
                                 if (CommandTouchDictionary.ContainsKey(e.Id))
-                                    CommandTouchDictionary.Remove(e.Id);
+                                {
+                                    TouchEntry removedEntry;
+                                    CommandTouchDictionary.TryRemove(e.Id, out removedEntry);
+                                }
                                 else
                                     CommandTouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
 
@@ -14709,7 +15569,10 @@ namespace GnollHackX.Pages.Game
                         break;
                     case SKTouchAction.Cancelled:
                         if (CommandTouchDictionary.ContainsKey(e.Id))
-                            CommandTouchDictionary.Remove(e.Id);
+                        {
+                            TouchEntry removedEntry;
+                            CommandTouchDictionary.TryRemove(e.Id, out removedEntry);
+                        }
                         else
                             CommandTouchDictionary.Clear(); /* Something's wrong; reset the touch dictionary */
                         e.Handled = true;
@@ -14733,8 +15596,16 @@ namespace GnollHackX.Pages.Game
                 _messageScrollSpeedOn = false;
                 _messageScrollSpeedRecords.Clear();
             }
-
-            ForceAllMessages = !ForceAllMessages;
+            if(MessageFilterFrame.IsVisible && MessageFilterEntry.IsVisible)
+            {
+                MessageFilterEntry.Unfocus();
+                if(UpperCmdGrid.IsVisible)
+                    ESCButton.Focus();
+                else
+                    SimpleESCButton.Focus();
+            }
+            bool prevForceAllMessages = ForceAllMessages;
+            ForceAllMessages = !prevForceAllMessages;
         }
 
         private readonly object _tipLock = new object();
@@ -15188,12 +16059,21 @@ namespace GnollHackX.Pages.Game
 
         public async void ReportPanic(string text)
         {
-            bool answer = await DisplayAlert("Panic", (text != null ? text : "GnollHack has panicked. See the Panic Log.") + 
-                "\nDo you want to send a crash report to help the developer fix the cause? This will create a zip archive of the files in your game directory and ask it to be shared further.", 
-                "Yes", "No");
-            if (answer)
+            if (!PlayingReplay)
             {
-                await GHApp.CreateCrashReport(this);
+                bool answer = await DisplayAlert("Panic", (text != null ? text : "GnollHack has panicked. See the Panic Log.") +
+                    "\nDo you want to report the panic and send a crash report to help the developer fix the cause? This will create a zip archive of the files in your game directory and ask it to be shared further.",
+                    "Yes", "No");
+
+                if (answer)
+                {
+                    await GHApp.CreateCrashReport(this);
+                }
+                _mainPage.EnqueuePost(new GHPost(0, false, (int)diagnostic_data_types.DIAGNOSTIC_DATA_PANIC, 0, text, null, answer));
+            }
+            else
+            {
+                await DisplayAlert("Panic (Replay: Press OK)", (text != null ? text : "GnollHack has panicked. See the Panic Log."), "OK");
             }
 
             ConcurrentQueue<GHResponse> queue;
@@ -15228,7 +16108,7 @@ namespace GnollHackX.Pages.Game
 
         public async void ReportCrashDetected()
         {
-            if(GHApp.InformAboutCrashReport)
+            if(GHApp.InformAboutCrashReport && !PlayingReplay)
             {
                 bool answer = await DisplayAlert("Crash Detected", "A crashed game has been detected. GnollHack will attempt to restore this game. Also, do you want to create a crash report? This will create a zip archive of the files in your game directory and ask it to be shared further." + (UseMainGLCanvas ? " If the problem persists, try switching GPU Acceleration off in Settings." : ""), "Yes", "No");
                 if (answer)
@@ -15258,10 +16138,6 @@ namespace GnollHackX.Pages.Game
             UIGrid.IsVisible = true;
             Debug.WriteLine("Finished Performance Tests");
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        uint MakePixel(byte red, byte green, byte blue, byte alpha) =>
-        (uint)((alpha << 24) | (blue << 16) | (green << 8) | red);
 
         private void GetLineEntryText_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -15335,14 +16211,32 @@ namespace GnollHackX.Pages.Game
             }
         }
 
+        //public bool IgnoreSave()
+        //{
+        //    /* Saving and reloading would lead to loss of the wish, so do not save; the game attempts to do insurance before expending charge from the wand of wishing and other similar situations instead */
+        //    return GetLineGrid.IsVisible && _getLineStyle == (int)getline_types.GETLINE_WISHING;
+        //}
+
         public void SaveGameAndWaitForResume()
+        {
+            if (_currentGame != null) // && !IgnoreSave()
+            {
+                ConcurrentQueue<GHResponse> queue;
+                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                {
+                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.SaveGameAndWaitForResume));
+                }
+            }
+        }
+
+        public void SaveCheckPoint()
         {
             if (_currentGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
                 if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.SaveGameAndWaitForResume));
+                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.SaveInsuranceCheckPoint));
                 }
             }
         }
@@ -15392,6 +16286,227 @@ namespace GnollHackX.Pages.Game
                 StartCommandCanvasAnimation();
             else if (!LoadingGrid.IsVisible && MainGrid.IsVisible && !canvasView.AnimationIsRunning("GeneralAnimationCounter"))
                 StartMainCanvasAnimation();
+        }
+
+        void UpdateMessageFilter()
+        {
+            lock (_msgHistoryLock)
+            {
+                if (_msgHistory != null)
+                {
+                    if(LongerMessageHistory)
+                    {
+                        foreach (GHMsgHistoryItem msg in _msgHistory)
+                        {
+                            if(msg != null)
+                                msg.Filter = MessageFilterEntry.Text;
+                        }
+                    }
+                    else
+                    {
+                        foreach (GHMsgHistoryItem msg in _msgHistory)
+                        {
+                            if (msg != null)
+                                msg.Filter = null;
+                        }
+                    }
+                }
+            }
+            RefreshMsgHistoryRowCounts = true;
+        }
+
+        private void MessageFilterEntry_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateMessageFilter();
+        }
+
+        public void RequestEndReplayFile()
+        {
+            if (_currentGame != null)
+            {
+                ConcurrentQueue<GHResponse> queue;
+                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                {
+                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.EndReplayFile));
+                }
+            }
+        }
+
+
+        private void ReplayQuitButton_Clicked(object sender, EventArgs e)
+        {
+            GHApp.StopReplay = true;
+            UpdateReplayHeaderLabel();
+        }
+
+        private void UpdateReplaySpeedButtons()
+        {
+            double speed = GHApp.ReplaySpeed;
+            ReplayFasterButton.Text = string.Format("{0:0.##}x", speed * 2);
+            ReplaySlowerButton.Text = string.Format("{0:0.##}x", speed / 2);
+            if(GHApp.ReplaySpeed >= 128)
+            {
+                ReplayFasterButton.TextColor = GHColors.Gray;
+                ReplayFasterButton.IsEnabled = false;
+            }
+            else
+            {
+                ReplayFasterButton.TextColor = GHColors.White;
+                ReplayFasterButton.IsEnabled = true;
+            }
+            if (GHApp.ReplaySpeed <= 1.0/128)
+            {
+                ReplaySlowerButton.TextColor = GHColors.Gray;
+                ReplaySlowerButton.IsEnabled = false;
+            }
+            else
+            {
+                ReplaySlowerButton.TextColor = GHColors.White;
+                ReplaySlowerButton.IsEnabled = true;
+            }
+            UpdateReplayHeaderLabel();
+        }
+        private void UpdateReplayPauseButton()
+        {
+            if(GHApp.PauseReplay)
+            {
+                ReplayPauseButton.Text = "Play";
+                ReplayPauseButton.TextColor = GHColors.BrighterGreen;
+                ReplaySlowerButton.IsVisible = false;
+                ReplayFasterButton.IsVisible = false;
+                ReplayGotoButton.IsVisible = true;
+                ReplayNextButton.IsVisible = true;
+            }
+            else
+            {
+                ReplayPauseButton.Text = "Pause";
+                ReplayPauseButton.TextColor = GHColors.Yellow;
+                ReplaySlowerButton.IsVisible = true;
+                ReplayFasterButton.IsVisible = true;
+                ReplayGotoButton.IsVisible = false;
+                ReplayNextButton.IsVisible = false;
+            }
+
+            UpdateReplayHeaderLabel();
+        }
+
+        private void UpdateReplayHeaderLabel()
+        {
+            int currentTurn = GHApp.ReplayTurn;
+            int gotoTurn = GHApp.GoToTurn;
+            int originalTurn = GHApp.OriginalReplayTurn;
+            if (GHApp.StopReplay)
+            {
+                ReplayHeaderLabel.Text = "Stopping Replay...";
+                ReplayHeaderLabel.TextColor = GHColors.BrighterRed;
+            }
+            else if (gotoTurn >= 0)
+            {
+                double percentage = currentTurn <= originalTurn ? 0.0 : gotoTurn <= originalTurn ? 1.0 : currentTurn < gotoTurn ? (currentTurn - originalTurn) / (gotoTurn - originalTurn) : 1.0;
+                if(percentage > 0.0)
+                    ReplayHeaderLabel.Text = string.Format("Rewinding to T:{0} ({1:0.#}%)", gotoTurn, percentage * 100);
+                else
+                    ReplayHeaderLabel.Text = string.Format("Rewinding to T:{0}...", gotoTurn);
+
+                ReplayHeaderLabel.TextColor = GHColors.LightBlue;
+            }
+            else
+            {
+                if (GHApp.PauseReplay)
+                {
+                    ReplayHeaderLabel.Text = string.Format("Speed: Paused at {0:0.##}x", GHApp.ReplaySpeed);
+                    ReplayHeaderLabel.TextColor = GHColors.Yellow;
+                }
+                else
+                {
+                    ReplayHeaderLabel.Text = string.Format("Speed: {0:0.##}x", GHApp.ReplaySpeed);
+                    ReplayHeaderLabel.TextColor = GHColors.White;
+                }
+            }
+        }
+        private void ReplayFasterButton_Clicked(object sender, EventArgs e)
+        {
+            if(GHApp.ReplaySpeed < 128)
+            {
+                GHApp.ReplaySpeed = GHApp.ReplaySpeed * 2;
+                UpdateReplaySpeedButtons();
+            }
+        }
+
+
+        private void ReplaySlowerButton_Clicked(object sender, EventArgs e)
+        {
+            if (GHApp.ReplaySpeed > 1.0 / 128)
+            {
+                GHApp.ReplaySpeed = GHApp.ReplaySpeed / 2;
+                UpdateReplaySpeedButtons();
+            }
+        }
+
+        private void ReplayPauseButton_Clicked(object sender, EventArgs e)
+        {
+            GHApp.PauseReplay = !GHApp.PauseReplay;
+            UpdateReplayPauseButton();
+        }
+
+        private void ReplayGotoButton_Clicked(object sender, EventArgs e)
+        {
+            GotoTurnEntryText.Text = "";
+            GotoTurnFrame.BorderColor = GHColors.Black;
+            GotoTurnOkButton.IsEnabled = true;
+            GotoTurnCancelButton.IsEnabled = true;
+            GotoTurnGrid.IsVisible = true;
+        }
+
+        private void ReplayNextButton_Clicked(object sender, EventArgs e)
+        {
+            ReplayNextButton.IsEnabled = false;
+            if (GHApp.ReplayTurn >= 0)
+            {
+                GHApp.GoToTurn = GHApp.ReplayTurn + 1;
+            }
+            UpdateReplayHeaderLabel();
+            ReplayNextButton.IsEnabled = true;
+        }
+
+        private void GotoTurnOkButton_Clicked(object sender, EventArgs e)
+        {
+            GotoTurnOkButton.IsEnabled = false;
+            GotoTurnCancelButton.IsEnabled = false;
+
+            if (string.IsNullOrWhiteSpace(GotoTurnEntryText.Text))
+            {
+                GHApp.GoToTurn = -1;
+            }
+            else
+            {
+                string txt = GotoTurnEntryText.Text.Trim();
+                if (int.TryParse(txt, out int turn))
+                {
+                    GHApp.GoToTurn = turn;
+                }
+                else
+                {
+                    GotoTurnFrame.BorderColor = GHColors.Red;
+                    GotoTurnEntryText.Focus();
+                    GotoTurnOkButton.IsEnabled = true;
+                    GotoTurnCancelButton.IsEnabled = true;
+                    return;
+                }
+            }
+            UpdateReplayHeaderLabel();
+            GotoTurnGrid.IsVisible = false;
+        }
+
+        private void GotoTurnCancelButton_Clicked(object sender, EventArgs e)
+        {
+            GotoTurnOkButton.IsEnabled = false;
+            GotoTurnCancelButton.IsEnabled = false;
+
+            GHApp.GoToTurn = -1;
+            UpdateReplayHeaderLabel();
+
+            GotoTurnGrid.IsVisible = false;
         }
     }
 }

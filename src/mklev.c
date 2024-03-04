@@ -969,7 +969,7 @@ int trap_type;
                                 (void)mongets(mon, ORCISH_SHIELD);
                             if (!m_carrying(mon, ORCISH_SHORT_SWORD))
                                 (void)mongets(mon, ORCISH_SHORT_SWORD);
-                            m_dowear(mon, TRUE);
+                            m_dowear(mon, TRUE, FALSE);
                             struct obj* box = mksobj_at(LARGE_BOX, xx, yy + dy, FALSE, FALSE);
                             struct obj* pie = mksobj(CREAM_PIE, FALSE, FALSE, FALSE);
                             add_to_container(box, pie);
@@ -999,7 +999,7 @@ int trap_type;
                             if (!m_carrying(mon, ORCISH_ARROW))
                                 m_initthrow(mon, ORCISH_ARROW, 10, 12, TRUE, -1, -1, MAT_NONE);
 
-                            m_dowear(mon, TRUE);
+                            m_dowear(mon, TRUE, FALSE);
                             mongets(mon, CREAM_PIE);
                             struct obj* box = mksobj_at(LARGE_BOX, xx, yy + dy, FALSE, FALSE);
                             struct obj* pie = mksobj(CREAM_PIE, FALSE, FALSE, FALSE);
@@ -1549,7 +1549,7 @@ makelevel()
                 if (context.game_difficulty < 0)
                 {
                     long bits = 0L, bits2 = 0L;
-                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, MKOBJ_TYPE_NORMAL, (struct monst*)0, MAT_NONE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
                     if (otmp)
                     {
                         otmp->bknown = 1;
@@ -1560,7 +1560,7 @@ makelevel()
                             bits2 |= 1L << (otmp->special_quality - 32);
                     }
 
-                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, bits, bits2, MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS);
+                    otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, MKOBJ_TYPE_NORMAL, (struct monst*)0, MAT_NONE, bits, bits2, MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS);
                     if (otmp)
                     {
                         otmp->bknown = 1;
@@ -2351,7 +2351,6 @@ coord *tm;
                 break;
             }
 
-            Strcpy(debug_buf_2, "mktrap");
             otmp = mkobj(poss_class, FALSE, FALSE);
             /* these items are always cursed, both for flavour (owned
                by a dead adventurer, bones-pile-style) and for balance
@@ -2831,6 +2830,7 @@ int dist;
             fracture_rock(otmp, FALSE);
             make_rocks = FALSE; /* don't bother with more rocks */
         } else {
+            Strcpy(debug_buf_2, "mkinvpos");
             obj_extract_self(otmp);
             obfree(otmp, (struct obj *) 0);
         }

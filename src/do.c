@@ -32,7 +32,7 @@ STATIC_VAR NEARDATA const char drop_types[] = { ALLOW_COUNT, COIN_CLASS,
 
 /* 'd' command: drop one inventory item */
 int
-dodrop()
+dodrop(VOID_ARGS)
 {
     int result, i = (invent) ? 0 : (SIZE(drop_types) - 1);
 
@@ -49,9 +49,9 @@ dodrop()
 
 /* the M('y') command - Character statistics */
 int
-docharacterstatistics()
+docharacterstatistics(VOID_ARGS)
 {
-    int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Upolyd ? u.mfemale : flags.female, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
+    int glyph = player_to_glyph_index(urole.rolenum, urace.racenum, Ufemale, u.ualign.type, 0) + GLYPH_PLAYER_OFF;
     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     winid datawin = WIN_ERR;
@@ -253,6 +253,7 @@ docharacterstatistics()
         long innate_intrinsic = u.uprops[i].intrinsic & (INTRINSIC | FROM_FORM);
         long temporary_intrinsic = u.uprops[i].intrinsic & TIMEOUT;
         long extrinsic = u.uprops[i].extrinsic;
+        boolean is_recurring = property_definitions[i].recurring;
         boolean o_stats_known = FALSE;
         if (extrinsic)
         {
@@ -260,14 +261,16 @@ docharacterstatistics()
             if (obj)
                 o_stats_known = object_stats_known(obj);
         }
-        if (innate_intrinsic || o_stats_known || temporary_intrinsic)
+        if (innate_intrinsic || o_stats_known || (temporary_intrinsic && !is_recurring))
         {
             intrinsic_count++;
 
             char dbuf2[BUFSZ];
             char dbuf3[BUFSZ];
-
-            Strcpy(dbuf2, get_property_name(i));
+            struct propname pn = get_property_name_ex(i);
+            boolean haspdesc = pn.prop_desc != 0;
+            Sprintf(dbuf2, "%s%s%s%s", pn.prop_noun ? pn.prop_noun : "", haspdesc ? " (" : "", haspdesc ? pn.prop_desc : "", haspdesc ? ")" : "");
+            //Strcpy(dbuf2, get_property_name(i));
             *dbuf2 = highc(*dbuf2);
             Strcpy(dbuf3, "");
 
@@ -304,7 +307,7 @@ docharacterstatistics()
                 Sprintf(eos(dbuf3), "%s", cxname(obj));
             }
             
-            if (temporary_intrinsic)
+            if (temporary_intrinsic && !is_recurring)
             {
                 if (strcmp(dbuf3, ""))
                     Sprintf(eos(dbuf3), ", ");
@@ -317,8 +320,6 @@ docharacterstatistics()
 
             Sprintf(buf, " %2d - %s (%s)", intrinsic_count, dbuf2, dbuf3);
             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
-
-
         }
     }
     if (intrinsic_count == 0)
@@ -326,8 +327,6 @@ docharacterstatistics()
         Sprintf(buf, " (None)");
         putstr(datawin, 0, buf);
     }
-
-
 
     /* Level-up intrinsics */
     for(i = 1; i <= 2; i++)
@@ -347,7 +346,10 @@ docharacterstatistics()
                     abil_count++;
 
                     char dbuf2[BUFSIZ] = "";
-                    Strcpy(dbuf2, get_property_name(intrinsic_ability[table_index].propid));
+                    struct propname pn = get_property_name_ex(intrinsic_ability[table_index].propid);
+                    boolean haspdesc = pn.prop_desc != 0;
+                    Sprintf(dbuf2, "%s%s%s%s", pn.prop_noun ? pn.prop_noun : "", haspdesc ? " (" : "", haspdesc ? pn.prop_desc : "", haspdesc ? ")" : "");
+                    //Strcpy(dbuf2, get_property_name(intrinsic_ability[table_index].propid));
                     *dbuf2 = highc(*dbuf2);
 
                     Sprintf(buf, " Level %2d - %s", intrinsic_ability[table_index].ulevel, dbuf2);
@@ -376,7 +378,7 @@ STATIC_VAR NEARDATA const char item_description_objects[] = { ALL_CLASSES, ALLOW
 
 /* the M('x') command - Item descriptions */
 int
-doitemdescriptions()
+doitemdescriptions(VOID_ARGS)
 {
     boolean proceedtoinventory = getobj_autoselect_obj ? TRUE : floorexamine();
     if (!proceedtoinventory)
@@ -385,14 +387,13 @@ doitemdescriptions()
     int i = (invent) ? 0 : (SIZE(item_description_objects) - 1);
 
     return itemdescription(getobj(&item_description_objects[i], "examine", 1, ""));
-
 }
 
 /* Returns TRUE if we proceed to inventory.
  * Object may be either on floor or in inventory.
  */
 boolean
-floorexamine()
+floorexamine(VOID_ARGS)
 {
     register struct obj* otmp;
     char qbuf[QBUFSZ];
@@ -532,6 +533,19 @@ int mnum;
         {
             cnt++;
             Sprintf(buf, "  %d - Reviving corpse", cnt);
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        }
+
+        if (vegan(ptr))
+        {
+            cnt++;
+            Sprintf(buf, "  %d - Vegan food", cnt);
+            putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+        }
+        else if (vegetarian(ptr))
+        {
+            cnt++;
+            Sprintf(buf, "  %d - Vegetarian food", cnt);
             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
         }
 
@@ -739,7 +753,7 @@ register struct obj* obj;
     if(obj->corpsenm > NON_PM)
         learn_corpse_type(obj->corpsenm);
 
-    obj->speflags |= SPEFLAGS_ROTTING_STATUS_KNOWN;
+    obj->rotknown = 1;
     return itemdescription(obj);
 }
 
@@ -764,13 +778,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
     
     struct window_procs saved_procs = windowprocs;
     if (stats_ptr)
-    {
-#ifdef SAFEPROCS
-        windowprocs = *get_safe_procs(0);
-#else
-        return 0;
-#endif
-    }
+        itemdesc_redirect();
 
     winid datawin = WIN_ERR;
     int glyph = obj ? obj_to_glyph(obj, rn2_on_display_rng) : otyp + GLYPH_OBJ_OFF;
@@ -1085,7 +1093,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             if (obj)
             {
                 int mnum = obj->corpsenm;
-                if (is_obj_rotting_corpse(obj) && mnum > NON_PM && (obj->speflags & SPEFLAGS_ROTTING_STATUS_KNOWN) != 0)
+                if (is_obj_rotting_corpse(obj) && mnum > NON_PM && obj->rotknown)
                 {
                     long rotted = get_rotted_status(obj);
                     if (rotted > 5L)
@@ -1377,8 +1385,13 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         }
 
         /* Add mythic base damage now here if mknown */
-        if (obj && has_obj_mythic_triple_base_damage(obj) && obj->mknown)
-            exceptionality_multiplier += 2;
+        if (obj && obj->mknown)
+        {
+            if (has_obj_mythic_triple_base_damage(obj))
+                exceptionality_multiplier += 2;
+            else if (has_obj_mythic_double_base_damage(obj))
+                exceptionality_multiplier += 1;
+        }
 
         boolean printmaindmgtype = FALSE;
         boolean doubledamagetopermittedtargets = FALSE;
@@ -1519,6 +1532,16 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
         double base_avg_dmg = 0.5 * ((double)wsdice * (double)exceptionality_multiplier * (1.0 + (double)wsdam) / 2.0 + (double)wsdmgplus * (double)exceptionality_multiplier
             + wldice * (double)exceptionality_multiplier * (1.0 + (double)wldam) / 2.0 + (double)wldmgplus * (double)exceptionality_multiplier);
+        /* Add mythic great damage if mknown */
+        if (obj && obj->mknown)
+        {
+            if (has_obj_mythic_great_damage(obj))
+            {
+                base_avg_dmg += MYTHIC_GREAT_DAMAGE_DICE * (double)(1 + MYTHIC_GREAT_DAMAGE_DIESIZE) / 2;
+                if(obj->known && objects[otyp].oc_enchantable)
+                    base_avg_dmg += obj->enchantment;
+            }
+        }
         wep_avg_dmg += base_avg_dmg;
         wep_multipliable_avg_dmg += base_avg_dmg;
         if (doubledamagetopermittedtargets)
@@ -1662,7 +1685,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         }
 
         /* Damage - Silver*/
-        if ((obj ? obj->material : objects[otyp].oc_material) == MAT_SILVER)
+        if (obj ? obj_counts_as_silver(obj) : objects[otyp].oc_material == MAT_SILVER)
         {
             Sprintf(buf, "Silver bonus damage:    ");
             maindiceprinted = TRUE;
@@ -1694,9 +1717,9 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             else if (is_ammo(obj) && uswapwep && is_launcher(uswapwep) && (objects[uswapwep->otyp].oc_flags3 & O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH))
                 dmg_bonus += (double)objects[uswapwep->otyp].oc_fixed_damage_bonus;
             else if(is_otyp_nonmelee_throwing_weapon(otyp) || objects[otyp].oc_skill == P_NONE)
-                dmg_bonus += (double)((int)strength_damage_bonus(ACURR(A_STR)) / 2);
+                dmg_bonus += strength_damage_bonus_core(ACURR(A_STR), TRUE) / 2;
             else
-                dmg_bonus += (double)strength_damage_bonus(ACURR(A_STR));
+                dmg_bonus += strength_damage_bonus_core(ACURR(A_STR), TRUE);
 
             wep_avg_dmg += dmg_bonus;
             wep_multipliable_avg_dmg += dmg_bonus;
@@ -1718,7 +1741,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
     else
     {
         /* Otherwise get full melee strength damage bonus */
-        double str_bonus = (double)strength_damage_bonus(ACURR(A_STR));
+        double str_bonus = strength_damage_bonus_core(ACURR(A_STR), TRUE);
         wep_avg_dmg += str_bonus;
         wep_multipliable_avg_dmg += str_bonus;
     }
@@ -1828,13 +1851,37 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
     {
         if (objects[otyp].oc_class == WAND_CLASS || objects[otyp].oc_class == SCROLL_CLASS || (objects[otyp].oc_class == TOOL_CLASS && is_otyp_spelltool(otyp)))
         {
+            double exceptionality_multiplier = 1.0;
+            if (obj && obj->exceptionality)
+            {
+                exceptionality_multiplier = get_wand_exceptionality_damage_multiplier(obj->exceptionality);
+                Sprintf(buf, "Wand quality:           %s", obj->exceptionality == EXCEPTIONALITY_EXCEPTIONAL ? "Exceptional (double base damage)" :
+                    obj->exceptionality == EXCEPTIONALITY_ELITE ? "Elite (triple base damage)" :
+                    obj->exceptionality == EXCEPTIONALITY_CELESTIAL ? "Celestial (quadruple base damage)" :
+                    obj->exceptionality == EXCEPTIONALITY_PRIMORDIAL ? "Primordial (quadruple base damage)" :
+                    obj->exceptionality == EXCEPTIONALITY_INFERNAL ? "Infernal (quadruple base damage)" :
+                    "Unknown quality"
+                );
+
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+
             boolean use_wand_skill = objects[otyp].oc_class == WAND_CLASS || objects[otyp].oc_skill == P_WAND;
+            double skill_multiplier = use_wand_skill ? get_wand_skill_damage_multiplier(P_SKILL_LEVEL(P_WAND)) : 1.0;
+            if (use_wand_skill)
+            {
+                char slnbuf[BUFSZ] = "";
+                skill_level_name(P_WAND, slnbuf, FALSE);
+                *slnbuf = highc(*slnbuf);
+                Sprintf(buf, "Wand skill level:       %s (%.1fx base damage)", slnbuf, skill_multiplier);
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
+
             const char *itemname_hc = objects[otyp].oc_class == WAND_CLASS ? "Wand" : objects[otyp].oc_class == SCROLL_CLASS ? "Scroll" : "Item";
             const char *itemname_lc = objects[otyp].oc_class == WAND_CLASS ? "wand" : objects[otyp].oc_class == SCROLL_CLASS ? "scroll" : "item";
             const char* itempadding = objects[otyp].oc_class == SCROLL_CLASS ? "" : "  ";
             if (objects[otyp].oc_spell_dmg_dice > 0 || objects[otyp].oc_spell_dmg_diesize > 0 || objects[otyp].oc_spell_dmg_plus != 0)
             {
-                double dicemult = use_wand_skill ? get_wand_damage_multiplier(P_SKILL_LEVEL(P_WAND)) : 1.0;
                 boolean maindiceprinted = FALSE;
                 if(objects[otyp].oc_flags5 & O5_EFFECT_IS_HEALING)
                     Sprintf(buf, "%s healing amount:  %s", itemname_hc, itempadding);
@@ -1848,7 +1895,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 if (objects[otyp].oc_spell_dmg_dice > 0 && objects[otyp].oc_spell_dmg_diesize > 0)
                 {
                     maindiceprinted = TRUE;
-                    Sprintf(plusbuf, "%dd%d", max(1, (int)((double)objects[otyp].oc_spell_dmg_dice * dicemult)), objects[otyp].oc_spell_dmg_diesize);
+                    Sprintf(plusbuf, "%dd%d", max(1, (int)((double)objects[otyp].oc_spell_dmg_dice * skill_multiplier * exceptionality_multiplier)), objects[otyp].oc_spell_dmg_diesize);
                     Strcat(buf, plusbuf);
                 }
 
@@ -1865,14 +1912,6 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
                 if (objects[otyp].oc_flags5 & O5_EFFECT_FOR_BLESSED_ONLY)
                     Strcat(buf, " (blessed only)");
-
-                if (use_wand_skill)
-                {
-                    char slnbuf[BUFSZ] = "";
-                    skill_level_name(P_WAND, slnbuf, FALSE);
-                    *slnbuf = lowc(*slnbuf);
-                    Sprintf(eos(buf), " (%.1fx, %s in %s)", dicemult, slnbuf, skill_name(P_WAND, TRUE));
-                }
 
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
@@ -2694,7 +2733,10 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     }
                     if (j <= 3)
                     {
-                        Strcpy(buf2, get_property_name(prop));
+                        struct propname pn = get_property_name_ex(prop);
+                        boolean haspdesc = pn.prop_desc != 0;
+                        Sprintf(buf2, "%s%s%s%s", pn.prop_noun ? pn.prop_noun : "", haspdesc ? " (" : "", haspdesc ? pn.prop_desc : "", haspdesc ? ")" : "");
+                        //Strcpy(buf2, get_property_name(prop));
                         *buf2 = highc(*buf2);
                     }
                     else if (j == 4)
@@ -3386,7 +3428,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         /* Item properties */
         if (ocflags & ~(O1_THROWN_WEAPON_ONLY | O1_MELEE_AND_THROWN_WEAPON
             | O1_SPELLTOOL | O1_NON_SPELL_SPELLBOOK | O1_EDIBLE_NONFOOD) 
-            || (ocflags5 & (O5_MBAG_DESTROYING_ITEM | O5_CANCELLATION_NO_EXPLOSION_BUT_DRAIN))
+            || (ocflags5 & (O5_MBAG_DESTROYING_ITEM | O5_CANCELLATION_NO_EXPLOSION_BUT_DRAIN | O5_PERMANENTLY_GREASED))
             || otyp_shines_magical_light(otyp)
             || is_otyp_special_praying_item(otyp) || otyp_consumes_nutrition_every_20_rounds(otyp)
             || (obj ? is_death_enchantable(obj) : is_otyp_death_enchantable(otyp)) //|| is_otyp_elemental_enchantable(otyp) 
@@ -3530,6 +3572,12 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 Sprintf(buf, " %2d - Strips magic bag destroying items of charges; does not explode", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
+            if (ocflags5 & O5_PERMANENTLY_GREASED)
+            {
+                powercnt++;
+                Sprintf(buf, " %2d - Permanently greased", powercnt);
+                putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
 
 #if 0
             if (is_otyp_elemental_enchantable(otyp))
@@ -3664,32 +3712,46 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         if (artilist[obj->oartifact].worn_prop > 0)
         {
             char defensetext[BUFSZ];
-            Strcpy(defensetext, get_property_name(artilist[obj->oartifact].worn_prop));
+            char descrtext[BUFSZ];
+            struct propname pn = get_property_name_ex(artilist[obj->oartifact].worn_prop);
+            Strcpy(defensetext, pn.prop_noun ? pn.prop_noun : "");
             *defensetext = highc(*defensetext);
+            if (pn.prop_desc)
+                Sprintf(descrtext, " (%s)", pn.prop_desc);
+            else
+                Strcpy(descrtext, "");
 
             powercnt++;
             if (is_wieldable_weapon(obj))
-                Sprintf(buf, " %2d - %s when wielded", powercnt, defensetext);
+                Sprintf(buf, " %2d - %s when wielded%s", powercnt, defensetext, descrtext);
             else
-                Sprintf(buf, " %2d - %s when worn", powercnt, defensetext);
+                Sprintf(buf, " %2d - %s when worn%s", powercnt, defensetext, descrtext);
             
             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
         }
         if (artilist[obj->oartifact].carried_prop > 0)
         {
             char defensetext[BUFSZ];
-            Strcpy(defensetext, get_property_name(artilist[obj->oartifact].carried_prop));
+            char descrtext[BUFSZ];
+            struct propname pn = get_property_name_ex(artilist[obj->oartifact].carried_prop);
+            Strcpy(defensetext, pn.prop_noun ? pn.prop_noun : "");
             *defensetext = highc(*defensetext);
+            if (pn.prop_desc)
+                Sprintf(descrtext, " (%s)", pn.prop_desc);
+            else
+                Strcpy(descrtext, "");
 
             powercnt++;
-            Sprintf(buf, " %2d - %s when carried", powercnt, defensetext);
+            Sprintf(buf, " %2d - %s when carried%s", powercnt, defensetext, descrtext);
             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
         }
         if (artilist[obj->oartifact].inv_prop > 0)
         {
             char invoketext[BUFSZ];
             char repowertext[BUFSZ];
+            char descrtext[BUFSZ];
             Strcpy(repowertext, "");
+            Strcpy(descrtext, "");
 
             if (artilist[obj->oartifact].inv_prop > LAST_PROP)
             {
@@ -3699,12 +3761,17 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             }
             else
             {
-                Strcpy(invoketext, get_property_name(artilist[obj->oartifact].inv_prop));
+                struct propname pn = get_property_name_ex(artilist[obj->oartifact].inv_prop);
+                Strcpy(invoketext, pn.prop_noun ? pn.prop_noun : "");
                 *invoketext = highc(*invoketext);
+                if (pn.prop_desc)
+                    Sprintf(descrtext, " (%s)", pn.prop_desc);
+                else
+                    Strcpy(descrtext, "");
             }
 
             powercnt++;
-            Sprintf(buf, " %2d - %s when invoked", powercnt, invoketext);
+            Sprintf(buf, " %2d - %s when invoked%s", powercnt, invoketext, descrtext);
             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
 
             if (artilist[obj->oartifact].inv_prop <= LAST_PROP /* switchable property */
@@ -3928,14 +3995,21 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     && bit != SPFX_CHA_25
                     )
                 {
-                    const char* propname = get_property_name(propnum);
-                    if (propname)
+                    struct propname pn = get_property_name_ex(propnum);
+                    if (pn.prop_noun)
                     {
                         char propbuf[BUFSZ];
-                        Strcpy(propbuf, propname);
+                        char descrbuf[BUFSZ];
+                        Strcpy(descrbuf, "");
+                        Strcpy(propbuf, pn.prop_noun);
                         *propbuf = highc(*propbuf);
+                        if (pn.prop_desc)
+                            Sprintf(descrbuf, " (%s)", pn.prop_desc);
+                        else
+                            Strcpy(descrbuf, "");
+
                         powercnt++;
-                        Sprintf(buf, " %2d - %s %s", powercnt, propbuf, endbuf);
+                        Sprintf(buf, " %2d - %s %s%s", powercnt, propbuf, endbuf, descrbuf);
                         
                         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                     }
@@ -5921,7 +5995,7 @@ dodropmany()
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist("What would you like to drop?", &invent,
-        (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ANY, allow_all, 3);
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY, allow_all, 3);
 
     if (n > 0 && pick_list)
     {
@@ -6093,7 +6167,7 @@ int retry;
     {
         /* should coordinate with perm invent, maybe not show worn items */
         n = query_objlist("What would you like to drop?", &invent,
-                          (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ANY,
+                          (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
                           all_categories ? allow_all : allow_category, 3);
         if (n > 0 && pick_list)
         {
@@ -6264,7 +6338,7 @@ int retry;
     {
         /* should coordinate with perm invent, maybe not show worn items */
         n = query_objlist("What would you like to put in bag?", &invent,
-            (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ANY,
+            (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
             all_categories ? allow_all : allow_category, 3);
         if (n > 0 && pick_list)
         {
@@ -6802,7 +6876,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     u.ustuck = 0; /* idem */
     u.uinwater = 0;
     u.uundetected = 0; /* not hidden, even if means are available */
-    keepdogs(context.reviving);
+    keepdogs(context.reviving, TRUE);
     removealtarsummons();
     if (u.uswallow) /* idem */
         u.uswldtim = u.uswallow = 0;
@@ -6902,6 +6976,10 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     }
     else 
     {
+        Strcpy(debug_buf_1, "goto_level");
+        Strcpy(debug_buf_2, "goto_level");
+        Strcpy(debug_buf_3, "goto_level");
+        Strcpy(debug_buf_4, "goto_level");
         /* returning to previously visited level; reload it */
         fd = open_levelfile(new_ledger, whynot);
         if (tricked_fileremoved(fd, whynot))
@@ -7076,6 +7154,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     {
         forget_map(ALL_MAP); /* forget the map */
         forget_traps();      /* forget all traps too */
+        forget_engravings();
         familiar = TRUE;
         level_info[new_ledger].flags &= ~FORGOTTEN;
     }
@@ -8857,7 +8936,7 @@ const char* str;
     else if ((attr & (ATR_TITLE)) == ATR_TITLE)
         return; // Strcat(buf, "# "); // No need to print the title twice
 
-    if ((attr & (ATR_INDENT_AT_COLON)) != 0)
+    if ((attr & ATR_INDENT_MASK) == ATR_INDENT_AT_COLON)
         Strcat(buf, "- **");
 
     Strcat(buf, str);
@@ -8865,7 +8944,7 @@ const char* str;
     if (removetrailingcolon && slen > 0 && buf[slen - 1] == ':')
         buf[slen - 1] = 0;
 
-    if ((attr & (ATR_INDENT_AT_COLON)) != 0)
+    if ((attr & ATR_INDENT_MASK) == ATR_INDENT_AT_COLON)
     {
         char* p = strchr(buf, ':');
         if (p)
@@ -8880,7 +8959,7 @@ const char* str;
             Strcat(buf, buf2);
         }
     }
-    else if ((attr & (ATR_INDENT_AT_DASH)) != 0)
+    else if ((attr & ATR_INDENT_MASK) == ATR_INDENT_AT_DASH)
     {
         char* p = strchr(buf, '-');
         if (p)
@@ -9475,7 +9554,7 @@ write_items()
     }
 
     short i_idx;
-    for (i = 0; i < NUM_MONSTERS - LOW_PM; i++)
+    for (i = 0; i < (short)cnt_objs; i++)
     {
         i_idx = item_indices[i];
 

@@ -143,6 +143,7 @@ void
 restore_artifacts(fd)
 int fd;
 {
+    Strcpy(debug_buf_4, "restore_artifacts");
     mread(fd, (genericptr_t) artiexist, sizeof artiexist);
     mread(fd, (genericptr_t) artidisco, sizeof artidisco);
     hack_artifacts(); /* redo non-saved special cases */
@@ -175,7 +176,7 @@ aligntyp alignment; /* target alignment, or A_NONE */
 uchar mkflags; /* for monks */
 {
     const struct artifact *a;
-    int m, n, altn;
+    int m, n, altn, i;
     boolean by_align = (alignment != A_NONE);
     short o_typ = (by_align || !otmp) ? 0 : otmp->otyp;
     boolean unique = !by_align && otmp && is_otyp_unique(o_typ);
@@ -252,18 +253,31 @@ uchar mkflags; /* for monks */
     if (n) 
     {
         /* found at least one candidate; pick one at random */
-        m = eligible[rn2(n)]; /* [0..n-1] */
-        a = &artilist[m];
+        int totalprob = 0, roll;
+        for (i = 0; i < n; i++)
+        {
+            totalprob += ((artilist[eligible[i]].aflags2 & AF2_RARE) ? ARTIFACT_RARE_CHANCE : ARTIFACT_NORMAL_CHANCE);
+        }
+        roll = totalprob > 1 ? rn2(totalprob) : 0;
+        m = -1;
+        do
+        {
+            m++;
+            roll -= ((artilist[eligible[m]].aflags2 & AF2_RARE) ? ARTIFACT_RARE_CHANCE : ARTIFACT_NORMAL_CHANCE);
+        } while (roll >= 0 && m < n - 1);
+
+        //m = eligible[rn2(n)]; /* [0..n-1] */
+        a = &artilist[eligible[m]];
 
         /* make an appropriate object if necessary, then christen it */
         if (by_align || !otmp)
-            otmp = mksobj_with_flags((int) a->otyp, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0UL, 0UL, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
+            otmp = mksobj_with_flags((int) a->otyp, TRUE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE, (struct monst*)0, MAT_NONE, 0UL, 0UL, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
 
         if (otmp) 
         {
             otmp = oname(otmp, a->name);
-            otmp->oartifact = m;
-            artiexist[m] = TRUE;
+            otmp->oartifact = eligible[m];
+            artiexist[eligible[m]] = TRUE;
             otmp->exceptionality = artilist[otmp->oartifact].exceptionality;
             otmp->mythic_prefix = artilist[otmp->oartifact].mythic_prefix;
             otmp->mythic_suffix = artilist[otmp->oartifact].mythic_suffix;
@@ -609,7 +623,7 @@ struct obj *obj;
     const struct artifact *arti;
 
     /* any silver object is effective */
-    if (obj->material == MAT_SILVER)
+    if (obj_counts_as_silver(obj))
         return TRUE;
 
     /* any blessed object is effective */
@@ -840,7 +854,7 @@ struct monst *mon;
             if(badclass || badalign)
                 dmg += d((Antimagic_or_resistance ? 2 : 4), (self_willed ? 10 : 4));
             /* add half (maybe quarter) of the usual silver damage bonus */
-            if (obj->material == MAT_SILVER && Hate_silver)
+            if (obj_counts_as_silver(obj) && Hate_silver)
                 dmg += rnd(10);
             damage = adjust_damage(dmg, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE);
 
@@ -2609,7 +2623,7 @@ struct obj *obj;
         return 0;
     }
 
-
+    wish_insurance_check(oart->inv_prop == ARTINVOKE_WISHING);
     check_arti_name_discovery(obj);
     
     if (oart->aflags & AF_INVOKE_EXPENDS_CHARGE)
@@ -3704,7 +3718,7 @@ boolean loseit;    /* whether to drop it if hero can longer touch it */
     if (touch_artifact(obj, &youmonst)) {
         char buf[BUFSZ];
         double damage = 0;
-        boolean ag = (obj->material == MAT_SILVER && Hate_silver),
+        boolean ag = (obj_counts_as_silver(obj) && Hate_silver),
             bane = bane_applies(get_artifact(obj), &youmonst),
             inappr_character = ((objects[obj->otyp].oc_flags4 & O4_INAPPROPRIATE_CHARACTERS_CANT_HANDLE) != 0 && inappropriate_monster_character_type(&youmonst, obj)),
             inappr_exceptionality = inappropriate_exceptionality(&youmonst, obj);

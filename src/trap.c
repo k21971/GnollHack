@@ -22,7 +22,6 @@ STATIC_DCL boolean FDECL(isclearpath, (coord *, int, SCHAR_P, SCHAR_P));
 STATIC_DCL void FDECL(dofiretrap, (struct obj *, int));
 STATIC_DCL void NDECL(domagictrap);
 STATIC_DCL boolean FDECL(emergency_disrobe, (boolean *));
-STATIC_DCL int FDECL(succeed_untrap, (struct trap *));
 STATIC_DCL void FDECL(move_into_trap, (struct trap *));
 STATIC_DCL int FDECL(try_disarm, (struct trap *, BOOLEAN_P));
 STATIC_DCL void FDECL(reward_untrap, (struct trap *, struct monst *));
@@ -55,36 +54,36 @@ STATIC_VAR const char *const blindgas[6] = { "humid",   "odorless",
                                              "acrid",   "biting" };
 
 /* Note these names are not currently being used, instead use the explanations in defsyms and defsym_variations */
-struct trap_type_definition trap_type_definitions[TRAPNUM] = {
-    {"", "", "", MAT_NONE, TRAPDEF_FLAGS_NONE},
-    {"arrow trap", "trap", "", MAT_METAL, TRAPDEF_FLAGS_NONE},
-    {"dart trap", "trap", "", MAT_METAL, TRAPDEF_FLAGS_NONE},
-    {"falling rock trap", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NONE},
-    {"squeaky board", "trap", "", MAT_WOOD, TRAPDEF_FLAGS_NONE},
-    {"bear trap", "trap", "", MAT_METAL, TRAPDEF_FLAGS_NONE},
-    {"land mine", "mine", "", MAT_MINERAL, TRAPDEF_FLAGS_NONE},
-    {"rolling boulder trap", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NONE},
-    {"sleep gas trap", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NONE},
-    {"rust trap", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NONE},
-    {"fire trap", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NONE},
-    {"pit", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"spiked pit", "trap", "", MAT_MINERAL, TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"hole", "hole", "", MAT_MINERAL, TRAPDEF_FLAGS_VISIBLE_AT_START | TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"trap door", "trap door", "", MAT_MINERAL, TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"teleport trap", "trap", "", MAT_ENERGY, TRAPDEF_FLAGS_NONE},
-    {"level teleport trap", "trap", "", MAT_ENERGY, TRAPDEF_FLAGS_NONE},
-    {"magic portal", "portal", "", MAT_ENERGY,
+const struct trap_type_definition trap_type_definitions[TRAPNUM] = {
+    {"", "", "", MAT_NONE,                              SIMPLE_MECHANICAL_TRAP,     SIMPLE_MECHANICAL_TRAP,     0, TRAPDEF_FLAGS_NONE},
+    {"arrow trap", "trap", "", MAT_METAL,               SIMPLE_MECHANICAL_TRAP,     SIMPLE_MECHANICAL_TRAP,     10, TRAPDEF_FLAGS_NONE},
+    {"dart trap", "trap", "", MAT_METAL,                SIMPLE_MECHANICAL_TRAP,     SIMPLE_MECHANICAL_TRAP,     10, TRAPDEF_FLAGS_NONE},
+    {"falling rock trap", "trap", "", MAT_MINERAL,      COMPLEX_MECHANICAL_TRAP,    COMPLEX_MECHANICAL_TRAP,    20, TRAPDEF_FLAGS_NONE},
+    {"squeaky board", "trap", "", MAT_WOOD,             SIMPLE_MECHANICAL_TRAP,     SIMPLE_MECHANICAL_TRAP,     10, TRAPDEF_FLAGS_NONE},
+    {"bear trap", "trap", "", MAT_METAL,                SIMPLE_MECHANICAL_TRAP,     SIMPLE_MECHANICAL_TRAP,     10, TRAPDEF_FLAGS_NONE},
+    {"land mine", "mine", "", MAT_MINERAL,              COMPLEX_MECHANICAL_TRAP,    COMPLEX_MECHANICAL_TRAP,    20, TRAPDEF_FLAGS_NONE},
+    {"rolling boulder trap", "trap", "", MAT_MINERAL,   COMPLEX_MECHANICAL_TRAP,    COMPLEX_MECHANICAL_TRAP,    20, TRAPDEF_FLAGS_NONE},
+    {"sleep gas trap", "trap", "", MAT_MINERAL,         COMPLEX_MECHANICAL_TRAP,    COMPLEX_MECHANICAL_TRAP,    20, TRAPDEF_FLAGS_NONE},
+    {"rust trap", "trap", "", MAT_MINERAL,              COMPLEX_MECHANICAL_TRAP,    COMPLEX_MECHANICAL_TRAP,    20, TRAPDEF_FLAGS_NONE},
+    {"fire trap", "trap", "", MAT_MINERAL,              COMPLEX_MAGICAL_TRAP,       COMPLEX_MAGICAL_TRAP,       40, TRAPDEF_FLAGS_NONE},
+    {"pit", "trap", "", MAT_MINERAL,                    NOT_DISARMABLE_TRAP,        SIMPLE_MECHANICAL_TRAP,     0, TRAPDEF_FLAGS_NOT_DISARMABLE},
+    {"spiked pit", "trap", "", MAT_MINERAL,             NOT_DISARMABLE_TRAP,        SIMPLE_MECHANICAL_TRAP,     0, TRAPDEF_FLAGS_NOT_DISARMABLE},
+    {"hole", "hole", "", MAT_MINERAL,                   NOT_DISARMABLE_TRAP,        SIMPLE_MECHANICAL_TRAP,     0, TRAPDEF_FLAGS_VISIBLE_AT_START | TRAPDEF_FLAGS_NOT_DISARMABLE},
+    {"trap door", "trap door", "", MAT_MINERAL,         NOT_DISARMABLE_TRAP,        SIMPLE_MECHANICAL_TRAP,     0, TRAPDEF_FLAGS_NOT_DISARMABLE},
+    {"teleport trap", "trap", "", MAT_ENERGY,           SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NONE},
+    {"level teleport trap", "trap", "", MAT_ENERGY,     SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NONE},
+    {"magic portal", "portal", "", MAT_ENERGY,          NOT_DISARMABLE_TRAP,        NOT_DISARMABLE_TRAP,        0,
         TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"web", "web", "", MAT_ORGANIC, TRAPDEF_FLAGS_NONE},
-    {"statue", "statue", "", MAT_MINERAL, TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS },
-    {"magic trap", "trap", "", MAT_ENERGY, TRAPDEF_FLAGS_NONE},
-    {"anti-magic trap", "trap", "", MAT_ENERGY, TRAPDEF_FLAGS_NO_TRY_ESCAPE },
-    {"polymorph trap", "trap", "", MAT_ENERGY, TRAPDEF_FLAGS_NONE},
-    {"geometric magic portal", "portal", "", MAT_ENERGY,
+    {"web", "web", "", MAT_ORGANIC,                     SPECIALLY_DISARMABLE_TRAP,  SPECIALLY_DISARMABLE_TRAP,  10, TRAPDEF_FLAGS_NONE},
+    {"statue", "statue", "", MAT_MINERAL,               SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS },
+    {"magic trap", "trap", "", MAT_ENERGY,              COMPLEX_MAGICAL_TRAP,       COMPLEX_MAGICAL_TRAP,       40, TRAPDEF_FLAGS_NONE},
+    {"anti-magic trap", "trap", "", MAT_ENERGY,         SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NO_TRY_ESCAPE },
+    {"polymorph trap", "trap", "", MAT_ENERGY,          COMPLEX_MAGICAL_TRAP,       COMPLEX_MAGICAL_TRAP,       40, TRAPDEF_FLAGS_NONE},
+    {"geometric magic portal", "portal","", MAT_ENERGY, NOT_DISARMABLE_TRAP,        NOT_DISARMABLE_TRAP,        0,
         TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"lever", "lever", "pull", MAT_METAL,
+    {"lever", "lever", "pull", MAT_METAL,               NOT_DISARMABLE_TRAP,        NOT_DISARMABLE_TRAP,        0,
         TRAPDEF_FLAGS_APPLIABLE | TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_TELEOK | TRAPDEF_FLAGS_VISIBLE_AT_START | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_NOT_DISARMABLE},
-    {"vibrating square", "vibrating square", "", MAT_MINERAL,
+    {"vibrating square", "vibrating square", "", MAT_MINERAL, NOT_DISARMABLE_TRAP, NOT_DISARMABLE_TRAP,         0,
         TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_TELEOK | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS | TRAPDEF_FLAGS_NOT_DISARMABLE}
 };
 
@@ -675,8 +674,7 @@ int *fail_reason;
     struct monst *mon = 0, *shkp;
     struct obj *item;
     coord cc;
-    boolean historic = (Role_if(PM_ARCHAEOLOGIST)
-                        && (statue->speflags & SPEFLAGS_STATUE_HISTORIC) != 0),
+    boolean historic = (Role_if(PM_ARCHAEOLOGIST) && statue->special_quality == SPEQUAL_STATUE_HISTORIC),
             golem_xform = FALSE, use_saved_traits;
     const char *comes_to_life;
     char statuename[BUFSZ], tmpbuf[BUFSZ];
@@ -872,11 +870,12 @@ int *fail_reason;
     }
 
     /* transfer any statue contents to monster's inventory */
+    Strcpy(debug_buf_2, "animate_statue");
     while ((item = statue->cobj) != 0) {
         obj_extract_self(item);
         (void) mpickobj(mon, item);
     }
-    m_dowear(mon, TRUE);
+    m_dowear(mon, TRUE, FALSE);
 
     /* in case statue is wielded and hero zaps stone-to-flesh at self */
     if (statue->owornmask)
@@ -944,6 +943,7 @@ struct obj *objchn, *saddle;
                 /* move saddle */
                 xchar x, y;
                 if (get_obj_location(objchn, &x, &y, 0)) {
+                    Strcpy(debug_buf_2, "keep_saddle_with_steedcorpse");
                     obj_extract_self(saddle);
                     place_object(saddle, x, y);
                     stackobj(saddle);
@@ -1013,7 +1013,7 @@ t_missile(otyp, trap)
 int otyp;
 struct trap *trap;
 {
-    struct obj *otmp = mksobj_with_flags(otyp, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
+    struct obj *otmp = mksobj_with_flags(otyp, TRUE, FALSE, MKOBJ_TYPE_GENERATED, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FORCE_BASE_MATERIAL);
 
     otmp->quan = 1L;
     otmp->opoisoned = 0;
@@ -1228,7 +1228,7 @@ unsigned short trflags;
 
             if (uarmh) 
             {
-                if (is_metallic(uarmh)) 
+                if (is_hard_helmet(uarmh))
                 {
                     if (flags.verbose)
                     {
@@ -1237,7 +1237,7 @@ unsigned short trflags;
                             //delay_output_milliseconds(150);
                             play_sfx_sound(SFX_ROCK_HITS_HARD_HELMET);
                         }
-                        pline("Fortunately, you are wearing a hard helmet.");
+                        pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately, you are wearing a hard helmet.");
                     }
                     dmg = 2;
                 } 
@@ -1548,7 +1548,7 @@ unsigned short trflags;
         if (Role_if(PM_RANGER) && !trap->madeby_u && !trap->once
             && In_quest(&u.uz) && Is_qlocate(&u.uz))
         {
-            pline("Fortunately it has a bottom after all...");
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately it has a bottom after all...");
             trap->once = 1;
         } 
         else if (u.umonnum == PM_PIT_VIPER || u.umonnum == PM_PIT_FIEND)
@@ -1970,7 +1970,7 @@ unsigned short trflags;
                 trap->launch2.x, trap->launch2.y, style)) {
                 deltrap(trap);
                 newsym(u.ux, u.uy); /* get rid of trap symbol */
-                pline("Fortunately for you, no boulder was released.");
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Fortunately for you, no boulder was released.");
             }
         }
         break;
@@ -2252,13 +2252,17 @@ int style;
     }
 
     if (otmp->quan == 1L) {
+        Strcpy(debug_buf_2, "launch_obj1");
         obj_extract_self(otmp);
         singleobj = otmp;
         otmp = (struct obj *) 0;
     } else {
         singleobj = splitobj(otmp, 1L);
-        if(singleobj)
+        if (singleobj)
+        {
+            Strcpy(debug_buf_2, "launch_obj2");
             obj_extract_self(singleobj);
+        }
     }
     newsym(x1, y1);
 
@@ -2482,6 +2486,7 @@ int style;
 
                 You_hear("a loud crash%s!",
                          cansee(bhitpos.x, bhitpos.y) ? bmsg : "");
+                Strcpy(debug_buf_2, "launch_obj3");
                 obj_extract_self(otmp2);
                 /* pass off the otrapped flag to the next boulder */
                 otmp2->otrapped = singleobj->otrapped;
@@ -3529,7 +3534,7 @@ register struct monst *mtmp;
 
                 newsym(mtmp->mx, mtmp->my);
                 if (in_sight)
-                    pline("Click!  %s triggers %s.", Monnam(mtmp),
+                    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Click!  %s triggers %s.", Monnam(mtmp),
                           trap->tseen ? "a rolling boulder trap" : something);
                 if (launch_obj(BOULDER, trap->launch.x, trap->launch.y,
                                trap->launch2.x, trap->launch2.y, style)) 
@@ -3550,7 +3555,8 @@ register struct monst *mtmp;
             if (see_it && !Blind) 
             {
                 seetrap(trap); /* before messages */
-                if (in_sight) {
+                if (in_sight) 
+                {
                     char buf[BUFSZ], *p, *monnm = mon_nam(mtmp);
 
                     if (nolimbs(mtmp->data)
@@ -3797,6 +3803,7 @@ int x, y;
 {
     struct obj *otmp;
     struct trap *t;
+    Strcpy(debug_buf_2, "fill_pit");
 
     if ((t = t_at(x, y)) && is_pit(t->ttyp)
         && (otmp = sobj_at(BOULDER, x, y))) {
@@ -4368,6 +4375,7 @@ xchar x, y;
             for (otmp = obj->cobj; otmp; otmp = ncobj) 
             {
                 ncobj = otmp->nobj;
+                Strcpy(debug_buf_2, "fire_damage");
                 obj_extract_self(otmp);
                 if (!flooreffects(otmp, x, y, ""))
                     place_object(otmp, x, y);
@@ -5088,22 +5096,23 @@ dountrap()
 }
 
 /* Did the untrap succeed? */
-STATIC_OVL int
-succeed_untrap(ttmp)
-struct trap *ttmp;
+int
+succeed_untrap(ttyp, helping_another)
+int ttyp;
+boolean helping_another;
 {
-    if (!ttmp)
+    if (ttyp < 0 || ttyp >= TRAPNUM)
         return FALSE;
 
     //boolean res = FALSE;
     //int probability = 0;
-    int usedskilllevel = max(P_UNSKILLED, min(P_EXPERT, P_SKILL_LEVEL(P_DISARM_TRAP) + (Enhanced_untrap ? 1 : 0))); /* (Role_if(PM_ROGUE) && u.uhave.questart) */
+    int usedskilllevel = max(P_UNSKILLED, min(P_GRAND_MASTER, P_SKILL_LEVEL(P_DISARM_TRAP) + (Enhanced_untrap ? 1 : 0))); /* (Role_if(PM_ROGUE) && u.uhave.questart) */
 
     //probability = untrap_probability(ttmp->ttyp, usedskilllevel, &youmonst);
     if (Fumbling & !rn2(2))
         return -1;
 
-    int trap_dif = trap_difficulty(ttmp->ttyp, &youmonst);
+    int trap_dif = trap_difficulty(ttyp, helping_another, &youmonst);
     int skill_lvl = max(0, usedskilllevel - 1);
     int checkdiff = skill_lvl - trap_dif;
     if (Confusion || Hallucination)
@@ -5153,43 +5162,26 @@ struct trap *ttmp;
 }
 
 int
-trap_difficulty(trap_type, mon)
+trap_difficulty(trap_type, helping_another, mon)
 int trap_type;
+boolean helping_another;
 struct monst* mon;
 {
-    int diflevel;
-    switch (trap_type)
+    if (trap_type < 0 || trap_type >= TRAPNUM)
+        return NOT_DISARMABLE_TRAP;
+     
+    int diflevel = helping_another ? trap_type_definitions[trap_type].thelpdifficulty : trap_type_definitions[trap_type].tdifficulty;
+    if (diflevel == SPECIALLY_DISARMABLE_TRAP)
     {
-    case WEB:
-        diflevel = webmaker(mon->data) ? 0 : 3;
-        break;
-    case ARROW_TRAP:
-    case DART_TRAP:        
-    case SQKY_BOARD:
-    case BEAR_TRAP:
-        diflevel = 0;
-        break;
-    case LANDMINE:
-    case RUST_TRAP:
-    case SLP_GAS_TRAP:
-    case ROCKTRAP:
-    case ROLLING_BOULDER_TRAP:
-        diflevel = 1;
-        break;
-    case ANTI_MAGIC_TRAP:
-    case TELEP_TRAP:
-    case LEVEL_TELEP:
-    case STATUE_TRAP:
-        diflevel = 2;
-        break;
-    case MAGIC_TRAP:
-    case POLY_TRAP:
-    case FIRE_TRAP:
-        diflevel = 3;
-        break;
-    default:
-        diflevel = 0;
-        break;
+        switch (trap_type)
+        {
+        case WEB:
+            diflevel = webmaker(mon->data) ? SIMPLE_MECHANICAL_TRAP : (helping_another ? COMPLEX_MECHANICAL_TRAP : COMPLEX_MAGICAL_TRAP);
+            break;
+        default:
+            diflevel = NOT_DISARMABLE_TRAP;
+            break;
+        }
     }
     return diflevel;
 }
@@ -5369,20 +5361,18 @@ struct monst* mon;
     //    break;
     //}
 
-    int trap_dif = trap_difficulty(trap_type, mon);
+    int trap_dif = trap_difficulty(trap_type, FALSE, mon);
     int skill_lvl = max(0, skill_level - 1);
     int checkdiff = skill_lvl - trap_dif;
 
     switch (checkdiff)
     {
-    case -1:
-        return 0;
     case 0:
         return 33;
     case 1:
         return 66;
     default:
-        if (checkdiff <= -2)
+        if (checkdiff <= -1)
         {
             return 0;
         }
@@ -5531,7 +5521,7 @@ boolean force_failure;
     }
 
     /* Will our hero succeed? */
-    int success = succeed_untrap(ttmp);
+    int success = succeed_untrap(ttmp->ttyp, FALSE);
     if (force_failure || success <= 0)
     {
         play_sfx_sound(SFX_DISARM_TRAP_FAIL);
@@ -5626,7 +5616,6 @@ struct trap *ttmp;
 {
     struct monst *mtmp;
     int fails = try_disarm(ttmp, FALSE);
-
     if (fails < 2)
     {
         return fails;
@@ -5634,6 +5623,8 @@ struct trap *ttmp;
 
     /* ok, disarm it. */
 
+    boolean madebyu = ttmp->madeby_u;
+    uchar ttyp = ttmp->ttyp;
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
 
     /* untrap the monster, if any.
@@ -5662,7 +5653,8 @@ struct trap *ttmp;
     newsym(u.ux + u.dx, u.uy + u.dy);
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, ttmp->madeby_u ? 0: 10);
+    if(!madebyu)
+        use_skill(P_DISARM_TRAP, trap_type_definitions[ttyp].training);
 
     return 1;
 }
@@ -5672,62 +5664,64 @@ disarm_magical_trap(ttmp) /* Janne Gustafsson */
 struct trap* ttmp;
 {
     int fails = try_disarm(ttmp, FALSE);
-
     if (fails < 2)
     {
         return fails;
     }
 
+    boolean madebyu = ttmp->madeby_u;
+    uchar ttyp = ttmp->ttyp;
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
     You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s %s.", the_your[ttmp->madeby_u], get_trap_explanation(ttmp));
     
-    /* Skills gained */
-    int skillgained = 5;
-    boolean ismagictrap = FALSE;
+    ///* Skills gained */
+    //int skillgained = 5;
+    //boolean ismagictrap = FALSE;
 
-    switch (ttmp->ttyp)
-    {
-    case POLY_TRAP:
-        skillgained = 32;
-        ismagictrap = TRUE;
-        break;
-    case MAGIC_TRAP:
-        skillgained = 28;
-        ismagictrap = TRUE;
-        break;
-    case LEVEL_TELEP:
-        skillgained = 26;
-        ismagictrap = TRUE;
-        break;
-    case ANTI_MAGIC_TRAP:
-        skillgained = 24;
-        ismagictrap = TRUE;
-        break;
-    case TELEP_TRAP:
-        skillgained = 22;
-        ismagictrap = TRUE;
-        break;
-    case SLP_GAS_TRAP:
-        skillgained = 20;
-        ismagictrap = TRUE;
-        break;
-    case RUST_TRAP:
-        skillgained = 18;
-        break;
-    case FIRE_TRAP:
-        skillgained = 16;
-        ismagictrap = TRUE;
-        break;
-    case ROLLING_BOULDER_TRAP:
-        skillgained = 14;
-        break;
-    case ROCKTRAP:
-        skillgained = 12;
-        break;
-    default:
-        break;
-    }
-    use_skill(P_DISARM_TRAP, ttmp->madeby_u ? 0 : skillgained);
+    //switch (ttmp->ttyp)
+    //{
+    //case POLY_TRAP:
+    //    skillgained = 32;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case MAGIC_TRAP:
+    //    skillgained = 28;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case LEVEL_TELEP:
+    //    skillgained = 26;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case ANTI_MAGIC_TRAP:
+    //    skillgained = 24;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case TELEP_TRAP:
+    //    skillgained = 22;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case SLP_GAS_TRAP:
+    //    skillgained = 20;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case RUST_TRAP:
+    //    skillgained = 18;
+    //    break;
+    //case FIRE_TRAP:
+    //    skillgained = 16;
+    //    ismagictrap = TRUE;
+    //    break;
+    //case ROLLING_BOULDER_TRAP:
+    //    skillgained = 14;
+    //    break;
+    //case ROCKTRAP:
+    //    skillgained = 12;
+    //    break;
+    //default:
+    //    break;
+    //}
+    if (!madebyu)
+        use_skill(P_DISARM_TRAP, trap_type_definitions[ttyp].training);
 
     int skill_level = P_SKILL_LEVEL(P_DISARM_TRAP);
     int getitem_normal = (skill_level <= P_UNSKILLED ? !rn2(3) :
@@ -5736,7 +5730,7 @@ struct trap* ttmp;
     int getitem_magic = (skill_level <= P_UNSKILLED ? 0 :
         skill_level == P_BASIC ? !rn2(3) :
         skill_level == P_SKILLED ? rn2(3) : rn2(6));
-    int getitem = ismagictrap ? getitem_magic : getitem_normal;
+    int getitem = trap_type_definitions[ttyp].tdifficulty == SIMPLE_MAGICAL_TRAP || trap_type_definitions[ttyp].tdifficulty == COMPLEX_MAGICAL_TRAP ? getitem_magic : getitem_normal;
 
     int genotyp = STRANGE_OBJECT;
     if (getitem)
@@ -5748,7 +5742,6 @@ struct trap* ttmp;
             genotyp = WAN_POLYMORPH;
             break;
         case MAGIC_TRAP:
-            Strcpy(debug_buf_1, "disarm_magical_trap");
             genotyp = random_objectid_from_class(WAND_CLASS, (struct monst*)0, 0UL);
             break;
         case LEVEL_TELEP:
@@ -5816,12 +5809,14 @@ struct trap *ttmp;
         return fails;
     }
 
+    uchar ttyp = ttmp->ttyp;
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
     You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s land mine.", the_your[ttmp->madeby_u]);
     cnv_trap_obj(LAND_MINE, 1, ttmp, FALSE, FALSE);
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, madebyu ? 0 : 14);
+    if (!madebyu)
+        use_skill(P_DISARM_TRAP, trap_type_definitions[ttyp].training);
 
     return 1;
 }
@@ -5872,13 +5867,15 @@ struct trap *ttmp;
         return fails;
     }
 
+    uchar ttyp = ttmp->ttyp;
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
     You("repair the squeaky board."); /* no madeby_u */
     deltrap(ttmp);
     newsym(u.ux + u.dx, u.uy + u.dy);
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, madebyu ? 0 : 10);
+    if (!madebyu)
+        use_skill(P_DISARM_TRAP, trap_type_definitions[ttyp].training);
 
     more_experienced(1, 0); // 5);
     newexplevel();
@@ -5899,6 +5896,7 @@ int otyp;
         return fails;
     }
 
+    uchar ttyp = ttmp->ttyp;
     play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
     You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm %s %s.", the_your[ttmp->madeby_u], get_trap_explanation(ttmp));
 
@@ -5916,7 +5914,8 @@ int otyp;
     }
 
     /* gain skill for untrap */
-    use_skill(P_DISARM_TRAP, madebyu ? 0 : 10);
+    if (!madebyu)
+        use_skill(P_DISARM_TRAP, trap_type_definitions[ttyp].training);
 
     return 1;
 }
@@ -5981,7 +5980,7 @@ struct trap *ttmp;
         return 1;
 
     /* Will our hero succeed? */
-    untrap_result = succeed_untrap(ttmp);
+    untrap_result = succeed_untrap(ttmp->ttyp, TRUE);
     if (untrap_result > 0 && mon_can_move(mtmp) && !is_tame(mtmp) && !is_peaceful(mtmp) && rn2(3))
     {
         play_sfx_sound(SFX_MONSTER_DOES_NOT_ALLOW);
@@ -6341,10 +6340,9 @@ boolean force;
 
         if (levl[x][y].doormask & D_TRAPPED) 
         {
-            ch = 15 + (Role_if(PM_ROGUE) ? u.ulevel * 3 : u.ulevel);
-            exercise(A_DEX, TRUE);
-            if (!force && (confused || Fumbling
-                           || rnd(75 + level_difficulty() / 2) > ch)) 
+            ch = succeed_untrap(ARROW_TRAP, FALSE);  /*untrap_probability(ARROW_TRAP, P_SKILL_LEVEL(P_DISARM_TRAP), &youmonst); */ // ACURR(A_DEX) + (Role_if(PM_ROGUE) ? u.ulevel * 3 : u.ulevel);
+            //exercise(A_DEX, TRUE);
+            if (!force && ch < 0) 
             {
                 play_sfx_sound(SFX_DISARM_TRAP_FAIL);
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "set it off!");
@@ -6354,19 +6352,25 @@ boolean force;
                 {
                     levl[x][y].doormask &= ~D_MASK;
                     levl[x][y].doormask |= D_NODOOR;
+                    levl[x][y].subtyp = 0;
                     unblock_vision_and_hearing_at_point(x, y);
                 }
                 newsym(x, y);
                 /* (probably ought to charge for this damage...) */
                 if (*in_rooms(x, y, SHOPBASE))
                     add_damage(x, y, 0L);
-            } 
+            }
+            else if (!force && !ch)
+            {
+                play_sfx_sound(SFX_DISARM_TRAP_FAIL);
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "fail to disarm it!");
+            }
             else 
             {
                 play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
                 You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm it!");
                 levl[x][y].doormask &= ~D_TRAPPED;
-                use_skill(P_DISARM_TRAP, 10);
+                use_skill(P_DISARM_TRAP, trap_type_definitions[ARROW_TRAP].training);
             }
         } 
         else
@@ -6502,25 +6506,29 @@ boolean force;
 
         if (otmp->otrapped)
         {
-            exercise(A_DEX, TRUE);
-            ch = ACURR(A_DEX) + u.ulevel;
+            ch = succeed_untrap(SLP_GAS_TRAP, FALSE);
+            //ch = untrap_probability(SLP_GAS_TRAP, P_SKILL_LEVEL(P_DISARM_TRAP), &youmonst); // ACURR(A_DEX) + (Role_if(PM_ROGUE) ? u.ulevel * 3 : u.ulevel);
+            //exercise(A_DEX, TRUE);
 
-            if (Role_if(PM_ROGUE))
-                ch *= 2;
+            //if (Role_if(PM_ROGUE))
+            //    ch *= 2;
 
-            if (!force && (confused || Fumbling
-                || rnd(75 + level_difficulty() / 2)
-            > ch))
+            if (!force && ch < 0) // && (confused || Fumbling || rnd(100) > ch))
             {
                 play_sfx_sound(SFX_DISARM_TRAP_FAIL);
                 (void)chest_trap(otmp, FINGER, TRUE);
+            }
+            else if (!force && !ch)
+            {
+                play_sfx_sound(SFX_DISARM_TRAP_FAIL);
+                You_ex(ATR_NONE, CLR_MSG_FAIL, "fail to disarm it!");
             }
             else
             {
                 play_sfx_sound(SFX_DISARM_TRAP_SUCCESS);
                 You_ex(ATR_NONE, CLR_MSG_SUCCESS, "disarm it!");
                 otmp->otrapped = 0;
-                use_skill(P_DISARM_TRAP, 10);
+                use_skill(P_DISARM_TRAP, trap_type_definitions[SLP_GAS_TRAP].training);
             }
         }
         else

@@ -626,8 +626,8 @@
 #define has_divine_regeneration(mon) \
     has_property(mon, DIVINE_REGENERATION)
 
-#define has_melee_life_leech(mon) \
-    has_property(mon, MELEE_LIFE_LEECH)
+#define has_wounding_resistance(mon) \
+    has_property(mon, WOUNDING_RESISTANCE)
 
 #define has_crazed(mon) \
     has_property(mon, CRAZED)
@@ -648,16 +648,16 @@
     (has_innate_or_property(mon, DEATH_RESISTANCE))
 
 #define has_fire_vulnerability(mon) \
-    (has_innate((mon)->data, MR_FIRE_VULNERABLITY) || has_property(mon, FIRE_VULNERABILITY))
+    (has_innate((mon)->data, MR_FIRE_VULNERABILITY) || has_property(mon, FIRE_VULNERABILITY))
 
 #define has_cold_vulnerability(mon) \
-    (has_innate((mon)->data, MR_COLD_VULNERABLITY) || has_property(mon, COLD_VULNERABILITY))
+    (has_innate((mon)->data, MR_COLD_VULNERABILITY) || has_property(mon, COLD_VULNERABILITY))
 
 #define has_elec_vulnerability(mon) \
-    (has_innate((mon)->data, MR_SHOCK_VULNERABLITY) || has_property(mon, SHOCK_VULNERABILITY))
+    (has_innate((mon)->data, MR_SHOCK_VULNERABILITY) || has_property(mon, SHOCK_VULNERABILITY))
 
 #define has_magm_vulnerability(mon) \
-    (has_innate((mon)->data, MR_MAGIC_MISSILE_VULNERABLITY) || has_property(mon, MAGIC_MISSILE_VULNERABILITY))
+    (has_innate((mon)->data, MR_MAGIC_MISSILE_VULNERABILITY) || has_property(mon, MAGIC_MISSILE_VULNERABILITY))
 
 #define has_invulnerable(mon) \
     (has_property(mon, INVULNERABLE))
@@ -717,9 +717,12 @@
 #define pm_resists_elec(ptr) \
     (has_innate2(ptr, MR2_SHOCK_RESISTANCE))
 
+#define pm_resists_wounding(ptr) \
+    (has_innate2(ptr, MR2_WOUNDING_RESISTANCE))
+
 /* resistances at the time of acquisition */
 #define is_mon_immune_to_fire(mon) \
-    ( pm_immune_to_fire((mon)->data) || has_property(mon, FIRE_IMMUNITY))
+    (pm_immune_to_fire((mon)->data) || has_property(mon, FIRE_IMMUNITY))
 #define is_mon_immune_to_cold(mon) \
     (pm_immune_to_cold((mon)->data) || has_property(mon, COLD_IMMUNITY))
 #define is_mon_immune_to_elec(mon) \
@@ -730,7 +733,7 @@
     (has_innate((mon)->data, MR_ACID) || has_property(mon, ACID_IMMUNITY) || is_incorporeal((mon)->data))
 
 #define mon_resists_fire_weakly(mon) \
-    ( pm_resists_fire((mon)->data) || has_property(mon, FIRE_RESISTANCE))
+    (pm_resists_fire((mon)->data) || has_property(mon, FIRE_RESISTANCE))
 #define mon_resists_cold_weakly(mon) \
     (pm_resists_cold((mon)->data) || has_property(mon, COLD_RESISTANCE) || is_vampshifter(mon))
 #define mon_resists_elec_weakly(mon) \
@@ -755,6 +758,9 @@
 #define resists_disint(mon) \
     (pm_resists_disint((mon)->data) || has_property(mon, DISINTEGRATION_RESISTANCE))
 
+#define resists_wounding(mon) \
+    (pm_resists_wounding((mon)->data) || has_wounding_resistance(mon))
+
 #define resists_sleep(mon) \
     (has_innate((mon)->data, MR_SLEEP) || has_property(mon, SLEEP_RESISTANCE) || is_undead((mon)->data) || is_vampshifter(mon))
 #define resists_death(mon) \
@@ -768,7 +774,7 @@
 #define resists_magic(mon) \
     (has_innate((mon)->data, MR_MAGIC) || has_property(mon, ANTIMAGIC))
 #define resists_charm(mon) \
-    (has_innate((mon)->data, MR_CHARM) || has_property(mon, CHARM_RESISTANCE) || is_undead((mon)->data) || mon_has_no_apparent_mind(mon))
+    (has_innate((mon)->data, MR_CHARM) || has_property(mon, CHARM_RESISTANCE) || is_undead((mon)->data) || mon_has_no_apparent_mind(mon) || is_vampshifter(mon))
 #define resists_fear(mon) \
     (has_innate((mon)->data, MR_FEAR) || has_property(mon, FEAR_RESISTANCE) || is_undead((mon)->data) || mon_has_no_apparent_mind(mon) || is_vampshifter(mon))
 #define is_reflecting(mon) \
@@ -779,11 +785,11 @@
 #define resists_flash(mon) \
     (has_innate((mon)->data, MR_FLASH) || has_property(mon, FLASH_RESISTANCE) || is_blinded(mon) || !haseyes((mon)->data) )
 #define resists_sickness(mon) \
-    (has_innate((mon)->data, MR_SICK) || has_property(mon, SICK_RESISTANCE) ||  is_not_living((mon)->data) || is_demon((mon)->data) || is_elemental((mon)->data) || is_incorporeal((mon)->data) || unsolid((mon)->data) || is_vampshifter(mon) )
+    (has_innate((mon)->data, MR_SICK) || has_property(mon, SICK_RESISTANCE) || is_not_living((mon)->data) || is_demon((mon)->data) || is_elemental((mon)->data) || is_incorporeal((mon)->data) || unsolid((mon)->data) || is_vampshifter(mon) )
 #define resists_paralysis(mon) \
-    (has_innate((mon)->data, MR_FREE_ACTION) || has_property(mon, FREE_ACTION) ||  is_not_living((mon)->data) || is_vampshifter(mon))
+    (has_innate((mon)->data, MR_FREE_ACTION) || has_property(mon, FREE_ACTION) || is_not_living((mon)->data) || is_vampshifter(mon))
 #define resists_stun(mon) \
-    (has_innate((mon)->data, MR_STUN) || has_property(mon, STUN_RESISTANCE) ||  mindless((mon)->data) || is_not_living((mon)->data) || is_vampshifter(mon))
+    (has_innate((mon)->data, MR_STUN) || has_property(mon, STUN_RESISTANCE) || mindless((mon)->data) || is_not_living((mon)->data) || is_vampshifter(mon))
 
 /* other "resists" definitions */
 #define resists_bisection(mon) \
@@ -841,6 +847,8 @@
     (has_innate_telepathy((mon)->data) || has_property(mon, TELEPAT))
 #define has_detect_monsters(mon) \
     (has_property(mon, DETECT_MONSTERS))
+#define has_water_walking(mon) \
+    (has_property(mon, WATER_WALKING))
 
 #define has_stunning_corpse(ptr) (((ptr)->mconveys & MC_STUNNING_CORPSE) != 0L)
 #define has_acidic_corpse(ptr) (((ptr)->mconveys & MC_ACIDIC_CORPSE) != 0L)
@@ -937,6 +945,8 @@
 
 /* Other */
 #define is_mon_talkative(mon) (is_speaking((mon)->data) && (is_peaceful(mon) || is_chatty((mon)->data)))
+#define mon_clings_on_water(mon) (is_clinger((mon)->data) && !Is_waterlevel(&u.uz))
+#define mon_walks_on_water(mon) (has_water_walking(mon) && !Is_waterlevel(&u.uz))
 
 /* monkeys are tameable via bananas but not pacifiable via food,
    otherwise their theft attack could be nullified too easily;

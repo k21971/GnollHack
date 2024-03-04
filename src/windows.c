@@ -76,6 +76,8 @@ extern void *FDECL(trace_procs_chain, (int, int, void *, void *, void *));
 
 STATIC_DCL void FDECL(def_raw_print, (const char *s));
 STATIC_DCL void NDECL(def_wait_synch);
+STATIC_DCL void FDECL(itemdesc_putstr_ex, (winid, const char*, int, int, int));
+STATIC_DCL void FDECL(itemdesc_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 
 #if defined (DUMPLOG) || defined (DUMPHTML)
 STATIC_DCL winid FDECL(dump_create_nhwindow_ex, (int, int, int, struct extended_create_window_info));
@@ -2777,7 +2779,7 @@ int attr, color;
     if (attr & ATR_ORDERED_LIST)
     {
         const char* dp = 0;
-        if (attr & ATR_INDENT_AT_DASH)
+        if ((attr & ATR_INDENT_MASK) == ATR_INDENT_AT_DASH)
             dp = strchr(p, '-');
 
         if (dp && dp > p)
@@ -2810,7 +2812,7 @@ int attr, color;
 
         if (attr & (ATR_TABLE_ROW | ATR_TABLE_HEADER))
         {
-            if ((attr & ATR_INDENT_AT_COLON) ? (*p == ':') : (p < endp - 1 && *p == ' ' && *(p + 1) == ' '))
+            if ((attr & ATR_INDENT_MASK) == ATR_INDENT_AT_COLON ? (*p == ':') : (p < endp - 1 && *p == ' ' && *(p + 1) == ' '))
             {
                 if (td_added)
                     td_changed = TRUE;
@@ -2830,7 +2832,7 @@ int attr, color;
 
         if (attr & (ATR_TABLE_ROW | ATR_TABLE_HEADER))
         {
-            if (((attr & ATR_INDENT_AT_COLON) ? (*p == ':') : (p < endp - 1 && *p == ' ' && *(p + 1) == ' ')) || i == 0)
+            if (((attr & ATR_INDENT_MASK) == ATR_INDENT_AT_COLON ? (*p == ':') : (p < endp - 1 && *p == ' ' && *(p + 1) == ' ')) || i == 0)
             {
                 if (td_added)
                     fprintf(fp, "%s", (attr & ATR_TABLE_HEADER) ? TH_E : TD_E);
@@ -2958,7 +2960,7 @@ int x, y, sym, color;
 nhsym ch;
 unsigned long special;
 {
-    char buf[BUFSZ]; /* do_screen_description requires this :( */
+    char buf[BUFSZ] = ""; /* do_screen_description requires this :( */
     const char* firstmatch = "unknown"; /* and this */
     coord cc;
     int desc_found = 0;
@@ -3163,6 +3165,35 @@ int no_forward, app;
 #endif
     if (!no_forward)
         putstr_ex(win, str, attr, NO_COLOR, app);
+}
+
+STATIC_OVL void
+itemdesc_putstr_ex(win, str, attr, color, app)
+winid win UNUSED;
+int attr UNUSED, app UNUSED, color UNUSED;
+const char* str UNUSED;
+{
+    return;
+}
+
+STATIC_OVL void
+itemdesc_putstr_ex2(win, str, attrs, colors, attr, color, app)
+winid win UNUSED;
+int attr UNUSED, color UNUSED, app UNUSED;
+const char* str UNUSED, * attrs UNUSED, * colors UNUSED;
+{
+    return;
+}
+
+void
+itemdesc_redirect(VOID_ARGS)
+{
+    windowprocs.win_create_nhwindow_ex = dump_create_nhwindow_ex;
+    windowprocs.win_clear_nhwindow = dump_clear_nhwindow;
+    windowprocs.win_display_nhwindow = dump_display_nhwindow;
+    windowprocs.win_destroy_nhwindow = dump_destroy_nhwindow;
+    windowprocs.win_putstr_ex = itemdesc_putstr_ex;
+    windowprocs.win_putstr_ex2 = itemdesc_putstr_ex2;
 }
 
 void

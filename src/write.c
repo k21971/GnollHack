@@ -193,7 +193,7 @@ register struct obj *pen;
 
         if (!strcmpi(OBJ_NAME(objects[i]), nm))
             goto found;
-        if (!strcmpi(OBJ_DESCR(objects[i]), nm)) {
+        if (OBJ_DESCR(objects[i]) && !strcmpi(OBJ_DESCR(objects[i]), nm)) {
             by_descr = TRUE;
             goto found;
         }
@@ -379,7 +379,7 @@ found:
     if (new_obj->otyp == SCR_MAIL)
         /* 0: delivered in-game via external event (or randomly for fake mail);
            1: from bones or wishing; 2: written with marker */
-        new_obj->special_quality = 2;
+        new_obj->special_quality = SPEQUAL_MAIL_FROM_MAGIC_MARKER;
     /* unlike alchemy, for example, a successful result yields the
        specifically chosen item so hero recognizes it even if blind;
        the exception is for being lucky writing an undiscovered scroll,

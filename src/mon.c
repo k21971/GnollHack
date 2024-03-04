@@ -856,7 +856,7 @@ boolean createcorpse;
     case PM_TARRASQUE:
         if (!exist_artifact(DAGGER, artiname(ART_TOOTH_OF_TARRASQUE)))
         {
-            obj = mksobj_found_at(DAGGER, x, y, FALSE, FALSE);
+            obj = mksobj_at_with_flags(DAGGER, x, y, FALSE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FOUND_THIS_TURN);
             if (obj)
             {
                 obj->quan = 1;
@@ -1144,8 +1144,8 @@ register struct monst *mtmp;
          * water damage to dead monsters' inventory, but survivors need to
          * be handled here.  Swimmers are able to protect their stuff...
          */
-        if (!is_clinger(mtmp->data) && !is_swimmer(mtmp->data)
-            && !amphibious(mtmp->data)) 
+        if (!mon_clings_on_water(mtmp) && !mon_walks_on_water(mtmp) && !has_swimming(mtmp)
+            && !has_magical_breathing(mtmp) && !amphibious(mtmp->data)) 
         {
             play_sfx_sound_at_location(SFX_FALL_INTO_PIT, mtmp->mx, mtmp->my);
 
@@ -1196,8 +1196,9 @@ register struct monst *mtmp;
 }
 
 int
-mcalcmove(mon)
+mcalcmove(mon, return_expected_value)
 struct monst *mon;
+boolean return_expected_value;
 {
     int mmove = mon->data->mmove;
     int mmove_adj;
@@ -1219,7 +1220,16 @@ struct monst *mon;
     else if (is_fast(mon))
         mmove = (4 * mmove + 2) / 3;
 
-    if (mon == u.usteed && u.ugallop && context.mv) {
+    if (return_expected_value)
+    {
+        if (mon == u.usteed && u.ugallop && context.mv)
+            return (int)(1.5 * (double)mmove);
+        else
+            return mmove;
+    }
+
+    if (mon == u.usteed && u.ugallop && context.mv) 
+    {
         /* increase movement by a factor of 1.5; also increase variance of
            movement speed (if it's naturally 24, we don't want it to always
            become 36) */
@@ -1668,7 +1678,7 @@ movemon()
 
             mtmp->worn_item_flags &= ~I_SPECIAL;
             oldworn = mtmp->worn_item_flags;
-            m_dowear(mtmp, FALSE);
+            m_dowear(mtmp, FALSE, FALSE);
             if (mtmp->worn_item_flags != oldworn || !mon_can_move(mtmp))
                 continue;
         }
@@ -2063,6 +2073,7 @@ struct monst *mtmp;
                         distant_name(otmp, doname));
             else if (ecount == 2)
                 Sprintf(buf, "%s engulfs several objects.", Monnam(mtmp));
+            Strcpy(debug_buf_2, "meatobj1");
             obj_extract_self(otmp);
             (void) mpickobj(mtmp, otmp); /* slurp */
 
@@ -2100,6 +2111,7 @@ struct monst *mtmp;
 
                 /* contents of eaten containers become engulfed; this
                    is arbitrary, but otherwise g.cubes are too powerful */
+                Strcpy(debug_buf_2, "meatobj2");
                 while ((otmp3 = otmp->cobj) != 0)
                 {
                     obj_extract_self(otmp3);
@@ -2168,6 +2180,7 @@ register struct monst *mtmp;
         if (is_obj_no_pickup(gold))
             return;
         mat_idx = gold->material;
+        Strcpy(debug_buf_2, "mpickgold");
         obj_extract_self(gold);
         add_to_minv(mtmp, gold);
         if (cansee(mtmp->mx, mtmp->my)) 
@@ -2240,9 +2253,10 @@ register const char *str;
                         : distant_name(otmp3, doname));
             }
 
+            Strcpy(debug_buf_2, "mpickstuff");
             obj_extract_self(otmp3);      /* remove from floor */
             (void) mpickobj(mtmp, otmp3); /* may merge and free otmp3 */
-            m_dowear(mtmp, FALSE);
+            m_dowear(mtmp, FALSE, FALSE);
             newsym(mtmp->mx, mtmp->my);
             return TRUE; /* pick only one object */
         }
@@ -2326,7 +2340,7 @@ struct obj *otmp;
         return 0;
     if (otyp == CORPSE && is_rider(&mons[otmp->corpsenm]))
         return 0;
-    if (otmp->material == MAT_SILVER && mon_hates_silver(mtmp)
+    if (obj_counts_as_silver(otmp) && mon_hates_silver(mtmp)
         && (otyp != BELL_OF_OPENING || !wants_bell(mdat)))
         return 0;
 
@@ -2426,9 +2440,9 @@ long flag;
 
     nodiag = NODIAG(mdat - mons);
     wantpool = mdat->mlet == S_EEL;
-    poolok = (((is_flying(mon) || is_levitating(mon) || is_clinger(mdat)) && !Is_waterlevel(&u.uz))
+    poolok = (((is_flying(mon) || is_levitating(mon) || mon_clings_on_water(mon)) && !Is_waterlevel(&u.uz))
               || (is_swimmer(mdat) && !wantpool));
-    lavaok = (is_flying(mon) || is_levitating(mon) || is_clinger(mdat) || likes_lava(mdat));
+    lavaok = (is_flying(mon) || is_levitating(mon) || mon_clings_on_water(mon) || likes_lava(mdat));
     wallwalk = ((flag & (ALLOW_WALL)) != 0L);
     thrudoor = ((flag & (BUSTDOOR)) != 0L);
     poisongas_ok = ((is_not_living(mdat) || is_vampshifter(mon)
@@ -3469,7 +3483,18 @@ unsigned long mondeadflags;
         }
         u.uachieve.killed_yacc = 1;
     }
-    else if (mtmp->data == &mons[PM_DEATH]) 
+    else if (mtmp->data == &mons[PM_DEMOGORGON])
+    {
+        if (flags.showscore && !u.uachieve.killed_demogorgon)
+            context.botl = 1;
+        if (!u.uachieve.killed_demogorgon)
+        {
+            achievement_gained("Defeated Demogorgon");
+            livelog_printf(LL_ACHIEVE | LL_UMONST, "%s", "killed Demogorgon");
+        }
+        u.uachieve.killed_demogorgon = 1;
+    }
+    else if (mtmp->data == &mons[PM_DEATH])
     {
         switch (mvitals[tmp].died) 
         {
@@ -3727,6 +3752,7 @@ struct monst *mdef;
         || !rn2(2 + ((int) (mdef->data->geno & G_FREQ) > 2))) {
         oldminvent = 0;
         /* some objects may end up outside the statue */
+        Strcpy(debug_buf_2, "monstone");
         while ((obj = mdef->minvent) != 0) {
             obj_extract_self(obj);
             obj_no_longer_held(obj);
@@ -3771,7 +3797,7 @@ struct monst *mdef;
         }
         /* Archaeologists should not break unique statues */
         if (mdef->data->geno & G_UNIQ)
-            otmp->speflags |= SPEFLAGS_STATUE_HISTORIC;
+            otmp->special_quality = SPEQUAL_STATUE_HISTORIC;
         otmp->owt = weight(otmp);
     } else
         otmp = mksobj_at(ROCK, x, y, TRUE, FALSE);
@@ -4024,8 +4050,8 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
             && (x != u.ux || y != u.uy)
             /* no extra item from kops--too easy to abuse */
             && mdat->mlet != S_KOP
-            /* no items from cloned monsters */
-            && !mtmp->mcloned) 
+            /* no items from cloned or revived monsters */
+            && !mtmp->mcloned && !mtmp->mrevived)
         {
             otmp = mkobj_with_flags(RANDOM_CLASS, TRUE, TRUE, mtmp, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FOUND_THIS_TURN | (is_lord(mdat) || is_prince(mdat) || (mdat->geno & G_UNIQ) ? MKOBJ_FLAGS_ALSO_RARE : 0UL));
             /* don't create large objects from small monsters */
@@ -5635,7 +5661,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
     if (!(mtmp->worn_item_flags & W_ARMG))
         mselftouch(mtmp, "No longer petrify-resistant, ", !context.mon_moving);
 
-    m_dowear(mtmp, FALSE);
+    m_dowear(mtmp, FALSE, FALSE);
 
     /* This ought to re-test can_carry() on each item in the inventory
      * rather than just checking ex-giants & boulders, but that'd be
@@ -5653,6 +5679,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
                    same zap that the monster that held it is polymorphed */
                 if (polyspot)
                     bypass_obj(otmp);
+                Strcpy(debug_buf_2, "newcham");
                 obj_extract_self(otmp);
                 /* probably ought to give some "drop" message here */
                 if (flooreffects(otmp, mtmp->mx, mtmp->my, ""))
@@ -6705,7 +6732,7 @@ boolean override_mextra, polyspot, msg;
     if (!(mtmp->worn_item_flags & W_ARMG))
         mselftouch(mtmp, "No longer petrify-resistant, ", !context.mon_moving);
 
-    m_dowear(mtmp, FALSE);
+    m_dowear(mtmp, FALSE, FALSE);
 
     /* This ought to re-test can_carry() on each item in the inventory
      * rather than just checking ex-giants & boulders, but that'd be
@@ -6723,6 +6750,7 @@ boolean override_mextra, polyspot, msg;
                    same zap that the monster that held it is polymorphed */
                 if (polyspot)
                     bypass_obj(otmp);
+                Strcpy(debug_buf_2, "revert_mon_polymorph");
                 obj_extract_self(otmp);
                 /* probably ought to give some "drop" message here */
                 if (flooreffects(otmp, mtmp->mx, mtmp->my, ""))
