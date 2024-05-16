@@ -1583,7 +1583,11 @@ enter_explore_mode(VOID_ARGS)
     {
         You("are already in explore mode.");
     } 
-    else 
+    else if (TournamentMode)
+    {
+        You("cannot access explore mode in tournament mode.");
+    }
+    else
     {
 #if defined(GNH_MOBILE)
         You("cannot access explore mode.");
@@ -3206,7 +3210,7 @@ int final;
 STATIC_OVL boolean
 walking_on_water()
 {
-    if (u.uinwater || Levitation || Flying)
+    if (u.uinwater || Moves_above_ground)
         return FALSE;
     return (boolean) (Walks_on_water
                       && (is_pool(u.ux, u.uy) || is_lava(u.ux, u.uy)));
@@ -5880,22 +5884,149 @@ int final;
                     " for any artifacts", "");
     }
 
-    if (Role_if(PM_ROGUE))
+    putstr(dumpwin, ATR_NONE, "");
+    putstr(en_win, ATR_TITLE, "Role score:");
+    if (!final)
+        putstr(en_win, ATR_HALF_SIZE, " ");
+
+    if (u.uachieve.role_achievement)
     {
-        char mbuf[BUFSZ];
-        long valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
-        putstr(dumpwin, ATR_NONE, "");
-        Sprintf(mbuf, "You %s %ld %s worth of %svaluables with you.", final ? "had" : "have", valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
-        putstr(en_win, ATR_TITLE, mbuf);
+        you_have("completed your role's optional quest", "");
+        if (Role_if(PM_KNIGHT) || Role_if(PM_TOURIST))
+            putstr(en_win, ATR_HALF_SIZE, " ");
     }
-    else if (Role_if(PM_TOURIST))
+
+    if (Role_if(PM_ARCHAEOLOGIST))
     {
-        putstr(dumpwin, ATR_NONE, "");
-        putstr(en_win, ATR_TITLE, "Selfies taken with:");
+        struct item_score_count_result artifacts = count_artifacts(invent);
+        long score_percentage = ((artifacts.score + (long)u.uachieve.role_achievement * ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld %sartifact%s with you",artifacts.quantity, program_state.gameover ? "" : "known ", plur(artifacts.quantity));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_BARBARIAN))
+    {
+        struct item_score_count_result valuables = count_powerful_melee_weapon_score(invent);
+        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * BARBARIAN_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld %smelee weapon%s of artifact or legendary quality with you", valuables.quantity, program_state.gameover ? "" : "known ", plur(valuables.quantity));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_CAVEMAN))
+    {
+        struct amulet_count_result amulets = count_amulets(invent);
+        long score_percentage = ((amulets.score + (long)u.uachieve.role_achievement * CAVEMAN_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld amulet%s of life saving with you", amulets.amulets_of_life_saving, plur(amulets.amulets_of_life_saving));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%ld non-prediscovered amulet%s with you", amulets.other_amulets, plur(amulets.other_amulets));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_KNIGHT) && u.ualign.type != A_NEUTRAL)
+    { 
+        putstr(en_win, ATR_SUBTITLE, u.ualign.type == A_LAWFUL ? " Demons, devils, and chaotic dragons slain:" : " Angels and lawful dragons slain:");
         if (!final)
             putstr(en_win, ATR_HALF_SIZE, " ");
 
-        print_selfies(en_win);
+        print_knight_slayings(en_win, final);
+    }
+    else if (Role_if(PM_RANGER))
+    {
+        struct item_score_count_result valuables = count_powerful_ranged_weapon_score(invent);
+        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * RANGER_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld %sranged weapon%s of at least artifact, elite, or mythic quality with you", valuables.quantity_nonammo, program_state.gameover ? "" : "known ", plur(valuables.quantity_nonammo));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%ld %sammo of at least artifact, elite, or mythic quality with you", valuables.quantity_ammo, program_state.gameover ? "" : "known ");
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_ROGUE))
+    {
+        long valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
+        long score_percentage = ((valuableworth + (long)u.uachieve.role_achievement * ROGUE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld %s worth of %svaluables with you", valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_SAMURAI))
+    {
+        struct item_score_count_result valuables = count_powerful_Japanese_item_score(invent);
+        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * SAMURAI_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld Japanese non-ammo item%s of at least artifact, exceptional, or mythic quality with you", valuables.quantity_nonammo, plur(valuables.quantity_nonammo));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%ld Japanese ammo of at least artifact, exceptional, or mythic quality with you", valuables.quantity_ammo);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_TOURIST))
+    {
+        putstr(en_win, ATR_SUBTITLE, " Selfies taken with:");
+        if (!final)
+            putstr(en_win, ATR_HALF_SIZE, " ");
+
+        print_selfies(en_win, final);
+    }
+    else if (Role_if(PM_VALKYRIE))
+    {
+        struct item_score_count_result valuables = count_powerful_valkyrie_item_score(invent);
+        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * VALKYRIE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "%ld non-ammo item%s of %s quality with you", valuables.quantity_nonammo, plur(valuables.quantity_nonammo), u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial");
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%ld ammo of %s quality with you", valuables.quantity_ammo, u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial");
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_HEALER) || Role_if(PM_PRIEST) || Role_if(PM_WIZARD))
+    {
+        long newspells = 0L;
+        long score_gained = 0L;
+        int i;
+        for (i = 0; i < MAXSPELL && spl_book[i].sp_id != NO_SPELL; i++)
+        {
+            if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
+            {
+                newspells++;
+                score_gained += (Role_if(PM_HEALER) ? HEALER_PER_SPELL_LEVEL_SCORE : Role_if(PM_PRIEST) ? PRIEST_PER_SPELL_LEVEL_SCORE : WIZARD_PER_SPELL_LEVEL_SCORE) * (long)(spl_book[i].sp_lev + 2);
+            }
+        }
+        long score_percentage = ((score_gained + (long)u.uachieve.role_achievement * (Role_if(PM_HEALER) ? HEALER_ROLE_ACHIEVEMENT_SCORE : Role_if(PM_PRIEST) ? PRIEST_ROLE_ACHIEVEMENT_SCORE : WIZARD_ROLE_ACHIEVEMENT_SCORE)) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(goalbuf, "learnt %ld new spell%s in unrestricted schools", newspells, plur(newspells));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+    }
+    else if (Role_if(PM_MONK))
+    {
+        long score_upon_ascension = get_conduct_score_upon_ascension() * MONK_EXTRA_CONDUCT_SCORE_MULTIPLIER;
+        long score_percentage = ((0L + (long)u.uachieve.role_achievement * MONK_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        long score_percentage_upon_ascension = ((score_upon_ascension + (long)u.uachieve.role_achievement * MONK_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = max(0, min(100, score_percentage));
+        score_percentage_upon_ascension = max(0, min(100, score_percentage_upon_ascension));
+        if(u.uachieve.ascended)
+            Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage_upon_ascension);
+        else
+            Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        you_have(goalbuf, "");
+        if (!u.uachieve.ascended)
+        {
+            Sprintf(goalbuf, "%ld%% of your maximum role score upon ascension with current conducts intact", score_percentage_upon_ascension);
+            enl_msg(You_, "will gain ", "would have gained ", goalbuf, "");
+        }
     }
 
     /* Pop up the window and wait for a key */
@@ -7470,6 +7601,7 @@ register char *cmd;
 
     check_gui_special_effect();
     check_mobbed_hint();
+    check_closed_for_inventory_hint();
 
     iflags.menu_requested = FALSE;
 #ifdef SAFERHANGUP
@@ -8712,8 +8844,8 @@ int x, y, mod;
                 boolean has_fitting_key = FALSE;
                 if (flags.autounlock)
                 {
-                    struct obj* carried_key = 0;
-                    if ((carried_key = carrying_fitting_unlocking_tool_for_door(door)) != 0)
+                    struct obj* carried_key = carrying_fitting_unlocking_tool_for_door(door);
+                    if (carried_key)
                     {
                         has_fitting_key = TRUE;
                     }

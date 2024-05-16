@@ -31,6 +31,7 @@ STATIC_DCL struct obj *FDECL(make_corpse, (struct monst *, unsigned, BOOLEAN_P))
 STATIC_DCL void FDECL(lifesaved_monster, (struct monst *));
 STATIC_DCL void FDECL(save_traits_mon, (struct monst*, BOOLEAN_P));
 STATIC_DCL struct monst* FDECL(get_saved_traits_mon, (struct monst*, BOOLEAN_P));
+STATIC_DCL void FDECL(add_knight_slaying_score, (struct monst*));
 
 /* note: duplicated in dog.c */
 #define LEVEL_SPECIFIC_NOCORPSE(mdat) \
@@ -1778,6 +1779,9 @@ register struct monst *mtmp;
         if (is_obj_no_pickup(otmp))
             continue;
 
+        if (m_unpaid_item_no_pickup(mtmp, otmp))
+            continue;
+
         /* Don't eat indigestible/choking/inappropriate objects */
         if ((rust_causing_and_ironvorous(mtmp->data) && is_rustprone(otmp))
             || (otmp->otyp == AMULET_OF_STRANGULATION)
@@ -2325,8 +2329,17 @@ struct monst *mtmp;
  */
 int
 can_carry(mtmp, otmp)
+struct monst* mtmp;
+struct obj* otmp;
+{
+    return can_carry_core(mtmp, otmp, FALSE);
+}
+
+int
+can_carry_core(mtmp, otmp, steed_ok)
 struct monst *mtmp;
 struct obj *otmp;
+boolean steed_ok;
 {
     int iquan, otyp = otmp->otyp, newload = otmp->owt;
     struct permonst *mdat = mtmp->data;
@@ -2376,7 +2389,7 @@ struct obj *otmp;
     }
 
     /* steeds don't pick up stuff (to avoid shop abuse) */
-    if (mtmp == u.usteed)
+    if (!steed_ok && mtmp == u.usteed)
         return 0;
     if (mtmp->isshk)
         return iquan; /* no limit */
@@ -3427,6 +3440,8 @@ unsigned long mondeadflags;
     tmp = mtmp->mnum;
     if (mvitals[tmp].died < 255)
     {
+        /* This needs to be here, so that role_score corresponds to mvitals[].died */
+        add_knight_slaying_score(mtmp);
         mvitals[tmp].died++;
         if(mtmp->female)
             mvitals[tmp].died_female++;
@@ -3570,6 +3585,31 @@ unsigned long mondeadflags;
     mtmp->action = ACTION_TILE_NO_ACTION;
 
     m_detach(mtmp, mptr, TRUE);
+}
+
+STATIC_OVL void
+add_knight_slaying_score(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return;
+
+    if (Role_if(PM_KNIGHT))
+    {
+        int mnum = mtmp->cham >= LOW_PM ? mtmp->cham : mtmp->mnum;
+        if (is_knight_bounty(&mons[mnum]))
+        {
+            if (UniqCritterIndx(mnum))
+            {
+                if (mvitals[mnum].died == 0)
+                    context.role_score += KNIGHT_UNIQUE_MONSTER_PER_LEVEL_SCORE * (mons[mnum].difficulty + 1);
+            }
+            else
+            {
+                context.role_score += KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[mnum].difficulty + 1);
+            }
+        }
+    }
 }
 
 /* TRUE if corpse might be dropped, magr may die if mon was swallowed */

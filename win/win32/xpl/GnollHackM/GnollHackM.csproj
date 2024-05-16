@@ -1,16 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
+		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
 		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
+		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
 		<OutputType>Exe</OutputType>
 		<RootNamespace>GnollHackM</RootNamespace>
 		<UseMaui>true</UseMaui>
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
-
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		
 		<!-- Display name -->
 		<ApplicationTitle>GnollHack</ApplicationTitle>
 
@@ -22,26 +24,43 @@
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(TargetFramework)'=='net8.0-ios'">
+	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+	  <!--<AotAssemblies>true</AotAssemblies>
+	  <RunAOTCompilation>true</RunAOTCompilation>-->
+	  <!-- Optional -->
+	  <!--<EnableLLVM>true</EnableLLVM>-->
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
 		<ProvisioningType>manual</ProvisioningType>
 		<CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
 		<CodesignProvision>Apple Dev M Development 2023</CodesignProvision>
 	</PropertyGroup>
 
-	<PropertyGroup>
-		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
+		<ProvisioningType>manual</ProvisioningType>
+		<CodesignKey>Apple Distribution: Hyvan mielen pelit ry (CUG8RS847T)</CodesignKey>
+		<CodesignProvision>Apple Dev M Distribution March 2024</CodesignProvision>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
 	    <UseInterpreter>false</UseInterpreter>
+		<!--<AndroidEnableProfiler>true</AndroidEnableProfiler> 
+		<RuntimeIdentifier>android-arm64</RuntimeIdentifier>
+		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>-->
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(TargetFramework.Contains('-ios'))">
@@ -49,16 +68,23 @@
 		<MtouchInterpreter>-all,FMODService.dll</MtouchInterpreter>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" BaseSize="210,210" />
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>
+	</PropertyGroup>
 
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
+		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="0.64" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)'!='net9.0-android'">
+		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="1.0" />
+	</ItemGroup>
+	
+	<ItemGroup>
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\gnollhackicon.png" Color="#000000" BaseSize="160,160" />
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
-		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
 
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
@@ -91,7 +117,6 @@
 		<None Remove="..\GnollHackX\GnollHackX\GHEditor.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHFloatingText.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHConditionText.cs" />
-		<None Remove="..\GnollHackX\GnollHackX\GHScreenFilter.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHGUIEffect.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHMenuInfo.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHMenuItem.cs" />
@@ -105,7 +130,9 @@
 		<None Remove="..\GnollHackX\GnollHackX\GHRecordedRecordedGameFile.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHResponse.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHRequest.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHScreenFilter.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHScreenText.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHSkiaFontPaint.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHStatusField.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHUtils.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHWindow.cs" />
@@ -147,6 +174,8 @@
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\VersionPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\Game\GameMenuPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\MainPage.xaml.cs" />
+		<None Remove="Assets\gnollhack-icon-v2-512.png" />
+		<None Remove="Assets\UI\autostash.png" />
 		<None Remove="Assets\UI\battery-frame.png" />
 		<None Remove="Assets\UI\fps.png" />
 		<None Remove="Assets\UI\frame2-horizontal.png" />
@@ -156,6 +185,9 @@
 		<None Remove="Assets\UI\picktobag.png" />
 		<None Remove="Assets\UI\status-quivered-weapon-style.png" />
 		<None Remove="Assets\UI\symbol-damage.png" />
+		<None Remove="Platforms\Android\Environment.txt" />
+		<None Remove="Resources\AppIcon\appicon.svg" />
+		<None Remove="Resources\AppIcon\appiconfg.svg" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -182,7 +214,6 @@
 		<Compile Include="..\GnollHackX\GnollHackX\GHFloatingText.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHConditionText.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHDrawCommand.cs" />
-		<Compile Include="..\GnollHackX\GnollHackX\GHScreenFilter.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHGUIEffect.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHNumberPickItem.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHMenuInfo.cs" />
@@ -196,7 +227,9 @@
 		<Compile Include="..\GnollHackX\GnollHackX\GHRecordedGameFile.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHResponse.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHRequest.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHScreenFilter.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHScreenText.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHSkiaFontPaint.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHStatusField.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHTopScoreItem.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHUtils.cs" />
@@ -458,37 +491,43 @@
 	  <None Remove="Platforms\Android\libs\arm64-v8a\libgnollhackdroid.so" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-android'">
-      <!--<EmbeddedJar Include="Platforms\Android\jars\fmod.jar" />-->
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
+      <EmbeddedJar Include="Platforms\Android\jars\fmod.jar" />
 	  <AndroidLibrary Include="Platforms\Android\jars\fmod.jar" />
 	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmod.so" />
   	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmodstudio.so" />
 	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libgnollhackdroid.so" />
 	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libc++_shared.so" />
-      <AndroidAsset Include="Platforms\Android\gnh\credits" />
-      <AndroidAsset Include="Platforms\Android\gnh\license" />
-      <AndroidAsset Include="Platforms\Android\gnh\logfile" />
-      <AndroidAsset Include="Platforms\Android\gnh\nhdat" />
-      <AndroidAsset Include="Platforms\Android\gnh\record" />
-      <AndroidAsset Include="Platforms\Android\gnh\symbols" />
-      <AndroidAsset Include="Platforms\Android\gnh\sysconf" />
-      <AndroidAsset Include="Platforms\Android\gnh\perm" />
-      <AndroidAsset Include="Platforms\Android\gnh\recover" />
-      <AndroidAsset Include="Platforms\Android\gnh\xlogfile" />
-      <AndroidAsset Include="Platforms\Android\gnh\defaults.gnh" />
-      <AndroidAsset Include="Platforms\Android\gnh\xcredits" />
-      <AndroidAsset Include="Platforms\Android\banks\Master.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Intro.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Music.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAppBundleModules Include="Platforms\Android\assetpacks\ondemandassetpack.zip" />
-	  <AndroidAppBundleModules Include="Platforms\Android\assetpacks\installtimeassetpack.zip" />
+      <AndroidAsset Include="Platforms\Android\gnh\credits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\license" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\logfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\nhdat" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\record" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\symbols" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\sysconf" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\perm" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\recover" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\xlogfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\gnh\xcredits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+      <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+      <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+      <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+      <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+      <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)%(Filename)banks\%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+      <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+      <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+      <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+      <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+      <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+      <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+	  <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+      <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\ondemandassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
+      <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\installtimeassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
 	  <Compile Include="..\GnollHackX\GnollHackX.Android\PlatformServiceAndroid.cs" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-ios' or '$(TargetFramework)'=='net8.0-maccatalyst'">
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-ios' or '$(TargetFramework)'=='net9.0-maccatalyst'">
 		<NativeReference Include="Platforms\iOS\libs\libfmodstudio_iphoneos.a">
 			<Kind>Static</Kind>
 			<Frameworks>AudioToolbox CoreAudio</Frameworks>
@@ -507,38 +546,45 @@
 			<IsCxx>True</IsCxx>
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</NativeReference>
-		<BundleResource Include="Platforms\iOS\gnh\credits" />
-		<BundleResource Include="Platforms\iOS\gnh\defaults.gnh" />
-		<BundleResource Include="Platforms\iOS\gnh\license" />
-		<BundleResource Include="Platforms\iOS\gnh\logfile" />
-		<BundleResource Include="Platforms\iOS\gnh\nhdat" />
-		<BundleResource Include="Platforms\iOS\gnh\perm" />
-		<BundleResource Include="Platforms\iOS\gnh\record" />
-		<BundleResource Include="Platforms\iOS\gnh\recover" />
-		<BundleResource Include="Platforms\iOS\gnh\symbols" />
-		<BundleResource Include="Platforms\iOS\gnh\sysconf" />
-		<BundleResource Include="Platforms\iOS\gnh\xcredits" />
-		<BundleResource Include="Platforms\iOS\gnh\xlogfile" />
-		<BundleResource Include="Platforms\iOS\banks\Auxiliary.bank" />
-		<BundleResource Include="Platforms\iOS\banks\Intro.bank" />
-		<BundleResource Include="Platforms\iOS\banks\Master.bank" />
-		<BundleResource Include="Platforms\iOS\banks\Master.strings.bank" />
-		<BundleResource Include="Platforms\iOS\banks\Music.bank" />
-		<BundleResource Include="Platforms\iOS\banks\Preliminary.bank" />
+		<BundleResource Include="Platforms\iOS\gnh\credits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\license" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\logfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\nhdat" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\perm" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\record" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\recover" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\symbols" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\sysconf" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\xcredits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\gnh\xlogfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
+		<BundleResource Include="Platforms\iOS\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
 		<Compile Include="..\GnollHackX\GnollHackX.iOS\PlatformServiceiOS.cs" />
 	</ItemGroup>
 
 	<PropertyGroup>
 		<DefineConstants>$(DefineConstants);GNH_MAUI</DefineConstants>
 	</PropertyGroup>
-	<PropertyGroup Condition="'$(TargetFramework)'=='net8.0-ios'">
+	<PropertyGroup Condition="'$(TargetFramework)'=='net9.0-ios'">
 		<DefineConstants>$(DefineConstants);UNITY_IPHONE</DefineConstants>
 	</PropertyGroup>
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-ios|AnyCPU'">
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
+	  <MtouchLink>None</MtouchLink>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
 	  <MtouchLink>SdkOnly</MtouchLink>
 	</PropertyGroup>
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-ios|AnyCPU'">
-	  <MtouchLink>SdkOnly</MtouchLink>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
+	  <PublishTrimmed>False</PublishTrimmed>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-android'">
+	  <PublishTrimmed>True</PublishTrimmed>
+      <TrimMode>partial</TrimMode>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -556,6 +602,7 @@
 	  <EmbeddedResource Include="Assets\FMOD-Logo-192-White.png" />
 	  <EmbeddedResource Include="Assets\ghsecrets.sjson" />
 	  <EmbeddedResource Include="Assets\ghsettings.json" />
+	  <EmbeddedResource Include="Assets\gnollhack-icon-v2-512.png" />
 	  <EmbeddedResource Include="Assets\gnollhack-logo-test-2.png" />
 	  <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits-2.png" />
 	  <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits.png" />
@@ -579,6 +626,7 @@
 	  <EmbeddedResource Include="Assets\UI\arrow_upright.png" />
 	  <EmbeddedResource Include="Assets\UI\attributes.png" />
 	  <EmbeddedResource Include="Assets\UI\autopickup.png" />
+	  <EmbeddedResource Include="Assets\UI\autostash.png" />
 	  <EmbeddedResource Include="Assets\UI\background-loading-screen.png" />
 	  <EmbeddedResource Include="Assets\UI\background-oldpaper.png" />
 	  <EmbeddedResource Include="Assets\UI\battery-frame.png" />
@@ -760,11 +808,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+		<PackageReference Include="Azure.Identity" Version="1.11.2" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0-preview.3.24126.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="SkiaSharp" Version="3.0.0-preview.2.1" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.0.0-preview.2.1" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.0.0-preview.2.1" />
+		<PackageReference Include="SkiaSharp" Version="3.0.0-preview.3.1" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.0.0-preview.3.1" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.0.0-preview.3.1" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -779,4 +831,8 @@
 	  </MauiXaml>
 	</ItemGroup>
 
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
+	</ItemGroup>
 </Project>
+ 

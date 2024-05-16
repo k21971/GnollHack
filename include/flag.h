@@ -139,8 +139,10 @@ struct flag {
     boolean show_decorations;/* show decorations on the walls etc. in ASCII */
     boolean fullstatuslineorder;
 
+    boolean tournament_mode;
+#define TournamentMode flags.tournament_mode
+
     /* Emergency reserved booleans to make non-save-game-breaking changes */
-    boolean reserved_bool1;
     boolean reserved_bool2;
     boolean reserved_bool3;
 
@@ -183,7 +185,7 @@ struct flag {
 #define PARANOID_TRAP           0x0400
 #define PARANOID_AUTOALL        0x0800
 #define PARANOID_TIP            0x1000
-#define PARANOID_MONK_WEAPON    0x2000
+#define PARANOID_WIELDED_WEAPON 0x2000
     int pickup_burden; /* maximum burden before prompt */
     int pile_limit;    /* controls feedback when walking over objects */
     char inv_order[MAX_OBJECT_CLASSES];
@@ -644,7 +646,7 @@ enum runmode_types {
 /* tip: accepting tipping a container */
 #define ParanoidTip ((flags.paranoia_bits & PARANOID_TIP) != 0)
 /* tip: accepting attacking with a weapon as a monk */
-#define ParanoidMonkWeapon ((flags.paranoia_bits & PARANOID_MONK_WEAPON) != 0)
+#define ParanoidWieldedWeapon ((flags.paranoia_bits & PARANOID_WIELDED_WEAPON) != 0)
 
 /* command parsing, mainly dealing with number_pad handling;
    not saved and restored */

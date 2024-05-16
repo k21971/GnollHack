@@ -3,10 +3,14 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
+#if GNH_MAUI
+namespace GnollHackM
+#else
 namespace GnollHackX
+#endif
 {
     /* Colors */
-    public enum nhcolor
+    public enum NhColor
     {
         CLR_BLACK = 0,
         CLR_RED,
@@ -27,7 +31,7 @@ namespace GnollHackX
         CLR_MAX
     }
 
-    public enum nhaltcolor
+    public enum NhAltColor
     {
         CLR_ALT_BLACK = 0,
         CLR_ALT_RED,
@@ -115,6 +119,12 @@ namespace GnollHackX
         Female =            0x00000400,
         HorizontalFlip =    0x00000800,
         StoneInverse =      0x00001000,
+        AltColors =         0x00002000,
+        Decoration =        0x00004000,
+        Carpet =            0x00008000,
+
+        Inverse =           0x10000000,
+        Underline =         0x20000000,
     }
 
     [Flags]
@@ -215,6 +225,8 @@ namespace GnollHackX
         DisableBones =          0x00000020, /* Force flags.bones to off */
         ForceLastPlayerName =   0x00000040, /* Use LastUsedPlayerName as preset player name */
         PlayingReplay =         0x00000080, /* Game is a replay */
+        TournamentMode =        0x00000100, /* Playing with server-like settings */
+        GUIDebugMode =          0x00000200, /* GUI has been built in debug mode (not a release mode game?) */
     }
 
     [Flags]
@@ -488,16 +500,6 @@ namespace GnollHackX
         public sbyte[] leash_mon_y; /* the last coordinate is the other end of the leash, i.e., u.uy at the time */
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct simple_layer_info
-    {
-        public int glyph; /* For ascii compatibility */
-        public int bkglyph; /* For ascii compatibility */
-        public ulong layer_flags;
-        public uint m_id;  /* check that the monster found at the square is the one that is supposed to be drawn by comparing their m_ids */
-        public uint o_id;  /* this is the o_id of the possibly moving boulder */
-    }
-
     public enum animation_play_types
     {
         ANIMATION_PLAY_TYPE_ALWAYS = 0,
@@ -713,7 +715,7 @@ namespace GnollHackX
         MAX_UI_TILES
     }
 
-    public enum statusfields
+    public enum NhStatusFields
     {
         BL_CHARACTERISTICS = -3, /* alias for BL_STR..BL_CH */
         BL_RESET = -2,           /* Force everything to redisplay */
@@ -760,7 +762,7 @@ namespace GnollHackX
         STATUS_MARK_PET = 0,
         STATUS_MARK_PEACEFUL,
         STATUS_MARK_DETECTED,
-        STATUS_MARK_PILE,
+        STATUS_MARK_BOUNTY,
         STATUS_MARK_SATIATED,
         STATUS_MARK_HUNGRY,
         STATUS_MARK_WEAK,
@@ -831,7 +833,7 @@ namespace GnollHackX
 
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct obj
+    public struct Obj
     {
         public IntPtr nobj;
         public IntPtr v;
@@ -857,7 +859,7 @@ namespace GnollHackX
 
         public sbyte recharged; /* number of times it's been recharged */
         public sbyte where;        /* where the object thinks it is */
-        public sbyte timed; /* # of fuses (timers) attached to this obj */
+        public sbyte timed; /* # of fuses (timers) attached to this Obj */
 
         internal uint bitfields;
 
@@ -1032,12 +1034,12 @@ namespace GnollHackX
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct objclassdata
+    public struct ObjClassData
     {
         public int tile_height;
         public short special_quality;
         public short max_charges;
-        public byte nhcolor;
+        public byte nh_color;
 
         public byte lamplit;
         public byte poisoned;
@@ -1287,6 +1289,8 @@ namespace GnollHackX
         GUI_CMD_DEBUGLOG,
         GUI_CMD_GAME_START,
         GUI_CMD_GAME_ENDED,
+        GUI_CMD_ENABLE_TOURNAMENT_MODE,
+        GUI_CMD_DISABLE_TOURNAMENT_MODE,
     }
 
     public enum game_status_types
@@ -1439,7 +1443,7 @@ namespace GnollHackX
         None = 0x00
     }
 
-    public class GHConstants
+    public static class GHConstants
     {
         public const int MinimumFileDescriptorLimit = 16384;
         public const int InputBufferLength = 32;
@@ -1595,6 +1599,7 @@ namespace GnollHackX
         public const string SaveDirectory = "save";
         public const string DumplogDirectory = "dumplog";
         public const string ReplayDirectory = "replay";
+        public const string ReplayDownloadFromCloudDirectory = "replay-cloud";
         public const string ArchiveDirectory = "archive"; /* Directory for sharable archives and files; cleaned and deleted at program start */
         public const string UploadDirectory = "upload"; /* Directory for uploadable files; files are never cleaned automatically, only upon successful upload */
         public const string TempDirectory = "temp";  /* Created and deleted on the go */
@@ -1626,6 +1631,9 @@ namespace GnollHackX
         public const string BonesPostFileNameSuffix = ".txt";
         public const string BonesPostPage = "bones";
         public const double BonesPostBaseChance = 2.0 / 3.0;
+        public const string ReplayPostQueueDirectory = "replaypost";
+        public const string ReplayPostFileNamePrefix = "queued_replay_post_";
+        public const string ReplayPostFileNameSuffix = ".txt";
         public const double MainScreenGeneralCounterIntervalInSeconds = 2.0;
         public const long MaxGHLogSize = 4194304;
         public const int LineBuilderInitialCapacity = 256;
@@ -1643,6 +1651,9 @@ namespace GnollHackX
         public const string ReplaySharedZipFileNamePrefix = "shared-replay-";
         public const string ReplaySharedZipFileNameSuffix = ".zip";
         public const string ReplayAllSharedZipFileNamePrefix = "shared-replays-";
+        public const string AzureBlobStorageReplayContainerName = "replays";
+        public const string AzureBlobStorageDelimiter = "/";
+        public const string AzureBlobStorageGeneralDirectoryName = "_Anonymous";
         public const bool GZipIsDefaultReplayCompression = true;
         public const int ReplayStandardDelay = 128; /* Milliseconds */
         public const int ReplayGetEventDelay = 16; /* Milliseconds */
@@ -1655,7 +1666,7 @@ namespace GnollHackX
         public const int ReplayGetLineDelay1 = 512; /* Milliseconds */
         public const int ReplayGetLineDelay2 = 1024; /* Milliseconds */
         public const int ReplayDisplayWindowDelay = 512; /* Milliseconds */
-
+        //public const long GPUResourceCacheSize = 800000000L;
 #if GNH_MAUI
         public const string PortName = "GnollHackM";
 #else

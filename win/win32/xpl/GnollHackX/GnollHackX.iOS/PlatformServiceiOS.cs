@@ -72,7 +72,11 @@ namespace GnollHackX.iOS
         public void CloseApplication()
         {
             RevertAnimatorDuration(true);
-            //MainActivity.CurrentMainActivity.Finish();
+#if GNH_MAUI
+            Environment.Exit(0);
+#else
+            /* Do nothing; fall back to Xamarin.Forms termination after this call */
+#endif
         }
 
         public void SetStatusBarHidden(bool ishidden)
@@ -205,10 +209,18 @@ namespace GnollHackX.iOS
 
         }
 
-
         public void HideKeyboard()
         {
             UIApplication.SharedApplication.KeyWindow.EndEditing(true);
+        }
+
+        public void HideOsNavigationBar()
+        {
+
+        }
+        public void ShowOsNavigationBar()
+        {
+
         }
     }
 }

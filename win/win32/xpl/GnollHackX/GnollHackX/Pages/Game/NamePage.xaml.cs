@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+
+
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
@@ -13,8 +15,10 @@ using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
 namespace GnollHackM
 #else
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
+using Xamarin.Essentials;
 
 namespace GnollHackX.Pages.Game
 #endif
@@ -27,17 +31,18 @@ namespace GnollHackX.Pages.Game
         private GamePage _gamePage;
         private string _replayEnteredName = null;
 
-        public NamePage(GamePage gamepage, string modeName, string modeDescription, string replayEnteredPlayerName)
+        public NamePage(GamePage gamePage, string modeName, string modeDescription, string replayEnteredPlayerName)
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
+#if GNH_MAUI
+            Loaded += ContentPage_Loaded;
 #else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
+            Appearing += ContentPage_Loaded;
 #endif
             ValidationExpression = new Regex(@"^[A-Za-z0-9_]{1,31}$");
-            _currentGame = gamepage.CurrentGame;
-            _gamePage = gamepage;
+            _currentGame = gamePage.CurrentGame;
+            _gamePage = gamePage;
             _replayEnteredName = replayEnteredPlayerName;
 
             if (!string.IsNullOrWhiteSpace(modeName))
@@ -97,31 +102,19 @@ namespace GnollHackX.Pages.Game
             ConcurrentQueue<GHResponse> queue;
             if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.AskName, usedName));
                 await _gamePage.Navigation.PopModalAsync();
+                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.AskName, usedName));
             }
             btnOK.IsEnabled = true;
             btnCancel.IsEnabled = true;
         }
 
-        protected override void OnAppearing()
+        private void ReplayDoEnterName()
         {
-            base.OnAppearing();
-            if(_gamePage.PlayingReplay)
+            MainThread.BeginInvokeOnMainThread(() =>
             {
-                if(!string.IsNullOrWhiteSpace(_replayEnteredName))
-                {
-                    Device.StartTimer(TimeSpan.FromMilliseconds(GHConstants.ReplayAskNameDelay1), () =>
-                    {
-                        eName.Text = _replayEnteredName;
-                        return false;
-                    });
-                }
-            }
-            else
-            {
-                eName.Focus();
-            }
+                eName.Text = _replayEnteredName;
+            });
         }
 
         private bool _backPressed = false;
@@ -139,13 +132,40 @@ namespace GnollHackX.Pages.Game
         private void ContentPage_Appearing(object sender, EventArgs e)
         {
             GHApp.BackButtonPressed += BackButtonPressed;
+        }
 
+        private void ContentPage_Loaded(object sender, EventArgs e)
+        {
+            if (_gamePage.PlayingReplay)
+            {
+                if (!string.IsNullOrWhiteSpace(_replayEnteredName))
+                {
+#if GNH_MAUI
+                    var timer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+                    timer.Interval = TimeSpan.FromSeconds(UIUtils.GetWindowHideSecs());
+                    timer.IsRepeating = false;
+                    timer.Tick += (s, e) => { ReplayDoEnterName(); };
+                    timer.Start();
+#else
+                    Device.StartTimer(TimeSpan.FromMilliseconds(GHConstants.ReplayAskNameDelay1), () =>
+                    {
+                        ReplayDoEnterName();
+                        return false;
+                    });
+#endif
+                }
+            }
+            else
+            {
+                eName.Focus();
+            }
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
             GHApp.BackButtonPressed -= BackButtonPressed;
-
+            eName.Unfocus();
+            eName.IsEnabled = false;
         }
 
         private double _currentPageWidth = 0;
@@ -171,8 +191,8 @@ namespace GnollHackX.Pages.Game
             ConcurrentQueue<GHResponse> queue;
             if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.AskName, ""));
                 await _gamePage.Navigation.PopModalAsync();
+                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.AskName, ""));
             }
             btnOK.IsEnabled = true;
             btnCancel.IsEnabled = true;

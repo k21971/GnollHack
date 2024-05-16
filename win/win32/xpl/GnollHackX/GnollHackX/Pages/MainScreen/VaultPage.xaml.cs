@@ -15,6 +15,7 @@ namespace GnollHackM
 using GnollHackX.Controls;
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 
@@ -31,11 +32,7 @@ namespace GnollHackX.Pages.MainScreen
             _mainPage = mainPage;
 
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
 
             LabeledImageButton rib = new LabeledImageButton();
             rib.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.conduct.png";
@@ -84,6 +81,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
+            GHApp.CurrentMainPage?.InvalidateCarousel();
             await App.Current.MainPage.Navigation.PopModalAsync();
         }
 
@@ -93,6 +91,7 @@ namespace GnollHackX.Pages.MainScreen
             if (!_backPressed)
             {
                 _backPressed = true;
+                GHApp.CurrentMainPage?.InvalidateCarousel();
                 await App.Current.MainPage.Navigation.PopModalAsync();
             }
             return false;
@@ -174,8 +173,7 @@ namespace GnollHackX.Pages.MainScreen
             VaultLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
 
-            string dir = Path.Combine(GHApp.GHPath, GHConstants.ReplayDirectory);
-            ReplayPage selectFilePage = new ReplayPage(dir, _mainPage);
+            ReplayPage selectFilePage = new ReplayPage(_mainPage);
             await App.Current.MainPage.Navigation.PushModalAsync(selectFilePage);
 
             VaultLayout.IsEnabled = true;

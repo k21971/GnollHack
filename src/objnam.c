@@ -102,8 +102,6 @@ STATIC_OVL struct Jitem Japanese_items[] = { { SHORT_SWORD, "wakizashi" },
                                              { FOOD_RATION, "gunyoki" },
                                              { 0, "" } };
 
-STATIC_DCL const char *FDECL(Japanese_item_name, (int i));
-
 STATIC_OVL char *
 strprepend(s, pref)
 register char *s;
@@ -2012,7 +2010,7 @@ weapon_here:
     if ((wizard && iflags.wizweight) || weightfirst) 
     {
         char weightbuf[OBUFSZ];
-        printweight(weightbuf, objweight_oz, TRUE, TRUE);
+        printweight(weightbuf, objweight_oz, TRUE, TRUE, FALSE);
         char buf[OBUFSZ];
         Sprintf(buf, "%s - %s", weightbuf, bp);
         Strcpy(bp, buf);
@@ -2021,7 +2019,7 @@ weapon_here:
     if (weightlast)
     {
         char weightbuf[OBUFSZ];
-        printweight(weightbuf, objweight_oz, FALSE, FALSE);
+        printweight(weightbuf, objweight_oz, FALSE, FALSE, TRUE);
         char buf[OBUFSZ];
         Sprintf(buf, "%s (%s)", bp, weightbuf);
         Strcpy(bp, buf);
@@ -5052,7 +5050,7 @@ retry:
             create_simple_location(x, y, LAVAPOOL, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
             del_engr_at(x, y);
             pline("A pool of molten lava.");
-            if (!(Levitation || Flying))
+            if (!Moves_above_ground)
                 (void) lava_effects();
             newsym(x, y);
             return (struct obj *) &zeroobj;
@@ -5550,9 +5548,9 @@ retry:
 
             if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_CELESTIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_UNDEAD_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_CELESTIAL)
                 otmp->exceptionality = EXCEPTIONALITY_ELITE;
-            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGELIC_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGEL_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
                 otmp->exceptionality = EXCEPTIONALITY_ELITE;
-            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGEL_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
                 otmp->exceptionality = EXCEPTIONALITY_ELITE;
         }
     }
@@ -5755,7 +5753,7 @@ int first, last;
     return 0;
 }
 
-STATIC_OVL const char *
+const char *
 Japanese_item_name(i)
 int i;
 {

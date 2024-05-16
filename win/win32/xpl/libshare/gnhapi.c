@@ -761,12 +761,21 @@ int RunGnollHack(
         Strcat(cmdbuf, "-b");
     }
 
+    if (runflags & GHRUNFLAGS_TOURNAMENT_MODE)
+    {
+        if (*cmdbuf)
+            Strcat(cmdbuf, " ");
+        Strcat(cmdbuf, "-T");
+    }
+
     /* Set directly, as other parts of GnollHack do not purposedly set this */
     if (last_used_player_name && strcmp(last_used_player_name, ""))
     {
         Strncpy(recovery_plname, last_used_player_name, PL_NSIZ - 1);
         recovery_plname[PL_NSIZ - 1] = '\0';
     }
+
+    is_gui_in_debug_mode = (runflags & GHRUNFLAGS_GUI_DEBUG_MODE) != 0;
 
     /* Set callback function pointers here */
     lib_callbacks.callback_init_nhwindows = callback_init_nhwindows;

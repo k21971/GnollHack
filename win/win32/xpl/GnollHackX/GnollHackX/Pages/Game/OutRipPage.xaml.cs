@@ -11,6 +11,7 @@ using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
 namespace GnollHackM
 #else
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 
@@ -28,11 +29,8 @@ namespace GnollHackX.Pages.Game
         public OutRipPage(GamePage gamePage, GHWindow window, GHOutRipInfo outripinfo)
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
+
             _gamePage = gamePage;
             _window = window;
             _glyph = _window.Glyph;
@@ -49,10 +47,16 @@ namespace GnollHackX.Pages.Game
             _playingReplay = gamePage.PlayingReplay;
         }
 
+        private bool _tapHide = false;
         private async void TapGestureRecognizer_Tapped(object sender, EventArgs e)
         {
             if(!_playingReplay)
+            {
+                _tapHide = true;
+                OutRipGrid.IsEnabled = false;
                 await App.Current.MainPage.Navigation.PopModalAsync();
+                _gamePage.GenericButton_Clicked(sender, e, 27);
+            }
         }
 
         private GlyphImageSource _glyphImageSource = new GlyphImageSource();
@@ -75,7 +79,7 @@ namespace GnollHackX.Pages.Game
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
-            if (!_playingReplay)
+            if (!_playingReplay && !_tapHide)
                 _gamePage.GenericButton_Clicked(sender, e, 27);
         }
     }

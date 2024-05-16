@@ -434,7 +434,7 @@ int force;
                             Your("chain breaks!");
                             reset_utrap(TRUE);
                         }
-                        if (Levitation || Flying || is_clinger(youmonst.data)) 
+                        if (Moves_above_ground)
                         {
                             if (!tu_pit) 
                             { /* no pit here previously */
@@ -668,6 +668,10 @@ struct obj *instr;
                     increase_mon_property_b(mtmp, CRAZED, (dur_dice > 0 && dur_diesize > 0 ? d(dur_dice, dur_diesize) : 0) + dur_plus, canspotmon(mtmp));
                     //incr_itimeout(&u.uprops[CRAZED].intrinsic, (dur_dice > 0 && dur_diesize > 0 ? d(dur_dice, dur_diesize) : 0) + dur_plus);
                     affected_cnt++;
+                }
+                else
+                {
+                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s is unaffected due to a successful saving throw.", Monnam(mtmp));
                 }
             }
         }

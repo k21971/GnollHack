@@ -20,6 +20,9 @@ namespace GnollHackX
         ulong GetDeviceTotalDiskSpaceInBytes();
         void SetStatusBarHidden(bool ishidden);
         bool GetStatusBarHidden();
+        void HideOsNavigationBar();
+        void ShowOsNavigationBar();
+
         float GetAnimatorDurationScaleSetting();
         float GetTransitionAnimationScaleSetting();
         float GetWindowAnimationScaleSetting();
@@ -36,6 +39,5 @@ namespace GnollHackX
         int FetchOnDemandPack(string pack);
         event EventHandler<AssetPackStatusEventArgs> OnDemandPackStatusNotification;
 
-        //void SaveFileToDownloads(byte[] data, string name);
     }
 }

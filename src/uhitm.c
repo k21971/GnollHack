@@ -561,7 +561,7 @@ register struct monst *mtmp;
 
     boolean has_right_weapon = (uwep && is_weapon(uwep));
     boolean has_left_weapon = (u.twoweap && uwep2 && is_weapon(uwep2));
-    if (/* !do_bash_prompt && */ ParanoidMonkWeapon && Role_if(PM_MONK) && u.uconduct.weaphit == 0 && (has_right_weapon || has_left_weapon))
+    if (/* !do_bash_prompt && */ ParanoidWieldedWeapon && u.uconduct.weaphit == 0 && (has_right_weapon || has_left_weapon))
     {
         if(has_right_weapon && !has_left_weapon)
             Sprintf(qbuf, "You begin attacking with %s. Continue?", yname(uwep));
@@ -646,7 +646,7 @@ int dieroll;
         long oldweaphit = u.uconduct.weaphit;
 
         /* KMH, conduct */
-        if (weapon && is_weapon(weapon))
+        if (weapon && is_wieldable_weapon(weapon))
             u.uconduct.weaphit++; /* Livelog is below */
 
         /* we hit the monster; be careful: it might die or
@@ -3564,7 +3564,7 @@ register struct attack *mattk;
     if (!engulf_target(&youmonst, mdef))
         return 0;
 
-    if (u.uhunger < 1500 && !u.uswallow)
+    if (u.uhunger < NUTRITION_FULL_AMOUNT && !u.uswallow)
     {
         for (otmp = mdef->minvent; otmp; otmp = otmp->nobj)
             (void) snuff_lit(otmp);
@@ -4633,7 +4633,7 @@ struct attack *mattk;     /* null means we find one internally */
         if (!is_cancelled(mon)) {
             if (drain_item(obj, TRUE) && carried(obj)
                 && (obj->known || obj->oclass == ARMOR_CLASS)) {
-                pline("%s less effective.", Yobjnam2(obj, "seem"));
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s less effective.", Yobjnam2(obj, "seem"));
             }
             break;
         }
@@ -4987,37 +4987,36 @@ schar difficulty_level;
     switch (difficulty_level)
     {
     case -4:
-        *monster_damage_multiplier_ptr = 0.25;
-        *monster_hp_multiplier_ptr = 0.40;
+        *monster_damage_multiplier_ptr = 0.3501;
+        *monster_hp_multiplier_ptr = 0.2856;
         break;
     case -3:
-        *monster_damage_multiplier_ptr = 0.353;
-        *monster_hp_multiplier_ptr = 0.50;
+        *monster_damage_multiplier_ptr = 0.4552;
+        *monster_hp_multiplier_ptr = 0.3907;
         break;
     case -2:
-        *monster_damage_multiplier_ptr = 0.50;
-        *monster_hp_multiplier_ptr = 0.63;
+        *monster_damage_multiplier_ptr = 0.5917;
+        *monster_hp_multiplier_ptr = 0.5344;
         break;
     case -1:
-        *monster_damage_multiplier_ptr = 0.707;
-        *monster_hp_multiplier_ptr = 0.79;
+        *monster_damage_multiplier_ptr = 0.7692;
+        *monster_hp_multiplier_ptr = 0.7310;
         break;
     case 0:
         *monster_damage_multiplier_ptr = 1.0;
         *monster_hp_multiplier_ptr = 1.0;
         break;
     case 1:
-        *monster_damage_multiplier_ptr = 1.414;
-        *monster_hp_multiplier_ptr = 1.26;
+        *monster_damage_multiplier_ptr = 1.3;
+        *monster_hp_multiplier_ptr = 1.3679;
         break;
     case 2:
-        *monster_damage_multiplier_ptr = 2.00;
-        *monster_hp_multiplier_ptr = 1.59;
+        *monster_damage_multiplier_ptr = 1.69;
+        *monster_hp_multiplier_ptr = 1.8712;
         break;
     default:
         break;
     }
-
 }
 
 int

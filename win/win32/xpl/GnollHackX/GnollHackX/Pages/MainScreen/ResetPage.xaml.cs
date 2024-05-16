@@ -16,6 +16,7 @@ namespace GnollHackM
 #else
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 
@@ -28,11 +29,7 @@ namespace GnollHackX.Pages.MainScreen
         public ResetPage()
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
 #if !DEBUG
             btnDownloadTestFiles.IsVisible = false;
             btnImportTestFiles.IsVisible = false;
@@ -215,6 +212,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             ResetGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
+            GHApp.CurrentMainPage?.InvalidateCarousel(); 
             await App.Current.MainPage.Navigation.PopModalAsync();
         }
 
@@ -225,6 +223,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 _backPressed = true;
                 ResetGrid.IsEnabled = false;
+                GHApp.CurrentMainPage?.InvalidateCarousel();
                 await App.Current.MainPage.Navigation.PopModalAsync();
             }
             return false;
@@ -262,7 +261,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             ResetGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-
+#if DEBUG
             string url = "https://download.gnollhack.com/test-files/test-files2.zip";
             string target_path = GHApp.GHPath;
             string target_file = Path.Combine(target_path, "test-files2.zip");
@@ -324,6 +323,7 @@ namespace GnollHackX.Pages.MainScreen
                     btnDownloadTestFiles.TextColor = GHColors.Red;
                 }
             }
+#endif
             ResetGrid.IsEnabled = true;
         }
 
@@ -380,8 +380,8 @@ namespace GnollHackX.Pages.MainScreen
         private async void btnImportTestFiles_Clicked(object sender, EventArgs e)
         {
             ResetGrid.IsEnabled = false;
-
             GHApp.PlayButtonClickedSound();
+#if DEBUG
             await CheckAndRequestWritePermission();
             await CheckAndRequestReadPermission();
             try
@@ -480,28 +480,15 @@ namespace GnollHackX.Pages.MainScreen
                             }
                             else
                             {
-                                string out_str = "";
-                                if (GHApp.GnollHackService.ValidateSaveFile(file.FullPath, out out_str))
+                                string targetfilename = file.FileName;
+                                string fulltargetpath = Path.Combine(gnhpath, targetfilename);
+                                if (System.IO.File.Exists(fulltargetpath))
+                                    System.IO.File.Delete(fulltargetpath);
+                                using (Stream t = System.IO.File.Open(fulltargetpath, FileMode.Create))
                                 {
-                                    string targetfilename = file.FileName + ".i";
-                                    string savedirpath = Path.Combine(gnhpath, GHConstants.SaveDirectory);
-                                    GHApp.CheckCreateDirectory(savedirpath);
-
-                                    string fulltargetpath = Path.Combine(savedirpath, targetfilename);
-                                    if (System.IO.File.Exists(fulltargetpath))
-                                        System.IO.File.Delete(fulltargetpath);
-                                    using (Stream t = System.IO.File.Open(fulltargetpath, FileMode.Create))
-                                    {
-                                        s.CopyTo(t);
-                                    }
-                                    await DisplayAlert("Game Saved", "Saved game \'" + file.FileName + "\' has been saved to the save directory as a non-scoring imported saved game.", "OK");
-                                    if (out_str != "" && GHApp.DebugLogMessages)
-                                        await DisplayAlert("ValidateSaveFile Messge", out_str, "OK");
+                                    s.CopyTo(t);
                                 }
-                                else
-                                {
-                                    await DisplayAlert("Invalid Saved Game", "Saved game \'" + file.FullPath + "\' is invalid: " + out_str, "OK");
-                                }
+                                await DisplayAlert("File Saved", "File \'" + file.FileName + "\' has been saved to the GnollHack directory.", "OK");
                             }
                         }
                     }
@@ -511,6 +498,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 await DisplayAlert("Error", "An error occurred while trying to import files: " + ex.Message, "OK");
             }
+#endif
             ResetGrid.IsEnabled = true;
         }
 
@@ -521,9 +509,11 @@ namespace GnollHackX.Pages.MainScreen
             string directory1 = Path.Combine(GHApp.GHPath, GHConstants.ForumPostQueueDirectory);
             string directory2 = Path.Combine(GHApp.GHPath, GHConstants.XlogPostQueueDirectory);
             string directory3 = Path.Combine(GHApp.GHPath, GHConstants.BonesPostQueueDirectory);
+            string directory4 = Path.Combine(GHApp.GHPath, GHConstants.ReplayPostQueueDirectory);
             int nofiles1 = 0;
             int nofiles2 = 0;
             int nofiles3 = 0;
+            int nofiles4 = 0;
             if (Directory.Exists(directory1))
             {
                 string[] files1 = Directory.GetFiles(directory1);
@@ -548,12 +538,21 @@ namespace GnollHackX.Pages.MainScreen
                     nofiles3 = files3.Length;
                 }
             }
+            if (Directory.Exists(directory4))
+            {
+                string[] files4 = Directory.GetFiles(directory4);
+                if (files4 != null)
+                {
+                    nofiles4 = files4.Length;
+                }
+            }
 
             bool answer = await DisplayAlert("Clear All Post Queues?", 
                 "Are you sure to delete all files in the " + 
-                GHConstants.ForumPostQueueDirectory + " (" + nofiles1 + " file" + (nofiles1 == 1 ? "" : "s" ) + "), " + 
-                GHConstants.XlogPostQueueDirectory + " (" + nofiles2 +  " file" + (nofiles2 == 1 ? "" : "s" ) + ") and " +
-                GHConstants.BonesPostQueueDirectory + " (" + nofiles3 + " file" + (nofiles3 == 1 ? "" : "s") + ") directories?",
+                GHConstants.ForumPostQueueDirectory + " (" + nofiles1 + " file" + (nofiles1 == 1 ? "" : "s" ) + "), " +
+                GHConstants.XlogPostQueueDirectory + " (" + nofiles2 + " file" + (nofiles2 == 1 ? "" : "s") + "), " +
+                GHConstants.BonesPostQueueDirectory + " (" + nofiles3 +  " file" + (nofiles3 == 1 ? "" : "s" ) + ") and " +
+                GHConstants.ReplayPostQueueDirectory + " (" + nofiles4 + " file" + (nofiles4 == 1 ? "" : "s") + ") directories?",
                 "Yes", "No");
 
             if (answer)
@@ -568,6 +567,9 @@ namespace GnollHackX.Pages.MainScreen
 
                     if (Directory.Exists(directory3))
                         Directory.Delete(directory3, true);
+
+                    if (Directory.Exists(directory4))
+                        Directory.Delete(directory4, true);
 
                     btnDeletePostQueues.Text = "Done";
                     btnDeletePostQueues.TextColor = GHColors.Red;

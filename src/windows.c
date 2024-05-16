@@ -97,7 +97,7 @@ STATIC_DCL void NDECL(dump_headers);
 STATIC_DCL void NDECL(dump_footers);
 STATIC_DCL void FDECL(dump_status_update, (int, genericptr_t, int, int, int, unsigned long*));
 STATIC_DCL void NDECL(dump_render_status);
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
 STATIC_DCL void FDECL(dump_set_color_attr, (int, int, BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL void NDECL(html_init_sym);
 STATIC_DCL void NDECL(dump_css);
@@ -107,10 +107,10 @@ STATIC_DCL void FDECL(html_dump_str, (FILE*, const char*, const char*, const cha
 STATIC_DCL void FDECL(html_dump_line, (FILE*, winid, const char*, const char*, int, int, int, const char*));
 STATIC_DCL void FDECL(html_write_tags, (FILE*, winid, int, int, int, BOOLEAN_P, struct extended_menu_info, BOOLEAN_P)); /* Tags before/after string */
 #endif
-#ifdef DUMPLOG
+#if defined (DUMPLOG)
 STATIC_VAR FILE* dumplog_file;
 #endif
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
 STATIC_VAR FILE* dumphtml_file;
 #endif
 #endif /* DUMPLOG */
@@ -1689,8 +1689,10 @@ dump_render_status(VOID_ARGS)
             break;
 
         int pad = COLNO + 1;
+#if defined(DUMPHTML)
         if (dumphtml_file)
             fprintf(dumphtml_file, "<div class=\"nh_screen\">  "); /* 2 space left margin */
+#endif
         for (i = 0; (idx = fieldorder[row][i]) != BL_FLUSH; ++i) {
             boolean hitpointbar = (idx == BL_TITLE
                 && iflags.wc2_hitpointbar);
@@ -1707,16 +1709,18 @@ dump_render_status(VOID_ARGS)
                     if (bits & mask) {
                         putstr_ex(NHW_STATUS, " ", ATR_NONE, NO_COLOR, 1);
                         pad--;
-#ifdef STATUS_HILITES
+#if defined (STATUS_HILITES)
                         if (iflags.hilite_delta) {
                             attrmask = condattr(mask, dump_colormasks);
                             coloridx = condcolor(mask, dump_colormasks);
+#if defined(DUMPHTML)
                             dump_set_color_attr(coloridx, attrmask, TRUE, FALSE);
+#endif
                         }
 #endif
                         putstr_ex(NHW_STATUS, condition_definitions[c].text[0], ATR_NONE, NO_COLOR, 1);
                         pad -= strlen(condition_definitions[c].text[0]);
-#ifdef STATUS_HILITES
+#if defined (STATUS_HILITES) && defined(DUMPHTML)
                         if (iflags.hilite_delta) {
                             dump_set_color_attr(coloridx, attrmask, FALSE, FALSE);
                         }
@@ -1757,9 +1761,13 @@ dump_render_status(VOID_ARGS)
                 }
                 putstr_ex(NHW_STATUS,  "[", ATR_NONE, NO_COLOR, 1);
                 if (*bar) { /* always True, unless twoparts+dead (0 HP) */
+#if defined(DUMPHTML)
                     dump_set_color_attr(hpbar_color, HL_INVERSE, TRUE, FALSE);
+#endif
                     putstr_ex(NHW_STATUS, bar, ATR_NONE, NO_COLOR, 0);
+#if defined(DUMPHTML)
                     dump_set_color_attr(hpbar_color, HL_INVERSE, FALSE, FALSE);
+#endif
                 }
                 if (twoparts) { /* no highlighting for second part */
                     *bar2 = savedch;
@@ -1770,7 +1778,7 @@ dump_render_status(VOID_ARGS)
             }
             else {
                 /* | Everything else not in a special case above | */
-#ifdef STATUS_HILITES
+#if defined (STATUS_HILITES)
                 if (iflags.hilite_delta) {
                     while (*text == ' ') {
                         putstr(NHW_STATUS, 0, " ");
@@ -1784,20 +1792,24 @@ dump_render_status(VOID_ARGS)
                     }
                     attrmask = dump_status[idx].attr;
                     coloridx = dump_status[idx].color;
+#if defined(DUMPHTML)
                     dump_set_color_attr(coloridx, attrmask, TRUE, FALSE);
+#endif
                 }
 #endif
                 putstr_ex(NHW_STATUS, text, ATR_NONE, NO_COLOR, 1);
                 pad -= strlen(text);
-#ifdef STATUS_HILITES
+#if defined (STATUS_HILITES) && defined(DUMPHTML)
                 if (iflags.hilite_delta) {
                     dump_set_color_attr(coloridx, attrmask, FALSE, FALSE);
                 }
 #endif
             }
         }
+#if defined(DUMPHTML)
         if (dumphtml_file)
             fprintf(dumphtml_file, "%*s</div>\n", pad, " ");
+#endif
     }
     return;
 }
@@ -2960,8 +2972,8 @@ int x, y, sym, color;
 nhsym ch;
 unsigned long special;
 {
-    char buf[BUFSZ] = ""; /* do_screen_description requires this :( */
-    const char* firstmatch = "unknown"; /* and this */
+    char descbuf[BUFSZ] = "";
+    const char* firstmatch = 0;
     coord cc;
     int desc_found = 0;
     unsigned attr;
@@ -2972,7 +2984,7 @@ unsigned long special;
         fprintf(dumphtml_file, "<div class=\"nh_screen\">  "); /* 2 space left margin */
     cc.x = x;
     cc.y = y;
-    desc_found = do_screen_description(cc, TRUE, ch, buf, &firstmatch, (struct permonst**)0);
+    desc_found = do_screen_description(cc, TRUE, ch, descbuf, &firstmatch, (struct permonst**)0);
     if (desc_found)
         fprintf(dumphtml_file, "<div class=\"tooltip\">");
     attr = mg_hl_attr(special);
@@ -2983,7 +2995,7 @@ unsigned long special;
         html_dump_char(dumphtml_file, ch, TRUE);
     dump_set_color_attr(color, attr, FALSE, TRUE);
     if (desc_found)
-        fprintf(dumphtml_file, "<div class=\"tooltiptext\">%s</div></div>", firstmatch);
+        fprintf(dumphtml_file, "<div class=\"tooltiptext\">%s</div></div>", descbuf);
     if (x == COLNO - 1)
         fprintf(dumphtml_file, "  </div>\n"); /* 2 trailing spaces and newline */
 }
@@ -3200,8 +3212,10 @@ void
 reset_windows(VOID_ARGS)
 {
     prev_app = 0;
+#ifdef DUMPHTML
     in_list = 0;
     //in_preform = 0;
+#endif
 }
 
 /*windows.c*/

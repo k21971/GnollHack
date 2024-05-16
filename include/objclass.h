@@ -631,6 +631,8 @@ struct objclass {
 
 #define S1_FLAGS_EFFECT_USES_SAVING_THROW_MASK        0x000FF000UL
 
+#define S1_FLAGS_SPELLBOOK_DOES_NOT_YIELD_CASTINGS    0x00100000UL
+
 #define S2_NONE                                       0x00000000UL
 #define POTFLAGS_NONE                                 0x00000000UL
 #define POTFLAGS_CURSED_CURE_SICKNESS                 0x00000001UL
@@ -938,7 +940,7 @@ struct objclass {
 #define O2_GNOLLISH_ITEM          0x00000008UL
 #define O2_DRAGON_ITEM            0x00000010UL
 #define O2_DEMON_ITEM             0x00000020UL
-#define O2_ANGELIC_ITEM           0x00000040UL
+#define O2_ANGEL_ITEM             0x00000040UL
 #define O2_MODRON_ITEM            0x00000080UL
 #define O2_GNOMISH_ITEM           0x00000100UL
 #define O2_UNDEAD_ITEM            0x00000200UL
@@ -1087,6 +1089,7 @@ struct objclass {
 #define O5_REMOVED_FROM_GAME           0x80000000UL /* Inform the player explicitly that the item has been removed from game (e.g., by using no wish and no generation flags) */
 
 #define O6_NONE                        0x00000000UL
+#define O6_JAPANESE_ITEM               0x00000001UL
 
 /* flag values for CONFERS_POWERS_TO_SPECIFIED_CHARACTERS_ONLY in nonspell_oc7 */
 #define PERMITTED_ALL                 0x00000000UL
@@ -1269,5 +1272,8 @@ struct fruit {
 
 #define has_spell_otyp_per_level_bonus(otyp) \
     ((objects[otyp].oc_spell_flags & S1_LDMG_IS_PER_LEVEL_DMG_INCREASE) != 0 && objects[otyp].oc_spell_per_level_step > 0)
+
+#define learning_spellbook_yields_castings(otyp) \
+    ((objects[otyp].oc_spell_flags & S1_FLAGS_SPELLBOOK_DOES_NOT_YIELD_CASTINGS) == 0)
 
 #endif /* OBJCLASS_H */

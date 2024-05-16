@@ -1718,6 +1718,38 @@ delete_error_savefile(VOID_ARGS)
     return -1;
 }
 
+int
+delete_running_files(VOID_ARGS)
+{
+    int lev, fd;
+    char errbuf[BUFSZ];
+#if defined(UNIX)
+    Sprintf(lock, "%d%s", (int)getuid(), plname);
+#elif defined(WIN32)
+    char fnamebuf[BUFSZ], encodedfnamebuf[BUFSZ];
+    Sprintf(fnamebuf, "%s-%s", get_username(0), plname);
+    (void)fname_encode(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-.", '%',
+        fnamebuf, encodedfnamebuf, BUFSZ);
+    Sprintf(lock, "%s", encodedfnamebuf);
+#else
+    Sprintf(lock, "%s", plname);
+#endif
+    for (lev = 0; lev < 256; lev++)
+    {
+        fd = open_levelfile(lev, errbuf);
+        if (fd >= 0) /* exists */
+        {
+            (void)nhclose(fd);
+            const char* fq_lock;
+            set_levelfile_name(lock, lev);
+            fq_lock = fqname(lock, LEVELPREFIX, 3);
+            (void)unlink(fq_lock);
+        }
+    }
+    return 0;
+}
+
 boolean check_has_backup_savefile(VOID_ARGS)
 {
     if (sysopt.make_backup_savefiles && *SAVEF)
@@ -1760,6 +1792,55 @@ delete_savefile_if_exists(VOID_ARGS)
         return -2; /* fq_save does not exist */
     }
     return -1; /* SAVEF is empty */
+}
+
+/* returns 1 if save file exists, otherwise 0 */
+boolean
+check_existing_save_file()
+{
+    const char* fq_save;
+    register int fd;
+    fq_save = fqname(SAVEF, SAVEPREFIX, 1); /* level files take 0 */
+
+#if defined(MICRO) && defined(MFLOPPY)
+    if (!saveDiskPrompt(0))
+        return 0;
+#endif
+
+    nh_uncompress(fq_save);
+    fd = open_savefile();
+    if (fd >= 0) {
+        (void)nhclose(fd);
+        /* There is an old save file, let's compress it back */
+        nh_compress(fq_save);
+        return 1;
+    }
+    return 0;
+}
+
+/* returns 1 if save file exists, otherwise 0 */
+boolean
+check_existing_error_save_file()
+{
+    const char* fq_save;
+    char fq_error[4096];
+    fq_save = fqname(SAVEF, SAVEPREFIX, 1); /* level files take 0 */
+    Strcpy(fq_error, fq_save);
+    print_error_savefile_extension(fq_error);
+
+#if defined(MICRO) && defined(MFLOPPY)
+    if (!saveDiskPrompt(0))
+        return 0;
+#endif
+
+    nh_uncompress(fq_error);
+    if (access(fq_error, F_OK) == 0)
+    {
+        nh_compress(fq_error);
+        return 1;
+    }
+    else
+        return 0;
 }
 
 /* try to open up a save file and prepare to restore it */
@@ -2279,10 +2360,13 @@ get_saved_games()
                 ++n2;
             } while (findnext());
         }
-        if (findfirst(fq_save_ibuf)) {
-            do {
-                ++n3;
-            } while (findnext());
+        if (!TournamentMode)
+        {
+            if (findfirst(fq_save_ibuf)) {
+                do {
+                    ++n3;
+                } while (findnext());
+            }
         }
 #endif
         if (n > 0 || n2 > 0 || n3 > 0) {
@@ -2300,7 +2384,13 @@ get_saved_games()
                         char* r;
                         r = plname_from_file(foundfile, &gamestats);
                         if (r)
+                        {
+                            if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                                continue;
+                            if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                                continue;
                             result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, FALSE, FALSE);
+                        }
                         ++n;
                     } while (findnext());
                 }
@@ -2315,7 +2405,13 @@ get_saved_games()
                         char* r;
                         r = plname_from_file(foundfile, &gamestats);
                         if (r)
+                        {
+                            if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                                continue;
+                            if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                                continue;
                             result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, TRUE, FALSE);
+                        }
                         ++n2;
                     } while (findnext());
                 }
@@ -2329,6 +2425,10 @@ get_saved_games()
                         r = plname_from_file(foundfile, &gamestats);
                         if (r)
                         {
+                            if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                                continue;
+                            if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                                continue;
                             boolean isimportederror = is_imported_error_savefile_name(foundfile);
                             result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, isimportederror, TRUE);
                         }
@@ -2372,7 +2472,13 @@ get_saved_games()
                         Sprintf(filename, "save/%d%s", uid, name);
                         r = plname_from_file(filename, &gamestats);
                         if (r)
+                        {
+                            if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                                continue;
+                            if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                                continue;
                             result[j++] = newsavegamedata(r, filename, gamestats, FALSE, FALSE, FALSE);
+                        }
                     }
                 }
             }
@@ -2399,7 +2505,8 @@ get_saved_games()
             if (uid == myuid) {
                 boolean isbackupfile = !!filter_backup(namelist[i]);
                 boolean isimportedbackupfile = !!filter_imported_backup(namelist[i]);
-                if (isbackupfile || isimportedbackupfile)
+                boolean isimportedfile = !!filter_imported(namelist[i]);
+                if (isbackupfile || isimportedbackupfile || (TournamentMode && isimportedfile))
                     continue;
                 char filename[BUFSZ];
                 char* r;
@@ -2407,7 +2514,10 @@ get_saved_games()
                 r = plname_from_file(filename, &gamestats);
                 if (r)
                 {
-                    boolean isimportedfile = !!filter_imported(namelist[i]);
+                    if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                        continue;
+                    if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                        continue;
                     boolean iserrorfile = filter_error(namelist[i]) || filter_imported_error(namelist[i]);
                     result[j++] = newsavegamedata(r, filename, gamestats, FALSE, iserrorfile, isimportedfile);
                 }
@@ -2420,7 +2530,13 @@ get_saved_games()
                 char* r;
                 r = plname_from_running(namelist2[i]->d_name, &gamestats);
                 if (r)
+                {
+                    if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                        continue;
+                    if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                        continue;
                     result[j++] = newsavegamedata(r, namelist2[i]->d_name, gamestats, TRUE, FALSE, FALSE);
+                }
             }
         }
     }
@@ -3712,49 +3828,49 @@ char *origbuf;
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTMLFILE", 12)) {
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
         if (sysopt.dumphtmlfile)
             free((genericptr_t)sysopt.dumphtmlfile);
         sysopt.dumphtmlfile = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTMLFONTNAME", 16)) {
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
         if (sysopt.dumphtmlfontname)
             free((genericptr_t)sysopt.dumphtmlfontname);
         sysopt.dumphtmlfontname = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTMLFONTLINK", 16)) {
-#if defined(DUMPHTML) && defined (DUMPHTML_WEBFONT_LINK)
+#if defined (DUMPHTML) && defined (DUMPHTML_WEBFONT_LINK)
         if (sysopt.dumphtmlfile)
             free((genericptr_t)sysopt.dumphtmlfontlink);
         sysopt.dumphtmlfontlink = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTML_CSS_FONTFACE_NORMAL", 28)) {
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
         if (sysopt.dumphtml_css_fontface_normal)
             free((genericptr_t)sysopt.dumphtml_css_fontface_normal);
         sysopt.dumphtml_css_fontface_normal = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTML_CSS_FONTFACE_BOLD", 26)) {
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
         if (sysopt.dumphtml_css_fontface_bold)
             free((genericptr_t)sysopt.dumphtml_css_fontface_bold);
         sysopt.dumphtml_css_fontface_bold = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTML_CSS_FONTFACE_ITALIC", 28)) {
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
         if (sysopt.dumphtml_css_fontface_italic)
             free((genericptr_t)sysopt.dumphtml_css_fontface_italic);
         sysopt.dumphtml_css_fontface_italic = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTML_CSS_FONTFACE_BOLD_ITALIC", 33)) {
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
         if (sysopt.dumphtml_css_fontface_bolditalic)
             free((genericptr_t)sysopt.dumphtml_css_fontface_bolditalic);
         sysopt.dumphtml_css_fontface_bolditalic = dupstr(bufp);

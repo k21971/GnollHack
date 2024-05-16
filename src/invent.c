@@ -2263,9 +2263,23 @@ struct obj* box;
 
     register struct obj *otmp;
 
+    /* is_unlocking_tool in order of preference */
+
+    /* Prefer keys */
     for (otmp = invent; otmp; otmp = otmp->nobj)
-        if (is_unlocking_tool(otmp) && key_fits_the_box_lock(otmp, box))
+        if (is_key(otmp) && key_fits_the_box_lock(otmp, box))
             return  otmp;
+
+    /* Then lock picks */
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+        if (otmp->otyp == LOCK_PICK && key_fits_the_box_lock(otmp, box))
+            return  otmp;
+
+    /* Then credit cards */
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+        if (otmp->otyp == CREDIT_CARD && key_fits_the_box_lock(otmp, box))
+            return  otmp;
+
     return (struct obj *) 0;
 }
 
@@ -2278,9 +2292,23 @@ struct rm* door;
 
     register struct obj* otmp;
 
+    /* is_unlocking_tool in order of preference */
+
+    /* Prefer keys */
     for (otmp = invent; otmp; otmp = otmp->nobj)
-        if (is_unlocking_tool(otmp) && key_fits_the_door_lock(otmp, door))
+        if (is_key(otmp) && key_fits_the_door_lock(otmp, door))
             return  otmp;
+
+    /* Then lock picks */
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+        if (otmp->otyp == LOCK_PICK && key_fits_the_door_lock(otmp, door))
+            return  otmp;
+
+    /* Then credit cards */
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+        if (otmp->otyp == CREDIT_CARD && key_fits_the_door_lock(otmp, door))
+            return  otmp;
+
     return (struct obj*)0;
 }
 
@@ -2992,6 +3020,10 @@ boolean (*validitemfunc)(struct obj*);
         for (otmp = invent; otmp; otmp = otmp->nobj)
             if (otmp->invlet == ilet)
                 break;
+
+        if (!otmp) /* Check for spurious ilet */
+            return (struct obj*)0;
+
         /* some items have restrictions */
         if (ilet == def_oc_syms[COIN_CLASS].sym
             /* guard against the [hypothetical] chace of having more
@@ -3045,7 +3077,7 @@ boolean (*validitemfunc)(struct obj*);
         }
         break;
     }
-    if (!allowall && let && !index(let, otmp->oclass)
+    if (!allowall && let && otmp && !index(let, otmp->oclass)
         && !(usegold && otmp->oclass == COIN_CLASS)
         && !(!strcmp(word, "read") && (objects[otmp->otyp].oc_flags3 & O3_READABLE))
         ) {
@@ -3055,7 +3087,7 @@ boolean (*validitemfunc)(struct obj*);
     if (cntgiven) {
         if (cnt == 0)
             return (struct obj *) 0;
-        if (cnt != otmp->quan) {
+        if (otmp && cnt != otmp->quan) {
             /* don't split a stack of cursed loadstones */
             if (splittable(otmp))
                 otmp = splitobj(otmp, cnt);
@@ -5061,11 +5093,11 @@ nextclass:
         char qbuf[BUFSIZ], subtitlebuf[BUFSIZ];
         int icnt = inv_cnt_ex(FALSE, wornonly);
         char weightbuf[BUFSZ];
-        printweight(weightbuf, wtcount, FALSE, FALSE);
+        printweight(weightbuf, wtcount, FALSE, FALSE, TRUE);
 
         int maxwt = enclevelmaximumweight(UNENCUMBERED);
         char maxbuf[BUFSZ];
-        printweight(maxbuf, maxwt, FALSE, FALSE);
+        printweight(maxbuf, maxwt, FALSE, FALSE, TRUE);
 
         if(wornonly)
             Strcpy(qbuf, "Worn Items");
@@ -5155,10 +5187,10 @@ int show_weights;
         curlevelmaxweight = enclevelmaximumweight(yourenclevel);
 
         char curlevelminbuf[BUFSZ] = "";
-        printweight(curlevelminbuf, curlevelminweight, FALSE, FALSE);
+        printweight(curlevelminbuf, curlevelminweight, FALSE, FALSE, TRUE);
 
         char curlevelmaxbuf[BUFSZ] = "";
-        printweight(curlevelmaxbuf, curlevelmaxweight, FALSE, FALSE);
+        printweight(curlevelmaxbuf, curlevelmaxweight, FALSE, FALSE, TRUE);
 
         //        curlevelminweight_lbs = ((double)curlevelminweight) / 16; //ounces to lbs
         //        curlevelmaxweight_lbs = ((double)curlevelmaxweight) / 16; //ounces to lbs
@@ -5168,7 +5200,7 @@ int show_weights;
         //        double burdnedweightlimit = ((double)wc) / 16; //ounces to lbs
 
         char carryingbuf[BUFSZ] = "";
-        printweight(carryingbuf, yourweight, FALSE, FALSE);
+        printweight(carryingbuf, yourweight, FALSE, FALSE, TRUE);
 
         //        double totalweight = ((double)total_ounce_weight) / 16; //ounces to lbs
 
@@ -5189,7 +5221,7 @@ int show_weights;
         if (total_ounce_weight > 0)
         {
             char weightbuf[BUFSZ];
-            printweight(weightbuf, total_ounce_weight, !flags.inventory_weights_last, FALSE);
+            printweight(weightbuf, total_ounce_weight, !flags.inventory_weights_last, FALSE, TRUE);
             if (flags.inventory_weights_last || tiles_being_used)
                 Sprintf(wtbuf, "%s of total weight.", weightbuf);
             else
@@ -5284,10 +5316,10 @@ int show_weights;
 //        curlevelmaxweight_lbs = ((double)curlevelmaxweight) / 16; //ounces to lbs
 
         char curlevelminbuf[BUFSZ] = "";
-        printweight(curlevelminbuf, curlevelminweight, FALSE, FALSE);
+        printweight(curlevelminbuf, curlevelminweight, FALSE, FALSE, TRUE);
 
         char curlevelmaxbuf[BUFSZ] = "";
-        printweight(curlevelmaxbuf, curlevelmaxweight, FALSE, FALSE);
+        printweight(curlevelmaxbuf, curlevelmaxweight, FALSE, FALSE, TRUE);
 
         yourweight = iw + wc;
 
@@ -5304,11 +5336,11 @@ int show_weights;
         //NOTE: Nested container listing should not be used with show_weights on
 //        double carryingweight = ((double)yourweight) / 16; // ounces to lbs
         char carryingweightbuf[BUFSZ] = "";
-        printweight(carryingweightbuf, yourweight, !flags.inventory_weights_last, FALSE);
+        printweight(carryingweightbuf, yourweight, !flags.inventory_weights_last, FALSE, TRUE);
         //        double unburdenedweight = ((double)(weight_cap())) / 16; // ounces to lbs
 //        double totalweight = ((double)total_ounce_weight) / 16; // ounces to lbs
         char totalweightbuf[BUFSZ] = "";
-        printweight(totalweightbuf, total_ounce_weight, FALSE, FALSE);
+        printweight(totalweightbuf, total_ounce_weight, FALSE, FALSE, TRUE);
 
         if (flags.inventory_weights_last)
             Sprintf(buf, "There is %s of total weight.", totalweightbuf);

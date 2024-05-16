@@ -99,8 +99,16 @@ boolean drink_yourself;
 
     if (u.dz) 
     {
-        You("throw some %s on the %s.", contents,
-            (u.dz > 0) ? surface(u.ux, u.uy) : ceiling(u.ux, u.uy));
+        if (u.dz > 0 && !u.ux && !u.uy && u.usteed)
+        {
+            You("apply some %s on %s.", contents, mon_nam(u.usteed));
+            weffects(obj);
+        }
+        else
+        {
+            You("throw some %s on the %s.", contents,
+                (u.dz > 0) ? surface(u.ux, u.uy) : ceiling(u.ux, u.uy));
+        }
     }
     else if (!u.dx && !u.dy) 
     {
@@ -189,8 +197,16 @@ boolean drink_yourself;
     if (u.dz)
     {
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY);
-        You("pour some %s on the %s.", objects[obj->otyp].oc_name_known ? contents : OBJ_CONTENT_DESC(obj->otyp),
-            (u.dz > 0) ? surface(u.ux, u.uy) : ceiling(u.ux, u.uy));
+        if (u.dz > 0 && !u.ux && !u.uy && u.usteed)
+        {
+            You("apply some %s on %s.", contents, mon_nam(u.usteed));
+            weffects(obj);
+        }
+        else
+        {
+            You("pour some %s on the %s.", objects[obj->otyp].oc_name_known ? contents : OBJ_CONTENT_DESC(obj->otyp),
+                (u.dz > 0) ? surface(u.ux, u.uy) : ceiling(u.ux, u.uy));
+        }
     }
     else if (!u.dx && !u.dy)
     {
@@ -346,6 +362,7 @@ struct obj *obj;
 
             if (Role_if(PM_TOURIST) && (mvitals[mtmp->mnum].mvflags & MV_SELFIE_TAKEN) == 0)
             {
+                context.role_score += TOURIST_SELFIE_PER_LEVEL_SCORE * (mons[mtmp->mnum].difficulty + 1);
                 pline_ex1(ATR_NONE, CLR_MSG_POSITIVE, "That turned out to be extraordinarily nice.");
                 if (mtmp->mnum == PM_DEMOGORGON && !u.uachieve.role_achievement)
                 {
@@ -2216,7 +2233,7 @@ struct obj **optr;
     else if (!otmp->lamplit && obj->lamplit)
         pline("%s out.", (obj->quan > 1L) ? "They go" : "It goes");
 
-    if ((obj->unpaid || (obj->where == OBJ_FLOOR && !obj->no_charge)) && costly_spot(u.ux, u.uy))
+    if (is_unpaid_shop_item(obj, u.ux, u.uy))
     {
         char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
         struct monst* shkp = shop_keeper(*o_shop);
@@ -2502,7 +2519,7 @@ struct obj *obj;
         { /* candle(s) */
             pline("%s flame%s %s%s", s_suffix(Yname2(obj)), plur(obj->quan),
                   otense(obj, "burn"), Blind ? "." : " brightly!");
-            if ((obj->unpaid || (obj->where == OBJ_FLOOR && !obj->no_charge)) && costly_spot(u.ux, u.uy)
+            if (is_unpaid_shop_item(obj, u.ux, u.uy)
                 && (obj->age == 30L * (long) objects[obj->otyp].oc_cost || obj->otyp == MAGIC_CANDLE)) 
             {
                 const char *ithem = (obj->quan > 1L) ? "them" : "it";
@@ -2640,7 +2657,7 @@ struct obj **optr;
     You("light %spotion.%s", shk_your(buf, obj),
         Blind ? "" : "  It gives off a dim light.");
 
-    if ((obj->unpaid || (obj->where == OBJ_FLOOR && !obj->no_charge)) && costly_spot(u.ux, u.uy)) {
+    if (is_unpaid_shop_item(obj, u.ux, u.uy)) {
         /* Normally, we shouldn't both partially and fully charge
          * for an item, but (Yendorian Fuel) Taxes are inevitable...
          */
@@ -4229,7 +4246,7 @@ struct obj *tstone;
         return;
     }
 
-    if (tstone->otyp == TOUCHSTONE && (tstone->cursed || tstone->charges <= 0)
+    if (tstone->otyp == TOUCHSTONE && tstone->cursed
         && obj->oclass == GEM_CLASS && !is_graystone(obj)
         && !obj_resists(obj, 80, 100)) 
     {

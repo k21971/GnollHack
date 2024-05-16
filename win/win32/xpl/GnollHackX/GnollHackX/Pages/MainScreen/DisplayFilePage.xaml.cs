@@ -15,6 +15,7 @@ namespace GnollHackM
 #else
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 
@@ -48,11 +49,7 @@ namespace GnollHackX.Pages.MainScreen
         public DisplayFilePage(string fileName, string header, int fixedWidth, bool displayshare, bool isHtml, bool isScrolledDown)
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
 
             _fileName = fileName;
             _fixedWidth = fixedWidth;
@@ -61,6 +58,8 @@ namespace GnollHackX.Pages.MainScreen
             CloseButton.IsVisible = !displayshare;
             _isHtml = isHtml;
             TextLabel.InitiallyRolledDown = isScrolledDown;
+            if (GHApp.IsiOS && _isHtml)
+                DisplayWebView.Opacity = 0.0;
         }
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
@@ -82,8 +81,6 @@ namespace GnollHackX.Pages.MainScreen
                     htmlSource.Html = text;
                     htmlSource.BaseUrl = GHApp.PlatformService.GetBaseUrl();
                     DisplayWebView.Source = htmlSource;
-                    if(GHApp.IsiOS)
-                        DisplayWebView.Opacity = 0;
                     DisplayWebView.IsVisible = true;
                 }
                 else
@@ -160,7 +157,13 @@ namespace GnollHackX.Pages.MainScreen
                     Thickness usedpadding = usingsafe ? safearea : MainGrid.Padding;
                     double bordermargin = UIUtils.GetBorderWidth(bkgView.BorderStyle, width, height);
                     MainGrid.Margin = new Thickness(bordermargin, 0, bordermargin, 0);
-                    double limited_width = Math.Min(Math.Min(width, MainGrid.WidthRequest), DeviceDisplay.MainDisplayInfo.Width);
+                    double limited_width = Math.Min(Math.Min(width,
+#if GNH_MAUI
+                        MainGrid.MaximumWidthRequest
+#else
+                        MainGrid.WidthRequest
+#endif
+                        ), DeviceDisplay.MainDisplayInfo.Width);
                     double target_width = limited_width - MainGrid.Margin.Left - MainGrid.Margin.Right
                         - usedpadding.Left - usedpadding.Right - margins.Left - margins.Right;
                     double testsize = 12.5;
@@ -204,14 +207,30 @@ namespace GnollHackX.Pages.MainScreen
         {
             if (GHApp.IsiOS && _isHtml)
             {
+#if GNH_MAUI
+                var timer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+                timer.Interval = TimeSpan.FromSeconds(1.0 / 2);
+                timer.IsRepeating = false;
+                timer.Tick += (s, e) => { DoiOSShowGrid(); };
+                timer.Start();
+#else
                 Device.StartTimer(TimeSpan.FromSeconds(1.0 / 20), () =>
                 {
-                    Animation displayFileAnimation = new Animation(v => DisplayWebView.Opacity = (double)v, 0.0, 1.0);
-                        displayFileAnimation.Commit(MainGrid, "DisplayFileShowAnimation", length: 256,
-                    rate: 16, repeat: () => false);
+                    DoiOSShowGrid();
                     return false;
                 });
+#endif
             }
+        }
+
+        private void DoiOSShowGrid()
+        {
+            MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                await DisplayWebView.FadeTo(1.0, 512);
+                //Animation displayFileAnimation = new Animation(v => DisplayWebView.Opacity = (double)v, 0.01, 1.00);
+                //displayFileAnimation.Commit(MainGrid, "DisplayFileShowAnimation", length: 512, rate: 16, repeat: () => false);
+            });
         }
     }
  }

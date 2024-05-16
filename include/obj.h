@@ -71,7 +71,7 @@ struct obj {
 #define SPEQUAL_MAGIC_CANDLE_UNUSED            2
 #define SPEQUAL_LIGHT_SOURCE_FUNCTIONAL        1
 #define SPEQUAL_UBALL_SPECIAL                  1
-#define SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP   1
+#define SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP    1
 
     unsigned long speflags; /* anything else that might be going on with an item, not affected by cancellation */
 
@@ -774,6 +774,9 @@ enum elemental_enchantments {
 #define is_obj_weight_reduced_by_wizardry(o) \
     ((o)->oclass == REAGENT_CLASS || (o)->oclass == SPBOOK_CLASS \
     || (o)->oclass == WAND_CLASS || (o)->oclass == SCROLL_CLASS \
+    || (o)->oartifact > 0 \
+    || (o)->mythic_prefix > 0 \
+    || (o)->mythic_suffix > 0 \
     )
 
 #define is_obj_weight_reduced_by_treasure_hauling(o) \

@@ -51,6 +51,7 @@
     <None Remove="Assets\FMOD-Logo-192-White.png" />
     <None Remove="Assets\ghsecrets.sjson" />
     <None Remove="Assets\ghsettings.json" />
+    <None Remove="Assets\gnollhack-icon-v2-512.png" />
     <None Remove="Assets\gnollhack-logo-test-2.png" />
     <None Remove="Assets\gnollhack_64x96_transparent_32bits-2.png" />
     <None Remove="Assets\gnollhack_64x96_transparent_32bits.png" />
@@ -280,6 +281,7 @@
     <EmbeddedResource Include="Assets\FMOD-Logo-192-White.png" />
     <EmbeddedResource Include="Assets\ghsecrets.sjson" />
     <EmbeddedResource Include="Assets\ghsettings.json" />
+    <EmbeddedResource Include="Assets\gnollhack-icon-v2-512.png" />
     <EmbeddedResource Include="Assets\gnollhack-logo-test-2.png" />
     <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits-2.png" />
     <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits.png" />
@@ -484,10 +486,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.11.2" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.13.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="SkiaSharp.Views.Forms" Version="2.80.3" />
-    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2578" />
-    <PackageReference Include="Xamarin.Essentials" Version="1.7.7" />
+    <PackageReference Include="SkiaSharp.Views.Forms" Version="2.88.8" />
+    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2662" />
+    <PackageReference Include="Xamarin.Essentials" Version="1.8.1" />
   </ItemGroup>
 
   <ItemGroup>

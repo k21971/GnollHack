@@ -13,15 +13,62 @@ namespace GnollHackM;
 public class MainActivity : MauiAppCompatActivity
 {
     public static Activity CurrentMainActivity = null;
-
+    public static bool DefaultShowNavigationBar = false;
     public static AssetManager StaticAssets;
-
     protected override void OnCreate(Bundle savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        CurrentMainActivity = this;
         Platform.Init(this, savedInstanceState);
-
-        this.Window.AddFlags(WindowManagerFlags.Fullscreen);
+        Window.AddFlags(WindowManagerFlags.Fullscreen);
+        if (DefaultShowNavigationBar)
+            ShowOsNavigationBar();
+        else
+            HideOsNavigationBar();
     }
 
+    public static void HideOsNavigationBar()
+    {
+        Activity activity = CurrentMainActivity;
+        if (activity == null)
+            return;
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+        {
+#pragma warning disable CA1416 // Supported on: 'android' 30.0 and later
+            activity.Window.SetDecorFitsSystemWindows(false);
+            activity.Window.InsetsController?.Hide(WindowInsets.Type.NavigationBars());
+#pragma warning restore CA1416 // Supported on: 'android' 30.0 and later
+        }
+        else
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            SystemUiFlags systemUiVisibility = (SystemUiFlags)activity.Window.DecorView.SystemUiVisibility;
+            systemUiVisibility |= SystemUiFlags.HideNavigation;
+            systemUiVisibility |= SystemUiFlags.Immersive;
+            activity.Window.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+#pragma warning restore CS0618 // Type or member is obsolete
+        }
+    }
+    public static void ShowOsNavigationBar()
+    {
+        Activity activity = CurrentMainActivity;
+        if (activity == null)
+            return;
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+        {
+#pragma warning disable CA1416 // Supported on: 'android' 30.0 and later
+            activity.Window.SetDecorFitsSystemWindows(true);
+            activity.Window.InsetsController?.Show(WindowInsets.Type.NavigationBars());
+#pragma warning restore CA1416 // Supported on: 'android' 30.0 and later
+        }
+        else
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            SystemUiFlags systemUiVisibility = (SystemUiFlags)activity.Window.DecorView.SystemUiVisibility;
+            systemUiVisibility &= ~SystemUiFlags.HideNavigation;
+            systemUiVisibility &= ~SystemUiFlags.Immersive;
+            activity.Window.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+#pragma warning restore CS0618 // Type or member is obsolete
+        }
+    }
 }

@@ -37,7 +37,7 @@ E void NDECL(choose_game_difficulty);
 E const char* FDECL(get_game_difficulty_text, (int));
 E const char* FDECL(get_game_difficulty_symbol, (int));
 E const char* FDECL(get_game_mode_text, (BOOLEAN_P));
-E const char* FDECL(get_game_mode_text_core, (BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P));
+E const char* FDECL(get_game_mode_text_core, (BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P));
 E const char* NDECL(get_game_mode_description);
 E const char* FDECL(get_game_mode_description_core, (BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P));
 E void NDECL(show_gui_tips);
@@ -666,7 +666,7 @@ E boolean NDECL(floorexamine);
 E int FDECL(itemdescription, (struct obj*));
 E int FDECL(itemdescription_core, (struct obj*, int, struct item_description_stats*));
 E int FDECL(corpsedescription, (struct obj*));
-E void FDECL(printweight, (char*, int, BOOLEAN_P, BOOLEAN_P));
+E void FDECL(printweight, (char*, int, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P));
 E int FDECL(monsterdescription, (struct monst*));
 E int FDECL(monsterdescription_core, (struct monst*, struct permonst*));
 E int NDECL(dotogglehpbars);
@@ -700,6 +700,7 @@ E void FDECL(grab_hint, (struct monst*));
 E void FDECL(pray_hint, (const char*, const char*, boolean*));
 E void NDECL(death_hint);
 E void NDECL(check_mobbed_hint);
+E void NDECL(check_closed_for_inventory_hint);
 E void FDECL(item_destruction_hint, (int, BOOLEAN_P));
 E void NDECL(heal_ailments_upon_revival);
 #if !defined (GNH_MOBILE) && defined (DEBUG)
@@ -1116,12 +1117,20 @@ E void FDECL(panictrace_setsignals, (BOOLEAN_P));
 void and_you_die();
 #endif
 E long NDECL(get_current_game_score);
+E long NDECL(get_conduct_score_upon_ascension);
 E int NDECL(wiz_dumplog);
-E void FDECL(print_selfies, (winid));
+E void FDECL(print_selfies, (winid, int));
+E void FDECL(print_knight_slayings, (winid, int));
 E void NDECL(reset_game);
 E void NDECL(reset_gamestate_ex);
 E void NDECL(tally_realtime);
-
+E struct item_score_count_result FDECL(count_powerful_melee_weapon_score, (struct obj*));
+E struct item_score_count_result FDECL(count_powerful_ranged_weapon_score, (struct obj*));
+E struct item_score_count_result FDECL(count_powerful_Japanese_item_score, (struct obj*));
+E struct item_score_count_result FDECL(count_powerful_valkyrie_item_score, (struct obj*));
+E struct amulet_count_result FDECL(count_amulets, (struct obj*));
+E struct item_score_count_result FDECL(count_artifacts, (struct obj*));
+E void NDECL(recalculate_knight_slaying_score);
 
 /* ### engrave.c ### */
 
@@ -1258,6 +1267,9 @@ E int NDECL(delete_tmp_backup_savefile);
 E boolean NDECL(check_has_backup_savefile);
 E int NDECL(delete_savefile_if_exists);
 E int NDECL(delete_error_savefile);
+E int NDECL(delete_running_files);
+E boolean NDECL(check_existing_save_file);
+E boolean NDECL(check_existing_error_save_file);
 
 #ifdef SELF_RECOVER
 E boolean NDECL(recover_savefile);
@@ -2073,6 +2085,7 @@ E boolean FDECL(mpickstuff, (struct monst *, const char *));
 E int FDECL(curr_mon_load, (struct monst *));
 E int FDECL(max_mon_load, (struct monst *));
 E int FDECL(can_carry, (struct monst *, struct obj *));
+E int FDECL(can_carry_core, (struct monst*, struct obj*, BOOLEAN_P));
 E int FDECL(mfndpos, (struct monst *, coord *, long *, long));
 E int FDECL(mfndpos_xy, (struct monst*, XCHAR_P, XCHAR_P, coord*, long*, long));
 E boolean FDECL(monnear, (struct monst *, int, int));
@@ -2540,6 +2553,7 @@ E char* NDECL(nextobuf);
 E char* FDECL(str_upper_start, (const char*));
 E void FDECL(print_comparison_stats, (struct obj*, char*, winid, int, int, UCHAR_P, BOOLEAN_P, char*, char*, char*));
 E void FDECL(concatenate_colored_text, (const char*, const char*, int, int, char*, char*, char*));
+E const char* FDECL(Japanese_item_name, (int i));
 
 /* ### options.c ### */
 
@@ -3189,7 +3203,6 @@ E void NDECL(rumor_check);
 
 E int NDECL(dosave);
 E int FDECL(dosave0, (BOOLEAN_P));
-E boolean NDECL(check_existing_save_file);
 E boolean FDECL(tricked_fileremoved, (int, char *));
 #ifdef INSURANCE
 E void NDECL(savestateinlock);
@@ -3299,6 +3312,7 @@ E long FDECL(set_cost, (struct obj*, struct monst*));
 E boolean FDECL(is_obj_on_shk_bill, (struct obj*, struct monst*));
 E void FDECL(add_one_tobill, (struct obj*, BOOLEAN_P, struct monst*));
 E void NDECL(reset_shk);
+E long FDECL(getprice, (struct obj*, BOOLEAN_P));
 
 /* ### shknam.c ### */
 

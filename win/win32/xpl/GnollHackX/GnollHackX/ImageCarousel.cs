@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+
 #if GNH_MAUI
 using GnollHackX;
 using SkiaSharp.Views.Maui;
@@ -13,6 +14,7 @@ namespace GnollHackM
 #else
 using SkiaSharp.Views.Forms;
 using Xamarin.Forms;
+using Xamarin.Essentials;
 
 namespace GnollHackX
 #endif
@@ -20,7 +22,7 @@ namespace GnollHackX
     public struct CarouselBitmap
     {
         public string ResourcePath;
-        public SKBitmap Bitmap;
+        public SKImage Bitmap;
         public TextAlignment HorizontalFitAlignment;
         public TextAlignment VerticalFitAlignment;
 
@@ -62,7 +64,7 @@ namespace GnollHackX
                     {
                         SKBitmap res = SKBitmap.Decode(stream);
                         res.SetImmutable();
-                        _caruselBitmaps[i].Bitmap = res;
+                        _caruselBitmaps[i].Bitmap = SKImage.FromBitmap(res);
                     }
                 }
             }
@@ -74,37 +76,63 @@ namespace GnollHackX
         public const long _slideDurationInMilliseconds = 15000;
         public const long _transitionDurationInMilliseconds = 3000;
 
-        public long _counterValue;
-        public bool _timerIsOn = false;
+        private readonly object _counterValueLock = new object();
+        private long _counterValue;
+        public long CounterValue { get { lock (_counterValueLock) { return _counterValue; } } set { lock (_counterValueLock) { _counterValue = value; } } }
+
+        private readonly object _timerIsOnLock = new object();
+        private bool _timerIsOn = false;
+        public bool CheckTimerOnAndSetTrue { get { lock (_timerIsOnLock) { bool oldValue = _timerIsOn; _timerIsOn = true; return oldValue; } } }
+        public bool TimerIsOn { get { lock (_timerIsOnLock) { return _timerIsOn; } } set { lock (_timerIsOnLock) { _timerIsOn = value; } } }
         public void Play()
         {
             if (!_inited)
                 Init();
 
             InvalidateSurface();
-            if(!_timerIsOn)
+            if(!CheckTimerOnAndSetTrue)
             {
-                _timerIsOn = true;
+#if GNH_MAUI
+                    var timer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+                    timer.Interval = TimeSpan.FromSeconds(1.0 / _refreshFrequency);
+                    timer.IsRepeating = true;
+                    timer.Tick += (s, e) => { DoIncrementCounter(); if (!TimerIsOn) timer.Stop(); };
+                    timer.Start();
+#else
                 Device.StartTimer(TimeSpan.FromSeconds(1.0 / _refreshFrequency), () =>
+                {
+                    DoIncrementCounter();
+                    return TimerIsOn;
+                });
+#endif
+            }
+        }
+
+        private void DoIncrementCounter()
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                long counter;
+                lock (_counterValueLock)
                 {
                     _counterValue++;
                     if (_counterValue >= (long)int.MaxValue)
                         _counterValue = 0;
-                    byte alpha = GetSecondBitmapAlpha(_counterValue);
-                    byte prevalpha = GetSecondBitmapAlpha(_counterValue - 1);
-                    if (alpha > 0 || prevalpha > 0)
-                        InvalidateSurface();
-                    return _timerIsOn;
-                });
-            }
+                    counter = _counterValue;
+                }
+                byte alpha = GetSecondBitmapAlpha(counter);
+                byte prevalpha = GetSecondBitmapAlpha(counter - 1);
+                if (alpha > 0 || prevalpha > 0)
+                    InvalidateSurface();
+            });
         }
 
         public void Stop()
         {
-            _timerIsOn = false;
+            TimerIsOn = false;
         }
 
-        private void UpdateCarusel()
+        private void UpdateCarousel()
         {
             InvalidateSurface();
         }
@@ -118,12 +146,17 @@ namespace GnollHackX
             {
                 _currentWidth = width;
                 _currentHeight = height;
-                UpdateCarusel();
+                UpdateCarousel();
             }
         }
 
+        private bool _initialDraw = true;
+
         private void Base_PaintSurface(object sender, SKPaintSurfaceEventArgs e)
         {
+            if (!_initialDraw && !TimerIsOn)
+                return;
+
             SKImageInfo info = e.Info;
             SKSurface surface = e.Surface;
             SKCanvas canvas = surface.Canvas;
@@ -141,7 +174,7 @@ namespace GnollHackX
                 float scale_x, scale_y, scale;
                 TextAlignment halign;
                 TextAlignment valign;
-                using (SKPaint textPaint = new SKPaint())
+                using (SKPaint bmpPaint = new SKPaint())
                 {
                     int idx = GetFirstBitmapIndex();
                     if(_caruselBitmaps[idx].Bitmap != null)
@@ -183,11 +216,11 @@ namespace GnollHackX
                                 break;
                         }
                         targetRect = new SKRect(target_x, target_y, target_x + target_width, target_y + target_height);
-                        canvas.DrawBitmap(_caruselBitmaps[idx].Bitmap, sourceRect, targetRect, textPaint);
+                        canvas.DrawImage(_caruselBitmaps[idx].Bitmap, sourceRect, targetRect, bmpPaint);
 
                         if (cnt > 1)
                         {
-                            byte alpha = GetSecondBitmapAlpha(_counterValue);
+                            byte alpha = GetSecondBitmapAlpha(CounterValue);
                             if (alpha > 0)
                             {
                                 int idx2 = GetSecondBitmapIndex();
@@ -231,16 +264,17 @@ namespace GnollHackX
                                     }
                                     targetRect = new SKRect(target_x, target_y, target_x + target_width, target_y + target_height);
 
-                                    byte oldalpha = textPaint.Color.Alpha;
-                                    textPaint.Color = textPaint.Color.WithAlpha(alpha);
-                                    canvas.DrawBitmap(_caruselBitmaps[idx2].Bitmap, sourceRect, targetRect, textPaint);
-                                    textPaint.Color = textPaint.Color.WithAlpha(oldalpha);
+                                    byte oldalpha = bmpPaint.Color.Alpha;
+                                    bmpPaint.Color = bmpPaint.Color.WithAlpha(alpha);
+                                    canvas.DrawImage(_caruselBitmaps[idx2].Bitmap, sourceRect, targetRect, bmpPaint);
+                                    bmpPaint.Color = bmpPaint.Color.WithAlpha(oldalpha);
                                 }
                             }
                         }
                     }
                 }
             }
+            _initialDraw = false;
         }
 
         private int GetFirstBitmapIndex()
@@ -248,7 +282,7 @@ namespace GnollHackX
             int cnt = _caruselBitmaps.Length;
             if(cnt == 0)
                 return 0;
-            long idx = _counterValue * 1000 / (_slideDurationInMilliseconds * _refreshFrequency);
+            long idx = CounterValue * 1000 / (_slideDurationInMilliseconds * _refreshFrequency);
             return (int)idx % cnt;
         }
 

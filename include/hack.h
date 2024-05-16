@@ -159,6 +159,10 @@ enum dismount_types {
 #define MG_DECORATION       0x00004000UL
 #define MG_CARPET           0x00008000UL
 
+/* Helper flags for mobile to indicate if the other flags mean inverse, underline, etc. for ASCII */
+#define MG_INVERSE          0x10000000UL
+#define MG_UNDERLINE        0x20000000UL
+
 
 /* sellobj_state() states */
 #define SELL_NORMAL (0)
@@ -792,6 +796,18 @@ extern struct objclass saved_objects[NUM_OBJECTS];
 #define Elbereth_word "Elbereth"
 #define Gilthoniel_word "Gilthoniel"
 #define Morgoth_word "Morgoth"
+
+#define Closed_for_inventory "Closed for inventory"
+
+/* high priests aren't unique but are flagged as such to simplify something */
+#define UniqCritterIndx(mndx) ((mons[mndx].geno & G_UNIQ) != 0 && (mndx) != PM_HIGH_PRIEST)
+
+#define is_unpaid_shop_item(o, x, y) ((o) && ((o)->unpaid || ((o)->where == OBJ_FLOOR && !(o)->no_charge && costly_spot(x, y))))
+#define mon_does_not_pick_up_shop_items(m) ((m) && ((m)->ispartymember || (m)->issummoned || (m)->isminion))
+#define m_unpaid_item_no_pickup_at_location(m, o, x, y) (is_unpaid_shop_item(o, x, y) && mon_does_not_pick_up_shop_items(m))
+#define m_unpaid_item_no_pickup(m, o) m_unpaid_item_no_pickup_at_location(m, o, (o)->ox, (o)->oy)
+
+#define is_knight_bounty(ptr) ((u.ualign.type == A_LAWFUL ? is_demon(ptr) || (ptr)->mlet == S_IMP : u.ualign.type == A_CHAOTIC ? is_angel(ptr) : is_undead(ptr)) || (is_dragon(ptr) && u.ualign.type * (ptr)->maligntyp < 0))
 
 #if defined(BSD) || defined(ULTRIX)
 #define readLenType int

@@ -27,6 +27,11 @@ using System.Security.Cryptography;
 using System.Timers;
 using System.Collections;
 using static System.Net.Mime.MediaTypeNames;
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure;
+using System.Text.RegularExpressions;
 
 namespace GnollHackX
 {
@@ -38,6 +43,36 @@ namespace GnollHackX
         public HttpStatusCode StatusCode;
         public string Message;
     }
+
+    public struct CacheUsageInfo
+    {
+        public int MaxResources;
+        public long MaxResourceBytes;
+
+        public CacheUsageInfo(int maxResources, long maxResourceBytes)
+        {
+            MaxResources = maxResources;
+            MaxResourceBytes = maxResourceBytes;
+        }
+    }
+
+    public class CacheSizeItem
+    {
+        public string Description;
+        public long Size;
+
+        public CacheSizeItem(string Description, long Size)
+        {
+            this.Description = Description;
+            this.Size = Size;
+        }
+
+        public override string ToString()
+        {
+            return Description != null ? Description : "";
+        }
+    };
+
 
 
     public static class GHApp
@@ -67,6 +102,7 @@ namespace GnollHackX
             HideiOSStatusBar = Preferences.Get("HideiOSStatusBar", GHConstants.DefaultHideStatusBar);
             DeveloperMode = Preferences.Get("DeveloperMode", GHConstants.DefaultDeveloperMode);
             DebugLogMessages = Preferences.Get("DebugLogMessages", GHConstants.DefaultLogMessages);
+            TournamentMode = Preferences.Get("TournamentMode", false);
             FullVersionMode = true; // Preferences.Get("FullVersion", true);
             ClassicMode = Preferences.Get("ClassicMode", false);
             CasualMode = Preferences.Get("CasualMode", false);
@@ -85,6 +121,7 @@ namespace GnollHackX
             CustomGameStatusLink = Preferences.Get("CustomGameStatusLink", "");
             CustomXlogAccountLink = Preferences.Get("CustomXlogAccountLink", "");
             CustomXlogPostLink = Preferences.Get("CustomXlogPostLink", "");
+            CustomCloudStorageConnectionString = Preferences.Get("CustomCloudStorageConnectionString", "");
             UseHTMLDumpLogs = Preferences.Get("UseHTMLDumpLogs", GHConstants.DefaultHTMLDumpLogs);
             UseSingleDumpLog = Preferences.Get("UseSingleDumpLog", GHConstants.DefaultUseSingleDumpLog);
             ReadStreamingBankToMemory = Preferences.Get("ReadStreamingBankToMemory", DefaultStreamingBankToMemory);
@@ -99,7 +136,11 @@ namespace GnollHackX
             EmptyWishIsNothing = Preferences.Get("EmptyWishIsNothing", true);
             RecommendedSettingsChecked = Preferences.Get("RecommendedSettingsChecked", false);
             RecordGame = Preferences.Get("RecordGame", false);
+            AutoUploadReplays = Preferences.Get("AutoUploadReplays", false);
             UseGZipForReplays = Preferences.Get("UseGZipForReplays", GHConstants.GZipIsDefaultReplayCompression);
+            SetAvailableGPUCacheLimits(TotalMemory);
+            PrimaryGPUCacheLimit = Preferences.Get("PrimaryGPUCacheLimit", -2L);
+            SecondaryGPUCacheLimit = Preferences.Get("SecondaryGPUCacheLimit", -2L);
             ulong FreeDiskSpaceInBytes = PlatformService.GetDeviceFreeDiskSpaceInBytes();
             if(FreeDiskSpaceInBytes < GHConstants.LowFreeDiskSpaceThresholdInBytes)
             {
@@ -119,16 +160,125 @@ namespace GnollHackX
             BackButtonPressed += EmptyBackButtonPressed;
         }
 
-        public static bool RecommendedSettingsChecked { get; set; }
+        private static long GetDefaultPrimaryGPUCacheSize(ulong memory)
+        {
+            long TotalMemInBytes = (long)memory;
+            long max = Math.Min(1280L * 1024 * 1024, Math.Max(256L * 1024 * 1024, (TotalMemInBytes - 2560L * 1024 * 1024)));
+            long min = Math.Max(768L * 1024 * 1024, (TotalMemInBytes - 3072L * 1024 * 1024) / 8);
+            long def = Math.Min(max, min);
+            if (_cacheSizeList.Count > 2 && _cacheSizeList[_cacheSizeList.Count - 1].Size >= 256L * 1024 * 1024 && def >= _cacheSizeList[_cacheSizeList.Count - 1].Size)
+                return _cacheSizeList[_cacheSizeList.Count - 1].Size;
 
+            for (int i = 3; i < _cacheSizeList.Count; i++)
+            {
+                CacheSizeItem item = _cacheSizeList[i];
+                if (item.Size > def)
+                    return _cacheSizeList[i - 1].Size;
+            }
+            return -3L;
+        }
+
+        private static long GetDefaultSecondaryGPUCacheSize(ulong memory)
+        {
+            long TotalMemInBytes = (long)memory;
+            long def = Math.Min(768L * 1024 * 1024, Math.Max(256L * 1024 * 1024, (TotalMemInBytes - 3072L * 1024 * 1024) / 8));
+            if (_cacheSizeList2.Count > 2 && _cacheSizeList2[_cacheSizeList2.Count - 1].Size >= 256L * 1024 * 1024 && def > _cacheSizeList2[_cacheSizeList2.Count - 1].Size)
+                return _cacheSizeList2[_cacheSizeList2.Count - 1].Size;
+            for (int i = 2; i < _cacheSizeList2.Count; i++)
+            {
+                CacheSizeItem item = _cacheSizeList2[i];
+                if (item.Size >= def)
+                    return item.Size;
+            }
+            return -3L;
+        }
+
+        private static List<CacheSizeItem> _cacheSizeList = new List<CacheSizeItem>()
+            {
+                new CacheSizeItem("Default", -3L ),
+                new CacheSizeItem("Recommended", -2L ),
+                new CacheSizeItem("8 MB", 8L * 1024 * 1024 ),
+                new CacheSizeItem("16 MB", 16L * 1024 * 1024 ),
+                new CacheSizeItem("32 MB", 32L * 1024 * 1024 ),
+                new CacheSizeItem("64 MB", 64L * 1024 * 1024 ),
+                new CacheSizeItem("128 MB", 128L * 1024 * 1024 ),
+                new CacheSizeItem("256 MB", 256L * 1024 * 1024 ),
+                new CacheSizeItem("384 MB", 384L * 1024 * 1024 ),
+                new CacheSizeItem("512 MB", 512L * 1024 * 1024 ),
+                new CacheSizeItem("640 MB", 640L * 1024 * 1024 ),
+                new CacheSizeItem("768 MB", 768L * 1024 * 1024 ),
+                new CacheSizeItem("896 MB", 896L * 1024 * 1024 ),
+                new CacheSizeItem("1024 MB", 1024L * 1024 * 1024 ),
+                new CacheSizeItem("1280 MB", 1280L * 1024 * 1024 ),
+                new CacheSizeItem("1536 MB", 1536L * 1024 * 1024 ),
+                new CacheSizeItem("1792 MB", 1792L * 1024 * 1024 ),
+                new CacheSizeItem("2048 MB", 2048L * 1024 * 1024 ),
+                new CacheSizeItem("2304 MB", 2304L * 1024 * 1024 ),
+                new CacheSizeItem("2560 MB", 2560L * 1024 * 1024 ),
+                new CacheSizeItem("3072 MB", 3072L * 1024 * 1024 ),
+                new CacheSizeItem("3584 MB", 3584L * 1024 * 1024 ),
+                new CacheSizeItem("4096 MB", 4096L * 1024 * 1024 ),
+                new CacheSizeItem("5120 MB", 5120L * 1024 * 1024 ),
+                new CacheSizeItem("6144 MB", 6144L * 1024 * 1024 ),
+                new CacheSizeItem("7168 MB", 7168L * 1024 * 1024 ),
+                new CacheSizeItem("8192 MB", 8192L * 1024 * 1024 ),
+            };
+
+        private static List<CacheSizeItem> _cacheSizeList2 = new List<CacheSizeItem>();
+
+        public static long RecommendedPrimaryGPUCacheSize { get; private set; }
+        public static long RecommendedSecondaryGPUCacheSize { get; private set; }
+
+        private static void SetAvailableGPUCacheLimits(ulong memory)
+        {
+            long TotalMemInBytes = (long)memory;
+            for (int i = _cacheSizeList.Count - 1; i >= 2; i--)
+            {
+                CacheSizeItem item = _cacheSizeList[i];
+                if (item.Size >= TotalMemInBytes)
+                    _cacheSizeList.RemoveAt(i);
+            }
+            foreach(CacheSizeItem item in _cacheSizeList)
+            {
+                _cacheSizeList2.Add(new CacheSizeItem(item.Description, item.Size));
+            }
+            RecommendedPrimaryGPUCacheSize = GetDefaultPrimaryGPUCacheSize(memory);
+            RecommendedSecondaryGPUCacheSize = GetDefaultSecondaryGPUCacheSize(memory);
+        }
+
+        public static List<CacheSizeItem> GetGPUCacheSizeList(bool isSecondary)
+        {
+            List<CacheSizeItem> list = isSecondary ? _cacheSizeList2 : _cacheSizeList;
+            long recommended = isSecondary ? RecommendedSecondaryGPUCacheSize : RecommendedPrimaryGPUCacheSize;
+            if (DefaultGPUCacheSize > 0 && list.Count > 0 && list[0].Description == "Default")
+            {
+                CacheSizeItem item = list[0];
+                item.Description = "Default (" + (DefaultGPUCacheSize / (1024 * 1024)) + " MB)";
+            }
+            if (recommended > 0 && list.Count > 0 && list[1].Description == "Recommended")
+            {
+                CacheSizeItem item = list[1];
+                item.Description = "Recommended (" + (recommended / (1024 * 1024)) + " MB)";
+            }
+            return list;
+        }
+
+        public static bool RecommendedSettingsChecked { get; set; }
         
         private static readonly object _recordGameLock = new object();
         private static bool _recordGame = false;
-        public static bool RecordGame { get { lock (_recordGameLock) { return _recordGame; } } set { lock (_recordGameLock) { _recordGame = value; } } }
+        public static bool RecordGame { get { bool t = TournamentMode; lock (_recordGameLock) { return _recordGame || t; } } set { lock (_recordGameLock) { _recordGame = value; } } }
+        private static bool _autoUploadReplays = false;
+        public static bool AutoUploadReplays { get { bool t = TournamentMode; lock (_recordGameLock) { return _autoUploadReplays || t; } } set { lock (_recordGameLock) { _autoUploadReplays = value; } } }
 
         private static object _networkAccessLock = new object();
+#if GNH_MAUI
+        private static Microsoft.Maui.Networking.NetworkAccess _networkAccessState = Microsoft.Maui.Networking.NetworkAccess.None;
+        public static bool HasInternetAccess { get { lock (_networkAccessLock) { return _networkAccessState == Microsoft.Maui.Networking.NetworkAccess.Internet; } } }
+#else
         private static NetworkAccess _networkAccessState = NetworkAccess.None;
         public static bool HasInternetAccess { get { lock (_networkAccessLock) { return _networkAccessState == NetworkAccess.Internet; } } }
+#endif
 
         public static void InitializeConnectivity()
         {
@@ -151,7 +301,7 @@ namespace GnollHackX
             }
         }
 
-        public static ulong TotalMemory { get; set; }
+        public static ulong TotalMemory { get; private set; }
         public static bool DefaultStreamingBankToMemory 
         { 
             get 
@@ -174,6 +324,20 @@ namespace GnollHackX
         }
 
         public static bool BatterySavingMode { get; set; }
+
+        private static readonly object _gPUBackendLock = new object();
+        private static string _gPUBackend = null;
+        public static string GPUBackend { get { lock (_gPUBackendLock) { return _gPUBackend; } } set { lock (_gPUBackendLock) { _gPUBackend = value; } } }
+        private static long _defaultGPUCacheSize = -1; /* Null */
+        public static long DefaultGPUCacheSize { get { lock (_gPUBackendLock) { return _defaultGPUCacheSize; } } set { lock (_gPUBackendLock) { _defaultGPUCacheSize = value; } } }
+        private static long _primaryGPUCacheSize = -2; /* Recommended */
+        public static long PrimaryGPUCacheLimit { get { lock (_gPUBackendLock) { return _primaryGPUCacheSize; } } set { lock (_gPUBackendLock) { _primaryGPUCacheSize = value; } } }
+        private static long _secondaryGPUCacheSize = -2; /* Recommended */
+        public static long SecondaryGPUCacheLimit { get { lock (_gPUBackendLock) { return _secondaryGPUCacheSize; } } set { lock (_gPUBackendLock) { _secondaryGPUCacheSize = value; } } }
+        private static long _currentGPUCacheSize = -1; /* Null */
+        public static long CurrentGPUCacheSize { get { lock (_gPUBackendLock) { return _currentGPUCacheSize; } } set { lock (_gPUBackendLock) { _currentGPUCacheSize = value; } } }
+        private static CacheUsageInfo _currentGPUCacheUsage = new CacheUsageInfo(-1, -1); /* Null */
+        public static CacheUsageInfo CurrentGPUCacheUsage { get { lock (_gPUBackendLock) { return _currentGPUCacheUsage; } } set { lock (_gPUBackendLock) { _currentGPUCacheUsage = value; } } }
 
         private static double _batteryChargeLevel = -1;
         private static double _previousBatteryChargeLevel = -1;
@@ -258,6 +422,8 @@ namespace GnollHackX
         {
             get
             {
+                return true; //SkiaSharp 2.88.8 should support Mali GPUs
+#if false
 #if GNH_MAUI
                 return true;
 #else
@@ -313,6 +479,7 @@ namespace GnollHackX
                         isDoogee = true;
                 }
                 return isGoogleMali || isSamsungMali || isVivo || isAlldocube || isDoogee ? false : GHConstants.IsGPUDefault;
+#endif
 #endif
             }
         }
@@ -413,7 +580,9 @@ namespace GnollHackX
         private static bool _savingGame = false;
         public static bool SavingGame { get { lock (_savingGameLock) { return _savingGame; } } set { lock (_savingGameLock) { _savingGame = value; } } }
 
-        public static int AppSwitchSaveStyle { get; set; }
+        private static readonly object _appSwitchLock = new object();
+        private static int _appSwitchSaveStyle = 0;
+        public static int AppSwitchSaveStyle { get { bool t = TournamentMode; lock (_appSwitchLock) { return t ? 0 : _appSwitchSaveStyle; } } set { lock (_appSwitchLock) { _appSwitchSaveStyle = value; } } }
 
         private static readonly object _gameSavedLock = new object();
         private static bool _gameSaved = false;
@@ -641,11 +810,21 @@ namespace GnollHackX
                 _hideNavBar = value;
                 if (_hideNavBar)
                 {
+#if GNH_MAUI
+                    if(PlatformService != null)
+                        PlatformService.HideOsNavigationBar();
+#else
                     MessagingCenter.Send<Object>(new object(), "HideOsNavigationBar");
+#endif
                 }
                 else
                 {
+#if GNH_MAUI
+                    if(PlatformService != null)
+                        PlatformService.ShowOsNavigationBar();
+#else
                     MessagingCenter.Send<Object>(new object(), "ShowOsNavigationBar");
+#endif
                 }
             }
         }
@@ -655,9 +834,13 @@ namespace GnollHackX
             get { return PlatformService.GetStatusBarHidden(); }
             set { PlatformService.SetStatusBarHidden(value); }
         }
-
         public static bool DeveloperMode { get; set; }
         public static bool DebugLogMessages { get; set; }
+
+        private static readonly object _tournamentLock = new object();
+        private static bool _tournamentMode = false;
+        public static bool TournamentMode { get { lock (_tournamentLock) { return _tournamentMode; } } set { lock (_tournamentLock) { _tournamentMode = value; } } }
+
         public static bool FullVersionMode { get; set; }
         public static bool ClassicMode { get; set; }
         public static bool CasualMode { get; set; }
@@ -677,6 +860,9 @@ namespace GnollHackX
         public static string SkiaVersionString { get; set; }
         public static string SkiaSharpVersionString { get; set; }
         public static string FMODVersionString { get; set; }
+        public static string FrameworkVersionString { get; set; }
+        public static string RuntimeVersionString { get; set; }
+        
         public static string GHPath { get; private set; } = ".";
         public static bool LoadBanks { get; set; }
 
@@ -689,13 +875,17 @@ namespace GnollHackX
         private static IPlatformService _platformService = null;
         public static IPlatformService PlatformService { get { return _platformService; } }
 
-        public static readonly float DisplayRefreshRate = Math.Max(30.0f, DeviceDisplay.MainDisplayInfo.RefreshRate);
+        public static readonly float DisplayRefreshRate = Math.Max(60.0f, DeviceDisplay.MainDisplayInfo.RefreshRate);
 #if GNH_MAUI
         public static readonly bool IsAndroid = (DeviceInfo.Platform == DevicePlatform.Android);
         public static readonly bool IsiOS = (DeviceInfo.Platform == DevicePlatform.iOS);
+        public static readonly bool IsMaui = true;
+        public static readonly string RuntimePlatform = DeviceInfo.Platform.ToString();
 #else
         public static readonly bool IsAndroid = (Device.RuntimePlatform == Device.Android);
         public static readonly bool IsiOS = (Device.RuntimePlatform == Device.iOS);
+        public static readonly bool IsMaui = false;
+        public static readonly string RuntimePlatform = Device.RuntimePlatform;
 #endif
         public static readonly float DisplayScale = DeviceDisplay.MainDisplayInfo.Density <= 0 ? 1.0f : (float)DeviceDisplay.MainDisplayInfo.Density;
         public static readonly float DisplayWidth = (float)DeviceDisplay.MainDisplayInfo.Width * DisplayScale;
@@ -976,25 +1166,25 @@ namespace GnollHackX
         //    }
         //}
 
-        public static SKBitmap MenuBackgroundBitmap { get; set; }
-        public static SKBitmap OldPaperBackgroundBitmap { get; set; }
-        public static SKBitmap LoadingScreenBackgroundBitmap { get; set; }
-        public static SKBitmap ButtonNormalBitmap { get; set; }
-        public static SKBitmap ButtonSelectedBitmap { get; set; }
-        public static SKBitmap ButtonDisabledBitmap { get; set; }
+        public static SKImage MenuBackgroundBitmap { get; set; }
+        public static SKImage OldPaperBackgroundBitmap { get; set; }
+        public static SKImage LoadingScreenBackgroundBitmap { get; set; }
+        public static SKImage ButtonNormalBitmap { get; set; }
+        public static SKImage ButtonSelectedBitmap { get; set; }
+        public static SKImage ButtonDisabledBitmap { get; set; }
 
-        public static SKBitmap SimpleFrameTopLeftCornerBitmap { get; set; }
-        public static SKBitmap SimpleFrameSmallTopLeftCornerBitmap { get; set; }
-        public static SKBitmap SimpleFrameTopHorizontalBitmap { get; set; }
-        public static SKBitmap SimpleFrameLeftVerticalBitmap { get; set; }
+        public static SKImage SimpleFrameTopLeftCornerBitmap { get; set; }
+        public static SKImage SimpleFrameSmallTopLeftCornerBitmap { get; set; }
+        public static SKImage SimpleFrameTopHorizontalBitmap { get; set; }
+        public static SKImage SimpleFrameLeftVerticalBitmap { get; set; }
 
-        public static SKBitmap SimpleFrame2TopLeftCornerBitmap { get; set; }
-        public static SKBitmap SimpleFrame2SmallTopLeftCornerBitmap { get; set; }
-        public static SKBitmap SimpleFrame2TopHorizontalBitmap { get; set; }
-        public static SKBitmap SimpleFrame2LeftVerticalBitmap { get; set; }
+        public static SKImage SimpleFrame2TopLeftCornerBitmap { get; set; }
+        public static SKImage SimpleFrame2SmallTopLeftCornerBitmap { get; set; }
+        public static SKImage SimpleFrame2TopHorizontalBitmap { get; set; }
+        public static SKImage SimpleFrame2LeftVerticalBitmap { get; set; }
 
-        public static SKBitmap ScrollBitmap { get; set; }
-        public static SKBitmap YouBitmap { get; set; }
+        public static SKImage ScrollBitmap { get; set; }
+        public static SKImage YouBitmap { get; set; }
 
         public static ImageSource ButtonNormalImageSource { get; set; }
         public static ImageSource ButtonSelectedImageSource { get; set; }
@@ -1006,83 +1196,99 @@ namespace GnollHackX
             {
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.menubackground.png"))
                 {
-                    MenuBackgroundBitmap = SKBitmap.Decode(stream);
-                    MenuBackgroundBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    MenuBackgroundBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.background-oldpaper.png"))
                 {
-                    OldPaperBackgroundBitmap = SKBitmap.Decode(stream);
-                    OldPaperBackgroundBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    OldPaperBackgroundBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.background-loading-screen.png"))
                 {
-                    LoadingScreenBackgroundBitmap = SKBitmap.Decode(stream);
-                    LoadingScreenBackgroundBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    LoadingScreenBackgroundBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.button_normal.png"))
                 {
-                    ButtonNormalBitmap = SKBitmap.Decode(stream);
-                    ButtonNormalBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    ButtonNormalBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.button_selected.png"))
                 {
-                    ButtonSelectedBitmap = SKBitmap.Decode(stream);
-                    ButtonSelectedBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    ButtonSelectedBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.button_disabled.png"))
                 {
-                    ButtonDisabledBitmap = SKBitmap.Decode(stream);
-                    ButtonDisabledBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    ButtonDisabledBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame-topleft.png"))
                 {
-                    SimpleFrameTopLeftCornerBitmap = SKBitmap.Decode(stream);
-                    SimpleFrameTopLeftCornerBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrameTopLeftCornerBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame-topleft-small.png"))
                 {
-                    SimpleFrameSmallTopLeftCornerBitmap = SKBitmap.Decode(stream);
-                    SimpleFrameSmallTopLeftCornerBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrameSmallTopLeftCornerBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame-horizontal.png"))
                 {
-                    SimpleFrameTopHorizontalBitmap = SKBitmap.Decode(stream);
-                    SimpleFrameTopHorizontalBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrameTopHorizontalBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame-vertical.png"))
                 {
-                    SimpleFrameLeftVerticalBitmap = SKBitmap.Decode(stream);
-                    SimpleFrameLeftVerticalBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrameLeftVerticalBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame2-topleft.png"))
                 {
-                    SimpleFrame2TopLeftCornerBitmap = SKBitmap.Decode(stream);
-                    SimpleFrame2TopLeftCornerBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrame2TopLeftCornerBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame2-topleft-small.png"))
                 {
-                    SimpleFrame2SmallTopLeftCornerBitmap = SKBitmap.Decode(stream);
-                    SimpleFrame2SmallTopLeftCornerBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrame2SmallTopLeftCornerBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame2-horizontal.png"))
                 {
-                    SimpleFrame2TopHorizontalBitmap = SKBitmap.Decode(stream);
-                    SimpleFrame2TopHorizontalBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrame2TopHorizontalBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.frame2-vertical.png"))
                 {
-                    SimpleFrame2LeftVerticalBitmap = SKBitmap.Decode(stream);
-                    SimpleFrame2LeftVerticalBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    SimpleFrame2LeftVerticalBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.scroll.png"))
                 {
-                    ScrollBitmap = SKBitmap.Decode(stream);
-                    ScrollBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    ScrollBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.you.png"))
                 {
-                    YouBitmap = SKBitmap.Decode(stream);
-                    YouBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    YouBitmap = SKImage.FromBitmap(bmp);
                 }
             }
             catch (Exception ex)
@@ -1091,25 +1297,25 @@ namespace GnollHackX
             }
         }
 
-        private static SKBitmap _successBitmap;
-        private static SKBitmap _manaBitmap;
-        private static SKBitmap _cooldownBitmap;
-        private static SKBitmap _castsBitmap;
-        private static SKBitmap _addsBitmap;
-        private static SKBitmap _foodBitmap;
+        private static SKImage _successBitmap;
+        private static SKImage _manaBitmap;
+        private static SKImage _cooldownBitmap;
+        private static SKImage _castsBitmap;
+        private static SKImage _addsBitmap;
+        private static SKImage _foodBitmap;
 
-        private static SKBitmap _spellAbjurationBitmap;
-        private static SKBitmap _spellArcaneBitmap;
-        private static SKBitmap _spellCelestialBitmap;
-        private static SKBitmap _spellClericalBitmap;
-        private static SKBitmap _spellConjurationBitmap;
-        private static SKBitmap _spellDivinationBitmap;
-        private static SKBitmap _spellEnchantmentBitmap;
-        private static SKBitmap _spellHealingBitmap;
-        private static SKBitmap _spellMovementBitmap;
-        private static SKBitmap _spellNatureBitmap;
-        private static SKBitmap _spellNecromancyBitmap;
-        private static SKBitmap _spellTransmutationBitmap;
+        private static SKImage _spellAbjurationBitmap;
+        private static SKImage _spellArcaneBitmap;
+        private static SKImage _spellCelestialBitmap;
+        private static SKImage _spellClericalBitmap;
+        private static SKImage _spellConjurationBitmap;
+        private static SKImage _spellDivinationBitmap;
+        private static SKImage _spellEnchantmentBitmap;
+        private static SKImage _spellHealingBitmap;
+        private static SKImage _spellMovementBitmap;
+        private static SKImage _spellNatureBitmap;
+        private static SKImage _spellNecromancyBitmap;
+        private static SKImage _spellTransmutationBitmap;
 
         public static void InitSymbolBitmaps(Assembly assembly)
         {
@@ -1118,94 +1324,112 @@ namespace GnollHackX
                 /* Replaceable menu symbols */
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-success.png"))
                 {
-                    _successBitmap = SKBitmap.Decode(stream);
-                    _successBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _successBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-mana.png"))
                 {
-                    _manaBitmap = SKBitmap.Decode(stream);
-                    _manaBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _manaBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-cooldown.png"))
                 {
-                    _cooldownBitmap = SKBitmap.Decode(stream);
-                    _cooldownBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _cooldownBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-casts.png"))
                 {
-                    _castsBitmap = SKBitmap.Decode(stream);
-                    _castsBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _castsBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-adds.png"))
                 {
-                    _addsBitmap = SKBitmap.Decode(stream);
-                    _addsBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _addsBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-food.png"))
                 {
-                    _foodBitmap = SKBitmap.Decode(stream);
-                    _foodBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _foodBitmap = SKImage.FromBitmap(bmp);
                 }
 
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-abjuration.png"))
                 {
-                    _spellAbjurationBitmap = SKBitmap.Decode(stream);
-                    _spellAbjurationBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellAbjurationBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-arcane.png"))
                 {
-                    _spellArcaneBitmap = SKBitmap.Decode(stream);
-                    _spellArcaneBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellArcaneBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-celestial.png"))
                 {
-                    _spellCelestialBitmap = SKBitmap.Decode(stream);
-                    _spellCelestialBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellCelestialBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-clerical.png"))
                 {
-                    _spellClericalBitmap = SKBitmap.Decode(stream);
-                    _spellClericalBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellClericalBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-conjuration.png"))
                 {
-                    _spellConjurationBitmap = SKBitmap.Decode(stream);
-                    _spellConjurationBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellConjurationBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-divination.png"))
                 {
-                    _spellDivinationBitmap = SKBitmap.Decode(stream);
-                    _spellDivinationBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellDivinationBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-enchantment.png"))
                 {
-                    _spellEnchantmentBitmap = SKBitmap.Decode(stream);
-                    _spellEnchantmentBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellEnchantmentBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-healing.png"))
                 {
-                    _spellHealingBitmap = SKBitmap.Decode(stream);
-                    _spellHealingBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellHealingBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-movement.png"))
                 {
-                    _spellMovementBitmap = SKBitmap.Decode(stream);
-                    _spellMovementBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellMovementBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-nature.png"))
                 {
-                    _spellNatureBitmap = SKBitmap.Decode(stream);
-                    _spellNatureBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellNatureBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-necromancy.png"))
                 {
-                    _spellNecromancyBitmap = SKBitmap.Decode(stream);
-                    _spellNecromancyBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellNecromancyBitmap = SKImage.FromBitmap(bmp);
                 }
                 using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-spell-transmutation.png"))
                 {
-                    _spellTransmutationBitmap = SKBitmap.Decode(stream);
-                    _spellTransmutationBitmap.SetImmutable();
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    _spellTransmutationBitmap = SKImage.FromBitmap(bmp);
                 }
 
             }
@@ -1217,52 +1441,52 @@ namespace GnollHackX
 
 
 
-        public static SKBitmap _logoBitmap;
-        public static SKBitmap _skillBitmap;
-        public static SKBitmap _prevWepBitmap;
-        public static SKBitmap _prevUnwieldBitmap;
-        public static SKBitmap[] _arrowBitmap = new SKBitmap[9];
-        public static SKBitmap _orbBorderBitmap;
-        public static SKBitmap _orbFillBitmap;
-        public static SKBitmap _orbFillBitmapRed;
-        public static SKBitmap _orbFillBitmapBlue;
-        public static SKBitmap _orbGlassBitmap;
+        public static SKImage _logoBitmap;
+        public static SKImage _skillBitmap;
+        public static SKImage _prevWepBitmap;
+        public static SKImage _prevUnwieldBitmap;
+        public static SKImage[] _arrowBitmap = new SKImage[9];
+        public static SKImage _orbBorderBitmap;
+        public static SKImage _orbFillBitmap;
+        public static SKImage _orbFillBitmapRed;
+        public static SKImage _orbFillBitmapBlue;
+        public static SKImage _orbGlassBitmap;
 
-        public static SKBitmap _batteryFrameBitmap;
-        public static SKBitmap _batteryRedFrameBitmap;
-        public static SKBitmap _fpsBitmap;
+        public static SKImage _batteryFrameBitmap;
+        public static SKImage _batteryRedFrameBitmap;
+        public static SKImage _fpsBitmap;
 
-        public static SKBitmap _statusWizardBitmap;
-        public static SKBitmap _statusCasualBitmap;
-        public static SKBitmap _statusCasualClassicBitmap;
-        public static SKBitmap _statusModernBitmap;
+        public static SKImage _statusWizardBitmap;
+        public static SKImage _statusCasualBitmap;
+        public static SKImage _statusCasualClassicBitmap;
+        public static SKImage _statusModernBitmap;
 
-        public static SKBitmap _statusDifficultyBitmap;
-        public static SKBitmap _statusDifficultyVeryEasyBitmap;
-        public static SKBitmap _statusDifficultyEasyBitmap;
-        public static SKBitmap _statusDifficultyAverageBitmap;
-        public static SKBitmap _statusDifficultyHardBitmap;
-        public static SKBitmap _statusDifficultyExpertBitmap;
-        public static SKBitmap _statusDifficultyMasterBitmap;
-        public static SKBitmap _statusDifficultyGrandMasterBitmap;
+        public static SKImage _statusDifficultyBitmap;
+        public static SKImage _statusDifficultyVeryEasyBitmap;
+        public static SKImage _statusDifficultyEasyBitmap;
+        public static SKImage _statusDifficultyAverageBitmap;
+        public static SKImage _statusDifficultyHardBitmap;
+        public static SKImage _statusDifficultyExpertBitmap;
+        public static SKImage _statusDifficultyMasterBitmap;
+        public static SKImage _statusDifficultyGrandMasterBitmap;
 
-        public static SKBitmap _statusXPLevelBitmap;
-        public static SKBitmap _statusHDBitmap;
-        public static SKBitmap _statusACBitmap;
-        public static SKBitmap _statusMCBitmap;
-        public static SKBitmap _statusMoveBitmap;
-        public static SKBitmap _statusWeaponStyleBitmap;
-        public static SKBitmap _statusQuiveredWeaponStyleBitmap;
-        public static SKBitmap _statusEmptyHandedBitmap;
+        public static SKImage _statusXPLevelBitmap;
+        public static SKImage _statusHDBitmap;
+        public static SKImage _statusACBitmap;
+        public static SKImage _statusMCBitmap;
+        public static SKImage _statusMoveBitmap;
+        public static SKImage _statusWeaponStyleBitmap;
+        public static SKImage _statusQuiveredWeaponStyleBitmap;
+        public static SKImage _statusEmptyHandedBitmap;
 
-        public static SKBitmap _statusGoldBitmap;
-        public static SKBitmap _statusTurnsBitmap;
+        public static SKImage _statusGoldBitmap;
+        public static SKImage _statusTurnsBitmap;
 
-        public static SKBitmap _statusDungeonLevelBitmap;
+        public static SKImage _statusDungeonLevelBitmap;
 
-        public static SKBitmap _searchBitmap;
-        public static SKBitmap _waitBitmap;
-        public static SKBitmap _damageBitmap;
+        public static SKImage _searchBitmap;
+        public static SKImage _waitBitmap;
+        public static SKImage _damageBitmap;
 
 
         public static bool StartGameDataSet = false;
@@ -1276,7 +1500,7 @@ namespace GnollHackX
         public static int[] EnlargementOffsets { get; set; }
         public static int[] ReplacementOffsets { get; set; }
         public static int Glyph2TileSize { get; set; }
-        public static SKBitmap[] _tileMap = new SKBitmap[GHConstants.MaxTileSheets];
+        public static SKImage[] _tileMap = new SKImage[GHConstants.MaxTileSheets];
         public static int UsedTileSheets { get; set; }
         public static int TotalTiles { get; set; }
         public static int UnexploredGlyph { get; set; }
@@ -1309,7 +1533,7 @@ namespace GnollHackX
 
         public static readonly object _moreBtnLock = new object();
         public static GHCommandButtonItem[,,] _moreBtnMatrix = new GHCommandButtonItem[GHConstants.MoreButtonPages, GHConstants.MoreButtonsPerRow, GHConstants.MoreButtonsPerColumn];
-        public static SKBitmap[,,] _moreBtnBitmaps = new SKBitmap[GHConstants.MoreButtonPages, GHConstants.MoreButtonsPerRow, GHConstants.MoreButtonsPerColumn];
+        public static SKImage[,,] _moreBtnBitmaps = new SKImage[GHConstants.MoreButtonPages, GHConstants.MoreButtonsPerRow, GHConstants.MoreButtonsPerColumn];
         public static readonly string[] _moreButtonPageTitle = new string[GHConstants.MoreButtonPages] { "Wizard Mode Commands", "Common Commands", "Additional Commands", "Context and More Commands" };
 
         public static int TileSheetIdx(int ntile)
@@ -1616,43 +1840,58 @@ namespace GnollHackX
         {
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_left.png"))
             {
-                _arrowBitmap[0] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[0] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_up.png"))
             {
-                _arrowBitmap[1] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[1] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_right.png"))
             {
-                _arrowBitmap[2] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[2] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_down.png"))
             {
-                _arrowBitmap[3] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[3] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_upleft.png"))
             {
-                _arrowBitmap[4] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[4] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.no.png"))
             {
-                _arrowBitmap[5] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[5] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_upright.png"))
             {
-                _arrowBitmap[6] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[6] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_downright.png"))
             {
-                _arrowBitmap[7] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[7] = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.arrow_downleft.png"))
             {
-                _arrowBitmap[8] = SKBitmap.Decode(stream);
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _arrowBitmap[8] = SKImage.FromBitmap(bmp);
             }
-
-            for(int i = 0; i < 9; i++)
-                _arrowBitmap[i].SetImmutable();
 
         }
 
@@ -1660,13 +1899,15 @@ namespace GnollHackX
         {
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.orb_border.png"))
             {
-                _orbBorderBitmap = SKBitmap.Decode(stream);
-                _orbBorderBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _orbBorderBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.orb_fill.png"))
             {
-                _orbFillBitmap = SKBitmap.Decode(stream);
-                _orbFillBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _orbFillBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (SKPaint bmpPaint = new SKPaint())
@@ -1683,9 +1924,9 @@ namespace GnollHackX
                     0,     0,     1.0f, 0, 0,
                     0,     0,     0,    1, 0
                     });
-                redcanvas.DrawBitmap(_orbFillBitmap, 0, 0, bmpPaint);
-                _orbFillBitmapRed = redbitmap;
-                _orbFillBitmapRed.SetImmutable();
+                redcanvas.DrawImage(_orbFillBitmap, 0, 0, bmpPaint);
+                redbitmap.SetImmutable();
+                _orbFillBitmapRed = SKImage.FromBitmap(redbitmap);
 
                 var bluebitmap = new SKBitmap(_orbFillBitmap.Width, _orbFillBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
                 var bluecanvas = new SKCanvas(bluebitmap);
@@ -1698,27 +1939,30 @@ namespace GnollHackX
                     0,     0,     0,     1,   0
                     });
 
-                bluecanvas.DrawBitmap(_orbFillBitmap, 0, 0, bmpPaint);
-                _orbFillBitmapBlue = bluebitmap;
-                _orbFillBitmapBlue.SetImmutable();
+                bluecanvas.DrawImage(_orbFillBitmap, 0, 0, bmpPaint);
+                bluebitmap.SetImmutable();
+                _orbFillBitmapBlue = SKImage.FromBitmap(bluebitmap);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.orb_glass.png"))
             {
-                _orbGlassBitmap = SKBitmap.Decode(stream);
-                _orbGlassBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _orbGlassBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.battery-frame.png"))
             {
-                _batteryFrameBitmap = SKBitmap.Decode(stream);
-                _batteryFrameBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _batteryFrameBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.fps.png"))
             {
-                _fpsBitmap = SKBitmap.Decode(stream);
-                _fpsBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _fpsBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (SKPaint bmpPaint = new SKPaint())
@@ -1734,143 +1978,170 @@ namespace GnollHackX
                     0,     0,     0.0f, 0, 0,
                     0,     0,     0,    1, 0
                     });
-                redcanvas.DrawBitmap(_batteryFrameBitmap, 0, 0, bmpPaint);
-                _batteryRedFrameBitmap = redbitmap;
-                _batteryRedFrameBitmap.SetImmutable();
+                redcanvas.DrawImage(_batteryFrameBitmap, 0, 0, bmpPaint);
+                redbitmap.SetImmutable();
+                _batteryRedFrameBitmap = SKImage.FromBitmap(redbitmap);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-wizard-mode.png"))
             {
-                _statusWizardBitmap = SKBitmap.Decode(stream);
-                _statusWizardBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusWizardBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-casual-mode.png"))
             {
-                _statusCasualBitmap = SKBitmap.Decode(stream);
-                _statusCasualBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusCasualBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-casual-classic-mode.png"))
             {
-                _statusCasualClassicBitmap = SKBitmap.Decode(stream);
-                _statusCasualClassicBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusCasualClassicBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-modern-mode.png"))
             {
-                _statusModernBitmap = SKBitmap.Decode(stream);
-                _statusModernBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusModernBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty.png"))
             {
-                _statusDifficultyBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-very-easy.png"))
             {
-                _statusDifficultyVeryEasyBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyVeryEasyBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyVeryEasyBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-easy.png"))
             {
-                _statusDifficultyEasyBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyEasyBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyEasyBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-average.png"))
             {
-                _statusDifficultyAverageBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyAverageBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyAverageBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-hard.png"))
             {
-                _statusDifficultyHardBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyHardBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyHardBitmap = SKImage.FromBitmap(bmp);
+
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-expert.png"))
             {
-                _statusDifficultyExpertBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyExpertBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyExpertBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-master.png"))
             {
-                _statusDifficultyMasterBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyMasterBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyMasterBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-difficulty-grand-master.png"))
             {
-                _statusDifficultyGrandMasterBitmap = SKBitmap.Decode(stream);
-                _statusDifficultyGrandMasterBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDifficultyGrandMasterBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-xp-level.png"))
             {
-                _statusXPLevelBitmap = SKBitmap.Decode(stream);
-                _statusXPLevelBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusXPLevelBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-hd.png"))
             {
-                _statusHDBitmap = SKBitmap.Decode(stream);
-                _statusHDBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusHDBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-ac.png"))
             {
-                _statusACBitmap = SKBitmap.Decode(stream);
-                _statusACBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusACBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-mc.png"))
             {
-                _statusMCBitmap = SKBitmap.Decode(stream);
-                _statusMCBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusMCBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-move.png"))
             {
-                _statusMoveBitmap = SKBitmap.Decode(stream);
-                _statusMoveBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusMoveBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-weapon-style.png"))
             {
-                _statusWeaponStyleBitmap = SKBitmap.Decode(stream);
-                _statusWeaponStyleBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusWeaponStyleBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-quivered-weapon-style.png"))
             {
-                _statusQuiveredWeaponStyleBitmap = SKBitmap.Decode(stream);
-                _statusQuiveredWeaponStyleBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusQuiveredWeaponStyleBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-empty-handed.png"))
             {
-                _statusEmptyHandedBitmap = SKBitmap.Decode(stream);
-                _statusEmptyHandedBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusEmptyHandedBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-gold.png"))
             {
-                _statusGoldBitmap = SKBitmap.Decode(stream);
-                _statusGoldBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusGoldBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-turns.png"))
             {
-                _statusTurnsBitmap = SKBitmap.Decode(stream);
-                _statusTurnsBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusTurnsBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.status-dungeon-level.png"))
             {
-                _statusDungeonLevelBitmap = SKBitmap.Decode(stream);
-                _statusDungeonLevelBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _statusDungeonLevelBitmap = SKImage.FromBitmap(bmp);
             }
 
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.search.png"))
             {
-                _searchBitmap = SKBitmap.Decode(stream);
-                _searchBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _searchBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.wait.png"))
             {
-                _waitBitmap = SKBitmap.Decode(stream);
-                _waitBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _waitBitmap = SKImage.FromBitmap(bmp);
             }
             using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + ".Assets.UI.symbol-damage.png"))
             {
-                _damageBitmap = SKBitmap.Decode(stream);
-                _damageBitmap.SetImmutable();
+                SKBitmap bmp = SKBitmap.Decode(stream);
+                bmp.SetImmutable();
+                _damageBitmap = SKImage.FromBitmap(bmp);
             }
         }
 
@@ -1903,7 +2174,7 @@ namespace GnollHackX
             new SelectableShortcutButton("Unwield Weapon", "Unwield", '\0', false, false, GHUtils.Meta(5), AppResourceName + ".Assets.UI.unwield.png"),
             new SelectableShortcutButton("Wait", "Wait", '.', false, false, 0, AppResourceName + ".Assets.UI.wait.png"),
             new SelectableShortcutButton("Wield Weapon", "Wield", 'w', false, false, 0, AppResourceName + ".Assets.UI.wield.png"),
-            new SelectableShortcutButton("Yell for Companions", "Yell", 'y', false, false, 0, AppResourceName + ".Assets.UI.yell.png"),
+            new SelectableShortcutButton("Yell for Companions", "Yell", 'y', true, false, 0, AppResourceName + ".Assets.UI.yell.png"),
             new SelectableShortcutButton("Zap Wand", "Zap", 'z', false, false, 0, AppResourceName + ".Assets.UI.zap.png"),
         };
 
@@ -2022,6 +2293,7 @@ namespace GnollHackX
             GnollHackService?.ReportFileDescriptors();
             if(IsAndroid)
             {
+#if !GNH_MAUI || ANDROID
                 /* Print file descriptors via C# */
                 int id = Process.GetCurrentProcess().Id;
                 string output = "";
@@ -2042,6 +2314,9 @@ namespace GnollHackX
                     output += proc.StandardOutput.ReadLine() + "\n";
                 }
                 await page.DisplayAlert("File Descriptors", "GnollHack will now attempt to send critical diagnostic data." + (output != "" ? "The information is as follows:\n\n" + output : ""), "OK");
+#else
+                await page.DisplayAlert("Unsupported Function", "ListFileDescriptors is unsupported.", "OK");
+#endif
             }
         }
 
@@ -2108,7 +2383,7 @@ namespace GnollHackX
                 {
                     archive.CreateEntryFromFile(fPath, Path.GetFileName(fPath));
                 }
-                string[] ghsubdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory, GHConstants.ReplayDirectory, GHConstants.UserDataDirectory };
+                string[] ghsubdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory, GHConstants.UserDataDirectory }; //These may be too large: GHConstants.ReplayDirectory, GHConstants.ReplayDownloadFromCloudDirectory, 
                 foreach (string ghsubdir in ghsubdirlist)
                 {
                     string subdirpath = Path.Combine(ghdir, ghsubdir);
@@ -2309,13 +2584,13 @@ namespace GnollHackX
             }
         }
 
-        public static SKBitmap GetSpecialSymbol(string str, out SKRect source_rect)
+        public static SKImage GetSpecialSymbol(string str, out SKRect source_rect)
         {
             source_rect = new SKRect();
             if (str == null || !str.StartsWith("&"))
                 return null;
 
-            SKBitmap bitmap = null;
+            SKImage bitmap = null;
             string trimmed_str = str.Trim();
             if (trimmed_str == "&success;")
             {
@@ -2411,7 +2686,7 @@ namespace GnollHackX
         }
 
         static readonly object _cachedBitmapsLock = new object();
-        static readonly ConcurrentDictionary<string, SKBitmap> _cachedBitmaps = new ConcurrentDictionary<string, SKBitmap>();
+        static readonly ConcurrentDictionary<string, SKImage> _cachedBitmaps = new ConcurrentDictionary<string, SKImage>();
 
         public static void InitBaseCachedBitmaps(Assembly assembly)
         {
@@ -2425,6 +2700,7 @@ namespace GnollHackX
                     AppResourceName + ".Assets.UI.missing_icon.png",
                     AppResourceName + ".Assets.FMOD-Logo-192-White.png",
                     AppResourceName + ".Assets.gnollhack-logo-test-2.png",
+                    AppResourceName + ".Assets.gnollhack-icon-v2-512.png",
                     };
                     foreach (string imagePath in cachedBitmaps)
                     {
@@ -2434,7 +2710,7 @@ namespace GnollHackX
                             if (newBitmap != null)
                             {
                                 newBitmap.SetImmutable();
-                                _cachedBitmaps.TryAdd("resource://" + imagePath, newBitmap);
+                                _cachedBitmaps.TryAdd("resource://" + imagePath, SKImage.FromBitmap(newBitmap));
                             }
                         }
                     }
@@ -2493,7 +2769,7 @@ namespace GnollHackX
                             if (newBitmap != null)
                             {
                                 newBitmap.SetImmutable();
-                                _cachedBitmaps.TryAdd("resource://" + imagePath, newBitmap);
+                                _cachedBitmaps.TryAdd("resource://" + imagePath, SKImage.FromBitmap(newBitmap));
                             }
                         }
                     }
@@ -2504,7 +2780,7 @@ namespace GnollHackX
                 }
             }
         }
-        public static SKBitmap GetCachedImageSourceBitmap(string sourcePath, bool addToCache)
+        public static SKImage GetCachedImageSourceBitmap(string sourcePath, bool addToCache)
         {
             if (sourcePath == null || sourcePath == "")
                 return null;
@@ -2513,7 +2789,7 @@ namespace GnollHackX
             {
                 try
                 {
-                    SKBitmap bitmap;
+                    SKImage bitmap;
                     if (!_cachedBitmaps.TryGetValue(sourcePath, out bitmap))
                     {
                         string imagePath = sourcePath.Length > 11 && sourcePath.Substring(0, 11) == "resource://" ? sourcePath.Substring(11) : sourcePath;
@@ -2524,10 +2800,11 @@ namespace GnollHackX
                             if (newBitmap != null)
                             {
                                 newBitmap.SetImmutable();
+                                SKImage newImage = SKImage.FromBitmap(newBitmap);
                                 if (addToCache)
-                                    _cachedBitmaps.TryAdd(sourcePath, newBitmap);
+                                    _cachedBitmaps.TryAdd(sourcePath, newImage);
 
-                                return newBitmap;
+                                return newImage;
                             }
                         }
                     }
@@ -2542,9 +2819,10 @@ namespace GnollHackX
             }
         }
 
+
         private static readonly object _postingGameStatusLock = new object();
         private static bool _postingGameStatus;
-        public static bool PostingGameStatus { get { lock (_postingGameStatusLock) { return _postingGameStatus; } } set { lock (_postingGameStatusLock) { _postingGameStatus = value; } } }
+        public static bool PostingGameStatus { get { bool t = TournamentMode; lock (_postingGameStatusLock) { return _postingGameStatus || t; } } set { lock (_postingGameStatusLock) { _postingGameStatus = value; } } }
 
         private static readonly object _postingDiagnosticDataLock = new object();
         private static bool _postingDiagnosticData;
@@ -2552,15 +2830,15 @@ namespace GnollHackX
 
         private static readonly object _postingXlogEntriesLock = new object();
         private static bool _postingXlogEntries;
-        public static bool PostingXlogEntries { get { lock (_postingXlogEntriesLock) { return _postingXlogEntries; } } set { lock (_postingXlogEntriesLock) { _postingXlogEntries = value; } } }
+        public static bool PostingXlogEntries { get { bool t = TournamentMode; lock (_postingXlogEntriesLock) { return _postingXlogEntries || t; } } set { lock (_postingXlogEntriesLock) { _postingXlogEntries = value; } } }
 
         private static readonly object _postingReplaysLock = new object();
         private static bool _postingReplays;
-        public static bool PostingReplays { get { lock (_postingReplaysLock) { return _postingReplays; } } set { lock (_postingReplaysLock) { _postingReplays = value; } } }
+        public static bool PostingReplays { get { bool t = TournamentMode; lock (_postingReplaysLock) { return _postingReplays || t; } } set { lock (_postingReplaysLock) { _postingReplays = value; } } }
 
         private static readonly object _postingBonesFilesLock = new object();
         private static bool _postingBonesFiles;
-        public static bool PostingBonesFiles { get { lock (_postingBonesFilesLock) { return _postingBonesFiles; } } set { lock (_postingBonesFilesLock) { _postingBonesFiles = value; } } }
+        public static bool PostingBonesFiles { get { bool t = TournamentMode; lock (_postingBonesFilesLock) { return _postingBonesFiles || t; } } set { lock (_postingBonesFilesLock) { _postingBonesFiles = value; } } }
 
         private static readonly object _bonesUserListIsBlackLock = new object();
         private static bool _bonesUserListIsBlack;
@@ -2568,7 +2846,7 @@ namespace GnollHackX
 
         private static readonly object _allowBonesLock = new object();
         private static bool _allowBones;
-        public static bool AllowBones { get { lock (_allowBonesLock) { return _allowBones; } } set { lock (_allowBonesLock) { _allowBones = value; } } }
+        public static bool AllowBones { get { bool t = TournamentMode; lock (_allowBonesLock) { return _allowBones || t; } } set { lock (_allowBonesLock) { _allowBones = value; } } }
 
         private static readonly object _emptyWishIsNothingLock = new object();
         private static bool _emptyWishIsNothing;
@@ -2577,12 +2855,13 @@ namespace GnollHackX
         public static string CustomGameStatusLink { get; set; }
         public static string CustomXlogAccountLink { get; set; }
         public static string CustomXlogPostLink { get; set; }
+        public static string CustomCloudStorageConnectionString { get; set; }
 
         public static string GameStatusPostAddress
         {
             get
             {
-                if (CustomGameStatusLink != null && CustomGameStatusLink != "")
+                if (CustomGameStatusLink != null && CustomGameStatusLink != "" && !TournamentMode)
                 {
                     return CustomGameStatusLink;
                 }
@@ -2607,13 +2886,27 @@ namespace GnollHackX
                     return address;
             }
         }
+        public static string CloudStorageConnectionString
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(CustomCloudStorageConnectionString) && !TournamentMode)
+                {
+                    return CustomCloudStorageConnectionString;
+                }
+                else
+                {
+                    return CurrentUserSecrets?.DefaultAzureBlobStorageConnectionString;
+                }
+            }
+        }
 
         public static string XlogPostAddress
         {
             get
             {
                 string address;
-                if (!string.IsNullOrWhiteSpace(CustomXlogPostLink))
+                if (!string.IsNullOrWhiteSpace(CustomXlogPostLink) && !TournamentMode)
                 {
                     address = CustomXlogPostLink;
                 }
@@ -2639,7 +2932,7 @@ namespace GnollHackX
             get
             {
                 string address;
-                if (CustomXlogAccountLink != null && CustomXlogAccountLink != "")
+                if (CustomXlogAccountLink != null && CustomXlogAccountLink != "" && !TournamentMode)
                 {
                     address = CustomXlogAccountLink;
                 }
@@ -2751,7 +3044,7 @@ namespace GnollHackX
 
         public static async Task TryVerifyXlogUserNameAsync()
         {
-            if(!PostingXlogEntries && !PostingReplays && !PostingBonesFiles)
+            if(!PostingXlogEntries && !PostingReplays && !PostingBonesFiles && !AutoUploadReplays)
             {
                 SetXlogUserNameVerified(false, null, null);
                 return;
@@ -2873,14 +3166,16 @@ namespace GnollHackX
                     }
                     else //In assets directory
                     {
-#if GNH_MAUI
-                        string sdir = Path.Combine(PlatformService.GetAssetsPath(), "Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory);
-#else
+                        /* Assetpacks in .NET MAUI Android Release configuration work as in Xamarin */
+//#if GNH_MAUI && !(ANDROID && !DEBUG)
+//                        string sdir = Path.Combine(PlatformService.GetAssetsPath(), "Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory);
+//                        string rfile = Path.Combine("Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory, sf.name);
+//#else
                         string sdir = Path.Combine(PlatformService.GetAssetsPath(), sf.source_directory);
-#endif
+                        string rfile = Path.Combine(sf.source_directory, sf.name);
+//#endif
                         string sfile = Path.Combine(sdir, sf.name);
 
-                        string rfile = Path.Combine(sf.source_directory, sf.name);
                         if (IsReadToMemoryBank(sf))  //Read to memory first and use from there
                             FmodService.AddLoadableSoundBank(rfile, sf.subtype_id, true, true);
                         else
@@ -3930,19 +4225,87 @@ namespace GnollHackX
             }
         }
 
+        private static CancellationTokenSource _uploadCts = null;
+        public static async Task<SendResult> SendReplayFile(string replay_filename, int status_type, int status_datatype, bool is_from_queue)
+        {
+            SendResult res = new SendResult();
+            BlobServiceClient blobServiceClient = GetBlobServiceClient();
+            BlobContainerClient blobContainerClient = blobServiceClient.GetBlobContainerClient(GHConstants.AzureBlobStorageReplayContainerName);
+            string prefix = XlogUserNameVerified ? XlogUserName : GHConstants.AzureBlobStorageGeneralDirectoryName;
+            string full_filepath = replay_filename;
+            bool fileexists = File.Exists(full_filepath);
+            if (fileexists)
+            {
+                if (_uploadCts == null)
+                    _uploadCts = new CancellationTokenSource();
+
+                try
+                {
+                    await UploadFromFileAsync(blobContainerClient, prefix, full_filepath, _uploadCts.Token);
+                    res.IsSuccess = true;
+                }
+                catch (Exception ex)
+                {
+                    WriteGHLog(ex.Message);
+                }
+            }
+
+            if (_uploadCts != null)
+            {
+                _uploadCts.Dispose();
+                _uploadCts = null;
+            }
+            return res;
+        }
+
+        public static void SaveReplayPostToDisk(int status_type, int status_datatype, string replay_filename)
+        {
+            string targetpath = Path.Combine(GHPath, GHConstants.ReplayPostQueueDirectory);
+            if (!Directory.Exists(targetpath))
+                CheckCreateDirectory(targetpath);
+            if (Directory.Exists(targetpath))
+            {
+                string targetfilename;
+                string targetfilepath;
+                int id = 0;
+                do
+                {
+                    targetfilename = GHConstants.ReplayPostFileNamePrefix + id + GHConstants.ReplayPostFileNameSuffix;
+                    targetfilepath = Path.Combine(targetpath, targetfilename);
+                    id++;
+                } while (File.Exists(targetfilepath));
+
+                try
+                {
+                    using (StreamWriter sw = File.CreateText(targetfilepath))
+                    {
+                        GHPost fp = new GHPost(2, true, status_type, status_datatype, replay_filename, null, false);
+                        string json = JsonConvert.SerializeObject(fp);
+                        Debug.WriteLine(json);
+                        sw.Write(json);
+                    }
+                    WriteGHLog("Replay file send request written to the queue on disk: " + targetfilepath);
+                }
+                catch (Exception ex)
+                {
+                    WriteGHLog("Writing the replay file send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                }
+            }
+        }
+
         public static string AddForumPostInfo(string message)
         {
             if (message == null)
                 message = "";
 
-            bool isCustomXlogServerLink = !string.IsNullOrWhiteSpace(CustomXlogPostLink);
+            bool isCustomXlogServerLink = !string.IsNullOrWhiteSpace(CustomXlogPostLink) && !TournamentMode;
             string username = XlogUserName;
             if (PostingXlogEntries && !string.IsNullOrWhiteSpace(username) && XlogUserNameVerified)
                 message = message + (isCustomXlogServerLink ? " {" : " [") + username + (isCustomXlogServerLink ? "}" : "]");
 
             string portver = VersionTracking.CurrentVersion;
             DevicePlatform platform = DeviceInfo.Platform;
-            string platstr = platform != null ? platform.ToString() : "";
+            string platstr = platform.ToString();
             if (platstr == null)
                 platstr = "";
             string platid;
@@ -3967,7 +4330,7 @@ namespace GnollHackX
             string device_model = manufacturer + " " + DeviceInfo.Model;
             string platform_with_version = DeviceInfo.Platform + " " + DeviceInfo.VersionString;
 
-            ulong TotalMemInBytes = GHApp.PlatformService.GetDeviceMemoryInBytes();
+            ulong TotalMemInBytes = TotalMemory;
             ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
             ulong FreeDiskSpaceInBytes = GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes();
             ulong FreeDiskSpaceInGB = ((FreeDiskSpaceInBytes / 1024) / 1024) / 1024;
@@ -3977,7 +4340,7 @@ namespace GnollHackX
             string totmem = TotalMemInMB + " MB";
             string diskspace = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
 
-            string player_name = Preferences.Get("LastUsedPlayerName", "Unknown Player");
+            string player_name = GHApp.TournamentMode ? Preferences.Get("LastUsedTournamentPlayerName", "Unknown Player") : Preferences.Get("LastUsedPlayerName", "Unknown Player");
             string info = ver + ", " + platform_with_version + ", " + device_model + ", " + totmem + ", " + diskspace;
 
             switch (status_type)
@@ -4014,15 +4377,15 @@ namespace GnollHackX
         {
             try
             {
+                Debug.WriteLine(loggedtext);
+                string logdir = Path.Combine(GHPath, GHConstants.AppLogDirectory);
+                string logfullpath = Path.Combine(logdir, GHConstants.AppLogFileName);
+                if (!Directory.Exists(logdir))
+                {
+                    CheckCreateDirectory(logdir);
+                }
                 lock (_ghlogLock)
                 {
-                    Debug.WriteLine(loggedtext);
-                    string logdir = Path.Combine(GHPath, GHConstants.AppLogDirectory);
-                    string logfullpath = Path.Combine(logdir, GHConstants.AppLogFileName);
-                    if (!Directory.Exists(logdir))
-                    {
-                        CheckCreateDirectory(logdir);
-                    }
                     if (Directory.Exists(logdir))
                     {
                         if (File.Exists(logfullpath))
@@ -4230,11 +4593,15 @@ namespace GnollHackX
         private static readonly object _replayLock = new object();
         private static bool _stopReplay = false;
         private static bool _pauseReplay = false;
+        private static bool _replayRestarted = false;
         private static double _replaySpeed = 1.0;
         private static int _replayGotoTurn = -1;
         private static int _originalReplayTurn = -1;
         private static int _replayTurn = -1;
+        private static int _startSearchReplayTurn = -1;
         private static string _replayRealTime = null;
+        private static string _replaySearchRegexString = null;
+        private static Regex _replayRegex = null;
 
         public static bool StopReplay { get { lock (_replayLock) { return _stopReplay; } } set { lock (_replayLock) { _stopReplay = value; } } }
         public static bool PauseReplay { get { lock (_replayLock) { return _pauseReplay; } } set { lock (_replayLock) { _pauseReplay = value; } } }
@@ -4243,6 +4610,11 @@ namespace GnollHackX
         public static int OriginalReplayTurn { get { lock (_replayLock) { return _originalReplayTurn; } } }
         public static int ReplayTurn { get { lock (_replayLock) { return _replayTurn; } } set { lock (_replayLock) { _replayTurn = value; } } }
         public static string ReplayRealTime { get { lock (_replayLock) { return _replayRealTime; } } set { lock (_replayLock) { _replayRealTime = value; } } }
+        public static string ReplaySearchRegexString { get { lock (_replayLock) { return _replaySearchRegexString; } } set { lock (_replayLock) { _replaySearchRegexString = value; if (value == null) { _startSearchReplayTurn = -1; _replayRegex = null; } else { _startSearchReplayTurn = _replayTurn; _replayRegex = new Regex(_replaySearchRegexString); } } } }
+        public static int StartSearchReplayTurn { get { lock (_replayLock) { return _startSearchReplayTurn; } } }
+        public static bool ReplayRestarted { get { lock (_replayLock) { return _replayRestarted; } } set { lock (_replayLock) { _replayRestarted = value; } } }
+
+        public static bool IsReplaySearching { get { lock (_replayLock) { return _replayGotoTurn >= 0 || _replaySearchRegexString != null; } } }
 
         public static void ResetReplay()
         {
@@ -4255,13 +4627,16 @@ namespace GnollHackX
                 _originalReplayTurn = -1;
                 _replayTurn = -1;
                 _replayRealTime = null;
+                _replaySearchRegexString = null;
+                _startSearchReplayTurn = -1;
+                _replayRestarted = false;
             }
         }
 
         private static readonly object _gzipLock = new object();
         private static bool _useGZipForReplays = GHConstants.GZipIsDefaultReplayCompression;
 
-        public static bool UseGZipForReplays { get { lock (_gzipLock) { return _useGZipForReplays; } } set { lock (_gzipLock) { _useGZipForReplays = value; } } }
+        public static bool UseGZipForReplays { get { bool t = TournamentMode; lock (_gzipLock) { return t || _useGZipForReplays; } } set { lock (_gzipLock) { _useGZipForReplays = value; } } }
 
         /* Called from GHGame thread! */
         public static PlayReplayResult PlayReplay(GHGame game, string replayFileName)
@@ -4281,14 +4656,19 @@ namespace GnollHackX
             bool contnextfile = false;
             string rawFileName = replayFileName;
             bool restartReplay = false;
+            string replayPath = Path.GetDirectoryName(replayFileName);
+            if (string.IsNullOrEmpty(replayPath))
+                replayPath = Path.Combine(GHPath, GHConstants.ReplayDirectory);
+
             do
             {
-                if(restartReplay)
+                if (restartReplay)
                 {
                     restartReplay = false;
                     rawFileName = replayFileName;
                     ReplayTurn = 0;
                     GoToTurn = GoToTurn; /* Reset original replay turn */
+                    ReplayRestarted = true;
                     ConcurrentQueue<GHRequest> queue;
                     if (GHGame.RequestDictionary.TryGetValue(game, out queue))
                     {
@@ -4358,11 +4738,11 @@ namespace GnollHackX
                 }
 
                 contnextfile = false;
-                _soundSourceIdDictionary.Clear();
-
                 byte prevcmd_byte = 0;
+                byte currcmd_byte = 0;
                 try
                 {
+                    _soundSourceIdDictionary.Clear();
                     using (FileStream fs = File.OpenRead(usedReplayFileName))
                     {
                         if (fs != null)
@@ -4407,6 +4787,7 @@ namespace GnollHackX
                                         time = 0UL;
                                         prevcmd_byte = cmd_byte;
                                         cmd_byte = br.ReadByte();
+                                        currcmd_byte = cmd_byte;
                                         cmd = (int)cmd_byte;
                                         if (IsTimeStampedFunctionCall(cmd_byte))
                                             time = br.ReadUInt64(); /* Time is only for input functions */
@@ -4418,10 +4799,10 @@ namespace GnollHackX
                                                 cmd = (int)RecordedFunctionID.EndOfFile;
                                                 break;
                                             }
-                                            else if (PauseReplay && GoToTurn < 0)
+                                            else if (PauseReplay && !IsReplaySearching)
                                                 Thread.Sleep(GHConstants.PollingInterval);
                                         } 
-                                        while (PauseReplay && GoToTurn < 0);
+                                        while (PauseReplay && !IsReplaySearching);
 
                                         switch (cmd)
                                         {
@@ -4434,14 +4815,14 @@ namespace GnollHackX
                                                     long nextfile_timestamp = br.ReadInt64();
                                                     string nextfile_config_string = br.ReadInt32() == 0 ? null : br.ReadString(); /* unused */
                                                     int nextfile_replay_continuation = br.ReadInt32();
-                                                    rawFileName = Path.Combine(GHPath, GHConstants.ReplayDirectory, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, knownPlayerName, knownFirstTurn, true));
+                                                    rawFileName = Path.Combine(replayPath, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, knownPlayerName, knownFirstTurn, true));
                                                     if (isZip)
                                                         rawFileName += usedZipSuffix;
                                                     for(int i = 0; i < 8; i++) /* Support for various other name formats */
                                                     {
                                                         if (File.Exists(rawFileName))
                                                             break;
-                                                        rawFileName = Path.Combine(GHPath, GHConstants.ReplayDirectory, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, (i & 1) != 0 ? null : knownPlayerName, (i & 2) != 0 ? -1 : knownFirstTurn, (i & 4) == 0));
+                                                        rawFileName = Path.Combine(replayPath, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, (i & 1) != 0 ? null : knownPlayerName, (i & 2) != 0 ? -1 : knownFirstTurn, (i & 4) == 0));
                                                         if (isZip)
                                                             rawFileName += usedZipSuffix;
                                                     }
@@ -4631,7 +5012,7 @@ namespace GnollHackX
                                                 {
                                                     /* No function call in replay */
                                                     //game.ClientCallback_get_nh_event();
-                                                    if (GoToTurn < 0)
+                                                    if (!IsReplaySearching)
                                                         Thread.Sleep((int)(GHConstants.ReplayGetEventDelay / ReplaySpeed));
                                                 }
                                                 break;
@@ -4640,7 +5021,7 @@ namespace GnollHackX
                                                     int res = br.ReadInt32();
                                                     /* No function call in replay */
                                                     //game.ClientCallback_nhgetch();
-                                                    if (GoToTurn < 0)
+                                                    if (!IsReplaySearching)
                                                         Thread.Sleep((int)(GHConstants.ReplayStandardDelay / ReplaySpeed));
                                                 }
                                                 break;
@@ -4652,7 +5033,7 @@ namespace GnollHackX
                                                     int res = br.ReadInt32();
                                                     /* No function call in replay */
                                                     //game.ClientCallback_nh_poskey();
-                                                    if (GoToTurn < 0)
+                                                    if (!IsReplaySearching)
                                                         Thread.Sleep((int)(GHConstants.ReplayStandardDelay / ReplaySpeed));
                                                 }
                                                 break;
@@ -4670,7 +5051,8 @@ namespace GnollHackX
                                                     string introline = br.ReadInt32() == 0 ? null : br.ReadString();
                                                     ulong ynflags = br.ReadUInt64();
                                                     int res = br.ReadInt32();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    CheckReplaySearchMatch(question);
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.ClientCallback_YnFunction(style, attr, color, glyph, title, question, responses, def, descriptions, introline, ynflags);
                                                 }
                                                 break;
@@ -4685,12 +5067,14 @@ namespace GnollHackX
                                             case (int)RecordedFunctionID.RawPrint:
                                                 {
                                                     string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    CheckReplaySearchMatch(str);
                                                     game.ClientCallback_RawPrint(str);
                                                 }
                                                 break;
                                             case (int)RecordedFunctionID.RawPrintBold:
                                                 {
                                                     string str = br.ReadInt32() == 0 ? null : br.ReadString();
+                                                    CheckReplaySearchMatch(str);
                                                     game.ClientCallback_RawPrintBold(str);
                                                 }
                                                 break;
@@ -4701,6 +5085,7 @@ namespace GnollHackX
                                                     int attributes = br.ReadInt32();
                                                     int color = br.ReadInt32();
                                                     int append = br.ReadInt32();
+                                                    CheckReplaySearchMatch(str);
                                                     game.ClientCallback_PutStrEx(win_id, str, attributes, color, append);
                                                 }
                                                 break;
@@ -4716,6 +5101,7 @@ namespace GnollHackX
                                                     int attributes = br.ReadInt32();
                                                     int color = br.ReadInt32();
                                                     int append = br.ReadInt32();
+                                                    CheckReplaySearchMatch(str);
                                                     unsafe
                                                     {
                                                         fixed (byte* attributes_byte_ptr = attributes_bytes)
@@ -4786,13 +5172,13 @@ namespace GnollHackX
                                                     for (int i = 0; i < condlen; i++)
                                                         condcolors[i] = br.ReadInt16();
 
-                                                    if(fieldidx == (int)statusfields.BL_TIME && !string.IsNullOrWhiteSpace(text) && int.TryParse(text.Trim(), out int curTurn))
+                                                    if(fieldidx == (int)NhStatusFields.BL_TIME && !string.IsNullOrWhiteSpace(text) && int.TryParse(text.Trim(), out int curTurn))
                                                     {
                                                         ReplayTurn = curTurn;
                                                         if(knownFirstTurn == -1)
                                                             knownFirstTurn = curTurn;
                                                     }
-                                                    else if (fieldidx == (int)statusfields.BL_REALTIME && !string.IsNullOrWhiteSpace(text))
+                                                    else if (fieldidx == (int)NhStatusFields.BL_REALTIME && !string.IsNullOrWhiteSpace(text))
                                                     {
                                                         ReplayRealTime = text;
                                                     }
@@ -4805,6 +5191,13 @@ namespace GnollHackX
                                                             restartReplay = true;
                                                             breakwhile = true;
                                                         }
+                                                    }
+                                                    if(ReplaySearchRegexString != null && ReplayRestarted && ReplayTurn >= StartSearchReplayTurn)
+                                                    {
+                                                        string txt = ReplaySearchRegexString;
+                                                        ReplaySearchRegexString = null;
+                                                        ReplayRestarted = false;
+                                                        game.ClientCallback_DisplayScreenText("No Match", "", txt, 0, (int)MenuItemAttributes.None, (int)NhColor.CLR_RED, 0);
                                                     }
 
                                                     unsafe
@@ -4909,7 +5302,7 @@ namespace GnollHackX
                                                         br.ReadInt64();
                                                     int listsize = br.ReadInt32();
                                                     int count = br.ReadInt32();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.Replay_SelectMenu(winid, how, count);
                                                 }
                                                 break;
@@ -5007,7 +5400,9 @@ namespace GnollHackX
                                                     string linesuffix = br.ReadInt32() == 0 ? null : br.ReadString();
                                                     string introline = br.ReadInt32() == 0 ? null : br.ReadString();
                                                     string line = br.ReadInt32() == 0 ? null : br.ReadString();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    CheckReplaySearchMatch(query);
+                                                    CheckReplaySearchMatch(line);
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.Replay_GetLine(style, attr, color, query, placeholder, linesuffix, introline, IntPtr.Zero, line);
                                                 }
                                                 break;
@@ -5059,7 +5454,7 @@ namespace GnollHackX
                                                     int attr = br.ReadInt32();
                                                     int color = br.ReadInt32();
                                                     ulong tflags = br.ReadUInt64();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.ClientCallback_DisplayFloatingText(x, y, text, style, attr, color, tflags);
                                                 }
                                                 break;
@@ -5072,7 +5467,7 @@ namespace GnollHackX
                                                     int attr = br.ReadInt32();
                                                     int color = br.ReadInt32();
                                                     ulong tflags = br.ReadUInt64();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.ClientCallback_DisplayScreenText(text, supertext, subtext, style, attr, color, tflags);
                                                 }
                                                 break;
@@ -5085,7 +5480,7 @@ namespace GnollHackX
                                                     int color = br.ReadInt32();
                                                     int glyph = br.ReadInt32();
                                                     ulong tflags = br.ReadUInt64();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.ClientCallback_DisplayPopupText(text, title, style, attr, color, glyph, tflags);
                                                 }
                                                 break;
@@ -5098,7 +5493,7 @@ namespace GnollHackX
                                                     int x2 = br.ReadInt32();
                                                     int y2 = br.ReadInt32();
                                                     ulong tflags = br.ReadUInt64();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.ClientCallback_DisplayGUIEffect(style, subtype, x, y, x2, y2, tflags);
                                                 }
                                                 break;
@@ -5130,7 +5525,7 @@ namespace GnollHackX
                                                     int play_group = br.ReadInt32();
                                                     uint dialogue_mid = br.ReadUInt32();
                                                     ulong play_flags = br.ReadUInt64();
-                                                    if (GoToTurn < 0 || ReplayTurn >= GoToTurn - 1)
+                                                    if (!IsReplaySearching || (GoToTurn >= 0 && ReplayTurn >= GoToTurn - 1))
                                                         game.ClientCallback_PlayImmediateSound(ghsound, eventPath, bankid, eventVolume, soundVolume, parameterNames, parameterValues,
                                                         arraysize, sound_type, play_group, dialogue_mid, play_flags);
                                                 }
@@ -5294,8 +5689,14 @@ namespace GnollHackX
                                                 break;
                                             case (int)RecordedFunctionID.ExitHack:
                                                 {
+                                                    if (ReplaySearchRegexString != null)
+                                                    {
+                                                        restartReplay = true;
+                                                        breakwhile = true;
+                                                        break;
+                                                    }
                                                     int status = br.ReadInt32();
-                                                    game.ClientCallback_ExitHack(status);
+                                                    game.ClientCallback_ExitHack(0); //status  We do not restart the game upon ExitHack even if the player so does, so status is unused
                                                     exitHackCalled = true;
                                                 }
                                                 break;
@@ -5324,17 +5725,28 @@ namespace GnollHackX
                 {
                     if (!exitHackCalled)
                         game.ClientCallback_ExitHack(0);
-                    MaybeWriteGHLog(prevcmd_byte + ": " + ex.Message);
+                    MaybeWriteGHLog(currcmd_byte + ", " + prevcmd_byte + ": " + ex.Message);
                     if (isZip && File.Exists(origRawFileName) && File.Exists(usedReplayFileName) && origRawFileName != usedReplayFileName)
                     {
                         File.Delete(usedReplayFileName);
                     }
                     return PlayReplayResult.Error;
                 }
-                _soundSourceIdDictionary.Clear();
-                if (isZip && File.Exists(origRawFileName) && File.Exists(usedReplayFileName) && origRawFileName != usedReplayFileName)
+                try
                 {
-                    File.Delete(usedReplayFileName);
+                    _soundSourceIdDictionary.Clear();
+                    if (isZip && File.Exists(origRawFileName) && File.Exists(usedReplayFileName) && origRawFileName != usedReplayFileName)
+                    {
+                        File.Delete(usedReplayFileName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MaybeWriteGHLog(ex.Message);
+                }
+                if (!contnextfile && ReplaySearchRegexString != null && !exitHackCalled)
+                {
+                    restartReplay = true;
                 }
             }
             while (contnextfile || restartReplay);
@@ -5342,6 +5754,245 @@ namespace GnollHackX
             if (!exitHackCalled)
                 game.ClientCallback_ExitHack(0);
             return PlayReplayResult.Success;
+        }
+
+        private static void CheckReplaySearchMatch(string str)
+        {
+            if (string.IsNullOrEmpty(str))
+                return;
+
+            lock (_replayLock)
+            {
+                if (_replayRegex != null)
+                {
+                    try
+                    {
+                        if (_replayRegex.IsMatch(str))
+                        {
+                            _replayRegex = null;
+                            _replaySearchRegexString = null;
+                            _startSearchReplayTurn = -1;
+                            _replayRestarted = false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                        _replayRegex = null;
+                        _replaySearchRegexString = null;
+                    }
+                }
+            }
+        }
+
+
+        private static BlobServiceClient _blobServiceClient = null;
+
+        public static BlobServiceClient GetBlobServiceClient()
+        {
+            if (_blobServiceClient != null)
+                return _blobServiceClient;
+
+            string connectionString = CloudStorageConnectionString;
+            BlobServiceClient client = null;
+            if (string.IsNullOrWhiteSpace(connectionString))
+                return client;
+            
+            try
+            {
+                client = new BlobServiceClient(connectionString);
+                _blobServiceClient = client;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            return client;
+        }
+
+        public static async Task ListBlobPrefixes(BlobContainerClient container,
+                                               string prefix,
+                                               int? segmentSize)
+        {
+            Debug.WriteLine("Listing All Blob Prefixes under " + (prefix != null ? prefix : "root"));
+            try
+            {
+                // Call the listing operation and return pages of the specified size.
+                var resultSegment = container.GetBlobsByHierarchyAsync(prefix: prefix, delimiter: GHConstants.AzureBlobStorageDelimiter)
+                    .AsPages(default, segmentSize);
+
+                var enumer = resultSegment.GetAsyncEnumerator();
+
+                try
+                {
+                    // Enumerate the blobs returned for each page.
+                    while (await enumer.MoveNextAsync())
+                    {
+                        Page<BlobHierarchyItem> blobPage = enumer.Current;
+                        // A hierarchical listing may return both virtual directories and blobs.
+                        foreach (BlobHierarchyItem blobhierarchyItem in blobPage.Values)
+                        {
+                            if (blobhierarchyItem.IsPrefix)
+                            {
+                                // Write out the prefix of the virtual directory.
+                                Debug.WriteLine("Virtual directory prefix: " + blobhierarchyItem.Prefix);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e.Message);
+                }
+                finally
+                {
+                    if (enumer != null)
+                        await enumer.DisposeAsync();
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+            }
+        }
+
+        public static async Task ListBlobsFlatListing(BlobContainerClient blobContainerClient, string prefix, int? segmentSize)
+        {
+            try
+            {
+                // Call the listing operation and return pages of the specified size.
+                var blobs = blobContainerClient.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix);
+                var resultSegment = blobs.AsPages(default, segmentSize);
+
+                // Enumerate the blobs returned for each page.
+                var enumer = resultSegment.GetAsyncEnumerator();
+                try
+                {
+                    while (await enumer.MoveNextAsync())
+                    {
+                        foreach (BlobItem blobItem in enumer.Current.Values)
+                        {
+                            Debug.WriteLine(blobItem.Name);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e.Message);
+                }
+                finally
+                {
+                    if (enumer != null)
+                        await enumer.DisposeAsync();
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+            }
+        }
+
+        public static async Task ListBlobsHierarchicalListing(BlobContainerClient container,
+                                                       string prefix,
+                                                       int? segmentSize)
+        {
+            try
+            {
+                // Call the listing operation and return pages of the specified size.
+                var resultSegment = container.GetBlobsByHierarchyAsync(prefix: prefix, delimiter: GHConstants.AzureBlobStorageDelimiter)
+                    .AsPages(default, segmentSize);
+
+                var enumer = resultSegment.GetAsyncEnumerator();
+
+                try
+                {
+                    // Enumerate the blobs returned for each page.
+                    while (await enumer.MoveNextAsync())
+                    {
+                        Page<BlobHierarchyItem> blobPage = enumer.Current;
+                        // A hierarchical listing may return both virtual directories and blobs.
+                        foreach (BlobHierarchyItem blobhierarchyItem in blobPage.Values)
+                        {
+                            if (blobhierarchyItem.IsPrefix)
+                            {
+                                // Write out the prefix of the virtual directory.
+                                Debug.WriteLine("Virtual directory prefix: " + blobhierarchyItem.Prefix);
+
+                                // Call recursively with the prefix to traverse the virtual directory.
+                                await ListBlobsHierarchicalListing(container, blobhierarchyItem.Prefix, null);
+                            }
+                            else
+                            {
+                                // Write out the name of the blob.
+                                Debug.WriteLine("Blob name: " + blobhierarchyItem.Blob.Name);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e.Message);
+                }
+                finally
+                {
+                    if (enumer != null)
+                        await enumer.DisposeAsync();
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+            }
+        }
+
+        public static async Task UploadFromFileAsync(BlobContainerClient containerClient, string prefix, string localFilePath, CancellationToken cancellationToken)
+        {
+            string blobName;
+            if (prefix == null)
+            {
+                blobName = Path.GetFileName(localFilePath);
+            }
+            else
+            {
+                blobName = prefix + GHConstants.AzureBlobStorageDelimiter + Path.GetFileName(localFilePath);
+            }
+
+            BlobClient blobClient = containerClient.GetBlobClient(blobName);
+            await blobClient.UploadAsync(localFilePath, true, cancellationToken);
+        }
+
+        public static async Task DownloadFileAsync(BlobContainerClient containerClient, string prefix, string blobName, long fileLength, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(blobName))
+                return;
+
+            BlobClient blobClient = containerClient.GetBlobClient(blobName);
+            string baseDir = Path.Combine(GHApp.GHPath, GHConstants.ReplayDownloadFromCloudDirectory);
+            if (!Directory.Exists(baseDir))
+                GHApp.CheckCreateDirectory(baseDir);
+            string targetDir = baseDir;
+            if(!string.IsNullOrWhiteSpace(prefix) && prefix.Length > 0)
+            {
+                string modPrefix = prefix[prefix.Length - 1] == GHConstants.AzureBlobStorageDelimiter[0] ? prefix.Substring(0, prefix.Length - 1) : prefix;
+                targetDir = Path.Combine(targetDir, modPrefix);
+                if (!Directory.Exists(targetDir))
+                    GHApp.CheckCreateDirectory(targetDir);
+            }
+            string targetFile;
+            if (string.IsNullOrWhiteSpace(prefix) || blobName.Length <= prefix.Length)
+                targetFile = blobName;
+            else
+                targetFile = blobName.Substring(prefix.Length);
+            string targetPath = Path.Combine(targetDir, targetFile);
+            if(File.Exists(targetPath))
+            {
+                FileInfo fi = new FileInfo(targetPath);
+                if (fi.Length != fileLength || fileLength <= 0)
+                    File.Delete(targetPath);
+                else /* Skip files with the right length */
+                    return;
+            }
+            await blobClient.DownloadToAsync(targetPath, cancellationToken);
         }
     }
 

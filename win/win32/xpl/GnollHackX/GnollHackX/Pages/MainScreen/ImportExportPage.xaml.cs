@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO.Compression;
 using System.IO;
-
+using static System.Net.WebRequestMethods;
 
 #if GNH_MAUI
 using GnollHackX;
@@ -16,6 +16,7 @@ namespace GnollHackM
 #else
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 using GnollHackX.Pages.Game;
@@ -30,11 +31,7 @@ namespace GnollHackX.Pages.MainScreen
 		public ImportExportPage ()
 		{
 			InitializeComponent ();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
         }
 
         private async void btnExportSavedGames_Clicked(object sender, EventArgs e)
@@ -131,8 +128,8 @@ namespace GnollHackX.Pages.MainScreen
                                                     System.IO.File.Delete(finalname);
                                                 System.IO.File.Move(filestr, finalname);
                                                 nextracted++;
-                                                if (out_str != "" && GHApp.DebugLogMessages)
-                                                    await DisplayAlert("ValidateSaveFile Messge", out_str, "OK");
+                                                if (!string.IsNullOrWhiteSpace(out_str) && GHApp.DebugLogMessages)
+                                                    await DisplayAlert("ValidateSaveFile Message", out_str, "OK");
                                             }
                                             else
                                             {
@@ -167,8 +164,8 @@ namespace GnollHackX.Pages.MainScreen
                                         s.CopyTo(t);
                                     }
                                     await DisplayAlert("Game Saved", "Saved game \'" + file.FileName + "\' has been saved to the save directory as a non-scoring imported saved game.", "OK");
-                                    if (out_str != "" && GHApp.DebugLogMessages)
-                                        await DisplayAlert("ValidateSaveFile Messge", out_str, "OK");
+                                    if (!string.IsNullOrWhiteSpace(out_str) && GHApp.DebugLogMessages)
+                                        await DisplayAlert("ValidateSaveFile Message", out_str, "OK");
                                 }
                                 else
                                 {
@@ -441,7 +438,12 @@ namespace GnollHackX.Pages.MainScreen
         {
             ImportExportGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
+
+            bool didDelete = false;
+            bool wasSuccess = true;
+
             string directory1 = Path.Combine(GHApp.GHPath, GHConstants.ReplayDirectory);
+            string directory2 = Path.Combine(GHApp.GHPath, GHConstants.ReplayDownloadFromCloudDirectory);
             int nofiles1 = 0;
             int nofiles_main = 0;
             int nofiles_cont = 0;
@@ -453,12 +455,12 @@ namespace GnollHackX.Pages.MainScreen
                 if (files1 != null)
                 {
                     nofiles1 = files1.Length;
-                    foreach(string file in files1)
+                    foreach (string file in files1)
                     {
-                        if(!string.IsNullOrWhiteSpace(file))
+                        if (!string.IsNullOrWhiteSpace(file))
                         {
                             FileInfo fileInfo = new FileInfo(file);
-                            if(fileInfo != null && !string.IsNullOrWhiteSpace(fileInfo.Name))
+                            if (fileInfo != null && !string.IsNullOrWhiteSpace(fileInfo.Name))
                             {
                                 if (fileInfo.Name.StartsWith(GHConstants.ReplayFileNamePrefix))
                                     nofiles_main++;
@@ -473,26 +475,63 @@ namespace GnollHackX.Pages.MainScreen
                     }
                 }
             }
-            bool answer = await DisplayAlert("Delete All Replays?", "Are you sure to delete all files (" 
-                + nofiles1 + ": " + nofiles_main + " main, " + nofiles_cont + " continuation, "/* + nofiles_shared + " shared, "*/ + nofiles_other + " other) in the " 
-                + GHConstants.ReplayDirectory + " directory?", "Yes", "No");
-            if (answer)
-            {
-                try
-                {
-                    string datadir = Path.Combine(GHApp.GHPath, GHConstants.ReplayDirectory);
-                    if (Directory.Exists(datadir))
-                        Directory.Delete(datadir, true);
 
-                    btnDeleteReplays.Text = "Done";
-                    btnDeleteReplays.TextColor = GHColors.Red;
-                }
-                catch (Exception ex)
+            if (nofiles1 == 0)
+            {
+                await DisplayAlert("No Local Replays to Delete", "There are no files in the " + GHConstants.ReplayDirectory + " directory.", "OK");
+            }
+            else
+            {
+                bool answer = await DisplayAlert("Delete All Local Replays?", "Are you sure to delete all files ("
+                    + nofiles1 + ": " + nofiles_main + " main, " + nofiles_cont + " continuation, "/* + nofiles_shared + " shared, "*/ + nofiles_other + " other) in the "
+                    + GHConstants.ReplayDirectory + " directory?", "Yes", "No");
+                if (answer)
                 {
-                    btnDeleteReplays.Text = "Failed";
-                    btnDeleteReplays.TextColor = GHColors.Red;
-                    await DisplayAlert("Deletion Failed", "GnollHack failed to delete the files in " + GHConstants.ReplayDirectory + ": " + ex.Message, "OK");
+                    try
+                    {
+                        string datadir = Path.Combine(GHApp.GHPath, GHConstants.ReplayDirectory);
+                        if (Directory.Exists(datadir))
+                            Directory.Delete(datadir, true);
+                        didDelete = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        wasSuccess = false;
+                        await DisplayAlert("Deletion Failed", "GnollHack failed to delete the files in " + GHConstants.ReplayDirectory + ": " + ex.Message, "OK");
+                    }
                 }
+            }
+
+            if(Directory.Exists(directory2))
+            {
+                bool answer = await DisplayAlert("Delete All Downloaded Replays?", "Are you sure to delete all downloaded replays in the "
+                    + GHConstants.ReplayDownloadFromCloudDirectory + " directory?", "Yes", "No");
+                if (answer)
+                {
+                    try
+                    {
+                        string datadir = Path.Combine(GHApp.GHPath, GHConstants.ReplayDownloadFromCloudDirectory);
+                        if (Directory.Exists(datadir))
+                            Directory.Delete(datadir, true);
+                        didDelete = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        wasSuccess = false;
+                        await DisplayAlert("Deletion Failed", "GnollHack failed to delete the files in " + GHConstants.ReplayDownloadFromCloudDirectory + ": " + ex.Message, "OK");
+                    }
+                }
+            }
+
+            if (didDelete && wasSuccess)
+            {
+                btnDeleteReplays.Text = "Done";
+                btnDeleteReplays.TextColor = GHColors.Red;
+            }
+            else if (!wasSuccess)
+            {
+                btnDeleteReplays.Text = "Failed";
+                btnDeleteReplays.TextColor = GHColors.Red;
             }
             ImportExportGrid.IsEnabled = true;
         }
@@ -507,6 +546,200 @@ namespace GnollHackX.Pages.MainScreen
                 GHApp.GnollHackService.ClearDumplogs();
                 btnDeleteDumplogs.Text = "Done";
                 btnDeleteDumplogs.TextColor = GHColors.Red;
+            }
+            ImportExportGrid.IsEnabled = true;
+        }
+
+        private async void btnClearPendingTasks_Clicked(object sender, EventArgs e)
+        {
+            ImportExportGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+
+            string directory1 = Path.Combine(GHApp.GHPath, GHConstants.ForumPostQueueDirectory);
+            string directory2 = Path.Combine(GHApp.GHPath, GHConstants.XlogPostQueueDirectory);
+            string directory3 = Path.Combine(GHApp.GHPath, GHConstants.BonesPostQueueDirectory);
+            string directory4 = Path.Combine(GHApp.GHPath, GHConstants.ReplayPostQueueDirectory);
+            int nofiles1 = 0;
+            int nofiles2 = 0;
+            int nofiles3 = 0;
+            int nofiles4 = 0;
+            if (Directory.Exists(directory1))
+            {
+                string[] files1 = Directory.GetFiles(directory1);
+                if (files1 != null)
+                {
+                    nofiles1 = files1.Length;
+                }
+            }
+            if (Directory.Exists(directory2))
+            {
+                string[] files2 = Directory.GetFiles(directory2);
+                if (files2 != null)
+                {
+                    nofiles2 = files2.Length;
+                }
+            }
+            if (Directory.Exists(directory3))
+            {
+                string[] files3 = Directory.GetFiles(directory3);
+                if (files3 != null)
+                {
+                    nofiles3 = files3.Length;
+                }
+            }
+            if (Directory.Exists(directory4))
+            {
+                string[] files4 = Directory.GetFiles(directory4);
+                if (files4 != null)
+                {
+                    nofiles4 = files4.Length;
+                }
+            }
+            int totalfiles = nofiles1 + nofiles2 + nofiles3 + nofiles4;
+
+            bool answer = await DisplayAlert("Clear Pending Tasks?", "Are you sure to delete all pending tasks on disk (" + totalfiles + " file" + (totalfiles == 1 ? "" : "s") + ")?", "Yes", "No");
+            if (answer)
+            {
+                try
+                {
+                    if (Directory.Exists(directory1))
+                        Directory.Delete(directory1, true);
+
+                    if (Directory.Exists(directory2))
+                        Directory.Delete(directory2, true);
+
+                    if (Directory.Exists(directory3))
+                        Directory.Delete(directory3, true);
+
+                    if (Directory.Exists(directory4))
+                        Directory.Delete(directory4, true);
+
+                    btnClearPendingTasks.Text = "Done";
+                    btnClearPendingTasks.TextColor = GHColors.Red;
+                }
+                catch
+                {
+                    btnClearPendingTasks.Text = "Failed";
+                    btnClearPendingTasks.TextColor = GHColors.Red;
+                }                
+            }
+            ImportExportGrid.IsEnabled = true;
+        }
+
+        private async void btnConvertSavedGames_Clicked(object sender, EventArgs e)
+        {
+            ImportExportGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            int conversionsFound = 0;
+            int conversionsRequested = 0;
+            int conversionsDone = 0;
+            string saveDir = Path.Combine(GHApp.GHPath, GHConstants.SaveDirectory);
+            if (Directory.Exists(saveDir))
+            {
+                string[] files = Directory.GetFiles(saveDir);
+                if(files != null && files.Length > 0)
+                {
+                    foreach (string file in files)
+                    {
+                        FileInfo fileInfo = new FileInfo(file);
+                        if (!fileInfo.Exists)
+                            continue;
+                        if(fileInfo.Extension != ".bup")
+                            continue;
+                        
+                        string fileNameWithoutExtension = fileInfo.Name.Substring(0, fileInfo.Name.Length - fileInfo.Extension?.Length ?? 0);
+                        /* file is an existing backup file */
+                        bool importedFound = false;
+                        bool errorFound = false;
+                        bool saveFound = false;
+                        foreach(string file2 in files)
+                        {
+                            FileInfo fileInfo2 = new FileInfo(file2);
+                            if (!fileInfo2.Exists) 
+                                continue;
+                            if (fileInfo2.Extension == ".bup")
+                                continue;
+
+                            string fileName2WithoutExtension = fileInfo2.Name.Substring(0, fileInfo2.Name.Length - fileInfo2.Extension?.Length ?? 0);
+                            if (fileName2WithoutExtension != fileNameWithoutExtension)
+                                continue;
+
+                            if (fileInfo2.Extension == ".i")
+                                importedFound = true;
+                            else if (fileInfo2.Extension == ".e")
+                                errorFound = true;
+                            else if (string.IsNullOrEmpty(fileInfo2.Extension))
+                                saveFound = true;
+                        }
+
+                        if (importedFound || saveFound)
+                            continue;
+                        else
+                        {
+                            conversionsFound++;
+                            bool answer = await DisplayAlert("Convert Backup into Imported?", "A backup for saved game \'" + fileNameWithoutExtension + "' has been found. Convert it into a non-scoring imported saved game?" 
+                                + (errorFound ? " This will delete the existing error save file." : ""), "Yes", "No");
+                            if(answer)
+                            {
+                                conversionsRequested++;
+                                bool conversionSuccessful = false;
+                                try
+                                {
+                                    string backuppath = fileInfo.FullName;
+                                    string savepath = Path.Combine(saveDir, fileNameWithoutExtension) + ".i";
+                                    if(System.IO.File.Exists(savepath))
+                                    {
+                                        /* Should not happen */
+                                        System.IO.File.Delete(savepath);
+                                    }
+                                    System.IO.File.Move(backuppath, savepath);
+                                    conversionsDone++;
+                                    conversionSuccessful = true;
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine(ex.Message);
+                                }
+
+                                if(conversionSuccessful)
+                                {
+                                    try
+                                    {
+                                        if (errorFound)
+                                        {
+                                            string errorpath = Path.Combine(saveDir, fileNameWithoutExtension + ".e");
+                                            if (System.IO.File.Exists(errorpath))
+                                                System.IO.File.Delete(errorpath);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine(ex.Message);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if(conversionsFound == 0)
+            {
+                await DisplayAlert("No Convertible Backups", "No backup saved games that are convertible to imported saved games were found.", "OK");
+            }
+            else
+            {
+                if(conversionsRequested > 0)
+                {
+                    if(conversionsDone == 0)
+                    {
+                        if(conversionsRequested == 1)
+                            await DisplayAlert("No Backups Converted", "The requested backup saved game was not converted to an imported saved game.", "OK");
+                        else
+                            await DisplayAlert("No Backups Converted", "None of the requested " + conversionsRequested + " backup saved games were converted to imported saved games.", "OK");
+                    }
+                    else
+                        await DisplayAlert("Backups Converted", (conversionsDone == conversionsRequested ? "The requested " :  conversionsDone + " of the requested ") + conversionsRequested + " backup saved game" + (conversionsRequested == 1 ? " was" : "s were") + " converted to " + (conversionsRequested == 1 ? "an imported saved game" : "imported saved games") + ".", "OK");
+                }
             }
             ImportExportGrid.IsEnabled = true;
         }

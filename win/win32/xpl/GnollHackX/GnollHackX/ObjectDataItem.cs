@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+#if GNH_MAUI
+using GnollHackM;
+#endif
 
 namespace GnollHackX
 {
     public class ObjectDataItem
     {
-        public obj ObjData;
-        public objclassdata OtypData;
+        public Obj ObjData;
+        public ObjClassData OtypData;
         public List<ObjectDataItem> ContainedObjs;
 
         public short TileHeight {
@@ -95,20 +98,20 @@ namespace GnollHackX
         {
 
         }
-        public ObjectDataItem(obj objData, objclassdata otypdata, bool hallucinated)
+        public ObjectDataItem(Obj objData, ObjClassData otypdata, bool hallucinated)
         {
             ObjData = objData;
             OtypData = otypdata;
             Hallucinated = hallucinated;
         }
-        public ObjectDataItem(obj objData, objclassdata otypdata, bool hallucinated, bool foundthisturn)
+        public ObjectDataItem(Obj objData, ObjClassData otypdata, bool hallucinated, bool foundthisturn)
         {
             ObjData = objData;
             OtypData = otypdata;
             Hallucinated = hallucinated;
             FoundThisTurn = foundthisturn;
         }
-        public ObjectDataItem(obj objData, objclassdata otypdata, bool hallucinated, bool outofammo, bool wrongammo, bool notbeingused,  bool notweapon, bool foundthisturn, bool isammo, bool isthrowingweapon, bool prevwepfound, bool prevunwield)
+        public ObjectDataItem(Obj objData, ObjClassData otypdata, bool hallucinated, bool outofammo, bool wrongammo, bool notbeingused,  bool notweapon, bool foundthisturn, bool isammo, bool isthrowingweapon, bool prevwepfound, bool prevunwield)
         {
             ObjData = objData;
             OtypData = otypdata;

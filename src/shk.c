@@ -44,7 +44,6 @@ STATIC_DCL int FDECL(dopayobj, (struct monst *, struct bill_x *,
                                 struct obj **, int, BOOLEAN_P));
 STATIC_DCL long FDECL(stolen_container, (struct obj *, struct monst *,
                                          long, BOOLEAN_P));
-STATIC_DCL long FDECL(getprice, (struct obj *, BOOLEAN_P));
 STATIC_DCL void FDECL(shk_names_obj, (struct monst *, struct obj *,
                                       const char *, long, const char *));
 STATIC_DCL struct obj *FDECL(bp_to_obj, (struct bill_x *));
@@ -3696,7 +3695,7 @@ struct obj* obj;
     return tmp;
 }
 
-STATIC_OVL long
+long
 getprice(obj, shk_buying)
 register struct obj *obj;
 boolean shk_buying;
@@ -4740,6 +4739,9 @@ boolean
 costly_spot(x, y)
 register xchar x, y;
 {
+    if (!isok(x, y))
+        return FALSE;
+
     struct monst *shkp;
     struct eshk *eshkp;
 
@@ -5520,7 +5522,7 @@ boolean eating;
     struct monst* shkp = (struct monst*)0;
     int omx = obj->ox, omy = obj->oy;
 
-    if (obj && (obj->unpaid || (obj->where == OBJ_FLOOR && !obj->no_charge && costly_spot(omx, omy))))
+    if (is_unpaid_shop_item(obj, omx, omy))
     {
         shkp = shop_keeper(inside_shop(omx, omy));
         char shopkeeper_name[BUFSZ] = "";

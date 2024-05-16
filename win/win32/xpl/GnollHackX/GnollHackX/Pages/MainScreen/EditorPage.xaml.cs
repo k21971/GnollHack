@@ -13,6 +13,7 @@ using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
 namespace GnollHackM
 #else
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 
@@ -27,11 +28,7 @@ namespace GnollHackX.Pages.MainScreen
         public EditorPage(string fileName, string header)
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
 
             _fileName = fileName;
             HeaderLabel.Text = header;
@@ -79,6 +76,7 @@ namespace GnollHackX.Pages.MainScreen
                         return;
                     }
                     ErrorLabel.Text = "";
+                    GHApp.CurrentMainPage?.InvalidateCarousel();
                     await App.Current.MainPage.Navigation.PopModalAsync();
                 }
                 else
@@ -89,6 +87,7 @@ namespace GnollHackX.Pages.MainScreen
             else
             {
                 ErrorLabel.Text = "";
+                GHApp.CurrentMainPage?.InvalidateCarousel();
                 await App.Current.MainPage.Navigation.PopModalAsync();
             }
         }
@@ -103,6 +102,7 @@ namespace GnollHackX.Pages.MainScreen
                 if (answer)
                 {
                     ErrorLabel.Text = "";
+                    GHApp.CurrentMainPage?.InvalidateCarousel();
                     await App.Current.MainPage.Navigation.PopModalAsync();
                 }
                 else 
@@ -113,6 +113,7 @@ namespace GnollHackX.Pages.MainScreen
             else
             {
                 ErrorLabel.Text = "";
+                GHApp.CurrentMainPage?.InvalidateCarousel();
                 await App.Current.MainPage.Navigation.PopModalAsync();
             }
         }
@@ -126,6 +127,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 ErrorLabel.Text = "";
                 GHApp.GnollHackService.ResetDefaultsFile();
+                GHApp.CurrentMainPage?.InvalidateCarousel();
                 await App.Current.MainPage.Navigation.PopModalAsync();
             }
             else

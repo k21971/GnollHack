@@ -15,6 +15,7 @@ namespace GnollHackM
 #else
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 
@@ -30,15 +31,12 @@ namespace GnollHackX.Pages.MainScreen
         public TopScorePage(string fileName)
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
+
             _fileName = fileName;
             ScoresView.BindingContext = this;
             MainGrid.BindingContext = this;
-            if(GHApp.PostingXlogEntries)
+            if(GHApp.HasInternetAccess)
             {
                 CloseButton.IsVisible = false;
                 CloseGrid.IsVisible = true;
@@ -48,11 +46,8 @@ namespace GnollHackX.Pages.MainScreen
         public TopScorePage()
         {
             InitializeComponent();
-#if GNH_MAUI
             On<iOS>().SetUseSafeArea(true);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
+
             _fileName = "";
             NoScoresLabel.IsVisible = true;
             ScoresView.IsVisible = false;
@@ -299,13 +294,14 @@ namespace GnollHackX.Pages.MainScreen
         private async void Button_Clicked(object sender, EventArgs e)
         {
             GHApp.PlayButtonClickedSound();
+            ScoresView.IsEnabled = false;
 
             Label btn = sender as Label;
             GHTopScoreItem tsi = null;
             if (btn != null)
                 tsi = btn.BindingContext as GHTopScoreItem;
 
-            if(tsi != null)
+            if (tsi != null)
             {
                 string fulltargetpath = Path.Combine(GHApp.GHPath, GHConstants.DumplogDirectory, tsi.GetDumplogFileName());
                 string fullhtmltargetpath = Path.Combine(GHApp.GHPath, GHConstants.DumplogDirectory, tsi.GetHTMLDumplogFileName());
@@ -374,6 +370,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 await DisplayAlert("Top Score Info Missing", "Selected top score information does not exist.", "OK");
             }
+            ScoresView.IsEnabled = true;
         }
 
         private async void ServerButton_Clicked(object sender, EventArgs e)

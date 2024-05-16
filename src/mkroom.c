@@ -111,7 +111,7 @@ int roomtype;
             return mkzoo(LIBRARY);
             break;
         case DRAGONLAIR:
-            mkdragonlair();
+            return mkdragonlair();
             break;
         case MORGUE:
             return mkzoo(MORGUE);
@@ -182,7 +182,6 @@ mkshop()
             }
             if (*ep == 'd' || *ep == 'D') {
                 return mkdragonlair();
-                return 1;
             }
             if (*ep == 't' || *ep == 'T' || *ep == '\\') {
                 return mkzoo(COURT);
@@ -594,12 +593,9 @@ int x,y;
         : (i > 4) ? PM_GNOLL_KING
         : (i > 2) ? PM_DWARF_KING
         : PM_GNOME_KING;
-    struct monst *mon = makemon(&mons[pm], x, y, MM_WAITFORU);
+    struct monst *mon = makemon(&mons[pm], x, y, MM_WAITFORU | MM_ANGRY);
 
     if (mon) {
-        //mon->msleeping = 1;
-        mon->mpeaceful = 0;
-        set_mhostility(mon);
         /* Give him a sceptre to pound in judgment */
         (void) mongets(mon, MACE);
     }
@@ -609,7 +605,7 @@ void
 fill_zoo(sroom)
 struct mkroom *sroom;
 {
-    struct monst *mon;
+    //struct monst *mon;
     register int sx, sy, i;
     int sh, tx = 0, ty = 0, goldlim = 0, type = sroom->rtype;
     int rmno = (int) ((sroom - rooms) + ROOMOFFSET);
@@ -796,11 +792,11 @@ place_main_monst_here:
 
             if (mon_one_in_chance > 1 && rn2(mon_one_in_chance))
             {
-                mon = (struct monst*) 0; //No monster
+                //mon = (struct monst*) 0; //No monster
             }
             else
             {
-                mon = makemon((type == COURT)
+                (void)makemon((type == COURT)
                            ? (Is_yeenaghu_level(&u.uz) ? yeenaghumon() : courtmon())
                            : (type == BARRACKS)
                               ? (Is_yeenaghu_level(&u.uz) ? yeenaghumon() : squadmon())
@@ -825,17 +821,7 @@ place_main_monst_here:
                                              : (type == ANTHOLE)
                                                  ? antholemon()
                                                  : (struct permonst *) 0,
-                          sx, sy, MM_WAITFORU);
-            }
-
-            if (mon)
-            {
-                //mon->msleeping = 1;
-                if (type == COURT && is_peaceful(mon))
-                {
-                    mon->mpeaceful = 0;
-                    set_mhostility(mon);
-                }
+                          sx, sy, MM_WAITFORU | MM_ANGRY);
             }
 
             if (!IS_FLOOR(levl[sx][sy].typ))

@@ -1302,6 +1302,194 @@ winid endwin;
 }
 #endif
 
+struct item_score_count_result
+count_artifacts(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj) 
+    {
+        if (otmp->oartifact && (program_state.gameover || otmp->nknown || otmp->aknown))
+        {
+            cnt.quantity += otmp->quan;
+            cnt.score += ARCHAEOLOGIST_PER_ARTIFACT_SCORE * otmp->quan;
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_artifacts(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_powerful_melee_weapon_score(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (is_wieldable_weapon(otmp) && !is_appliable_pole_type_weapon(otmp)
+            && !(is_launcher(otmp) || is_ammo(otmp) || is_missile(otmp))
+            && ((otmp->oartifact && (program_state.gameover || otmp->nknown || otmp->aknown)) || (otmp->mythic_prefix && otmp->mythic_suffix)))
+        {
+            cnt.quantity += otmp->quan;
+            cnt.score += BARBARIAN_PER_WEAPON_SCORE * otmp->quan;
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_powerful_melee_weapon_score(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_powerful_ranged_weapon_score(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (is_wieldable_weapon(otmp)
+            && (is_launcher(otmp) || is_ammo(otmp) || is_missile(otmp))
+            && ((otmp->oartifact && (program_state.gameover || otmp->nknown || otmp->aknown)) || (otmp->mythic_prefix || otmp->mythic_suffix || otmp->exceptionality >= EXCEPTIONALITY_ELITE)))
+        {
+            cnt.quantity += otmp->quan;
+            if (is_launcher(otmp))
+            {
+                cnt.quantity_nonammo += otmp->quan;
+                cnt.score += RANGER_PER_LAUNCHER_SCORE * otmp->quan;
+            }
+            else
+            {
+                cnt.quantity_ammo += otmp->quan;
+                cnt.score += RANGER_PER_AMMO_SCORE * otmp->quan;
+            }
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_powerful_ranged_weapon_score(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.quantity_nonammo += cont_cnt.quantity_nonammo;
+            cnt.quantity_ammo += cont_cnt.quantity_ammo;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_powerful_Japanese_item_score(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (((otmp->oartifact && (program_state.gameover || otmp->nknown || otmp->aknown)) && (artilist[otmp->oartifact].aflags2 & AF2_JAPANESE) != 0)
+            || ((otmp->mythic_prefix || otmp->mythic_suffix || otmp->exceptionality >= EXCEPTIONALITY_EXCEPTIONAL) && ((objects[otmp->otyp].oc_flags6 & O6_JAPANESE_ITEM) != 0 || Japanese_item_name(otmp->otyp) != 0))
+           )
+        {
+            cnt.quantity += otmp->quan;
+            if (is_ammo(otmp) || is_missile(otmp))
+            {
+                cnt.quantity_ammo += otmp->quan;
+                cnt.score += SAMURAI_PER_AMMO_SCORE * otmp->quan;
+            }
+            else
+            {
+                cnt.quantity_nonammo += otmp->quan;
+                cnt.score += SAMURAI_PER_ITEM_SCORE * otmp->quan;
+            }
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_powerful_Japanese_item_score(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.quantity_nonammo += cont_cnt.quantity_nonammo;
+            cnt.quantity_ammo += cont_cnt.quantity_ammo;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_powerful_valkyrie_item_score(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (u.ualign.type == A_CHAOTIC ? otmp->exceptionality == EXCEPTIONALITY_INFERNAL : u.ualign.type == A_LAWFUL ? otmp->exceptionality == EXCEPTIONALITY_CELESTIAL : otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+        {
+            cnt.quantity += otmp->quan;
+            if (is_ammo(otmp) || is_missile(otmp))
+            {
+                cnt.quantity_ammo += otmp->quan;
+                cnt.score += VALKYRIE_PER_AMMO_SCORE * otmp->quan;
+            }
+            else
+            {
+                cnt.quantity_nonammo += otmp->quan;
+                cnt.score += VALKYRIE_PER_ITEM_SCORE * otmp->quan;
+            }
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_powerful_melee_weapon_score(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.quantity_nonammo += cont_cnt.quantity_nonammo;
+            cnt.quantity_ammo += cont_cnt.quantity_ammo;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct amulet_count_result
+count_amulets(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct amulet_count_result cnt = { 0, 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == AMULET_OF_LIFE_SAVING)
+        {
+            cnt.quantity += otmp->quan;
+            cnt.amulets_of_life_saving += otmp->quan;
+            cnt.score += CAVEMAN_PER_AMULET_OF_LIFE_SAVING_SCORE * otmp->quan;
+        }
+        else if (otmp->oclass == AMULET_CLASS && !objects[otmp->otyp].oc_pre_discovered && otmp->otyp != AMULET_OF_YENDOR && otmp->otyp != FAKE_AMULET_OF_YENDOR)
+        {
+            cnt.quantity += otmp->quan;
+            cnt.other_amulets += otmp->quan;
+            cnt.score += CAVEMAN_PER_OTHER_AMULET_SCORE * otmp->quan;
+        }
+
+        if (Has_contents(otmp))
+        {
+            struct amulet_count_result cont_cnt = count_amulets(otmp->cobj);
+            cnt.score += cont_cnt.score;
+            cnt.quantity += cont_cnt.quantity;
+            cnt.amulets_of_life_saving += cont_cnt.amulets_of_life_saving;
+            cnt.other_amulets += cont_cnt.other_amulets;
+        }
+    }
+    return cnt;
+}
+
+
 /* Be careful not to call panic from here! */
 void
 done(how)
@@ -1725,7 +1913,7 @@ int how;
         force_launch_placement();
 
     /* maintain ugrave_arise even for !bones_ok */
-    if (how == PANICKED)
+    if (how == PANICKED || how == TRICKED)
         u.ugrave_arise = (NON_PM - 3); /* no corpse, no grave */
     else if (how == BURNING || how == DISSOLVED || how == DISINTEGRATION) /* corpse burns up too */
         u.ugrave_arise = (NON_PM - 2); /* leave no corpse */
@@ -1760,7 +1948,7 @@ int how;
     if (how == ESCAPED || how == PANICKED)
         killer.format = NO_KILLER_PREFIX;
 
-    if (how != PANICKED) 
+    if (how != PANICKED && how != TRICKED)
     {
         boolean silently = done_stopprint ? TRUE : FALSE;
 
@@ -1780,7 +1968,7 @@ int how;
     if (have_windows)
         display_nhwindow(WIN_MESSAGE, FALSE);
 
-    if (how != PANICKED && disclose_and_dumplog_ok)
+    if (how != PANICKED && how != TRICKED && disclose_and_dumplog_ok)
     {
         struct obj *obj;
 
@@ -2466,8 +2654,8 @@ const genericptr vptr2;
         res = mstr2 - mstr1; /* monstr high to low */
         break;
     case VANQ_ALPHA_SEP:
-        uniq1 = ((mons[indx1].geno & G_UNIQ) && indx1 != PM_HIGH_PRIEST);
-        uniq2 = ((mons[indx2].geno & G_UNIQ) && indx2 != PM_HIGH_PRIEST);
+        uniq1 = UniqCritterIndx(indx1);
+        uniq2 = UniqCritterIndx(indx2);
         if (uniq1 ^ uniq2) { /* one or other uniq, but not both */
             res = uniq2 - uniq1;
             break;
@@ -2580,10 +2768,6 @@ dogenocidedmonsters()
     list_genocided('a', FALSE, FALSE);
     return 0;
 }
-
-/* high priests aren't unique but are flagged as such to simplify something */
-#define UniqCritterIndx(mndx) ((mons[mndx].geno & G_UNIQ) \
-                               && mndx != PM_HIGH_PRIEST)
 
 STATIC_OVL void
 list_vanquished(defquery, ask, isend)
@@ -2745,8 +2929,9 @@ boolean ask, isend;
 }
 
 void
-print_selfies(enwin)
+print_selfies(enwin, final)
 winid enwin;
+int final;
 {
     short mindx[NUM_MONSTERS] = { 0 };
     int ntypes = 0;
@@ -2763,7 +2948,7 @@ winid enwin;
 
     if (!ntypes)
     {
-        putstr(enwin, 0, " (No selfies taken with monsters)");
+        putstr(enwin, 0, "  (No selfies taken with monsters)");
     }
     else
     {
@@ -2771,6 +2956,7 @@ winid enwin;
 
         char buf[BUFSZ], buftoo[BUFSZ];
         int ni;
+        long selfiescore = 0L;
         for (ni = 0; ni < ntypes; ni++)
         {
             i = mindx[ni];
@@ -2784,6 +2970,7 @@ winid enwin;
             {
                 Strcpy(buf, an(pm_common_name(&mons[i])));
             }
+            selfiescore += TOURIST_SELFIE_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
 
             /* number of leading spaces to match 3 digit prefix */
             pfx = !strncmpi(buf, "the ", 4) ? 0
@@ -2791,12 +2978,155 @@ winid enwin;
                 : !strncmpi(buf, "a ", 2) ? 2
                 : !digit(buf[2]) ? 4 : 0;
 
-            Sprintf(buftoo, "%*s%s", pfx, "", buf);
+            Sprintf(buftoo, " %*s%s", pfx, "", buf);
             putstr(enwin, 0, buftoo);
         }
+        if (!final)
+            putstr(enwin, ATR_HALF_SIZE, " ");
+        if (selfiescore != context.role_score)
+        {
+            char dbuf[BUFSZ];
+            Sprintf(dbuf, "print_selfies: selfiescore of %ld does not match context.role_score of %ld.", selfiescore, context.role_score);
+            issue_debuglog(DEBUGLOG_GENERAL, dbuf);
+            context.role_score = selfiescore;
+        }
+        long score_percentage = ((selfiescore + (long)u.uachieve.role_achievement * TOURIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(buf, " You %s gained %ld%% of your maximum role score.", final ? "had" : "have", score_percentage);
+        putstr(enwin, ATR_NONE, buf);
     }
 }
 
+void
+print_knight_slayings(enwin, final)
+winid enwin;
+int final;
+{
+    short mindx[NUM_MONSTERS] = { 0 };
+    int ntypes = 0;
+    int i;
+    int pfx;
+    for (i = LOW_PM; i < NUM_MONSTERS; i++)
+    {
+        if (mvitals[i].died > 0 && is_knight_bounty(&mons[i]))
+        {
+            mindx[ntypes] = i;
+            ntypes++;
+        }
+    }
+
+    if (!ntypes)
+    {
+        putstr(enwin, 0, "  (No creatures slain)");
+    }
+    else
+    {
+        qsort((genericptr_t)mindx, ntypes, sizeof * mindx, vanqsort_cmp);
+
+        char buf[BUFSZ], buftoo[BUFSZ];
+        int ni;
+        boolean no_female, all_female;
+        uchar nkilled, fkilled;
+        long killscore = 0L;
+        for (ni = 0; ni < ntypes; ni++)
+        {
+            i = mindx[ni];
+            nkilled = mvitals[i].died;
+            fkilled = mvitals[i].died_female;
+            no_female = (fkilled == 0);
+            all_female = (fkilled == nkilled);
+            if (nkilled > 0)
+            {
+                if (UniqCritterIndx(i))
+                {
+                    killscore += KNIGHT_UNIQUE_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+                    Sprintf(buf, "%s%s",
+                        !is_mname_proper_name(&mons[i]) ? "the " : "",
+                        pm_common_name(&mons[i]));
+                    if (nkilled > 1)
+                    {
+                        switch (nkilled)
+                        {
+                        case 2:
+                            Sprintf(eos(buf), " (twice)");
+                            break;
+                        case 3:
+                            Sprintf(eos(buf), " (thrice)");
+                            break;
+                        default:
+                            Sprintf(eos(buf), " (%d times)", nkilled);
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    killscore += KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1) * nkilled;
+                    /* trolls or undead might have come back,
+                       but we don't keep track of that */
+                    if (nkilled == 1)
+                        Strcpy(buf, an(all_female ? pm_female_name(&mons[i]) : no_female ? mons[i].mname : pm_common_name(&mons[i])));
+                    else
+                    {
+                        const char* plural_name = all_female ? makeplural(pm_female_name(&mons[i])) : no_female ? makeplural(mons[i].mname) : pm_plural_name(&mons[i], 3);
+                        Sprintf(buf, "%3d %s", nkilled, plural_name);
+                    }
+                }
+                /* number of leading spaces to match 3 digit prefix */
+                pfx = !strncmpi(buf, "the ", 4) ? 0
+                    : !strncmpi(buf, "an ", 3) ? 1
+                    : !strncmpi(buf, "a ", 2) ? 2
+                    : !digit(buf[2]) ? 4 : 0;
+                Sprintf(buftoo, " %*s%s", pfx, "", buf);
+                putstr(enwin, ATR_NONE, buftoo);
+            }
+        }
+        if (!final)
+            putstr(enwin, ATR_HALF_SIZE, " ");
+        if (killscore != context.role_score)
+        {
+            char dbuf[BUFSZ];
+            Sprintf(dbuf, "print_knight_slayings: killscore of %ld does not match context.role_score of %ld.", killscore, context.role_score);
+            issue_debuglog(DEBUGLOG_GENERAL, dbuf);
+            context.role_score = killscore;
+        }
+        long score_percentage = ((killscore + (long)u.uachieve.role_achievement * KNIGHT_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        score_percentage = min(100, score_percentage);
+        Sprintf(buf, " You %s gained %ld%% of your maximum role score.", final ? "had" : "have", score_percentage);
+        putstr(enwin, ATR_NONE, buf);
+    }
+}
+
+void
+recalculate_knight_slaying_score(VOID_ARGS)
+{
+    int i;
+    long score = 0L;
+    for (i = LOW_PM; i < NUM_MONSTERS; i++)
+    {
+        if (mvitals[i].died > 0 && is_knight_bounty(&mons[i]))
+        {
+            if (UniqCritterIndx(i))
+            {
+                score += KNIGHT_UNIQUE_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+            }
+            else
+            {
+                score += (long)mvitals[i].died * KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+            }
+        }
+    }
+    context.role_score = score;
+
+    struct monst* mtmp;
+    for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
+    {
+        if (!DEADMONSTER(mtmp) && isok(mtmp->mx, mtmp->my) && canspotmon(mtmp))
+        {
+            refresh_m_tile_gui_info(mtmp, FALSE);
+        }
+    }
+}
 
 /* number of monster species which have been genocided */
 int
@@ -3111,9 +3441,32 @@ char *in;
     return out;
 }
 
+long
+get_conduct_score_upon_ascension(VOID_ARGS)
+{
+    int ngenocided = num_genocides();
+    return (long)(
+        50 * (u.uconduct.food == 0)
+        + 15 * (u.uconduct.gnostic == 0)
+        + 60 * (u.uconduct.killer == 0)
+        + 30 * (u.uconduct.literate == 0)
+        + 2 * (u.uconduct.polypiles == 0)
+        + 2 * (u.uconduct.polyselfs == 0)
+        + 10 * (u.uconduct.unvegan == 0)
+        + 10 * (u.uconduct.unvegetarian == 0)
+        + 5 * (u.uconduct.weaphit == 0)
+        + 5 * (u.uconduct.wisharti == 0)
+        + 15 * (u.uconduct.wishes == 0)
+        + 80 * (u.uroleplay.blind)
+        + 60 * (u.uroleplay.nudist)
+        + 15 * (ngenocided == 0)
+        - 20 * (u.ualign.type != u.ualignbase[A_ORIGINAL])
+        - 20 * (u.ualignbase[A_CURRENT] != u.ualignbase[A_ORIGINAL])
+        );
+}
 
 long
-get_current_game_score()
+get_current_game_score(VOID_ARGS)
 {
 #if 0
     /* Old NetHack score */
@@ -3136,64 +3489,163 @@ get_current_game_score()
     long Deepest_Dungeon_Level = deepest_lev_reached(FALSE);
     long Achievements_Score = (long)(u.uachieve.amulet + u.uachieve.ascended + u.uachieve.bell + u.uachieve.book + u.uachieve.enter_gehennom + u.uachieve.finish_sokoban +
         u.uachieve.killed_medusa + u.uachieve.killed_yacc + u.uachieve.killed_demogorgon + u.uachieve.menorah + u.uachieve.prime_codex + u.uachieve.mines_luckstone +
-        !!In_endgame(&u.uz) + !!Is_astralevel(&u.uz) + u.uevent.invoked 
-        + u.uachieve.role_achievement /* Special role-specific achievement */
-        + u.uachieve.crowned
+        + u.uachieve.entered_astral_plane + u.uachieve.entered_elemental_planes + u.uevent.invoked + u.uachieve.crowned
         );
 
     long Small_Achievements_Score = (long)(u.uachieve.consulted_oracle + u.uachieve.read_discworld_novel
         + u.uachieve.entered_gnomish_mines + u.uachieve.entered_mine_town + u.uachieve.entered_shop + u.uachieve.entered_temple
         + u.uachieve.entered_sokoban + u.uachieve.entered_bigroom + u.uachieve.learned_castle_tune 
         + u.uachieve.entered_large_circular_dungeon + u.uachieve.entered_plane_of_modron + u.uachieve.entered_hellish_pastures
-        + u.uachieve.entered_astral_plane + u.uachieve.entered_elemental_planes
         );
 
-    /* Monk gets special score from easy achievements */
+    long Conduct_Score = (long)(u.uachieve.ascended) * get_conduct_score_upon_ascension();
 
-    long Rogue_Loot_Score = 0L;
-    if (Role_if(PM_ROGUE))
+    long Role_Specific_Score = 0L;
+    long Role_Achievement_Score = 0L;  /* Special role-specific achievement */
+
+    switch (Role_switch)
+    {
+    case PM_ARCHAEOLOGIST:
+    {
+        struct item_score_count_result cnt = count_artifacts(invent);
+        Role_Specific_Score = cnt.score;
+        Role_Achievement_Score = ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_BARBARIAN:
+    {
+        struct item_score_count_result cnt = count_powerful_melee_weapon_score(invent);
+        Role_Specific_Score = cnt.score;
+        Role_Achievement_Score = BARBARIAN_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_CAVEMAN:
+    {
+        struct amulet_count_result cnt = count_amulets(invent);
+        Role_Specific_Score = CAVEMAN_PER_AMULET_OF_LIFE_SAVING_SCORE * cnt.amulets_of_life_saving + CAVEMAN_PER_OTHER_AMULET_SCORE * cnt.other_amulets;
+        Role_Achievement_Score = CAVEMAN_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_HEALER:
+    {
+        int i;
+        for (i = 0; i < MAXSPELL; i++)
+        {
+            if (spl_book[i].sp_id == NO_SPELL)
+                break;
+            if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
+                Role_Specific_Score += HEALER_PER_SPELL_LEVEL_SCORE * (long)(spl_book[i].sp_lev + 2); /* Healer has the fewest spells */
+        }
+        Role_Achievement_Score = HEALER_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_KNIGHT:
+    {
+        //int i;
+        //for (i = LOW_PM; i < NUM_MONSTERS; i++)
+        //{
+        //    if (mvitals[i].died > 0 && ((u.ualign.type == A_LAWFUL ? is_demon(&mons[i]) || mons[i].mlet == S_IMP : u.ualign.type == A_CHAOTIC ? is_angel(&mons[i]) : FALSE) || (is_dragon(&mons[i]) && u.ualign.type * mons[i].maligntyp < 0)))
+        //    {
+        //        if (UniqCritterIndx(i))
+        //        {
+        //            Role_Specific_Score += KNIGHT_UNIQUE_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+        //        }
+        //        else
+        //        {
+        //            Role_Specific_Score += (long)mvitals[i].died * KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+        //        }
+        //    }
+        //}
+        Role_Specific_Score = context.role_score;
+        Role_Achievement_Score = KNIGHT_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_MONK:
+    {
+        Role_Specific_Score = Conduct_Score * MONK_EXTRA_CONDUCT_SCORE_MULTIPLIER;
+        Role_Achievement_Score = MONK_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_PRIEST:
+    {
+        int i;
+        for (i = 0; i < MAXSPELL; i++)
+        {
+            if (spl_book[i].sp_id == NO_SPELL)
+                break;
+            if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
+                Role_Specific_Score += PRIEST_PER_SPELL_LEVEL_SCORE * (long)(spl_book[i].sp_lev + 2); /* Priest has the fewer spell than wizard */
+        }
+        Role_Achievement_Score = PRIEST_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_RANGER:
+    {
+        struct item_score_count_result cnt = count_powerful_ranged_weapon_score(invent);
+        Role_Specific_Score = cnt.score;
+        Role_Achievement_Score = RANGER_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_ROGUE:
     {
         long lootvalue = 0L;
         lootvalue += money_cnt(invent);
         lootvalue += hidden_gold(); /* accumulate gold from containers */
         lootvalue += carried_gem_value();
-        Rogue_Loot_Score = lootvalue;
+        Role_Specific_Score = lootvalue;
+        Role_Achievement_Score = ROGUE_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
     }
-
-    long Tourist_Selfie_Score = 0L;
-    if (Role_if(PM_TOURIST))
+    case PM_SAMURAI:
+    {
+        struct item_score_count_result cnt = count_powerful_Japanese_item_score(invent);
+        Role_Specific_Score = cnt.score;
+        Role_Achievement_Score = SAMURAI_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_TOURIST:
+    {
+        //int i;
+        //for (i = LOW_PM; i < NUM_MONSTERS; i++)
+        //{
+        //    if (mvitals[i].mvflags & MV_SELFIE_TAKEN)
+        //    {
+        //        Role_Specific_Score += TOURIST_SELFIE_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+        //    }
+        //}
+        Role_Specific_Score = context.role_score;
+        Role_Achievement_Score = TOURIST_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_VALKYRIE:
+    {
+        struct item_score_count_result cnt = count_powerful_valkyrie_item_score(invent);
+        Role_Specific_Score = cnt.score;
+        Role_Achievement_Score = VALKYRIE_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    case PM_WIZARD:
     {
         int i;
-        for (i = LOW_PM; i < NUM_MONSTERS; i++)
+        for (i = 0; i < MAXSPELL; i++)
         {
-            if (mvitals[i].mvflags & MV_SELFIE_TAKEN)
-            {
-                Tourist_Selfie_Score += 100L * (mons[i].difficulty + 1);
-            }
+            if (spl_book[i].sp_id == NO_SPELL)
+                break;
+            if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
+                Role_Specific_Score += WIZARD_PER_SPELL_LEVEL_SCORE * (long)(spl_book[i].sp_lev + 2);
         }
+        Role_Achievement_Score = WIZARD_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        break;
+    }
+    default:
+        break;
     }
 
-    int ngenocided = num_genocides();
-
-    long Conduct_Score = (long)(u.uachieve.ascended) * (long)(
-        50 * (u.uconduct.food == 0)
-        + 15 * (u.uconduct.gnostic == 0)
-        + 60 * (u.uconduct.killer == 0)
-        + 30 * (u.uconduct.literate == 0)
-        + 2 * (u.uconduct.polypiles == 0)
-        + 2 * (u.uconduct.polyselfs == 0)
-        + 15 * (u.uconduct.unvegan == 0)
-        + 10 * (u.uconduct.unvegetarian == 0)
-        + 15 * (u.uconduct.weaphit == 0)
-        + 2 * (u.uconduct.wisharti == 0)
-        + 10 * (u.uconduct.wishes == 0)
-        + 80 * (u.uroleplay.blind)
-        + 60 * (u.uroleplay.nudist)
-        + 10 * (ngenocided == 0)
-        );
-
-    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * 1000L + Small_Achievements_Score * 5000L + Achievements_Score * 10000L + Conduct_Score * 5000L 
-        + Rogue_Loot_Score + Tourist_Selfie_Score;
+    long Total_Role_Score = Role_Specific_Score + Role_Achievement_Score;
+    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * SCORE_PER_DUNGEON_LEVEL + Small_Achievements_Score * SCORE_PER_MINOR_ACHIEVEMENT + Achievements_Score * SCORE_PER_MAJOR_ACHIEVEMENT 
+        + Conduct_Score * CONDUCT_SCORE_MULTIPLIER + min(Total_Role_Score, MAXIMUM_ROLE_SCORE);
+    
+    Base_Score = max(0L, Base_Score);
 
     double Turn_Count_Multiplier = sqrt(50000.0) / sqrt((double)max(1L, moves));
     double Ascension_Multiplier = u.uachieve.ascended ? min(16.0, max(2.0, 4.0 * Turn_Count_Multiplier)) : 1.0;
@@ -3484,6 +3936,7 @@ reset_game(VOID_ARGS)
     dmonsfree();
     *plname = 0;
     *recovery_plname = 0;
+    is_gui_in_debug_mode = FALSE;
     plname_from_error_savefile = FALSE;
     plname_from_imported_savefile = FALSE;
     reset_gamestate_ex();

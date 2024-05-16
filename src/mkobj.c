@@ -822,7 +822,7 @@ long num;
 
     if (obj->cobj || num <= 0L || obj->quan <= num)
     {
-        panic("splitobj"); /* can't split containers */
+        panic("splitobj: num=%ld, quan=%ld", num, obj->quan); /* can't split containers */
         return (struct obj*)0;
     }
     otmp = newobj();
@@ -1590,9 +1590,9 @@ unsigned long mkflags;
 
             if (mkobj_type <= MKOBJ_RANDOM_PROPERTY_MAX_TYPE && is_poisonable(otmp) && !rn2(100) && !(objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED))
                 otmp->opoisoned = 1;
-            else if (is_elemental_enchantable(otmp) && ((objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED) || (mkobj_type <= MKOBJ_RANDOM_PROPERTY_MAX_TYPE && (is_multigen(otmp) ? !rn2(40) : !rn2(160)))))
+            else if (is_elemental_enchantable(otmp) && ((objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED) || (mkobj_type <= MKOBJ_RANDOM_PROPERTY_MAX_TYPE && leveldiff > 4 && (is_multigen(otmp) ? !rn2(40) : !rn2(160)))))
             {
-                if (is_death_enchantable(otmp) && ((objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED) || (mkobj_type <= MKOBJ_RANDOM_PROPERTY_MAX_TYPE && !rn2(10))))
+                if (is_death_enchantable(otmp) && ((objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED) || (mkobj_type <= MKOBJ_RANDOM_PROPERTY_MAX_TYPE && leveldiff > 16 && !rn2(10))))
                 {
                     otmp->elemental_enchantment = DEATH_ENCHANTMENT;
                     if (is_multigen(otmp))
@@ -1603,8 +1603,8 @@ unsigned long mkflags;
                 else
                 {
                     otmp->elemental_enchantment = (objects[otmp->otyp].oc_flags2 & O2_GENERATED_DEATH_OR_COLD_ENCHANTED) ? COLD_ENCHANTMENT :
-                        leveldiff > 11 ? (!rn2(7) ? COLD_ENCHANTMENT : !rn2(3) ? LIGHTNING_ENCHANTMENT  : FIRE_ENCHANTMENT) :
-                        (!rn2(3) ? LIGHTNING_ENCHANTMENT : FIRE_ENCHANTMENT);
+                        leveldiff > 12 ? (!rn2(7) ? COLD_ENCHANTMENT : !rn2(3) ? LIGHTNING_ENCHANTMENT  : FIRE_ENCHANTMENT) :
+                        (!rn2(3) && leveldiff > 8 ? LIGHTNING_ENCHANTMENT : FIRE_ENCHANTMENT);
 
                     if (is_multigen(otmp))
                     {
@@ -1763,7 +1763,6 @@ unsigned long mkflags;
             case SARCOPHAGUS:
             case COFFIN:
             {
-
                 if (!(mkflags & MKOBJ_FLAGS_OPEN_COFFIN) && !(mkflags & MKOBJ_FLAGS_MONSTER_SPECIFIED))
                 {
                     int cnm = NON_PM;
@@ -1771,12 +1770,14 @@ unsigned long mkflags;
 
                     if (otmp->otyp == SARCOPHAGUS)
                     {
-                        if (!rn2(2))
-                            cnm = NON_PM;
-                        else if (Inhell && !context.amonket_generated && (Is_sanctum(&u.uz) || rn2(100) < leveldiff * 2 - 23))
+                        if (Inhell && !context.amonket_generated && (Is_sanctum(&u.uz) || rn2(100) < leveldiff * 2 - 23))
                         {
                             context.amonket_generated = TRUE;
                             cnm = PM_AMONKET;
+                        }
+                        else if (!rn2(2))
+                        {
+                            cnm = NON_PM;
                         }
                         else
                         {
@@ -2171,9 +2172,9 @@ unsigned long mkflags;
 
         if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_CELESTIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_UNDEAD_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_CELESTIAL)
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
-        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGELIC_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGEL_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
-        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGELIC_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+        else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGEL_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
             otmp->exceptionality = EXCEPTIONALITY_ELITE;
     }
 

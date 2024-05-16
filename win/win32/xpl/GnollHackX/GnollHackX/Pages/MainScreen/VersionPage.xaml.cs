@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
@@ -13,9 +14,11 @@ namespace GnollHackM
 #else
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 using GnollHackX.Pages.Game;
+using GnollHackX.Controls;
 
 namespace GnollHackX.Pages.MainScreen
 #endif
@@ -27,11 +30,7 @@ namespace GnollHackX.Pages.MainScreen
         public VersionPage(GamePage gamePage)
         {
             InitializeComponent();
-#if GNH_MAUI
-            On<iOS>().SetUseSafeArea(false);
-#else
-            On<Xamarin.Forms.PlatformConfiguration.iOS>().SetUseSafeArea(true);
-#endif
+            On<iOS>().SetUseSafeArea(true);
 
             _gamePage = gamePage;
 
@@ -78,18 +77,91 @@ namespace GnollHackX.Pages.MainScreen
                 GameDurationTitleLabel.IsVisible = false;
                 VersionInfoGrid.Children.Remove(GameDurationLabel);
                 VersionInfoGrid.Children.Remove(GameDurationTitleLabel);
-                VersionInfoGrid.RowDefinitions.Remove(GameDurationRowDefinition);
+                //VersionInfoGrid.RowDefinitions.Remove(GameDurationRowDefinition);
+                GameDurationRowDefinition.Height = 0;
 
                 SessionTimeLabel.Text = "";
                 SessionTimeLabel.IsVisible = false;
                 SessionTitleLabel.IsVisible = false;
                 VersionInfoGrid.Children.Remove(SessionTimeLabel);
                 VersionInfoGrid.Children.Remove(SessionTitleLabel);
-                VersionInfoGrid.RowDefinitions.Remove(SessionPlayTimeRowDefinition);
+                //VersionInfoGrid.RowDefinitions.Remove(SessionPlayTimeRowDefinition);
+                SessionPlayTimeRowDefinition.Height = 0;
             }
 
-            PortVersionTitleLabel.Text = Device.RuntimePlatform + " Port Version:";
-            PortBuildTitleLabel.Text = Device.RuntimePlatform + " Port Build:";
+            /* Update GPU resource usage to latest value */
+            if(_gamePage != null)
+            {
+                GHApp.CurrentGPUCacheUsage = _gamePage.GetPrimaryCanvasResourceCacheUsage();
+            }
+
+            string backend = GHApp.GPUBackend;
+            if (backend != null)
+            {
+                GPUBackendLabel.Text = backend;
+            }
+            else
+            {
+                GPUBackendLabel.Text = "";
+                GPUBackendLabel.IsVisible = false;
+                GPUBackendTitleLabel.IsVisible = false;
+                VersionInfoGrid.Children.Remove(GPUBackendLabel);
+                VersionInfoGrid.Children.Remove(GPUBackendTitleLabel);
+                //VersionInfoGrid.RowDefinitions.Remove(GPUBackendRowDefinition);
+                GPUBackendRowDefinition.Height = 0;
+            }
+
+            long cacheSize = GHApp.CurrentGPUCacheSize;
+            if (cacheSize >= 0)
+            {
+                long TotalGPUCacheInBytes = cacheSize;
+                long TotalGPUCacheInMB = (TotalGPUCacheInBytes / 1024) / 1024;
+                GPUCacheSizeLabel.Text = TotalGPUCacheInMB + " MB";
+            }
+            else
+            {
+                GPUCacheSizeLabel.Text = "";
+                GPUCacheSizeLabel.IsVisible = false;
+                GPUCacheSizeTitleLabel.IsVisible = false;
+                VersionInfoGrid.Children.Remove(GPUCacheSizeLabel);
+                VersionInfoGrid.Children.Remove(GPUCacheSizeTitleLabel);
+                //VersionInfoGrid.RowDefinitions.Remove(GPUCacheSizeRowDefinition);
+                GPUCacheSizeRowDefinition.Height = 0;
+            }
+
+            CacheUsageInfo cacheUsage = GHApp.CurrentGPUCacheUsage;
+            int cacheUsageResources = cacheUsage.MaxResources;
+            long cacheUsageBytes = cacheUsage.MaxResourceBytes;
+            if (cacheUsageBytes >= 0 || cacheUsageResources >= 0)
+            {
+                string str = "";
+                if(cacheUsageBytes >= 0)
+                {
+                    long TotalCacheUsageInBytes = cacheUsageBytes;
+                    long TotalCacheUsageInMB = (TotalCacheUsageInBytes / 1024) / 1024;
+                    str += TotalCacheUsageInMB + " MB";
+                }
+                if (cacheUsageResources >= 0)
+                {
+                    if (str != "")
+                        str += " / ";
+                    str += cacheUsageResources + " #";
+                }
+                GPUCacheUsageLabel.Text = str;
+            }
+            else
+            {
+                GPUCacheUsageLabel.Text = "";
+                GPUCacheUsageLabel.IsVisible = false;
+                GPUCacheUsageTitleLabel.IsVisible = false;
+                VersionInfoGrid.Children.Remove(GPUCacheUsageLabel);
+                VersionInfoGrid.Children.Remove(GPUCacheUsageTitleLabel);
+                //VersionInfoGrid.RowDefinitions.Remove(GPUCacheUsageRowDefinition);
+                GPUCacheUsageRowDefinition.Height = 0;
+            }
+
+            PortVersionTitleLabel.Text = GHApp.RuntimePlatform + " Port Version:";
+            PortBuildTitleLabel.Text = GHApp.RuntimePlatform + " Port Build:";
             PortConfigurationTitleLabel.Text ="Port Configuration:";
 
             GnollHackVersionLabel.Text = GHApp.GHVersionString;
@@ -105,6 +177,8 @@ namespace GnollHackX.Pages.MainScreen
             GnollHackCompatibilityLabel.Text = compatstr == "" ? "" : "From " + compatstr;
             FMODVersionLabel.Text = GHApp.FMODVersionString;
             SkiaVersionLabel.Text = GHApp.SkiaVersionString + " (# " + GHApp.SkiaSharpVersionString + ")";
+            FrameworkVersionLabel.Text = GHApp.FrameworkVersionString;
+            RuntimeVersionLabel.Text = GHApp.RuntimeVersionString;
             PlatformLabel.Text = DeviceInfo.Platform + " " + DeviceInfo.VersionString;
             DeviceLabel.Text = manufacturer + " " + DeviceInfo.Model;
             TotalMemoryLabel.Text = TotalMemInMB + " MB";
@@ -136,7 +210,13 @@ namespace GnollHackX.Pages.MainScreen
 
                 double bordermargin = UIUtils.GetBorderWidth(bkgView.BorderStyle, width, height);
                 MainGrid.Margin = new Thickness(bordermargin, 0, bordermargin, 0);
-                double target_width = (Math.Min(width, MainGrid.WidthRequest) - MainGrid.Margin.Left - MainGrid.Margin.Right
+                double target_width = (Math.Min(width,
+#if GNH_MAUI
+                        TextScrollGrid.MaximumWidthRequest
+#else
+                        TextScrollGrid.WidthRequest
+#endif
+                    ) - MainGrid.Margin.Left - MainGrid.Margin.Right
                     - MainGrid.Padding.Left - MainGrid.Padding.Right - margins.Left - margins.Right);
                 double newsize = 15 * target_width / 400;
 

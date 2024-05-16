@@ -415,6 +415,7 @@ STATIC_VAR const struct def_skill Skill_A_Max[] = {
     { P_TRANSMUTATION_SPELL, P_MASTER },
     { P_NECROMANCY_SPELL, P_MASTER },
     { P_DUAL_WEAPON_COMBAT, P_MASTER },
+    { P_TWO_HANDED_WEAPON, P_EXPERT },
     { P_BARE_HANDED_COMBAT, P_MASTER },
     { P_DODGE, P_EXPERT },
     { P_WAND, P_MASTER },
@@ -856,11 +857,11 @@ STATIC_VAR const struct def_skill Skill_W_Init[] = {
 
 
 STATIC_OVL void
-knows_object(obj)
-register int obj;
+knows_object(otyp)
+register int otyp;
 {
-    discover_object(obj, TRUE, FALSE);
-    objects[obj].oc_pre_discovered = 1; /* not a "discovery" */
+    discover_object(otyp, TRUE, FALSE);
+    objects[otyp].oc_pre_discovered = 1; /* not a "discovery" */
 }
 
 #if 0
@@ -1013,6 +1014,7 @@ u_init()
     case PM_CAVEMAN:
         ini_inv(Cave_man);
         skill_init(Skill_C_Init, Skill_C_Max);
+        knows_object(AMULET_OF_LIFE_SAVING);
         break;
     case PM_HEALER:
         u.umoney0 = rn1(1000, 1001);
@@ -1488,8 +1490,7 @@ add_school_specific_spellbooks(VOID_ARGS)
 
                 obj = addinv(obj);
                 if (OBJ_DESCR(objects[otyp]))
-                    discover_object(otyp, TRUE, FALSE);
-
+                    knows_object(otyp);
                 initialspell(obj);
                 useup(obj);
             }
@@ -1982,9 +1983,9 @@ register const struct trobj * trop;
 
             /* Make the type known if necessary */
             if (OBJ_DESCR(objects[otyp]))
-                discover_object(otyp, TRUE, FALSE);
+                knows_object(otyp);
             if (otyp == OIL_LAMP)
-                discover_object(POT_OIL, TRUE, FALSE);
+                knows_object(POT_OIL);
 
             if (obj->oclass == ARMOR_CLASS)
             {

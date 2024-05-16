@@ -29,6 +29,7 @@ using Android.Util;
 using AndroidX.Core.App;
 using Android.Content.PM;
 using Android.Views.InputMethods;
+using Android.Provider;
 
 #if GNH_MAUI
 namespace GnollHackM
@@ -44,7 +45,9 @@ namespace GnollHackX.Droid
             var context = Android.App.Application.Context;
             if (Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.Tiramisu)
             {
+#pragma warning disable CA1416 // Supported on: 'android' 33.0 and later
                 return context.PackageManager.GetPackageInfo(context.PackageName, PackageManager.PackageInfoFlags.Of(0L)).VersionName;
+#pragma warning restore CA1416 // Supported on: 'android' 33.0 and later
             }
             else
             {
@@ -110,6 +113,7 @@ namespace GnollHackX.Droid
             //StopForegroundService();
 #if GNH_MAUI
             Platform.CurrentActivity.Finish();
+            Microsoft.Maui.Controls.Application.Current.Quit();
 #else
             MainActivity.CurrentMainActivity.Finish();
 #endif
@@ -279,7 +283,7 @@ namespace GnollHackX.Droid
                 Log.Clear();
             }
             if (GHApp.DebugLogMessages)
-                await page.DisplayAlert("App Review Log", logs, "OK");
+                GHApp.MaybeWriteGHLog("App Review Log: " + logs);
         }
 #endif
 
@@ -424,6 +428,28 @@ namespace GnollHackX.Droid
                     activity.Window.DecorView.ClearFocus();
                 }
             }
+        }
+
+        public void HideOsNavigationBar()
+        {
+#if GNH_MAUI
+            Activity activity = MainActivity.CurrentMainActivity;
+            if (activity == null)
+                MainActivity.DefaultShowNavigationBar = false;
+            else
+                MainActivity.HideOsNavigationBar();
+#endif
+        }
+
+        public void ShowOsNavigationBar()
+        {
+#if GNH_MAUI
+            Activity activity = MainActivity.CurrentMainActivity;
+            if (activity == null)
+                MainActivity.DefaultShowNavigationBar = true;
+            else
+                MainActivity.ShowOsNavigationBar();
+#endif
         }
     }
 

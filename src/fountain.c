@@ -664,7 +664,7 @@ register struct obj *obj;
             obj->oeroded = obj->oeroded2 = 0;
             obj->oerodeproof = TRUE;
             exercise(A_WIS, TRUE);
-            livelog_printf(LL_ARTIFACT, "%s", excalmsgs[rn2(SIZE(excalmsgs))]);
+            livelog_printf(LL_ARTIFACT, "%s", Hallucination || OddIdeas ? excalmsgs[rn2(SIZE(excalmsgs))] : "was bestowed with Excalibur by the Lady of the Lake");
         }
         update_inventory();
         create_current_floor_location(u.ux, u.uy, 0, NO_GLYPH, TRUE);
@@ -799,6 +799,7 @@ register struct obj *obj;
             case POT_HEALING:
             case POT_LESSER_REGENERATION:
             case POT_LESSER_REJUVENATION:
+            case POT_SPEED:
             case POT_EXTRA_ENERGY:
                 obj->otyp = POT_EXTRA_ENERGY;
                 break;

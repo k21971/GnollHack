@@ -49,12 +49,15 @@ namespace GnollHackX.Unknown
 {
     public class PlatformConstants
     {
-#if __IOS__
+#if __IOS__ || (GNH_MAUI && IOS)
         public const string dll     = "__Internal";
         public const string library = "gnollhackios";
-#elif __ANDROID__
+#elif __ANDROID__ || (GNH_MAUI && ANDROID)
         public const string dll     = @"libgnollhackdroid.so";
         public const string library = "gnollhackdroid";
+#elif GNH_MAUI && WINDOWS
+        public const string dll = @"libgnollhackwin.dll";
+        public const string library = "gnollhackwin";
 #else
         public const string dll     = @"libgnollhackunknown.so";
         public const string library = "gnollhackunknown";
@@ -513,15 +516,15 @@ namespace GnollHackX.Unknown
             /* Copy missing files from resources */
             string content;
             string assetsourcedir = "gnh";
-#if GNH_MAUI
-#if __ANDROID__
-            assetsourcedir = Path.Combine("Platforms", "Android", assetsourcedir);
-#elif __IOS__
-            assetsourcedir = Path.Combine("Platforms", "iOS", assetsourcedir);
-#else                
-            assetsourcedir = Path.Combine("Platforms", "Unknown", assetsourcedir);
-#endif
-#endif
+//#if GNH_MAUI
+//#if __ANDROID__
+//            assetsourcedir = Path.Combine("Platforms", "Android", assetsourcedir);
+//#elif __IOS__
+//            assetsourcedir = Path.Combine("Platforms", "iOS", assetsourcedir);
+//#else                
+//            assetsourcedir = Path.Combine("Platforms", "Unknown", assetsourcedir);
+//#endif
+//#endif
 #if __ANDROID__
             AssetManager assets = MainActivity.StaticAssets;
 #endif
@@ -621,15 +624,15 @@ namespace GnollHackX.Unknown
             {
                 string assetfile = sfile.name;
                 string sfiledir = sfile.source_directory;
-#if GNH_MAUI
-#if __IOS__
-                sfiledir = Path.Combine("Platforms", "iOS", sfiledir);
-#elif __ANDROID__
-                sfiledir = Path.Combine("Platforms", "Android", sfiledir);
-#else
-                sfiledir = Path.Combine("Platforms", "Unknown", sfiledir);
-#endif
-#endif
+//#if GNH_MAUI
+//#if __IOS__
+//                sfiledir = Path.Combine("Platforms", "iOS", sfiledir);
+//#elif __ANDROID__
+//                sfiledir = Path.Combine("Platforms", "Android", sfiledir);
+//#else
+//                sfiledir = Path.Combine("Platforms", "Unknown", sfiledir);
+//#endif
+//#endif
 #if __IOS__
                 string extension = Path.GetExtension(assetfile);
                 if (extension != null && extension.Length > 0)
@@ -1008,8 +1011,10 @@ namespace GnollHackX.Unknown
                 (ulong)(ghGame.ModernMode ? RunGnollHackFlags.ModernMode : 0) |
                 (ulong)(ghGame.CasualMode ? RunGnollHackFlags.CasualMode : 0) |
                 (ulong)(allowbones ? 0 : RunGnollHackFlags.DisableBones) |
+                (ulong)(GHApp.TournamentMode ? RunGnollHackFlags.TournamentMode : 0) |
+                (ulong)(GHApp.IsDebug ? RunGnollHackFlags.GUIDebugMode : 0) |
                 (ulong)ghGame.StartFlags;
-            string lastusedplname = Preferences.Get("LastUsedPlayerName", "");
+            string lastusedplname = GHApp.TournamentMode && !ghGame.PlayingReplay ? Preferences.Get("LastUsedTournamentPlayerName", "") : Preferences.Get("LastUsedPlayerName", "");
 
             return RunGnollHack(
                 filesdir,

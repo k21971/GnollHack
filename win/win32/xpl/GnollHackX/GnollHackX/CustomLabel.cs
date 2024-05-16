@@ -4,11 +4,11 @@ using System.Collections.Generic;
 using System.Text;
 using System.Collections.Concurrent;
 
-
 #if GNH_MAUI
 using GnollHackX;
 using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
+using SkiaSharp.Views.Maui.Handlers;
 
 namespace GnollHackM
 #else
@@ -206,7 +206,7 @@ namespace GnollHackX
 
         private void SplitRows()
         {
-            using (SKPaint textPaint = new SKPaint())
+            using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
                 float scale = GHApp.DisplayScale;
                 textPaint.TextSize = (float)FontSize * scale;
@@ -256,12 +256,12 @@ namespace GnollHackX
             }
         }
 
-        float CalculateTextPartWidth(string textPart, SKPaint textPaint)
+        float CalculateTextPartWidth(string textPart, GHSkiaFontPaint textPaint)
         {
             if(textPart == null || textPart == "")
                 return 0;
 
-            SKBitmap symbolbitmap;
+            SKImage symbolbitmap;
             SKRect source_rect = new SKRect();
             if (UseSpecialSymbols && (symbolbitmap = GHApp.GetSpecialSymbol(textPart, out source_rect)) != null)
             {
@@ -277,7 +277,7 @@ namespace GnollHackX
             }
         }
 
-        public string[] SplitTextWithConstraint(string text, float widthConstraint, SKPaint textPaint)
+        public string[] SplitTextWithConstraint(string text, float widthConstraint, GHSkiaFontPaint textPaint)
         {
             if (text == null)
                 return null;
@@ -382,7 +382,7 @@ namespace GnollHackX
             float longestwidth = 0;
             float totalheight = 0;
             List<float> rowWidths = new List<float>();
-            using (SKPaint textPaint = new SKPaint())
+            using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
                 float scale = GHApp.DisplayScale;
                 textPaint.TextSize = (float)FontSize * scale;
@@ -409,7 +409,7 @@ namespace GnollHackX
                     float totalwidth = 0;
                     foreach (string textPart in textParts)
                     {
-                        SKBitmap symbolbitmap;
+                        SKImage symbolbitmap;
                         SKRect source_rect = new SKRect();
                         if (UseSpecialSymbols && (symbolbitmap = GHApp.GetSpecialSymbol(textPart, out source_rect)) != null)
                         {
@@ -550,7 +550,7 @@ namespace GnollHackX
 
                 textAreaSize = TextAreaSize;
 
-                using (SKPaint textPaint = new SKPaint())
+                using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
                 {
                     float x = 0, y = 0;
                     textPaint.Typeface = GetFontTypeface();
@@ -594,7 +594,7 @@ namespace GnollHackX
                     y += usedTextOffset;
 
                     float generalpadding = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
-                    textPaint.TextAlign = SKTextAlign.Left;
+                    //textPaint.TextAlign = SKTextAlign.Left;
                     for (int i = 0; i < textRows.Length; i++)
                     {
                         string textRow = textRows[i];
@@ -626,7 +626,7 @@ namespace GnollHackX
                             int cnt = 0;
                             foreach (string textPart in textParts)
                             {
-                                SKBitmap symbolbitmap;
+                                SKImage symbolbitmap;
                                 SKRect source_rect = new SKRect();
                                 if (UseSpecialSymbols && (symbolbitmap = GHApp.GetSpecialSymbol(textPart, out source_rect)) != null)
                                 {
@@ -637,7 +637,7 @@ namespace GnollHackX
                                     float bmpx = x;
                                     float bmpy = y + textPaint.FontMetrics.Ascent;
                                     SKRect bmptargetrect = new SKRect(bmpx, bmpy, bmpx + bmpwidth, bmpy + bmpheight);
-                                    canvas.DrawBitmap(symbolbitmap, source_rect, bmptargetrect, textPaint);
+                                    canvas.DrawImage(symbolbitmap, source_rect, bmptargetrect, textPaint.Paint); 
                                     x += bmpwidth + bmpmargin;
                                 }
                                 else
@@ -653,7 +653,8 @@ namespace GnollHackX
                                         SKColor outlinecolor = new SKColor((byte)(255 * OutlineColor.R), (byte)(255 * OutlineColor.G), (byte)(255 * OutlineColor.B), (byte)(255 * OutlineColor.A));
 #endif
                                         textPaint.Color = outlinecolor;
-                                        canvas.DrawText(printedString, x, y, textPaint);
+                                        //canvas.DrawText(printedString, x, y, textPaint);
+                                        textPaint.DrawTextOnCanvas(canvas, printedString, x, y, SKTextAlign.Left);
                                     }
 
                                     textPaint.Style = SKPaintStyle.Fill;
@@ -663,7 +664,8 @@ namespace GnollHackX
                                     SKColor fillcolor = new SKColor((byte)(255 * TextColor.R), (byte)(255 * TextColor.G), (byte)(255 * TextColor.B), (byte)(255 * TextColor.A));
 #endif
                                     textPaint.Color = fillcolor;
-                                    canvas.DrawText(printedString, x, y, textPaint);
+                                    //canvas.DrawText(printedString, x, y, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, printedString, x, y, SKTextAlign.Left);
                                     x += textPaint.MeasureText(printedString);
                                 }
                                 cnt++;
@@ -685,7 +687,7 @@ namespace GnollHackX
             if (scale == 0)
                 return 0;
             float skwidth = 0;
-            using (SKPaint textPaint = new SKPaint())
+            using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
                 textPaint.Typeface = GetFontTypeface();
                 textPaint.TextSize = (float)FontSize * scale;
@@ -1061,7 +1063,7 @@ namespace GnollHackX
                 }
                 else
                 {
-                    if (_textScrollSpeedReleaseStamp != null)
+                    //if (_textScrollSpeedReleaseStamp != null)
                     {
                         long millisecs_elapsed = (DateTime.Now.Ticks - _textScrollSpeedReleaseStamp.Ticks) / TimeSpan.TicksPerMillisecond;
                         if (millisecs_elapsed > GHConstants.FreeScrollingTime)
@@ -1077,11 +1079,19 @@ namespace GnollHackX
                 }
             }
         }
-
         protected override SizeRequest OnMeasure(double widthConstraint, double heightConstraint)
         {
             return CalculateLabelSize(widthConstraint, heightConstraint);
         }
+
+#if GNH_MAUI
+        public Size CustomMeasureSize(double widthConstraint, double heightConstraint)
+        {
+            SizeRequest sizeRequest = CalculateLabelSize(widthConstraint, heightConstraint);
+            Size size = new Size(sizeRequest.Request.Width, sizeRequest.Request.Height);
+            return size;
+        }
+#endif
 
         private double _currentWidth = 0;
         private double _currentHeight = 0;
@@ -1097,4 +1107,18 @@ namespace GnollHackX
             }
         }
     }
+
+#if GNH_MAUI
+    internal class AutoSizeSKCanvasViewHandler : SKCanvasViewHandler
+    {
+        public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
+        {
+            var custom = (this.VirtualView as CustomLabel).CustomMeasureSize(widthConstraint, heightConstraint);
+            if (custom == Size.Zero)
+                return base.GetDesiredSize(widthConstraint, heightConstraint);
+            else
+                return custom;
+        }
+    }
+#endif
 }

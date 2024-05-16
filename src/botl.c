@@ -1374,28 +1374,28 @@ boolean loc_is_you, ispeaceful, ispet, isdetected;
         switch (status_mark)
         {
         case STATUS_MARK_TOWNGUARD_PEACEFUL:
-            if (!loc_is_you && ispeaceful && !ispet && is_watch(mtmp->data))
+            if (!loc_is_you && ispeaceful && !ispet && !Hallucination && is_watch(mtmp->data))
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_TOWNGUARD_HOSTILE:
-            if (!loc_is_you && !ispeaceful && !ispet && is_watch(mtmp->data))
+            if (!loc_is_you && !ispeaceful && !ispet && !Hallucination && is_watch(mtmp->data))
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_PET:
-            if (!loc_is_you && ispet)
+            if (!loc_is_you && ispet && !Hallucination)
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_PEACEFUL:
-            if (!loc_is_you && ispeaceful && !ispet && !is_watch(mtmp->data))
+            if (!loc_is_you && ispeaceful && !ispet && !Hallucination && !is_watch(mtmp->data))
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_DETECTED:
             if (!loc_is_you && isdetected)
                 display_this_status_mark = TRUE;
             break;
-        case STATUS_MARK_PILE:
-            //if (!loc_is_you && data->map[i][j].layer_flags & LFLAGS_O_PILE)
-            //    display_this_status_mark = TRUE;
+        case STATUS_MARK_BOUNTY:
+            if (!loc_is_you && Role_if(PM_KNIGHT) && !ispeaceful && !Hallucination && is_knight_bounty(mtmp->data))
+                display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_SATIATED:
             if (loc_is_you && u.uhs == SATIATED)

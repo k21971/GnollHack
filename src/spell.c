@@ -544,7 +544,7 @@ learn(VOID_ARGS)
             book->spestudied++;
             exercise(A_WIS, TRUE); /* extra study */
 
-            if (spl_book[i].sp_matcomp > 0)
+            if (spl_book[i].sp_matcomp > 0 && learning_spellbook_yields_castings(spellid(i)))
             {
                 addedamount = matlists[spl_book[i].sp_matcomp].spellsgained;
                 spl_book[i].sp_amount += addedamount;
@@ -572,7 +572,7 @@ learn(VOID_ARGS)
         else 
         {
             spl_book[i].sp_id = (short)booktype;
-            spl_book[i].sp_lev = (xchar)objects[booktype].oc_spell_level;
+            spl_book[i].sp_lev = (schar)objects[booktype].oc_spell_level;
             spl_book[i].sp_matcomp = objects[booktype].oc_material_components;
             if(spl_book[i].sp_matcomp)
                 spl_book[i].sp_amount = 0; //How many times material components have been mixed
@@ -585,7 +585,7 @@ learn(VOID_ARGS)
             incr_spell_nknow(i, 1);
             book->spestudied++;
 
-            if (spl_book[i].sp_matcomp > 0)
+            if (spl_book[i].sp_matcomp > 0 && learning_spellbook_yields_castings(spellid(i)))
             {
                 addedamount = matlists[spl_book[i].sp_matcomp].spellsgained;
                 spl_book[i].sp_amount += addedamount;
@@ -2184,6 +2184,11 @@ int spell, booktype;
         
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
+    if (objects[booktype].oc_spell_flags & S1_FLAGS_SPELLBOOK_DOES_NOT_YIELD_CASTINGS)
+    {
+        Sprintf(buf, "Other:            %s", "Learning does not yield castings");
+        putstr(datawin, ATR_INDENT_AT_COLON, buf);
+    }
 
     Strcpy(buf2, "");
     if (!(objects[booktype].oc_spell_flags & S1_NO_VERBAL_COMPONENT))
@@ -2798,7 +2803,12 @@ struct monst* targetmonst;
         int trycnt = 0;
         while (trycnt < 10)
         {
-            (void)getpos(&cc, TRUE, "the desired position", CURSOR_STYLE_SPELL_CURSOR);
+            if(getpos(&cc, TRUE, "the desired position", CURSOR_STYLE_SPELL_CURSOR) < 0)
+            {
+                pline1(Never_mind);
+                break;
+            }
+
             if (!get_valid_targeted_position(cc.x, cc.y, otyp))
             {
                 play_sfx_sound(SFX_GENERAL_NOT_AT_RIGHT_LOCATION);
@@ -3441,7 +3451,7 @@ int what;
             save_tport.savespell = spl_book[i];
             save_tport.tport_indx = i;
             spl_book[i].sp_id = SPE_TELEPORT_MONSTER;
-            spl_book[i].sp_lev = (xchar)objects[SPE_TELEPORT_MONSTER].oc_spell_level;
+            spl_book[i].sp_lev = (schar)objects[SPE_TELEPORT_MONSTER].oc_spell_level;
             spl_book[i].sp_matcomp = objects[SPE_TELEPORT_MONSTER].oc_material_components;
             spl_book[i].sp_cooldownlength = (int)objects[SPE_TELEPORT_MONSTER].oc_spell_cooldown;
             spl_book[i].sp_cooldownleft = 0;
@@ -4998,10 +5008,10 @@ struct obj *obj;
         impossible("Spell %s already known.", OBJ_NAME(objects[otyp]));
     } else {
         spl_book[i].sp_id = (short)otyp;
-        spl_book[i].sp_lev = (xchar)objects[otyp].oc_spell_level;
+        spl_book[i].sp_lev = (schar)objects[otyp].oc_spell_level;
         spl_book[i].sp_matcomp = objects[otyp].oc_material_components;
         if(spl_book[i].sp_matcomp)
-            spl_book[i].sp_amount = matlists[spl_book[i].sp_matcomp].spellsgained; /* Some amount in the beginning */
+            spl_book[i].sp_amount = learning_spellbook_yields_castings(spellid(i)) ? matlists[spl_book[i].sp_matcomp].spellsgained : 0; /* Some amount in the beginning */
         else
             spl_book[i].sp_amount = -1;
         spl_book[i].sp_cooldownlength = (int)objects[otyp].oc_spell_cooldown;

@@ -171,6 +171,11 @@ char** argv;
     else
         issue_simple_gui_command(GUI_CMD_DISABLE_CASUAL_MODE); /* Notification may be needed */
 
+    if (TournamentMode)
+        issue_simple_gui_command(GUI_CMD_ENABLE_TOURNAMENT_MODE); /* Notification may be needed if loaded a tournament mode saved game */
+    else
+        issue_simple_gui_command(GUI_CMD_DISABLE_TOURNAMENT_MODE); /* Notification may be needed */
+
     moveloop(resuming);
     gnollhack_exit(EXIT_SUCCESS);
     return (0);
@@ -216,6 +221,9 @@ char *argv[];
             break;
         case 'B':
             flags.bones = TRUE;
+            break;
+        case 'T':
+            TournamentMode = TRUE;
             break;
 #ifdef NEWS
             case 'n':
