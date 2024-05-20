@@ -1196,7 +1196,7 @@ int* spell_no;
 {
     winid tmpwin;
     int i, n, how, splnum;
-    char buf[BUFSIZ], descbuf[BUFSZ];
+    char buf[BUFSZ * 10], descbuf[BUFSZ * 8];
     menu_item* selected;
     anything any;
     const char* nodesc = "(No short description)";
@@ -1220,6 +1220,12 @@ int* spell_no;
                 if (OBJ_ITEM_DESC(spellid(splnum)))
                 {
                     Strcpy(descbuf, OBJ_ITEM_DESC(spellid(splnum)));
+                    char* p;
+                    for (p = descbuf; *p; p++)
+                    {
+                        if (*p == '\n')
+                            *p = ' ';
+                    }
                 }
                 else
                     Strcpy(descbuf, nodesc);
@@ -2317,15 +2323,18 @@ struct monst* targetmonst;
      * (There's no duplication of messages; when the rejection takes
      * place in getspell(), we don't get called.)
      */
-    if (rejectcasting()) {
+    if (rejectcasting()) 
+    {
         return 0; /* no time elapses */
     }
 
-    if (reject_specific_spell_casting(spell)) {
+    if (reject_specific_spell_casting(spell)) 
+    {
         return 0; /* no time elapses */
     }
 
-    if (spellamount(spell) == 0) {
+    if (spellamount(spell) == 0) 
+    {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "do not have the spell's material components prepared.");
         skip_savech = 1;
@@ -2343,7 +2352,8 @@ struct monst* targetmonst;
 
     }
 
-    if (spellcooldownleft(spell) > 0) {
+    if (spellcooldownleft(spell) > 0) 
+    {
         play_sfx_sound(SFX_NOT_READY_YET);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot cast the spell before the cooldown has expired.");
         return 0; /* no time elapses */
@@ -2390,12 +2400,14 @@ struct monst* targetmonst;
         You("are too hungry to cast that spell.");
         return 0;
     } else*/
-    if (ACURR(A_STR) < 4 && spellid(spell) != SPE_RESTORE_ABILITY) {
+    if (ACURR(A_STR) < 4 && spellid(spell) != SPE_RESTORE_ABILITY) 
+    {
         play_sfx_sound(SFX_GENERAL_NOT_ENOUGH_STAMINA);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the strength to cast spells.");
         return 0;
-    } else if (check_capacity(
-                "Your concentration falters while carrying so much stuff.")) {
+    } 
+    else if (check_capacity("Your concentration falters while carrying so much stuff.")) 
+    {
         play_sfx_sound(SFX_FAIL_TO_CAST_CORRECTLY);
         return 1;
     }
@@ -2484,6 +2496,13 @@ struct monst* targetmonst;
     //}
 
     wish_insurance_check(spellid(spell) == SPE_WISH);
+
+    /* Armageddon warning */
+    if (spellid(spell) == SPE_ARMAGEDDON && !Lifesaved && !(P_SKILL_LEVEL(P_NECROMANCY_SPELL) == P_GRAND_MASTER && Luck > LUCKMAX / 2)
+        && yn_query_ex(ATR_NONE, CLR_MSG_WARNING, "Precarious Spell", "You are getting cold shivers from being about to cast such a sinister spell. Continue?") != 'y')
+    {
+        return 0;
+    }
 
     //One spell preparation is used, successful casting or not
     if(spellamount(spell) > 0)
@@ -3884,12 +3903,17 @@ int *spell_no;
 
 
             //Shorten description, if needed
-            char shorteneddesc[BUFSZ] = "";
-            char fulldesc[BUFSZ];
-
             if(OBJ_ITEM_DESC(spellid(splnum)))
             {
+                char shorteneddesc[BUFSZ] = "";
+                char fulldesc[BUFSZ * 8];
                 Strcpy(fulldesc, OBJ_ITEM_DESC(spellid(splnum)));
+                char* p;
+                for (p = fulldesc; *p; p++)
+                {
+                    if (*p == '\n')
+                        *p = ' ';
+                }
 
                 if (strlen(fulldesc) > 57)
                     Strncpy(shorteneddesc, fulldesc, 57);
@@ -4275,7 +4299,15 @@ int splaction;
     print_spell_level_symbol(levelbuf, spellid(splnum));
     if (OBJ_ITEM_DESC(spellid(splnum)))
     {
-        Sprintf(descbuf, " (%s)", OBJ_ITEM_DESC(spellid(splnum)));
+        char fulldescbuf[BUFSZ * 8];
+        Strcpy(fulldescbuf, OBJ_ITEM_DESC(spellid(splnum)));
+        char* p;
+        for (p = fulldescbuf; *p; p++)
+        {
+            if (*p == '\n')
+                *p = ' ';
+        }
+        Sprintf(descbuf, " (%s)", fulldescbuf);
     }
     else
         Strcpy(descbuf, "");
