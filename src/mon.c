@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mon.c    $NHDT-Date: 1556139724 2019/04/24 21:02:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.284 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -19,8 +19,8 @@ STATIC_VAR boolean vamp_rise_msg;
 STATIC_DCL void FDECL(sanity_check_single_mon, (struct monst *, BOOLEAN_P,
                                                 const char *));
 STATIC_DCL boolean FDECL(restrap, (struct monst *));
-STATIC_DCL long FDECL(mm_aggression, (struct monst *, struct monst *));
-STATIC_DCL long FDECL(mm_displacement, (struct monst *, struct monst *));
+STATIC_DCL int64_t FDECL(mm_aggression, (struct monst *, struct monst *));
+STATIC_DCL int64_t FDECL(mm_displacement, (struct monst *, struct monst *));
 //STATIC_DCL int NDECL(pick_animal);
 STATIC_DCL void FDECL(kill_eggs, (struct obj *));
 STATIC_DCL int FDECL(pickvampshape, (struct monst *));
@@ -434,6 +434,7 @@ boolean createcorpse;
            dragons is the same as the order of the scales. */
         if (!istame && !isquestmonster)
         {
+            boolean is_exceptional = FALSE;
             if (mndx >= PM_GRAY_DRAGON_HATCHLING && mndx <= PM_YELLOW_DRAGON_HATCHLING)
             {
                 oneinchance = mtmp->mrevived ? 50 : 5;
@@ -448,17 +449,42 @@ boolean createcorpse;
             {
                 oneinchance = mtmp->mrevived ? 10 : 1;
                 basemonsterindex = PM_ANCIENT_GRAY_DRAGON;
+                is_exceptional = TRUE;
             }
 
             if (oneinchance > 0 && basemonsterindex > 0 && (oneinchance == 1 || !rn2(oneinchance))) {
                 num = GRAY_DRAGON_SCALES + mndx - basemonsterindex;
                 obj = mksobj_found_at(num, x, y, FALSE, FALSE);
-                obj->enchantment = 0;
-                obj->cursed = obj->blessed = FALSE;
+                if (obj)
+                {
+                    obj->enchantment = 0;
+                    obj->cursed = obj->blessed = FALSE;
+                    if (is_exceptional)
+                        obj->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
+                }
             }
-
         }
         goto default_1;
+    case PM_IXOTH:
+        num = RED_DRAGON_SCALES;
+        obj = mksobj_found_at(num, x, y, FALSE, FALSE);
+        if (obj)
+        {
+            obj->enchantment = 0;
+            obj->cursed = obj->blessed = FALSE;
+            obj->exceptionality = EXCEPTIONALITY_ELITE;
+        }
+        break;
+    case PM_TIAMAT:
+        num = GRAY_DRAGON_SCALES + rn2(YELLOW_DRAGON_SCALES - GRAY_DRAGON_SCALES + 1);
+        obj = mksobj_found_at(num, x, y, FALSE, FALSE);
+        if (obj)
+        {
+            obj->enchantment = 0;
+            obj->cursed = obj->blessed = FALSE;
+            obj->exceptionality = EXCEPTIONALITY_ELITE;
+        }
+        break;
     case PM_WHITE_UNICORN:
     case PM_GRAY_UNICORN:
     case PM_BLACK_UNICORN:
@@ -476,8 +502,14 @@ boolean createcorpse;
         goto default_1;
     case PM_LONG_WORM:
     case PM_ELDER_LONG_WORM:
-        if(!istame && !isquestmonster)
-            (void)mksobj_found_at(WORM_TOOTH, x, y, TRUE, FALSE);
+        if (!istame && !isquestmonster)
+        {
+            obj = mksobj_found_at(WORM_TOOTH, x, y, TRUE, FALSE);
+            if (obj && mndx == PM_ELDER_LONG_WORM && obj->exceptionality < EXCEPTIONALITY_EXCEPTIONAL)
+            {
+                obj->exceptionality = EXCEPTIONALITY_EXCEPTIONAL;
+            }
+        }
         goto default_1;
     case PM_CAVE_SPIDER:
     case PM_GIANT_SPIDER:
@@ -621,7 +653,7 @@ boolean createcorpse;
             if (!rn2(2))
             {
                 obj = mksobj_found_at(NUGGET_OF_IRON_ORE, x, y, FALSE, FALSE);
-                obj->quan = (long)(rnd(2));
+                obj->quan = (int64_t)(rnd(2));
                 obj->owt = weight(obj);
             }
             if (!rn2(4))
@@ -667,7 +699,7 @@ boolean createcorpse;
             if (!rn2(2))
             {
                 obj = mksobj_found_at(BONE, x, y, FALSE, FALSE);
-                obj->quan = (long)(rnd(4));
+                obj->quan = (int64_t)(rnd(4));
                 obj->owt = weight(obj);
             }
         }
@@ -680,7 +712,7 @@ boolean createcorpse;
             if (!rn2(2))
             {
                 obj = mksobj_found_at(NUGGET_OF_SILVER_ORE, x, y, FALSE, FALSE);
-                obj->quan = (long)(rnd(2));
+                obj->quan = (int64_t)(rnd(2));
                 obj->owt = weight(obj);
             }
         }
@@ -693,7 +725,7 @@ boolean createcorpse;
             if (!rn2(2))
             {
                 obj = mksobj_found_at(CLAY_PEBBLE, x, y, FALSE, FALSE);
-                obj->quan = (long)(d(2, 6));
+                obj->quan = (int64_t)(d(2, 6));
                 obj->owt = weight(obj);
             }
         }
@@ -711,7 +743,7 @@ boolean createcorpse;
             if (!rn2(2))
             {
                 obj = mksobj_found_at(STONE_PEBBLE, x, y, FALSE, FALSE);
-                obj->quan = (long)(rnd(5));
+                obj->quan = (int64_t)(rnd(5));
                 obj->owt = weight(obj);
             }
         }
@@ -724,7 +756,7 @@ boolean createcorpse;
             if (!rn2(2))
             {
                 obj = mksobj_found_at(PIECE_OF_WOOD, x, y, FALSE, FALSE);
-                obj->quan = (long)(rnd(2));
+                obj->quan = (int64_t)(rnd(2));
                 obj->owt = weight(obj);
             }
         }
@@ -782,7 +814,7 @@ boolean createcorpse;
         {
             if (!rn2(2))
             {
-                obj = mkgold((long)(195 - rnl(101)), x, y);
+                obj = mkgold((int64_t)(195 - rnl(101)), x, y);
             }
         }
         free_mname(mtmp);
@@ -1675,7 +1707,7 @@ movemon()
         /* after losing equipment, try to put on replacement */
         if (mtmp->worn_item_flags & I_SPECIAL) 
         {
-            long oldworn;
+            int64_t oldworn;
 
             mtmp->worn_item_flags &= ~I_SPECIAL;
             oldworn = mtmp->worn_item_flags;
@@ -2288,7 +2320,7 @@ int
 max_mon_load(mtmp)
 struct monst *mtmp;
 {
-    long carrcap = 0;
+    int64_t carrcap = 0;
 
     /* Base monster carrying capacity is equal to human maximum
      * carrying capacity, or half human maximum if not strong.
@@ -2323,7 +2355,7 @@ struct monst *mtmp;
  * this will probably cause very amusing behavior with pets and gold coins.
  *
  * TODO: allow picking up 2-N objects from a pile of N based on weight.
- *       Change from 'int' to 'long' to accomate big stacks of gold.
+ *       Change from 'int' to 'int64_t' to accomate big stacks of gold.
  *       Right now we fake it by reporting a partial quantity, but the
  *       likesgold handling m_move results in picking up the whole stack.
  */
@@ -2359,7 +2391,7 @@ boolean steed_ok;
 
     /* hostile monsters who like gold will pick up the whole stack;
        tame mosnters with hands will pick up the partial stack */
-    iquan = (otmp->quan > (long) LARGEST_INT)
+    iquan = (otmp->quan > (int64_t) LARGEST_INT)
                ? 20000 + rn2(LARGEST_INT - 20000 + 1)
                : (int) otmp->quan;
 
@@ -2418,8 +2450,8 @@ int
 mfndpos(mon, poss, info, flag)
 struct monst* mon;
 coord* poss; /* coord poss[9] */
-long* info;  /* long info[9] */
-long flag;
+int64_t* info;  /* int64_t info[9] */
+int64_t flag;
 {
     xchar x = mon->mx;
     xchar y = mon->my;
@@ -2433,8 +2465,8 @@ mfndpos_xy(mon, x, y, poss, info, flag)
 struct monst *mon;
 xchar x, y;
 coord *poss; /* coord poss[9] */
-long *info;  /* long info[9] */
-long flag;
+int64_t *info;  /* int64_t info[9] */
+int64_t flag;
 {
     struct permonst *mdat = mon->data;
     register struct trap *ttmp;
@@ -2550,7 +2582,7 @@ nexttry: /* eels prefer the water, but if there is no water nearby,
                     || (IS_DOOR(ntyp) && (levl[nx][ny].doormask & ~D_BROKEN))
                     || ((IS_DOOR(nowtyp) || IS_DOOR(ntyp))
                         && Is_really_rogue_level(&u.uz))
-                    /* mustn't pass between adjacent long worm segments,
+                    /* mustn't pass between adjacent int64_t worm segments,
                        but can attack that way */
                     || (m_at(x, ny) && m_at(nx, y) && worm_cross(x, y, nx, ny)
                         && !m_at(nx, ny) && (nx != u.ux || ny != u.uy))))
@@ -2564,7 +2596,7 @@ nexttry: /* eels prefer the water, but if there is no water nearby,
                 boolean checkobj = OBJ_AT(nx, ny);
 
                 /* Displacement also displaces the Elbereth/scare monster,
-                 * as long as you are visible.
+                 * as int64_t as you are visible.
                  */
                 if (Displaced && monseeu && mon->mux == nx && mon->muy == ny) 
                 {
@@ -2607,9 +2639,9 @@ nexttry: /* eels prefer the water, but if there is no water nearby,
                     if (MON_AT(nx, ny))
                     {
                         struct monst *mtmp2 = m_at(nx, ny);
-                        long mmagr = mm_aggression(mon, mtmp2);
-                        long mmflag = flag | mmagr;
-                        long mmdispl = mm_displacement(mon, mtmp2);
+                        int64_t mmagr = mm_aggression(mon, mtmp2);
+                        int64_t mmflag = flag | mmagr;
+                        int64_t mmdispl = mm_displacement(mon, mtmp2);
                         mmflag |= mmdispl;
 
                         if (mtmp2)
@@ -2712,7 +2744,7 @@ nexttry: /* eels prefer the water, but if there is no water nearby,
                             info[cnt] |= ALLOW_PITS;
                         else
                         {
-                            if (mon->mtrapseen & (1L << (ttmp->ttyp - 1)))
+                            if (mon->mtrapseen & ((int64_t)1 << (ttmp->ttyp - 1)))
                                 continue; /* No movement to the trap */
                             else
                                 info[cnt] |= (flag & (ALLOW_TRAPS | ALLOW_PITS)); /* The mon does not know the trap is there */
@@ -2737,7 +2769,7 @@ nexttry: /* eels prefer the water, but if there is no water nearby,
    in the absence of Conflict.  There is no provision for targetting
    other monsters; just hand to hand fighting when they happen to be
    next to each other. */
-STATIC_OVL long
+STATIC_OVL int64_t
 mm_aggression(magr, mdef)
 struct monst *magr, /* monster that is currently deciding where to move */
              *mdef; /* another monster which is next to it */
@@ -2777,7 +2809,7 @@ struct monst *magr, /* monster that is currently deciding where to move */
 }
 
 /* Monster displacing another monster out of the way */
-STATIC_OVL long
+STATIC_OVL int64_t
 mm_displacement(magr, mdef)
 struct monst *magr, /* monster that is currently deciding where to move */
              *mdef; /* another monster which is next to it */
@@ -2878,6 +2910,7 @@ struct monst *mtmp, *mtmp2;
 
     if (emitted_light_range(mtmp2->data)) 
     {
+        Strcpy(debug_buf_4, "replmon");
         /* since this is so rare, we don't have any `mon_move_light_source' */
         new_light_source(mtmp2->mx, mtmp2->my, emitted_light_range(mtmp2->data), LS_MONSTER, monst_to_any(mtmp2), 0);
         /* here we rely on fact that `mtmp' hasn't actually been deleted */
@@ -3147,6 +3180,7 @@ boolean is_mon_dead;
 {
     boolean onmap = (mtmp->mx > 0);
 
+    Strcpy(debug_buf_4, "m_detach");
     if (mtmp == context.polearm.hitmon)
         context.polearm.hitmon = 0;
     if (mtmp->mleashed)
@@ -3209,7 +3243,7 @@ struct monst *mtmp;
     if (lifesave) 
     {
         /* not canseemon; amulets are on the head, so you don't want
-         * to show this for a long worm with only a tail visible.
+         * to show this for a int64_t worm with only a tail visible.
          * Nor do you check invisibility, because glowing and
          * disintegrating amulets are always visible. */
         if (cansee(mtmp->mx, mtmp->my)) 
@@ -3276,7 +3310,7 @@ register struct monst* mtmp;
 void
 mondead_with_flags(mtmp, mondeadflags)
 register struct monst *mtmp;
-unsigned long mondeadflags;
+uint64_t mondeadflags;
 {
     struct permonst *mptr;
     int tmp;
@@ -3451,7 +3485,10 @@ unsigned long mondeadflags;
         quest_status.leader_is_dead = TRUE;
     /* if the mail daemon dies, no more mail delivery.  -3. */
     if (tmp == PM_MAIL_DAEMON)
+    {
         mvitals[tmp].mvflags |= MV_GENOCIDED;
+        u.uconduct.genocides++;
+    }
 
     if (mtmp->data->mlet == S_KOP) 
     {
@@ -3567,7 +3604,7 @@ unsigned long mondeadflags;
     {
         u.uachieve.role_achievement = 1;
         char abuf[BUFSZ];
-        const char* ra_desc = get_role_achievement_description(TRUE);
+        char* ra_desc = get_role_achievement_description(1);
         strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
         livelog_printf(LL_ACHIEVE, "%s", ra_desc);
@@ -3816,6 +3853,7 @@ struct monst *mdef;
                     continue;
                 place_object(obj, x, y);
             } else {
+                Strcpy(debug_buf_3, "monstone");
                 if (obj->lamplit)
                     end_burn(obj, TRUE);
                 if (obj->makingsound)
@@ -4020,7 +4058,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
         EDOG(mtmp)->killed_by_u = 1;
 
     /* shopkeeper adds lost money in debit bill */
-    long shkmoney = 0;
+    int64_t shkmoney = 0;
     if (mtmp->isshk && has_eshk(mtmp))
     {
         shkmoney += money_cnt(mtmp->minvent);
@@ -4984,7 +5022,7 @@ struct monst *mtmp;
     if (is_u)
         u.uundetected = undetected;
     else
-        mtmp->mundetected = undetected;
+        mtmp->mundetected = undetected ? TRUE : FALSE; /* Since mundetected is not a boolean (either a bitfield / unsigned int or uchar) */
 
     newsym(x, y);
 
@@ -5591,7 +5629,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
     newmonhp(mtmp, newtype, 0, 0UL);
     /* new hp: same fraction of max as before */
 #ifndef LINT
-    mtmp->mhp = (int)(((long)hpn * (long)mtmp->mhp) / (long)hpd);
+    mtmp->mhp = (int)(((int64_t)hpn * (int64_t)mtmp->mhp) / (int64_t)hpd);
 #endif
 
     /* sanity check (potential overflow) */
@@ -5603,6 +5641,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
         mtmp->mhp = 1;
 
     if (emitted_light_range(olddata) != emitted_light_range(mtmp->data)) {
+        Strcpy(debug_buf_4, "newcham");
         /* used to give light, now doesn't, or vice versa,
            or light's range has changed */
         if (emitted_light_range(olddata))
@@ -5950,7 +5989,8 @@ boolean silent;
                     sct++;
             }
             if (!mon_can_move(mtmp)) {
-                mtmp->msleeping = mtmp->mfrozen = 0;
+                mtmp->msleeping = 0;
+                mtmp->mfrozen = 0;
                 mtmp->mcanmove = 1;
                 if(mon_can_move(mtmp))
                     slct++;
@@ -6148,7 +6188,8 @@ struct permonst *mdat;
     return msg_given ? TRUE : FALSE;
 }
 
-const char* pm_monster_name(ptr, isfemale)
+const char* 
+pm_monster_name(ptr, isfemale)
 struct permonst* ptr;
 uchar isfemale; /* 1 = female, 2 = neuter, transgender or the like */
 {
@@ -6604,8 +6645,8 @@ boolean override_mextra, polyspot, msg;
             //struct obj* mw = mtmp->mw;
             //xchar mx = mtmp->mx, my = mtmp->my;
             //int meating = mtmp->meating;
-            //long mtrapseen = mtmp->mtrapseen;
-            //long worn_item_flags = mtmp->worn_item_flags;
+            //int64_t mtrapseen = mtmp->mtrapseen;
+            //int64_t worn_item_flags = mtmp->worn_item_flags;
             //xchar weapon_strategy = mtmp->weapon_strategy;
             //short mprops[MAX_PROPS] = { 0 };
             //int i;
@@ -6674,6 +6715,7 @@ boolean override_mextra, polyspot, msg;
 
     struct permonst* mdat = mtmp->data;
     if (emitted_light_range(olddata) != emitted_light_range(mtmp->data)) {
+        Strcpy(debug_buf_4, "revert_mon_polymorph");
         /* used to give light, now doesn't, or vice versa,
            or light's range has changed */
         if (emitted_light_range(olddata))

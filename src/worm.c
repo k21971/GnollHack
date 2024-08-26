@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    worm.c    $NHDT-Date: 1543892216 2018/12/04 02:56:56 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -71,7 +71,7 @@ STATIC_DCL struct wseg *FDECL(create_worm_tail, (int));
  */
 
 struct wseg *wheads[MAX_NUM_WORMS] = DUMMY, *wtails[MAX_NUM_WORMS] = DUMMY;
-long wgrowtime[MAX_NUM_WORMS] = DUMMY;
+int64_t wgrowtime[MAX_NUM_WORMS] = DUMMY;
 
 /*
  *  get_wormno()
@@ -475,7 +475,7 @@ boolean use_detection_glyph;
 
     while (curr != wheads[worm->wormno]) {
         num = monnum_to_glyph(what_tail);
-        unsigned long extra_mflags = (LMFLAGS_WORM_SEEN | LMFLAGS_WORM_TAIL | ((use_detection_glyph ? LMFLAGS_DETECTED : 0UL) | (is_tame(worm) ? LMFLAGS_PET : 0UL)));
+        uint64_t extra_mflags = (LMFLAGS_WORM_SEEN | LMFLAGS_WORM_TAIL | ((use_detection_glyph ? LMFLAGS_DETECTED : 0UL) | (is_tame(worm) ? LMFLAGS_PET : 0UL)));
         show_monster_glyph_with_extra_info(curr->wx, curr->wy, num, worm, 0UL, extra_mflags, 0, 0);
         curr = curr->nseg;
     }

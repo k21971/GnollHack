@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    shknam.c    $NHDT-Date: 1454485432 2016/02/03 07:43:52 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.41 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -695,7 +695,7 @@ const char *const *nlp;
            and restore support which would be necessary for randomization;
            try not to make too many assumptions about time_t's internals;
            use ledger_no rather than depth to keep mine town distinct. */
-        int nseed = (int) ((long) ubirthday / 257L);
+        int nseed = (int) ((int64_t) ubirthday / 257L);
 
         name_wanted = ledger_no(&u.uz) + (nseed % 13) - (nseed % 5);
         if (name_wanted < 0)
@@ -870,9 +870,9 @@ struct mkroom *sroom;
     eshkp->billct = eshkp->visitct = 0;
     eshkp->bill_p = (struct bill_x *) 0;
     eshkp->customer[0] = '\0';
-    long shk_money = 
-        u.uz.dnum != main_dungeon_dnum ? 10000L + 30L * (long)d(5, 100) 
-        : 2000L + 60L * (long)rnd(100);
+    int64_t shk_money = 
+        u.uz.dnum != main_dungeon_dnum ? 10000L + 30L * (int64_t)d(5, 100) 
+        : 2000L + 60L * (int64_t)rnd(100);
     mkmonmoney(shk, shk_money); /* initial capital */
     if (shp->shknms == shkrings)
         (void) mongets(shk, TOUCHSTONE);

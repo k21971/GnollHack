@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    save.c    $NHDT-Date: 1554591225 2019/04/06 22:53:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -16,7 +16,7 @@
 #endif
 
 #ifdef MFLOPPY
-long bytes_counted;
+int64_t bytes_counted;
 STATIC_VAR int count_only;
 #endif
 
@@ -147,6 +147,8 @@ dosave()
     return 0;
 }
 
+char saved_dgnlvl_name_buf[BUFSZ * 2] = "";
+
 /* returns 1 if save successful */
 int
 dosave0(quietly)
@@ -161,6 +163,7 @@ boolean quietly;
     Strcpy(debug_buf_2, "dosave0");
     Strcpy(debug_buf_3, "dosave0");
     Strcpy(debug_buf_4, "dosave0");
+    Strcpy(saved_dgnlvl_name_buf, "");
 
 #ifdef WHEREIS_FILE
     delete_whereis();
@@ -231,6 +234,7 @@ boolean quietly;
     if(!quietly)
         display_screen_text("Saving...", (const char*)0, (const char*)0, SCREEN_TEXT_SAVING, ATR_NONE, NO_COLOR, 0UL);
 
+    print_current_dgnlvl(saved_dgnlvl_name_buf);
     vision_recalc(2); /* shut down vision to prevent problems
                          in the event of an impossible() call */
 
@@ -252,7 +256,7 @@ boolean quietly;
 #ifdef MFLOPPY
     /* make sure there is enough disk space */
     if (iflags.checkspace) {
-        long fds, needed;
+        int64_t fds, needed;
 
         savelev(fd, ledger_no(&u.uz), COUNT_SAVE);
         savegamestate(fd, COUNT_SAVE);
@@ -353,6 +357,9 @@ boolean quietly;
     /* this should probably come sooner... */
     program_state.something_worth_saving = 0;
     saving = FALSE;
+
+    post_to_forum_printf(LL_GAME_SAVE, "saved %s game %s", uhis(), saved_dgnlvl_name_buf);
+    Strcpy(saved_dgnlvl_name_buf, "");
     return 1;
 }
 
@@ -390,13 +397,12 @@ STATIC_OVL void
 savegamestate(fd, mode)
 register int fd, mode;
 {
-    unsigned long uid;
+    uint64_t uid;
 
 #ifdef MFLOPPY
     count_only = (mode & COUNT_SAVE);
 #endif
-    lock_thread_lock();
-    uid = (unsigned long) getuid();
+    uid = (uint64_t) getuid();
     bwrite(fd, (genericptr_t) &uid, sizeof uid);
     bwrite(fd, (genericptr_t) &context, sizeof(struct context_info));
     bwrite(fd, (genericptr_t) &flags, sizeof(struct flag));
@@ -404,14 +410,13 @@ register int fd, mode;
     bwrite(fd, (genericptr_t) &sysflags, sizeof(struct sysflag));
 #endif
     bwrite(fd, (genericptr_t)&spl_orderindx, sizeof(spl_orderindx));
-    urealtime.finish_time = getnow();
-    urealtime.realtime += (long) (urealtime.finish_time
+    urealtime.finish_time = (int64_t)getnow();
+    urealtime.realtime += (urealtime.finish_time
                                   - urealtime.start_timing);
     bwrite(fd, (genericptr_t) &u, sizeof(struct you));
     bwrite(fd, yyyymmddhhmmss(ubirthday), 14);
-    bwrite(fd, (genericptr_t) &urealtime.realtime, sizeof urealtime.realtime);
-    bwrite(fd, yyyymmddhhmmss(urealtime.start_timing), 14);  /** Why? **/
-    unlock_thread_lock();
+    bwrite(fd, (genericptr_t) &urealtime, sizeof urealtime);
+    //bwrite(fd, yyyymmddhhmmss(urealtime.start_timing), 14);  /** Why? **/
 
     save_killers(fd, mode);
 
@@ -421,6 +426,7 @@ register int fd, mode;
     save_sound_sources(fd, mode, RANGE_GLOBAL);
 
     saveobjchn(fd, invent, mode);
+
     if (BALL_IN_MON) {
         /* prevent loss of ball & chain when swallowed */
         uball->nobj = uchain;
@@ -430,10 +436,12 @@ register int fd, mode;
         saveobjchn(fd, (struct obj *) 0, mode);
     }
 
+    saveobjchn(fd, magic_objs, mode);
     saveobjchn(fd, migrating_objs, mode);
     savemonchn(fd, migrating_mons, mode);
     if (release_data(mode)) {
         invent = 0;
+        magic_objs = 0;
         migrating_objs = 0;
         migrating_mons = 0;
     }
@@ -464,9 +472,7 @@ register int fd, mode;
 
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
     /* this is the value to use for the next update of urealtime.realtime */
-    lock_thread_lock();
     urealtime.start_timing = urealtime.finish_time;
-    unlock_thread_lock();
 }
 
 boolean
@@ -853,9 +859,9 @@ register size_t num;
     {
         /* lint wants 3rd arg of write to be an int; lint -p an unsigned */
 #if defined(BSD) || defined(ULTRIX) || defined(WIN32) || defined(_MSC_VER)
-        failed = ((long) write(fd, loc, (int) num) != (long) num);
+        failed = ((int64_t) write(fd, loc, (int) num) != (int64_t) num);
 #else /* e.g. SYSV, __TURBOC__ */
-        failed = ((long) write(fd, loc, num) != (long) num);
+        failed = ((int64_t) write(fd, loc, num) != (int64_t) num);
 #endif
     }
 
@@ -1141,7 +1147,7 @@ struct obj *otmp;
             bwrite(fd, (genericptr_t) OMID(otmp), buflen);
 
         if (OLONG(otmp))
-            buflen = sizeof(long);
+            buflen = sizeof(int64_t);
         else
             buflen = 0;
         bwrite(fd, (genericptr_t) &buflen, sizeof buflen);
@@ -1198,6 +1204,7 @@ register struct obj *otmp;
             otmp->cobj = NULL;      /* contents handled above */
             otmp->timed = 0;        /* not timed any more */
             otmp->lamplit = 0;      /* caller handled lights */
+            otmp->makingsound = 0;  /* caller handled sounds */
             dealloc_obj(otmp);
         }
         otmp = otmp2;
@@ -1450,7 +1457,7 @@ int fd;
     gamestats.modern_mode = ModernMode;
     gamestats.casual_mode = CasualMode;
     gamestats.save_flags = (flags.non_scoring ? SAVEFLAGS_NON_SCORING : 0) | (TournamentMode ? SAVEFLAGS_TOURNAMENT_MODE : 0);
-    gamestats.time_stamp = getnow();
+    gamestats.time_stamp = (int64_t)getnow();
     gamestats.num_recoveries = n_game_recoveries;
 
     bufoff(fd);
@@ -1666,6 +1673,7 @@ freedynamicdata(VOID_ARGS)
     free_light_sources(RANGE_GLOBAL);
     free_sound_sources(RANGE_GLOBAL);
     freeobjchn(invent);
+    freeobjchn(magic_objs);
     freeobjchn(migrating_objs);
     freemonchn(migrating_mons);
     freemonchn(mydogs); /* ascension or dungeon escape */
@@ -1717,7 +1725,7 @@ swapout_oldest()
 {
     char to[PATHLEN], from[PATHLEN];
     int i, oldest;
-    long oldtime;
+    int64_t oldtime;
 
     if (!ramdisk)
         return FALSE;

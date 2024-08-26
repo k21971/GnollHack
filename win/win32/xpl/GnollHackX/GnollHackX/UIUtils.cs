@@ -2,8 +2,14 @@
 using System.Collections.Generic;
 using System.Text;
 using SkiaSharp;
+using System.Diagnostics;
+
 #if GNH_MAUI
 using GnollHackM;
+
+#if WINDOWS
+using GnollHackM.Platforms.Windows;
+#endif
 using Microsoft.Maui.Controls;
 #else
 using Xamarin.Forms;
@@ -14,23 +20,32 @@ namespace GnollHackX
 {
     public static class UIUtils
     {
-        private static SKColor GHDarkGray = new SKColor(96, 96, 96);
-        private static SKColor GHVeryDarkGray = new SKColor(64, 64, 64);
-        private static SKColor GHTitleGold = new SKColor(0xD4, 0xA0, 0x17);
-        private static SKColor GHRed = new SKColor(255, 32, 32);
-        private static SKColor GHDarkRed = new SKColor(224, 0, 0);
-        private static SKColor GHGreen = new SKColor(0, 255, 0);
-        private static SKColor GHRevertedBrightGreen = new SKColor(0, 160, 0);
-        private static SKColor GHDarkGreen = new SKColor(0, 192, 0);
-        private static SKColor GHBlue = new SKColor(112, 112, 255);
-        private static SKColor GHDarkBlue = new SKColor(64, 64, 255);
-        private static SKColor GHBrown = new SKColor(210, 128, 32);
-        private static SKColor GHDarkBrown = new SKColor(180, 92, 0);
-        private static SKColor GHBrightBlue = new SKColor(180, 200, 255);
-        private static SKColor GHCyan = new SKColor(133, 224, 224);
-        private static SKColor GHBrightCyan = new SKColor(165, 255, 255);
-        private static SKColor GHBrightCyanReverted = new SKColor(190, 255, 255);
-        private static SKColor GHDarkYellow = new SKColor(192, 192, 0);
+        private static readonly SKColor GHDarkGray = new SKColor(96, 96, 96);
+        private static readonly SKColor GHVeryDarkGray = new SKColor(64, 64, 64);
+        private static readonly SKColor GHTitleGold = new SKColor(0xD4, 0xA0, 0x17);
+        private static readonly SKColor GHRed = new SKColor(255, 32, 32);
+        private static readonly SKColor GHDarkRed = new SKColor(224, 0, 0);
+        private static readonly SKColor GHGreen = new SKColor(0, 255, 0);
+        private static readonly SKColor GHRevertedBrightGreen = new SKColor(0, 160, 0);
+        private static readonly SKColor GHDarkGreen = new SKColor(0, 192, 0);
+        private static readonly SKColor GHBlue = new SKColor(112, 112, 255);
+        private static readonly SKColor GHDarkBlue = new SKColor(64, 64, 255);
+        private static readonly SKColor GHBrown = new SKColor(210, 128, 32);
+        private static readonly SKColor GHDarkBrown = new SKColor(180, 92, 0);
+        private static readonly SKColor GHBrightBlue = new SKColor(180, 200, 255);
+        private static readonly SKColor GHCyan = new SKColor(133, 224, 224);
+        private static readonly SKColor GHBrightCyan = new SKColor(165, 255, 255);
+        private static readonly SKColor GHBrightCyanReverted = new SKColor(190, 255, 255);
+        private static readonly SKColor GHDarkYellow = new SKColor(192, 192, 0);
+
+        public static readonly SKColorFilter HighlightColorFilter = SKColorFilter.CreateLighting(new SKColor(255, 255, 255), new SKColor(20, 20, 20));
+        public static readonly SKColorFilter GrayedColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                            {
+                                0.21f, 0.72f, 0.07f, 0, 0,
+                                0.21f, 0.72f, 0.07f, 0, 0,
+                                0.21f, 0.72f, 0.07f, 0, 0,
+                                0,     0,     0,     1, 0
+                            });
 
         public static SKColor NHColor2SKColor(int nhclr, int attr)
         {
@@ -453,13 +468,14 @@ namespace GnollHackX
 
         public static Color MenuHeaderTextColor(ghmenu_styles style)
         {
-            Color res = GHColors.Black;
+            Color res;
             switch (style)
             {
                 case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
                     res = GHColors.Beige;
                     break;
                 default:
+                    res = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                     break;
             }
             return res;
@@ -481,12 +497,14 @@ namespace GnollHackX
 
         public static Color MenuHeaderOutlineColor(ghmenu_styles style)
         {
-            Color res = GHColors.Black;
+            Color res;
             switch (style)
             {
                 case ghmenu_styles.GHMENU_STYLE_START_GAME_MENU:
+                    res = GHColors.Black;
                     break;
                 default:
+                    res = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                     break;
             }
             return res;
@@ -673,13 +691,14 @@ namespace GnollHackX
 
         public static Color MenuSubtitleTextColor(ghmenu_styles style)
         {
-            Color res = GHColors.Black;
+            Color res;
             switch (style)
             {
                 case ghmenu_styles.GHMENU_STYLE_ACCEPT_PLAYER:
-                    res = GHColors.DarkGreen;
+                    res = GHApp.DarkMode ? GHColors.LightGreen : GHColors.DarkGreen;
                     break;
                 default:
+                    res = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                     break;
             }
             return res;
@@ -700,12 +719,12 @@ namespace GnollHackX
 
         public static Color MenuSubtitleOutlineColor(ghmenu_styles style)
         {
-            Color res = GHColors.Black;
+            Color res;
             switch (style)
             {
                 case ghmenu_styles.GHMENU_STYLE_ACCEPT_PLAYER:
-                    break;
                 default:
+                    res = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                     break;
             }
             return res;
@@ -1125,10 +1144,154 @@ namespace GnollHackX
             float padding = ssize / 2;
             float width = canvaswidth - 2 * padding;
             float height = canvasheight - 2 * padding;
-            foreach (SKPoint point in sparkleList)
+            for (int i = 0, cnt = sparkleList.Count; i < cnt; i++)
             {
+                SKPoint point = sparkleList[i];
                 DrawSparkle(canvas, paint, padding + point.X * width, padding + point.Y * height,  ssize, generalcounter - (ctr_diff += df), true);
             }
+        }
+
+        public static int LandscapeButtonsInRow(bool usingDesktopButtons, bool usingSimpleLayout)
+        {
+            return usingSimpleLayout ? PortraitButtonsInRow(usingDesktopButtons, usingSimpleLayout) : usingDesktopButtons ? 16 : 14;
+        }
+        public static int PortraitButtonsInRow(bool usingDesktopButtons, bool usingSimpleLayout)
+        {
+            return usingDesktopButtons ? 9 : 7;
+        }
+
+        public static bool UseTwoButtonRows(double width, double height, double buttonWidth, bool usingDesktopButtons, bool usingSimpleLayout)
+        {
+            int buttonsPerRow = LandscapeButtonsInRow(usingDesktopButtons, usingSimpleLayout);
+            double sideWidth = buttonWidth;
+            bool useTwoRows = width <= height || sideWidth * buttonsPerRow + (buttonsPerRow - 1) * 6 > width;
+            return useTwoRows;
+        }
+
+        public static void AdjustRootLayout(Layout layout)
+        {
+            /* Hopefully a temporary workaround for Maui Windows modal bug */
+#if WINDOWS
+            if (!GHApp.WindowedMode)
+                layout.Margin = new(0, -32, 0, 0);
+#endif
+        }
+
+        public static void ChangeElementCursor(View layout, GameCursorType cursorType)
+        {
+#if WINDOWS
+            Microsoft.UI.Input.InputCursor usedCursor = cursorType == GameCursorType.Normal ? GHApp.WindowsCursor : GHApp.WindowsInfoCursor;
+            if (usedCursor == null || layout == null || layout.Handler == null)
+                return;
+
+            if (layout.Handler.PlatformView is Microsoft.UI.Xaml.UIElement)
+            {
+                try
+                {
+                    Microsoft.UI.Xaml.UIElement element = (Microsoft.UI.Xaml.UIElement)layout.Handler.PlatformView;
+                    element.ChangeCursor(usedCursor);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                }
+            }
+#endif
+        }
+
+        public static Color HoveringColorAdjustment(Color rawColor, bool darkMode)
+        {
+#if GNH_MAUI
+            if (darkMode)
+                return rawColor;
+            else
+                return new Color(rawColor.Red + (1.0f - rawColor.Red) * GHConstants.HoveringColorMultiplier, rawColor.Green + (1.0f - rawColor.Green) * GHConstants.HoveringColorMultiplier, rawColor.Blue + (1.0f - rawColor.Blue) * GHConstants.HoveringColorMultiplier, rawColor.Alpha);
+#else
+            if (darkMode)
+                return rawColor;
+            else
+                return new Color(rawColor.R + (1.0 - rawColor.R) * GHConstants.HoveringColorMultiplier, rawColor.G + (1.0 - rawColor.G) * GHConstants.HoveringColorMultiplier, rawColor.B + (1.0 - rawColor.B) * GHConstants.HoveringColorMultiplier, rawColor.A);
+#endif
+        }
+
+        public static Color NonHoveringColorAdjustment(Color rawColor, bool darkMode)
+        {
+#if GNH_MAUI
+            if (darkMode)
+                return new Color(rawColor.Red * GHConstants.NonHoveringColorMultiplier, rawColor.Green * GHConstants.NonHoveringColorMultiplier, rawColor.Blue * GHConstants.NonHoveringColorMultiplier, rawColor.Alpha);
+            else
+                return rawColor;
+#else
+            if (darkMode)
+                return new Color(rawColor.R * GHConstants.NonHoveringColorMultiplier, rawColor.G * GHConstants.NonHoveringColorMultiplier, rawColor.B * GHConstants.NonHoveringColorMultiplier, rawColor.A);
+            else
+                return rawColor;
+#endif
+        }
+
+        public static SKColor NonHoveringSKColorAdjustment(SKColor rawColor)
+        {
+            return new SKColor((byte)(rawColor.Red * GHConstants.NonHoveringColorMultiplier), (byte)(rawColor.Green * GHConstants.NonHoveringColorMultiplier), (byte)(rawColor.Blue * GHConstants.NonHoveringColorMultiplier), rawColor.Alpha);
+        }
+
+        public static bool MaybeSmallFontFamily(string fontFamily, float fontSize, out string smallerFontFamily)
+        {
+            if (fontSize <= 14.9f)
+            {
+                if (fontFamily == "Immortal")
+                {
+                    smallerFontFamily = "LatoRegular";
+                    return true;
+                }
+                else if (fontFamily == "Underwood")
+                {
+                    smallerFontFamily = "DejaVuSansMono";
+                    return true;
+                }
+            }
+            smallerFontFamily = fontFamily;
+            return false;
+        }
+
+        public static double CalculateButtonSideWidth(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller)
+        {
+            double tmpSideWidth = UIUtils.CalculatePreliminaryButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale, noOfLandscapeButtonsInRow, noOfPortraitButtonsInRow, isSmaller);
+            if (noOfLandscapeButtonsInRow > 0 && noOfPortraitButtonsInRow > 0) /* Yes/no buttons are not limited by height */
+                return tmpSideWidth;
+            double tmpSideHeight = UIUtils.CalculatePreliminaryButtonSideHeight(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale, noOfLandscapeButtonsInRow, noOfPortraitButtonsInRow, isSmaller);
+            return Math.Min(tmpSideWidth, tmpSideHeight);
+        }
+
+        public static double CalculatePreliminaryButtonSideWidth(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller)
+        {
+            bool isLandscape = canvasViewWidth > canvasViewHeight;
+            int bigRowNoOfButtons = noOfLandscapeButtonsInRow > 0 ? noOfLandscapeButtonsInRow : LandscapeButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
+            bool tooWide = customScale * (isSmaller ? 35.0 : 40.0) * bigRowNoOfButtons + (bigRowNoOfButtons - 1) * 6 > canvasViewWidth;
+            int noOfButtons = isLandscape && !tooWide ? bigRowNoOfButtons : noOfPortraitButtonsInRow > 0 ? noOfPortraitButtonsInRow : PortraitButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
+            double tmpsidewidth = Math.Min(customScale * (isSmaller ? 75.0 : 80.0), Math.Max(customScale * (isSmaller ? 35.0 : 40.0), (canvasViewWidth - (noOfButtons - 1) * 6) / Math.Max(1, noOfButtons)));
+            return tmpsidewidth;
+        }
+
+        public static double CalculatePreliminaryButtonSideHeight(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller)
+        {
+            if(inverseCanvasScale == 0.0f)
+                inverseCanvasScale = 1.0f;
+            bool isLandscape = canvasViewWidth > canvasViewHeight;
+            int bigRowNoOfButtons = noOfLandscapeButtonsInRow > 0 ? noOfLandscapeButtonsInRow : LandscapeButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
+            bool tooWide = customScale * 40.0 * bigRowNoOfButtons + (bigRowNoOfButtons - 1) * 6 > canvasViewWidth;
+            int minNoOfContextButtonRows = 2;
+            int noOfCommandRows = usingSimpleCmdLayout ? 1 : isLandscape && !tooWide ? 1 : 2;
+            float statusBarRowSizeRelativeToButtonWidth = 2 * (GHConstants.StatusBarBaseFontSize / 50.0f * inverseCanvasScale);
+            float minNoOfLabeledButtonRows = minNoOfContextButtonRows + noOfCommandRows;
+            int noOfVerticalSmallerButtons = usingSimpleCmdLayout ? (isLandscape ? 3 : 4) : (isLandscape ? 3 : 5);
+            float labeledButtonFontSizeRelativeToButtonSize = GHConstants.ContextButtonBaseFontSize / 50f;
+            float noOfButtonWidthsNeededForHeight = minNoOfLabeledButtonRows * (1.0f + labeledButtonFontSizeRelativeToButtonSize)
+                + statusBarRowSizeRelativeToButtonWidth
+                + noOfVerticalSmallerButtons * 75f / 80f;
+            float verticalMargins = (noOfVerticalSmallerButtons - 1) * 6 + (noOfCommandRows - 1) * 6 + (minNoOfContextButtonRows - 1) * GHConstants.ContextButtonSpacing + (GHConstants.StatusBarVerticalMargin * 2 + GHConstants.StatusBarRowMargin + GHConstants.ContextButtonBottomStartMargin) / inverseCanvasScale;
+            double verticalSpaceAvailable = canvasViewHeight - verticalMargins - 1.0;
+            double tmpsideheight = Math.Min(customScale * (isSmaller ? 75.0 : 80.0), Math.Max(customScale * (isSmaller ? 35.0 : 40.0), verticalSpaceAvailable / Math.Max(1, noOfButtonWidthsNeededForHeight)));
+            return tmpsideheight;
         }
     }
 

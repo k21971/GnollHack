@@ -1,5 +1,5 @@
 %{
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0  lev_comp.l	$NHDT-Date: 1543371690 2018/11/28 02:21:30 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /*	Copyright (c) 1989 by Jean-Christophe Collet */
@@ -85,7 +85,7 @@ extern struct lc_vardefs *FDECL(vardef_defined,(struct lc_vardefs *,char *, int)
 
 extern struct lc_vardefs *vardefs;
 
-extern long FDECL(method_defined, (char *, long, long *));
+extern int64_t FDECL(method_defined, (char *, int64_t, int64_t *));
 
 void FDECL(savetoken, (char *));
 void NDECL(newline);
@@ -493,6 +493,7 @@ elite { savetoken(yytext); yylval.i=EXCEPTIONALITY_ELITE; return EXCEPTIONALITY_
 celestial { savetoken(yytext); yylval.i=EXCEPTIONALITY_CELESTIAL; return EXCEPTIONALITY_TYPE; }
 primordial { savetoken(yytext); yylval.i=EXCEPTIONALITY_PRIMORDIAL; return EXCEPTIONALITY_TYPE; }
 infernal { savetoken(yytext); yylval.i=EXCEPTIONALITY_INFERNAL; return EXCEPTIONALITY_TYPE; }
+planar_by_original_alignment { savetoken(yytext); yylval.i=EXCEPTIONALITY_PLANAR_BY_ORIGINAL_ALIGNMENT; return EXCEPTIONALITY_TYPE; }
 no_mythic_prefix { savetoken(yytext); yylval.i=MYTHIC_PREFIX_NONE; return MYTHIC_PREFIX_TYPE; }
 no_mythic_suffix { savetoken(yytext); yylval.i=MYTHIC_SUFFIX_NONE; return MYTHIC_SUFFIX_TYPE; }
 material_none { savetoken(yytext); yylval.i=MAT_NONE; return MATERIAL_TYPE; }
@@ -688,7 +689,7 @@ handle_varstring_check()
 
     yylval.map = dupstr(yytext);
     if ((vd = vardef_defined(vardefs, yytext, 1)) != 0) {
-        long l = vd->var_type;
+        int64_t l = vd->var_type;
         int a = ((l & SPOVAR_ARRAY) == SPOVAR_ARRAY);
 
         l &= ~SPOVAR_ARRAY;

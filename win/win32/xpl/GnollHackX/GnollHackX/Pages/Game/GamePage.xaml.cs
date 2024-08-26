@@ -21,6 +21,7 @@ using System.Collections;
 using System.Data;
 using System.Xml.Linq;
 
+
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
@@ -28,6 +29,17 @@ using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
 using Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific;
 using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
+using Microsoft.Maui.Controls;
+using System.Security.AccessControl;
+
+
+
+#if WINDOWS
+using Windows.UI.Core;
+using Windows.System;
+using GnollHackM.Platforms.Windows;
+using GnollHackM.WinUI;
+#endif
 
 namespace GnollHackM
 #else
@@ -40,6 +52,7 @@ using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.PlatformConfiguration.AndroidSpecific;
 using SkiaSharp.Views.Forms;
 using static Xamarin.Essentials.Permissions;
+using Xamarin.Forms.PlatformConfiguration.TizenSpecific;
 
 namespace GnollHackX.Pages.Game
 #endif
@@ -47,25 +60,47 @@ namespace GnollHackX.Pages.Game
     [XamlCompilation(XamlCompilationOptions.Compile)]
     public partial class GamePage : ContentPage
     {
+        private struct MenuClickResult
+        {
+            public bool OkClicked;
+            public int MenuItemClickIndex;
+            public long ItemIdentifier;
+            public MenuClickResult(bool okClicked, int menuItemClickIndex, long itemIdentifier)
+            {
+                OkClicked = okClicked;
+                MenuItemClickIndex = menuItemClickIndex;
+                ItemIdentifier = itemIdentifier;
+            }
+        };
+
         private readonly object _canvasButtonLock = new object();
         private SKRect _canvasButtonRect = new SKRect(0, 0, 0, 0);
         private SKColor _cursorDefaultGreen = new SKColor(0, 255, 0);
 
-        private const float _statusbar_hmargin = 5.0f;
-        private const float _statusbar_vmargin = 5.0f;
-        private const float _statusbar_rowmargin = 5.0f;
-        private const float _statusbar_basefontsize = 14f;
+        private const float _statusbar_hmargin = GHConstants.StatusBarHorizontalMargin;
+        private const float _statusbar_vmargin = GHConstants.StatusBarVerticalMargin;
+        private const float _statusbar_rowmargin = GHConstants.StatusBarRowMargin;
+        private const float _statusbar_basefontsize = GHConstants.StatusBarBaseFontSize;
         private const float _statusbar_shieldfontsize = _statusbar_basefontsize * 32f / 42f;
         private const float _statusbar_diffontsize = _statusbar_basefontsize * 24f / 42f;
 
         private object _isGameOnLock = new object();
         private bool _isGameOn = false;
+        private bool _gameEnded = false;
         public bool IsGameOn { get { lock (_isGameOnLock) { return _isGameOn; } } set { lock (_isGameOnLock) { _isGameOn = value; } } }
+        public bool GameEnded { get { lock (_isGameOnLock) { return _gameEnded; } } set { lock (_isGameOnLock) { _gameEnded = value; } } }
+
+        private object _isMainCanvasOnLock = new object();
+        private bool _isMainCanvasOn = false;
+        private bool _isMainCanvasDrawing = false;
+        public bool IsMainCanvasOn { get { lock (_isMainCanvasOnLock) { return _isMainCanvasOn; } } set { lock (_isMainCanvasOnLock) { _isMainCanvasOn = value; } } }
+        public bool IsMainCanvasDrawing { get { lock (_isMainCanvasOnLock) { return _isMainCanvasDrawing; } } set { lock (_isMainCanvasOnLock) { _isMainCanvasDrawing = value; } } }
+        public bool IsMainCanvasDrawingAndSetTrue { get { lock (_isMainCanvasOnLock) { bool val = _isMainCanvasDrawing; _isMainCanvasDrawing = true; return val; } } }
 
         private readonly string _fontSizeString = "FontS";
         private bool _refreshMsgHistoryRowCounts = true;
-        private readonly object _refreshMsgHistoryRowCountLock = new object();
-        private bool RefreshMsgHistoryRowCounts { get { lock (_refreshMsgHistoryRowCountLock) { return _refreshMsgHistoryRowCounts; } } set { lock (_refreshMsgHistoryRowCountLock) { _refreshMsgHistoryRowCounts = value; } } }
+        //private readonly object _refreshMsgHistoryRowCountLock = new object();
+        private bool RefreshMsgHistoryRowCounts { get { lock (_msgHistoryLock) { return _refreshMsgHistoryRowCounts; } } set { lock (_msgHistoryLock) { _refreshMsgHistoryRowCounts = value; } } }
 
         public List<string> ExtendedCommands { get; set; }
 
@@ -73,8 +108,10 @@ namespace GnollHackX.Pages.Game
         public IGnollHackService GnollHackService { get { return _gnollHackService; } }
         private bool _isFirstAppearance = true;
         private Thread _gnhthread;
+
+        private readonly object _currentGameLock = new object();
         private GHGame _currentGame;
-        public GHGame CurrentGame { get { return _currentGame; } }
+        public GHGame CurrentGame { get { lock (_currentGameLock) { return _currentGame; } } set { lock (_currentGameLock) { _currentGame = value; } } }
 
         private MapData[,] _mapData = new MapData[GHConstants.MapCols, GHConstants.MapRows];
         private readonly object _mapDataLock = new object();
@@ -117,6 +154,7 @@ namespace GnollHackX.Pages.Game
             "Grabbed",
             "Mummy rot",
             "Lycanthropy",
+            "Wounded legs",
         };
 
         public string[] _status_names = new string[(int)game_ui_status_mark_types.MAX_STATUS_MARKS] {
@@ -128,7 +166,7 @@ namespace GnollHackX.Pages.Game
             "Hungry",
             "Weak",
             "Fainting",
-            "Burdended",
+            "Burdened",
             "Stressed",
             "Strained",
             "Overtaxed",
@@ -463,17 +501,17 @@ namespace GnollHackX.Pages.Game
         private bool _breatheAnimations = false;
         public bool BreatheAnimations { get { lock (_breatheAnimationLock) { return _breatheAnimations; } } set { lock (_breatheAnimationLock) { _breatheAnimations = value; } } }
 
-        private readonly object _longerMessageHistoryLock = new object();
+        //private readonly object _longerMessageHistoryLock = new object();
         bool _longerMessageHistory = false;
         public bool LongerMessageHistory
         {
             get
             {
-                lock (_longerMessageHistoryLock) { return _longerMessageHistory; };
+                lock (_msgHistoryLock) { return _longerMessageHistory; };
             }
             set
             {
-                lock (_longerMessageHistoryLock)
+                lock (_msgHistoryLock)
                 {
                     _longerMessageHistory = value;
                 }
@@ -488,12 +526,14 @@ namespace GnollHackX.Pages.Game
                 }
                 else
                     RefreshMsgHistoryRowCounts = true;
-                if (_currentGame != null)
+
+                GHGame curGame = CurrentGame;
+                if (curGame != null)
                 {
                     ConcurrentQueue<GHResponse> queue;
-                    if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                    if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                     {
-                        queue.Enqueue(new GHResponse(_currentGame, GHRequestType.UseLongerMessageHistory, value));
+                        queue.Enqueue(new GHResponse(curGame, GHRequestType.UseLongerMessageHistory, value));
                     }
                 }
             }
@@ -524,67 +564,92 @@ namespace GnollHackX.Pages.Game
         private readonly object _weaponStyleObjDataItemLock = new object();
         private bool _drawWeaponStyleAsGlyphs = true;
 
+        public SimpleImageButton StandardMeasurementButton { get { return UseSimpleCmdLayout ? SimpleESCButton : ESCButton; } }
+        public StackLayout StandardMeasurementCmdLayout { get { return UseSimpleCmdLayout ? SimpleUpperCmdLayout : UpperCmdLayout; } }
+        public LabeledImageButton StandardReferenceButton { get { return UseSimpleCmdLayout ? lSimpleInventoryButton : lInventoryButton; } } // { get { return DesktopButtons ? lRowAbilitiesButton : lAbilitiesButton; } }
+        public StackLayout UsedButtonRowStack { get { return UseSimpleCmdLayout ? SimpleButtonRowStack : ButtonRowStack; } }
+
         private readonly object _petDataLock = new object();
         private List<GHPetDataItem> _petData = new List<GHPetDataItem>();
 
+        private readonly object _styleLock = new object();
         private int _shownMessageRows = GHConstants.DefaultMessageRows;
-        public int NumDisplayedMessages { get { return _shownMessageRows; } set { _shownMessageRows = value; } }
-        public int ActualDisplayedMessages { get { return ForceAllMessages ? (LongerMessageHistory ? GHConstants.MaxLongerMessageHistoryLength : GHConstants.AllMessageRows) : NumDisplayedMessages; } }
-
         private int _shownPetRows = GHConstants.DefaultPetRows;
-        public int NumDisplayedPetRows { get { return _shownPetRows; } set { _shownPetRows = value; } }
-        public SimpleImageButton StandardMeasurementButton { get { return UseSimpleCmdLayout ? SimpleESCButton : ESCButton; } }
-
-        public TTYCursorStyle CursorStyle { get; set; }
-        public GHGraphicsStyle GraphicsStyle { get; set; }
+        private TTYCursorStyle _cursorStyle;
+        private GHGraphicsStyle _graphicsStyle;
         private MapRefreshRateStyle _mapRefreshRate = MapRefreshRateStyle.MapFPS60;
+
+        public int NumDisplayedMessages { get { lock (_styleLock) { return _shownMessageRows; } } set { lock (_styleLock) { _shownMessageRows = value; } } }
+        public int ActualDisplayedMessages { get { return ForceAllMessages ? (LongerMessageHistory ? GHConstants.MaxLongerMessageHistoryLength : GHConstants.AllMessageRows) : NumDisplayedMessages; } }
+        public int NumDisplayedPetRows { get { lock (_styleLock) { return _shownPetRows; } } set { lock (_styleLock) { _shownPetRows = value; } } }
+        public TTYCursorStyle CursorStyle { get { lock (_styleLock) { return _cursorStyle; } } set { lock (_styleLock) { _cursorStyle = value; } } }
+        public GHGraphicsStyle GraphicsStyle { get { lock (_styleLock) { return _graphicsStyle; } } set { lock (_styleLock) { _graphicsStyle = value; } } }
         public MapRefreshRateStyle MapRefreshRate
         {
             get
             {
-                return _mapRefreshRate;
+                lock (_styleLock) { return _mapRefreshRate; }
             }
             set
             {
-                if (_mapRefreshRate == value)
-                    return;
+                lock (_styleLock)
+                {
+                    if (_mapRefreshRate == value)
+                        return;
 
-                _mapRefreshRate = value;
-
-                if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                    canvasView.AbortAnimation("GeneralAnimationCounter");
-                _mapUpdateStopWatch.Stop();
-
+                    _mapRefreshRate = value;
+                }
+                StopMainCanvasAnimation();
                 if (!LoadingGrid.IsVisible)
                     StartMainCanvasAnimation();
             }
         }
 
-        public bool ShowMemoryUsage { get; set; }
+        private readonly object _mipMapLock = new object();
+        private bool _useMainMipMap = false;
+        public bool UseMainMipMap
+        {
+            get { lock (_mipMapLock) { return _useMainMipMap; } }
+            set { lock (_mipMapLock) { _useMainMipMap = value; } }
+        }
+
         public bool UseMainGLCanvas
         {
             get { return canvasView.UseGL; }
-            set {
-                canvasView.UseGL = value;
-                MenuCanvas.UseGL = value;
-                TextCanvas.UseGL = value;
-                CommandCanvas.UseGL = value;
-            }
+            set { canvasView.UseGL = value; }
         }
-        private bool _useSimpleCmdLayout = true;
-        public bool UseSimpleCmdLayout
+
+        public bool UseAuxiliaryGLCanvas
         {
-            get { return _useSimpleCmdLayout; }
+            get { return CommandCanvas.UseGL; }
             set
             {
-                _useSimpleCmdLayout = value;
+                /* SKGLView is non-transparent on Windows */
+                CommandCanvas.UseGL = value;
+#if !WINDOWS
+                MenuCanvas.UseGL = value;
+                TextCanvas.UseGL = value;
+#endif
+            }
+        }
+
+        private readonly object _useSimpleCmdLock = new object();
+        private bool _useSimpleCmdLayout = GHConstants.DefaultSimpleCmdLayout;
+        public bool UseSimpleCmdLayout
+        {
+            get { lock (_useSimpleCmdLock) { return _useSimpleCmdLayout; } }
+            set
+            {
+                lock (_useSimpleCmdLock)
+                {
+                    _useSimpleCmdLayout = value;
+                }
                 ButtonRowStack.IsVisible = !value;
                 UpperCmdLayout.IsVisible = !value;
                 SimpleButtonRowStack.IsVisible = value;
                 SimpleUpperCmdLayout.IsVisible = value;
             }
         }
-        public StackLayout UsedButtonRowStack { get { return UseSimpleCmdLayout ? SimpleButtonRowStack : ButtonRowStack; } }
 
         private readonly object _showBatteryLock = new object();
         private bool _showBattery;
@@ -593,6 +658,15 @@ namespace GnollHackX.Pages.Game
         private readonly object _showFPSLock = new object();
         private bool _showFPS;
         public bool ShowFPS { get { lock (_showFPSLock) { return _showFPS; } } set { lock (_showFPSLock) { _showFPS = value; } } }
+
+        private readonly object _showMemoryLock = new object();
+        private bool _showMemory;
+        private long _memUsage = 0;
+        public bool ShowMemory { get { lock (_showMemoryLock) { return _showMemory; } } set { lock (_showMemoryLock) { _showMemory = value; } } }
+
+        private readonly object _showZoomLock = new object();
+        private bool _showZoom;
+        public bool ShowZoom { get { lock (_showZoomLock) { return _showZoom; } } set { lock (_showZoomLock) { _showZoom = value; } } }
 
         private readonly object _showRecordingLock = new object();
         private bool _showRecording = true;
@@ -605,9 +679,6 @@ namespace GnollHackX.Pages.Game
         private readonly object _fpslock = new object();
         private Stopwatch _stopWatch = new Stopwatch();
         private Stopwatch _mapUpdateStopWatch = new Stopwatch();
-
-        private Stopwatch _animationStopwatch = new Stopwatch();
-        private TimeSpan _previousTimeSpan;
 
         private readonly object _mapGridLock = new object();
         private bool _mapGrid = false;
@@ -641,6 +712,39 @@ namespace GnollHackX.Pages.Game
         private bool _classicStatusBar = true;
         public bool ClassicStatusBar { get { lock (_classicStatusBarLock) { return _classicStatusBar; } } set { lock (_classicStatusBarLock) { _classicStatusBar = value; } } }
 
+        private readonly object _desktopLock = new object();
+        private bool _desktopStatusBar = false;
+        private bool _desktopButtons = false;
+        private bool _showScore = false;
+        private bool _showXP = false;
+        private bool _rightAligned2ndRow = false;
+        private bool _menuFadeEffects = false;
+        private bool _menuHighFilterQuality = false;
+        public bool DesktopStatusBar { get { lock (_desktopLock) { return _desktopStatusBar; } } set { lock (_desktopLock) { _desktopStatusBar = value; } } }
+        public bool DesktopButtons
+        {
+            get { lock (_desktopLock) { return _desktopButtons; } }
+            set
+            {
+                bool changed;
+                lock (_desktopLock)
+                {
+                    changed = _desktopButtons != value;
+                    _desktopButtons = value;
+                }
+                if (changed)
+                {
+                    UpdateAbilityButtonVisibility(value);
+                    UpdateButtonAndUISizes();
+                }
+            }
+        }
+        public bool MenuFadeEffects { get { lock (_desktopLock) { return _menuFadeEffects; } } set { lock (_desktopLock) { _menuFadeEffects = value; } } }
+        public bool MenuHighFilterQuality { get { lock (_desktopLock) { return _menuHighFilterQuality; } } set { lock (_desktopLock) { _menuHighFilterQuality = value; } } }
+        public bool ShowScore { get { lock (_desktopLock) { return _showScore; } } set { lock (_desktopLock) { _showScore = value; } } }
+        public bool ShowXP { get { lock (_desktopLock) { return _showXP; } } set { lock (_desktopLock) { _showXP = value; } } }
+        public bool RightAligned2ndRow { get { lock (_desktopLock) { return _rightAligned2ndRow; } } set { lock (_desktopLock) { _rightAligned2ndRow = value; } } }
+
         private readonly object _showPetsLock = new object();
         private bool _showPets = false;
         public bool ShowPets { get { lock (_showPetsLock) { return _showPets; } } set { lock (_showPetsLock) { _showPets = value; } } }
@@ -663,12 +767,10 @@ namespace GnollHackX.Pages.Game
         private MainPage _mainPage;
 
 
-
-
         /* Persistent temporary bitmap */
-        SKBitmap _tempBitmap = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        SKBitmap _tempBitmap = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight, SKImageInfo.PlatformColorType, SKAlphaType.Unpremul);
 
-        private readonly object _skillRectLock = new object(); 
+        private readonly object _skillRectLock = new object();
         private SKRect _skillRect = new SKRect();
         public SKRect SkillRect { get { lock (_skillRectLock) { return _skillRect; } } set { lock (_skillRectLock) { _skillRect = value; } } }
         private bool _skillRectDrawn = false;
@@ -688,7 +790,7 @@ namespace GnollHackX.Pages.Game
         public SKRect ManaRect { get { lock (_manaRectLock) { return _manaRect; } } set { lock (_manaRectLock) { _manaRect = value; } } }
         private bool _manaRectDrawn = false;
 
-        private readonly object _statusBarRectLock = new object(); 
+        private readonly object _statusBarRectLock = new object();
         private SKRect _statusBarRect = new SKRect();
         public SKRect StatusBarRect { get { lock (_statusBarRectLock) { return _statusBarRect; } } set { lock (_statusBarRectLock) { _statusBarRect = value; } } }
         private bool _statusBarRectDrawn = false;
@@ -702,7 +804,6 @@ namespace GnollHackX.Pages.Game
         private bool _youRectDrawn = false;
         public bool YouRectDrawn { get { lock (_youRectDrawnLock) { return _youRectDrawn; } } set { lock (_youRectDrawnLock) { _youRectDrawn = value; } } }
 
-        private readonly object _targetClipLock = new object();
         private float _originMapOffsetWithNewClipX;
         private float _originMapOffsetWithNewClipY;
         private bool _targetClipOn;
@@ -712,7 +813,7 @@ namespace GnollHackX.Pages.Game
         private int _clipX;
         private int _clipY;
         private readonly object _clipLock = new object();
-        
+
         private readonly object _mapNoClipModeLock = new object();
         private bool _mapNoClipMode = false;
         public bool MapNoClipMode { get { lock (_mapNoClipModeLock) { return _mapNoClipMode; } } set { lock (_mapNoClipModeLock) { _mapNoClipMode = value; } } }
@@ -737,22 +838,24 @@ namespace GnollHackX.Pages.Game
         private bool _mapAlternateMode = false;
         public bool ZoomAlternateMode { get { lock (_mapAlternateModeLock) { return _mapAlternateMode; } } set { lock (_mapAlternateModeLock) { _mapAlternateMode = value; } } }
 
+        private float _defaultMapFontSize = GHConstants.MapFontDefaultSize;
         private float _mapFontSize = GHConstants.MapFontDefaultSize;
         private float _mapFontAlternateSize = GHConstants.MapFontDefaultSize * GHConstants.MapFontRelativeAlternateSize;
         private float _mapFontMiniRelativeSize = 1.0f;
+        private bool _mapFontShowPercentageDecimal = false;
         private readonly object _mapFontSizeLock = new object();
+        public float DefaultMapFontSize { get { lock (_mapFontSizeLock) { return _defaultMapFontSize; } } set { lock (_mapFontSizeLock) { _defaultMapFontSize = value; } } }
         public float MapFontSize { get { lock (_mapFontSizeLock) { return _mapFontSize; } } set { lock (_mapFontSizeLock) { _mapFontSize = value; } } }
         public float MapFontAlternateSize { get { lock (_mapFontSizeLock) { return _mapFontAlternateSize; } } set { lock (_mapFontSizeLock) { _mapFontAlternateSize = value; } } }
         public float MapFontMiniRelativeSize { get { lock (_mapFontSizeLock) { return _mapFontMiniRelativeSize; } } set { lock (_mapFontSizeLock) { _mapFontMiniRelativeSize = value; } } }
+        public bool MapFontShowPercentageDecimal { get { lock (_mapFontSizeLock) { return _mapFontShowPercentageDecimal; } } set { lock (_mapFontSizeLock) { _mapFontShowPercentageDecimal = value; } } }
 
-        private readonly object _tileWidthLock = new object();
-        private float _tileWidth;
-        private float UsedTileWidth { get { lock (_tileWidthLock) { return _tileWidth; } } set { lock (_tileWidthLock) { _tileWidth = value; } } }
-        private readonly object _tileHeightLock = new object();
-        private float _tileHeight;
-        private float UsedTileHeight { get { lock (_tileHeightLock) { return _tileHeight; } } set { lock (_tileHeightLock) { _tileHeight = value; } } }
+        private readonly object _tileSizeLock = new object();
+        private float _usedTileWidth;
+        private float _usedTileHeight;
         private float _mapWidth;
         private float _mapHeight;
+
         private readonly object _mapFontAscentLock = new object();
         private float _mapFontAscent;
         private float UsedMapFontAscent { get { lock (_mapFontAscentLock) { return _mapFontAscent; } } set { lock (_mapFontAscentLock) { _mapFontAscent = value; } } }
@@ -783,7 +886,20 @@ namespace GnollHackX.Pages.Game
         private bool _enableModernMode = false;
         public bool EnableModernMode { get { lock (_enableModernModeLock) { return _enableModernMode; } } set { lock (_enableModernModeLock) { _enableModernMode = value; } } }
 
-        private List<AddContextMenuData> _contextMenuData = new List<AddContextMenuData>();
+        private readonly object _contextMenuDataLock = new object();
+        private List<ContextMenuButton> _contextMenuData = new List<ContextMenuButton>();
+        private class ContextMenuButton
+        {
+            public string LblText;
+            public string ImgSourcePath;
+            public SKImage Bitmap;
+            public int BtnCommand;
+            public SKRect Rect;
+            public ContextMenuButton()
+            {
+
+            }
+        }
 
         public void SetPrimaryCanvasResourceCacheLimit(long cacheLimit)
         {
@@ -806,23 +922,35 @@ namespace GnollHackX.Pages.Game
             return canvasView.ResourceCacheUsage;
         }
 
+        protected override bool OnBackButtonPressed()
+        {
+            return true;  
+        }
+
         public GamePage(MainPage mainPage)
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            GHApp.SetViewCursorOnHandler(ToggleMessageNumberButton, GameCursorType.Info);
 
             _mainPage = mainPage;
 
-            for (int i = 0; i < GHConstants.MapCols; i++)
+            lock (_mapDataLock)
             {
-                for (int j = 0; j < GHConstants.MapRows; j++)
+                for (int i = 0; i < GHConstants.MapCols; i++)
                 {
-                    _mapData[i, j] = new MapData();
-                    _mapData[i, j].Glyph = GHApp.UnexploredGlyph;
-                    _mapData[i, j].BkGlyph = GHApp.NoGlyph;
-                    _mapData[i, j].NeedsUpdate = true;
+                    for (int j = 0; j < GHConstants.MapRows; j++)
+                    {
+                        _mapData[i, j] = new MapData();
+                        _mapData[i, j].Glyph = GHApp.UnexploredGlyph;
+                        _mapData[i, j].BkGlyph = GHApp.NoGlyph;
+                        _mapData[i, j].NeedsUpdate = true;
 
-                    _objectData[i, j] = new ObjectData();
+                        _objectData[i, j] = new ObjectData();
+                    }
                 }
             }
             SetLayerDrawOrder();
@@ -832,13 +960,22 @@ namespace GnollHackX.Pages.Game
             MapRefreshRate = (MapRefreshRateStyle)Preferences.Get("MapRefreshRate", (int)UIUtils.GetDefaultMapFPS());
             ShowFPS = Preferences.Get("ShowFPS", false);
             ShowBattery = Preferences.Get("ShowBattery", false);
+            ShowZoom = Preferences.Get("ShowZoom", false);
             ShowRecording = Preferences.Get("ShowRecording", true);
-            UseMainGLCanvas = Preferences.Get("UseMainGLCanvas", GHApp.IsGPUDefault);
-            UseSimpleCmdLayout = Preferences.Get("UseSimpleCmdLayout", true);
-            ShowMemoryUsage = Preferences.Get("ShowMemoryUsage", false);
+            UseMainMipMap = Preferences.Get("UseMainMipMap", GHApp.IsUseMainMipMapDefault);
+            UseMainGLCanvas = Preferences.Get("UseMainGLCanvas", GHApp.IsUseMainGPUDefault);
+            UseAuxiliaryGLCanvas = Preferences.Get("UseAuxiliaryGLCanvas", GHApp.IsUseAuxGPUDefault);
+            UseSimpleCmdLayout = Preferences.Get("UseSimpleCmdLayout", GHConstants.DefaultSimpleCmdLayout);
+            ShowMemory = Preferences.Get("ShowMemory", false);
             MapGrid = Preferences.Get("MapGrid", false);
             HitPointBars = Preferences.Get("HitPointBars", false);
             ClassicStatusBar = Preferences.Get("ClassicStatusBar", GHConstants.IsDefaultStatusBarClassic);
+            DesktopStatusBar = Preferences.Get("DesktopStatusBar", GHApp.IsDesktop);
+            ShowScore = Preferences.Get("ShowScore", GHApp.IsDesktop);
+            ShowXP = Preferences.Get("ShowXP", GHApp.IsDesktop);
+            RightAligned2ndRow = Preferences.Get("RightAligned2ndRow", false);
+            MenuFadeEffects = Preferences.Get("MenuFadeEffects", GHConstants.AreMenuFadeEffectsDefault);
+            MenuHighFilterQuality = Preferences.Get("MenuHighFilterQuality", GHApp.IsMenuHighFilterQualityDefault);
             ShowOrbs = Preferences.Get("ShowOrbs", true);
             ShowPets = Preferences.Get("ShowPets", true);
             PlayerMark = Preferences.Get("PlayerMark", false);
@@ -850,13 +987,17 @@ namespace GnollHackX.Pages.Game
             DrawWallEnds = Preferences.Get("DrawWallEnds", GHConstants.DefaultDrawWallEnds);
             BreatheAnimations = Preferences.Get("BreatheAnimations", GHConstants.DefaultBreatheAnimations);
             AlternativeLayerDrawing = Preferences.Get("AlternativeLayerDrawing", GHConstants.DefaultAlternativeLayerDrawing);
-            _longerMessageHistory = GHApp.SavedLongerMessageHistory; /* Cannot send response command yet, hence using private variable */
+            lock (_msgHistoryLock)
+            {
+                _longerMessageHistory = GHApp.SavedLongerMessageHistory; /* Cannot send response command yet, hence using private variable */
+            }
 
             float deffontsize = GetDefaultMapFontSize();
+            DefaultMapFontSize = deffontsize;
             MapFontSize = Preferences.Get("MapFontSize", deffontsize);
             MapFontAlternateSize = Preferences.Get("MapFontAlternateSize", deffontsize * GHConstants.MapFontRelativeAlternateSize);
             MapFontMiniRelativeSize = Preferences.Get("MapFontMiniRelativeSize", 1.0f);
-            lock(_mapOffsetLock)
+            lock (_mapOffsetLock)
             {
                 _mapMiniOffsetX = Preferences.Get("MapMiniOffsetX", 0.0f);
                 _mapMiniOffsetY = Preferences.Get("MapMiniOffsetY", 0.0f);
@@ -873,6 +1014,16 @@ namespace GnollHackX.Pages.Game
                     SetSimpleLayoutCommandButton(i, listselidx);
             }
 
+            for (int i = 0; i < 13; i++)
+            {
+                string keystr = "FullUILayoutCommandButton" + (i + 1);
+                int defCmd = GHApp.DefaultShortcutButton(0, i, false).GetCommand();
+                int savedCmd = Preferences.Get(keystr, defCmd);
+                int listselidx = GHApp.SelectableShortcutButtonIndexInList(savedCmd, defCmd);
+                if (listselidx >= 0)
+                    SetFullLayoutCommandButton(i, listselidx);
+            }
+
             ToggleTravelModeButton_Clicked(null, null);
             ZoomMiniMode = true;
             ZoomAlternateMode = true;
@@ -880,6 +1031,65 @@ namespace GnollHackX.Pages.Game
             ToggleZoomAlternateButton_Clicked(null, null);
             MapNoClipMode = !MapNoClipMode;
             ToggleAutoCenterModeButton_Clicked(null, null);
+            StartAtBlack();
+
+            /* Do this last just in case */
+            DesktopButtons = Preferences.Get("DesktopButtons", GHApp.IsDesktop);
+#if WINDOWS
+            Loaded += (s, e) => 
+            {
+                UpdateMoreNextPrevButtonVisibility(true, true);
+                CommandCanvas.InvalidateSurface();
+                MenuCanvas.InvalidateSurface();
+                TextCanvas.InvalidateSurface();
+            };
+#endif
+        }
+
+        private void UpdateAbilityButtonVisibility(bool isDesktop)
+        {
+            lAbilitiesButton.IsVisible = !isDesktop;
+            lWornItemsButton.IsVisible = !isDesktop;
+            lRowAbilitiesButton.IsVisible = isDesktop;
+            lRowWornItemsButton.IsVisible = isDesktop;
+            if (isDesktop)
+            {
+                lRowAbilitiesButton.SetButtonFocus();
+            }
+            else
+            {
+                lAbilitiesButton.SetButtonFocus();
+            }
+        }
+
+        private void NextLabelHandler_PointerExited(object sender, EventArgs e)
+        {
+            //MoreNextButton.IsVisible = false;
+        }
+
+        private void NextLabelHandler_PointerEntered(object sender, EventArgs e)
+        {
+            if (!MoreNextButton.IsVisible)
+            {
+                MoreNextButton.Opacity = 0;
+                MoreNextButton.IsVisible = true;
+                MoreNextButton.FadeTo(1.0);
+            }
+        }
+
+        private void PreviousLabelHandler_PointerExited(object sender, EventArgs e)
+        {
+            //MorePreviousButton.IsVisible = false;
+        }
+
+        private void PreviousLabelHandler_PointerEntered(object sender, EventArgs e)
+        {
+            if (!MorePreviousButton.IsVisible)
+            {
+                MorePreviousButton.Opacity = 0;
+                MorePreviousButton.IsVisible = true;
+                MorePreviousButton.FadeTo(1.0);
+            }
         }
 
         private float GetDefaultMapFontSize()
@@ -890,7 +1100,7 @@ namespace GnollHackX.Pages.Game
             float density = (float)mainDisplayInfo.Density;
 #if GNH_MAUI
             DeviceIdiom ti = DeviceInfo.Idiom;
-            if(ti == DeviceIdiom.Tablet || ti == DeviceIdiom.Phone)
+            if (ti == DeviceIdiom.Tablet || ti == DeviceIdiom.Phone)
             {
                 c_numerator = 2.0f;
                 c_denominator = 3.0f;
@@ -909,6 +1119,45 @@ namespace GnollHackX.Pages.Game
             }
 #endif
             return GHConstants.MapFontDefaultSize * (density * c_numerator) / c_denominator;
+        }
+
+        public void SetCharacterClickAction(bool newValue)
+        {
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
+            {
+                ConcurrentQueue<GHResponse> queue;
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
+                {
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.SetCharacterClickAction, newValue));
+                }
+            }
+        }
+
+        public void SetRightMouseCommand(int newValue)
+        {
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
+            {
+                ConcurrentQueue<GHResponse> queue;
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
+                {
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.SetRightMouseCommand, newValue));
+                }
+            }
+        }
+
+        public void SetMiddleMouseCommand(int newValue)
+        {
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
+            {
+                ConcurrentQueue<GHResponse> queue;
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
+                {
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.SetMiddleMouseCommand, newValue));
+                }
+            }
         }
 
         public async void StartNewGame()
@@ -932,253 +1181,239 @@ namespace GnollHackX.Pages.Game
 #endif
         public async Task StartGame(string replayFileName, int fromTurn)
         {
-            ReplayFileName = replayFileName;
-            _mainPage.GameStarted = true;
-            LoadingProgressBar.Progress = 0.0;
-
-            var tasks = new List<Task>();
-            _gnollHackService = GHApp.GnollHackService;
-            _gnollHackService.InitializeGnollHack();
-
-            if (!GHApp.StartGameDataSet)
+            try
             {
-                Assembly assembly = GetType().GetTypeInfo().Assembly;
-                tasks.Add(LoadingProgressBar.ProgressTo(0.3, 600, Easing.Linear));
+                ReplayFileName = replayFileName;
+                _mainPage.GameStarted = true;
+                LoadingProgressBar.Progress = 0.0;
+                canvasView.Focus();
+
+                var tasks = new List<Task>();
+                _gnollHackService = GHApp.GnollHackService;
+                await _gnollHackService.InitializeGnollHack();
+                GHApp.FmodService.LoadBanks(sound_bank_loading_type.Music);
+
+                if (!GHApp.StartGameDataSet)
+                {
+                    tasks.Add(LoadingProgressBar.ProgressTo(0.3, 600, Easing.Linear));
+                    tasks.Add(Task.Run(() =>
+                    {
+                        GHApp.FmodService.LoadBanks(sound_bank_loading_type.Game);
+                        GHApp._tileMap[0] = GHApp.LoadEmbeddedAssetsBitmap("gnollhack_64x96_transparent_32bits.png");
+                    }));
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+
+                    tasks.Add(LoadingProgressBar.ProgressTo(0.4, 100, Easing.Linear));
+                    tasks.Add(Task.Run(() =>
+                    {
+                        GHApp._tileMap[1] = GHApp.LoadEmbeddedAssetsBitmap("gnollhack_64x96_transparent_32bits-2.png");
+                    }));
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+
+                    tasks.Add(LoadingProgressBar.ProgressTo(0.5, 100, Easing.Linear));
+                    tasks.Add(Task.Run(() =>
+                    {
+                        GHApp._logoBitmap = GHApp.LoadEmbeddedAssetsBitmap("gnollhack-icon-v2-512.png");
+                    }));
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+
+                    tasks.Add(LoadingProgressBar.ProgressTo(0.6, 100, Easing.Linear));
+                    tasks.Add(Task.Run(() =>
+                    {
+                        GHApp._skillBitmap = GHApp.LoadEmbeddedUIBitmap("skill.png");
+                        GHApp._prevWepBitmap = GHApp.LoadEmbeddedUIBitmap("wield.png");
+                        GHApp._prevUnwieldBitmap = GHApp.LoadEmbeddedUIBitmap("unwield.png");
+
+                        GHApp.InitializeArrowButtons();
+                        GHApp.InitializeUIBitmaps();
+                        GHApp.InitializeMoreCommandButtons(UseSimpleCmdLayout);
+
+                        GHApp.UnexploredGlyph = _gnollHackService.GetUnexploredGlyph();
+                        GHApp.NoGlyph = _gnollHackService.GetNoGlyph();
+
+                        int animoff, enloff, reoff, general_tile_off, hit_tile_off, ui_tile_off, spell_tile_off, skill_tile_off, command_tile_off, buff_tile_off, cursor_off;
+                        _gnollHackService.GetOffs(out animoff, out enloff, out reoff, out general_tile_off, out hit_tile_off, out ui_tile_off, out spell_tile_off, out skill_tile_off, out command_tile_off, out buff_tile_off,
+                            out cursor_off);
+                        GHApp.AnimationOff = animoff;
+                        GHApp.EnlargementOff = enloff;
+                        GHApp.ReplacementOff = reoff;
+                        GHApp.GeneralTileOff = general_tile_off;
+                        GHApp.HitTileOff = hit_tile_off;
+                        GHApp.UITileOff = ui_tile_off;
+                        GHApp.SpellTileOff = spell_tile_off;
+                        GHApp.SkillTileOff = skill_tile_off;
+                        GHApp.CommandTileOff = command_tile_off;
+                        GHApp.BuffTileOff = buff_tile_off;
+                        GHApp.CursorOff = cursor_off;
+
+                    }));
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+
+                    tasks.Add(LoadingProgressBar.ProgressTo(0.7, 100, Easing.Linear));
+                    tasks.Add(Task.Run(() =>
+                    {
+                        GHApp._animationDefs = _gnollHackService.GetAnimationArray();
+                        GHApp._enlargementDefs = _gnollHackService.GetEnlargementArray();
+                    }));
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+
+                    tasks.Add(LoadingProgressBar.ProgressTo(0.80, 100, Easing.Linear));
+                    tasks.Add(Task.Run(() =>
+                    {
+                        GHApp._replacementDefs = _gnollHackService.GetReplacementArray();
+                        GHApp._autodraws = _gnollHackService.GetAutoDrawArray();
+                    }));
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+                    GHApp.StartGameDataSet = true;
+                }
+
+                tasks.Add(LoadingProgressBar.ProgressTo(0.90, 100, Easing.Linear));
                 tasks.Add(Task.Run(() =>
                 {
-                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.gnollhack_64x96_transparent_32bits.png"))
-                    {
-                        SKBitmap tileMap = SKBitmap.Decode(stream);
-                        tileMap.SetImmutable();
-                        GHApp._tileMap[0] = SKImage.FromBitmap(tileMap);
-                    }
+                    ExtendedCommands = _gnollHackService.GetExtendedCommands();
                 }));
                 await Task.WhenAll(tasks);
                 tasks.Clear();
 
-                tasks.Add(LoadingProgressBar.ProgressTo(0.4, 100, Easing.Linear));
-                tasks.Add(Task.Run(() =>
+                await LoadingProgressBar.ProgressTo(0.95, 50, Easing.Linear);
+
+                if (PlayingReplay)
                 {
-                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.gnollhack_64x96_transparent_32bits-2.png"))
-                    {
-                        SKBitmap tileMap = SKBitmap.Decode(stream);
-                        tileMap.SetImmutable();
-                        GHApp._tileMap[1] = SKImage.FromBitmap(tileMap);
-                    }
-                }));
-                await Task.WhenAll(tasks);
-                tasks.Clear();
+                    //MainGrid.IsEnabled = false;
+                    lWornItemsButton.IsEnabled = false;
+                    lAbilitiesButton.IsEnabled = false;
+                    lRowWornItemsButton.IsEnabled = false;
+                    lRowAbilitiesButton.IsEnabled = false;
+                    //ContextLayout.IsEnabled = false;
 
-                tasks.Add(LoadingProgressBar.ProgressTo(0.5, 100, Easing.Linear));
-                tasks.Add(Task.Run(() =>
-                {
-                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.gnollhack-icon-v2-512.png"))
-                    {
-                        SKBitmap bmp = SKBitmap.Decode(stream);
-                        bmp.SetImmutable();
-                        GHApp._logoBitmap = SKImage.FromBitmap(bmp);
-                    }
-                }));
-                await Task.WhenAll(tasks);
-                tasks.Clear();
+                    GameMenuButton.IsEnabled = false;
+                    ESCButton.IsEnabled = false;
+                    LookModeButton.IsEnabled = false;
+                    ToggleTravelModeButton.IsEnabled = false;
+                    ButtonRowStack.IsEnabled = false;
 
-                tasks.Add(LoadingProgressBar.ProgressTo(0.6, 100, Easing.Linear));
-                tasks.Add(Task.Run(() =>
-                {
-                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.UI.skill.png"))
-                    {
-                        SKBitmap bmp = SKBitmap.Decode(stream);
-                        bmp.SetImmutable();
-                        GHApp._skillBitmap = SKImage.FromBitmap(bmp);
-                    }
-                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.UI.wield.png"))
-                    {
-                        SKBitmap bmp = SKBitmap.Decode(stream);
-                        bmp.SetImmutable();
-                        GHApp._prevWepBitmap = SKImage.FromBitmap(bmp);
-                    }
-                    using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + ".Assets.UI.unwield.png"))
-                    {
-                        SKBitmap bmp = SKBitmap.Decode(stream);
-                        bmp.SetImmutable();
-                        GHApp._prevUnwieldBitmap = SKImage.FromBitmap(bmp);
-                    }
+                    GameMenuButton.Opacity = 0.5;
+                    ESCButton.Opacity = 0.5;
+                    LookModeButton.Opacity = 0.5;
+                    ToggleTravelModeButton.Opacity = 0.5;
 
-                    GHApp.InitializeArrowButtons(assembly);
-                    GHApp.InitializeUIBitmaps(assembly);
-                    GHApp.InitializeMoreCommandButtons(assembly, UseSimpleCmdLayout);
+                    SimpleGameMenuButton.IsEnabled = false;
+                    SimpleESCButton.IsEnabled = false;
+                    SimpleLookModeButton.IsEnabled = false;
+                    SimpleButtonRowStack.IsEnabled = false;
 
-                    GHApp.UnexploredGlyph = _gnollHackService.GetUnexploredGlyph();
-                    GHApp.NoGlyph = _gnollHackService.GetNoGlyph();
+                    SimpleGameMenuButton.Opacity = 0.5;
+                    SimpleESCButton.Opacity = 0.5;
+                    SimpleLookModeButton.Opacity = 0.5;
 
-                    int animoff, enloff, reoff, general_tile_off, hit_tile_off, ui_tile_off, spell_tile_off, skill_tile_off, command_tile_off, buff_tile_off, cursor_off;
-                    _gnollHackService.GetOffs(out animoff, out enloff, out reoff, out general_tile_off, out hit_tile_off, out ui_tile_off, out spell_tile_off, out skill_tile_off, out command_tile_off, out buff_tile_off,
-                        out cursor_off);
-                    GHApp.AnimationOff = animoff;
-                    GHApp.EnlargementOff = enloff;
-                    GHApp.ReplacementOff = reoff;
-                    GHApp.GeneralTileOff = general_tile_off;
-                    GHApp.HitTileOff = hit_tile_off;
-                    GHApp.UITileOff = ui_tile_off;
-                    GHApp.SpellTileOff = spell_tile_off;
-                    GHApp.SkillTileOff = skill_tile_off;
-                    GHApp.CommandTileOff = command_tile_off;
-                    GHApp.BuffTileOff = buff_tile_off;
-                    GHApp.CursorOff = cursor_off;
+                    MenuGrid.IsEnabled = false;
+                    TextGrid.IsEnabled = false;
+                    GetLineGrid.IsEnabled = false;
+                    YnGrid.IsEnabled = false;
+                    PopupGrid.IsEnabled = false;
+                    MoreCommandsGrid.IsEnabled = false;
+                    TipView.IsEnabled = false;
+                    ReplayRealTimeLabel.Text = "";
+                    ReplayHeaderLabel.Text = "";
+                    GHApp.ResetReplay();
+                    GHApp.GoToTurn = fromTurn;
+                    UpdateReplaySpeedButtons();
+                    UpdateReplayPauseButton();
+                    ReplayGrid.IsVisible = true;
+                }
 
-                }));
-                await Task.WhenAll(tasks);
-                tasks.Clear();
+                Thread t;
+                if (PlayingReplay)
+                    t = new Thread(new ThreadStart(GNHThreadProcForReplay));
+                else
+                    t = new Thread(new ThreadStart(GNHThreadProc));
+                _gnhthread = t;
+                _gnhthread.Start();
 
-                tasks.Add(LoadingProgressBar.ProgressTo(0.7, 100, Easing.Linear));
-                tasks.Add(Task.Run(() =>
-                {
-                    GHApp._animationDefs = _gnollHackService.GetAnimationArray();
-                    GHApp._enlargementDefs = _gnollHackService.GetEnlargementArray();
-                }));
-                await Task.WhenAll(tasks);
-                tasks.Clear();
+                _stopWatch.Start();
 
-                tasks.Add(LoadingProgressBar.ProgressTo(0.80, 100, Easing.Linear));
-                tasks.Add(Task.Run(() =>
-                {
-                    GHApp._replacementDefs = _gnollHackService.GetReplacementArray();
-                    GHApp._autodraws = _gnollHackService.GetAutoDrawArray();
-                }));
-                await Task.WhenAll(tasks);
-                tasks.Clear();
-                GHApp.StartGameDataSet = true;
-            }
+                await LoadingProgressBar.ProgressTo(0.99, 40, Easing.Linear);
 
-            tasks.Add(LoadingProgressBar.ProgressTo(0.90, 100, Easing.Linear));
-            tasks.Add(Task.Run(() =>
-            {
-                ExtendedCommands = _gnollHackService.GetExtendedCommands();
-            }));
-            await Task.WhenAll(tasks);
-            tasks.Clear();
+                canvasView._gamePage = this;
+                CommandCanvas._gamePage = this;
+                MenuCanvas._gamePage = this;
+                TextCanvas._gamePage = this;
+                TipView._gamePage = this;
 
-            await LoadingProgressBar.ProgressTo(0.95, 50, Easing.Linear);
+                canvasView._parentGrid = MainGrid;
+                CommandCanvas._parentGrid = MoreCommandsGrid;
+                MenuCanvas._parentGrid = MenuGrid;
+                TextCanvas._parentGrid = TextGrid;
+                TipView._parentGrid = null;
 
-            if (PlayingReplay)
-            {
-                //MainGrid.IsEnabled = false;
-                lWornItemsButton.IsEnabled = false;
-                lAbilitiesButton.IsEnabled = false;
-                ContextLayout.IsEnabled = false;
+                IsGameOn = true;
+                IsMainCanvasOn = true;
+                MainGrid.IsVisible = true;
+                canvasView.InvalidateSurface();
 
-                GameMenuButton.IsEnabled = false;
-                ESCButton.IsEnabled = false;
-                LookModeButton.IsEnabled = false;
-                ToggleTravelModeButton.IsEnabled = false;
-                ButtonRowStack.IsEnabled = false;
-
-                GameMenuButton.Opacity = 0.5;
-                ESCButton.Opacity = 0.5;
-                LookModeButton.Opacity = 0.5;
-                ToggleTravelModeButton.Opacity = 0.5;
-
-                SimpleGameMenuButton.IsEnabled = false;
-                SimpleESCButton.IsEnabled = false;
-                SimpleLookModeButton.IsEnabled = false;
-                SimpleButtonRowStack.IsEnabled = false;
-
-                SimpleGameMenuButton.Opacity = 0.5;
-                SimpleESCButton.Opacity = 0.5;
-                SimpleLookModeButton.Opacity = 0.5;
-
-                MenuGrid.IsEnabled = false;
-                TextGrid.IsEnabled = false;
-                GetLineGrid.IsEnabled = false;
-                YnGrid.IsEnabled = false;
-                PopupGrid.IsEnabled = false;
-                MoreCommandsGrid.IsEnabled = false;
-                TipView.IsEnabled = false;
-                ReplayRealTimeLabel.Text = "";
-                ReplayHeaderLabel.Text = "";
-                GHApp.ResetReplay();
-                GHApp.GoToTurn = fromTurn;
-                UpdateReplaySpeedButtons();
-                UpdateReplayPauseButton();
-                ReplayGrid.IsVisible = true;
-            }
-
-            Thread t;
-            if(PlayingReplay)
-                t = new Thread(new ThreadStart(GNHThreadProcForReplay));
-            else
-                t = new Thread(new ThreadStart(GNHThreadProc));
-            _gnhthread = t;
-            _gnhthread.Start();
-
-            _stopWatch.Start();
-
-            await LoadingProgressBar.ProgressTo(0.99, 40, Easing.Linear);
-
-            _animationStopwatch.Reset();
-            _previousTimeSpan = _animationStopwatch.Elapsed;
-            _animationStopwatch.Start();
-
-            canvasView._gamePage = this;
-            CommandCanvas._gamePage = this;
-            MenuCanvas._gamePage = this;
-            TextCanvas._gamePage = this;
-            TipView._gamePage = this;
-
-            canvasView._parentGrid = MainGrid;
-            CommandCanvas._parentGrid = MoreCommandsGrid;
-            MenuCanvas._parentGrid = MenuGrid;
-            TextCanvas._parentGrid = TextGrid;
-            TipView._parentGrid = null;
-
-            IsGameOn = true;
-
-            /* Polling timer */
+                /* Polling timer */
 #if GNH_MAUI
-            _pollingTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
-            _pollingTimer.Interval = TimeSpan.FromSeconds(1.0 / GHConstants.PollingFrequency);
-            _pollingTimer.IsRepeating = true;
-            _pollingTimer.Tick += (s, e) => { DoPolling(); if (!IsGameOn) _pollingTimer?.Stop(); };
-            _pollingTimer.Start();
+                _pollingTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+                _pollingTimer.Interval = TimeSpan.FromSeconds(1.0 / GHConstants.PollingFrequency);
+                _pollingTimer.IsRepeating = true;
+                _pollingTimer.Tick += (s, e) => { DoPolling(); if (!IsGameOn) _pollingTimer?.Stop(); };
+                _pollingTimer.Start();
 #else
-            Device.StartTimer(TimeSpan.FromSeconds(1.0 / GHConstants.PollingFrequency), () =>
-            {
-                DoPolling();
-                return IsGameOn;
-            });
+                Device.StartTimer(TimeSpan.FromSeconds(1.0 / GHConstants.PollingFrequency), () =>
+                {
+                    DoPolling();
+                    return IsGameOn;
+                });
 #endif
-            /* Cursor and FPS update timer */
+                /* Cursor and FPS update timer */
 #if GNH_MAUI
-            _updateTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
-            _updateTimer.Interval = TimeSpan.FromSeconds(0.5);
-            _updateTimer.IsRepeating = true;
-            _updateTimer.Tick += (s, e) => { DoUpdateTimer(); if (!IsGameOn) _updateTimer?.Stop(); };
-            _updateTimer.Start();
+                _updateTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+                _updateTimer.Interval = TimeSpan.FromSeconds(0.5);
+                _updateTimer.IsRepeating = true;
+                _updateTimer.Tick += (s, e) => { DoUpdateTimer(); if (!IsGameOn) _updateTimer?.Stop(); };
+                _updateTimer.Start();
 #else
-            Device.StartTimer(TimeSpan.FromSeconds(0.5), () =>
-            {
-                DoUpdateTimer();
-                return IsGameOn;
-            });
+                Device.StartTimer(TimeSpan.FromSeconds(0.5), () =>
+                {
+                    DoUpdateTimer();
+                    return IsGameOn;
+                });
 #endif
 
-            await LoadingProgressBar.ProgressTo(1.0, 20, Easing.Linear);
-            GHApp.DebugCheckCurrentFileDescriptor("StartGameFinished");
+                await LoadingProgressBar.ProgressTo(1.0, 20, Easing.Linear);
+                SetupKeyListening();
+                GHApp.DebugCheckCurrentFileDescriptor("StartGameFinished");
+            }
+            catch (Exception ex)
+            {
+                GHApp.MaybeWriteGHLog("StartGame: " + ex.Message);
+#if SENTRY
+                SentrySdk.CaptureException(ex);
+#endif
+                await DisplayAlert("Error", "Error occurred when setting up the game: " + ex.Message, "OK");
+            }
         }
 
+        //private bool StartingPositionsSet { get; set; }
         private void DoPolling()
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                if (!StartingPositionsSet && !canvasView.CanvasSize.IsEmpty && IsSizeAllocatedProcessed && lAbilitiesButton.Width > 0)
-                {
-                    double statusBarHeight = GetStatusBarHeight();
-                    lAbilitiesButton.HeightRequest = statusBarHeight;
-                    lWornItemsButton.HeightRequest = statusBarHeight;
-                    UpperCmdLayout.Margin = new Thickness(0, statusBarHeight, 0, 0);
-                    SimpleUpperCmdLayout.Margin = new Thickness(0, statusBarHeight, 0, 0);
-                    StartingPositionsSet = true;
-                }
+                //if (!StartingPositionsSet && !canvasView.CanvasSize.IsEmpty && IsSizeAllocatedProcessed && StandardReferenceButton.Width > 0)
+                //{
+                //    double statusBarHeight = GetStatusBarHeight();
+                //    lAbilitiesButton.HeightRequest = statusBarHeight;
+                //    lWornItemsButton.HeightRequest = statusBarHeight;
+                //    UpperCmdLayout.Margin = new Thickness(0, statusBarHeight, 0, 0);
+                //    SimpleUpperCmdLayout.Margin = new Thickness(0, statusBarHeight, 0, 0);
+                //    StartingPositionsSet = true;
+                //}
 
                 pollRequestQueue();
             });
@@ -1192,6 +1427,12 @@ namespace GnollHackX.Pages.Game
                 {
                     _cursorIsOn = !_cursorIsOn;
                 }
+                lock (_showMemoryLock)
+                {
+                    if (_showMemory)
+                        _memUsage = GC.GetTotalMemory(false);
+                }
+
                 if (ShowFPS)
                 {
                     if (!_stopWatch.IsRunning)
@@ -1254,12 +1495,19 @@ namespace GnollHackX.Pages.Game
 
         public async void RestartGame()
         {
-            _currentGame = null;
+            if (_gnhthread != null)
+            {
+                /* Game thread may have outstanding things to do, but wait for up to 1 second to let them finish */
+                for (int i = 0; i < 20 && _gnhthread.IsAlive; i++)
+                {
+                    await Task.Delay(50);
+                }
+            }
+            CurrentGame = null;
             GHApp.CurrentGHGame = null;
             _gnhthread = null;
 
             /* Collect garbage at this point */
-            await Task.Delay(50);
             GHApp.CollectGarbage();
             await Task.Delay(50);
 
@@ -1270,12 +1518,15 @@ namespace GnollHackX.Pages.Game
 
         public async void RestartReplay()
         {
-            _currentGame = null;
+            /* Replay thread should have finished by now since it does not have any outstanding things to do, but wait for 50 millisecs just in case if this is not the case */
+            if (_gnhthread != null && _gnhthread.IsAlive)
+                await Task.Delay(50);
+
+            CurrentGame = null;
             GHApp.CurrentGHGame = null;
             _gnhthread = null;
 
             /* Collect garbage at this point */
-            await Task.Delay(50);
             GHApp.CollectGarbage();
             await Task.Delay(50);
 
@@ -1294,11 +1545,9 @@ namespace GnollHackX.Pages.Game
 
             IncrementCounters();
 
-            if(canvasView.IsVisible && refresh)
+            if (canvasView.IsVisible && refresh)
             {
-                canvasView.InvalidateSurface();
-
-                if(ForceAllMessages)
+                if (ForceAllMessages)
                 {
                     float timePassed = 0;
                     if (!_mapUpdateStopWatch.IsRunning)
@@ -1386,6 +1635,8 @@ namespace GnollHackX.Pages.Game
                         }
                     }
                 }
+
+                canvasView.InvalidateSurface();
             }
         }
 
@@ -1393,11 +1644,23 @@ namespace GnollHackX.Pages.Game
         {
             if (MoreCommandsGrid.IsVisible)
             {
-                CommandCanvas.InvalidateSurface();
+                float timePassed = 1.0f / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                //float timePassed = 0;
+                //if (!_mapUpdateStopWatch.IsRunning)
+                //{
+                //    timePassed = 1.0f / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                //    _mapUpdateStopWatch.Restart();
+                //}
+                //else
+                //{
+                //    _mapUpdateStopWatch.Stop();
+                //    timePassed = (float)_mapUpdateStopWatch.ElapsedMilliseconds / 1000f;
+                //    _mapUpdateStopWatch.Restart();
+                //}
                 float offx = MoreCmdOffsetX;
                 if (offx != 0 && (CommandTouchDictionary.Count == 0 || _commandChangedPage))
                 {
-                    float delta = -1 * Math.Sign(offx) * CommandCanvas.CanvasSize.Width * _moreCmdOffsetAutoSpeed / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                    float delta = -1 * Math.Sign(offx) * CommandCanvas.CanvasSize.Width * _moreCmdOffsetAutoSpeed * timePassed;
                     if (offx > 0 && offx + delta < 0)
                         MoreCmdOffsetX = 0;
                     else if (offx < 0 && offx + delta > 0)
@@ -1405,9 +1668,11 @@ namespace GnollHackX.Pages.Game
                     else
                         MoreCmdOffsetX = offx + delta;
                 }
+                CommandCanvas.InvalidateSurface();
             }
         }
 
+        //private int _menuUpdateGCCounter = 0;
         public void UpdateMenuCanvas()
         {
             bool refresh = false;
@@ -1419,7 +1684,20 @@ namespace GnollHackX.Pages.Game
                 }
                 if (refresh)
                 {
-                    MenuCanvas.InvalidateSurface();
+                    float timePassed = 1.0f / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                    //float timePassed = 0;
+                    //if (!_mapUpdateStopWatch.IsRunning)
+                    //{
+                    //    timePassed = 1.0f / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                    //    _mapUpdateStopWatch.Restart();
+                    //}
+                    //else
+                    //{
+                    //    _mapUpdateStopWatch.Stop();
+                    //    timePassed = (float)_mapUpdateStopWatch.ElapsedMilliseconds / 1000f;
+                    //    _mapUpdateStopWatch.Restart();
+                    //}
+                    //bool doGC = false;
                     lock (_menuScrollLock)
                     {
                         float speed = _menuScrollSpeed; /* pixels per second */
@@ -1428,7 +1706,7 @@ namespace GnollHackX.Pages.Game
                         if (_menuScrollSpeedOn)
                         {
                             int sgn = Math.Sign(_menuScrollSpeed);
-                            float delta = speed / UIUtils.GetAuxiliaryCanvasAnimationFrequency(); /* pixels */
+                            float delta = speed * timePassed;
                             _menuScrollOffset += delta;
                             if (_menuScrollOffset < 0 && _menuScrollOffset - delta > 0)
                             {
@@ -1456,18 +1734,18 @@ namespace GnollHackX.Pages.Game
                                 float target_speed_at_edge = GHConstants.ScrollTargetSpeedAtEdge;
                                 float dist_factor = (Math.Abs(distance_from_edge) - close_anchor_distance) / (distance_anchor_distance - close_anchor_distance);
                                 float close_factor = Math.Abs(distance_from_edge) / close_anchor_distance;
-                                float target_speed = -1.0f * (float)Math.Sign(distance_from_edge) 
+                                float target_speed = -1.0f * (float)Math.Sign(distance_from_edge)
                                     * (
                                     Math.Max(0f, dist_factor) * (target_speed_at_distance - target_speed_at_close)
-                                    + Math.Min(1f, close_factor) * (target_speed_at_close - target_speed_at_edge) 
+                                    + Math.Min(1f, close_factor) * (target_speed_at_close - target_speed_at_edge)
                                     + target_speed_at_edge
-                                    ) 
+                                    )
                                     * MenuCanvas.CanvasSize.Height;
                                 if (_menuScrollOffset > 0 ? _menuScrollSpeed <= 0 : _menuScrollSpeed >= 0)
                                 {
                                     float target_factor = Math.Abs(distance_from_edge) / distance_anchor_distance;
                                     _menuScrollSpeed += (-1.0f * deceleration3) * (float)UIUtils.GetAuxiliaryCanvasAnimationInterval() / 1000;
-                                    if(target_factor < 1.0f)
+                                    if (target_factor < 1.0f)
                                     {
                                         _menuScrollSpeed = _menuScrollSpeed * target_factor + target_speed * (1.0f - target_factor);
                                     }
@@ -1485,14 +1763,29 @@ namespace GnollHackX.Pages.Game
                                         float deceleration1 = (float)MenuCanvas.CanvasSize.Height * GHConstants.ScrollConstantDeceleration;
                                         float deceleration2 = Math.Abs(_menuScrollSpeed) * GHConstants.ScrollSpeedDeceleration;
                                         float deceleration_per_second = deceleration1 + deceleration2;
-                                        _menuScrollSpeed += - 1.0f * (float)sgn * ((deceleration_per_second * (float)UIUtils.GetAuxiliaryCanvasAnimationInterval()) / 1000);
+                                        _menuScrollSpeed += -1.0f * (float)sgn * ((deceleration_per_second * (float)UIUtils.GetAuxiliaryCanvasAnimationInterval()) / 1000);
                                         if (sgn == 0 || (sgn > 0 && _menuScrollSpeed < 0) || (sgn < 0 && _menuScrollSpeed > 0))
                                             _menuScrollSpeed = 0;
                                     }
                                 }
                             }
                         }
+                        //if (!_menuScrollSpeedOn && GHApp.IsAndroid)
+                        //{
+                        //    if (_menuUpdateGCCounter >= 20)
+                        //        doGC = true;
+                        //    else
+                        //        _menuUpdateGCCounter++;
+                        //}
                     }
+
+                    MenuCanvas.InvalidateSurface();
+                    //if(doGC)
+                    //{
+                    //    _menuUpdateGCCounter = 0;
+                    //    GHApp.PlatformService?.CollectGarbage();
+                    //    GC.Collect();
+                    //}
                 }
             }
         }
@@ -1501,7 +1794,19 @@ namespace GnollHackX.Pages.Game
         {
             if (TextGrid.IsVisible)
             {
-                TextCanvas.InvalidateSurface();
+                float timePassed = 1.0f / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                //float timePassed = 0;
+                //if (!_mapUpdateStopWatch.IsRunning)
+                //{
+                //    timePassed = 1.0f / UIUtils.GetAuxiliaryCanvasAnimationFrequency();
+                //    _mapUpdateStopWatch.Restart();
+                //}
+                //else
+                //{
+                //    _mapUpdateStopWatch.Stop();
+                //    timePassed = (float)_mapUpdateStopWatch.ElapsedMilliseconds / 1000f;
+                //    _mapUpdateStopWatch.Restart();
+                //}
                 lock (_textScrollLock)
                 {
                     float speed = _textScrollSpeed; /* pixels per second */
@@ -1510,7 +1815,7 @@ namespace GnollHackX.Pages.Game
                     if (_textScrollSpeedOn)
                     {
                         int sgn = Math.Sign(_textScrollSpeed);
-                        float delta = speed / UIUtils.GetAuxiliaryCanvasAnimationFrequency(); /* pixels */
+                        float delta = speed * timePassed; /* pixels */
                         _textScrollOffset += delta;
                         if (_textScrollOffset < 0 && _textScrollOffset - delta > 0)
                         {
@@ -1575,24 +1880,43 @@ namespace GnollHackX.Pages.Game
                         }
                     }
                 }
+
+                TextCanvas.InvalidateSurface();
             }
         }
 
         private uint _auxAnimationLength = GHConstants.AuxiliaryCanvasAnimationTime / UIUtils.GetAuxiliaryCanvasAnimationInterval();
         private void StartMainCanvasAnimation()
         {
-            uint mainAnimationLength = 20; // GHConstants.MainCanvasAnimationTime / UIUtils.GetMainCanvasAnimationInterval(MapRefreshRate);
+            uint mainAnimationLength = GHConstants.MainCanvasAnimationTime / UIUtils.GetMainCanvasAnimationInterval(MapRefreshRate);
             Animation canvasAnimation = new Animation(v => canvasView.GeneralAnimationCounter = (long)v, 1, mainAnimationLength);
-            canvasAnimation.Commit(canvasView, "GeneralAnimationCounter", length: GHConstants.MainCanvasAnimationTime, 
+            canvasAnimation.Commit(canvasView, "GeneralAnimationCounter", length: GHConstants.MainCanvasAnimationTime,
                 rate: UIUtils.GetMainCanvasAnimationInterval(MapRefreshRate), repeat: () => true /* MainGrid.IsVisible */);
             _mapUpdateStopWatch.Restart();
+        }
+
+        private void StopMainCanvasAnimation()
+        {
+            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
+                canvasView.AbortAnimation("GeneralAnimationCounter");
+            if (_mapUpdateStopWatch.IsRunning)
+                _mapUpdateStopWatch.Stop();
         }
 
         private void StartCommandCanvasAnimation()
         {
             Animation commandAnimation = new Animation(v => CommandCanvas.GeneralAnimationCounter = (long)v, 1, _auxAnimationLength);
-            commandAnimation.Commit(CommandCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime, 
+            commandAnimation.Commit(CommandCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime,
                 rate: UIUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => true /* MoreCommandsGrid.IsVisible */);
+            //_mapUpdateStopWatch.Restart();
+        }
+
+        private void StopCommandCanvasAnimation()
+        {
+            if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                CommandCanvas.AbortAnimation("GeneralAnimationCounter");
+            //if (_mapUpdateStopWatch.IsRunning)
+            //    _mapUpdateStopWatch.Stop();
         }
 
         private void StartMenuCanvasAnimation()
@@ -1600,15 +1924,33 @@ namespace GnollHackX.Pages.Game
             Animation commandAnimation = new Animation(v => MenuCanvas.GeneralAnimationCounter = (long)v, 1, _auxAnimationLength);
             commandAnimation.Commit(MenuCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime, 
                 rate: UIUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => true /* MenuGrid.IsVisible */);
+            //_mapUpdateStopWatch.Restart();
         }
+
+        private void StopMenuCanvasAnimation()
+        {
+            if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                MenuCanvas.AbortAnimation("GeneralAnimationCounter");
+            //if(_mapUpdateStopWatch.IsRunning)
+            //    _mapUpdateStopWatch.Stop();
+        }
+
         private void StartTextCanvasAnimation()
         {
             Animation commandAnimation = new Animation(v => TextCanvas.GeneralAnimationCounter = (long)v, 1, _auxAnimationLength);
             commandAnimation.Commit(TextCanvas, "GeneralAnimationCounter", length: GHConstants.AuxiliaryCanvasAnimationTime, 
                 rate: UIUtils.GetAuxiliaryCanvasAnimationInterval(), repeat: () => true /* TextGrid.IsVisible */);
+            //_mapUpdateStopWatch.Restart();
         }
 
-        private bool StartingPositionsSet { get; set; }
+        private void StopTextCanvasAnimation()
+        {
+            if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
+                TextCanvas.AbortAnimation("GeneralAnimationCounter");
+            //if (_mapUpdateStopWatch.IsRunning)
+            //    _mapUpdateStopWatch.Stop();
+        }
+
         private int _subCounter = 0;
         public long GetAnimationCounterIncrement()
         {
@@ -1731,9 +2073,26 @@ namespace GnollHackX.Pages.Game
                 maincountervalue = _mainCounterValue;
             }
 
+            lock (_mapOffsetLock)
+            {
+                if (_targetClipOn && (maincountervalue < _targetClipStartCounterValue
+                    || maincountervalue > _targetClipStartCounterValue + _targetClipPanTime))
+                {
+                    _targetClipOn = false;
+                    _mapOffsetX = 0;
+                    _mapOffsetY = 0;
+                }
+
+                if (_targetClipOn)
+                {
+                    _mapOffsetX = _originMapOffsetWithNewClipX * Math.Max(0.0f, 1.0f - (float)(maincountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
+                    _mapOffsetY = _originMapOffsetWithNewClipY * Math.Max(0.0f, 1.0f - (float)(maincountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
+                }
+            }
+
             lock (_floatingTextLock)
             {
-                for (i = _floatingTexts.Count - 1; i >= 0; i--)
+                for (i = _floatingTexts.Count - 1; i >= 0 && i < _floatingTexts.Count; i--)
                 {
                     if (_floatingTexts[i].IsFinished(maincountervalue))
                         _floatingTexts.RemoveAt(i);
@@ -1742,7 +2101,7 @@ namespace GnollHackX.Pages.Game
 
             lock (_conditionTextLock)
             {
-                for (i = _conditionTexts.Count - 1; i >= 0; i--)
+                for (i = _conditionTexts.Count - 1; i >= 0 && i < _conditionTexts.Count; i--)
                 {
                     if (_conditionTexts[i].IsFinished(maincountervalue))
                         _conditionTexts.RemoveAt(i);
@@ -1751,7 +2110,7 @@ namespace GnollHackX.Pages.Game
 
             lock (_screenFilterLock)
             {
-                for (i = _screenFilters.Count - 1; i >= 0; i--)
+                for (i = _screenFilters.Count - 1; i >= 0 && i < _screenFilters.Count; i--)
                 {
                     if (_screenFilters[i].IsFinished(maincountervalue))
                         _screenFilters.RemoveAt(i);
@@ -1760,7 +2119,7 @@ namespace GnollHackX.Pages.Game
 
             lock (_guiEffectLock)
             {
-                for (i = _guiEffects.Count - 1; i >= 0; i--)
+                for (i = _guiEffects.Count - 1; i >= 0 && i < _guiEffects.Count; i--)
                 {
                     if (_guiEffects[i].IsFinished(maincountervalue))
                         _guiEffects.RemoveAt(i);
@@ -1772,29 +2131,14 @@ namespace GnollHackX.Pages.Game
                 if (_screenText != null && _screenText.IsFinished(maincountervalue))
                     _screenText = null;
             }
-
-            lock (_targetClipLock)
-            {
-                if (maincountervalue < _targetClipStartCounterValue
-                    || maincountervalue > _targetClipStartCounterValue + _targetClipPanTime)
-                    _targetClipOn = false;
-
-                if (_targetClipOn)
-                {
-                    lock (_mapOffsetLock)
-                    {
-                        _mapOffsetX = _originMapOffsetWithNewClipX * Math.Max(0.0f, 1.0f - (float)(maincountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
-                        _mapOffsetY = _originMapOffsetWithNewClipY * Math.Max(0.0f, 1.0f - (float)(maincountervalue - _targetClipStartCounterValue) / (float)_targetClipPanTime);
-                    }
-                }
-            }
-            
         }
 
         public void HideLoadingScreen()
         {
             DelayedLoadingScreenHide();
-            MainGrid.IsVisible = true;
+            DelayedFadeFromBlackAtStart();
+            //MainGrid.IsVisible = true;
+            IsMainCanvasOn = true;
             StartMainCanvasAnimation();
         }
 
@@ -1815,6 +2159,25 @@ namespace GnollHackX.Pages.Game
 #endif
         }
 
+        private bool _delayedFadeFromBlackAtStartOn = false;
+        public void DelayedFadeFromBlackAtStart()
+        {
+            _delayedFadeFromBlackAtStartOn = true;
+#if GNH_MAUI
+            var timer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+            timer.Interval = TimeSpan.FromSeconds(UIUtils.GetWindowHideSecs() + GHConstants.FadeFromBlackAtStartExtraDelaySecs);
+            timer.IsRepeating = false;
+            timer.Tick += (s, e) => { DoFadeFromBlackAtStart(); };
+            timer.Start();
+#else
+            Device.StartTimer(TimeSpan.FromSeconds(UIUtils.GetWindowHideSecs() + GHConstants.FadeFromBlackAtStartExtraDelaySecs), () =>
+            {
+                DoFadeFromBlackAtStart();
+                return false;
+            });
+#endif
+        }
+
         private void DoHideLoadingScreen()
         {
             MainThread.BeginInvokeOnMainThread(() =>
@@ -1822,12 +2185,29 @@ namespace GnollHackX.Pages.Game
                 LoadingGrid.IsVisible = false;
             });
         }
+        private void DoFadeFromBlackAtStart()
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (_delayedMenuShow)
+                {
+                    _delayedMenuShow = false;
+                    DoShowMenuCanvas(_delayedMenuShowDoTextHide);
+                }
+                FadeFromBlackAtStart(GHConstants.FadeFromBlackDurationAtStart);
+                _delayedFadeFromBlackAtStartOn = false;
+            });
+        }
+
 
         public void ClearContextMenu()
         {
-            ContextLayout.Children.Clear();
-            _contextMenuData.Clear();
-            ContextLayout.IsVisible = false;
+            //ContextLayout.Children.Clear();
+            //ContextLayout.IsVisible = false;
+            lock (_contextMenuDataLock)
+            {
+                _contextMenuData.Clear();
+            }
         }
         public void AddContextMenu(AddContextMenuData data)
         {
@@ -1851,8 +2231,6 @@ namespace GnollHackX.Pages.Game
             //    return; /* Do not add */
             //if (cmddefchar == PrevWepCmd && !ShowPrevWepContextCommand)
             //    return; /* Do not add */
-
-            _contextMenuData.Add(data);
 
             switch ((char)cmddefchar)
             {
@@ -1965,7 +2343,7 @@ namespace GnollHackX.Pages.Game
                             break;
                     }
                     break;
-                case (char)27:
+                case (char)GHConstants.CancelChar:
                     switch (data.style)
                     {
                         case (int)context_menu_styles.CONTEXT_MENU_STYLE_CLOSE_DISPLAY:
@@ -2009,16 +2387,15 @@ namespace GnollHackX.Pages.Game
                     break;
             }
 
-            LabeledImageButton lib = new LabeledImageButton();
-            lib.ImgSourcePath = "resource://" + icon_string;
-            lib.LargerFont = false;
-            lib.LblText = data.cmd_text;
-            lib.SetSideSize(_currentPageWidth, _currentPageHeight);
-            lib.GridMargin = new Thickness(lib.ImgWidth / 15, lib.ImgWidth / 30);
-            lib.BtnCommand = cmdcurchar;
-            lib.BtnClicked += GHButton_Clicked;
-            ContextLayout.IsVisible = true;
-            ContextLayout.Children.Add(lib);
+            ContextMenuButton cmb = new ContextMenuButton();
+            cmb.ImgSourcePath = "resource://" + icon_string;
+            cmb.Bitmap = GHApp.GetCachedImageSourceBitmap(cmb.ImgSourcePath, true);
+            cmb.LblText = data.cmd_text;
+            cmb.BtnCommand = cmdcurchar;
+            lock (_contextMenuDataLock)
+            {
+                _contextMenuData.Add(cmb);
+            }
         }
 
         public void DisplayFloatingText(DisplayFloatingTextData data)
@@ -2082,12 +2459,13 @@ namespace GnollHackX.Pages.Game
                 _screenText = new GHScreenText(data, countervalue, this);
             }
 
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.DisplayScreenText));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.DisplayScreenText));
                 }
             }
         }
@@ -2266,26 +2644,6 @@ namespace GnollHackX.Pages.Game
             PopupGrid.IsVisible = true;
         }
 
-        private void ContextButton_Clicked(object sender, EventArgs e)
-        {
-            int idx = 0;
-#if GNH_MAUI
-            idx = ContextLayout.Children.IndexOf((Microsoft.Maui.Controls.View)sender);
-            if (idx < 0)
-                idx = ContextLayout.Children.IndexOf((Microsoft.Maui.Controls.View)((Microsoft.Maui.Controls.View)sender).Parent);
-#else
-            idx = ContextLayout.Children.IndexOf((Xamarin.Forms.View)sender);
-            if (idx < 0)
-                idx = ContextLayout.Children.IndexOf((Xamarin.Forms.View)((Xamarin.Forms.View)sender).Parent);
-#endif
-            if (idx >= 0 && idx < _contextMenuData.Count)
-            {
-                int resp = _contextMenuData[idx].cmd_cur_char;
-                GenericButton_Clicked(sender, e, resp);
-            }
-        }
-
-
         private /*async*/ void ContentPage_Appearing(object sender, EventArgs e)
         {
             GHApp.BackButtonPressed += BackButtonPressed;
@@ -2309,34 +2667,38 @@ namespace GnollHackX.Pages.Game
 
         protected void GNHThreadProc()
         {
-            _currentGame = new GHGame(this);
-            GHApp.CurrentGHGame = _currentGame;
-            _gnollHackService.StartGnollHack(_currentGame);
+            GHGame curGame = new GHGame(this);
+            CurrentGame = curGame;
+            GHApp.CurrentGHGame = curGame;
+            _gnollHackService.StartGnollHack(curGame);
         }
 
         protected void GNHThreadProcForRestart()
         {
-            _currentGame = new GHGame(this);
-            _currentGame.StartFlags = RunGnollHackFlags.ForceLastPlayerName;
-            GHApp.CurrentGHGame = _currentGame;
-            _gnollHackService.StartGnollHack(_currentGame);
+            GHGame curGame = new GHGame(this);
+            CurrentGame = curGame;
+            GHApp.CurrentGHGame = curGame;
+            curGame.StartFlags = RunGnollHackFlags.ForceLastPlayerName;
+            _gnollHackService.StartGnollHack(curGame);
         }
 
         protected void GNHThreadProcForReplay()
         {
-            _currentGame = new GHGame(this);
-            _currentGame.StartFlags = RunGnollHackFlags.PlayingReplay;
-            GHApp.CurrentGHGame = _currentGame;
-            GHApp.PlayReplay(_currentGame, ReplayFileName);
+            GHGame curGame = new GHGame(this);
+            CurrentGame = curGame;
+            GHApp.CurrentGHGame = curGame;
+            curGame.StartFlags = RunGnollHackFlags.PlayingReplay;
+            GHApp.PlayReplay(curGame, ReplayFileName);
         }
 
         private void pollRequestQueue()
         {
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 GHRequest req;
                 ConcurrentQueue<GHRequest> queue;
-                if (GHGame.RequestDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.RequestDictionary.TryGetValue(curGame, out queue))
                 {
                     while (queue.TryDequeue(out req))
                     {
@@ -2344,6 +2706,9 @@ namespace GnollHackX.Pages.Game
                         {
                             case GHRequestType.PrintHistory:
                                 PrintHistory(req.MessageHistory);
+                                break;
+                            case GHRequestType.PrintHistoryItem:
+                                //PrintHistoryItem(req.MessageHistoryItem);
                                 break;
                             case GHRequestType.PrintTopLine:
                                 PrintTopLine(req.RequestString, req.RequestStringAttributes);
@@ -2381,18 +2746,13 @@ namespace GnollHackX.Pages.Game
                             case GHRequestType.ReturnToMainMenu:
                                 IsGameOn = false;
                                 ClearMap();
-                                _currentGame = null;
+                                CurrentGame = null;
                                 GHApp.CurrentGHGame = null;
                                 _mainPage.GameStarted = false;
-                                if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                                    canvasView.AbortAnimation("GeneralAnimationCounter");
-                                if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                                    CommandCanvas.AbortAnimation("GeneralAnimationCounter");
-                                if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                                    MenuCanvas.AbortAnimation("GeneralAnimationCounter");
-                                if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                                    TextCanvas.AbortAnimation("GeneralAnimationCounter");
-                                _mapUpdateStopWatch.Stop();
+                                StopMainCanvasAnimation();
+                                StopCommandCanvasAnimation();
+                                StopMenuCanvasAnimation();
+                                StopTextCanvasAnimation();
                                 ReturnToMainMenu();
                                 break;
                             case GHRequestType.RestartGame:
@@ -2464,6 +2824,9 @@ namespace GnollHackX.Pages.Game
                             case GHRequestType.FadeFromBlack:
                                 FadeFromBlack((uint)req.RequestInt);
                                 break;
+                            case GHRequestType.SetToBlack:
+                                SetToBlack();
+                                break;
                             case GHRequestType.ShowGUITips:
                                 ShowGUITips(true);
                                 break;
@@ -2533,9 +2896,31 @@ namespace GnollHackX.Pages.Game
                                 Preferences.Set("RecordGame", false);
                                 InformRecordingWentOff();
                                 break;
+                            case GHRequestType.ToggleMenuPositionSaving:
+                                ToggleMenuPositionSaving(req.RequestInt, req.RequestInt2);
+                                break;
+                            case GHRequestType.ClipAround:
+                                SetTargetClip(req.RequestInt, req.RequestInt2, req.RequestBool);
+                                break;
+                            case GHRequestType.GameEnded:
+                                GameEnded = true;
+                                break;
                         }
                     }
                 }
+            }
+        }
+
+        private readonly object _menuPositionLock = new object();
+        private bool[] _menuPositionSavingOn = new bool[(int)ghmenu_styles.MAX_GHMENU_STYLES];
+        private float[] _savedMenuScrollOffset = new float[(int)ghmenu_styles.MAX_GHMENU_STYLES];
+
+        private void ToggleMenuPositionSaving(int menuStyle, int toggleValue)
+        {
+            lock (_menuPositionLock)
+            {
+                _menuPositionSavingOn[menuStyle] = toggleValue != 0;
+                _savedMenuScrollOffset[menuStyle] = 0.0f;
             }
         }
 
@@ -2546,10 +2931,8 @@ namespace GnollHackX.Pages.Game
 
         private void CloseAllDialogs()
         {
-            if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                MenuCanvas.AbortAnimation("GeneralAnimationCounter");
-            if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                TextCanvas.AbortAnimation("GeneralAnimationCounter");
+            StopMenuCanvasAnimation();
+            StopTextCanvasAnimation();
 
             TextGrid.IsVisible = false;
             MenuGrid.IsVisible = false;
@@ -2562,9 +2945,10 @@ namespace GnollHackX.Pages.Game
             YnGrid.IsVisible = false;
             DoHideDirections();
 
-            if (!LoadingGrid.IsVisible && (!MainGrid.IsVisible || !canvasView.AnimationIsRunning("GeneralAnimationCounter")))
+            if (!LoadingGrid.IsVisible && ( !IsMainCanvasOn || /* !MainGrid.IsVisible || */ !canvasView.AnimationIsRunning("GeneralAnimationCounter")))
             {
-                MainGrid.IsVisible = true;
+                //MainGrid.IsVisible = true;
+                IsMainCanvasOn = true;
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -2622,9 +3006,10 @@ namespace GnollHackX.Pages.Game
         private void DisplayWindowView(int winid, List<GHPutStrItem> strs)
         {
             GHWindow window;
-            lock (_currentGame.WindowsLock)
+            GHGame curGame = CurrentGame;
+            lock (curGame.WindowsLock)
             {
-                window = _currentGame.Windows[winid];
+                window = curGame.Windows[winid];
             }
             if(window != null)
                 ShowWindowCanvas(window, strs);
@@ -2668,6 +3053,8 @@ namespace GnollHackX.Pages.Game
                 _textScrollSpeedRecords.Clear();
             }
 
+            TextCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
+
             TextWindowGlyphImage.Source = null;
 
             _textGlyphImageSource.ReferenceGamePage = this;
@@ -2676,6 +3063,9 @@ namespace GnollHackX.Pages.Game
             _textGlyphImageSource.Glyph = window.Glyph;
             _textGlyphImageSource.UseUpperSide = window.UseUpperSide;
 
+            float customScale = GHApp.CustomScreenScale;
+            TextWindowGlyphImage.WidthRequest = 75 * customScale;
+            TextWindowGlyphImage.HeightRequest = 75 * customScale;
             TextWindowGlyphImage.ActiveGlyphImageSource = TextGlyphImage;
             TextWindowGlyphImage.IsVisible = IsTextGlyphVisible;
 
@@ -2723,17 +3113,23 @@ namespace GnollHackX.Pages.Game
             }
             else
             {
-                TextGrid.IsVisible = true;
-                MainGrid.IsVisible = false;
+                if (MenuFadeEffects && !MenuGrid.IsVisible && !TextGrid.IsVisible)
+                {
+                    TextGrid.Opacity = 0;
+                    TextGrid.IsVisible = true;
+                    TextGrid.FadeTo(1.0);
+                }
+                else
+                    TextGrid.IsVisible = true;
+                //MainGrid.IsVisible = false;
+                IsMainCanvasOn = false;
                 if (dohidemenu)
                 {
                     MenuGrid.IsVisible = false;
                 }
             }
 
-            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                canvasView.AbortAnimation("GeneralAnimationCounter");
-            _mapUpdateStopWatch.Stop();
+            StopMainCanvasAnimation();
             StartTextCanvasAnimation();
         }
 
@@ -2741,17 +3137,12 @@ namespace GnollHackX.Pages.Game
         {
             MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                //if (TextStack.AnimationIsRunning("TextHideAnimation"))
-                //    TextStack.AbortAnimation("TextHideAnimation");
                 TextStack.CancelAnimations();
                 TextStack.Opacity = 0.0;
                 TextStack.IsVisible = true;
-                //Animation textAnimation = new Animation(v => TextStack.Opacity = (double)v, 0.0, 1.0);
-                //textAnimation.Commit(TextStack, "TextShowAnimation", length: 256,
-                //    rate: 16, repeat: () => false);
 
                 TextGrid.IsVisible = true;
-                MainGrid.IsVisible = false;
+                IsMainCanvasOn = false;
                 if (dohidemenu)
                 {
                     MenuGrid.IsVisible = false;
@@ -2788,6 +3179,7 @@ namespace GnollHackX.Pages.Game
         }
 
         private GlyphImageSource _ynImageSource = new GlyphImageSource();
+        private string _ynResponses = null;
         private void ShowYnResponses(int style, int attr, int color, int glyph, string title, string question, string responses, string descriptions, string introline, ulong ynflags)
         {
             string[] descr_list = null;
@@ -2842,14 +3234,17 @@ namespace GnollHackX.Pages.Game
             else
                 YnTitleLayout.IsVisible = true;
 
+            string txt;
             /* Question */
-            if(string.IsNullOrWhiteSpace(introline))
-                YnQuestionLabel.Text = "";
+            if(!string.IsNullOrWhiteSpace(introline))
+                txt = introline + " ";
             else
-                YnQuestionLabel.Text = introline + " ";
-            
-            if(question != null)
-                YnQuestionLabel.Text += question;
+                txt = "";
+
+            if (!string.IsNullOrWhiteSpace(question))
+                txt += question;
+
+            YnQuestionLabel.Text = txt;
 
             /* Buttons */
             LabeledImageButton[] btnList = { ZeroButton, FirstButton, SecondButton, ThirdButton, FourthButton };
@@ -2879,9 +3274,14 @@ namespace GnollHackX.Pages.Game
                         btnList[i].IsEnabled = false;
                 }
             }
+            _ynResponses = responses;
 
+            float inverseCanvasScale = GetInverseCanvasScale();
+            float customScale = GHApp.CustomScreenScale;
+            bool usingDesktopButtons = DesktopButtons;
+            bool usingSimpleCmdLayout = UseSimpleCmdLayout;
             for (int i = 0; i < 5; i++)
-                btnList[i].SetSideSize(_currentPageWidth, _currentPageHeight);
+                btnList[i].SetSideSize(_currentPageWidth, _currentPageHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
 
             YnButtonStack.HeightRequest = btnList[0].GridHeight;
             switch(style)
@@ -2977,27 +3377,43 @@ namespace GnollHackX.Pages.Game
         private GHMsgHistoryItem[] _msgHistory = null;
         private void PrintHistory(GHMsgHistoryItem[] msgHistory)
         {
-            lock (_msgHistoryLock)
+            lock(_msgHistoryLock)
             {
                 _msgHistory = msgHistory;
             }
             RefreshMsgHistoryRowCounts = true;
         }
 
+        //private void PrintHistoryItem(GHMsgHistoryItem msgHistoryItem)
+        //{
+        //    lock (_msgHistoryLock)
+        //    {
+        //        if (_msgHistory == null)
+        //            _msgHistory = new List<GHMsgHistoryItem>(GHConstants.MaxMessageHistoryLength + 1);
+        //        _msgHistory.Add(msgHistoryItem);
+        //    }
+        //    RefreshMsgHistoryRowCounts = true;
+        //}
+
         private async void AskName(string modeName, string modeDescription, string replayEnteredPlayerName)
         {
             var namePage = new NamePage(this, modeName, modeDescription, replayEnteredPlayerName);
-            await App.Current.MainPage.Navigation.PushModalAsync(namePage);
+            await GHApp.Navigation.PushModalAsync(namePage);
         }
 
         private int _getLineStyle = 0;
         private Regex _getLineRegex = null;
         private void GetLine(string query, string placeholder, string linesuffix, string introline, int style, int attr, int color)
         {
+#if GNH_MAUI
+            GetLineFrame.Stroke = SolidColorBrush.Black;
+#else
             GetLineFrame.BorderColor = GHColors.Black;
+#endif
             GetLineOkButton.IsEnabled = true;
             GetLineCancelButton.IsEnabled = true;
             GetLineQuestionMarkButton.IsEnabled = true;
+            GetLineMenuButton.IsEnabled = true;
 
             Color clr = UIUtils.NHColor2XColor(color, attr, false, false); /* Non-title / white coloring works better here */
             string PlaceHolderText = null;
@@ -3016,9 +3432,11 @@ namespace GnollHackX.Pages.Game
                 GetLineCaption.Text += " " + linesuffix;
 
             GetLineCaption.TextColor = clr;
+
             GetLineEntryText.Text = "";
             GetLineEntryText.MaxLength = GHConstants.BUFSZ - 1;
             GetLineQuestionMarkButton.IsVisible = false;
+            GetLineMenuButton.IsVisible = false;
             GetLineEntryText.IsEnabled = true;
             GetLineEntryText.IsVisible = true;
             GetLineEntryText.Keyboard = Keyboard.Default;
@@ -3066,6 +3484,7 @@ namespace GnollHackX.Pages.Game
                     GetLineEntryText.Placeholder = "Type your wish here";
                     _getLineRegex = new Regex(@"^[A-Za-z0-9_ \(\:\)\+\-\'\’]{0,128}$");
                     GetLineCancelButton.Text = "Random";
+                    GetLineMenuButton.IsVisible = true;
                     break;
                 case (int)getline_types.GETLINE_GENESIS:
                 case (int)getline_types.GETLINE_POLYMORPH:
@@ -3073,6 +3492,7 @@ namespace GnollHackX.Pages.Game
                 case (int)getline_types.GETLINE_MONSTER:
                     GetLineEntryText.Placeholder = "Type the monster here";
                     _getLineRegex = new Regex(@"^[A-Za-z0-9_ ]{0,64}$");
+                    GetLineMenuButton.IsVisible = true;
                     break;
                 case (int)getline_types.GETLINE_MONSTER_CLASS:
                     GetLineEntryText.WidthRequest = 230;
@@ -3080,6 +3500,7 @@ namespace GnollHackX.Pages.Game
                     GetLineQuestionMarkButton.IsVisible = true;
                     GetLineEntryText.Placeholder = "Type the monster class";
                     _getLineRegex = new Regex(@"^[A-Za-z0-9_ \'\&\#\:\;]{0,64}$");
+                    GetLineMenuButton.IsVisible = true;
                     break;
                 case (int)getline_types.GETLINE_TUNE:
                     GetLineEntryText.WidthRequest = 240;
@@ -3108,9 +3529,18 @@ namespace GnollHackX.Pages.Game
                 GetLineOkButton.IsEnabled = false;
                 GetLineCancelButton.IsEnabled = false;
                 GetLineQuestionMarkButton.IsEnabled = false;
+                GetLineMenuButton.IsEnabled = false;
                 //GetLineEntryText.IsEnabled = false;
             }
+
             GetLineGrid.IsVisible = true;
+
+            if(!PlayingReplay)
+            {
+#if WINDOWS
+                GetLineEntryText.Focus();
+#endif
+            }
         }
 
         private void HideGetLine()
@@ -3153,14 +3583,22 @@ namespace GnollHackX.Pages.Game
 
             if(_getLineRegex != null && !_getLineRegex.IsMatch(res))
             {
+#if GNH_MAUI
+                GetLineFrame.Stroke = SolidColorBrush.Red;
+#else
                 GetLineFrame.BorderColor = GHColors.Red;
+#endif
                 GetLineEntryText.Focus();
                 GetLineOkButton.IsEnabled = true;
                 GetLineCancelButton.IsEnabled = true;
                 GetLineQuestionMarkButton.IsEnabled = true;
                 return;
             }
+#if GNH_MAUI
+            GetLineFrame.Stroke = SolidColorBrush.Black;
+#else
             GetLineFrame.BorderColor = GHColors.Black;
+#endif
 
             /* Style-dependent behavior */
             switch (_getLineStyle)
@@ -3179,9 +3617,10 @@ namespace GnollHackX.Pages.Game
             }
 
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetLine, res));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.GetLine, res));
             }
 
             HideGetLine();
@@ -3196,9 +3635,10 @@ namespace GnollHackX.Pages.Game
 
             string res = "?";
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetLine, res));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.GetLine, res));
             }
 
             HideGetLine();
@@ -3212,9 +3652,10 @@ namespace GnollHackX.Pages.Game
             GHApp.PlayButtonClickedSound();
             
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetLine, '\x1B'.ToString()));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.GetLine, '\x1B'.ToString()));
             }
 
             HideGetLine();
@@ -3229,7 +3670,14 @@ namespace GnollHackX.Pages.Game
 
         private async void ReturnToMainMenu()
         {
-            GHApp.TournamentMode = Preferences.Get("TournamentMode", false); /* In the case it was changed by loading a Tournament Mode game while not in tournament mode */
+            /* These need to be returned to their non-game default values */
+            GHApp.TournamentMode = Preferences.Get("TournamentMode", false);
+            GHApp.SetMirroredOptionsToDefaults();
+            /* These need to be set also here in the case game over was fast forwarded */
+            Preferences.Set("WentToSleepWithGameOn", false);
+            Preferences.Set("GameSaveResult", 0);
+
+            StopKeyListening();
             if (MainPageBackgroundNeedsUpdate)
             {
                 _mainPage.UpdateMainScreenBackgroundStyle();
@@ -3237,17 +3685,21 @@ namespace GnollHackX.Pages.Game
             }
             _mainPage.UpdateLayout();
             _mainPage.ActivateLocalGameButton();
+            GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
+            GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Music);
             _mainPage.PlayMainScreenVideoAndMusic(); /* Just to be doubly sure */
             if (GHApp.GameMuteMode)
                 GHApp.GameMuteMode = false;
             GHApp.CurrentGamePage = null;
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
             _mainPage.StartGeneralTimer(); /* Just to be doubly sure */
         }
 
         private readonly object _menuDrawOnlyLock = new object();
         private bool _menuDrawOnlyClear = true;
         private bool _menuRefresh = false;
+        private bool _delayedMenuShow = false;
+        private bool _delayedMenuShowDoTextHide = false;
 
         private void ShowMenuCanvas(GHMenuInfo menuinfo, GHWindow ghwindow)
         {
@@ -3292,6 +3744,7 @@ namespace GnollHackX.Pages.Game
             }
 
             GHApp.DebugWriteProfilingStopwatchTimeAndStart("ShowMenuCanvas Start");
+            float customScale = GHApp.CustomScreenScale;
             MenuTouchDictionary.Clear();
             lock(_menuScrollLock)
             {
@@ -3314,7 +3767,7 @@ namespace GnollHackX.Pages.Game
                 MenuHeaderLabel.OutlineWidth = UIUtils.MenuHeaderOutlineWidth(menuinfo.Style);
             }
             MenuHeaderLabel.FontFamily = UIUtils.MenuHeaderFontFamily(menuinfo.Style);
-            MenuHeaderLabel.FontSize = UIUtils.MenuHeaderFontSize(menuinfo.Style);
+            MenuHeaderLabel.FontSize = UIUtils.MenuHeaderFontSize(menuinfo.Style) * customScale;
             MenuHeaderLabel.TextColor = UIUtils.MenuHeaderTextColor(menuinfo.Style);
             MenuHeaderLabel.OutlineColor = UIUtils.MenuHeaderOutlineColor(menuinfo.Style);
 
@@ -3330,7 +3783,7 @@ namespace GnollHackX.Pages.Game
                 MenuSubtitleLabel.IsVisible = true;
                 MenuSubtitleLabel.Text = menuinfo.Subtitle;
                 MenuSubtitleLabel.FontFamily = UIUtils.MenuSubtitleFontFamily(menuinfo.Style);
-                MenuSubtitleLabel.FontSize = UIUtils.MenuSubtitleFontSize(menuinfo.Style);
+                MenuSubtitleLabel.FontSize = UIUtils.MenuSubtitleFontSize(menuinfo.Style) * customScale;
                 MenuSubtitleLabel.UseSpecialSymbols = UIUtils.MenuSubtitleUsesSpecialSymbols(menuinfo.Style);
                 MenuSubtitleLabel.WordWrapSeparator = UIUtils.MenuSubtitleWordWrapSeparator(menuinfo.Style);
                 MenuSubtitleLabel.DisplayWrapSeparator = UIUtils.MenuSubtitleDisplayWrapSeparator(menuinfo.Style);
@@ -3347,8 +3800,8 @@ namespace GnollHackX.Pages.Game
             MenuCanvas.SelectionIndex = -1;
             if (MenuCanvas.SelectionHow == SelectionMode.Single)
             {
-                int idx = -1;
                 bool selectedFound = false;
+                int idx = -1;
                 foreach (GHMenuItem mi in menuinfo.MenuItems)
                 {
                     idx++;
@@ -3380,24 +3833,25 @@ namespace GnollHackX.Pages.Game
                     MenuCanvas.ClickOKOnSelection = true;
                     MenuCanvas.MenuGlyphAtBottom = false;
                     MenuCanvas.AllowLongTap = false;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_DIFFICULTY:
                 case ghmenu_styles.GHMENU_STYLE_ACCEPT_PLAYER:
-                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
-                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
                     MenuBackground.BorderStyle = BorderStyles.SimpleAlternative;
-                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
                     MenuCanvas.UseTextOutline = false;
                     MenuCanvas.HideMenuLetters = true;
                     MenuCanvas.MenuButtonStyle = true;
                     MenuCanvas.ClickOKOnSelection = true;
                     MenuCanvas.MenuGlyphAtBottom = true;
                     MenuCanvas.AllowLongTap = false;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_GENERAL_COMMAND:
-                case ghmenu_styles.GHMENU_STYLE_SPELL_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_SKILL_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_CHARACTER:
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL:
@@ -3405,9 +3859,9 @@ namespace GnollHackX.Pages.Game
                 case ghmenu_styles.GHMENU_STYLE_CHAT:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
-                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
-                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
-                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
                     MenuCanvas.UseTextOutline = false;
                     MenuCanvas.HideMenuLetters = false;
                     MenuCanvas.MenuButtonStyle = false;
@@ -3415,59 +3869,93 @@ namespace GnollHackX.Pages.Game
                     MenuCanvas.MenuGlyphAtBottom = false;
                     MenuBackground.BorderStyle = MenuCanvas.ClickOKOnSelection ? BorderStyles.SimpleAlternative : BorderStyles.Simple;
                     MenuCanvas.AllowLongTap = false;
+                    MenuCanvas.SpecialClickOnLongTap = false;
+                    MenuCanvas.AllowHighlight = true;
+                    break;
+                case ghmenu_styles.GHMENU_STYLE_SPELL_COMMAND:
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
+                    MenuCanvas.UseTextOutline = false;
+                    MenuCanvas.HideMenuLetters = false;
+                    MenuCanvas.MenuButtonStyle = false;
+                    MenuCanvas.ClickOKOnSelection = false;
+                    MenuCanvas.MenuGlyphAtBottom = false;
+                    MenuBackground.BorderStyle = BorderStyles.Simple;
+                    MenuCanvas.AllowLongTap = false;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_PICK_CATEGORY_LIST:
-                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
-                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
                     MenuBackground.BorderStyle = BorderStyles.Simple;
-                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
                     MenuCanvas.UseTextOutline = false;
                     MenuCanvas.HideMenuLetters = false;
                     MenuCanvas.MenuButtonStyle = false;
                     MenuCanvas.ClickOKOnSelection = false;
                     MenuCanvas.MenuGlyphAtBottom = false;
                     MenuCanvas.AllowLongTap = false;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_PICK_ITEM_LIST_AUTO_OK:
-                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
-                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
                     MenuBackground.BorderStyle = BorderStyles.SimpleAlternative;
-                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
                     MenuCanvas.UseTextOutline = false;
                     MenuCanvas.HideMenuLetters = false;
                     MenuCanvas.MenuButtonStyle = false;
                     MenuCanvas.ClickOKOnSelection = true;
                     MenuCanvas.MenuGlyphAtBottom = false;
                     MenuCanvas.AllowLongTap = false;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_ITEM_COMMAND:
                 case ghmenu_styles.GHMENU_STYLE_PICK_ITEM_LIST:
-                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
-                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
                     MenuBackground.BorderStyle = BorderStyles.Simple;
-                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
                     MenuCanvas.UseTextOutline = false;
                     MenuCanvas.HideMenuLetters = false;
                     MenuCanvas.MenuButtonStyle = false;
                     MenuCanvas.ClickOKOnSelection = false;
                     MenuCanvas.MenuGlyphAtBottom = false;
                     MenuCanvas.AllowLongTap = true;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = true;
                     break;
-                default:
-                    MenuBackground.BackgroundStyle = BackgroundStyles.StretchedBitmap;
-                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.OldPaper;
+                case ghmenu_styles.GHMENU_STYLE_SPELLS:
+                case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
                     MenuBackground.BorderStyle = BorderStyles.Simple;
-                    MenuCanvas.RevertBlackAndWhite = true;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
                     MenuCanvas.UseTextOutline = false;
                     MenuCanvas.HideMenuLetters = false;
                     MenuCanvas.MenuButtonStyle = false;
                     MenuCanvas.ClickOKOnSelection = false;
                     MenuCanvas.MenuGlyphAtBottom = false;
                     MenuCanvas.AllowLongTap = true;
+                    MenuCanvas.SpecialClickOnLongTap = true;
+                    MenuCanvas.AllowHighlight = false;
+                    break;
+                default:
+                    MenuBackground.BackgroundStyle = BackgroundStyles.Automatic;
+                    MenuBackground.BackgroundBitmap = BackgroundBitmaps.AutoMenuBackground;
+                    MenuBackground.BorderStyle = BorderStyles.Simple;
+                    MenuCanvas.RevertBlackAndWhite = !GHApp.DarkMode;
+                    MenuCanvas.UseTextOutline = false;
+                    MenuCanvas.HideMenuLetters = false;
+                    MenuCanvas.MenuButtonStyle = false;
+                    MenuCanvas.ClickOKOnSelection = false;
+                    MenuCanvas.MenuGlyphAtBottom = false;
+                    MenuCanvas.AllowLongTap = true;
+                    MenuCanvas.SpecialClickOnLongTap = false;
                     MenuCanvas.AllowHighlight = false;
                     break;
             }
@@ -3492,12 +3980,20 @@ namespace GnollHackX.Pages.Game
             _menuGlyphImageSource.Glyph = ghwindow.Glyph;
             _menuGlyphImageSource.UseUpperSide = ghwindow.UseUpperSide;
 
+            MenuWindowGlyphImage.WidthRequest = 75 * customScale;
+            MenuWindowGlyphImage.HeightRequest = 75 * customScale;
             MenuWindowGlyphImage.ActiveGlyphImageSource = MenuGlyphImage;
             MenuWindowGlyphImage.VerticalOptions = MenuCanvas.MenuGlyphAtBottom ? LayoutOptions.End : LayoutOptions.Start;
             MenuWindowGlyphImage.IsVisible = IsMenuGlyphVisible;
 
             MenuHeaderLabel.Margin = UIUtils.GetHeaderMarginWithBorder(MenuBackground.BorderStyle, _currentPageWidth, _currentPageHeight);
             MenuCloseGrid.Margin = UIUtils.GetFooterMarginWithBorder(MenuBackground.BorderStyle, _currentPageWidth, _currentPageHeight);
+            MenuOKButton.WidthRequest = 135 * customScale;
+            MenuOKButton.HeightRequest = 60 * customScale;
+            MenuOKButton.FontSize = 20 * customScale;
+            MenuCancelButton.WidthRequest = 135 * customScale;
+            MenuCancelButton.HeightRequest = 60 * customScale;
+            MenuCancelButton.FontSize = 20 * customScale;
 
             ObservableCollection<GHMenuItem> newmis = new ObservableCollection<GHMenuItem>();
             if (menuinfo != null)
@@ -3514,6 +4010,7 @@ namespace GnollHackX.Pages.Game
                 MenuCanvas.MenuItems = newmis;
             }
             RefreshMenuRowCounts = true;
+            _unselectOnTap = false;
 
             lock (_menuDrawOnlyLock)
             {
@@ -3521,7 +4018,18 @@ namespace GnollHackX.Pages.Game
                 _menuRefresh = true;
             }
 
-            if(PlayingReplay)
+            lock (_menuPositionLock)
+            {
+                if (_menuPositionSavingOn[(int)MenuCanvas.MenuStyle])
+                {
+                    lock(_menuScrollLock)
+                    {
+                        _menuScrollOffset = _savedMenuScrollOffset[(int)MenuCanvas.MenuStyle];
+                    }
+                }
+            }
+
+            if (PlayingReplay)
             {
                 MenuOKButton.IsEnabled = false;
                 MenuCancelButton.IsEnabled = false;
@@ -3531,6 +4039,19 @@ namespace GnollHackX.Pages.Game
                 MenuCanvas.EnableTouchEvents = false;
             }
 
+            _delayedMenuShow = _delayedFadeFromBlackAtStartOn;
+            _delayedMenuShowDoTextHide = dohidetext;
+
+            if (!_delayedMenuShow)
+                DoShowMenuCanvas(dohidetext);
+
+            StopMainCanvasAnimation();
+            StartMenuCanvasAnimation();
+            GHApp.DebugWriteProfilingStopwatchTimeAndStart("ShowMenuCanvas End");
+        }
+
+        private void DoShowMenuCanvas(bool dohidetext)
+        {
             if (GHApp.IsiOS)
             {
                 /* On iOS, fade in the menu. NOTE: this was originally a work-around for bad layout performance on iOS */
@@ -3550,19 +4071,22 @@ namespace GnollHackX.Pages.Game
             }
             else
             {
-                MenuGrid.IsVisible = true;
-                MainGrid.IsVisible = false;
+                if(MenuFadeEffects && !MenuGrid.IsVisible && !TextGrid.IsVisible)
+                {
+                    MenuGrid.Opacity = 0;
+                    MenuGrid.IsVisible = true;
+                    MenuGrid.FadeTo(1.0);
+                }
+                else
+                    MenuGrid.IsVisible = true;
+
+                //MainGrid.IsVisible = false;
+                IsMainCanvasOn = false;
                 if (dohidetext)
                 {
                     TextGrid.IsVisible = false;
                 }
             }
-
-            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                canvasView.AbortAnimation("GeneralAnimationCounter");
-            _mapUpdateStopWatch.Stop();
-            StartMenuCanvasAnimation();
-            GHApp.DebugWriteProfilingStopwatchTimeAndStart("ShowMenuCanvas End");
         }
 
         private void DoiOSShowMenuCanvas(bool dohidetext)
@@ -3570,16 +4094,11 @@ namespace GnollHackX.Pages.Game
             MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 MenuStack.CancelAnimations();
-                //if (MenuStack.AnimationIsRunning("MenuHideAnimation"))
-                //    MenuStack.AbortAnimation("MenuHideAnimation");
                 MenuStack.Opacity = 0.0;
                 MenuStack.IsVisible = true;
-                //Animation menuAnimation = new Animation(v => MenuStack.Opacity = (double)v, 0.0, 1.0);
-                //menuAnimation.Commit(MenuStack, "MenuShowAnimation", length: 256,
-                //    rate: 16, repeat: () => false);
 
                 MenuGrid.IsVisible = true;
-                MainGrid.IsVisible = false;
+                IsMainCanvasOn = false;
                 if (dohidetext)
                 {
                     TextGrid.IsVisible = false;
@@ -3594,15 +4113,15 @@ namespace GnollHackX.Pages.Game
         private async void ShowOutRipPage(GHOutRipInfo outripinfo, GHWindow ghwindow)
         {
             var outRipPage = new OutRipPage(this, ghwindow, outripinfo);
-            await App.Current.MainPage.Navigation.PushModalAsync(outRipPage);
+            await GHApp.Navigation.PushModalAsync(outRipPage);
         }
         private async void HideOutRipPage()
         {
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
         private async void HideAskNamePage()
         {
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private async Task<bool> BackButtonPressed(object sender, EventArgs e)
@@ -3610,9 +4129,10 @@ namespace GnollHackX.Pages.Game
             if (MoreCommandsGrid.IsVisible)
             {
                 MoreCommandsGrid.IsVisible = false;
-                MainGrid.IsVisible = true;
-                if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                    CommandCanvas.AbortAnimation("GeneralAnimationCounter");
+                //MainGrid.IsVisible = true;
+                IsMainCanvasOn = true;
+                UpdateMoreNextPrevButtonVisibility(true, true);
+                StopCommandCanvasAnimation();
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -3644,11 +4164,11 @@ namespace GnollHackX.Pages.Game
             }
             else if (TextGrid.IsVisible)
             {
-                GenericButton_Clicked(sender, e, 27);
+                GenericButton_Clicked(sender, e, GHConstants.CancelChar);
                 TextGrid.IsVisible = false;
-                MainGrid.IsVisible = true;
-                if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                    TextCanvas.AbortAnimation("GeneralAnimationCounter");
+                //MainGrid.IsVisible = true;
+                IsMainCanvasOn = true;
+                StopTextCanvasAnimation();
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -3658,14 +4178,15 @@ namespace GnollHackX.Pages.Game
             else if (MenuGrid.IsVisible)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                GHGame curGame = CurrentGame;
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.ShowMenuPage, MenuCanvas.GHWindow, new List<GHMenuItem>(), true));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.ShowMenuPage, MenuCanvas.GHWindow, new List<GHMenuItem>(), true));
                 }
                 MenuGrid.IsVisible = false;
-                MainGrid.IsVisible = true;
-                if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                    MenuCanvas.AbortAnimation("GeneralAnimationCounter");
+                //MainGrid.IsVisible = true;
+                IsMainCanvasOn = true;
+                StopMenuCanvasAnimation();
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -3675,8 +4196,8 @@ namespace GnollHackX.Pages.Game
             else
             {
                 var menu = new GameMenuPage(this);
-                TallyRealTime();
-                await App.Current.MainPage.Navigation.PushModalAsync(menu);
+                SendRequestForTallyRealTime();
+                await GHApp.Navigation.PushModalAsync(menu);
             }
 
             return false;
@@ -3684,8 +4205,8 @@ namespace GnollHackX.Pages.Game
         public async Task ShowGameMenu(object sender, EventArgs e)
         {
             var menu = new GameMenuPage(this);
-            TallyRealTime();
-            await App.Current.MainPage.Navigation.PushModalAsync(menu);
+            SendRequestForTallyRealTime();
+            await GHApp.Navigation.PushModalAsync(menu);
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
@@ -3699,7 +4220,7 @@ namespace GnollHackX.Pages.Game
             Preferences.Set("MapFontSize", Math.Max(GHConstants.MinimumMapFontSize, MapFontSize));
             Preferences.Set("MapFontAlternateSize", Math.Max(GHConstants.MinimumMapFontSize, MapFontAlternateSize));
             Preferences.Set("MapFontMiniRelativeSize", Math.Min(GHConstants.MaximumMapMiniRelativeFontSize, Math.Max(GHConstants.MinimumMapMiniRelativeFontSize, MapFontMiniRelativeSize)));
-            lock(_mapOffsetLock)
+            lock (_mapOffsetLock)
             {
                 Preferences.Set("MapMiniOffsetX", _mapMiniOffsetX);
                 Preferences.Set("MapMiniOffsetY", _mapMiniOffsetY);
@@ -3777,57 +4298,43 @@ namespace GnollHackX.Pages.Game
             if (MenuGrid.IsVisible || TextGrid.IsVisible || MoreCommandsGrid.IsVisible)
                 return;
 
+            if (IsMainCanvasDrawingAndSetTrue) /* In the case of some sort of reentrancy or new draw before previous is finished */
+                return;
+
             PaintMainGamePage(sender, e);
 
-            /* General stuff */
+            lock (_mainFPSCounterLock)
+            {
+                _mainFPSCounterValue++;
+                if (_mainFPSCounterValue < 0)
+                    _mainFPSCounterValue = 0;
+            }
+
             SKImageInfo info = e.Info;
             SKSurface surface = e.Surface;
             SKCanvas canvas = surface.Canvas;
-            string str = "";
-            float textWidth = 0;
-            SKRect textBounds = new SKRect();
-            float xText = 0;
-            float yText = 0;
-            float canvasWidth = canvasView.CanvasSize.Width;
-            float canvasHeight = canvasView.CanvasSize.Height;
 
-            using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
-            {
-                if (ShowMemoryUsage)
-                {
-                    long memUsage = GC.GetTotalMemory(false);
-                    str = "Memory: " + memUsage / 1024 + " kB";
-                    textPaint.Typeface = GHApp.LatoBold;
-                    textPaint.TextSize = 26;
-                    textWidth = textPaint.MeasureText(str, ref textBounds);
-                    yText = -textPaint.FontMetrics.Ascent + 5; // + (ShowFPS ? textPaint.FontSpacing : 0);
-                    xText = canvasWidth - textWidth - 5;
-                    float textmargin = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
-                    textPaint.Color = SKColors.Black.WithAlpha(128);
-                    SKRect bkRect = new SKRect(xText - textmargin, yText + textPaint.FontMetrics.Ascent - textmargin, xText + textWidth + textmargin, yText + textPaint.FontMetrics.Ascent - textmargin + textPaint.FontSpacing);
-                    canvas.DrawRect(bkRect, textPaint.Paint);
-                    textPaint.Color = SKColors.Yellow;
-                    textPaint.DrawTextOnCanvas(canvas, str, xText, yText);
-                    //canvas.DrawText(str, xText, yText, textPaint);
-                }
-
-                lock (_mainFPSCounterLock)
-                {
-                    _mainFPSCounterValue++;
-                    if (_mainFPSCounterValue < 0)
-                        _mainFPSCounterValue = 0;
-                }
-
-                /* Finally, flush */
-                canvas.Flush();
-            }
+            /* Finally, flush */
+            canvas.Flush();
+            IsMainCanvasDrawing = false;
         }
 
         private float[] _gridIntervals = { 2.0f, 2.0f };
 
         public float GetTextScale()
         {
-            return (float)((lWornItemsButton.Width <= 0 ? lWornItemsButton.WidthRequest : lWornItemsButton.Width) / 50.0f) / (float)GetCanvasScale();
+            //return (float)((StandardReferenceButton.Width <= 0 ? StandardReferenceButton.WidthRequest : StandardReferenceButton.Width) / 50.0f) * GetInverseCanvasScale();
+            return GetTextScaleEx(canvasView.Width, canvasView.Height, DesktopButtons, UseSimpleCmdLayout);
+        }
+
+        public float GetTextScaleEx(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout)
+        {
+            return GetTextScaleEx(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, GetInverseCanvasScale(), GHApp.CustomScreenScale);
+        }
+
+        public float GetTextScaleEx(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale)
+        {
+            return ((float)UIUtils.CalculateButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale, 0, 0, false) / 50.0f) * inverseCanvasScale;
         }
 
 #if GNH_MAP_PROFILING && DEBUG
@@ -3881,7 +4388,7 @@ namespace GnollHackX.Pages.Game
         }
 #endif
 
-        private void PaintMapUIElements(SKCanvas canvas, GHSkiaFontPaint textPaint, SKPaint paint, SKPathEffect pathEffect, int mapx, int mapy, float width, float height, float offsetX, float offsetY, float usedOffsetX, float usedOffsetY, float base_move_offset_x, float base_move_offset_y, float targetscale, long generalcountervalue, float usedFontSize, int monster_height, bool loc_is_you, bool canspotself)
+        private void PaintMapUIElements(SKCanvas canvas, GHSkiaFontPaint textPaint, SKPaint paint, SKPathEffect pathEffect, int mapx, int mapy, float width, float height, float offsetX, float offsetY, float usedOffsetX, float usedOffsetY, float base_move_offset_x, float base_move_offset_y, float targetscale, long generalcountervalue, float usedFontSize, int monster_height, bool loc_is_you, bool canspotself, bool usingGL)
         {
             float scaled_y_height_change = 0;
             float mapFontAscent = UsedMapFontAscent;
@@ -3913,7 +4420,7 @@ namespace GnollHackX.Pages.Game
             {
                 tx = (offsetX + usedOffsetX + base_move_offset_x + width * (float)mapx);
                 ty = (offsetY + usedOffsetY + base_move_offset_y + mapFontAscent + height * (float)mapy); /* No scaled_y_height_change */
-                DrawChain(canvas, paint, mapx, mapy, 0, true, width, height, ty, tx, 1.0f, targetscale);
+                DrawChain(canvas, paint, mapx, mapy, 0, true, width, height, ty, tx, 1.0f, targetscale, usingGL, false);
             }
 
             /* Cursor */
@@ -3944,6 +4451,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                 StartProfiling(GHProfilingStyle.Bitmap);
 #endif
+                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
                 canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect);
 #if GNH_MAP_PROFILING && DEBUG
                 StopProfiling(GHProfilingStyle.Bitmap);
@@ -4005,6 +4513,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                 StartProfiling(GHProfilingStyle.Bitmap);
 #endif
+                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
                 canvas.DrawImage(TileMap[m_sheet_idx], sourcerect, targetrect);
 #if GNH_MAP_PROFILING && DEBUG
                 StopProfiling(GHProfilingStyle.Bitmap);
@@ -4029,6 +4538,7 @@ namespace GnollHackX.Pages.Game
 
                 SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
                 SKRect sourcerect = new SKRect(tile_x, tile_y, tile_x + GHConstants.TileWidth, tile_y + GHConstants.TileHeight);
+                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
                 canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect);
 
                 if (_mapData[mapx, mapy].Symbol != null && _mapData[mapx, mapy].Symbol != "")
@@ -4054,6 +4564,7 @@ namespace GnollHackX.Pages.Game
 
                 SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
                 SKRect sourcerect = new SKRect(tile_x, tile_y, tile_x + GHConstants.TileWidth, tile_y + GHConstants.TileHeight);
+                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
                 canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect);
 
                 if (_mapData[mapx, mapy].Symbol != null && _mapData[mapx, mapy].Symbol != "")
@@ -4088,12 +4599,6 @@ namespace GnollHackX.Pages.Game
                 ulong status_bits = _mapData[mapx, mapy].Layers.status_bits;
                 if (status_bits != 0)
                 {
-                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                    int mglyph = (int)game_ui_tile_types.STATUS_MARKS + GHApp.UITileOff;
-                    int mtile = GHApp.Glyph2Tile[mglyph];
-                    int sheet_idx = GHApp.TileSheetIdx(mtile);
-                    int tile_x = GHApp.TileSheetX(mtile);
-                    int tile_y = GHApp.TileSheetY(mtile);
                     foreach (int status_mark in _statusmarkorder)
                     {
                         if (status_count >= max_fitted_rows)
@@ -4102,8 +4607,14 @@ namespace GnollHackX.Pages.Game
                         ulong statusbit = 1UL << status_mark;
                         if ((status_bits & statusbit) != 0)
                         {
-                            int within_tile_x = status_mark % tiles_per_row;
-                            int within_tile_y = status_mark / tiles_per_row;
+                            int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                            int mglyph = (int)game_ui_tile_types.STATUS_MARKS + status_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
+                            int mtile = GHApp.Glyph2Tile[mglyph];
+                            int sheet_idx = GHApp.TileSheetIdx(mtile);
+                            int tile_x = GHApp.TileSheetX(mtile);
+                            int tile_y = GHApp.TileSheetY(mtile);
+                            int within_tile_x = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                            int within_tile_y = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                             int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                             int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -4127,6 +4638,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
                             canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
 #if GNH_MAP_PROFILING && DEBUG
                             StopProfiling(GHProfilingStyle.Bitmap);
@@ -4140,11 +4652,6 @@ namespace GnollHackX.Pages.Game
                 if (condition_bits != 0)
                 {
                     int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                    int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + GHApp.UITileOff;
-                    int mtile = GHApp.Glyph2Tile[mglyph];
-                    int sheet_idx = GHApp.TileSheetIdx(mtile);
-                    int tile_x = GHApp.TileSheetX(mtile);
-                    int tile_y = GHApp.TileSheetY(mtile);
                     for (int condition_mark = 0; condition_mark < (int)bl_conditions.NUM_BL_CONDITIONS; condition_mark++)
                     {
                         if (status_count >= max_fitted_rows)
@@ -4153,8 +4660,13 @@ namespace GnollHackX.Pages.Game
                         ulong conditionbit = 1UL << condition_mark;
                         if ((condition_bits & conditionbit) != 0)
                         {
-                            int within_tile_x = condition_mark % tiles_per_row;
-                            int within_tile_y = condition_mark / tiles_per_row;
+                            int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + condition_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
+                            int mtile = GHApp.Glyph2Tile[mglyph];
+                            int sheet_idx = GHApp.TileSheetIdx(mtile);
+                            int tile_x = GHApp.TileSheetX(mtile);
+                            int tile_y = GHApp.TileSheetY(mtile);
+                            int within_tile_x = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                            int within_tile_y = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                             int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                             int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -4178,6 +4690,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
                             canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
 #if GNH_MAP_PROFILING && DEBUG
                             StopProfiling(GHProfilingStyle.Bitmap);
@@ -4240,6 +4753,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                                 StartProfiling(GHProfilingStyle.Bitmap);
 #endif
+                                GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
                                 canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
 #if GNH_MAP_PROFILING && DEBUG
                                 StopProfiling(GHProfilingStyle.Bitmap);
@@ -4263,6 +4777,7 @@ namespace GnollHackX.Pages.Game
 
                 SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
                 SKRect sourcerect = new SKRect(tile_x, tile_y, tile_x + GHConstants.TileWidth, tile_y + GHConstants.TileHeight);
+                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
                 canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect);
             }
             else if ((_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_BEING_HIT) != 0)
@@ -4276,6 +4791,7 @@ namespace GnollHackX.Pages.Game
 
                 SKRect targetrect = new SKRect(tx, ty, tx + width, ty + height);
                 SKRect sourcerect = new SKRect(tile_x, tile_y, tile_x + GHConstants.TileWidth, tile_y + GHConstants.TileHeight);
+                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
                 canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect);
             }
         }
@@ -4288,7 +4804,7 @@ namespace GnollHackX.Pages.Game
             bool is_monster_like_layer, bool is_object_like_layer, bool obj_in_pit, int obj_height, bool is_missile_layer, int missile_height,
             bool loc_is_you, bool canspotself, bool tileflag_halfsize, bool tileflag_normalobjmissile, bool tileflag_fullsizeditem, bool tileflag_floortile, bool tileflag_height_is_clipping,
             bool hflip_glyph, bool vflip_glyph,
-            ObjectDataItem otmp_round, int autodraw, bool drawwallends, bool breatheanimations, long generalcounterdiff, float canvaswidth, float canvasheight, int enlargement) //, ref float minDrawX, ref float maxDrawX, ref float minDrawY, ref float maxDrawY,
+            ObjectDataItem otmp_round, int autodraw, bool drawwallends, bool breatheanimations, long generalcounterdiff, float canvaswidth, float canvasheight, int enlargement, bool usingGL, bool usingMipMap) //, ref float minDrawX, ref float maxDrawX, ref float minDrawY, ref float maxDrawY,
             //ref float enlMinDrawX, ref float enlMaxDrawX, ref float enlMinDrawY, ref float enlMaxDrawY)
         {
             if (!GHUtils.isok(draw_map_x, draw_map_y))
@@ -4598,7 +5114,7 @@ namespace GnollHackX.Pages.Game
                 paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
                 if (is_monster_like_layer && (_mapData[mapx, mapy].Layers.monster_flags & (ulong)LayerMonsterFlags.LMFLAGS_RADIAL_TRANSPARENCY) != 0)
                 {
-                    DrawTileWithRadialTransparency(canvas, delayedDraw, TileMap[sheet_idx], sourcerect, targetrect, ref _mapData[mapx, mapy].Layers, splitY, opaqueness, paint, mapx, mapy);
+                    DrawTileWithRadialTransparency(canvas, delayedDraw, TileMap[sheet_idx], sourcerect, targetrect, ref _mapData[mapx, mapy].Layers, splitY, opaqueness, paint, mapx, mapy, canvaswidth, canvasheight, targetscale, usingGL, usingMipMap);
                         //, ref baseUpdateRect, ref enlUpdateRect);
                 }
                 else
@@ -4606,8 +5122,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                     StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                    DrawSplitBitmap(canvas, delayedDraw, splitY, TileMap[sheet_idx], sourcerect, targetrect, paint, mapx, mapy); //, ref baseUpdateRect, ref enlUpdateRect);
-                    //canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect, paint);
+                    DrawSplitBitmap(canvas, delayedDraw, splitY, TileMap[sheet_idx], sourcerect, targetrect, paint, mapx, mapy, canvaswidth, canvasheight, targetscale, usingGL, usingMipMap); //, ref baseUpdateRect, ref enlUpdateRect);
 #if GNH_MAP_PROFILING && DEBUG
                     StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -4628,7 +5143,7 @@ namespace GnollHackX.Pages.Game
                 tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem,
                 tx, ty, width, height,
                 scale, targetscale, scaled_x_padding, scaled_y_padding, scaled_tile_height,
-                false, drawwallends);
+                false, drawwallends, usingGL, false);
         }
 
         public void UpdateDrawBounds(SKRect mUpdateRect, ref float minDrawX, ref float maxDrawX, ref float minDrawY, ref float maxDrawY)
@@ -4656,7 +5171,7 @@ namespace GnollHackX.Pages.Game
 
         private readonly object _saveRectLock = new object();
         ConcurrentDictionary<SavedRect, SKImage> _savedRects = new ConcurrentDictionary<SavedRect, SKImage>();
-        public void DrawTileWithRadialTransparency(SKCanvas canvas, bool delayedDraw, SKImage tileSheet, SKRect sourcerect, SKRect targetrect, ref LayerInfo layers, float destSplitY, float opaqueness, SKPaint paint, int mapX, int mapY)
+        public void DrawTileWithRadialTransparency(SKCanvas canvas, bool delayedDraw, SKImage tileSheet, SKRect sourcerect, SKRect targetrect, ref LayerInfo layers, float destSplitY, float opaqueness, SKPaint paint, int mapX, int mapY, float canvaswidth, float canvasheight, float targetscale, bool usingGL, bool usingMipMap)
             //, ref SKRect baseUpdateRect, ref SKRect enlUpdateRect)
         {
             bool cache = false;
@@ -4676,7 +5191,7 @@ namespace GnollHackX.Pages.Game
                 if (getsuccessful && bmp != null)
                 {
                     SKRect bmpsourcerect = new SKRect(0, 0, (float)bmp.Width, (float)bmp.Height);
-                    DrawSplitBitmap(canvas, delayedDraw, destSplitY, bmp, bmpsourcerect, targetrect, paint, mapX, mapY);
+                    DrawSplitBitmap(canvas, delayedDraw, destSplitY, bmp, bmpsourcerect, targetrect, paint, mapX, mapY, canvaswidth, canvasheight, targetscale, usingGL, usingMipMap);
                     return;
                 }
             }
@@ -4743,7 +5258,7 @@ namespace GnollHackX.Pages.Game
                 {
                     try
                     {
-                        SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+                        SKBitmap newbmp = new SKBitmap(GHConstants.TileWidth, GHConstants.TileHeight, pixmapTile.ColorType, pixmapTile.AlphaType);
                         _tempBitmap.CopyTo(newbmp);
                         newbmp.SetImmutable();
                         SKImage newimg = SKImage.FromBitmap(newbmp);
@@ -4757,7 +5272,7 @@ namespace GnollHackX.Pages.Game
                             }
                             _savedRects.TryAdd(sr, newimg);
                         }
-                        DrawSplitBitmap(canvas, delayedDraw, destSplitY, newimg, tempsourcerect, targetrect, paint, mapX, mapY); //, ref baseUpdateRect, ref enlUpdateRect);
+                        DrawSplitBitmap(canvas, delayedDraw, destSplitY, newimg, tempsourcerect, targetrect, paint, mapX, mapY, canvaswidth, canvasheight, targetscale, usingGL, usingMipMap); //, ref baseUpdateRect, ref enlUpdateRect);
                     }
                     catch (Exception ex)
                     {
@@ -4770,8 +5285,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                DrawSplitBitmap(canvas, delayedDraw, destSplitY, SKImage.FromBitmap(_tempBitmap), tempsourcerect, targetrect, paint, mapX, mapY); //, ref baseUpdateRect, ref enlUpdateRect);
-                                                                                                                  //canvas.DrawImage(_tempBitmap, tempsourcerect, targetrect, paint);
+                DrawSplitBitmap(canvas, delayedDraw, destSplitY, SKImage.FromBitmap(_tempBitmap), tempsourcerect, targetrect, paint, mapX, mapY, canvaswidth, canvasheight, targetscale, usingGL, usingMipMap); //, ref baseUpdateRect, ref enlUpdateRect);
 #if GNH_MAP_PROFILING && DEBUG
             StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -4780,23 +5294,28 @@ namespace GnollHackX.Pages.Game
 
         private List<GHDrawCommand> _drawCommandList = new List<GHDrawCommand>();
 
-        public void DrawSplitBitmap(SKCanvas canvas, bool delayedDraw, float destSplitY, SKImage bitmap, SKRect source, SKRect dest, SKPaint paint, int mapX, int mapY) //, ref SKRect baseUpdateRect, ref SKRect enlUpdateRect)
+        public void DrawSplitBitmap(SKCanvas canvas, bool delayedDraw, float destSplitY, SKImage bitmap, SKRect source, SKRect dest, SKPaint paint, int mapX, int mapY, float canvaswidth, float canvasheight, float targetscale, bool usingGL, bool usingMipMap) //, ref SKRect baseUpdateRect, ref SKRect enlUpdateRect)
         {
+            if (dest.Bottom <= 0 || dest.Top >= canvasheight || dest.Right < 0 || dest.Left >= canvaswidth)
+                return;
+
             if (destSplitY <= dest.Top || delayedDraw)
             {
-                if(delayedDraw)
+                if (delayedDraw)
                     _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, source, dest, bitmap, paint.Color, mapX, mapY));
                 else
-                    canvas.DrawImage(bitmap, source, dest, paint);
-                //baseUpdateRect = dest;
-                //enlUpdateRect = new SKRect();
+                {
+                    GHApp.MaybeFixRects(ref source, ref dest, targetscale, usingGL);
+                    canvas.DrawImage(bitmap, source, dest,
+#if GNH_MAUI
+                        new SKSamplingOptions(SKFilterMode.Nearest, usingGL && usingMipMap ? SKMipmapMode.Nearest: SKMipmapMode.None),
+#endif
+                        paint);
+                }
             }
             else if (destSplitY >= dest.Bottom)
             {
                 _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, source, dest, bitmap, paint.Color, mapX, mapY));
-                //enlCanvas.DrawBitmap(bitmap, source, dest, paint);
-                //baseUpdateRect = new SKRect();
-                //enlUpdateRect = dest;
             }
             else
             {
@@ -4809,11 +5328,13 @@ namespace GnollHackX.Pages.Game
                 float sourceSplitY = source.Top + (source.Bottom - source.Top) * topDestScale;
                 SKRect enlSource = new SKRect(source.Left, source.Top, source.Right, sourceSplitY);
                 SKRect baseSource = new SKRect(source.Left, sourceSplitY, source.Right, source.Bottom);
-                canvas.DrawImage(bitmap, baseSource, baseDest, paint);
-                //enlCanvas.DrawBitmap(bitmap, enlSource, enlDest, paint);
+                GHApp.MaybeFixRects(ref baseSource, ref baseDest, targetscale, usingGL);
+                canvas.DrawImage(bitmap, baseSource, baseDest,
+#if GNH_MAUI
+                    new SKSamplingOptions(SKFilterMode.Nearest, usingGL && usingMipMap ? SKMipmapMode.Nearest : SKMipmapMode.None),
+#endif
+                    paint);
                 _drawCommandList.Add(new GHDrawCommand(canvas.TotalMatrix, enlSource, enlDest, bitmap, paint.Color, mapX, mapY));
-                //baseUpdateRect = baseDest;
-                //enlUpdateRect = enlDest;
             }
         }
 
@@ -5684,14 +6205,13 @@ namespace GnollHackX.Pages.Game
                     float wpadding = width / 32;
                     float stwidth = atwidth * 4;
                     int rowcnt = _mapData[mapx, mapy].Engraving.RowSplit.Length;
-                    int rowidx = -1;
                     float rscale = (width - 2 * wpadding) / stwidth;
                     float prerowheight = textPaint.FontSpacing * rscale;
                     float rowhscale = prerowheight * rowcnt > height ? height / (prerowheight * rowcnt) : 1.0f;
                     float rowheight = prerowheight * rowhscale;
-                    foreach (string str in _mapData[mapx, mapy].Engraving.RowSplit)
+                    for (int rowidx = 0, num_s = _mapData[mapx, mapy].Engraving.RowSplit.Length; rowidx < num_s; rowidx++)
                     {
-                        rowidx++;
+                        string str = _mapData[mapx, mapy].Engraving.RowSplit[rowidx];
                         textPaint.TextSize = 10;
                         float twidth = textPaint.MeasureText(str);
                         float usedtwidth = twidth > stwidth ? twidth : stwidth;
@@ -5873,7 +6393,7 @@ namespace GnollHackX.Pages.Game
 
         private void PaintMainGamePage(object sender, SKPaintSurfaceEventArgs e)
         {
-            if (!MainGrid.IsVisible || GHApp.IsReplaySearching)
+            if (!IsMainCanvasOn || /* !MainGrid.IsVisible || */ GHApp.IsReplaySearching)
                 return;
 
             SKImageInfo info = e.Info;
@@ -5881,12 +6401,17 @@ namespace GnollHackX.Pages.Game
             SKCanvas canvas = surface.Canvas;
             float canvaswidth = canvasView.CanvasSize.Width;
             float canvasheight = canvasView.CanvasSize.Height;
-            bool drawwallends = DrawWallEnds;
-            bool breatheanimations = BreatheAnimations;
 
             canvas.Clear(SKColors.Black);
             if (canvaswidth <= 16 || canvasheight <= 16)
                 return;
+
+            bool drawwallends = DrawWallEnds;
+            bool breatheanimations = BreatheAnimations;
+            bool usingGL = UseMainGLCanvas;
+            bool usingMipMap = UseMainMipMap;
+            bool usingDesktopButtons = DesktopButtons;
+            bool usingSimpleCmdLayout = UseSimpleCmdLayout;
 
             _drawCommandList.Clear();
 
@@ -5898,8 +6423,12 @@ namespace GnollHackX.Pages.Game
             //if (_enlargementBitmap == null || _enlargementBitmap.Width != (int)canvaswidth || _enlargementBitmap.Height != (int)canvasheight)
             //    _enlargementBitmap = new SKBitmap(Math.Max(1, (int)canvaswidth), Math.Max(1, (int)canvasheight));
 
-            double canvas_scale = GetCanvasScale();
-            float inverse_canvas_scale = canvas_scale == 0 ? 0.0f : 1.0f / (float)canvas_scale;
+            //double canvas_scale = GetCanvasScale();
+            //float inverse_canvas_scale = canvas_scale == 0 ? 0.0f : 1.0f / (float)canvas_scale;
+            float inverse_canvas_scale = GetInverseCanvasScale();
+            float customScale = GHApp.CustomScreenScale;
+            float textscale = GetTextScaleEx(canvasView.Width, canvasView.Height, usingDesktopButtons, usingSimpleCmdLayout, inverse_canvas_scale, customScale);
+            float statusBarSkiaHeight = GetStatusBarSkiaHeightEx(textscale);
             long generalcountervalue, maincountervalue;
             lock (AnimationTimerLock)
             {
@@ -5911,7 +6440,15 @@ namespace GnollHackX.Pages.Game
             }
             long moveIntervals = Math.Max(2, (long)Math.Ceiling((double)UIUtils.GetMainCanvasAnimationFrequency(MapRefreshRate) / 10.0));
             bool lighter_darkening = LighterDarkening;
-
+            bool isPointerHovering = false;
+            SKPoint pointerHoverLocation = new SKPoint();
+#if WINDOWS
+            lock (_canvasPointerLock)
+            {
+                isPointerHovering = _isCanvasHovering;
+                pointerHoverLocation = _canvasHoverLocation;
+            }
+#endif
             using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
                 string str = "";
@@ -5922,7 +6459,6 @@ namespace GnollHackX.Pages.Game
                 textPaint.Typeface = GHApp.LatoRegular;
 
                 /* Map */
-                float textscale = GetTextScale();
                 float usedFontSize = ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
                 textPaint.Typeface = GHApp.DejaVuSansMonoTypeface;
                 textPaint.TextSize = usedFontSize;
@@ -5944,6 +6480,7 @@ namespace GnollHackX.Pages.Game
                     usedFontSize = usedFontSize * MapFontMiniRelativeSize;
                     textPaint.TextSize = usedFontSize;
                 }
+
                 float width = textPaint.MeasureText("A"); //textPaint.FontMetrics.AverageCharacterWidth;
                 float height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
 
@@ -5956,10 +6493,13 @@ namespace GnollHackX.Pages.Game
                 float mapwidth = width * (GHConstants.MapCols - 1);
                 float mapheight = height * (GHConstants.MapRows);
 
-                UsedTileWidth = width;
-                UsedTileHeight = height;
-                _mapWidth = mapwidth;
-                _mapHeight = mapheight;
+                lock (_tileSizeLock)
+                {
+                    _usedTileWidth = width;
+                    _usedTileHeight = height;
+                    _mapWidth = mapwidth;
+                    _mapHeight = mapheight;
+                }
                 float mapFontAscent = textPaint.FontMetrics.Ascent;
                 UsedMapFontAscent = mapFontAscent;
                 float targetscale = height / (float)GHConstants.TileHeight;
@@ -5977,14 +6517,15 @@ namespace GnollHackX.Pages.Game
 
                 float tx = 0, ty = 0;
                 float startx = 0, starty = 0;
-                if (_currentGame != null)
+                GHGame curGame = CurrentGame;
+                if (curGame != null)
                 {
-                    lock (_currentGame.WindowsLock)
+                    lock (curGame.WindowsLock)
                     {
-                        if (_currentGame.Windows[_currentGame.MapWindowId] != null)
+                        if (curGame.Windows[curGame.MapWindowId] != null)
                         {
-                            startx = _currentGame.Windows[_currentGame.MapWindowId].Left;
-                            starty = _currentGame.Windows[_currentGame.MapWindowId].Top;
+                            startx = curGame.Windows[curGame.MapWindowId].Left;
+                            starty = curGame.Windows[curGame.MapWindowId].Top;
                         }
                     }
                 }
@@ -6145,7 +6686,7 @@ namespace GnollHackX.Pages.Game
                                                             {
                                                                 if (layer_idx == (int)layer_types.MAX_LAYERS + 1)
                                                                 {
-                                                                    PaintMapUIElements(canvas, textPaint, paint, pathEffect, mapx, mapy, width, height, offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, targetscale, generalcountervalue, usedFontSize, monster_height, loc_is_you, canspotself);
+                                                                    PaintMapUIElements(canvas, textPaint, paint, pathEffect, mapx, mapy, width, height, offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, targetscale, generalcountervalue, usedFontSize, monster_height, loc_is_you, canspotself, usingGL);
                                                                 }
                                                                 else
                                                                 {
@@ -6221,7 +6762,7 @@ namespace GnollHackX.Pages.Game
                                                                             scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
                                                                             monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
                                                                             loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
-                                                                            hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement); //, ref minDrawX, ref maxDrawX, ref minDrawY, ref maxDrawY, ref enlMinDrawX, ref enlMaxDrawX, ref enlMinDrawY, ref enlMaxDrawY);
+                                                                            hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement, usingGL, usingMipMap); //, ref minDrawX, ref maxDrawX, ref minDrawY, ref maxDrawY, ref enlMinDrawX, ref enlMaxDrawX, ref enlMinDrawY, ref enlMaxDrawY);
                                                                     }
                                                                 }
                                                             }
@@ -6277,7 +6818,7 @@ namespace GnollHackX.Pages.Game
                                                         {
                                                             if (layer_idx == (int)layer_types.MAX_LAYERS + 1)
                                                             {
-                                                                PaintMapUIElements(canvas, textPaint, paint, pathEffect, mapx, mapy, width, height, offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, targetscale, generalcountervalue, usedFontSize, monster_height, loc_is_you, canspotself);
+                                                                PaintMapUIElements(canvas, textPaint, paint, pathEffect, mapx, mapy, width, height, offsetX, offsetY, usedOffsetX, usedOffsetY, base_move_offset_x, base_move_offset_y, targetscale, generalcountervalue, usedFontSize, monster_height, loc_is_you, canspotself, usingGL);
                                                             }
                                                             else
                                                             {
@@ -6358,7 +6899,7 @@ namespace GnollHackX.Pages.Game
                                                                                 scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
                                                                                 monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
                                                                                 loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
-                                                                                hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement); //, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
+                                                                                hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement, usingGL, usingMipMap); //, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
                                                                         }
                                                                         else
                                                                         {
@@ -6368,7 +6909,7 @@ namespace GnollHackX.Pages.Game
                                                                                 scaled_y_height_change, pit_border, targetscale, generalcountervalue, usedFontSize,
                                                                                 monster_height, is_monster_like_layer, is_object_like_layer, obj_in_pit, obj_height, is_missile_layer, missile_height,
                                                                                 loc_is_you, canspotself, tileflag_halfsize, tileflag_normalobjmissile, tileflag_fullsizeditem, tileflag_floortile, tileflag_height_is_clipping,
-                                                                                hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement); //, ref minDrawX, ref maxDrawX, ref minDrawY, ref maxDrawY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
+                                                                                hflip_glyph, vflip_glyph, otmp_round, autodraw, drawwallends, breatheanimations, generalcounterdiff, canvaswidth, canvasheight, enlargement, usingGL, usingMipMap); //, ref minDrawX, ref maxDrawX, ref minDrawY, ref maxDrawY, ref _enlBmpMinX, ref _enlBmpMaxX, ref _enlBmpMinY, ref _enlBmpMaxY);
                                                                         }
                                                                     }
                                                                 }
@@ -6484,6 +7025,7 @@ namespace GnollHackX.Pages.Game
                                                                             {
                                                                                 paint.Color = dc.PaintColor;
                                                                                 canvas.SetMatrix(dc.Matrix);
+                                                                                GHApp.MaybeFixRects(ref sourceRect, ref destRect, targetscale, usingGL);
                                                                                 canvas.DrawImage(usedDarkenedBitmap, sourceRect, destRect, paint);
                                                                             }
                                                                             else
@@ -6496,7 +7038,7 @@ namespace GnollHackX.Pages.Game
                                                                                     dc.AutoDrawParameters.tileflag_normalobjmissile, dc.AutoDrawParameters.tileflag_fullsizeditem, 0, 0,
                                                                                     dc.AutoDrawParameters.width, dc.AutoDrawParameters.height, 1, 1,
                                                                                     0, 0, height, dc.AutoDrawParameters.is_inventory,
-                                                                                    dc.AutoDrawParameters.drawwallends);
+                                                                                    dc.AutoDrawParameters.drawwallends, usingGL, false);
                                                                                 DoDarkening(darkeningCanvas, paint, 0, 0, dc.AutoDrawParameters.width, dc.AutoDrawParameters.height, darken_percentage);
 
                                                                                 /* Save to cache as immutable */
@@ -6526,6 +7068,7 @@ namespace GnollHackX.Pages.Game
                                                                                     doDisposeImage = true;
                                                                                 }
 
+                                                                                GHApp.MaybeFixRects(ref sourceRect, ref destRect, targetscale, usingGL);
                                                                                 canvas.DrawImage(usedDarkenedBitmap, sourceRect, destRect, paint);
                                                                                 if (doDisposeImage)
                                                                                     usedDarkenedBitmap.Dispose();
@@ -6546,6 +7089,7 @@ namespace GnollHackX.Pages.Game
                                                                             {
                                                                                 paint.Color = dc.PaintColor;
                                                                                 canvas.SetMatrix(dc.Matrix);
+                                                                                GHApp.MaybeFixRects(ref cacheRect, ref dc.DestinationRect, targetscale, usingGL);
                                                                                 canvas.DrawImage(usedDarkenedBitmap, cacheRect, dc.DestinationRect, paint);
                                                                             }
                                                                             else
@@ -6584,6 +7128,7 @@ namespace GnollHackX.Pages.Game
 
                                                                                 paint.Color = dc.PaintColor;
                                                                                 canvas.SetMatrix(dc.Matrix);
+                                                                                GHApp.MaybeFixRects(ref cacheRect, ref dc.DestinationRect, targetscale, usingGL);
                                                                                 canvas.DrawImage(usedDarkenedBitmap, cacheRect, dc.DestinationRect, paint);
                                                                                 if (doDisposeImage)
                                                                                     usedDarkenedBitmap.Dispose();
@@ -6602,10 +7147,13 @@ namespace GnollHackX.Pages.Game
                                                                                 dc.AutoDrawParameters.tileflag_normalobjmissile, dc.AutoDrawParameters.tileflag_fullsizeditem, dc.AutoDrawParameters.tx, dc.AutoDrawParameters.ty,
                                                                                 dc.AutoDrawParameters.width, dc.AutoDrawParameters.height, dc.AutoDrawParameters.scale, dc.AutoDrawParameters.targetscale,
                                                                                 dc.AutoDrawParameters.scaled_x_padding, dc.AutoDrawParameters.scaled_y_padding, dc.AutoDrawParameters.scaled_tile_height, dc.AutoDrawParameters.is_inventory,
-                                                                                dc.AutoDrawParameters.drawwallends);
+                                                                                dc.AutoDrawParameters.drawwallends, usingGL, false);
                                                                     }
                                                                     else
+                                                                    {
+                                                                        GHApp.MaybeFixRects(ref dc.SourceRect, ref dc.DestinationRect, targetscale, usingGL);
                                                                         canvas.DrawImage(dc.SourceBitmap, dc.SourceRect, dc.DestinationRect, paint);
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -6676,7 +7224,6 @@ namespace GnollHackX.Pages.Game
                             textPaint.DrawTextOnCanvas(canvas, str, tx, ty);
                         }
                     }
-                    
 
                     /* Screen Filter */
                     lock (_screenFilterLock)
@@ -6930,7 +7477,7 @@ namespace GnollHackX.Pages.Game
 
                                 //textPaint.TextAlign = SKTextAlign.Center;
                                 tx = canvaswidth / 2;
-                                ty = GetStatusBarSkiaHeight() + 1.5f * inverse_canvas_scale * (float)StandardMeasurementButton.Height - textPaint.FontMetrics.Ascent;
+                                ty = statusBarSkiaHeight + 1.5f * inverse_canvas_scale * (float)StandardMeasurementButton.Height - textPaint.FontMetrics.Ascent;
 #if GNH_MAP_PROFILING && DEBUG
                                 StartProfiling(GHProfilingStyle.Text);
 #endif
@@ -6984,7 +7531,9 @@ namespace GnollHackX.Pages.Game
                                                 float rectleft = tx + search_x * width + rectxmargin;
                                                 float recttop = ty + search_y * height + rectymargin;
                                                 SKRect effRect = new SKRect(rectleft, recttop, rectleft + rectsize, recttop + rectsize);
-                                                canvas.DrawImage(GHApp._searchBitmap, effRect, textPaint.Paint);
+                                                SKRect sourcerect = new SKRect(0, 0, GHApp._searchBitmap.Width, GHApp._searchBitmap.Height);
+                                                GHApp.MaybeFixRects(ref sourcerect, ref effRect, targetscale, usingGL);
+                                                canvas.DrawImage(GHApp._searchBitmap, sourcerect, effRect, textPaint.Paint);
                                             }
                                         }
                                         break;
@@ -6996,6 +7545,8 @@ namespace GnollHackX.Pages.Game
                                             float rectleft = tx + rectxmargin;
                                             float recttop = ty + rectymargin;
                                             SKRect effRect = new SKRect(rectleft, recttop, rectleft + rectsize, recttop + rectsize);
+                                            SKRect sourcerect = new SKRect(0, 0, GHApp._waitBitmap.Width, GHApp._waitBitmap.Height);
+                                            GHApp.MaybeFixRects(ref sourcerect, ref effRect, targetscale, usingGL);
                                             canvas.DrawImage(GHApp._waitBitmap, effRect, textPaint.Paint);
                                         }
                                         break;
@@ -7432,363 +7983,365 @@ namespace GnollHackX.Pages.Game
                 {
                     _canvasButtonRect.Top = 0; /* Maybe overrwritten below */
                     _canvasButtonRect.Bottom = canvasheight; /* Maybe overrwritten below */
-                    if (_currentGame != null)
+                    GHWindow ghWindow = null;
+                    GHWindow messageWindow = null;
+                    GHSubstring substr = new GHSubstring("");
+                    for (int i = 0; i < GHConstants.MaxGHWindows; i++)
                     {
-                        lock (_currentGame.WindowsLock)
+                        if (curGame == null)
+                            break;
+                        lock (curGame.WindowsLock)
                         {
-                            for (int i = 0; _currentGame.Windows[i] != null && i < GHConstants.MaxGHWindows; i++)
+                            ghWindow = curGame.Windows[i];
+                            messageWindow = curGame.Windows[curGame.MessageWindowId];
+                        }
+                        if (ghWindow == null || messageWindow == null)
+                            break;
+
+                        if (ghWindow.Visible && (
+                            ghWindow.WindowPrintStyle == GHWindowPrintLocations.PrintToMap
+                            || ghWindow.WindowPrintStyle == GHWindowPrintLocations.RawPrint))
+                        {
+                            if (ghWindow.WindowType == GHWinType.Status && !ClassicStatusBar)
+                                continue;
+
+                            textPaint.Typeface = ghWindow.Typeface;
+                            textPaint.TextSize = ghWindow.TextSize * textscale;
+                            textPaint.Color = ghWindow.TextColor;
+                            width = textPaint.MeasureText("A"); // textPaint.FontMetrics.AverageCharacterWidth;
+                            height = textPaint.FontSpacing; // textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+
+                            if (ghWindow.AutoPlacement)
                             {
-                                if (_currentGame.Windows[i].Visible && (
-                                    _currentGame.Windows[i].WindowPrintStyle == GHWindowPrintLocations.PrintToMap
-                                    || _currentGame.Windows[i].WindowPrintStyle == GHWindowPrintLocations.RawPrint))
+                                if (ghWindow.WindowType == GHWinType.Message)
                                 {
-                                    if (_currentGame.Windows[i].WindowType == GHWinType.Status && !ClassicStatusBar)
-                                        continue;
+                                    float newleft = 0;
+                                    float newtop = canvasheight - height * ActualDisplayedMessages - (float)UsedButtonRowStack.Height * inverse_canvas_scale - GHConstants.ContextButtonBottomStartMargin;
+                                    ghWindow.Left = newleft;
+                                    ghWindow.Top = newtop;
+                                }
+                                else if (ghWindow.WindowType == GHWinType.Here)
+                                {
+                                    float newleft = 0;
+                                    float messagetop = messageWindow.Top;
+                                    float newtop = messagetop - ghWindow.Height - 10 * textscale;
+                                    ghWindow.Left = newleft;
+                                    ghWindow.Top = newtop;
+                                }
+                            }
 
-                                    textPaint.Typeface = _currentGame.Windows[i].Typeface;
-                                    textPaint.TextSize = _currentGame.Windows[i].TextSize * textscale;
-                                    textPaint.Color = _currentGame.Windows[i].TextColor;
-                                    width = textPaint.MeasureText("A"); // textPaint.FontMetrics.AverageCharacterWidth;
-                                    height = textPaint.FontSpacing; // textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                            SKRect winRect = new SKRect(ghWindow.Left, ghWindow.Top,
+                                ghWindow.Right,
+                                ghWindow.Bottom);
 
-                                    if (_currentGame.Windows[i].AutoPlacement)
-                                    {
-                                        if (_currentGame.Windows[i].WindowType == GHWinType.Message)
-                                        {
-                                            float newleft = 0;
-                                            float newtop = canvasheight - height * ActualDisplayedMessages - canvasheight * (float)UsedButtonRowStack.Height / Math.Max(1.0f, (float)canvasView.Height) - 30;
-                                            _currentGame.Windows[i].Left = newleft;
-                                            _currentGame.Windows[i].Top = newtop;
-                                        }
-                                        else if (_currentGame.Windows[i].WindowType == GHWinType.Here)
-                                        {
-                                            float newleft = 0;
-                                            float messagetop = _currentGame.Windows[_currentGame.MessageWindowId].Top;
-                                            float newtop = messagetop - _currentGame.Windows[i].Height - 10 * textscale;
-                                            _currentGame.Windows[i].Left = newleft;
-                                            _currentGame.Windows[i].Top = newtop;
-                                        }
-                                    }
+                            if (ghWindow.CenterHorizontally && winRect.Right - winRect.Left < canvaswidth)
+                            {
+                                float newleft = (canvaswidth - (winRect.Right - winRect.Left)) / 2;
+                                float addition = newleft - winRect.Left;
+                                winRect.Left += addition;
+                                winRect.Right += addition;
+                            }
 
-                                    SKRect winRect = new SKRect(_currentGame.Windows[i].Left, _currentGame.Windows[i].Top,
-                                        _currentGame.Windows[i].Right,
-                                        _currentGame.Windows[i].Bottom);
+                            switch (ghWindow.WindowType)
+                            {
+                                case GHWinType.Here:
+                                    herewindowtop = winRect.Top;
+                                    break;
+                                case GHWinType.Message:
+                                    messagewindowtop = winRect.Top;
+                                    break;
+                                default:
+                                    break;
+                            }
 
-                                    if (_currentGame.Windows[i].CenterHorizontally && winRect.Right - winRect.Left < canvaswidth)
-                                    {
-                                        float newleft = (canvaswidth - (winRect.Right - winRect.Left)) / 2;
-                                        float addition = newleft - winRect.Left;
-                                        winRect.Left += addition;
-                                        winRect.Right += addition;
-                                    }
+                            using (SKPaint winPaint = new SKPaint())
+                            {
+                                //winPaint.FilterQuality = SKFilterQuality.None;
 
-                                    switch (_currentGame.Windows[i].WindowType)
-                                    {
-                                        case GHWinType.Here:
-                                            herewindowtop = winRect.Top;
-                                            break;
-                                        case GHWinType.Message:
-                                            messagewindowtop = winRect.Top;
-                                            break;
-                                        default:
-                                            break;
-                                    }
+                                winPaint.Color = ghWindow.BackgroundColor;
+                                winPaint.Style = SKPaintStyle.Fill;
 
-                                    using (SKPaint winPaint = new SKPaint())
-                                    {
-                                        //winPaint.FilterQuality = SKFilterQuality.None;
-
-                                        winPaint.Color = _currentGame.Windows[i].BackgroundColor;
-                                        winPaint.Style = SKPaintStyle.Fill;
-
-                                        if (winPaint.Color != SKColors.Transparent)
-                                        {
+                                if (winPaint.Color != SKColors.Transparent)
+                                {
 #if GNH_MAP_PROFILING && DEBUG
-                                            StartProfiling(GHProfilingStyle.Rect);
+                                    StartProfiling(GHProfilingStyle.Rect);
 #endif
-                                            canvas.DrawRect(winRect, winPaint);
+                                    canvas.DrawRect(winRect, winPaint);
 #if GNH_MAP_PROFILING && DEBUG
-                                            StopProfiling(GHProfilingStyle.Rect);
+                                    StopProfiling(GHProfilingStyle.Rect);
 #endif
 
-                                        }
+                                }
 
-                                        if (i == _currentGame.StatusWindowId && ClassicStatusBar)
-                                            _canvasButtonRect.Top = winRect.Bottom;
-                                        else if (i == _currentGame.MessageWindowId)
-                                            _canvasButtonRect.Bottom = winRect.Top;
-                                    }
+                                if (i == curGame.StatusWindowId && ClassicStatusBar)
+                                    _canvasButtonRect.Top = winRect.Bottom;
+                                else if (i == curGame.MessageWindowId)
+                                    _canvasButtonRect.Bottom = winRect.Top;
+                            }
 
-                                    if (_currentGame.Windows[i].WindowType != GHWinType.Message && !ForceAllMessages)
+                            if (ghWindow.WindowType != GHWinType.Message && !ForceAllMessages)
+                            {
+                                lock (ghWindow.PutStrsLock)
+                                {
+                                    int j = -1;
+                                    foreach (GHPutStrItem putstritem in ghWindow.PutStrs)
                                     {
-                                        lock (_currentGame.Windows[i].PutStrsLock)
+                                        j++;
+                                        int pos = 0;
+                                        float xpos = 0;
+                                        float totwidth = 0;
+                                        foreach (GHPutStrInstructions instr in putstritem.InstructionList)
                                         {
-                                            int j = 0;
-                                            foreach (GHPutStrItem putstritem in _currentGame.Windows[i].PutStrs)
+                                            if (putstritem.Text == null)
+                                                substr.SetValue("");
+                                            else if (pos + instr.PrintLength <= putstritem.Text.Length)
+                                                substr.SetValue(putstritem.Text, pos, instr.PrintLength);
+                                            else if (putstritem.Text.Length - pos > 0)
+                                                substr.SetValue(putstritem.Text, pos, putstritem.Text.Length - pos);
+                                            else
+                                                substr.SetValue("");
+                                            pos += substr.Length;
+                                            totwidth = textPaint.MeasureText(substr.Value, ref textBounds);
+
+                                            /* attributes */
+                                            tx = xpos + winRect.Left + ghWindow.Padding.Left;
+                                            ty = winRect.Top + ghWindow.Padding.Top - textPaint.FontMetrics.Ascent + j * height;
+
+#if GNH_MAP_PROFILING && DEBUG
+                                            StartProfiling(GHProfilingStyle.Text);
+#endif
+                                            if (ghWindow.HasShadow)
                                             {
-                                                int pos = 0;
-                                                float xpos = 0;
-                                                float totwidth = 0;
-                                                foreach (GHPutStrInstructions instr in putstritem.InstructionList)
-                                                {
-                                                    if (putstritem.Text == null)
-                                                        str = "";
-                                                    else if (pos + instr.PrintLength <= putstritem.Text.Length)
-                                                        str = putstritem.Text.Substring(pos, instr.PrintLength);
-                                                    else if (putstritem.Text.Length - pos > 0)
-                                                        str = putstritem.Text.Substring(pos, putstritem.Text.Length - pos);
-                                                    else
-                                                        str = "";
-                                                    pos += str.Length;
-                                                    totwidth = textPaint.MeasureText(str, ref textBounds);
-
-                                                    /* attributes */
-                                                    tx = xpos + winRect.Left + _currentGame.Windows[i].Padding.Left;
-                                                    ty = winRect.Top + _currentGame.Windows[i].Padding.Top - textPaint.FontMetrics.Ascent + j * height;
-
+                                                textPaint.Style = SKPaintStyle.Fill;
+                                                textPaint.Color = SKColors.Black;
+                                                textPaint.MaskFilter = _blur;
+                                                float shadow_offset = 0.15f * textPaint.TextSize;
+                                                textPaint.DrawTextOnCanvas(canvas, substr.Value, tx + shadow_offset, ty + shadow_offset);
+                                                textPaint.MaskFilter = null;
+                                            }
+                                            if (ghWindow.StrokeWidth > 0)
+                                            {
+                                                textPaint.Style = SKPaintStyle.Stroke;
+                                                textPaint.StrokeWidth = ghWindow.StrokeWidth * textscale;
+                                                textPaint.Color = SKColors.Black;
+                                                textPaint.DrawTextOnCanvas(canvas, substr.Value, tx, ty);
+                                            }
+                                            textPaint.Style = SKPaintStyle.Fill;
+                                            textPaint.Color = UIUtils.NHColor2SKColor(instr.Color < (int)NhColor.CLR_MAX ? instr.Color : (int)NhColor.CLR_WHITE, instr.Attributes);
+                                            textPaint.DrawTextOnCanvas(canvas, substr.Value, tx, ty);
+                                            textPaint.Style = SKPaintStyle.Fill;
+                                            xpos += totwidth;
 #if GNH_MAP_PROFILING && DEBUG
-                                                    StartProfiling(GHProfilingStyle.Text);
-#endif
-                                                    if (_currentGame.Windows[i].HasShadow)
-                                                    {
-                                                        textPaint.Style = SKPaintStyle.Fill;
-                                                        textPaint.Color = SKColors.Black;
-                                                        textPaint.MaskFilter = _blur;
-                                                        float shadow_offset = 0.15f * textPaint.TextSize;
-                                                        textPaint.DrawTextOnCanvas(canvas, str, tx + shadow_offset, ty + shadow_offset);
-                                                        textPaint.MaskFilter = null;
-                                                    }
-                                                    if (_currentGame.Windows[i].StrokeWidth > 0)
-                                                    {
-                                                        textPaint.Style = SKPaintStyle.Stroke;
-                                                        textPaint.StrokeWidth = _currentGame.Windows[i].StrokeWidth * textscale;
-                                                        textPaint.Color = SKColors.Black;
-                                                        //canvas.DrawText(str, tx, ty, textPaint);
-                                                        textPaint.DrawTextOnCanvas(canvas, str, tx, ty);
-                                                    }
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = UIUtils.NHColor2SKColor(instr.Color < (int)NhColor.CLR_MAX ? instr.Color : (int)NhColor.CLR_WHITE, instr.Attributes);
-                                                    //canvas.DrawText(str, tx, ty, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, str, tx, ty);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    xpos += totwidth;
-#if GNH_MAP_PROFILING && DEBUG
-                                                    StopProfiling(GHProfilingStyle.Text);
+                                            StopProfiling(GHProfilingStyle.Text);
 #endif
 
-                                                    if (_currentGame.Windows[i].WindowType == GHWinType.Status && lastStatusRowPrintY < ty + textPaint.FontMetrics.Descent)
-                                                    {
-                                                        lastStatusRowPrintY = ty + textPaint.FontMetrics.Descent;
-                                                        lastStatusRowFontSpacing = textPaint.FontSpacing;
-                                                    }
-                                                }
-                                                j++;
+                                            if (ghWindow.WindowType == GHWinType.Status && lastStatusRowPrintY < ty + textPaint.FontMetrics.Descent)
+                                            {
+                                                lastStatusRowPrintY = ty + textPaint.FontMetrics.Descent;
+                                                lastStatusRowFontSpacing = textPaint.FontSpacing;
                                             }
                                         }
                                     }
+                                }
+                            }
 
-                                    if (_currentGame.Windows[i].WindowType == GHWinType.Message)
+                            if (ghWindow.WindowType == GHWinType.Message)
+                            {
+                                lock (_msgHistoryLock)
+                                {
+                                    GHMsgHistoryItem[] msgHistoryPtr = _msgHistory;
+                                    if (msgHistoryPtr != null)
                                     {
-                                        lock (_msgHistoryLock)
+                                        int j = ActualDisplayedMessages - 1, idx;
+                                        float lineLengthLimit = 0.85f * canvaswidth;
+                                        float spaceLength = textPaint.MeasureText(" ");
+
+                                        bool refreshsmallesttop = false;
+                                        GHSubstring printedsubline = new GHSubstring("");
+                                        for (idx = msgHistoryPtr.Length - 1; idx >= 0 && j >= 0; idx--)
                                         {
-                                            if (_msgHistory != null)
+                                            GHMsgHistoryItem msgHistoryItem = msgHistoryPtr[idx];
+                                            //longLine = msgHistoryItem.Text;
+                                            SKColor printColor = UIUtils.NHColor2SKColor(
+                                                msgHistoryItem.Colors != null && msgHistoryItem.Colors.Length > 0 ? msgHistoryItem.Colors[0] : msgHistoryItem.NHColor < (int)NhColor.CLR_MAX ? msgHistoryItem.NHColor : (int)NhColor.CLR_WHITE, 
+                                                msgHistoryItem.Attributes != null && msgHistoryItem.Attributes.Length > 0 ? msgHistoryItem.Attributes[0] : msgHistoryItem.Attribute);
+
+                                            bool use_one_color = msgHistoryItem.Colors == null && msgHistoryItem.Attributes == null;
+                                            int char_idx = 0;
+
+                                            if (_refreshMsgHistoryRowCounts || msgHistoryItem.WrappedTextRows.Count == 0)
                                             {
-                                                int j = ActualDisplayedMessages - 1, idx;
-                                                float lineLengthLimit = 0.85f * canvaswidth;
-                                                float spaceLength = textPaint.MeasureText(" ");
-
-                                                lock (_refreshMsgHistoryRowCountLock)
+                                                refreshsmallesttop = true;
+                                                msgHistoryItem.WrappedTextRows.Clear();
+                                                float lineLength = 0.0f;
+                                                //string line = "";
+                                                _lineBuilder.Clear();
+                                                string[] txtsplit = msgHistoryItem.TextSplit;
+                                                bool firstonline = true;
+                                                for (int widx = 0; widx < txtsplit.Length; widx++)
                                                 {
-                                                    bool refreshsmallesttop = false;
-                                                    for (idx = _msgHistory.Length - 1; idx >= 0 && j >= 0; idx--)
+                                                    string word = txtsplit[widx];
+                                                    //string wordWithSpace = word + " ";
+                                                    float wordLength = textPaint.MeasureText(word);
+                                                    float wordWithSpaceLength = wordLength + spaceLength;
+                                                    if (lineLength + wordLength > lineLengthLimit && !firstonline)
                                                     {
-                                                        GHMsgHistoryItem msgHistoryItem = _msgHistory[idx];
-                                                        //longLine = msgHistoryItem.Text;
-                                                        SKColor printColor = UIUtils.NHColor2SKColor(
-                                                            msgHistoryItem.Colors != null && msgHistoryItem.Colors.Length > 0 ? msgHistoryItem.Colors[0] : msgHistoryItem.NHColor < (int)NhColor.CLR_MAX ? msgHistoryItem.NHColor : (int)NhColor.CLR_WHITE, 
-                                                            msgHistoryItem.Attributes != null && msgHistoryItem.Attributes.Length > 0 ? msgHistoryItem.Attributes[0] : msgHistoryItem.Attribute);
+                                                        msgHistoryItem.WrappedTextRows.Add(_lineBuilder.ToString());
+                                                        //line = wordWithSpace;
+                                                        _lineBuilder.Clear();
+                                                        _lineBuilder.Append(word);
+                                                        _lineBuilder.Append(" ");
+                                                        lineLength = wordWithSpaceLength;
+                                                        firstonline = true;
+                                                    }
+                                                    else
+                                                    {
+                                                        //line += wordWithSpace;
+                                                        _lineBuilder.Append(word);
+                                                        _lineBuilder.Append(" ");
+                                                        lineLength += wordWithSpaceLength;
+                                                        firstonline = false;
+                                                    }
+                                                }
+                                                msgHistoryItem.WrappedTextRows.Add(_lineBuilder.ToString());
+                                            }
 
-                                                        bool use_one_color = msgHistoryItem.Colors == null && msgHistoryItem.Attributes == null;
-                                                        int char_idx = 0;
+                                            if(!msgHistoryItem.MatchFilter)
+                                                continue;
 
-                                                        if (_refreshMsgHistoryRowCounts || msgHistoryItem.WrappedTextRows.Count == 0)
+                                            int lineidx;
+                                            for (lineidx = 0; lineidx < msgHistoryItem.WrappedTextRows.Count; lineidx++)
+                                            {
+                                                string wrappedLine = msgHistoryItem.WrappedTextRows[lineidx];
+                                                int window_row_idx = j + lineidx - msgHistoryItem.WrappedTextRows.Count + 1;
+                                                if (window_row_idx < 0)
+                                                {
+                                                    char_idx += wrappedLine.Length;
+                                                    continue;
+                                                }
+                                                tx = winRect.Left + ghWindow.Padding.Left;
+                                                ty = winRect.Top + ghWindow.Padding.Top - textPaint.FontMetrics.Ascent + window_row_idx * height;
+                                                if (ForceAllMessages)
+                                                {
+                                                    ty += _messageScrollOffset;
+                                                }
+                                                if (ty + textPaint.FontMetrics.Descent < 0)
+                                                {
+                                                    char_idx += wrappedLine.Length;
+                                                    continue;
+                                                }
+                                                if (ty - textPaint.FontMetrics.Ascent > canvasheight)
+                                                {
+                                                    char_idx += wrappedLine.Length;
+                                                    continue;
+                                                }
+
+                                                if (use_one_color)
+                                                {
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                                    textPaint.Style = SKPaintStyle.Stroke;
+                                                    textPaint.StrokeWidth = ghWindow.StrokeWidth * textscale;
+                                                    textPaint.Color = SKColors.Black;
+                                                    //canvas.DrawText(wrappedLine, tx, ty, textPaint);
+                                                    textPaint.DrawTextOnCanvas(canvas, wrappedLine, tx, ty);
+                                                    textPaint.Style = SKPaintStyle.Fill;
+                                                    textPaint.StrokeWidth = 0;
+                                                    textPaint.Color = printColor;
+                                                    //canvas.DrawText(wrappedLine, tx, ty, textPaint);
+                                                    textPaint.DrawTextOnCanvas(canvas, wrappedLine, tx, ty);
+                                                    textPaint.Style = SKPaintStyle.Fill;
+                                                    textPaint.StrokeWidth = 0;
+                                                    textPaint.Color = SKColors.White;
+                                                    char_idx += wrappedLine.Length;
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                                }
+                                                else
+                                                {
+                                                    int charidx_start = 0;
+                                                    while (char_idx < msgHistoryItem.Text.Length && charidx_start < wrappedLine.Length)
+                                                    {
+                                                        int charidx_len = 0;
+                                                        int new_nhcolor = msgHistoryItem.Colors != null && msgHistoryItem.Colors.Length > 0 && char_idx < msgHistoryItem.Colors.Length ? msgHistoryItem.Colors[char_idx] : msgHistoryItem.NHColor < (int)NhColor.CLR_MAX ? msgHistoryItem.NHColor : (int)NhColor.CLR_WHITE;
+                                                        int new_nhattr = msgHistoryItem.Attributes != null && msgHistoryItem.Attributes.Length > 0 && char_idx < msgHistoryItem.Attributes.Length ? msgHistoryItem.Attributes[char_idx] : msgHistoryItem.Attribute;
+                                                        int char_idx2 = char_idx;
+                                                        int new_nhcolor2 = new_nhcolor;
+                                                        int new_nhattr2 = new_nhattr;
+
+                                                        while (char_idx2 < msgHistoryItem.Text.Length && charidx_start + charidx_len < wrappedLine.Length && new_nhcolor == new_nhcolor2 && new_nhattr == new_nhattr2)
                                                         {
-                                                            refreshsmallesttop = true;
-                                                            msgHistoryItem.WrappedTextRows.Clear();
-                                                            float lineLength = 0.0f;
-                                                            //string line = "";
-                                                            _lineBuilder.Clear();
-                                                            string[] txtsplit = msgHistoryItem.TextSplit;
-                                                            bool firstonline = true;
-                                                            for (int widx = 0; widx < txtsplit.Length; widx++)
-                                                            {
-                                                                string word = txtsplit[widx];
-                                                                //string wordWithSpace = word + " ";
-                                                                float wordLength = textPaint.MeasureText(word);
-                                                                float wordWithSpaceLength = wordLength + spaceLength;
-                                                                if (lineLength + wordLength > lineLengthLimit && !firstonline)
-                                                                {
-                                                                    msgHistoryItem.WrappedTextRows.Add(_lineBuilder.ToString());
-                                                                    //line = wordWithSpace;
-                                                                    _lineBuilder.Clear();
-                                                                    _lineBuilder.Append(word);
-                                                                    _lineBuilder.Append(" ");
-                                                                    lineLength = wordWithSpaceLength;
-                                                                    firstonline = true;
-                                                                }
-                                                                else
-                                                                {
-                                                                    //line += wordWithSpace;
-                                                                    _lineBuilder.Append(word);
-                                                                    _lineBuilder.Append(" ");
-                                                                    lineLength += wordWithSpaceLength;
-                                                                    firstonline = false;
-                                                                }
-                                                            }
-                                                            msgHistoryItem.WrappedTextRows.Add(_lineBuilder.ToString());
+                                                            char_idx2++;
+                                                            new_nhcolor2 = msgHistoryItem.Colors != null && msgHistoryItem.Colors.Length > 0 && char_idx2 < msgHistoryItem.Colors.Length ? msgHistoryItem.Colors[char_idx2] : msgHistoryItem.NHColor < (int)NhColor.CLR_MAX ? msgHistoryItem.NHColor : (int)NhColor.CLR_WHITE;
+                                                            new_nhattr2 = msgHistoryItem.Attributes != null && msgHistoryItem.Attributes.Length > 0 && char_idx2 < msgHistoryItem.Attributes.Length ? msgHistoryItem.Attributes[char_idx2] : msgHistoryItem.Attribute;
+                                                            charidx_len = char_idx2 - char_idx;
                                                         }
 
-                                                        if(!msgHistoryItem.MatchFilter)
+#if GNH_MAP_PROFILING && DEBUG
+                                                        StartProfiling(GHProfilingStyle.Text);
+#endif
+                                                        SKColor new_skcolor = UIUtils.NHColor2SKColor(new_nhcolor, new_nhattr);
+                                                        printedsubline.SetValue(wrappedLine, charidx_start, charidx_len);
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = ghWindow.StrokeWidth * textscale;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.DrawTextOnCanvas(canvas, printedsubline.Value, tx, ty);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.StrokeWidth = 0;
+                                                        textPaint.Color = new_skcolor;
+                                                        textPaint.DrawTextOnCanvas(canvas, printedsubline.Value, tx, ty);
+                                                        float twidth = textPaint.MeasureText(printedsubline.Value);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.StrokeWidth = 0;
+                                                        textPaint.Color = SKColors.White;
+#if GNH_MAP_PROFILING && DEBUG
+                                                        StopProfiling(GHProfilingStyle.Text);
+#endif
+
+                                                        tx += twidth;
+                                                        char_idx += charidx_len;
+                                                        charidx_start += charidx_len;
+                                                    }
+                                                }
+                                            }
+                                            j -= msgHistoryItem.WrappedTextRows.Count;
+                                        }
+                                        _refreshMsgHistoryRowCounts = false;
+
+                                        /* Calculate smallest top */
+                                        if(refreshsmallesttop)
+                                        {
+                                            lock (_messageScrollLock)
+                                            {
+                                                _messageSmallestTop = canvasheight;
+                                                j = ActualDisplayedMessages - 1;
+                                                for (idx = msgHistoryPtr.Length - 1; idx >= 0 && j >= 0; idx--)
+                                                {
+                                                    GHMsgHistoryItem msgHistoryItem = msgHistoryPtr[idx];
+                                                    if (!msgHistoryItem.MatchFilter)
+                                                        continue;
+                                                    int lineidx;
+                                                    for (lineidx = 0; lineidx < msgHistoryItem.WrappedTextRows.Count; lineidx++)
+                                                    {
+                                                        string wrappedLine = msgHistoryItem.WrappedTextRows[lineidx];
+                                                        int window_row_idx = j + lineidx - msgHistoryItem.WrappedTextRows.Count + 1;
+                                                        if (window_row_idx < 0)
                                                             continue;
-
-                                                        int lineidx;
-                                                        for (lineidx = 0; lineidx < msgHistoryItem.WrappedTextRows.Count; lineidx++)
-                                                        {
-                                                            string wrappedLine = msgHistoryItem.WrappedTextRows[lineidx];
-                                                            int window_row_idx = j + lineidx - msgHistoryItem.WrappedTextRows.Count + 1;
-                                                            if (window_row_idx < 0)
-                                                            {
-                                                                char_idx += wrappedLine.Length;
-                                                                continue;
-                                                            }
-                                                            tx = winRect.Left + _currentGame.Windows[i].Padding.Left;
-                                                            ty = winRect.Top + _currentGame.Windows[i].Padding.Top - textPaint.FontMetrics.Ascent + window_row_idx * height;
-                                                            if (ForceAllMessages)
-                                                            {
-                                                                ty += _messageScrollOffset;
-                                                            }
-                                                            if (ty + textPaint.FontMetrics.Descent < 0)
-                                                            {
-                                                                char_idx += wrappedLine.Length;
-                                                                continue;
-                                                            }
-                                                            if (ty - textPaint.FontMetrics.Ascent > canvasheight)
-                                                            {
-                                                                char_idx += wrappedLine.Length;
-                                                                continue;
-                                                            }
-
-                                                            if (use_one_color)
-                                                            {
-#if GNH_MAP_PROFILING && DEBUG
-                                                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                                                textPaint.Style = SKPaintStyle.Stroke;
-                                                                textPaint.StrokeWidth = _currentGame.Windows[i].StrokeWidth * textscale;
-                                                                textPaint.Color = SKColors.Black;
-                                                                //canvas.DrawText(wrappedLine, tx, ty, textPaint);
-                                                                textPaint.DrawTextOnCanvas(canvas, wrappedLine, tx, ty);
-                                                                textPaint.Style = SKPaintStyle.Fill;
-                                                                textPaint.StrokeWidth = 0;
-                                                                textPaint.Color = printColor;
-                                                                //canvas.DrawText(wrappedLine, tx, ty, textPaint);
-                                                                textPaint.DrawTextOnCanvas(canvas, wrappedLine, tx, ty);
-                                                                textPaint.Style = SKPaintStyle.Fill;
-                                                                textPaint.StrokeWidth = 0;
-                                                                textPaint.Color = SKColors.White;
-                                                                char_idx += wrappedLine.Length;
-#if GNH_MAP_PROFILING && DEBUG
-                                                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                                            }
-                                                            else
-                                                            {
-                                                                int charidx_start = 0;
-                                                                while (char_idx < msgHistoryItem.Text.Length && charidx_start < wrappedLine.Length)
-                                                                {
-                                                                    int charidx_len = 0;
-                                                                    int new_nhcolor = msgHistoryItem.Colors != null && msgHistoryItem.Colors.Length > 0 && char_idx < msgHistoryItem.Colors.Length ? msgHistoryItem.Colors[char_idx] : msgHistoryItem.NHColor < (int)NhColor.CLR_MAX ? msgHistoryItem.NHColor : (int)NhColor.CLR_WHITE;
-                                                                    int new_nhattr = msgHistoryItem.Attributes != null && msgHistoryItem.Attributes.Length > 0 && char_idx < msgHistoryItem.Attributes.Length ? msgHistoryItem.Attributes[char_idx] : msgHistoryItem.Attribute;
-                                                                    int char_idx2 = char_idx;
-                                                                    int new_nhcolor2 = new_nhcolor;
-                                                                    int new_nhattr2 = new_nhattr;
-
-                                                                    while (char_idx2 < msgHistoryItem.Text.Length && charidx_start + charidx_len < wrappedLine.Length && new_nhcolor == new_nhcolor2 && new_nhattr == new_nhattr2)
-                                                                    {
-                                                                        char_idx2++;
-                                                                        new_nhcolor2 = msgHistoryItem.Colors != null && msgHistoryItem.Colors.Length > 0 && char_idx2 < msgHistoryItem.Colors.Length ? msgHistoryItem.Colors[char_idx2] : msgHistoryItem.NHColor < (int)NhColor.CLR_MAX ? msgHistoryItem.NHColor : (int)NhColor.CLR_WHITE;
-                                                                        new_nhattr2 = msgHistoryItem.Attributes != null && msgHistoryItem.Attributes.Length > 0 && char_idx2 < msgHistoryItem.Attributes.Length ? msgHistoryItem.Attributes[char_idx2] : msgHistoryItem.Attribute;
-                                                                        charidx_len = char_idx2 - char_idx;
-                                                                    }
-
-#if GNH_MAP_PROFILING && DEBUG
-                                                                    StartProfiling(GHProfilingStyle.Text);
-#endif
-                                                                    SKColor new_skcolor = UIUtils.NHColor2SKColor(new_nhcolor, new_nhattr);
-                                                                    string printedsubline = wrappedLine.Substring(charidx_start, charidx_len);
-                                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                                    textPaint.StrokeWidth = _currentGame.Windows[i].StrokeWidth * textscale;
-                                                                    textPaint.Color = SKColors.Black;
-                                                                    //canvas.DrawText(printedsubline, tx, ty, textPaint);
-                                                                    textPaint.DrawTextOnCanvas(canvas, printedsubline, tx, ty);
-                                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                                    textPaint.StrokeWidth = 0;
-                                                                    textPaint.Color = new_skcolor;
-                                                                    //canvas.DrawText(printedsubline, tx, ty, textPaint);
-                                                                    textPaint.DrawTextOnCanvas(canvas, printedsubline, tx, ty);
-                                                                    float twidth = textPaint.MeasureText(printedsubline);
-                                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                                    textPaint.StrokeWidth = 0;
-                                                                    textPaint.Color = SKColors.White;
-#if GNH_MAP_PROFILING && DEBUG
-                                                                    StopProfiling(GHProfilingStyle.Text);
-#endif
-
-                                                                    tx += twidth;
-                                                                    char_idx += charidx_len;
-                                                                    charidx_start += charidx_len;
-                                                                }
-                                                            }
-                                                        }
-                                                        j -= msgHistoryItem.WrappedTextRows.Count;
+                                                        ty = winRect.Top + ghWindow.Padding.Top - textPaint.FontMetrics.Ascent + window_row_idx * height;
+                                                        if (ty + textPaint.FontMetrics.Ascent < _messageSmallestTop)
+                                                            _messageSmallestTop = ty + textPaint.FontMetrics.Ascent;
                                                     }
-                                                    _refreshMsgHistoryRowCounts = false;
-
-                                                    /* Calculate smallest top */
-                                                    if(refreshsmallesttop)
-                                                    {
-                                                        lock (_messageScrollLock)
-                                                        {
-                                                            _messageSmallestTop = canvasheight;
-                                                            j = ActualDisplayedMessages - 1;
-                                                            for (idx = _msgHistory.Length - 1; idx >= 0 && j >= 0; idx--)
-                                                            {
-                                                                GHMsgHistoryItem msgHistoryItem = _msgHistory[idx];
-                                                                if (!msgHistoryItem.MatchFilter)
-                                                                    continue;
-                                                                int lineidx;
-                                                                for (lineidx = 0; lineidx < msgHistoryItem.WrappedTextRows.Count; lineidx++)
-                                                                {
-                                                                    string wrappedLine = msgHistoryItem.WrappedTextRows[lineidx];
-                                                                    int window_row_idx = j + lineidx - msgHistoryItem.WrappedTextRows.Count + 1;
-                                                                    if (window_row_idx < 0)
-                                                                        continue;
-                                                                    ty = winRect.Top + _currentGame.Windows[i].Padding.Top - textPaint.FontMetrics.Ascent + window_row_idx * height;
-                                                                    if (ty + textPaint.FontMetrics.Ascent < _messageSmallestTop)
-                                                                        _messageSmallestTop = ty + textPaint.FontMetrics.Ascent;
-                                                                }
-                                                                j -= msgHistoryItem.WrappedTextRows.Count;
-                                                            }
-                                                            float topScrollLimit = Math.Max(0, -_messageSmallestTop);
-                                                            if (_messageScrollOffset > topScrollLimit)
-                                                            {
-                                                                _messageScrollOffset = topScrollLimit;
-                                                                _messageScrollSpeed = 0;
-                                                                _messageScrollSpeedOn = false;
-                                                                _messageScrollSpeedRecords.Clear();
-                                                            }
-                                                        }
-                                                    }
+                                                    j -= msgHistoryItem.WrappedTextRows.Count;
+                                                }
+                                                float topScrollLimit = Math.Max(0, -_messageSmallestTop);
+                                                if (_messageScrollOffset > topScrollLimit)
+                                                {
+                                                    _messageScrollOffset = topScrollLimit;
+                                                    _messageScrollSpeed = 0;
+                                                    _messageScrollSpeedOn = false;
+                                                    _messageScrollSpeedRecords.Clear();
                                                 }
                                             }
                                         }
@@ -7797,8 +8350,9 @@ namespace GnollHackX.Pages.Game
                             }
                         }
                     }
+                    
 
-                    float abilitybuttonbottom = (float)((lAbilitiesButton.Y + lAbilitiesButton.Height) / canvasView.Height) * canvasheight;
+                    float abilitybuttonbottom = (float)(StandardMeasurementCmdLayout.Margin.Top / canvasView.Height) * canvasheight; ; // (float)((lAbilitiesButton.Y + lAbilitiesButton.Height) / canvasView.Height) * canvasheight;
                     float escbuttonbottom = (float)((StandardMeasurementButton.Y + StandardMeasurementButton.Height) / canvasView.Height) * canvasheight;
                     if (_canvasButtonRect.Top < escbuttonbottom)
                         _canvasButtonRect.Top = escbuttonbottom;
@@ -7817,7 +8371,7 @@ namespace GnollHackX.Pages.Game
                     _skillRectDrawn = false;
                     _prevWepRectDrawn = false;
                     float orbleft = 5.0f;
-                    float orbbordersize = (float)(lAbilitiesButton.Width / canvasView.Width) * canvaswidth;
+                    float orbbordersize = (float)(StandardReferenceButton.Width / canvasView.Width) * canvaswidth;
 
                     if (statusfieldsok && !ForceAllMessages)
                     {
@@ -7851,788 +8405,1056 @@ namespace GnollHackX.Pages.Game
                             StopProfiling(GHProfilingStyle.Rect);
 #endif
                             textPaint.Color = SKColors.White;
-                            //textPaint.TextAlign = SKTextAlign.Left;
                             textPaint.Typeface = GHApp.LatoRegular;
                             float target_scale = rowheight / GHApp._statusWizardBitmap.Height; // All are 64px high
 
-                            string valtext;
-                            SKRect statusDest;
-                            SKRect bounds = new SKRect();
-
-
-                            valtext = "";
-                            lock (StatusFieldLock)
+                            using (SKPaint highQualityPaint = new SKPaint())
                             {
-                                if (StatusFields[(int)NhStatusFields.BL_MODE] != null && StatusFields[(int)NhStatusFields.BL_MODE].IsEnabled && StatusFields[(int)NhStatusFields.BL_MODE].Text != null)
+#if !GNH_MAUI
+                                highQualityPaint.FilterQuality = SKFilterQuality.High;
+#endif
+                                string valtext = "";
+                                int valcolor = (int)NhColor.CLR_WHITE;
+                                SKRect statusDest;
+                                SKRect bounds = new SKRect();
+
+                                lock (StatusFieldLock)
                                 {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_MODE].Text;
-                                }
-                            }
-
-                            float target_width = 0;
-                            float target_height = 0;
-                            if (valtext.Contains("W"))
-                            {
-                                target_width = target_scale * GHApp._statusWizardBitmap.Width;
-                                target_height = target_scale * GHApp._statusWizardBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusWizardBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                            }
-
-                            if (valtext.Contains("C"))
-                            {
-                                target_width = target_scale * GHApp._statusCasualBitmap.Width;
-                                target_height = target_scale * GHApp._statusCasualBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusCasualBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                            }
-                            else if (valtext.Contains("R"))
-                            {
-                                target_width = target_scale * GHApp._statusCasualClassicBitmap.Width;
-                                target_height = target_scale * GHApp._statusCasualClassicBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusCasualClassicBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                            }
-                            else if (valtext.Contains("M"))
-                            {
-                                target_width = target_scale * GHApp._statusModernBitmap.Width;
-                                target_height = target_scale * GHApp._statusModernBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusModernBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                            }
-
-                            SKImage difbmp = GHApp._statusDifficultyBitmap;
-                            string diftext = "";
-                            if (valtext.Contains("s"))
-                            {
-                                diftext = "s";
-                                difbmp = GHApp._statusDifficultyVeryEasyBitmap;
-                            }
-                            else if (valtext.Contains("e"))
-                            {
-                                diftext = "e";
-                                difbmp = GHApp._statusDifficultyEasyBitmap;
-                            }
-                            else if (valtext.Contains("a"))
-                            {
-                                diftext = "a";
-                                difbmp = GHApp._statusDifficultyAverageBitmap;
-                            }
-                            else if (valtext.Contains("v"))
-                            {
-                                diftext = "v";
-                                difbmp = GHApp._statusDifficultyHardBitmap;
-                            }
-                            else if (valtext.Contains("x"))
-                            {
-                                diftext = "x";
-                                difbmp = GHApp._statusDifficultyExpertBitmap;
-                            }
-                            else if (valtext.Contains("m"))
-                            {
-                                diftext = "m";
-                                difbmp = GHApp._statusDifficultyMasterBitmap;
-                            }
-                            else if (valtext.Contains("g"))
-                            {
-                                diftext = "g";
-                                difbmp = GHApp._statusDifficultyGrandMasterBitmap;
-                            }
-
-                            if (diftext != "")
-                            {
-                                target_width = target_scale * difbmp.Width;
-                                target_height = target_scale * difbmp.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(difbmp, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                textPaint.MeasureText(diftext, ref bounds);
-                                //textPaint.TextAlign = SKTextAlign.Center;
-                                textPaint.Color = SKColors.Black;
-                                textPaint.TextSize = diffontsize;
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                //canvas.DrawText(diftext, curx + target_width / 2, cury + (rowheight - (textPaint.FontSpacing)) / 2 - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, diftext, curx + target_width / 2, cury + (rowheight - (textPaint.FontSpacing)) / 2 - textPaint.FontMetrics.Ascent, SKTextAlign.Center);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                curx += target_width;
-                                curx += stdspacing;
-                                //textPaint.TextAlign = SKTextAlign.Left;
-                                textPaint.Color = SKColors.White;
-                                textPaint.TextSize = basefontsize;
-                            }
-
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_XP] != null && StatusFields[(int)NhStatusFields.BL_XP].IsEnabled && StatusFields[(int)NhStatusFields.BL_XP].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_XP].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                target_width = target_scale * GHApp._statusXPLevelBitmap.Width;
-                                target_height = target_scale * GHApp._statusXPLevelBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusXPLevelBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                                float print_width = textPaint.MeasureText(valtext);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                //canvas.DrawText(valtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                curx += print_width + stdspacing;
-                            }
-
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_HD] != null && StatusFields[(int)NhStatusFields.BL_HD].IsEnabled && StatusFields[(int)NhStatusFields.BL_HD].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_HD].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                target_width = target_scale * GHApp._statusHDBitmap.Width;
-                                target_height = target_scale * GHApp._statusHDBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusHDBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                                float print_width = textPaint.MeasureText(valtext);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                //canvas.DrawText(valtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                curx += print_width + stdspacing;
-                            }
-
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_AC] != null && StatusFields[(int)NhStatusFields.BL_AC].IsEnabled && StatusFields[(int)NhStatusFields.BL_AC].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_AC].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                target_width = target_scale * GHApp._statusACBitmap.Width;
-                                target_height = target_scale * GHApp._statusACBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusACBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                //textPaint.TextAlign = SKTextAlign.Center;
-                                textPaint.Color = SKColors.Black;
-                                textPaint.TextSize = shieldfontsize;
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                //canvas.DrawText(valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, SKTextAlign.Center);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                curx += target_width;
-                                curx += stdspacing;
-                                //textPaint.TextAlign = SKTextAlign.Left;
-                                textPaint.Color = SKColors.White;
-                                textPaint.TextSize = basefontsize;
-                            }
-
-                            valtext = "";
-                            string valtext2 = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_MC_LVL] != null && StatusFields[(int)NhStatusFields.BL_MC_LVL].IsEnabled && StatusFields[(int)NhStatusFields.BL_MC_LVL].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_MC_LVL].Text;
-                                }
-                                if (StatusFields[(int)NhStatusFields.BL_MC_PCT] != null && StatusFields[(int)NhStatusFields.BL_MC_PCT].IsEnabled && StatusFields[(int)NhStatusFields.BL_MC_PCT].Text != null)
-                                {
-                                    valtext2 = StatusFields[(int)NhStatusFields.BL_MC_PCT].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                target_width = target_scale * GHApp._statusMCBitmap.Width;
-                                target_height = target_scale * GHApp._statusMCBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusMCBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                //textPaint.TextAlign = SKTextAlign.Center;
-                                textPaint.Color = SKColors.Black;
-                                textPaint.TextSize = shieldfontsize;
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                //canvas.DrawText(valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, SKTextAlign.Center);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                                //textPaint.TextAlign = SKTextAlign.Left;
-                                textPaint.Color = SKColors.White;
-                                textPaint.TextSize = basefontsize;
-                                string printtext = valtext2 + "%";
-                                float print_width = textPaint.MeasureText(printtext);
-                                //canvas.DrawText(printtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
-                                curx += print_width + stdspacing;
-                            }
-
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_MOVE] != null && StatusFields[(int)NhStatusFields.BL_MOVE].IsEnabled && StatusFields[(int)NhStatusFields.BL_MOVE].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_MOVE].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                target_width = target_scale * GHApp._statusMoveBitmap.Width;
-                                target_height = target_scale * GHApp._statusMoveBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusMoveBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                                float print_width = textPaint.MeasureText(valtext);
-                                //canvas.DrawText(valtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
-                                curx += print_width + stdspacing;
-                            }
-
-                            valtext = "";
-                            valtext2 = "";
-                            string valtext3 = "";
-                            bool isenabled1 = false;
-                            bool isenabled2 = false;
-                            bool isenabled3 = false;
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_UWEP] != null && StatusFields[(int)NhStatusFields.BL_UWEP].IsEnabled && StatusFields[(int)NhStatusFields.BL_UWEP].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_UWEP].Text;
-                                    isenabled1 = StatusFields[(int)NhStatusFields.BL_UWEP].IsEnabled;
-                                }
-                                if (StatusFields[(int)NhStatusFields.BL_UWEP2] != null && StatusFields[(int)NhStatusFields.BL_UWEP2].IsEnabled && StatusFields[(int)NhStatusFields.BL_UWEP2].Text != null)
-                                {
-                                    valtext2 = StatusFields[(int)NhStatusFields.BL_UWEP2].Text;
-                                    isenabled2 = StatusFields[(int)NhStatusFields.BL_UWEP2].IsEnabled;
-                                }
-                                if (StatusFields[(int)NhStatusFields.BL_UQUIVER] != null && StatusFields[(int)NhStatusFields.BL_UQUIVER].IsEnabled && StatusFields[(int)NhStatusFields.BL_UQUIVER].Text != null)
-                                {
-                                    valtext3 = StatusFields[(int)NhStatusFields.BL_UQUIVER].Text;
-                                    isenabled3 = StatusFields[(int)NhStatusFields.BL_UQUIVER].IsEnabled;
-                                }
-                            }
-                            if (valtext != "" || valtext2 != "" || valtext3 != "")
-                            {
-                                target_width = target_scale * GHApp._statusWeaponStyleBitmap.Width;
-                                target_height = target_scale * GHApp._statusWeaponStyleBitmap.Height;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                canvas.DrawImage(GHApp._statusWeaponStyleBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                curx += target_width;
-                                curx += innerspacing;
-                                float print_width = 0;
-                                if (_drawWeaponStyleAsGlyphs)
-                                {
-                                    SKTypeface savedtypeface = textPaint.Typeface;
-                                    float savedfontsize = textPaint.TextSize;
-                                    lock (_weaponStyleObjDataItemLock)
+                                    if (StatusFields[(int)NhStatusFields.BL_MODE] != null && StatusFields[(int)NhStatusFields.BL_MODE].IsEnabled && StatusFields[(int)NhStatusFields.BL_MODE].Text != null)
                                     {
-                                        if (isenabled1 && valtext != "")
-                                        {
-                                            /* Right-hand weapon */
-                                            if (_weaponStyleObjDataItem[0] != null)
-                                            {
-                                                float startpicturex = curx;
-                                                using (new SKAutoCanvasRestore(canvas, true))
-                                                {
-                                                    GlyphImageSource gis = _paintGlyphImageSource;
-                                                    gis.ReferenceGamePage = this;
-                                                    gis.UseUpperSide = false;
-                                                    gis.AutoSize = true;
-                                                    gis.Glyph = Math.Abs(_weaponStyleObjDataItem[0].ObjData.gui_glyph);
-                                                    gis.ObjData = _weaponStyleObjDataItem[0];
-                                                    gis.DoAutoSize();
-                                                    float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
-                                                    float weppicturewidth = wep_scale * gis.Width;
-                                                    float weppictureheight = wep_scale * gis.Height;
-                                                    canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
-                                                    canvas.Scale(wep_scale);
-#if GNH_MAP_PROFILING && DEBUG
-                                                    StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                    gis.DrawOnCanvas(canvas);
-#if GNH_MAP_PROFILING && DEBUG
-                                                    StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                    curx += weppicturewidth;
-                                                    curx += innerspacing;
-                                                }
-                                                float endpicturex = curx;
-#if GNH_MAP_PROFILING && DEBUG
-                                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                                if (_weaponStyleObjDataItem[0].OutOfAmmo)
-                                                {
-                                                    textPaint.TextSize = basefontsize;
-                                                    string printtext = "X";
-                                                    SKColor oldcolor = textPaint.Color;
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
-                                                    float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
-                                                    textPaint.Color = SKColors.Black;
-                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = textPaint.TextSize / 5;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = SKColors.Red;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Color = oldcolor;
-                                                }
-
-                                                if (_weaponStyleObjDataItem[0].WrongAmmoType)
-                                                {
-                                                    textPaint.Typeface = GHApp.LatoBold;
-                                                    textPaint.TextSize = basefontsize;
-                                                    string printtext = "?";
-                                                    SKColor oldcolor = textPaint.Color;
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
-                                                    float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
-                                                    textPaint.Color = SKColors.Black;
-                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = textPaint.TextSize / 5;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = SKColors.Red;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Color = oldcolor;
-                                                    textPaint.Typeface = GHApp.LatoRegular;
-                                                }
-                                                if (_weaponStyleObjDataItem[0].NotBeingUsed || _weaponStyleObjDataItem[0].NotWeapon)
-                                                {
-                                                    textPaint.Typeface = GHApp.LatoBold;
-                                                    textPaint.TextSize = basefontsize;
-                                                    string printtext = "!";
-                                                    SKColor oldcolor = textPaint.Color;
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
-                                                    float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
-                                                    textPaint.Color = SKColors.Black;
-                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = textPaint.TextSize / 5;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = SKColors.Orange;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Color = oldcolor;
-                                                    textPaint.Typeface = GHApp.LatoRegular;
-                                                }
-#if GNH_MAP_PROFILING && DEBUG
-                                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                            }
-                                            else
-                                            {
-                                                SKRect emptyHandedSource = new SKRect(0, 0, GHApp._statusEmptyHandedBitmap.Width, GHApp._statusEmptyHandedBitmap.Height);
-                                                float empty_handed_scale = rowheight / GHApp._statusEmptyHandedBitmap.Height;
-                                                if (valtext2 != "")
-                                                {
-                                                    emptyHandedSource = new SKRect(0, 0, GHApp._statusEmptyHandedBitmap.Width / 2, GHApp._statusEmptyHandedBitmap.Height);
-                                                    target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width / 2;
-                                                    target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
-                                                }
-                                                else
-                                                {
-                                                    target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width;
-                                                    target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
-                                                }
-                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                canvas.DrawImage(GHApp._statusEmptyHandedBitmap, emptyHandedSource, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                curx += target_width;
-                                                curx += innerspacing;
-                                            }
-                                            /* Ammo */
-                                            //if (_weaponStyleObjDataItem[2] != null)
-                                            //{
-                                            //    string printtext = "+";
-                                            //    print_width = textPaint.MeasureText(printtext);
-                                            //    canvas.DrawText(printtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                            //    curx += print_width;
-                                            //    using (new SKAutoCanvasRestore(canvas, true))
-                                            //    {
-                                            //        GlyphImageSource gis = _paintGlyphImageSource;
-                                            //        gis.ReferenceGamePage = this;
-                                            //        gis.UseUpperSide = false;
-                                            //        gis.AutoSize = true;
-                                            //        gis.Glyph = Math.Abs(_weaponStyleObjDataItem[2].ObjData.gui_glyph);
-                                            //        gis.ObjData = _weaponStyleObjDataItem[2];
-                                            //        gis.DoAutoSize();
-                                            //        float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
-                                            //        float weppicturewidth = wep_scale * gis.Width;
-                                            //        float weppictureheight = wep_scale * gis.Height;
-                                            //        canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
-                                            //        canvas.Scale(wep_scale);
-                                            //        gis.DrawOnCanvas(canvas);
-                                            //        curx += weppicturewidth;
-                                            //        curx += innerspacing;
-                                            //    }
-                                            //}
-                                        }
-                                        if (isenabled2 && valtext2 != "")
-                                        {
-                                            /* Left-hand weapon */
-                                            if (_weaponStyleObjDataItem[1] != null)
-                                            {
-                                                textPaint.TextSize = shieldfontsize;
-                                                string printtext = "+";
-                                                print_width = textPaint.MeasureText(printtext);
-                                                //canvas.DrawText(printtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                                textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
-                                                curx += print_width;
-
-                                                float startpicturex = curx;
-                                                using (new SKAutoCanvasRestore(canvas, true))
-                                                {
-                                                    GlyphImageSource gis = _paintGlyphImageSource;
-                                                    gis.ReferenceGamePage = this;
-                                                    gis.UseUpperSide = false;
-                                                    gis.AutoSize = true;
-                                                    gis.Glyph = Math.Abs(_weaponStyleObjDataItem[1].ObjData.gui_glyph);
-                                                    gis.ObjData = _weaponStyleObjDataItem[1];
-                                                    gis.DoAutoSize();
-                                                    float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
-                                                    float weppicturewidth = wep_scale * gis.Width;
-                                                    float weppictureheight = wep_scale * gis.Height;
-                                                    canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
-                                                    canvas.Scale(wep_scale);
-#if GNH_MAP_PROFILING && DEBUG
-                                                    StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                    gis.DrawOnCanvas(canvas);
-#if GNH_MAP_PROFILING && DEBUG
-                                                    StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                    curx += weppicturewidth;
-                                                    curx += innerspacing;
-                                                }
-                                                float endpicturex = curx;
-#if GNH_MAP_PROFILING && DEBUG
-                                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                                if (_weaponStyleObjDataItem[1].OutOfAmmo)
-                                                {
-                                                    textPaint.TextSize = basefontsize;
-                                                    printtext = "X";
-                                                    SKColor oldcolor = textPaint.Color;
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
-                                                    float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
-                                                    textPaint.Color = SKColors.Black;
-                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = textPaint.TextSize / 5;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = SKColors.Red;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Color = oldcolor;
-
-                                                }
-                                                if (_weaponStyleObjDataItem[1].WrongAmmoType)
-                                                {
-                                                    textPaint.Typeface = GHApp.LatoBold;
-                                                    textPaint.TextSize = basefontsize;
-                                                    printtext = "?";
-                                                    SKColor oldcolor = textPaint.Color;
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
-                                                    float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
-                                                    textPaint.Color = SKColors.Black;
-                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = textPaint.TextSize / 5;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = SKColors.Red;
-                                                    //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Color = oldcolor;
-                                                    textPaint.Typeface = GHApp.LatoRegular;
-                                                }
-                                                if (_weaponStyleObjDataItem[1].NotBeingUsed || _weaponStyleObjDataItem[1].NotWeapon)
-                                                {
-                                                    textPaint.Typeface = GHApp.LatoBold;
-                                                    textPaint.TextSize = basefontsize;
-                                                    printtext = "!";
-                                                    SKColor oldcolor = textPaint.Color;
-                                                    textPaint.Color = SKColors.Orange;
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
-                                                    float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
-                                                    textPaint.Color = SKColors.Black;
-                                                    textPaint.Style = SKPaintStyle.Stroke;
-                                                    textPaint.StrokeWidth = textPaint.TextSize / 5;
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Style = SKPaintStyle.Fill;
-                                                    textPaint.Color = SKColors.Orange;
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
-                                                    textPaint.Color = oldcolor;
-                                                    textPaint.Typeface = GHApp.LatoRegular;
-                                                }
-#if GNH_MAP_PROFILING && DEBUG
-                                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                            }
-                                            else
-                                            {
-                                                SKRect emptyHandedSource = new SKRect(0, 0, GHApp._statusEmptyHandedBitmap.Width, GHApp._statusEmptyHandedBitmap.Height);
-                                                float empty_handed_scale = rowheight / GHApp._statusEmptyHandedBitmap.Height;
-                                                if (valtext != "")
-                                                {
-                                                    string printtext = "+";
-                                                    print_width = textPaint.MeasureText(printtext);
-                                                    textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
-                                                    curx += print_width;
-
-                                                    emptyHandedSource = new SKRect(GHApp._statusEmptyHandedBitmap.Width / 2, 0, GHApp._statusEmptyHandedBitmap.Width, GHApp._statusEmptyHandedBitmap.Height);
-                                                    target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width / 2;
-                                                    target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
-                                                }
-                                                else
-                                                {
-                                                    target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width;
-                                                    target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
-                                                }
-                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                canvas.DrawImage(GHApp._statusEmptyHandedBitmap, emptyHandedSource, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                curx += target_width;
-                                                curx += innerspacing;
-                                            }
-                                        }
-
-                                        if (isenabled3 && valtext3 != "")
-                                        {
-                                            /* Throwing weapons in quiver (which are not ammo by definition) */
-                                            if (_weaponStyleObjDataItem[2] != null && _weaponStyleObjDataItem[2].IsThrowingWeapon && !_weaponStyleObjDataItem[2].IsAmmo)
-                                            {
-                                                curx += innerspacing; /* More space to other weapon styles */
-                                                target_width = target_scale * GHApp._statusQuiveredWeaponStyleBitmap.Width;
-                                                target_height = target_scale * GHApp._statusQuiveredWeaponStyleBitmap.Height;
-                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                canvas.DrawImage(GHApp._statusQuiveredWeaponStyleBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                curx += target_width;
-                                                curx += innerspacing;
-
-                                                //SKColor oldcolor = textPaint.Color;
-                                                //textPaint.Color = SKColors.Cyan;
-                                                //textPaint.TextSize = shieldfontsize;
-                                                //string printtext = "+";
-                                                //print_width = textPaint.MeasureText(printtext);
-                                                //canvas.DrawText(printtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
-                                                //textPaint.Color = oldcolor;
-                                                //curx += print_width;
-                                                using (new SKAutoCanvasRestore(canvas, true))
-                                                {
-                                                    GlyphImageSource gis = _paintGlyphImageSource;
-                                                    gis.ReferenceGamePage = this;
-                                                    gis.UseUpperSide = false;
-                                                    gis.AutoSize = true;
-                                                    gis.Glyph = Math.Abs(_weaponStyleObjDataItem[2].ObjData.gui_glyph);
-                                                    gis.ObjData = _weaponStyleObjDataItem[2];
-                                                    gis.DoAutoSize();
-                                                    float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
-                                                    float weppicturewidth = wep_scale * gis.Width;
-                                                    float weppictureheight = wep_scale * gis.Height;
-                                                    canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
-                                                    canvas.Scale(wep_scale);
-                                                    gis.DrawOnCanvas(canvas);
-                                                    curx += weppicturewidth;
-                                                    curx += innerspacing;
-                                                }
-                                            }
-                                        }
+                                        valtext = StatusFields[(int)NhStatusFields.BL_MODE].Text;
                                     }
-                                    textPaint.TextSize = savedfontsize;
-                                    textPaint.Typeface = savedtypeface;
                                 }
-                                else
-                                {
-#if GNH_MAP_PROFILING && DEBUG
-                                    StartProfiling(GHProfilingStyle.Text);
-#endif
-                                    if (valtext != "")
-                                    {
-                                        print_width = textPaint.MeasureText(valtext);
-                                        textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
-                                        curx += print_width;
-                                    }
-                                    if (valtext2 != "")
-                                    {
-                                        string printtext = "/" + valtext2;
-                                        print_width = textPaint.MeasureText(printtext);
-                                        textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
-                                        curx += print_width;
-                                    }
-#if GNH_MAP_PROFILING && DEBUG
-                                    StopProfiling(GHProfilingStyle.Text);
-#endif
-                                }
-                                curx += stdspacing;
-                            }
 
-                            /* Right aligned */
-                            bool turnsprinted = false;
-                            float finalleftcurx = curx;
-                            curx = canvaswidth - hmargin;
-                            float turnsleft = curx;
-
-                            /* Turns */
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_TIME] != null && StatusFields[(int)NhStatusFields.BL_TIME].IsEnabled && StatusFields[(int)NhStatusFields.BL_TIME].Text != null)
+                                float target_width = 0;
+                                float target_height = 0;
+                                if (valtext.Contains("W"))
                                 {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_TIME].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                target_width = target_scale * GHApp._statusTurnsBitmap.Width;
-                                target_height = target_scale * GHApp._statusTurnsBitmap.Height;
-                                float print_width = textPaint.MeasureText(valtext);
-                                float newcurx = canvaswidth - hmargin - print_width - innerspacing - target_width;
-                                if (newcurx >= finalleftcurx) /* Avoid printing status bar elements over each other */
-                                {
-                                    turnsprinted = true;
-                                    curx = newcurx;
-                                    turnsleft = curx;
+                                    target_width = target_scale * GHApp._statusWizardBitmap.Width;
+                                    target_height = target_scale * GHApp._statusWizardBitmap.Height;
                                     statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
 #if GNH_MAP_PROFILING && DEBUG
                                     StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                                    canvas.DrawImage(GHApp._statusTurnsBitmap, statusDest);
+                                    canvas.DrawImage(GHApp._statusWizardBitmap, statusDest);
 #if GNH_MAP_PROFILING && DEBUG
                                     StopProfiling(GHProfilingStyle.Bitmap);
 #endif
                                     curx += target_width;
                                     curx += innerspacing;
+                                }
+
+                                if (valtext.Contains("C"))
+                                {
+                                    target_width = target_scale * GHApp._statusCasualBitmap.Width;
+                                    target_height = target_scale * GHApp._statusCasualBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusCasualBitmap, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                }
+                                else if (valtext.Contains("R"))
+                                {
+                                    target_width = target_scale * GHApp._statusCasualClassicBitmap.Width;
+                                    target_height = target_scale * GHApp._statusCasualClassicBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusCasualClassicBitmap, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                }
+                                else if (valtext.Contains("M"))
+                                {
+                                    target_width = target_scale * GHApp._statusModernBitmap.Width;
+                                    target_height = target_scale * GHApp._statusModernBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusModernBitmap, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                }
+
+                                SKImage difbmp = GHApp._statusDifficultyBitmap;
+                                string diftext = "";
+                                if (valtext.Contains("s"))
+                                {
+                                    diftext = "s";
+                                    difbmp = GHApp._statusDifficultyVeryEasyBitmap;
+                                }
+                                else if (valtext.Contains("e"))
+                                {
+                                    diftext = "e";
+                                    difbmp = GHApp._statusDifficultyEasyBitmap;
+                                }
+                                else if (valtext.Contains("a"))
+                                {
+                                    diftext = "a";
+                                    difbmp = GHApp._statusDifficultyAverageBitmap;
+                                }
+                                else if (valtext.Contains("v"))
+                                {
+                                    diftext = "v";
+                                    difbmp = GHApp._statusDifficultyHardBitmap;
+                                }
+                                else if (valtext.Contains("x"))
+                                {
+                                    diftext = "x";
+                                    difbmp = GHApp._statusDifficultyExpertBitmap;
+                                }
+                                else if (valtext.Contains("m"))
+                                {
+                                    diftext = "m";
+                                    difbmp = GHApp._statusDifficultyMasterBitmap;
+                                }
+                                else if (valtext.Contains("g"))
+                                {
+                                    diftext = "g";
+                                    difbmp = GHApp._statusDifficultyGrandMasterBitmap;
+                                }
+
+                                if (diftext != "")
+                                {
+                                    target_width = target_scale * difbmp.Width;
+                                    target_height = target_scale * difbmp.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(difbmp, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    textPaint.MeasureText(diftext, ref bounds);
+                                    //textPaint.TextAlign = SKTextAlign.Center;
+                                    textPaint.Color = SKColors.Black;
+                                    textPaint.TextSize = diffontsize;
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                    //canvas.DrawText(diftext, curx + target_width / 2, cury + (rowheight - (textPaint.FontSpacing)) / 2 - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, diftext, curx + target_width / 2, cury + (rowheight - (textPaint.FontSpacing)) / 2 - textPaint.FontMetrics.Ascent, SKTextAlign.Center);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                    curx += target_width;
+                                    curx += stdspacing;
+                                    //textPaint.TextAlign = SKTextAlign.Left;
+                                    textPaint.Color = SKColors.White;
+                                    textPaint.TextSize = basefontsize;
+                                }
+
+
+                                /* STATS on Desktop */
+                                if (DesktopStatusBar)
+                                {
+                                    curx += stdspacing * 2;
+                                    //target_width = target_scale * GHApp._statusSeparatorBitmap.Width;
+                                    //target_height = target_scale * GHApp._statusSeparatorBitmap.Height;
+                                    //statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    //canvas.DrawImage(GHApp._statusSeparatorBitmap, statusDest);
+                                    //curx += target_width;
+                                    //curx += stdspacing;
+
+                                    for (int i = 0; i < 6; i++)
+                                    {
+                                        valtext = "";
+                                        lock (StatusFieldLock)
+                                        {
+                                            if (StatusFields[(int)NhStatusFields.BL_STR + i] != null && StatusFields[(int)NhStatusFields.BL_STR + i].IsEnabled && StatusFields[(int)NhStatusFields.BL_STR + i].Text != null)
+                                            {
+                                                valtext = StatusFields[(int)NhStatusFields.BL_STR + i].Text;
+                                                valcolor = StatusFields[(int)NhStatusFields.BL_STR + i].Color;
+                                            }
+                                        }
+                                        if (valtext != "")
+                                        {
+                                            SKImage statIcon = GetStatIcon(i);
+                                            target_width = target_scale * statIcon.Width;
+                                            target_height = target_scale * statIcon.Height;
+                                            statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                            canvas.DrawImage(statIcon, statusDest);
+                                            curx += target_width;
+                                            curx += innerspacing;
+                                            float print_width = textPaint.MeasureText(valtext);
+                                            SKColor oldColor = textPaint.Color;
+                                            textPaint.Color = UIUtils.NHColor2SKColorCore(valcolor, 0, false, false);
+                                            textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                            textPaint.Color = oldColor;
+                                            curx += print_width + stdspacing;
+                                        }
+                                    }
+
+                                    valtext = "";
+                                    lock (StatusFieldLock)
+                                    {
+                                        if (StatusFields[(int)NhStatusFields.BL_ALIGN] != null && StatusFields[(int)NhStatusFields.BL_ALIGN].IsEnabled && StatusFields[(int)NhStatusFields.BL_ALIGN].Text != null)
+                                        {
+                                            valtext = StatusFields[(int)NhStatusFields.BL_ALIGN].Text;
+                                        }
+                                    }
+                                    if (valtext != "")
+                                    {
+                                        curx += stdspacing / 2;
+
+                                        SKImage statIcon = GetAlignmentIcon(valtext);
+                                        target_width = target_scale * statIcon.Width;
+                                        target_height = target_scale * statIcon.Height;
+                                        statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                        canvas.DrawImage(statIcon, statusDest,
+#if GNH_MAUI
+                                            new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                            highQualityPaint);
+                                        curx += target_width;
+                                        if (valtext.Length >= 3)
+                                        {
+                                            curx += innerspacing;
+                                            GHSubstring print_text = new GHSubstring(valtext, 0, 3);
+                                            float print_width = textPaint.MeasureText(print_text.Value);
+                                            textPaint.DrawTextOnCanvas(canvas, print_text.Value, curx, cury - textPaint.FontMetrics.Ascent);
+                                            curx += print_width;
+                                        }
+
+                                        curx += stdspacing / 2;
+                                        curx += stdspacing;
+                                    }
+                                    curx += stdspacing * 2;
+                                }
+
+
+                                /* Normal non-desktop stats */
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_XP] != null && StatusFields[(int)NhStatusFields.BL_XP].IsEnabled && StatusFields[(int)NhStatusFields.BL_XP].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_XP].Text;
+                                    }
+                                }
+                                if (valtext != "")
+                                {
+                                    target_width = target_scale * GHApp._statusXPLevelBitmap.Width;
+                                    target_height = target_scale * GHApp._statusXPLevelBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusXPLevelBitmap, statusDest,
+#if GNH_MAUI
+                                        new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                        highQualityPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                    float print_width = textPaint.MeasureText(valtext);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                    //canvas.DrawText(valtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                    curx += print_width + stdspacing;
+                                }
+
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_HD] != null && StatusFields[(int)NhStatusFields.BL_HD].IsEnabled && StatusFields[(int)NhStatusFields.BL_HD].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_HD].Text;
+                                    }
+                                }
+                                if (valtext != "")
+                                {
+                                    target_width = target_scale * GHApp._statusHDBitmap.Width;
+                                    target_height = target_scale * GHApp._statusHDBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusHDBitmap, statusDest,
+#if GNH_MAUI
+                                        new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                        highQualityPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                    float print_width = textPaint.MeasureText(valtext);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                    //canvas.DrawText(valtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                    curx += print_width + stdspacing;
+                                }
+
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_AC] != null && StatusFields[(int)NhStatusFields.BL_AC].IsEnabled && StatusFields[(int)NhStatusFields.BL_AC].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_AC].Text;
+                                    }
+                                }
+                                if (valtext != "")
+                                {
+                                    target_width = target_scale * GHApp._statusACBitmap.Width;
+                                    target_height = target_scale * GHApp._statusACBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusACBitmap, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    //textPaint.TextAlign = SKTextAlign.Center;
+                                    textPaint.Color = SKColors.Black;
+                                    textPaint.TextSize = shieldfontsize;
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                    //canvas.DrawText(valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, SKTextAlign.Center);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                    curx += target_width;
+                                    curx += stdspacing;
+                                    //textPaint.TextAlign = SKTextAlign.Left;
+                                    textPaint.Color = SKColors.White;
+                                    textPaint.TextSize = basefontsize;
+                                }
+
+                                valtext = "";
+                                string valtext2 = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_MC_LVL] != null && StatusFields[(int)NhStatusFields.BL_MC_LVL].IsEnabled && StatusFields[(int)NhStatusFields.BL_MC_LVL].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_MC_LVL].Text;
+                                    }
+                                    if (StatusFields[(int)NhStatusFields.BL_MC_PCT] != null && StatusFields[(int)NhStatusFields.BL_MC_PCT].IsEnabled && StatusFields[(int)NhStatusFields.BL_MC_PCT].Text != null)
+                                    {
+                                        valtext2 = StatusFields[(int)NhStatusFields.BL_MC_PCT].Text;
+                                    }
+                                }
+                                if (valtext != "")
+                                {
+                                    target_width = target_scale * GHApp._statusMCBitmap.Width;
+                                    target_height = target_scale * GHApp._statusMCBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusMCBitmap, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    //textPaint.TextAlign = SKTextAlign.Center;
+                                    textPaint.Color = SKColors.Black;
+                                    textPaint.TextSize = shieldfontsize;
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                    //canvas.DrawText(valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, valtext, curx + target_width / 2, cury + (rowheight - textPaint.FontSpacing) / 2 - textPaint.FontMetrics.Ascent, SKTextAlign.Center);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                    //textPaint.TextAlign = SKTextAlign.Left;
+                                    textPaint.Color = SKColors.White;
+                                    textPaint.TextSize = basefontsize;
+                                    string printtext = valtext2 + "%";
+                                    float print_width = textPaint.MeasureText(printtext);
+                                    //canvas.DrawText(printtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                    curx += print_width + stdspacing;
+                                }
+
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_MOVE] != null && StatusFields[(int)NhStatusFields.BL_MOVE].IsEnabled && StatusFields[(int)NhStatusFields.BL_MOVE].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_MOVE].Text;
+                                    }
+                                }
+                                if (valtext != "")
+                                {
+                                    target_width = target_scale * GHApp._statusMoveBitmap.Width;
+                                    target_height = target_scale * GHApp._statusMoveBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusMoveBitmap, statusDest,
+#if GNH_MAUI
+                                        new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                        highQualityPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                    float print_width = textPaint.MeasureText(valtext);
+                                    //canvas.DrawText(valtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
+                                    textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                    curx += print_width + stdspacing;
+                                }
+
+                                valtext = "";
+                                valtext2 = "";
+                                string valtext3 = "";
+                                bool isenabled1 = false;
+                                bool isenabled2 = false;
+                                bool isenabled3 = false;
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_UWEP] != null && StatusFields[(int)NhStatusFields.BL_UWEP].IsEnabled && StatusFields[(int)NhStatusFields.BL_UWEP].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_UWEP].Text;
+                                        isenabled1 = StatusFields[(int)NhStatusFields.BL_UWEP].IsEnabled;
+                                    }
+                                    if (StatusFields[(int)NhStatusFields.BL_UWEP2] != null && StatusFields[(int)NhStatusFields.BL_UWEP2].IsEnabled && StatusFields[(int)NhStatusFields.BL_UWEP2].Text != null)
+                                    {
+                                        valtext2 = StatusFields[(int)NhStatusFields.BL_UWEP2].Text;
+                                        isenabled2 = StatusFields[(int)NhStatusFields.BL_UWEP2].IsEnabled;
+                                    }
+                                    if (StatusFields[(int)NhStatusFields.BL_UQUIVER] != null && StatusFields[(int)NhStatusFields.BL_UQUIVER].IsEnabled && StatusFields[(int)NhStatusFields.BL_UQUIVER].Text != null)
+                                    {
+                                        valtext3 = StatusFields[(int)NhStatusFields.BL_UQUIVER].Text;
+                                        isenabled3 = StatusFields[(int)NhStatusFields.BL_UQUIVER].IsEnabled;
+                                    }
+                                }
+                                if (valtext != "" || valtext2 != "" || valtext3 != "")
+                                {
+                                    target_width = target_scale * GHApp._statusWeaponStyleBitmap.Width;
+                                    target_height = target_scale * GHApp._statusWeaponStyleBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    canvas.DrawImage(GHApp._statusWeaponStyleBitmap, statusDest,
+#if GNH_MAUI
+                                        new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                        highQualityPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                    float print_width = 0;
+                                    if (_drawWeaponStyleAsGlyphs)
+                                    {
+                                        SKTypeface savedtypeface = textPaint.Typeface;
+                                        float savedfontsize = textPaint.TextSize;
+                                        lock (_weaponStyleObjDataItemLock)
+                                        {
+                                            if (isenabled1 && valtext != "")
+                                            {
+                                                /* Right-hand weapon */
+                                                if (_weaponStyleObjDataItem[0] != null)
+                                                {
+                                                    float startpicturex = curx;
+                                                    using (new SKAutoCanvasRestore(canvas, true))
+                                                    {
+                                                        GlyphImageSource gis = _paintGlyphImageSource;
+                                                        gis.ReferenceGamePage = this;
+                                                        gis.UseUpperSide = false;
+                                                        gis.AutoSize = true;
+                                                        gis.Glyph = Math.Abs(_weaponStyleObjDataItem[0].ObjData.gui_glyph);
+                                                        gis.ObjData = _weaponStyleObjDataItem[0];
+                                                        gis.DoAutoSize();
+                                                        float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
+                                                        float weppicturewidth = wep_scale * gis.Width;
+                                                        float weppictureheight = wep_scale * gis.Height;
+                                                        canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
+                                                        canvas.Scale(wep_scale);
+#if GNH_MAP_PROFILING && DEBUG
+                                                        StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                        gis.DrawOnCanvas(canvas, usingGL, false, true);
+#if GNH_MAP_PROFILING && DEBUG
+                                                        StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                        curx += weppicturewidth;
+                                                        curx += innerspacing;
+                                                    }
+                                                    float endpicturex = curx;
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                                    if (_weaponStyleObjDataItem[0].OutOfAmmo)
+                                                    {
+                                                        textPaint.TextSize = basefontsize;
+                                                        string printtext = "X";
+                                                        SKColor oldcolor = textPaint.Color;
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                                                        float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = textPaint.TextSize / 5;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.Color = SKColors.Red;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Color = oldcolor;
+                                                    }
+
+                                                    if (_weaponStyleObjDataItem[0].WrongAmmoType)
+                                                    {
+                                                        textPaint.Typeface = GHApp.LatoBold;
+                                                        textPaint.TextSize = basefontsize;
+                                                        string printtext = "?";
+                                                        SKColor oldcolor = textPaint.Color;
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                                                        float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = textPaint.TextSize / 5;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.Color = SKColors.Red;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Color = oldcolor;
+                                                        textPaint.Typeface = GHApp.LatoRegular;
+                                                    }
+                                                    if (_weaponStyleObjDataItem[0].NotBeingUsed || _weaponStyleObjDataItem[0].NotWeapon)
+                                                    {
+                                                        textPaint.Typeface = GHApp.LatoBold;
+                                                        textPaint.TextSize = basefontsize;
+                                                        string printtext = "!";
+                                                        SKColor oldcolor = textPaint.Color;
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
+                                                        float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = textPaint.TextSize / 5;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.Color = SKColors.Orange;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Color = oldcolor;
+                                                        textPaint.Typeface = GHApp.LatoRegular;
+                                                    }
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                                }
+                                                else
+                                                {
+                                                    SKRect emptyHandedSource = new SKRect(0, 0, GHApp._statusEmptyHandedBitmap.Width, GHApp._statusEmptyHandedBitmap.Height);
+                                                    float empty_handed_scale = rowheight / GHApp._statusEmptyHandedBitmap.Height;
+                                                    if (valtext2 != "")
+                                                    {
+                                                        emptyHandedSource = new SKRect(0, 0, GHApp._statusEmptyHandedBitmap.Width / 2, GHApp._statusEmptyHandedBitmap.Height);
+                                                        target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width / 2;
+                                                        target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
+                                                    }
+                                                    else
+                                                    {
+                                                        target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width;
+                                                        target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
+                                                    }
+                                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    canvas.DrawImage(GHApp._statusEmptyHandedBitmap, emptyHandedSource, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    curx += target_width;
+                                                    curx += innerspacing;
+                                                }
+                                            }
+                                            if (isenabled2 && valtext2 != "")
+                                            {
+                                                /* Left-hand weapon */
+                                                if (_weaponStyleObjDataItem[1] != null)
+                                                {
+                                                    textPaint.TextSize = shieldfontsize;
+                                                    string printtext = "+";
+                                                    print_width = textPaint.MeasureText(printtext);
+                                                    //canvas.DrawText(printtext, curx, cury - textPaint.FontMetrics.Ascent, textPaint);
+                                                    textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                                    curx += print_width;
+
+                                                    float startpicturex = curx;
+                                                    using (new SKAutoCanvasRestore(canvas, true))
+                                                    {
+                                                        GlyphImageSource gis = _paintGlyphImageSource;
+                                                        gis.ReferenceGamePage = this;
+                                                        gis.UseUpperSide = false;
+                                                        gis.AutoSize = true;
+                                                        gis.Glyph = Math.Abs(_weaponStyleObjDataItem[1].ObjData.gui_glyph);
+                                                        gis.ObjData = _weaponStyleObjDataItem[1];
+                                                        gis.DoAutoSize();
+                                                        float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
+                                                        float weppicturewidth = wep_scale * gis.Width;
+                                                        float weppictureheight = wep_scale * gis.Height;
+                                                        canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
+                                                        canvas.Scale(wep_scale);
+#if GNH_MAP_PROFILING && DEBUG
+                                                        StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                        gis.DrawOnCanvas(canvas, usingGL, false, true);
+#if GNH_MAP_PROFILING && DEBUG
+                                                        StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                        curx += weppicturewidth;
+                                                        curx += innerspacing;
+                                                    }
+                                                    float endpicturex = curx;
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Text);
+#endif
+                                                    if (_weaponStyleObjDataItem[1].OutOfAmmo)
+                                                    {
+                                                        textPaint.TextSize = basefontsize;
+                                                        printtext = "X";
+                                                        SKColor oldcolor = textPaint.Color;
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
+                                                        float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = textPaint.TextSize / 5;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.Color = SKColors.Red;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Color = oldcolor;
+
+                                                    }
+                                                    if (_weaponStyleObjDataItem[1].WrongAmmoType)
+                                                    {
+                                                        textPaint.Typeface = GHApp.LatoBold;
+                                                        textPaint.TextSize = basefontsize;
+                                                        printtext = "?";
+                                                        SKColor oldcolor = textPaint.Color;
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
+                                                        float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = textPaint.TextSize / 5;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.Color = SKColors.Red;
+                                                        //canvas.DrawText(printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2, textPaint);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Color = oldcolor;
+                                                        textPaint.Typeface = GHApp.LatoRegular;
+                                                    }
+                                                    if (_weaponStyleObjDataItem[1].NotBeingUsed || _weaponStyleObjDataItem[1].NotWeapon)
+                                                    {
+                                                        textPaint.Typeface = GHApp.LatoBold;
+                                                        textPaint.TextSize = basefontsize;
+                                                        printtext = "!";
+                                                        SKColor oldcolor = textPaint.Color;
+                                                        textPaint.Color = SKColors.Orange;
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        float ontopx = ((endpicturex - startpicturex) - print_width) / 2 + startpicturex;
+                                                        float font_height = textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent;
+                                                        textPaint.Color = SKColors.Black;
+                                                        textPaint.Style = SKPaintStyle.Stroke;
+                                                        textPaint.StrokeWidth = textPaint.TextSize / 5;
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Style = SKPaintStyle.Fill;
+                                                        textPaint.Color = SKColors.Orange;
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, ontopx, cury - textPaint.FontMetrics.Ascent + (target_height - font_height) / 2);
+                                                        textPaint.Color = oldcolor;
+                                                        textPaint.Typeface = GHApp.LatoRegular;
+                                                    }
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Text);
+#endif
+                                                }
+                                                else
+                                                {
+                                                    SKRect emptyHandedSource = new SKRect(0, 0, GHApp._statusEmptyHandedBitmap.Width, GHApp._statusEmptyHandedBitmap.Height);
+                                                    float empty_handed_scale = rowheight / GHApp._statusEmptyHandedBitmap.Height;
+                                                    if (valtext != "")
+                                                    {
+                                                        string printtext = "+";
+                                                        print_width = textPaint.MeasureText(printtext);
+                                                        textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                                        curx += print_width;
+
+                                                        emptyHandedSource = new SKRect(GHApp._statusEmptyHandedBitmap.Width / 2, 0, GHApp._statusEmptyHandedBitmap.Width, GHApp._statusEmptyHandedBitmap.Height);
+                                                        target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width / 2;
+                                                        target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
+                                                    }
+                                                    else
+                                                    {
+                                                        target_width = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Width;
+                                                        target_height = empty_handed_scale * GHApp._statusEmptyHandedBitmap.Height;
+                                                    }
+                                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    canvas.DrawImage(GHApp._statusEmptyHandedBitmap, emptyHandedSource, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    curx += target_width;
+                                                    curx += innerspacing;
+                                                }
+                                            }
+
+                                            if (isenabled3 && valtext3 != "")
+                                            {
+                                                /* Throwing weapons in quiver (which are not ammo by definition) */
+                                                if (_weaponStyleObjDataItem[2] != null && _weaponStyleObjDataItem[2].IsThrowingWeapon && !_weaponStyleObjDataItem[2].IsAmmo)
+                                                {
+                                                    curx += innerspacing; /* More space to other weapon styles */
+                                                    target_width = target_scale * GHApp._statusQuiveredWeaponStyleBitmap.Width;
+                                                    target_height = target_scale * GHApp._statusQuiveredWeaponStyleBitmap.Height;
+                                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    canvas.DrawImage(GHApp._statusQuiveredWeaponStyleBitmap, statusDest,
+#if GNH_MAUI
+                                                        new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                                        highQualityPaint);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    curx += target_width;
+                                                    curx += innerspacing;
+
+                                                    using (new SKAutoCanvasRestore(canvas, true))
+                                                    {
+                                                        GlyphImageSource gis = _paintGlyphImageSource;
+                                                        gis.ReferenceGamePage = this;
+                                                        gis.UseUpperSide = false;
+                                                        gis.AutoSize = true;
+                                                        gis.Glyph = Math.Abs(_weaponStyleObjDataItem[2].ObjData.gui_glyph);
+                                                        gis.ObjData = _weaponStyleObjDataItem[2];
+                                                        gis.DoAutoSize();
+                                                        float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
+                                                        float weppicturewidth = wep_scale * gis.Width;
+                                                        float weppictureheight = wep_scale * gis.Height;
+                                                        canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
+                                                        canvas.Scale(wep_scale);
+                                                        gis.DrawOnCanvas(canvas, usingGL, false, true);
+                                                        curx += weppicturewidth;
+                                                        curx += innerspacing;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        textPaint.TextSize = savedfontsize;
+                                        textPaint.Typeface = savedtypeface;
+                                    }
+                                    else
+                                    {
+#if GNH_MAP_PROFILING && DEBUG
+                                        StartProfiling(GHProfilingStyle.Text);
+#endif
+                                        if (valtext != "")
+                                        {
+                                            print_width = textPaint.MeasureText(valtext);
+                                            textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                            curx += print_width;
+                                        }
+                                        if (valtext2 != "")
+                                        {
+                                            string printtext = "/" + valtext2;
+                                            print_width = textPaint.MeasureText(printtext);
+                                            textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                            curx += print_width;
+                                        }
+#if GNH_MAP_PROFILING && DEBUG
+                                        StopProfiling(GHProfilingStyle.Text);
+#endif
+                                    }
+                                    curx += stdspacing;
+                                }
+
+                                /* Quick spell and wand */
+                                int qWandGlyph, qWandExceptinality, qSpellGlyph, qSpellOtyp;
+                                string qWandName, qSpellName;
+                                lock (_quickLock)
+                                {
+                                    qWandExceptinality = _quickWandExceptionality;
+                                    qWandGlyph = _quickWandGlyph;
+                                    qWandName = _quickWandName;
+                                    qSpellOtyp = _quickSpellOtyp;
+                                    qSpellGlyph = _quickSpellGlyph;
+                                    qSpellName = _quickSpellName;
+                                }
+                                if (qWandGlyph != GHApp.NoGlyph)
+                                {
+                                    target_width = target_scale * GHApp._statusQuickWandBitmap.Width;
+                                    target_height = target_scale * GHApp._statusQuickWandBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    canvas.DrawImage(GHApp._statusQuickWandBitmap, statusDest);
+                                    curx += target_width;
+                                    curx += innerspacing;
+
+                                    using (new SKAutoCanvasRestore(canvas, true))
+                                    {
+                                        GlyphImageSource gis = _paintGlyphImageSource;
+                                        gis.ReferenceGamePage = this;
+                                        gis.UseUpperSide = false;
+                                        gis.AutoSize = true;
+                                        gis.Glyph = Math.Abs(_quickWandGlyph);
+                                        gis.ObjData = new ObjectDataItem(new Obj() { exceptionality = (byte)qWandExceptinality }, new ObjClassData(), false);
+                                        gis.DoAutoSize();
+                                        float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
+                                        float weppicturewidth = wep_scale * gis.Width;
+                                        float weppictureheight = wep_scale * gis.Height;
+                                        canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
+                                        canvas.Scale(wep_scale);
+                                        gis.DrawOnCanvas(canvas, usingGL, false, true);
+                                        curx += weppicturewidth;
+                                    }
+                                    curx += stdspacing;
+                                }
+                                if (qSpellGlyph != GHApp.NoGlyph)
+                                {
+                                    target_width = target_scale * GHApp._statusQuickSpellBitmap.Width;
+                                    target_height = target_scale * GHApp._statusQuickSpellBitmap.Height;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    canvas.DrawImage(GHApp._statusQuickSpellBitmap, statusDest);
+                                    curx += target_width;
+                                    curx += innerspacing;
+                                    using (new SKAutoCanvasRestore(canvas, true))
+                                    {
+                                        GlyphImageSource gis = _paintGlyphImageSource;
+                                        gis.ReferenceGamePage = this;
+                                        gis.UseUpperSide = true;
+                                        gis.AutoSize = true;
+                                        gis.ObjData = null;
+                                        gis.Glyph = Math.Abs(_quickSpellGlyph);
+                                        gis.DoAutoSize();
+                                        float wep_scale = gis.Height == 0 ? 1.0f : target_height / gis.Height;
+                                        float weppicturewidth = wep_scale * gis.Width;
+                                        float weppictureheight = wep_scale * gis.Height;
+                                        canvas.Translate(curx + 0, cury + (target_height - weppictureheight) / 2);
+                                        canvas.Scale(wep_scale);
+                                        gis.DrawOnCanvas(canvas, usingGL, false, true);
+                                        curx += weppicturewidth;
+                                    }
+                                    curx += stdspacing;
+                                }
+
+
+                                /* Right aligned */
+                                bool turnsprinted = false;
+                                float finalleftcurx = curx;
+                                curx = canvaswidth - hmargin;
+                                float turnsleft = curx;
+
+                                /* Turns */
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_TIME] != null && StatusFields[(int)NhStatusFields.BL_TIME].IsEnabled && StatusFields[(int)NhStatusFields.BL_TIME].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_TIME].Text;
+                                    }
+                                }
+                                if (valtext != "")
+                                {
+                                    target_width = target_scale * GHApp._statusTurnsBitmap.Width;
+                                    target_height = target_scale * GHApp._statusTurnsBitmap.Height;
+                                    float print_width = textPaint.MeasureText(valtext);
+                                    float newcurx = canvaswidth - hmargin - print_width - innerspacing - target_width;
+                                    if (newcurx >= finalleftcurx) /* Avoid printing status bar elements over each other */
+                                    {
+                                        turnsprinted = true;
+                                        curx = newcurx;
+                                        turnsleft = curx;
+                                        statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+#if GNH_MAP_PROFILING && DEBUG
+                                        StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                        canvas.DrawImage(GHApp._statusTurnsBitmap, statusDest);
+#if GNH_MAP_PROFILING && DEBUG
+                                        StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                        curx += target_width;
+                                        curx += innerspacing;
+#if GNH_MAP_PROFILING && DEBUG
+                                        StartProfiling(GHProfilingStyle.Text);
+#endif
+                                        textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+#if GNH_MAP_PROFILING && DEBUG
+                                        StopProfiling(GHProfilingStyle.Text);
+#endif
+                                        curx += print_width;
+                                    }
+                                }
+
+                                /* Gold */
+                                bool goldprinted = false;
+                                float goldleft = turnsleft;
+                                if (!RightAligned2ndRow)
+                                {
+                                    valtext = "";
+                                    lock (StatusFieldLock)
+                                    {
+                                        if (StatusFields[(int)NhStatusFields.BL_GOLD] != null && StatusFields[(int)NhStatusFields.BL_GOLD].IsEnabled && StatusFields[(int)NhStatusFields.BL_GOLD].Text != null)
+                                        {
+                                            valtext = StatusFields[(int)NhStatusFields.BL_GOLD].Text;
+                                        }
+                                    }
+                                    if (valtext != "")
+                                    {
+                                        GHSubstring printtext = valtext.Length > 11 && valtext[0] == '\\' ? new GHSubstring(valtext, 11) : new GHSubstring(valtext);
+                                        target_width = target_scale * GHApp._statusGoldBitmap.Width;
+                                        target_height = target_scale * GHApp._statusGoldBitmap.Height;
+                                        float print_width = textPaint.MeasureText(printtext.Value);
+                                        float newcurx = turnsleft - (turnsprinted ? stdspacing : 0) - print_width - innerspacing - target_width;
+                                        if (newcurx >= finalleftcurx) /* Avoid printing status bar elements over each other */
+                                        {
+                                            goldprinted = true;
+                                            curx = newcurx;
+                                            goldleft = curx;
+                                            statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                            canvas.DrawImage(GHApp._statusGoldBitmap, statusDest);
+                                            curx += target_width;
+                                            curx += innerspacing;
+                                            textPaint.DrawTextOnCanvas(canvas, printtext.Value, curx, cury - textPaint.FontMetrics.Ascent);
+                                            curx += print_width;
+                                        }
+                                    }
+
+                                    float scoreleft = goldleft;
+                                    bool scoreprinted = false;
+                                    if (ShowScore)
+                                    {
+                                        /* Score */
+                                        valtext = "";
+                                        lock (StatusFieldLock)
+                                        {
+                                            if (StatusFields[(int)NhStatusFields.BL_SCORE] != null && StatusFields[(int)NhStatusFields.BL_SCORE].IsEnabled && StatusFields[(int)NhStatusFields.BL_SCORE].Text != null)
+                                            {
+                                                valtext = StatusFields[(int)NhStatusFields.BL_SCORE].Text;
+                                            }
+                                        }
+                                        if (valtext != "")
+                                        {
+                                            target_width = target_scale * GHApp._statusScoreBitmap.Width;
+                                            target_height = target_scale * GHApp._statusScoreBitmap.Height;
+                                            float print_width = textPaint.MeasureText(valtext);
+                                            float newcurx = goldleft - (goldprinted || turnsprinted ? stdspacing : 0) - print_width - innerspacing - target_width;
+                                            if (newcurx >= finalleftcurx) /* Avoid printing status bar elements over each other */
+                                            {
+                                                scoreprinted = true;
+                                                curx = newcurx;
+                                                scoreleft = curx;
+                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                                canvas.DrawImage(GHApp._statusScoreBitmap, statusDest);
+                                                curx += target_width;
+                                                curx += innerspacing;
+                                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                                curx += print_width;
+                                            }
+                                        }
+                                    }
+                                    if (ShowXP)
+                                    {
+                                        /* XP Points */
+                                        valtext = "";
+                                        lock (StatusFieldLock)
+                                        {
+                                            if (StatusFields[(int)NhStatusFields.BL_EXP] != null && StatusFields[(int)NhStatusFields.BL_EXP].IsEnabled && StatusFields[(int)NhStatusFields.BL_EXP].Text != null)
+                                            {
+                                                valtext = StatusFields[(int)NhStatusFields.BL_EXP].Text;
+                                            }
+                                        }
+                                        if (valtext != "")
+                                        {
+                                            target_width = target_scale * GHApp._statusXPPointsBitmap.Width;
+                                            target_height = target_scale * GHApp._statusXPPointsBitmap.Height;
+                                            float print_width = textPaint.MeasureText(valtext);
+                                            float newcurx = scoreleft - (goldprinted || turnsprinted || scoreprinted ? stdspacing : 0) - print_width - innerspacing - target_width;
+                                            if (newcurx >= finalleftcurx) /* Avoid printing status bar elements over each other */
+                                            {
+                                                curx = newcurx;
+                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                                canvas.DrawImage(GHApp._statusXPPointsBitmap, statusDest,
+#if GNH_MAUI
+                                                    new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                                                    highQualityPaint);
+                                                curx += target_width;
+                                                curx += innerspacing;
+                                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                                curx += print_width;
+                                            }
+                                        }
+                                    }
+                                }
+
+
+                                /* Second row */
+                                curx = hmargin;
+                                cury += rowheight + rowmargin;
+
+                                /* Title */
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_TITLE] != null && StatusFields[(int)NhStatusFields.BL_TITLE].IsEnabled && StatusFields[(int)NhStatusFields.BL_TITLE].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_TITLE].Text;
+                                    }
+                                }
+                                valtext = valtext.Trim();
+                                if (valtext != "")
+                                {
 #if GNH_MAP_PROFILING && DEBUG
                                     StartProfiling(GHProfilingStyle.Text);
 #endif
@@ -8640,211 +9462,35 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                                     StopProfiling(GHProfilingStyle.Text);
 #endif
-                                    curx += print_width;
-                                }
-                            }
-
-                            /* Gold */
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_GOLD] != null && StatusFields[(int)NhStatusFields.BL_GOLD].IsEnabled && StatusFields[(int)NhStatusFields.BL_GOLD].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_GOLD].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                string printtext;
-                                if (valtext.Length > 11 && valtext.Substring(0, 1) == "\\")
-                                    printtext = valtext.Substring(11);
-                                else
-                                    printtext = valtext;
-
-                                target_width = target_scale * GHApp._statusGoldBitmap.Width;
-                                target_height = target_scale * GHApp._statusGoldBitmap.Height;
-                                float print_width = textPaint.MeasureText(printtext);
-                                float newcurx = turnsleft - (turnsprinted ? stdspacing : 0) - print_width - innerspacing - target_width;
-                                if (newcurx >= finalleftcurx) /* Avoid printing status bar elements over each other */
-                                {
-                                    curx = newcurx;
-                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-#if GNH_MAP_PROFILING && DEBUG
-                                    StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                    canvas.DrawImage(GHApp._statusGoldBitmap, statusDest);
-#if GNH_MAP_PROFILING && DEBUG
-                                    StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                    curx += target_width;
-                                    curx += innerspacing;
-#if GNH_MAP_PROFILING && DEBUG
-                                    StartProfiling(GHProfilingStyle.Text);
-#endif
-                                    textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
-#if GNH_MAP_PROFILING && DEBUG
-                                    StopProfiling(GHProfilingStyle.Text);
-#endif
-                                    curx += print_width;
-                                }
-                            }
-
-
-                            /* Second row */
-                            curx = hmargin;
-                            cury += rowheight + rowmargin;
-
-                            /* Title */
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_TITLE] != null && StatusFields[(int)NhStatusFields.BL_TITLE].IsEnabled && StatusFields[(int)NhStatusFields.BL_TITLE].Text != null)
-                                {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_TITLE].Text;
-                                }
-                            }
-                            valtext = valtext.Trim();
-                            if (valtext != "")
-                            {
-#if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
-#endif
-                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
-#if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
-#endif
-                                float textprint_length = textPaint.MeasureText(valtext);
-                                curx += textprint_length;
-                                curx += stdspacing;
-                            }
-
-                            {
-                                /* Condition, status and buff marks */
-                                float marksize = rowheight * 0.80f;
-                                float markpadding = marksize / 8;
-                                ulong status_bits;
-                                lock (_uLock)
-                                {
-                                    status_bits = _u_status_bits;
-                                }
-                                if (status_bits != 0)
-                                {
-                                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                                    int mglyph = (int)game_ui_tile_types.STATUS_MARKS + GHApp.UITileOff;
-                                    int mtile = GHApp.Glyph2Tile[mglyph];
-                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
-                                    int tile_x = GHApp.TileSheetX(mtile);
-                                    int tile_y = GHApp.TileSheetY(mtile);
-                                    foreach (int status_mark in _statusmarkorder)
-                                    {
-                                        ulong statusbit = 1UL << status_mark;
-                                        if ((status_bits & statusbit) != 0)
-                                        {
-                                            int within_tile_x = status_mark % tiles_per_row;
-                                            int within_tile_y = status_mark / tiles_per_row;
-                                            int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
-                                            int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
-
-                                            SKRect source_rt = new SKRect();
-                                            source_rt.Left = c_x;
-                                            source_rt.Right = c_x + GHConstants.StatusMarkWidth;
-                                            source_rt.Top = c_y;
-                                            source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
-
-                                            SKRect target_rt = new SKRect();
-                                            target_rt.Left = curx;
-                                            target_rt.Right = target_rt.Left + marksize;
-                                            target_rt.Top = cury + (rowheight - marksize) / 2;
-                                            target_rt.Bottom = target_rt.Top + marksize;
-#if GNH_MAP_PROFILING && DEBUG
-                                            StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                            canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
-#if GNH_MAP_PROFILING && DEBUG
-                                            StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-
-                                            curx += marksize;
-                                            curx += markpadding;
-                                        }
-                                    }
+                                    float textprint_length = textPaint.MeasureText(valtext);
+                                    curx += textprint_length;
+                                    curx += stdspacing;
                                 }
 
-                                ulong condition_bits;
-                                lock (_uLock)
                                 {
-                                    condition_bits = _u_condition_bits;
-                                }
-                                if (condition_bits != 0)
-                                {
-                                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                                    int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + GHApp.UITileOff;
-                                    int mtile = GHApp.Glyph2Tile[mglyph];
-                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
-                                    int tile_x = GHApp.TileSheetX(mtile);
-                                    int tile_y = GHApp.TileSheetY(mtile);
-                                    for (int condition_mark = 0; condition_mark < (int)bl_conditions.NUM_BL_CONDITIONS; condition_mark++)
-                                    {
-                                        ulong conditionbit = 1UL << condition_mark;
-                                        if ((condition_bits & conditionbit) != 0)
-                                        {
-                                            int within_tile_x = condition_mark % tiles_per_row;
-                                            int within_tile_y = condition_mark / tiles_per_row;
-                                            int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
-                                            int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
-
-                                            SKRect source_rt = new SKRect();
-                                            source_rt.Left = c_x;
-                                            source_rt.Right = c_x + GHConstants.StatusMarkWidth;
-                                            source_rt.Top = c_y;
-                                            source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
-
-                                            SKRect target_rt = new SKRect();
-                                            target_rt.Left = curx;
-                                            target_rt.Right = target_rt.Left + marksize;
-                                            target_rt.Top = cury + (rowheight - marksize) / 2;
-                                            target_rt.Bottom = target_rt.Top + marksize;
-#if GNH_MAP_PROFILING && DEBUG
-                                            StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                            canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
-#if GNH_MAP_PROFILING && DEBUG
-                                            StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-
-                                            curx += marksize;
-                                            curx += markpadding;
-                                        }
-                                    }
-                                }
-
-                                ulong buff_bits;
-                                for (int buff_ulong = 0; buff_ulong < GHConstants.NUM_BUFF_BIT_ULONGS; buff_ulong++)
-                                {
+                                    /* Condition, status and buff marks */
+                                    float marksize = rowheight * 0.80f;
+                                    float markpadding = marksize / 8;
+                                    ulong status_bits;
                                     lock (_uLock)
                                     {
-                                        buff_bits = _u_buff_bits[buff_ulong];
+                                        status_bits = _u_status_bits;
                                     }
-                                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                                    if (buff_bits != 0)
+                                    if (status_bits != 0)
                                     {
-                                        for (int buff_idx = 0; buff_idx < 32; buff_idx++)
+                                        int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                                        foreach (int status_mark in _statusmarkorder)
                                         {
-                                            ulong buffbit = 1UL << buff_idx;
-                                            if ((buff_bits & buffbit) != 0)
+                                            ulong statusbit = 1UL << status_mark;
+                                            if ((status_bits & statusbit) != 0)
                                             {
-                                                int propidx = buff_ulong * 32 + buff_idx;
-                                                if (propidx > GHConstants.LAST_PROP)
-                                                    break;
-                                                int mglyph = (propidx - 1) / GHConstants.BUFFS_PER_TILE + GHApp.BuffTileOff;
+                                                int mglyph = (int)game_ui_tile_types.STATUS_MARKS + status_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
                                                 int mtile = GHApp.Glyph2Tile[mglyph];
                                                 int sheet_idx = GHApp.TileSheetIdx(mtile);
                                                 int tile_x = GHApp.TileSheetX(mtile);
                                                 int tile_y = GHApp.TileSheetY(mtile);
-
-                                                int buff_mark = (propidx - 1) % GHConstants.BUFFS_PER_TILE;
-                                                int within_tile_x = buff_mark % tiles_per_row;
-                                                int within_tile_y = buff_mark / tiles_per_row;
+                                                int within_tile_x = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                                                int within_tile_y = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                                                 int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                                                 int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -8872,118 +9518,365 @@ namespace GnollHackX.Pages.Game
                                             }
                                         }
                                     }
-                                }
 
-                                bool colorfound = false;
-                                for (int i = (int)NhColor.CLR_BLACK + 1; i < (int)NhColor.CLR_WHITE; i++)
-                                {
-                                    if (i == (int)NhColor.NO_COLOR || i == (int)NhColor.CLR_GRAY)
-                                        continue;
-
-                                    colorfound = false;
-                                    for (int j = 0; j < 6; j++)
+                                    ulong condition_bits;
+                                    lock (_uLock)
                                     {
-                                        lock (StatusFieldLock)
+                                        condition_bits = _u_condition_bits;
+                                    }
+                                    if (condition_bits != 0)
+                                    {
+                                        int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                                        for (int condition_mark = 0; condition_mark < (int)bl_conditions.NUM_BL_CONDITIONS; condition_mark++)
                                         {
-                                            if (StatusFields[(int)NhStatusFields.BL_STR + j] != null && StatusFields[(int)NhStatusFields.BL_STR + j].IsEnabled && StatusFields[(int)NhStatusFields.BL_STR + j].Text != null)
+                                            ulong conditionbit = 1UL << condition_mark;
+                                            if ((condition_bits & conditionbit) != 0)
                                             {
-                                                if (StatusFields[(int)NhStatusFields.BL_STR + j].Color == i)
+                                                int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + condition_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
+                                                int mtile = GHApp.Glyph2Tile[mglyph];
+                                                int sheet_idx = GHApp.TileSheetIdx(mtile);
+                                                int tile_x = GHApp.TileSheetX(mtile);
+                                                int tile_y = GHApp.TileSheetY(mtile);
+                                                int within_tile_x = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                                                int within_tile_y = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
+                                                int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
+                                                int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
+
+                                                SKRect source_rt = new SKRect();
+                                                source_rt.Left = c_x;
+                                                source_rt.Right = c_x + GHConstants.StatusMarkWidth;
+                                                source_rt.Top = c_y;
+                                                source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
+
+                                                SKRect target_rt = new SKRect();
+                                                target_rt.Left = curx;
+                                                target_rt.Right = target_rt.Left + marksize;
+                                                target_rt.Top = cury + (rowheight - marksize) / 2;
+                                                target_rt.Bottom = target_rt.Top + marksize;
+#if GNH_MAP_PROFILING && DEBUG
+                                                StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
+#if GNH_MAP_PROFILING && DEBUG
+                                                StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+
+                                                curx += marksize;
+                                                curx += markpadding;
+                                            }
+                                        }
+                                    }
+
+                                    ulong buff_bits;
+                                    for (int buff_ulong = 0; buff_ulong < GHConstants.NUM_BUFF_BIT_ULONGS; buff_ulong++)
+                                    {
+                                        lock (_uLock)
+                                        {
+                                            buff_bits = _u_buff_bits[buff_ulong];
+                                        }
+                                        int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                                        if (buff_bits != 0)
+                                        {
+                                            for (int buff_idx = 0; buff_idx < 32; buff_idx++)
+                                            {
+                                                ulong buffbit = 1UL << buff_idx;
+                                                if ((buff_bits & buffbit) != 0)
                                                 {
-                                                    colorfound = true;
-                                                    break;
+                                                    int propidx = buff_ulong * 32 + buff_idx;
+                                                    if (propidx > GHConstants.LAST_PROP)
+                                                        break;
+                                                    int mglyph = (propidx - 1) / GHConstants.BUFFS_PER_TILE + GHApp.BuffTileOff;
+                                                    int mtile = GHApp.Glyph2Tile[mglyph];
+                                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
+                                                    int tile_x = GHApp.TileSheetX(mtile);
+                                                    int tile_y = GHApp.TileSheetY(mtile);
+
+                                                    int buff_mark = (propidx - 1) % GHConstants.BUFFS_PER_TILE;
+                                                    int within_tile_x = buff_mark % tiles_per_row;
+                                                    int within_tile_y = buff_mark / tiles_per_row;
+                                                    int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
+                                                    int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
+
+                                                    SKRect source_rt = new SKRect();
+                                                    source_rt.Left = c_x;
+                                                    source_rt.Right = c_x + GHConstants.StatusMarkWidth;
+                                                    source_rt.Top = c_y;
+                                                    source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
+
+                                                    SKRect target_rt = new SKRect();
+                                                    target_rt.Left = curx;
+                                                    target_rt.Right = target_rt.Left + marksize;
+                                                    target_rt.Top = cury + (rowheight - marksize) / 2;
+                                                    target_rt.Bottom = target_rt.Top + marksize;
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                    canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
+#if GNH_MAP_PROFILING && DEBUG
+                                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+
+                                                    curx += marksize;
+                                                    curx += markpadding;
                                                 }
                                             }
                                         }
                                     }
-                                    if (colorfound)
+
+                                    bool colorfound = false;
+                                    for (int i = (int)NhColor.CLR_BLACK + 1; i < (int)NhColor.CLR_WHITE; i++)
                                     {
-                                        SKColor dotcolor = UIUtils.NHColor2SKColorCore(i, 0, true, false);
-                                        SKPoint dotpoint = new SKPoint(curx + marksize / 4, cury + (rowheight - marksize) / 2 + marksize / 2);
-                                        float dotradius = marksize / 8;
-                                        textPaint.Color = dotcolor;
-                                        textPaint.Style = SKPaintStyle.Fill;
-                                        canvas.DrawCircle(dotpoint, dotradius, textPaint.Paint);
-                                        curx += marksize / 2;
-                                        curx += markpadding;
+                                        if (i == (int)NhColor.NO_COLOR || i == (int)NhColor.CLR_GRAY)
+                                            continue;
+
+                                        colorfound = false;
+                                        for (int j = 0; j < 6; j++)
+                                        {
+                                            lock (StatusFieldLock)
+                                            {
+                                                if (StatusFields[(int)NhStatusFields.BL_STR + j] != null && StatusFields[(int)NhStatusFields.BL_STR + j].IsEnabled && StatusFields[(int)NhStatusFields.BL_STR + j].Text != null)
+                                                {
+                                                    if (StatusFields[(int)NhStatusFields.BL_STR + j].Color == i)
+                                                    {
+                                                        colorfound = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (colorfound)
+                                        {
+                                            SKColor dotcolor = UIUtils.NHColor2SKColorCore(i, 0, true, false);
+                                            SKPoint dotpoint = new SKPoint(curx + marksize / 4, cury + (rowheight - marksize) / 2 + marksize / 2);
+                                            float dotradius = marksize / 8;
+                                            textPaint.Color = dotcolor;
+                                            textPaint.Style = SKPaintStyle.Fill;
+                                            canvas.DrawCircle(dotpoint, dotradius, textPaint.Paint);
+                                            curx += marksize / 2;
+                                            curx += markpadding;
+                                        }
+                                    }
+                                    textPaint.Color = SKColors.White;
+                                }
+
+                                float final2ndrowleftcurx = curx;
+
+
+                                /* Right aligned */
+                                float dungeonleft = canvaswidth - hmargin;
+                                /* Dungeon level */
+                                valtext = "";
+                                lock (StatusFieldLock)
+                                {
+                                    if (StatusFields[(int)NhStatusFields.BL_LEVELDESC] != null && StatusFields[(int)NhStatusFields.BL_LEVELDESC].IsEnabled && StatusFields[(int)NhStatusFields.BL_LEVELDESC].Text != null)
+                                    {
+                                        valtext = StatusFields[(int)NhStatusFields.BL_LEVELDESC].Text;
                                     }
                                 }
-                                textPaint.Color = SKColors.White;
-                            }
-
-                            /* Right aligned */
-                            float dungeonleft = canvaswidth - hmargin;
-                            /* Dungeon level */
-                            valtext = "";
-                            lock (StatusFieldLock)
-                            {
-                                if (StatusFields[(int)NhStatusFields.BL_LEVELDESC] != null && StatusFields[(int)NhStatusFields.BL_LEVELDESC].IsEnabled && StatusFields[(int)NhStatusFields.BL_LEVELDESC].Text != null)
+                                if (valtext != "")
                                 {
-                                    valtext = StatusFields[(int)NhStatusFields.BL_LEVELDESC].Text;
-                                }
-                            }
-                            if (valtext != "")
-                            {
-                                string printtext;
-                                if (valtext.Length > 3 && valtext.Substring(0, 3) == "DL:")
-                                    printtext = valtext.Substring(3);
-                                else if (valtext.Length > 5 && valtext.Substring(0, 5) == "Dlvl:")
-                                    printtext = valtext.Substring(5);
-                                else
-                                    printtext = valtext;
+                                    GHSubstring printtext;
+                                    if (valtext.Length > 3 && (new GHSubstring(valtext, 0, 3)).IsEqualTo("DL:"))
+                                    {
+                                        printtext = new GHSubstring(valtext, 3);
+                                    }
+                                    else if (valtext.Length > 5 && (new GHSubstring(valtext, 0, 5)).IsEqualTo("Dlvl:"))
+                                    {
+                                        printtext = new GHSubstring(valtext, 5);
+                                    }
+                                    else
+                                        printtext = new GHSubstring(valtext);
 
-                                target_width = target_scale * GHApp._statusDungeonLevelBitmap.Width;
-                                target_height = target_scale * GHApp._statusDungeonLevelBitmap.Height;
-                                float print_width = textPaint.MeasureText(printtext);
-                                curx = canvaswidth - hmargin - print_width - innerspacing - target_width;
-                                dungeonleft = curx;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    target_width = target_scale * GHApp._statusDungeonLevelBitmap.Width;
+                                    target_height = target_scale * GHApp._statusDungeonLevelBitmap.Height;
+                                    float print_width = textPaint.MeasureText(printtext.Value);
+                                    curx = canvaswidth - hmargin - print_width - innerspacing - target_width;
+                                    dungeonleft = curx;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
 #if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Bitmap);
+                                    StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                                canvas.DrawImage(GHApp._statusDungeonLevelBitmap, statusDest);
+                                    canvas.DrawImage(GHApp._statusDungeonLevelBitmap, statusDest);
 #if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Bitmap);
+                                    StopProfiling(GHProfilingStyle.Bitmap);
 #endif
-                                curx += target_width;
-                                curx += innerspacing;
+                                    curx += target_width;
+                                    curx += innerspacing;
 #if GNH_MAP_PROFILING && DEBUG
-                                StartProfiling(GHProfilingStyle.Text);
+                                    StartProfiling(GHProfilingStyle.Text);
 #endif
-                                textPaint.DrawTextOnCanvas(canvas, printtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                    textPaint.DrawTextOnCanvas(canvas, printtext.Value, curx, cury - textPaint.FontMetrics.Ascent);
 #if GNH_MAP_PROFILING && DEBUG
-                                StopProfiling(GHProfilingStyle.Text);
+                                    StopProfiling(GHProfilingStyle.Text);
 #endif
-                                curx += print_width;
-                            }
-
-                            float batteryleft = dungeonleft;
-                            double chargeLevel = GHApp.BatteryChargeLevel;
-                            float chargePercentage = (float)chargeLevel / 100;
-                            if (ShowBattery || chargePercentage <= GHConstants.CriticalBatteryChargeLevel)
-                            {
-                                target_width = target_scale * GHApp._batteryFrameBitmap.Width;
-                                target_height = target_scale * GHApp._batteryFrameBitmap.Height;
-                                curx = dungeonleft - innerspacing * 5 - target_width;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-                                canvas.DrawImage(GHApp._batteryFrameBitmap, statusDest);
-                                batteryleft = curx;
-
-                                int alen = _shineAnimation.Length;
-                                if (chargePercentage <= GHConstants.CriticalBatteryChargeLevel)
-                                {
-                                    textPaint.Color = _magicShineOutlineColor.WithAlpha((byte)(_shineAnimation[generalcountervalue % alen] * 255));
-                                    canvas.DrawImage(GHApp._batteryRedFrameBitmap, statusDest, textPaint.Paint);
+                                    curx += print_width;
                                 }
 
-                                const int topMargin = 12, bottomMargin = 5, hMargin = 6;
-
-                                if (chargeLevel <= 9)
+                                float desktopleft = dungeonleft;
+                                if (RightAligned2ndRow)
                                 {
-                                    string drawtext = ((int)chargeLevel).ToString();
+                                    valtext = "";
+                                    lock (StatusFieldLock)
+                                    {
+                                        if (StatusFields[(int)NhStatusFields.BL_GOLD] != null && StatusFields[(int)NhStatusFields.BL_GOLD].IsEnabled && StatusFields[(int)NhStatusFields.BL_GOLD].Text != null)
+                                        {
+                                            valtext = StatusFields[(int)NhStatusFields.BL_GOLD].Text;
+                                        }
+                                    }
+                                    if (valtext != "")
+                                    {
+                                        GHSubstring printtext = valtext.Length > 11 && valtext[0] == '\\' ? new GHSubstring(valtext, 11) : new GHSubstring(valtext);
+                                        target_width = target_scale * GHApp._statusGoldBitmap.Width;
+                                        target_height = target_scale * GHApp._statusGoldBitmap.Height;
+                                        float print_width = textPaint.MeasureText(printtext.Value);
+                                        float newcurx = desktopleft - stdspacing - print_width - innerspacing - target_width;
+                                        if (newcurx >= final2ndrowleftcurx) /* Avoid printing status bar elements over each other */
+                                        {
+                                            curx = newcurx;
+                                            desktopleft = curx;
+                                            statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                            canvas.DrawImage(GHApp._statusGoldBitmap, statusDest);
+                                            curx += target_width;
+                                            curx += innerspacing;
+                                            textPaint.DrawTextOnCanvas(canvas, printtext.Value, curx, cury - textPaint.FontMetrics.Ascent);
+                                            curx += print_width;
+                                        }
+                                    }
+
+                                    if (ShowScore)
+                                    {
+                                        /* Score */
+                                        valtext = "";
+                                        lock (StatusFieldLock)
+                                        {
+                                            if (StatusFields[(int)NhStatusFields.BL_SCORE] != null && StatusFields[(int)NhStatusFields.BL_SCORE].IsEnabled && StatusFields[(int)NhStatusFields.BL_SCORE].Text != null)
+                                            {
+                                                valtext = StatusFields[(int)NhStatusFields.BL_SCORE].Text;
+                                            }
+                                        }
+                                        if (valtext != "")
+                                        {
+                                            target_width = target_scale * GHApp._statusScoreBitmap.Width;
+                                            target_height = target_scale * GHApp._statusScoreBitmap.Height;
+                                            float print_width = textPaint.MeasureText(valtext);
+                                            float newcurx = desktopleft - stdspacing - print_width - innerspacing - target_width;
+                                            if (newcurx >= final2ndrowleftcurx) /* Avoid printing status bar elements over each other */
+                                            {
+                                                curx = newcurx;
+                                                desktopleft = curx;
+                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                                canvas.DrawImage(GHApp._statusScoreBitmap, statusDest);
+                                                curx += target_width;
+                                                curx += innerspacing;
+                                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                                curx += print_width;
+                                            }
+                                        }
+                                    }
+                                    if (ShowXP)
+                                    {
+                                        /* XP Points */
+                                        valtext = "";
+                                        lock (StatusFieldLock)
+                                        {
+                                            if (StatusFields[(int)NhStatusFields.BL_EXP] != null && StatusFields[(int)NhStatusFields.BL_EXP].IsEnabled && StatusFields[(int)NhStatusFields.BL_EXP].Text != null)
+                                            {
+                                                valtext = StatusFields[(int)NhStatusFields.BL_EXP].Text;
+                                            }
+                                        }
+                                        if (valtext != "")
+                                        {
+                                            target_width = target_scale * GHApp._statusXPPointsBitmap.Width;
+                                            target_height = target_scale * GHApp._statusXPPointsBitmap.Height;
+                                            float print_width = textPaint.MeasureText(valtext);
+                                            float newcurx = desktopleft - stdspacing - print_width - innerspacing - target_width;
+                                            if (newcurx >= final2ndrowleftcurx) /* Avoid printing status bar elements over each other */
+                                            {
+                                                curx = newcurx;
+                                                desktopleft = curx;
+                                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                                canvas.DrawImage(GHApp._statusXPPointsBitmap, statusDest);
+                                                curx += target_width;
+                                                curx += innerspacing;
+                                                textPaint.DrawTextOnCanvas(canvas, valtext, curx, cury - textPaint.FontMetrics.Ascent);
+                                                curx += print_width;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                double chargeLevel = GHApp.BatteryChargeLevel;
+                                float chargePercentage = (float)chargeLevel / 100;
+                                if (ShowBattery || chargePercentage <= GHConstants.CriticalBatteryChargeLevel)
+                                {
+                                    target_width = target_scale * GHApp._batteryFrameBitmap.Width;
+                                    target_height = target_scale * GHApp._batteryFrameBitmap.Height;
+                                    curx = desktopleft - innerspacing * 5 - target_width;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    canvas.DrawImage(GHApp._batteryFrameBitmap, statusDest);
+                                    desktopleft = curx;
+
+                                    int alen = _shineAnimation.Length;
+                                    if (chargePercentage <= GHConstants.CriticalBatteryChargeLevel)
+                                    {
+                                        textPaint.Color = _magicShineOutlineColor.WithAlpha((byte)(_shineAnimation[generalcountervalue % alen] * 255));
+                                        canvas.DrawImage(GHApp._batteryRedFrameBitmap, statusDest, textPaint.Paint);
+                                    }
+
+                                    const int topMargin = 12, bottomMargin = 5, hMargin = 6;
+
+                                    if (chargeLevel <= 9)
+                                    {
+                                        string drawtext = ((int)chargeLevel).ToString();
+                                        textPaint.TextSize = diffontsize;
+                                        //textPaint.TextAlign = SKTextAlign.Center;
+                                        float alpha = _shineAnimation[generalcountervalue % alen];
+                                        textPaint.Color = new SKColor(255, (byte)(alpha * 0 + (1 - alpha) * 255), (byte)(alpha * 0 + (1 - alpha) * 255));
+                                        float vsize = target_height - (topMargin + bottomMargin) * target_scale;
+                                        float fsize = textPaint.FontSpacing;
+                                        float vpadding = (vsize - fsize) / 2;
+                                        SKPoint drawpoint = new SKPoint(curx + target_width / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
+                                        textPaint.DrawTextOnCanvas(canvas, drawtext, drawpoint, SKTextAlign.Center);
+                                        //textPaint.TextAlign = SKTextAlign.Left;
+                                        textPaint.TextSize = basefontsize;
+                                        textPaint.Color = SKColors.White;
+                                    }
+
+                                    int totalHeight = GHApp._batteryFrameBitmap.Height;
+                                    int fillHeight = totalHeight - topMargin - bottomMargin;
+                                    float calcFillHeight = fillHeight * chargePercentage;
+                                    float addedFillTop = fillHeight - calcFillHeight;
+
+                                    float r_mult = chargePercentage <= 0.25f ? chargePercentage * 2.0f + 0.5f : chargePercentage <= 0.5f ? 1.0f : (1.0f - chargePercentage) * 2.0f;
+                                    float g_mult = chargePercentage <= 0.25f ? 0 : chargePercentage <= 0.5f ? (chargePercentage - 0.25f) * 4.0f : 1.0f;
+                                    textPaint.Color = new SKColor((byte)(255 * r_mult), (byte)(255 * g_mult), 0);
+
+                                    statusDest = new SKRect(curx + hMargin * target_scale, cury + (topMargin + addedFillTop) * target_scale, curx + target_width - hMargin * target_scale, cury + target_height - bottomMargin * target_scale);
+                                    canvas.DrawRect(statusDest, textPaint.Paint);
+                                    textPaint.Color = SKColors.White;
+
+                                    curx += target_width;
+                                }
+
+                                if (ShowFPS)
+                                {
+                                    target_width = target_scale * GHApp._fpsBitmap.Width;
+                                    target_height = target_scale * GHApp._fpsBitmap.Height;
+                                    curx = desktopleft - innerspacing * 5 - target_width;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    canvas.DrawImage(GHApp._fpsBitmap, statusDest);
+                                    desktopleft = curx;
+
+                                    string drawtext;
+                                    lock (_fpslock)
+                                    {
+                                        drawtext = string.Format("{0:0.0}", _fps);
+                                    }
+
+                                    const int topMargin = 4, bottomMargin = 16;
+                                    textPaint.Color = SKColors.White;
                                     textPaint.TextSize = diffontsize;
                                     //textPaint.TextAlign = SKTextAlign.Center;
-                                    float alpha = _shineAnimation[generalcountervalue % alen];
-                                    textPaint.Color = new SKColor(255, (byte)(alpha * 0 + (1 - alpha) * 255), (byte)(alpha * 0 + (1 - alpha) * 255));
                                     float vsize = target_height - (topMargin + bottomMargin) * target_scale;
                                     float fsize = textPaint.FontSpacing;
                                     float vpadding = (vsize - fsize) / 2;
@@ -8991,289 +9884,206 @@ namespace GnollHackX.Pages.Game
                                     textPaint.DrawTextOnCanvas(canvas, drawtext, drawpoint, SKTextAlign.Center);
                                     //textPaint.TextAlign = SKTextAlign.Left;
                                     textPaint.TextSize = basefontsize;
-                                    textPaint.Color = SKColors.White;
                                 }
 
-                                int totalHeight = GHApp._batteryFrameBitmap.Height;
-                                int fillHeight = totalHeight - topMargin - bottomMargin;
-                                float calcFillHeight = fillHeight * chargePercentage;
-                                float addedFillTop = fillHeight - calcFillHeight;
-
-                                float r_mult = chargePercentage <= 0.25f ? chargePercentage * 2.0f + 0.5f : chargePercentage <= 0.5f ? 1.0f : (1.0f - chargePercentage) * 2.0f;
-                                float g_mult = chargePercentage <= 0.25f ? 0 : chargePercentage <= 0.5f ? (chargePercentage - 0.25f) * 4.0f : 1.0f;
-                                textPaint.Color = new SKColor((byte)(255 * r_mult), (byte)(255 * g_mult), 0);
-
-                                statusDest = new SKRect(curx + hMargin * target_scale, cury + (topMargin + addedFillTop) * target_scale, curx + target_width - hMargin * target_scale, cury + target_height - bottomMargin * target_scale);
-                                canvas.DrawRect(statusDest, textPaint.Paint);
-                                textPaint.Color = SKColors.White;
-
-                                curx += target_width;
-                            }
-
-                            float fpsleft = batteryleft;
-                            if(ShowFPS)
-                            {
-                                target_width = target_scale * GHApp._fpsBitmap.Width;
-                                target_height = target_scale * GHApp._fpsBitmap.Height;
-                                curx = batteryleft - innerspacing * 5 - target_width;
-                                statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
-                                canvas.DrawImage(GHApp._fpsBitmap, statusDest);
-                                fpsleft = curx;
-
-                                string drawtext;
-                                lock (_fpslock)
+                                if (ShowMemory)
                                 {
-                                    drawtext = string.Format("{0:0.0}", _fps);
-                                }
+                                    target_width = target_scale * GHApp._memoryBitmap.Width;
+                                    target_height = target_scale * GHApp._memoryBitmap.Height;
+                                    curx = desktopleft - innerspacing * 5 - target_width;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    canvas.DrawImage(GHApp._memoryBitmap, statusDest);
+                                    desktopleft = curx;
 
-                                const int topMargin = 4, bottomMargin = 16;
-                                textPaint.Color = SKColors.White;
-                                textPaint.TextSize = diffontsize;
-                                //textPaint.TextAlign = SKTextAlign.Center;
-                                float vsize = target_height - (topMargin + bottomMargin) * target_scale;
-                                float fsize = textPaint.FontSpacing;
-                                float vpadding = (vsize - fsize) / 2;
-                                SKPoint drawpoint = new SKPoint(curx + target_width / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
-                                textPaint.DrawTextOnCanvas(canvas, drawtext, drawpoint, SKTextAlign.Center);
-                                //textPaint.TextAlign = SKTextAlign.Left;
-                                textPaint.TextSize = basefontsize;
-                            }
-
-                            if(ShowRecording)
-                            {
-                                if (GHApp.RecordGame && !PlayingReplay)
-                                {
-                                    target_width = rowheight / 4;
-                                    target_height = rowheight;
-                                    curx = fpsleft - innerspacing * 6 - target_width;
-                                    SKPoint dotpoint = new SKPoint(curx + target_width / 2, cury + target_height / 2);
-                                    float dotradius = target_width / 2;
-                                    textPaint.Color = SKColors.Red;
-                                    textPaint.Style = SKPaintStyle.Fill;
-                                    canvas.DrawCircle(dotpoint, dotradius, textPaint.Paint);
-                                    curx += target_width;
-                                }
-                            }
-
-                            /* Pets */
-                            if (ShowPets)
-                            {
-                                lock (_petDataLock)
-                                {
-                                    textPaint.Color = SKColors.White;
-                                    textPaint.Typeface = GHApp.LatoRegular;
-                                    textPaint.TextSize = 36;
-                                    float pet_target_height = inverse_canvas_scale * (float)(StandardMeasurementButton.Height + lAbilitiesButton.Width) / 2;
-                                    //float pet_name_target_height = pet_target_height * 0.4f;
-                                    float pet_picture_target_height = pet_target_height * 0.56f;
-                                    float pet_hp_target_height = pet_target_height * 0.24f;
-                                    float pet_status_target_height = pet_target_height * 0.2f;
-                                    //float pet_name_size = textPaint.TextSize * pet_name_target_height / textPaint.FontSpacing;
-                                    float pet_hp_size = textPaint.TextSize * pet_hp_target_height / textPaint.FontSpacing; //pet_name_size * pet_hp_target_height / pet_name_target_height;
-                                                                                                                            //textPaint.TextSize = pet_name_size;
-                                                                                                                            //string pet_test_text = "Large Dog";
-                                                                                                                            //float pet_target_width = textPaint.MeasureText(pet_test_text);
-                                                                                                                            //pet_target_width += textPaint.FontSpacing; // For picture
-                                    float pet_target_width = pet_target_height; // inverse_canvas_scale * (float)StandardMeasurementButton.Width;
-
-                                    SKRect menubuttonrect = GetViewScreenRect(UseSimpleCmdLayout ? SimpleGameMenuButton : GameMenuButton);
-                                    SKRect canvasrect = GetViewScreenRect(canvasView);
-                                    SKRect adjustedrect = new SKRect(menubuttonrect.Left - canvasrect.Left, menubuttonrect.Top - canvasrect.Top, menubuttonrect.Right - canvasrect.Left, menubuttonrect.Bottom - canvasrect.Top);
-                                    float menu_button_left = adjustedrect.Left;
-                                    float pet_tx_start = orbleft + orbbordersize * 1.1f;
-                                    tx = pet_tx_start;
-                                    ty = statusbarheight + 5.0f;
-                                    int petrownum = 0;
-
-                                    foreach (GHPetDataItem pdi in _petData)
+                                    string drawtext;
+                                    lock (_showMemoryLock)
                                     {
-                                        monst_info mi = pdi.Data;
-                                        using (new SKAutoCanvasRestore(canvas, true))
-                                        {
-                                            canvas.ClipRect(new SKRect(tx - 1, ty - 1, tx + pet_target_width + 1, ty + pet_target_height + 2));
-                                            pdi.Rect = new SKRect(tx, ty, tx + pet_target_width, ty + pet_target_height);
+                                        drawtext = (_memUsage / 1024).ToString();
+                                    }
 
-                                            float petpicturewidth = 0f;
-                                            float petpictureheight = 0f;
+                                    const int topMargin = 7, bottomMargin = 20;
+                                    textPaint.Color = SKColors.White;
+                                    textPaint.TextSize = diffontsize;
+                                    float vsize = target_height - (topMargin + bottomMargin) * target_scale;
+                                    float fsize = textPaint.FontSpacing;
+                                    float vpadding = (vsize - fsize) / 2;
+                                    SKPoint drawpoint = new SKPoint(curx + target_width / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
+                                    textPaint.DrawTextOnCanvas(canvas, drawtext, drawpoint, SKTextAlign.Center);
+                                    textPaint.TextSize = basefontsize;
+                                }
+
+                                if (ShowZoom)
+                                {
+                                    target_width = target_scale * GHApp._zoomBitmap.Width;
+                                    target_height = target_scale * GHApp._zoomBitmap.Height;
+                                    curx = desktopleft - innerspacing * 5 - target_width;
+                                    statusDest = new SKRect(curx, cury, curx + target_width, cury + target_height);
+                                    canvas.DrawImage(GHApp._zoomBitmap, statusDest);
+                                    desktopleft = curx;
+
+                                    float percentage = usedFontSize / DefaultMapFontSize;
+                                    int percentage_int = (int)(percentage * 100);
+                                    string drawtext = percentage_int.ToString();
+
+                                    const int topMargin = 12, bottomMargin = 12;
+                                    const int leftMargin = 5, rightMargin = 11;
+                                    textPaint.Color = SKColors.White;
+                                    textPaint.TextSize = diffontsize * 0.9f;
+                                    float vsize = target_height - (topMargin + bottomMargin) * target_scale;
+                                    float fsize = textPaint.FontSpacing;
+                                    float vpadding = (vsize - fsize) / 2;
+                                    SKPoint drawpoint = new SKPoint(curx + leftMargin + (target_width - leftMargin - rightMargin) / 2, cury + (topMargin * target_scale) + vpadding - textPaint.FontMetrics.Ascent);
+                                    textPaint.DrawTextOnCanvas(canvas, drawtext, drawpoint, SKTextAlign.Center);
+
+                                    if (MapFontShowPercentageDecimal)
+                                    {
+                                        const int topFractionMargin = 46, bottomFractionMargin = 4;
+                                        int fraction_int = (int)((percentage * 100 - (float)Math.Floor(percentage * 100)) * 10);
+                                        string drawtext2 = fraction_int.ToString();
+                                        textPaint.TextSize = textPaint.TextSize * 0.7f;
+                                        float vsize2 = target_height - (topFractionMargin + bottomFractionMargin) * target_scale;
+                                        float fsize2 = textPaint.FontSpacing;
+                                        float vpadding2 = (vsize2 - fsize2) / 2;
+                                        SKPoint drawpoint2 = new SKPoint(curx + leftMargin + (target_width - leftMargin - rightMargin) / 2, cury + (topFractionMargin * target_scale) + vpadding2 - textPaint.FontMetrics.Ascent);
+                                        textPaint.DrawTextOnCanvas(canvas, drawtext2, drawpoint2, SKTextAlign.Center);
+                                    }
+
+                                    textPaint.TextSize = basefontsize;
+                                }
+
+                                if (ShowRecording)
+                                {
+                                    if (GHApp.RecordGame && !PlayingReplay)
+                                    {
+                                        target_width = rowheight / 4;
+                                        target_height = rowheight;
+                                        curx = desktopleft - innerspacing * 6 - target_width;
+                                        desktopleft = curx;
+                                        SKPoint dotpoint = new SKPoint(curx + target_width / 2, cury + target_height / 2);
+                                        float dotradius = target_width / 2;
+                                        textPaint.Color = SKColors.Red;
+                                        textPaint.Style = SKPaintStyle.Fill;
+                                        canvas.DrawCircle(dotpoint, dotradius, textPaint.Paint);
+                                        curx += target_width;
+                                    }
+                                }
+
+                                /* Pets */
+                                if (ShowPets)
+                                {
+                                    lock (_petDataLock)
+                                    {
+                                        textPaint.Color = SKColors.White;
+                                        textPaint.Typeface = GHApp.LatoRegular;
+                                        textPaint.TextSize = 36;
+                                        float pet_target_height = inverse_canvas_scale * (float)(StandardMeasurementButton.Height + StandardReferenceButton.Width) / 2;
+                                        float pet_picture_target_height = pet_target_height * 0.56f;
+                                        float pet_hp_target_height = pet_target_height * 0.24f;
+                                        float pet_status_target_height = pet_target_height * 0.2f;
+                                        float pet_hp_size = textPaint.TextSize * pet_hp_target_height / textPaint.FontSpacing;
+                                        float pet_target_width = pet_target_height;
+
+                                        SKRect menubuttonrect = GetViewScreenRect(UseSimpleCmdLayout ? SimpleGameMenuButton : GameMenuButton);
+                                        SKRect canvasrect = GetViewScreenRect(canvasView);
+                                        SKRect adjustedrect = new SKRect(menubuttonrect.Left - canvasrect.Left, menubuttonrect.Top - canvasrect.Top, menubuttonrect.Right - canvasrect.Left, menubuttonrect.Bottom - canvasrect.Top);
+                                        float menu_button_left = adjustedrect.Left;
+                                        float pet_tx_start = orbleft + orbbordersize * 1.1f;
+                                        tx = pet_tx_start;
+                                        ty = statusbarheight + 5.0f;
+                                        int petrownum = 0;
+
+                                        foreach (GHPetDataItem pdi in _petData)
+                                        {
+                                            monst_info mi = pdi.Data;
                                             using (new SKAutoCanvasRestore(canvas, true))
                                             {
-                                                GlyphImageSource gis = new GlyphImageSource();
-                                                gis.ReferenceGamePage = this;
-                                                gis.UseUpperSide = false; /* Monsters are generally full-sized */
-                                                gis.AutoSize = true;
-                                                gis.Glyph = Math.Abs(mi.gui_glyph);
-                                                gis.DoAutoSize();
-                                                float pet_scale = Math.Min(gis.Width == 0 ? 1.0f : pet_target_width / gis.Width, gis.Height == 0 ? 1.0f : pet_picture_target_height / gis.Height);
-                                                petpicturewidth = pet_scale * gis.Width;
-                                                petpictureheight = pet_scale * gis.Height;
-                                                canvas.Translate(tx + (pet_target_width - petpicturewidth) / 2, ty + (pet_picture_target_height - petpictureheight));
-                                                canvas.Scale(pet_scale);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StartProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                                gis.DrawOnCanvas(canvas);
-#if GNH_MAP_PROFILING && DEBUG
-                                                StopProfiling(GHProfilingStyle.Bitmap);
-#endif
-                                            }
+                                                canvas.ClipRect(new SKRect(tx - 1, ty - 1, tx + pet_target_width + 1, ty + pet_target_height + 2));
+                                                pdi.Rect = new SKRect(tx, ty, tx + pet_target_width, ty + pet_target_height);
 
-                                            float curpety = ty + pet_picture_target_height;
-                                            textPaint.TextSize = pet_hp_size;
-                                            //textPaint.TextAlign = SKTextAlign.Center;
-                                            float petHPHeight = textPaint.FontSpacing;
-                                            float barpadding = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
-                                            SKRect petHPRect = new SKRect(tx, curpety, tx + pet_target_width, curpety + petHPHeight);
-                                            float petpct = mi.mhpmax <= 0 ? 0.0f : (float)mi.mhp / (float)mi.mhpmax;
-                                            SKRect petHPFill = new SKRect(tx, curpety, tx + pet_target_width * petpct, curpety + petHPHeight);
-                                            textPaint.Color = SKColors.Red.WithAlpha(144);
-#if GNH_MAP_PROFILING && DEBUG
-                                            StartProfiling(GHProfilingStyle.Rect);
-#endif
-                                            canvas.DrawRect(petHPFill, textPaint.Paint);
-                                            SKRect petHPNonFill = new SKRect(tx + pet_target_width * petpct, curpety, tx + pet_target_width, curpety + petHPHeight);
-                                            textPaint.Color = SKColors.Gray.WithAlpha(144);
-                                            canvas.DrawRect(petHPNonFill, textPaint.Paint);
-                                            textPaint.Color = SKColors.Black.WithAlpha(144);
-                                            textPaint.Style = SKPaintStyle.Stroke;
-                                            textPaint.StrokeWidth = 2;
-                                            canvas.DrawRect(petHPRect, textPaint.Paint);
-#if GNH_MAP_PROFILING && DEBUG
-                                            StopProfiling(GHProfilingStyle.Rect);
-#endif
-
-                                            curpety += barpadding - textPaint.FontMetrics.Ascent;
-                                            textPaint.Style = SKPaintStyle.Fill;
-                                            textPaint.Color = SKColors.White;
-#if GNH_MAP_PROFILING && DEBUG
-                                            StartProfiling(GHProfilingStyle.Text);
-#endif
-                                            textPaint.DrawTextOnCanvas(canvas, mi.mhp + "(" + mi.mhpmax + ")", tx + pet_target_width / 2, curpety, SKTextAlign.Center);
-#if GNH_MAP_PROFILING && DEBUG
-                                            StopProfiling(GHProfilingStyle.Text);
-#endif
-
-                                            {
-                                                /* Condition, status and buff marks */
-                                                curx = tx;
-                                                cury = petHPRect.Bottom;
-                                                rowheight = pet_status_target_height;
-
-                                                float marksize = rowheight * 0.95f;
-                                                float markpadding = marksize / 8;
-                                                ulong status_bits;
-                                                status_bits = mi.status_bits;
-                                                if (status_bits != 0)
+                                                float petpicturewidth = 0f;
+                                                float petpictureheight = 0f;
+                                                using (new SKAutoCanvasRestore(canvas, true))
                                                 {
-                                                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                                                    int mglyph = (int)game_ui_tile_types.STATUS_MARKS + GHApp.UITileOff;
-                                                    int mtile = GHApp.Glyph2Tile[mglyph];
-                                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
-                                                    int tile_x = GHApp.TileSheetX(mtile);
-                                                    int tile_y = GHApp.TileSheetY(mtile);
-                                                    foreach (int status_mark in _statusmarkorder)
-                                                    {
-                                                        ulong statusbit = 1UL << status_mark;
-                                                        if ((status_bits & statusbit) != 0)
-                                                        {
-                                                            int within_tile_x = status_mark % tiles_per_row;
-                                                            int within_tile_y = status_mark / tiles_per_row;
-                                                            int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
-                                                            int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
-
-                                                            SKRect source_rt = new SKRect();
-                                                            source_rt.Left = c_x;
-                                                            source_rt.Right = c_x + GHConstants.StatusMarkWidth;
-                                                            source_rt.Top = c_y;
-                                                            source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
-
-                                                            SKRect target_rt = new SKRect();
-                                                            target_rt.Left = curx;
-                                                            target_rt.Right = target_rt.Left + marksize;
-                                                            target_rt.Top = cury + (rowheight - marksize) / 2;
-                                                            target_rt.Bottom = target_rt.Top + marksize;
+                                                    GlyphImageSource gis = new GlyphImageSource();
+                                                    gis.ReferenceGamePage = this;
+                                                    gis.UseUpperSide = false; /* Monsters are generally full-sized */
+                                                    gis.AutoSize = true;
+                                                    gis.Glyph = Math.Abs(mi.gui_glyph);
+                                                    gis.DoAutoSize();
+                                                    float pet_scale = Math.Min(gis.Width == 0 ? 1.0f : pet_target_width / gis.Width, gis.Height == 0 ? 1.0f : pet_picture_target_height / gis.Height);
+                                                    petpicturewidth = pet_scale * gis.Width;
+                                                    petpictureheight = pet_scale * gis.Height;
+                                                    canvas.Translate(tx + (pet_target_width - petpicturewidth) / 2, ty + (pet_picture_target_height - petpictureheight));
+                                                    canvas.Scale(pet_scale);
 #if GNH_MAP_PROFILING && DEBUG
-                                                            StartProfiling(GHProfilingStyle.Bitmap);
+                                                    StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                                                            canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
+                                                    gis.DrawOnCanvas(canvas, usingGL, isPointerHovering && pdi.Rect.Contains(pointerHoverLocation), false);
 #if GNH_MAP_PROFILING && DEBUG
-                                                            StopProfiling(GHProfilingStyle.Bitmap);
+                                                    StopProfiling(GHProfilingStyle.Bitmap);
 #endif
-
-                                                            curx += marksize;
-                                                            curx += markpadding;
-                                                        }
-                                                    }
                                                 }
 
-                                                ulong condition_bits;
-                                                condition_bits = mi.condition_bits;
-                                                if (condition_bits != 0)
-                                                {
-                                                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                                                    int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + GHApp.UITileOff;
-                                                    int mtile = GHApp.Glyph2Tile[mglyph];
-                                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
-                                                    int tile_x = GHApp.TileSheetX(mtile);
-                                                    int tile_y = GHApp.TileSheetY(mtile);
-                                                    for (int condition_mark = 0; condition_mark < (int)bl_conditions.NUM_BL_CONDITIONS; condition_mark++)
-                                                    {
-                                                        ulong conditionbit = 1UL << condition_mark;
-                                                        if ((condition_bits & conditionbit) != 0)
-                                                        {
-                                                            int within_tile_x = condition_mark % tiles_per_row;
-                                                            int within_tile_y = condition_mark / tiles_per_row;
-                                                            int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
-                                                            int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
-
-                                                            SKRect source_rt = new SKRect();
-                                                            source_rt.Left = c_x;
-                                                            source_rt.Right = c_x + GHConstants.StatusMarkWidth;
-                                                            source_rt.Top = c_y;
-                                                            source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
-
-                                                            SKRect target_rt = new SKRect();
-                                                            target_rt.Left = curx;
-                                                            target_rt.Right = target_rt.Left + marksize;
-                                                            target_rt.Top = cury + (rowheight - marksize) / 2;
-                                                            target_rt.Bottom = target_rt.Top + marksize;
+                                                float curpety = ty + pet_picture_target_height;
+                                                textPaint.TextSize = pet_hp_size;
+                                                //textPaint.TextAlign = SKTextAlign.Center;
+                                                float petHPHeight = textPaint.FontSpacing;
+                                                float barpadding = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
+                                                SKRect petHPRect = new SKRect(tx, curpety, tx + pet_target_width, curpety + petHPHeight);
+                                                float petpct = mi.mhpmax <= 0 ? 0.0f : (float)mi.mhp / (float)mi.mhpmax;
+                                                SKRect petHPFill = new SKRect(tx, curpety, tx + pet_target_width * petpct, curpety + petHPHeight);
+                                                textPaint.Color = SKColors.Red.WithAlpha(144);
 #if GNH_MAP_PROFILING && DEBUG
-                                                            StartProfiling(GHProfilingStyle.Bitmap);
+                                                StartProfiling(GHProfilingStyle.Rect);
 #endif
-                                                            canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
+                                                canvas.DrawRect(petHPFill, textPaint.Paint);
+                                                SKRect petHPNonFill = new SKRect(tx + pet_target_width * petpct, curpety, tx + pet_target_width, curpety + petHPHeight);
+                                                textPaint.Color = SKColors.Gray.WithAlpha(144);
+                                                canvas.DrawRect(petHPNonFill, textPaint.Paint);
+                                                textPaint.Color = SKColors.Black.WithAlpha(144);
+                                                textPaint.Style = SKPaintStyle.Stroke;
+                                                textPaint.StrokeWidth = 2;
+                                                canvas.DrawRect(petHPRect, textPaint.Paint);
 #if GNH_MAP_PROFILING && DEBUG
-                                                            StopProfiling(GHProfilingStyle.Bitmap);
+                                                StopProfiling(GHProfilingStyle.Rect);
 #endif
 
-                                                            curx += marksize;
-                                                            curx += markpadding;
-                                                        }
-                                                    }
-                                                }
+                                                curpety += barpadding - textPaint.FontMetrics.Ascent;
+                                                textPaint.Style = SKPaintStyle.Fill;
+                                                textPaint.Color = SKColors.White;
+#if GNH_MAP_PROFILING && DEBUG
+                                                StartProfiling(GHProfilingStyle.Text);
+#endif
+                                                textPaint.DrawTextOnCanvas(canvas, mi.mhp + "(" + mi.mhpmax + ")", tx + pet_target_width / 2, curpety, SKTextAlign.Center);
+#if GNH_MAP_PROFILING && DEBUG
+                                                StopProfiling(GHProfilingStyle.Text);
+#endif
 
-                                                ulong buff_bits;
-                                                for (int buff_ulong = 0; buff_ulong < GHConstants.NUM_BUFF_BIT_ULONGS; buff_ulong++)
                                                 {
-                                                    buff_bits = mi.buff_bits[buff_ulong];
-                                                    int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                                                    if (buff_bits != 0)
+                                                    /* Condition, status and buff marks */
+                                                    curx = tx;
+                                                    cury = petHPRect.Bottom;
+                                                    rowheight = pet_status_target_height;
+
+                                                    float marksize = rowheight * 0.95f;
+                                                    float markpadding = marksize / 8;
+                                                    ulong status_bits;
+                                                    status_bits = mi.status_bits;
+                                                    if (status_bits != 0)
                                                     {
-                                                        for (int buff_idx = 0; buff_idx < 32; buff_idx++)
+                                                        int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                                                        foreach (int status_mark in _statusmarkorder)
                                                         {
-                                                            ulong buffbit = 1UL << buff_idx;
-                                                            if ((buff_bits & buffbit) != 0)
+                                                            ulong statusbit = 1UL << status_mark;
+                                                            if ((status_bits & statusbit) != 0)
                                                             {
-                                                                int propidx = buff_ulong * 32 + buff_idx;
-                                                                if (propidx > GHConstants.LAST_PROP)
-                                                                    break;
-                                                                int mglyph = (propidx - 1) / GHConstants.BUFFS_PER_TILE + GHApp.BuffTileOff;
+                                                                int mglyph = (int)game_ui_tile_types.STATUS_MARKS + status_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
                                                                 int mtile = GHApp.Glyph2Tile[mglyph];
                                                                 int sheet_idx = GHApp.TileSheetIdx(mtile);
                                                                 int tile_x = GHApp.TileSheetX(mtile);
                                                                 int tile_y = GHApp.TileSheetY(mtile);
-
-                                                                int buff_mark = (propidx - 1) % GHConstants.BUFFS_PER_TILE;
-                                                                int within_tile_x = buff_mark % tiles_per_row;
-                                                                int within_tile_y = buff_mark / tiles_per_row;
+                                                                int within_tile_x = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                                                                int within_tile_y = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                                                                 int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                                                                 int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -9291,6 +10101,7 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                                                                 StartProfiling(GHProfilingStyle.Bitmap);
 #endif
+                                                                GHApp.MaybeFixRects(ref source_rt, ref target_rt, 1.0f, usingGL);
                                                                 canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
 #if GNH_MAP_PROFILING && DEBUG
                                                                 StopProfiling(GHProfilingStyle.Bitmap);
@@ -9301,34 +10112,134 @@ namespace GnollHackX.Pages.Game
                                                             }
                                                         }
                                                     }
+
+                                                    ulong condition_bits;
+                                                    condition_bits = mi.condition_bits;
+                                                    if (condition_bits != 0)
+                                                    {
+                                                        int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                                                        for (int condition_mark = 0; condition_mark < (int)bl_conditions.NUM_BL_CONDITIONS; condition_mark++)
+                                                        {
+                                                            ulong conditionbit = 1UL << condition_mark;
+                                                            if ((condition_bits & conditionbit) != 0)
+                                                            {
+                                                                int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + condition_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
+                                                                int mtile = GHApp.Glyph2Tile[mglyph];
+                                                                int sheet_idx = GHApp.TileSheetIdx(mtile);
+                                                                int tile_x = GHApp.TileSheetX(mtile);
+                                                                int tile_y = GHApp.TileSheetY(mtile);
+                                                                int within_tile_x = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                                                                int within_tile_y = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
+                                                                int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
+                                                                int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
+
+                                                                SKRect source_rt = new SKRect();
+                                                                source_rt.Left = c_x;
+                                                                source_rt.Right = c_x + GHConstants.StatusMarkWidth;
+                                                                source_rt.Top = c_y;
+                                                                source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
+
+                                                                SKRect target_rt = new SKRect();
+                                                                target_rt.Left = curx;
+                                                                target_rt.Right = target_rt.Left + marksize;
+                                                                target_rt.Top = cury + (rowheight - marksize) / 2;
+                                                                target_rt.Bottom = target_rt.Top + marksize;
+#if GNH_MAP_PROFILING && DEBUG
+                                                                StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                                GHApp.MaybeFixRects(ref source_rt, ref target_rt, 1.0f, usingGL);
+                                                                canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
+#if GNH_MAP_PROFILING && DEBUG
+                                                                StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+
+                                                                curx += marksize;
+                                                                curx += markpadding;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    ulong buff_bits;
+                                                    for (int buff_ulong = 0; buff_ulong < GHConstants.NUM_BUFF_BIT_ULONGS; buff_ulong++)
+                                                    {
+                                                        buff_bits = mi.buff_bits[buff_ulong];
+                                                        int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
+                                                        if (buff_bits != 0)
+                                                        {
+                                                            for (int buff_idx = 0; buff_idx < 32; buff_idx++)
+                                                            {
+                                                                ulong buffbit = 1UL << buff_idx;
+                                                                if ((buff_bits & buffbit) != 0)
+                                                                {
+                                                                    int propidx = buff_ulong * 32 + buff_idx;
+                                                                    if (propidx > GHConstants.LAST_PROP)
+                                                                        break;
+                                                                    int mglyph = (propidx - 1) / GHConstants.BUFFS_PER_TILE + GHApp.BuffTileOff;
+                                                                    int mtile = GHApp.Glyph2Tile[mglyph];
+                                                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
+                                                                    int tile_x = GHApp.TileSheetX(mtile);
+                                                                    int tile_y = GHApp.TileSheetY(mtile);
+
+                                                                    int buff_mark = (propidx - 1) % GHConstants.BUFFS_PER_TILE;
+                                                                    int within_tile_x = buff_mark % tiles_per_row;
+                                                                    int within_tile_y = buff_mark / tiles_per_row;
+                                                                    int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
+                                                                    int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
+
+                                                                    SKRect source_rt = new SKRect();
+                                                                    source_rt.Left = c_x;
+                                                                    source_rt.Right = c_x + GHConstants.StatusMarkWidth;
+                                                                    source_rt.Top = c_y;
+                                                                    source_rt.Bottom = c_y + GHConstants.StatusMarkHeight;
+
+                                                                    SKRect target_rt = new SKRect();
+                                                                    target_rt.Left = curx;
+                                                                    target_rt.Right = target_rt.Left + marksize;
+                                                                    target_rt.Top = cury + (rowheight - marksize) / 2;
+                                                                    target_rt.Bottom = target_rt.Top + marksize;
+#if GNH_MAP_PROFILING && DEBUG
+                                                                    StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                                                                    GHApp.MaybeFixRects(ref source_rt, ref target_rt, 1.0f, usingGL);
+                                                                    canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
+#if GNH_MAP_PROFILING && DEBUG
+                                                                    StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+
+                                                                    curx += marksize;
+                                                                    curx += markpadding;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                 }
+
+                                                /* Next pet */
+                                                tx += pet_target_width;
+                                                if (tx + pet_target_width * 1.08f > menu_button_left)
+                                                {
+                                                    tx = pet_tx_start;
+                                                    ty += pet_target_height + textPaint.FontSpacing / 2;
+                                                    petrownum++;
+                                                    if (petrownum >= NumDisplayedPetRows)
+                                                        break;
+                                                }
+                                                else
+                                                    tx += pet_target_width * 0.08f;
                                             }
 
-                                            /* Next pet */
-                                            tx += pet_target_width;
-                                            if (tx + pet_target_width * 1.08f > menu_button_left)
-                                            {
-                                                tx = pet_tx_start;
-                                                ty += pet_target_height + textPaint.FontSpacing / 2;
-                                                petrownum++;
-                                                if (petrownum >= NumDisplayedPetRows)
-                                                    break;
-                                            }
-                                            else
-                                                tx += pet_target_width * 0.08f;
+                                            //textPaint.TextAlign = SKTextAlign.Left;
                                         }
-
-                                        //textPaint.TextAlign = SKTextAlign.Left;
                                     }
                                 }
-                            }
-                            else
-                            {
-                                lock (_petDataLock)
+                                else
                                 {
-                                    foreach (GHPetDataItem pdi in _petData)
+                                    lock (_petDataLock)
                                     {
-                                        pdi.Rect = new SKRect();
+                                        foreach (GHPetDataItem pdi in _petData)
+                                        {
+                                            pdi.Rect = new SKRect();
+                                        }
                                     }
                                 }
                             }
@@ -9358,7 +10269,7 @@ namespace GnollHackX.Pages.Game
                             skillbuttonok = false;
 
                         /* HP and MP */
-                        if ((ShowOrbs | !ClassicStatusBar) && orbsok)
+                        if ((ShowOrbs || !ClassicStatusBar) && orbsok)
                         {
                             float orbfillpercentage = 0.0f;
                             string valtext = "";
@@ -9386,7 +10297,7 @@ namespace GnollHackX.Pages.Game
                             SKRect orbBorderDest = new SKRect(tx, ty, tx + orbbordersize, ty + orbbordersize);
                             HealthRect = orbBorderDest;
                             _healthRectDrawn = true;
-                            DrawOrb(canvas, textPaint, orbBorderDest, SKColors.Red, valtext, maxtext, orbfillpercentage, ShowMaxHealthInOrb);
+                            DrawOrb(canvas, textPaint, orbBorderDest, SKColors.Red, valtext, maxtext, orbfillpercentage, ShowMaxHealthInOrb, false /* isPointerHovering && orbBorderDest.Contains(pointerHoverLocation) */);
 
                             orbfillpercentage = 0.0f;
                             valtext = "";
@@ -9410,7 +10321,7 @@ namespace GnollHackX.Pages.Game
                             orbBorderDest = new SKRect(tx, ty + orbbordersize + 5, tx + orbbordersize, ty + orbbordersize + 5 + orbbordersize);
                             ManaRect = orbBorderDest;
                             _manaRectDrawn = true;
-                            DrawOrb(canvas, textPaint, orbBorderDest, SKColors.Blue, valtext, maxtext, orbfillpercentage, ShowMaxManaInOrb);
+                            DrawOrb(canvas, textPaint, orbBorderDest, SKColors.Blue, valtext, maxtext, orbfillpercentage, ShowMaxManaInOrb, false /* isPointerHovering && orbBorderDest.Contains(pointerHoverLocation) */);
                             lastdrawnrecty = orbBorderDest.Bottom;
                         }
 
@@ -9426,7 +10337,14 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                            canvas.DrawImage(GHApp._skillBitmap, skillDest);
+                            using(SKPaint btnPaint = new SKPaint())
+                            {
+                                if (isPointerHovering && skillDest.Contains(pointerHoverLocation))
+                                {
+                                    btnPaint.ColorFilter = UIUtils.HighlightColorFilter;
+                                }
+                                canvas.DrawImage(GHApp._skillBitmap, skillDest, btnPaint);
+                            }
 #if GNH_MAP_PROFILING && DEBUG
                             StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -9455,7 +10373,14 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                            canvas.DrawImage(isunwield ? GHApp._prevUnwieldBitmap : GHApp._prevWepBitmap, prevWepDest);
+                            using (SKPaint btnPaint = new SKPaint())
+                            {
+                                if (isPointerHovering && prevWepDest.Contains(pointerHoverLocation))
+                                {
+                                    btnPaint.ColorFilter = UIUtils.HighlightColorFilter;
+                                }
+                                canvas.DrawImage(isunwield ? GHApp._prevUnwieldBitmap : GHApp._prevWepBitmap, prevWepDest, btnPaint);
+                            }
 #if GNH_MAP_PROFILING && DEBUG
                             StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -9469,6 +10394,61 @@ namespace GnollHackX.Pages.Game
                             StopProfiling(GHProfilingStyle.Text);
 #endif
                             //textPaint.TextAlign = SKTextAlign.Left;
+                        }
+                    }
+
+                    /* Context Menu */
+                    lock(_contextMenuDataLock)
+                    {
+                        float startBottom = canvasheight - (float)UsedButtonRowStack.Height * inverse_canvas_scale - GHConstants.ContextButtonBottomStartMargin;
+                        float textSize = GHConstants.ContextButtonBaseFontSize * orbbordersize / 50.0f;
+                        float internalPadding = GHConstants.ContextButtonSpacing * inverse_canvas_scale;
+                        float startTop = startBottom + internalPadding;
+                        float horizontalPadding = 2f * inverse_canvas_scale;
+                        float startLeft = canvaswidth - orbbordersize - horizontalPadding;
+                        float topLimit = (float)(StandardMeasurementCmdLayout.Height + StandardMeasurementCmdLayout.Margin.Top) * inverse_canvas_scale;
+                        bool isFirstCmb = true;
+                        foreach (ContextMenuButton cmb in _contextMenuData) /* foreach, since _contextMenuData may in theory be cleared concurrently in the same thread */
+                        {
+                            startTop -= (orbbordersize + internalPadding + textSize);
+                            if (startTop < topLimit && !isFirstCmb)
+                            {
+                                startTop = startBottom - orbbordersize - textSize;
+                                startLeft -= (internalPadding + orbbordersize);
+                            }
+                            else
+                            {
+                                isFirstCmb = false;
+                            }
+                            cmb.Rect = new SKRect(startLeft, startTop, startLeft + orbbordersize, startTop + orbbordersize + textSize);
+                            SKRect imgDest = new SKRect(startLeft, startTop, startLeft + orbbordersize, startTop + orbbordersize);
+                            textPaint.Color = SKColors.White;
+                            textPaint.Typeface = GHApp.LatoRegular;
+                            textPaint.TextSize = textSize;
+                            //textPaint.TextAlign = SKTextAlign.Center;
+#if GNH_MAP_PROFILING && DEBUG
+                            StartProfiling(GHProfilingStyle.Bitmap);
+#endif
+                            using (SKPaint btnPaint = new SKPaint())
+                            {
+                                if (isPointerHovering && cmb.Rect.Contains(pointerHoverLocation))
+                                {
+                                    btnPaint.ColorFilter = UIUtils.HighlightColorFilter;
+                                }
+                                canvas.DrawImage(cmb.Bitmap, imgDest, btnPaint);
+                            }
+#if GNH_MAP_PROFILING && DEBUG
+                            StopProfiling(GHProfilingStyle.Bitmap);
+#endif
+                            float text_x = (imgDest.Left + imgDest.Right) / 2;
+                            float text_y = imgDest.Bottom - textPaint.FontMetrics.Ascent;
+#if GNH_MAP_PROFILING && DEBUG
+                            StartProfiling(GHProfilingStyle.Text);
+#endif
+                            textPaint.DrawTextOnCanvas(canvas, cmb.LblText, text_x, text_y, SKTextAlign.Center);
+#if GNH_MAP_PROFILING && DEBUG
+                            StopProfiling(GHProfilingStyle.Text);
+#endif
                         }
                     }
                     
@@ -9659,8 +10639,8 @@ namespace GnollHackX.Pages.Game
                     float box_right = canvaswidth - box_left;
                     if (box_right < box_left)
                         box_right = box_left;
-                    float box_top = canvaswidth < canvasheight ? GetStatusBarSkiaHeight() + 1.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Height :
-                        GetStatusBarSkiaHeight() + 0.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Height;
+                    float box_top = canvaswidth < canvasheight ? statusBarSkiaHeight + 1.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Height :
+                        statusBarSkiaHeight + 0.25f * inverse_canvas_scale * (float)StandardMeasurementButton.Height;
                     float box_bottom = canvasheight - 1.25f * inverse_canvas_scale * (float)UsedButtonRowStack.Height;
                     if (box_bottom < box_top)
                         box_bottom = box_top;
@@ -9743,13 +10723,13 @@ namespace GnollHackX.Pages.Game
                         SKRect cliprect = new SKRect(0, ty + textPaint.FontMetrics.Ascent, canvaswidth, bkgrect.Bottom - bkgrect.Height / 8.5f);
                         canvas.ClipRect(cliprect);
 
-                        ty += _statusOffsetY;
-                        base_ty = ty;
-
-                        lock (_mapOffsetLock)
+                        lock (_statusOffsetLock)
                         {
+                            ty += _statusOffsetY;
                             _statusClipBottom = cliprect.Bottom;
                         }
+                        base_ty = ty;
+
                         for (int i = 0; i < 6; i++)
                         {
                             valtext = "";
@@ -9768,6 +10748,12 @@ namespace GnollHackX.Pages.Game
                                 textPaint.Color = UIUtils.NHColor2SKColorCore(valcolor, 0, true, false);
                                 textPaint.DrawTextOnCanvas(canvas, valtext, tx + indentation, ty);
                                 textPaint.Color = SKColors.Black;
+                                SKImage statIcon = GetStatIcon(i);
+                                icon_width = icon_height * (float)statIcon.Width / (float)statIcon.Height;
+                                icon_tx = icon_base_left + (icon_max_width - icon_width) / 2f;
+                                icon_ty = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - icon_height) / 2;
+                                icon_rect = new SKRect(icon_tx, icon_ty, icon_tx + icon_width, icon_ty + icon_height);
+                                canvas.DrawImage(statIcon, icon_rect);
                                 ty += textPaint.FontSpacing;
                             }
                         }
@@ -9805,6 +10791,10 @@ namespace GnollHackX.Pages.Game
                         {
                             textPaint.DrawTextOnCanvas(canvas, "Experience:", tx, ty);
                             textPaint.DrawTextOnCanvas(canvas, valtext, tx + indentation, ty);
+                            icon_tx = icon_base_left + (icon_max_width - icon_width) / 2f;
+                            icon_ty = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - icon_height) / 2;
+                            icon_rect = new SKRect(icon_tx, icon_ty, icon_tx + icon_width, icon_ty + icon_height);
+                            canvas.DrawImage(GHApp._statusXPPointsBitmap, icon_rect);
                             ty += textPaint.FontSpacing;
                         }
 
@@ -9840,6 +10830,10 @@ namespace GnollHackX.Pages.Game
                         {
                             textPaint.DrawTextOnCanvas(canvas, "Alignment:", tx, ty);
                             textPaint.DrawTextOnCanvas(canvas, valtext, tx + indentation, ty);
+                            icon_tx = icon_base_left + (icon_max_width - icon_width) / 2f;
+                            icon_ty = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - icon_height) / 2;
+                            icon_rect = new SKRect(icon_tx, icon_ty, icon_tx + icon_width, icon_ty + icon_height);
+                            canvas.DrawImage(GetAlignmentIcon(valtext), icon_rect);
                             ty += textPaint.FontSpacing;
                         }
 
@@ -9855,6 +10849,10 @@ namespace GnollHackX.Pages.Game
                         {
                             textPaint.DrawTextOnCanvas(canvas, "Score:", tx, ty);
                             textPaint.DrawTextOnCanvas(canvas, valtext, tx + indentation, ty);
+                            icon_tx = icon_base_left + (icon_max_width - icon_width) / 2f;
+                            icon_ty = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - icon_height) / 2;
+                            icon_rect = new SKRect(icon_tx, icon_ty, icon_tx + icon_width, icon_ty + icon_height);
+                            canvas.DrawImage(GHApp._statusScoreBitmap, icon_rect);
                             ty += textPaint.FontSpacing;
                         }
 
@@ -9870,7 +10868,7 @@ namespace GnollHackX.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (_mapOffsetLock)
+                            lock (_statusOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -9899,7 +10897,7 @@ namespace GnollHackX.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (_mapOffsetLock)
+                            lock (_statusOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -9924,7 +10922,7 @@ namespace GnollHackX.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (_mapOffsetLock)
+                            lock (_statusOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -9958,7 +10956,7 @@ namespace GnollHackX.Pages.Game
                         }
                         if (valtext != "" || valtext2 != "" || valtext3 != "")
                         {
-                            lock (_mapOffsetLock)
+                            lock (_statusOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -9989,18 +10987,13 @@ namespace GnollHackX.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (_mapOffsetLock)
+                            lock (_statusOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
-                            string printtext;
-                            if (valtext.Length > 11 && valtext.Substring(0, 1) == "\\")
-                                printtext = valtext.Substring(11);
-                            else
-                                printtext = valtext;
-
+                            GHSubstring printtext = valtext.Length > 11 && valtext[0] == '\\' ? new GHSubstring(valtext, 11) : new GHSubstring(valtext);
                             textPaint.DrawTextOnCanvas(canvas, "Gold:", tx, ty);
-                            textPaint.DrawTextOnCanvas(canvas, printtext, tx + indentation, ty);
+                            textPaint.DrawTextOnCanvas(canvas, printtext.Value, tx + indentation, ty);
                             icon_width = icon_height * (float)GHApp._statusGoldBitmap.Width / (float)GHApp._statusGoldBitmap.Height;
                             icon_tx = icon_base_left + (icon_max_width - icon_width) / 2f;
                             icon_ty = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - icon_height) / 2;
@@ -10019,7 +11012,7 @@ namespace GnollHackX.Pages.Game
                         }
                         if (valtext != "")
                         {
-                            lock (_mapOffsetLock)
+                            lock (_statusOffsetLock)
                             {
                                 _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                             }
@@ -10052,19 +11045,19 @@ namespace GnollHackX.Pages.Game
                         if (status_bits != 0)
                         {
                             int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                            int mglyph = (int)game_ui_tile_types.STATUS_MARKS + GHApp.UITileOff;
-                            int mtile = GHApp.Glyph2Tile[mglyph];
-                            int sheet_idx = GHApp.TileSheetIdx(mtile);
-                            int tile_x = GHApp.TileSheetX(mtile);
-                            int tile_y = GHApp.TileSheetY(mtile);
                             foreach (int status_mark in _statusmarkorder)
                             {
                                 ulong statusbit = 1UL << status_mark;
                                 if ((status_bits & statusbit) != 0)
                                 {
                                     string statusname = _status_names[status_mark];
-                                    int within_tile_x = status_mark % tiles_per_row;
-                                    int within_tile_y = status_mark / tiles_per_row;
+                                    int mglyph = (int)game_ui_tile_types.STATUS_MARKS + status_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
+                                    int mtile = GHApp.Glyph2Tile[mglyph];
+                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
+                                    int tile_x = GHApp.TileSheetX(mtile);
+                                    int tile_y = GHApp.TileSheetY(mtile);
+                                    int within_tile_x = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                                    int within_tile_y = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                                     int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                                     int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -10080,9 +11073,10 @@ namespace GnollHackX.Pages.Game
                                     target_rt.Top = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - marksize) / 2;
                                     target_rt.Bottom = target_rt.Top + marksize;
 
+                                    GHApp.MaybeFixRects(ref source_rt, ref target_rt, 1.0f, usingGL);
                                     canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
                                     textPaint.DrawTextOnCanvas(canvas, statusname, tx + marksize + markpadding, ty);
-                                    lock (_mapOffsetLock)
+                                    lock (_statusOffsetLock)
                                     {
                                         _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                                     }
@@ -10099,19 +11093,19 @@ namespace GnollHackX.Pages.Game
                         if (condition_bits != 0)
                         {
                             int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                            int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + GHApp.UITileOff;
-                            int mtile = GHApp.Glyph2Tile[mglyph];
-                            int sheet_idx = GHApp.TileSheetIdx(mtile);
-                            int tile_x = GHApp.TileSheetX(mtile);
-                            int tile_y = GHApp.TileSheetY(mtile);
                             for (int condition_mark = 0; condition_mark < (int)bl_conditions.NUM_BL_CONDITIONS; condition_mark++)
                             {
                                 ulong conditionbit = 1UL << condition_mark;
                                 if ((condition_bits & conditionbit) != 0)
                                 {
                                     string conditionname = _condition_names[condition_mark];
-                                    int within_tile_x = condition_mark % tiles_per_row;
-                                    int within_tile_y = condition_mark / tiles_per_row;
+                                    int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + condition_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
+                                    int mtile = GHApp.Glyph2Tile[mglyph];
+                                    int sheet_idx = GHApp.TileSheetIdx(mtile);
+                                    int tile_x = GHApp.TileSheetX(mtile);
+                                    int tile_y = GHApp.TileSheetY(mtile);
+                                    int within_tile_x = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                                    int within_tile_y = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                                     int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                                     int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -10127,9 +11121,10 @@ namespace GnollHackX.Pages.Game
                                     target_rt.Top = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - marksize) / 2;
                                     target_rt.Bottom = target_rt.Top + marksize;
 
+                                    GHApp.MaybeFixRects(ref source_rt, ref target_rt, 1.0f, usingGL);
                                     canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
                                     textPaint.DrawTextOnCanvas(canvas, conditionname, tx + marksize + markpadding, ty);
-                                    lock (_mapOffsetLock)
+                                    lock (_statusOffsetLock)
                                     {
                                         _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                                     }
@@ -10184,10 +11179,11 @@ namespace GnollHackX.Pages.Game
                                         target_rt.Top = ty + textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent / 2 + (textPaint.FontSpacing - marksize) / 2;
                                         target_rt.Bottom = target_rt.Top + marksize;
 
+                                        GHApp.MaybeFixRects(ref source_rt, ref target_rt, 1.0f, usingGL);
                                         canvas.DrawImage(TileMap[sheet_idx], source_rt, target_rt);
                                         if (propname != null)
                                             textPaint.DrawTextOnCanvas(canvas, propname, tx + marksize + markpadding, ty);
-                                        lock (_mapOffsetLock)
+                                        lock (_statusOffsetLock)
                                         {
                                             _statusLargestBottom = ty + textPaint.FontMetrics.Descent;
                                         }
@@ -10201,6 +11197,21 @@ namespace GnollHackX.Pages.Game
                     if(!YouRectDrawn)
                         YouRect = new SKRect();
                 }
+#if WINDOWS
+                GameCursorType newCursor = GameCursorType.Normal;
+                bool doChangeCursor = false;
+                lock (_canvasPointerLock)
+                {
+                    GameCursorType usedCursor = _isCanvasHovering && (StatusBarRect.Contains(_canvasHoverLocation) || YouRect.Contains(_canvasHoverLocation) || HealthRect.Contains(_canvasHoverLocation) || ManaRect.Contains(_canvasHoverLocation)) ? GameCursorType.Info : GameCursorType.Normal;
+                    if (usedCursor != _currentCursorType)
+                    {
+                        doChangeCursor = true;
+                        _currentCursorType = newCursor = usedCursor;
+                    }
+                }
+                if (doChangeCursor)
+                    UIUtils.ChangeElementCursor(RootGrid, newCursor);
+#endif
             }
 
 #if GNH_MAP_PROFILING && DEBUG
@@ -10248,7 +11259,7 @@ namespace GnollHackX.Pages.Game
             paint.BlendMode = old_bm;
         }
 
-        bool IsNoWallEndAutoDraw(int x, int y)
+        private bool IsNoWallEndAutoDraw(int x, int y)
         {
             if (!GHUtils.isok(x, y))
                 return true;
@@ -10309,7 +11320,7 @@ namespace GnollHackX.Pages.Game
             bool tileflag_halfsize, bool tileflag_normalobjmissile, bool tileflag_fullsizeditem,
             float tx, float ty, float width, float height,
             float scale, float targetscale, float scaled_x_padding, float scaled_y_padding, float scaled_tile_height,
-            bool is_inventory, bool drawwallends)
+            bool is_inventory, bool drawwallends, bool usingGL, bool highFilterQuality)
         {
             if (delayedDraw)
             {
@@ -10327,7 +11338,7 @@ namespace GnollHackX.Pages.Game
                     {
                         foreach (ObjectDataItem otmp in otmp_round.ContainedObjs)
                         {
-                            if(otmp != null)
+                            if (otmp != null)
                             {
                                 contents_no++;
                                 contents_id_sum += otmp.ObjData.o_id;
@@ -10532,7 +11543,12 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                                     StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                                    canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                                    GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                                    canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                        new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                        paint);
 #if GNH_MAP_PROFILING && DEBUG
                                     StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -10547,7 +11563,7 @@ namespace GnollHackX.Pages.Game
                     )
                     /*|| autodraw_u_punished*/)
                 {
-                    DrawChain(canvas, paint, mapx, mapy, autodraw, false, width, height, ty, tx, scale, targetscale);
+                    DrawChain(canvas, paint, mapx, mapy, autodraw, false, width, height, ty, tx, scale, targetscale, usingGL, highFilterQuality);
                 }
                 else if (GHApp._autodraws[autodraw].draw_type == (int)autodraw_drawing_types.AUTODRAW_DRAW_LONG_WORM)
                 {
@@ -10658,7 +11674,12 @@ namespace GnollHackX.Pages.Game
                                 canvas.Translate(target_x + (hflip_seg ? width : 0), target_y + (vflip_seg ? height : 0));
                                 canvas.Scale(hflip_seg ? -1 : 1, vflip_seg ? -1 : 1, 0, 0);
                                 paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
-                                canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect, paint);
+                                GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
+                                canvas.DrawImage(TileMap[sheet_idx], sourcerect, targetrect,
+#if GNH_MAUI
+                                    new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                    paint);
                             }
                         }
                     }
@@ -10678,7 +11699,6 @@ namespace GnollHackX.Pages.Game
                     int src_scroll_y = 0;
                     int cnt = 0;
                     int items_per_row = shelf_width / shelf_item_width;
-
                     foreach (ObjectDataItem contained_obj in otmp_round.ContainedObjs)
                     {
                         int src_x = 0, src_y = 0;
@@ -10731,9 +11751,13 @@ namespace GnollHackX.Pages.Game
                                 canvas.Translate(target_x, target_y);
                                 canvas.Scale(1, 1, 0, 0);
                                 paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
-                                canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                                GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                                canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                    new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                    paint);
                             }
-
                             cnt++;
                         }
                     }
@@ -10745,9 +11769,7 @@ namespace GnollHackX.Pages.Game
                     int rack_width = 48;
                     int rack_height = GHConstants.TileHeight - y_to_rack_top;
                     int rack_item_spacing = 6;
-
                     int cnt = 0;
-
                     foreach (ObjectDataItem contained_obj in otmp_round.ContainedObjs)
                     {
                         int source_glyph = Math.Abs(contained_obj.ObjData.gui_glyph);
@@ -10806,9 +11828,13 @@ namespace GnollHackX.Pages.Game
                             canvas.RotateDegrees(-90);
                             canvas.Translate(-target_width, 0);
                             paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
-                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                paint);
                         }
-
                         cnt++;
                     }
                 }
@@ -10823,7 +11849,6 @@ namespace GnollHackX.Pages.Game
                     int src_unlit_y = 10;
                     int src_lit_x = 6 * (1 + (int)GHApp._autodraws[autodraw].flags);
                     int src_lit_y = 10;
-                    int cnt = 0;
                     short missile_special_quality = _mapData[mapx, mapy].Layers.missile_special_quality;
                     bool missile_lamplit = (_mapData[mapx, mapy].Layers.missile_flags & (ulong)LayerMissileFlags.MISSILE_FLAGS_LIT) != 0;
 
@@ -10842,7 +11867,7 @@ namespace GnollHackX.Pages.Game
                             src_y = src_unlit_y;
                         }
 
-                        int item_xpos = cnt;
+                        int item_xpos = cidx;
 
                         dest_y = y_start;
                         dest_x = x_start + ((float)(x_padding + item_xpos * item_width) * scale * targetscale);
@@ -10871,10 +11896,13 @@ namespace GnollHackX.Pages.Game
                             canvas.Translate(target_x, target_y);
                             canvas.Scale(1, 1, 0, 0);
                             paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
-                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                paint);
                         }
-
-                        cnt++;
                     }
                 }
                 else if (GHApp._autodraws[autodraw].draw_type == (int)autodraw_drawing_types.AUTODRAW_DRAW_LARGE_FIVE_BRANCHED_CANDELABRUM_CANDLES && (otmp_round != null || layer_idx == (int)layer_types.LAYER_MISSILE))
@@ -10956,7 +11984,12 @@ namespace GnollHackX.Pages.Game
                             canvas.Translate(target_x, target_y);
                             canvas.Scale(1, 1, 0, 0);
                             paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
-                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                paint);
                         }
                         cnt++;
                     }
@@ -11003,7 +12036,12 @@ namespace GnollHackX.Pages.Game
                         {
                             canvas.Translate(dest_x, dest_y);
                             paint.Color = paint.Color.WithAlpha((byte)(0xFF * opaqueness));
-                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                            canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                paint);
                         }
 
                         /* Color */
@@ -11052,7 +12090,11 @@ namespace GnollHackX.Pages.Game
                                 {
                                     _paintCanvas.Clear(SKColors.Transparent);
                                     paint.Color = SKColors.Black.WithAlpha((byte)(0xFF * (1 - semi_transparency)));
-                                    _paintCanvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt, paint);
+                                    _paintCanvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                        new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                        paint);
                                     if ((GHApp._autodraws[autodraw].parameter3 & 1) != 0)
                                     {
                                         paint.BlendMode = SKBlendMode.Modulate;
@@ -11214,7 +12256,12 @@ namespace GnollHackX.Pages.Game
                         using (new SKAutoCanvasRestore(canvas, true))
                         {
                             canvas.Translate(dest_x, dest_y);
-                            canvas.DrawImage(TileMap[a2_sheet_idx], source_rt, target_rt, paint);
+                            GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                            canvas.DrawImage(TileMap[a2_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                paint);
                         }
 
                         /* Fourth, opaque foreground */
@@ -11254,7 +12301,11 @@ namespace GnollHackX.Pages.Game
                             using (SKCanvas _paintCanvas = new SKCanvas(_paintBitmap))
                             {
                                 _paintCanvas.Clear(SKColors.Transparent);
-                                _paintCanvas.DrawImage(TileMap[a2_sheet_idx], source_rt, target_rt, paint);
+                                _paintCanvas.DrawImage(TileMap[a2_sheet_idx], source_rt, target_rt,
+#if GNH_MAUI
+                                    new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                    paint);
                                 paint.Color = capcolor;
                                 paint.BlendMode = SKBlendMode.Modulate;
                                 _paintCanvas.DrawRect(target_rt, paint);
@@ -11371,8 +12422,9 @@ namespace GnollHackX.Pages.Game
                     if (cnt >= 8)
                         break;
 
-                    src_x = ((int)ipm_idx % marks_per_row) * mark_width;
-                    src_y = ((int)ipm_idx / marks_per_row) * mark_height;
+                    int src_tile = (int)game_ui_tile_types.ITEM_PROPERTY_MARKS + (int)ipm_idx / GHConstants.MAX_UI_TILE_8_x_24_COMPONENTS;
+                    src_x = (((int)ipm_idx % GHConstants.MAX_UI_TILE_8_x_24_COMPONENTS) % marks_per_row) * mark_width;
+                    src_y = (((int)ipm_idx % GHConstants.MAX_UI_TILE_8_x_24_COMPONENTS) / marks_per_row) * mark_height;
                     dest_x = 0;
                     dest_y = 0;
 
@@ -11484,7 +12536,7 @@ namespace GnollHackX.Pages.Game
                     dest_y = y_start + scaled_tile_height / 2 - (targetscale * scale * (float)(mark_height / 2));
                     dest_x = x_start + (targetscale * scale * (float)item_xpos);
 
-                    int source_glyph = (int)game_ui_tile_types.ITEM_PROPERTY_MARKS + GHApp.UITileOff;
+                    int source_glyph = src_tile + GHApp.UITileOff;
                     int atile = GHApp.Glyph2Tile[source_glyph];
                     int a_sheet_idx = GHApp.TileSheetIdx(atile);
                     int at_x = GHApp.TileSheetX(atile);
@@ -11506,7 +12558,12 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
                     StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-                    canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt);
+                    GHApp.MaybeFixRects(ref source_rt, ref target_rt, targetscale, usingGL);
+                    canvas.DrawImage(TileMap[a_sheet_idx], source_rt, target_rt
+#if GNH_MAUI
+                        , new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest)
+#endif
+                    );
 #if GNH_MAP_PROFILING && DEBUG
                     StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -11516,7 +12573,7 @@ namespace GnollHackX.Pages.Game
             }
         }
 
-        private void DrawChain(SKCanvas canvas, SKPaint paint, int mapx, int mapy, int autodraw, bool autodraw_u_punished, float width, float height, float ty, float tx, float scale, float targetscale)
+        private void DrawChain(SKCanvas canvas, SKPaint paint, int mapx, int mapy, int autodraw, bool autodraw_u_punished, float width, float height, float ty, float tx, float scale, float targetscale, bool usingGL, bool highFilterQuality)
         {
             int u_x;
             int u_y;
@@ -11640,7 +12697,12 @@ namespace GnollHackX.Pages.Game
                                     {
                                         canvas.Translate(target_x + (hflip_link ? target_width : 0), target_y + (vflip_link ? target_height : 0));
                                         canvas.Scale(hflip_link ? -1 : 1, vflip_link ? -1 : 1, 0, 0);
-                                        canvas.DrawImage(TileMap[a_sheet_idx], sourcerect, targetrect, paint);
+                                        GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
+                                        canvas.DrawImage(TileMap[a_sheet_idx], sourcerect, targetrect,
+#if GNH_MAUI
+                                            new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                            paint);
                                     }
                                 }
                             }
@@ -11748,7 +12810,12 @@ namespace GnollHackX.Pages.Game
                                     {
                                         canvas.Translate(target_x + (hflip_link ? target_width : 0), target_y + (vflip_link ? target_height : 0));
                                         canvas.Scale(hflip_link ? -1 : 1, vflip_link ? -1 : 1, 0, 0);
-                                        canvas.DrawImage(TileMap[a_sheet_idx], sourcerect, targetrect, paint);
+                                        GHApp.MaybeFixRects(ref sourcerect, ref targetrect, targetscale, usingGL);
+                                        canvas.DrawImage(TileMap[a_sheet_idx], sourcerect, targetrect,
+#if GNH_MAUI
+                                            new SKSamplingOptions(highFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest),
+#endif
+                                            paint);
                                     }
                                 }
                             }
@@ -11781,148 +12848,331 @@ namespace GnollHackX.Pages.Game
                 if (TipView.IsVisible)
                     TipView.InvalidateSurface();
 
-                GameMenuButton.SetSideSize(width, height);
-                ESCButton.SetSideSize(width, height);
-                ToggleAutoCenterModeButton.SetSideSize(width, height);
-                LookModeButton.SetSideSize(width, height);
-                ToggleTravelModeButton.SetSideSize(width, height);
-                ToggleZoomMiniButton.SetSideSize(width, height);
-                ToggleZoomAlternateButton.SetSideSize(width, height);
-
-                SimpleGameMenuButton.SetSideSize(width, height);
-                SimpleESCButton.SetSideSize(width, height);
-                SimpleToggleAutoCenterModeButton.SetSideSize(width, height);
-                SimpleLookModeButton.SetSideSize(width, height);
-                SimpleToggleZoomMiniButton.SetSideSize(width, height);
-
-                ZeroButton.SetSideSize(width, height);
-                FirstButton.SetSideSize(width, height);
-                SecondButton.SetSideSize(width, height);
-                ThirdButton.SetSideSize(width, height);
-                FourthButton.SetSideSize(width, height);
-
-                lAbilitiesButton.SetSideSize(width, height);
-                lWornItemsButton.SetSideSize(width, height);
-                double statusbarheight = GetStatusBarHeight();
-                lAbilitiesButton.HeightRequest = statusbarheight;
-                lWornItemsButton.HeightRequest = statusbarheight;
-                //lSkillButton.SetSideSize(width, height);
-
-                UpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
-                SimpleUpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
-
-                foreach (View v in UpperCmdGrid.Children)
-                {
-                    LabeledImageButton lib = (LabeledImageButton)v;
-                    lib.SetSideSize(width, height);
-                }
-                foreach (View v in LowerCmdGrid.Children)
-                {
-                    LabeledImageButton lib = (LabeledImageButton)v;
-                    lib.SetSideSize(width, height);
-                }
-                foreach (View v in SimpleCmdGrid.Children)
-                {
-                    LabeledImageButton lib = (LabeledImageButton)v;
-                    lib.SetSideSize(width, height);
-                }
-
-                LabeledImageButton firstchild = (LabeledImageButton)UpperCmdGrid.Children[0];
-                UpperCmdGrid.HeightRequest = firstchild.GridHeight;
-                LowerCmdGrid.HeightRequest = firstchild.GridHeight;
-
-                LabeledImageButton simplefirstchild = (LabeledImageButton)SimpleCmdGrid.Children[0];
-                SimpleCmdGrid.HeightRequest = simplefirstchild.GridHeight;
-
-                MenuHeaderLabel.Margin = UIUtils.GetHeaderMarginWithBorder(MenuBackground.BorderStyle, width, height);
-                MenuCloseGrid.Margin = UIUtils.GetFooterMarginWithBorder(MenuBackground.BorderStyle, width, height);
-                Thickness smallthick = UIUtils.GetSmallBorderThickness(width, height, 1.5);
-                TextCanvas.Margin = smallthick;
-                TextWindowGlyphImage.Margin = smallthick;
-                Thickness subthick = smallthick;
-                subthick.Top = MenuSubtitleLabel.Margin.Top;
-                subthick.Bottom = MenuSubtitleLabel.Margin.Bottom;
-                MenuSubtitleLabel.Margin = subthick;
-                Thickness glyphthick = smallthick;
-                glyphthick.Top = MenuWindowGlyphImage.Margin.Top;
-                glyphthick.Bottom = MenuWindowGlyphImage.Margin.Bottom;
-                MenuWindowGlyphImage.Margin = glyphthick;
-
-                lock (_mapOffsetLock)
-                {
-                    _statusOffsetY = 0;
-                }
-                lock (_messageScrollLock)
-                {
-                    _messageScrollOffset = 0;
-                }
-                
-
-                if (width > height)
-                {
-                    /* Landscape */
-                    ButtonRowStack.Orientation = StackOrientation.Horizontal;
-                    ModeLayout.Orientation = StackOrientation.Vertical;
-                    ModeSubLayout1.Orientation = StackOrientation.Horizontal;
-                    ModeSubLayout2.Orientation = StackOrientation.Horizontal;
-                    GameMenuLayout.Orientation = StackOrientation.Horizontal;
-                    //UpperCmdLayout.Orientation = StackOrientation.Vertical;
-
-                    SimpleButtonRowStack.Orientation = StackOrientation.Horizontal;
-                    SimpleModeLayout.Orientation = StackOrientation.Vertical;
-                    SimpleModeSubLayout1.Orientation = StackOrientation.Horizontal;
-                    SimpleModeSubLayout2.Orientation = StackOrientation.Horizontal;
-                    SimpleGameMenuLayout.Orientation = StackOrientation.Horizontal;
-                }
-                else
-                {
-                    /* Portrait */
-                    ButtonRowStack.Orientation = StackOrientation.Vertical;
-                    ModeLayout.Orientation = StackOrientation.Vertical;
-                    ModeSubLayout1.Orientation = StackOrientation.Vertical;
-                    ModeSubLayout2.Orientation = StackOrientation.Vertical;
-                    GameMenuLayout.Orientation = StackOrientation.Horizontal;
-                    //UpperCmdLayout.Orientation = StackOrientation.Horizontal;
-
-                    SimpleButtonRowStack.Orientation = StackOrientation.Vertical;
-                    SimpleModeLayout.Orientation = StackOrientation.Vertical;
-                    SimpleModeSubLayout1.Orientation = StackOrientation.Vertical;
-                    SimpleModeSubLayout2.Orientation = StackOrientation.Vertical;
-                    SimpleGameMenuLayout.Orientation = StackOrientation.Horizontal;
-                }
-
-                RefreshMenuRowCounts = true;
-                RefreshMsgHistoryRowCounts = true;
+                UpdateButtonAndUISizes();
                 IsSizeAllocatedProcessed = true;
             }
         }
 
-        public float GetStatusBarSkiaHeight()
+        public void UpdateButtonAndUISizes()
+        {
+            double width = _currentPageWidth;
+            double height = _currentPageHeight;
+            if (width == 0 || height == 0)
+                return;
+
+            bool usingDesktopButtons = DesktopButtons;
+            bool usingSimpleCmdLayout = UseSimpleCmdLayout;
+            float inverseCanvasScale = GetInverseCanvasScale();
+            float customScale = GHApp.CustomScreenScale;
+
+            GameMenuButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            ESCButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            ToggleAutoCenterModeButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            LookModeButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            ToggleTravelModeButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            ToggleZoomMiniButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            ToggleZoomAlternateButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+
+            SimpleGameMenuButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            SimpleESCButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            SimpleToggleAutoCenterModeButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            SimpleLookModeButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            SimpleToggleZoomMiniButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+
+#if GNH_MAUI
+            YnWidthGrid.MaximumWidthRequest = 600 * customScale;
+            PopupWidthGrid.MaximumWidthRequest = 600 * customScale;
+            GetLineWidthGrid.MaximumWidthRequest = 440 * customScale;
+            GetLineFrame.Padding = new Thickness(12 * customScale);
+            MenuCountForegroundGrid.MaximumWidthRequest = 360 * customScale;
+            MenuCountFrame.Padding = new Thickness(12 * customScale);
+#else
+            YnWidthGrid.WidthRequest = 600 * customScale;
+            PopupWidthGrid.WidthRequest = 600 * customScale;
+            GetLineWidthGrid.WidthRequest = 440 * customScale;
+            MenuCountForegroundGrid.WidthRequest = 360 * customScale;
+#endif
+            YnTitleLabel.FontSize = 22 * customScale;
+            YnQuestionLabel.FontSize = 19 * customScale;
+            YnImage.WidthRequest = 32 * customScale;
+            YnImage.HeightRequest = 48 * customScale;
+            ZeroButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            FirstButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            SecondButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            ThirdButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            FourthButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+
+            PopupTitleLabel.FontSize = 20 * customScale;
+            PopupLabel.FontSize = 16 * customScale;
+            PopupImage.WidthRequest = 32 * customScale;
+            PopupImage.HeightRequest = 48 * customScale;
+            PopupOkButton.FontSize = 19 * customScale;
+            PopupOkButton.WidthRequest = 170 * customScale;
+            PopupOkButton.HeightRequest = 60 * customScale;
+
+            GetLineCaption.FontSize = 20 * customScale;
+            GetLineEntryText.FontSize = 20 * customScale;
+            GetLineEntryText.WidthRequest = 320 * customScale;
+            GetLineQuestionMarkButton.FontSize = 18 * customScale;
+            GetLineQuestionMarkButton.WidthRequest = 50 * customScale;
+            GetLineQuestionMarkButton.HeightRequest = 50 * customScale;
+            GetLineAutoComplete.FontSize = 18 * customScale;
+            GetLineButtonGrid.WidthRequest = 360 * customScale;
+            GetLineButtonRowDefinition.Height = 65 * customScale;
+            GetLineOkButton.FontSize = 19 * customScale;
+            GetLineOkButton.WidthRequest = 135 * customScale;
+            GetLineOkButton.HeightRequest = 60 * customScale;
+            GetLineCancelButton.FontSize = 19 * customScale;
+            GetLineCancelButton.WidthRequest = 135 * customScale;
+            GetLineCancelButton.HeightRequest = 60 * customScale;
+
+            MenuCountCaption.FontSize = 20 * customScale;
+            CountPicker.FontSize = 15 * customScale;
+            CountPicker.WidthRequest = 180 * customScale;
+            MenuCountEntry.FontSize = 15 * customScale;
+            MenuCountEntry.WidthRequest = 180 * customScale;
+            MenuCountButtonGrid.WidthRequest = 360 * customScale;
+            MenuCountButtonRowDefinition.Height = 65 * customScale;
+            MenuCountOkButton.FontSize = 19 * customScale;
+            MenuCountOkButton.WidthRequest = 135 * customScale;
+            MenuCountOkButton.HeightRequest = 60 * customScale;
+            MenuCountCancelButton.FontSize = 19 * customScale;
+            MenuCountCancelButton.WidthRequest = 135 * customScale;
+            MenuCountCancelButton.HeightRequest = 60 * customScale;
+
+            foreach (View v in UpperCmdGrid.Children)
+            {
+                LabeledImageButton lib = (LabeledImageButton)v;
+                lib.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            }
+            foreach (View v in LowerCmdGrid.Children)
+            {
+                LabeledImageButton lib = (LabeledImageButton)v;
+                lib.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            }
+            foreach (View v in SimpleCmdGrid.Children)
+            {
+                LabeledImageButton lib = (LabeledImageButton)v;
+                lib.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            }
+
+            LabeledImageButton firstchild = (LabeledImageButton)UpperCmdGrid.Children[0];
+            UpperCmdGrid.HeightRequest = firstchild.GridHeight;
+            LowerCmdGrid.HeightRequest = firstchild.GridHeight;
+
+            LabeledImageButton simplefirstchild = (LabeledImageButton)SimpleCmdGrid.Children[0];
+            SimpleCmdGrid.HeightRequest = simplefirstchild.GridHeight;
+
+            lAbilitiesButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            lWornItemsButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            lRowAbilitiesButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            lRowWornItemsButton.SetSideSize(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            //double statusbarheight = GetStatusBarHeight(); /* Requires lInventoryButton size having set to determine scaling */
+            double statusbarheight = GetStatusBarHeightEx(width, height, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            lAbilitiesButton.HeightRequest = statusbarheight;
+            lWornItemsButton.HeightRequest = statusbarheight;
+            UpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
+            SimpleUpperCmdLayout.Margin = new Thickness(0, statusbarheight, 0, 0);
+
+            MenuHeaderLabel.Margin = UIUtils.GetHeaderMarginWithBorder(MenuBackground.BorderStyle, width, height);
+            MenuCloseGrid.Margin = UIUtils.GetFooterMarginWithBorder(MenuBackground.BorderStyle, width, height);
+            Thickness smallthick = UIUtils.GetSmallBorderThickness(width, height, 1.5);
+            TextCanvas.Margin = smallthick;
+            TextWindowGlyphImage.Margin = smallthick;
+            Thickness subthick = smallthick;
+            subthick.Top = MenuSubtitleLabel.Margin.Top;
+            subthick.Bottom = MenuSubtitleLabel.Margin.Bottom;
+            MenuSubtitleLabel.Margin = subthick;
+            Thickness glyphthick = smallthick;
+            glyphthick.Top = MenuWindowGlyphImage.Margin.Top;
+            glyphthick.Bottom = MenuWindowGlyphImage.Margin.Bottom;
+            MenuWindowGlyphImage.Margin = glyphthick;
+
+            lock (_statusOffsetLock)
+            {
+                _statusOffsetY = 0;
+            }
+            lock (_messageScrollLock)
+            {
+                _messageScrollOffset = 0;
+            }
+            lock (_menuScrollLock)
+            {
+                _menuScrollOffset = 0;
+            }
+            lock (_menuPositionLock)
+            {
+                Array.Clear(_savedMenuScrollOffset, 0, _savedMenuScrollOffset.Length);
+            }
+            lock (_textScrollLock)
+            {
+                _textScrollOffset = 0;
+            }
+
+            bool useTwoRows = UIUtils.UseTwoButtonRows(width, height, lInventoryButton.GridWidth, usingDesktopButtons, usingSimpleCmdLayout);
+            if (!useTwoRows)
+            {
+                /* One row */
+                ButtonRowStack.Orientation = StackOrientation.Horizontal;
+                SimpleButtonRowStack.Orientation = StackOrientation.Horizontal;
+            }
+            else
+            {
+                /* Two rows */
+                ButtonRowStack.Orientation = StackOrientation.Vertical;
+                SimpleButtonRowStack.Orientation = StackOrientation.Vertical;
+            }
+
+            if (width > height)
+            {
+                /* Landscape */
+                ModeLayout.Orientation = StackOrientation.Vertical;
+                ModeSubLayout1.Orientation = StackOrientation.Horizontal;
+                ModeSubLayout2.Orientation = StackOrientation.Horizontal;
+                GameMenuLayout.Orientation = StackOrientation.Horizontal;
+
+                SimpleModeLayout.Orientation = StackOrientation.Vertical;
+                SimpleModeSubLayout1.Orientation = StackOrientation.Horizontal;
+                SimpleModeSubLayout2.Orientation = StackOrientation.Horizontal;
+                SimpleGameMenuLayout.Orientation = StackOrientation.Horizontal;
+            }
+            else
+            {
+                /* Portrait */
+                ModeLayout.Orientation = StackOrientation.Vertical;
+                ModeSubLayout1.Orientation = StackOrientation.Vertical;
+                ModeSubLayout2.Orientation = StackOrientation.Vertical;
+                GameMenuLayout.Orientation = StackOrientation.Horizontal;
+
+                SimpleModeLayout.Orientation = StackOrientation.Vertical;
+                SimpleModeSubLayout1.Orientation = StackOrientation.Vertical;
+                SimpleModeSubLayout2.Orientation = StackOrientation.Vertical;
+                SimpleGameMenuLayout.Orientation = StackOrientation.Horizontal;
+            }
+
+            RefreshMenuRowCounts = true;
+            RefreshMsgHistoryRowCounts = true;
+        }
+
+        //public float GetStatusBarSkiaHeight()
+        //{
+        //    float statusbarheight;
+        //    using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
+        //    {
+        //        textPaint.Typeface = GHApp.LatoRegular;
+        //        textPaint.TextSize = _statusbar_basefontsize * GetTextScale();
+        //        float rowheight = textPaint.FontSpacing;
+        //        statusbarheight = rowheight * 2 + _statusbar_vmargin * 2 + _statusbar_rowmargin;
+        //    }
+        //    return statusbarheight;
+        //}
+
+        public float GetStatusBarSkiaHeightEx(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout)
+        {
+            float textScale = GetTextScaleEx(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout);
+            return GetStatusBarSkiaHeightEx(textScale);
+        }
+
+        public float GetStatusBarSkiaHeightEx(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale)
+        {
+            float textScale = GetTextScaleEx(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            return GetStatusBarSkiaHeightEx(textScale);
+        }
+
+        public float GetStatusBarSkiaHeightEx(float textScale)
         {
             float statusbarheight;
             using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
                 textPaint.Typeface = GHApp.LatoRegular;
-                textPaint.TextSize = _statusbar_basefontsize * GetTextScale();
+                textPaint.TextSize = _statusbar_basefontsize * textScale;
                 float rowheight = textPaint.FontSpacing;
                 statusbarheight = rowheight * 2 + _statusbar_vmargin * 2 + _statusbar_rowmargin;
             }
             return statusbarheight;
         }
+
         public double GetCanvasScale()
         {
-            if (canvasView.CanvasSize.Width <= 0 || canvasView.CanvasSize.Height <= 0)
-                return 1.0;
-            return Math.Sqrt(canvasView.Width / (double)canvasView.CanvasSize.Width * canvasView.Height / (double)canvasView.CanvasSize.Height);
+            return 1.0 / GHApp.DisplayDensity;
+            //if (canvasView.CanvasSize.Width <= 0 || canvasView.CanvasSize.Height <= 0)
+            //    return 1.0;
+            //return Math.Sqrt(canvasView.Width / (double)canvasView.CanvasSize.Width * canvasView.Height / (double)canvasView.CanvasSize.Height);
         }
 
-        public double GetStatusBarHeight()
+        public float GetInverseCanvasScale()
         {
-            double sb_xheight;
-            float statusbarheight = GetStatusBarSkiaHeight();
-            double scale = GetCanvasScale();
-            sb_xheight = scale * (double)statusbarheight;
-            return sb_xheight;
+            return GHApp.DisplayDensity;
+            //return (float)(1.0 / GetCanvasScale());
+        }
+
+        //public double GetStatusBarHeight()
+        //{
+        //    double sb_xheight;
+        //    float statusbarheight = GetStatusBarSkiaHeight();
+        //    double scale = GetCanvasScale();
+        //    sb_xheight = scale * (double)statusbarheight;
+        //    return sb_xheight;
+        //}
+
+        public double GetStatusBarHeightEx(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout)
+        {
+            return GetStatusBarHeightEx(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, GetInverseCanvasScale(), GHApp.CustomScreenScale);
+        }
+
+        public double GetStatusBarHeightEx(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale)
+        {
+            if(inverseCanvasScale == 0.0f) 
+                inverseCanvasScale = 1.0f;
+            float statusbarheight = GetStatusBarSkiaHeightEx(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale);
+            return (double)statusbarheight / (double)inverseCanvasScale;
+        }
+
+        private SKImage GetStatIcon(int i)
+        {
+            SKImage statIcon;
+            switch (i)
+            {
+                default:
+                case 0:
+                    statIcon = GHApp._statusStrBitmap;
+                    break;
+                case 1:
+                    statIcon = GHApp._statusDexBitmap;
+                    break;
+                case 2:
+                    statIcon = GHApp._statusConBitmap;
+                    break;
+                case 3:
+                    statIcon = GHApp._statusIntBitmap;
+                    break;
+                case 4:
+                    statIcon = GHApp._statusWisBitmap;
+                    break;
+                case 5:
+                    statIcon = GHApp._statusChaBitmap;
+                    break;
+            }
+            return statIcon;
+        }
+
+        private SKImage GetAlignmentIcon(string alignment)
+        {
+            return GHApp._statusAlignmentLawfulBitmap;
+            //if (alignment == null || alignment.Length < 3)
+            //    return GHApp._statusAlignmentUnknownBitmap;
+            //else
+            //{
+            //    string lcAlign = alignment.Substring(0, 3).ToLower();
+            //    if (lcAlign == "law")
+            //        return GHApp._statusAlignmentLawfulBitmap;
+            //    else if (lcAlign == "neu")
+            //        return GHApp._statusAlignmentNeutralBitmap;
+            //    else if (lcAlign == "cha")
+            //        return GHApp._statusAlignmentChaoticBitmap;
+            //    else
+            //        return GHApp._statusAlignmentUnknownBitmap;
+            //}
         }
 
         private ConcurrentDictionary<long, TouchEntry> TouchDictionary = new ConcurrentDictionary<long, TouchEntry>();
@@ -11931,6 +13181,7 @@ namespace GnollHackX.Pages.Game
         public float _mapOffsetY = 0;
         public float _mapMiniOffsetX = 0;
         public float _mapMiniOffsetY = 0;
+        private readonly object _statusOffsetLock = new object();
         public float _statusOffsetY = 0;
         public float _statusLargestBottom = 0;
         public float _statusClipBottom = 0;
@@ -11942,6 +13193,7 @@ namespace GnollHackX.Pages.Game
         private bool _touchWithinStatusBar = false;
         private uint _touchWithinPet = 0;
         private bool _touchWithinYouButton = false;
+        private int _touchWithinContextButton = 0;
         private object _savedSender = null;
         private SKTouchEventArgs _savedEventArgs = null;
 
@@ -11963,13 +13215,9 @@ namespace GnollHackX.Pages.Game
 
         private void canvasView_Touch_MainPage(object sender, SKTouchEventArgs e)
         {
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
-                lock (_targetClipLock)
-                {
-                    _targetClipOn = false;
-                }
-
                 switch (e?.ActionType)
                 {
                     case SKTouchAction.Entered:
@@ -11984,6 +13232,7 @@ namespace GnollHackX.Pages.Game
                         _touchWithinStatusBar = false;
                         _touchWithinPet = 0;
                         _touchWithinYouButton = false;
+                        _touchWithinContextButton = 0;
 
                         if (TouchDictionary.ContainsKey(e.Id))
                             TouchDictionary[e.Id] = new TouchEntry(e.Location, DateTime.Now);
@@ -11995,6 +13244,7 @@ namespace GnollHackX.Pages.Game
                         else if (!ForceAllMessages && !ShowExtendedStatusBar)
                         {
                             uint m_id = 0;
+                            int cmd = 0;
                             if (SkillRect.Contains(e.Location))
                             {
                                 _touchWithinSkillButton = true;
@@ -12014,6 +13264,10 @@ namespace GnollHackX.Pages.Game
                             else if (StatusBarRect.Contains(e.Location))
                             {
                                 _touchWithinStatusBar = true;
+                            }
+                            else if ((cmd = PointWithinContextMenuButton(e.Location)) != 0)
+                            {
+                                _touchWithinContextButton = cmd;
                             }
                             else if (!ShowDirections && !ShowNumberPad && ShowPets && (m_id = PetRectContains(e.Location)) != 0)
                             {
@@ -12070,7 +13324,7 @@ namespace GnollHackX.Pages.Game
 
                                 if (TouchDictionary.Count == 1)
                                 {
-                                    if (_touchWithinSkillButton || _touchWithinPrevWepButton || _touchWithinHealthOrb || _touchWithinManaOrb || _touchWithinStatusBar || (_touchWithinPet > 0 && !ShowDirections && !ShowNumberPad) || _touchWithinYouButton)
+                                    if (_touchWithinSkillButton || _touchWithinPrevWepButton || _touchWithinHealthOrb || _touchWithinManaOrb || _touchWithinStatusBar || (_touchWithinPet > 0 && !ShowDirections && !ShowNumberPad) || _touchWithinYouButton || _touchWithinContextButton != 0)
                                     {
                                         /* Do nothing */
                                     }
@@ -12089,7 +13343,7 @@ namespace GnollHackX.Pages.Game
                                         {
                                             if (ShowExtendedStatusBar)
                                             {
-                                                lock (_mapOffsetLock)
+                                                lock (_statusOffsetLock)
                                                 {
                                                     if (diffY < 0)
                                                     {
@@ -12202,32 +13456,39 @@ namespace GnollHackX.Pages.Game
                                             }
                                             else
                                             {
+                                                float mapWidth;
+                                                float mapHeight;
+                                                lock (_tileSizeLock)
+                                                {
+                                                    mapWidth = _mapWidth;
+                                                    mapHeight = _mapHeight;
+                                                }
                                                 lock (_mapOffsetLock)
                                                 {
                                                     if (ZoomMiniMode)
                                                     {
                                                         _mapMiniOffsetX += diffX;
                                                         _mapMiniOffsetY += diffY;
-                                                        if (_mapWidth > 0 && Math.Abs(_mapMiniOffsetX) > 1 * _mapWidth)
+                                                        if (mapWidth > 0 && Math.Abs(_mapMiniOffsetX) > 1 * mapWidth)
                                                         {
-                                                            _mapMiniOffsetX = 1 * _mapWidth * Math.Sign(_mapMiniOffsetX);
+                                                            _mapMiniOffsetX = 1 * mapWidth * Math.Sign(_mapMiniOffsetX);
                                                         }
-                                                        if (_mapHeight > 0 && Math.Abs(_mapMiniOffsetY) > 1 * _mapHeight)
+                                                        if (mapHeight > 0 && Math.Abs(_mapMiniOffsetY) > 1 * mapHeight)
                                                         {
-                                                            _mapMiniOffsetY = 1 * _mapHeight * Math.Sign(_mapMiniOffsetY);
+                                                            _mapMiniOffsetY = 1 * mapHeight * Math.Sign(_mapMiniOffsetY);
                                                         }
                                                     }
                                                     else
                                                     {
                                                         _mapOffsetX += diffX;
                                                         _mapOffsetY += diffY;
-                                                        if (_mapWidth > 0 && Math.Abs(_mapOffsetX) > 10 * _mapWidth)
+                                                        if (mapWidth > 0 && Math.Abs(_mapOffsetX) > 10 * mapWidth)
                                                         {
-                                                            _mapOffsetX = 10 * _mapWidth * Math.Sign(_mapOffsetX);
+                                                            _mapOffsetX = 10 * mapWidth * Math.Sign(_mapOffsetX);
                                                         }
-                                                        if (_mapHeight > 0 && Math.Abs(_mapOffsetY) > 10 * _mapHeight)
+                                                        if (mapHeight > 0 && Math.Abs(_mapOffsetY) > 10 * mapHeight)
                                                         {
-                                                            _mapOffsetY = 10 * _mapHeight * Math.Sign(_mapOffsetY);
+                                                            _mapOffsetY = 10 * mapHeight * Math.Sign(_mapOffsetY);
                                                         }
                                                     }
                                                 }
@@ -12250,6 +13511,7 @@ namespace GnollHackX.Pages.Game
                                     _touchWithinStatusBar = false;
                                     _touchWithinPet = 0;
                                     _touchWithinYouButton = false;
+                                    _touchWithinContextButton = 0;
 
                                     SKPoint prevloc = TouchDictionary[e.Id].Location;
                                     SKPoint curloc = e.Location;
@@ -12274,86 +13536,8 @@ namespace GnollHackX.Pages.Game
                                         if (prevdist > 0 && curdist > 0)
                                         {
                                             float ratio = curdist / prevdist;
-                                            float curfontsize = ZoomMiniMode ? MapFontMiniRelativeSize : ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
-                                            float newfontsize = curfontsize * ratio;
-                                            if(ZoomMiniMode)
-                                            {
-                                                if (newfontsize > GHConstants.MaximumMapMiniRelativeFontSize)
-                                                    newfontsize = GHConstants.MaximumMapMiniRelativeFontSize;
-                                                if (newfontsize < GHConstants.MinimumMapMiniRelativeFontSize)
-                                                    newfontsize = GHConstants.MinimumMapMiniRelativeFontSize;
-                                            }
-                                            else
-                                            {
-                                                if (newfontsize > GHConstants.MaximumMapFontSize)
-                                                    newfontsize = GHConstants.MaximumMapFontSize;
-                                                if (newfontsize < GHConstants.MinimumMapFontSize)
-                                                    newfontsize = GHConstants.MinimumMapFontSize;
-                                            }
-
-                                            float newratio = newfontsize / Math.Max(1, curfontsize);
-                                            float mapFontAscent = UsedMapFontAscent;
-                                            if (ZoomMiniMode)
-                                                MapFontMiniRelativeSize = newfontsize;
-                                            else if (ZoomAlternateMode)
-                                                MapFontAlternateSize = newfontsize;
-                                            else
-                                                MapFontSize = newfontsize;
-
-                                            if (ZoomMiniMode)
-                                            {
-                                                lock (_mapOffsetLock)
-                                                {
-                                                    _mapMiniOffsetX *= newratio;
-                                                    _mapMiniOffsetY *= newratio;
-                                                    if (_mapWidth > 0 && Math.Abs(_mapMiniOffsetX) > 1 * _mapWidth)
-                                                    {
-                                                        _mapMiniOffsetX = 1 * _mapWidth * Math.Sign(_mapMiniOffsetX);
-                                                    }
-                                                    if (_mapHeight > 0 && Math.Abs(_mapMiniOffsetY) > 1 * _mapHeight)
-                                                    {
-                                                        _mapMiniOffsetY = 1 * _mapHeight * Math.Sign(_mapMiniOffsetY);
-                                                    }
-                                                }
-                                            }
-                                            else
-                                            {
-                                                float width = UsedTileWidth;
-                                                float height = UsedTileHeight;
-                                                float mapwidth = width * (GHConstants.MapCols - 1);
-                                                float mapheight = height * (GHConstants.MapRows);
-                                                float canvaswidth = canvasView.CanvasSize.Width;
-                                                float canvasheight = canvasView.CanvasSize.Height;
-                                                float offsetX, offsetY, usedOffsetX, usedOffsetY;
-                                                GetMapOffsets(canvaswidth, canvasheight, mapwidth, mapheight, width, height, out offsetX, out offsetY, out usedOffsetX, out usedOffsetY);
-                                                float totalOffsetX = offsetX + usedOffsetX;
-                                                float totalOffsetY = offsetY + usedOffsetY + mapFontAscent;
-                                                SKPoint oldLoc = new SKPoint((prevloc.X + otherloc.X) / 2, (prevloc.Y + otherloc.Y) / 2);
-                                                SKPoint newLoc = new SKPoint((curloc.X + otherloc.X) / 2, (curloc.Y + otherloc.Y) / 2);
-                                                float newTotalOffsetX = newLoc.X - (oldLoc.X - totalOffsetX) * newratio;
-                                                float newTotalOffsetY = newLoc.Y - (oldLoc.Y - totalOffsetY) * newratio;
-                                                float newWidth = width * newratio;
-                                                float newHeight = height * newratio;
-                                                float newMapwidth = newWidth * (GHConstants.MapCols - 1);
-                                                float newMapheight = newHeight * (GHConstants.MapRows);
-                                                float newMapFontAscent = mapFontAscent * newratio;
-                                                float newOffsetX, newOffsetY, newUsedOffsetX, newUsedOffsetY;
-                                                GetMapOffsets(canvaswidth, canvasheight, newMapwidth, newMapheight, newWidth, newHeight, out newOffsetX, out newOffsetY, out newUsedOffsetX, out newUsedOffsetY);
-
-                                                lock (_mapOffsetLock)
-                                                {
-                                                    _mapOffsetX = newTotalOffsetX - newOffsetX;
-                                                    _mapOffsetY = newTotalOffsetY - newOffsetY - newMapFontAscent;
-                                                    if (_mapWidth > 0 && Math.Abs(_mapOffsetX) > 10 * _mapWidth)
-                                                    {
-                                                        _mapOffsetX = 10 * _mapWidth * Math.Sign(_mapOffsetX);
-                                                    }
-                                                    if (_mapHeight > 0 && Math.Abs(_mapOffsetY) > 10 * _mapHeight)
-                                                    {
-                                                        _mapOffsetY = 10 * _mapHeight * Math.Sign(_mapOffsetY);
-                                                    }
-                                                }
-                                            }
+                                            AdjustZoomByRatio(ratio, curloc, prevloc, otherloc);
+                                            MapFontShowPercentageDecimal = false;
                                         }
                                     }
 
@@ -12428,7 +13612,11 @@ namespace GnollHackX.Pages.Game
                             }
                             else if (_touchWithinPrevWepButton && !PlayingReplay)
                             {
-                                GenericButton_Clicked(sender, e, GHUtils.Meta(16));
+                                GenericButton_Clicked(sender, e, GHUtils.Meta('P'));
+                            }
+                            else if (_touchWithinContextButton != 0 && !PlayingReplay)
+                            {
+                                GenericButton_Clicked(sender, e, _touchWithinContextButton);
                             }
                             else if (_touchWithinHealthOrb)
                             {
@@ -12441,7 +13629,7 @@ namespace GnollHackX.Pages.Game
                             else if (_touchWithinStatusBar)
                             {
                                 ShowExtendedStatusBar = !ShowExtendedStatusBar;
-                                lock (_mapOffsetLock)
+                                lock (_statusOffsetLock)
                                 {
                                     _statusOffsetY = 0.0f;
                                 }
@@ -12454,10 +13642,10 @@ namespace GnollHackX.Pages.Game
                             else if (_touchWithinPet > 0 && !ShowDirections && !ShowNumberPad && !PlayingReplay)
                             {
                                 ConcurrentQueue<GHResponse> queue;
-                                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                                 {
-                                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.SetPetMID, _touchWithinPet));
-                                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetChar, (int)'{'));
+                                    queue.Enqueue(new GHResponse(curGame, GHRequestType.SetPetMID, _touchWithinPet));
+                                    queue.Enqueue(new GHResponse(curGame, GHRequestType.GetChar, (int)'{'));
                                 }
                             }
                             else if (!PlayingReplay || ShowExtendedStatusBar)
@@ -12473,7 +13661,7 @@ namespace GnollHackX.Pages.Game
                                         if (ShowExtendedStatusBar)
                                         {
                                             ShowExtendedStatusBar = false;
-                                            lock (_mapOffsetLock)
+                                            lock (_statusOffsetLock)
                                             {
                                                 _statusOffsetY = 0.0f;
                                             }
@@ -12540,6 +13728,194 @@ namespace GnollHackX.Pages.Game
             }
         }
 
+        private int PointWithinContextMenuButton(SKPoint point)
+        {
+            lock (_contextMenuDataLock)
+            {
+                foreach (ContextMenuButton cmb in _contextMenuData)
+                {
+                    if (cmb.Rect.Contains(point))
+                        return cmb.BtnCommand;
+                }
+            }
+            return 0;
+
+        }
+
+        private void AdjustZoomByRatio(float ratio, SKPoint curloc, SKPoint prevloc, SKPoint otherloc)
+        {
+            float curfontsize = ZoomMiniMode ? MapFontMiniRelativeSize : ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
+            float newfontsize = curfontsize * ratio;
+            SetZoomFontSize(newfontsize, curloc, prevloc, otherloc);
+        }
+
+        private void SetZoomFontSize(float newfontsize, SKPoint curloc, SKPoint prevloc, SKPoint otherloc)
+        {
+            float curfontsize = ZoomMiniMode ? MapFontMiniRelativeSize : ZoomAlternateMode ? MapFontAlternateSize : MapFontSize;
+            if (ZoomMiniMode)
+            {
+                if (newfontsize > GHConstants.MaximumMapMiniRelativeFontSize)
+                    newfontsize = GHConstants.MaximumMapMiniRelativeFontSize;
+                if (newfontsize < GHConstants.MinimumMapMiniRelativeFontSize)
+                    newfontsize = GHConstants.MinimumMapMiniRelativeFontSize;
+            }
+            else
+            {
+                if (newfontsize > GHConstants.MaximumMapFontSize)
+                    newfontsize = GHConstants.MaximumMapFontSize;
+                if (newfontsize < GHConstants.MinimumMapFontSize)
+                    newfontsize = GHConstants.MinimumMapFontSize;
+            }
+
+            float newratio = newfontsize / Math.Max(1, curfontsize);
+            float mapFontAscent = UsedMapFontAscent;
+            if (ZoomMiniMode)
+                MapFontMiniRelativeSize = newfontsize;
+            else if (ZoomAlternateMode)
+                MapFontAlternateSize = newfontsize;
+            else
+                MapFontSize = newfontsize;
+
+            float usedTileWidth;
+            float usedTileHeight;
+            float mapWidth;
+            float mapHeight;
+            lock (_tileSizeLock)
+            {
+                usedTileWidth = _usedTileWidth;
+                usedTileHeight = _usedTileHeight;
+                mapWidth = _mapWidth;
+                mapHeight = _mapHeight;
+            }
+
+            if (ZoomMiniMode)
+            {
+                lock (_mapOffsetLock)
+                {
+                    _mapMiniOffsetX *= newratio;
+                    _mapMiniOffsetY *= newratio;
+                    if (mapWidth > 0 && Math.Abs(_mapMiniOffsetX) > 1 * mapWidth)
+                    {
+                        _mapMiniOffsetX = 1 * mapWidth * Math.Sign(_mapMiniOffsetX);
+                    }
+                    if (mapHeight > 0 && Math.Abs(_mapMiniOffsetY) > 1 * mapHeight)
+                    {
+                        _mapMiniOffsetY = 1 * mapHeight * Math.Sign(_mapMiniOffsetY);
+                    }
+                }
+            }
+            else
+            {
+                float width = usedTileWidth;
+                float height = usedTileHeight;
+                float mapwidth = width * (GHConstants.MapCols - 1);
+                float mapheight = height * (GHConstants.MapRows);
+                float canvaswidth = canvasView.CanvasSize.Width;
+                float canvasheight = canvasView.CanvasSize.Height;
+                float offsetX, offsetY, usedOffsetX, usedOffsetY;
+                GetMapOffsets(canvaswidth, canvasheight, mapwidth, mapheight, width, height, out offsetX, out offsetY, out usedOffsetX, out usedOffsetY);
+                float totalOffsetX = offsetX + usedOffsetX;
+                float totalOffsetY = offsetY + usedOffsetY + mapFontAscent;
+                SKPoint oldLoc = new SKPoint((prevloc.X + otherloc.X) / 2, (prevloc.Y + otherloc.Y) / 2);
+                SKPoint newLoc = new SKPoint((curloc.X + otherloc.X) / 2, (curloc.Y + otherloc.Y) / 2);
+                float newTotalOffsetX = newLoc.X - (oldLoc.X - totalOffsetX) * newratio;
+                float newTotalOffsetY = newLoc.Y - (oldLoc.Y - totalOffsetY) * newratio;
+                float newWidth = width * newratio;
+                float newHeight = height * newratio;
+                float newMapwidth = newWidth * (GHConstants.MapCols - 1);
+                float newMapheight = newHeight * (GHConstants.MapRows);
+                float newMapFontAscent = mapFontAscent * newratio;
+                float newOffsetX, newOffsetY, newUsedOffsetX, newUsedOffsetY;
+                GetMapOffsets(canvaswidth, canvasheight, newMapwidth, newMapheight, newWidth, newHeight, out newOffsetX, out newOffsetY, out newUsedOffsetX, out newUsedOffsetY);
+
+                lock (_mapOffsetLock)
+                {
+                    _mapOffsetX = newTotalOffsetX - newOffsetX;
+                    _mapOffsetY = newTotalOffsetY - newOffsetY - newMapFontAscent;
+                    if (mapWidth > 0 && Math.Abs(_mapOffsetX) > 10 * mapWidth)
+                    {
+                        _mapOffsetX = 10 * mapWidth * Math.Sign(_mapOffsetX);
+                    }
+                    if (mapHeight > 0 && Math.Abs(_mapOffsetY) > 10 * mapHeight)
+                    {
+                        _mapOffsetY = 10 * mapHeight * Math.Sign(_mapOffsetY);
+                    }
+                }
+            }
+        }
+
+        private void canvasView_MouseWheel(object sender, GHMouseWheelEventArgs e)
+        {
+            if(e.MouseWheelDelta != 0)
+            {
+                if (ForceAllMessages)
+                {
+                    ScrollMessages(e.MouseWheelDelta);
+                }
+                else
+                {
+                    float ratio = 1.1f * (float)Math.Abs(e.MouseWheelDelta) / 120;
+                    float canvaswidth = canvasView.CanvasSize.Width;
+                    float canvasheight = canvasView.CanvasSize.Height;
+                    SKPoint point = new SKPoint(canvaswidth / 2, canvasheight / 2);
+                    AdjustZoomByRatio(e.MouseWheelDelta < 0 ? 1.0f / ratio : ratio, point, point, point);
+                    MapFontShowPercentageDecimal = false;
+                }
+            }
+        }
+
+#if WINDOWS
+        private readonly object _canvasPointerLock = new object();
+        private bool _isCanvasHovering = false;
+        private SKPoint _canvasHoverLocation = new SKPoint();
+        GameCursorType _currentCursorType = GameCursorType.Normal;
+#endif
+
+        private void canvasView_MousePointer(object sender, SKTouchEventArgs e)
+        {
+#if WINDOWS
+            lock (_canvasPointerLock)
+            {
+                _canvasHoverLocation = e.Location;
+                switch (e.ActionType)
+                {
+                    case SKTouchAction.Entered:
+                    case SKTouchAction.Moved:
+                        _isCanvasHovering = true;
+                        break;
+                    case SKTouchAction.Exited:
+                    case SKTouchAction.Cancelled:
+                        _isCanvasHovering = false;
+                        break;
+                }
+            }
+#endif
+        }
+
+        private void ScrollMessages(int delta)
+        {
+            if (delta != 0)
+            {
+                lock (_menuScrollLock)
+                {
+                    float topScrollLimit = Math.Max(0, -_messageSmallestTop);
+                    float scrollAmount = (canvasView.CanvasSize.Height * delta) / (10 * 120);
+                    _messageScrollOffset += scrollAmount;
+
+                    if (_messageScrollOffset > topScrollLimit)
+                        _messageScrollOffset = topScrollLimit;
+                    else if (_messageScrollOffset < 0)
+                        _messageScrollOffset = 0;
+
+                    _messageScrollSpeedOn = false;
+                    _messageScrollSpeed = 0;
+                    _messageScrollSpeedRecordOn = false;
+                    _messageScrollSpeedRecords.Clear();
+                }
+            }
+        }
+
+
         private bool DoMoveByHoldingDown()
         {
             if (_savedSender == null || _savedEventArgs == null)
@@ -12564,11 +13940,23 @@ namespace GnollHackX.Pages.Game
 
         public void IssueNHCommandViaTouch(object sender, SKTouchEventArgs e)
         {
+            GHGame curGame = CurrentGame;
             int x = 0, y = 0, mod = 0;
             float canvaswidth = canvasView.CanvasSize.Width;
             float canvasheight = canvasView.CanvasSize.Height;
-            float offsetX = (canvaswidth - _mapWidth) / 2;
-            float offsetY = (canvasheight - _mapHeight) / 2;
+            float usedTileWidth;
+            float usedTileHeight;
+            float mapWidth;
+            float mapHeight;
+            lock (_tileSizeLock)
+            {
+                usedTileWidth = _usedTileWidth;
+                usedTileHeight = _usedTileHeight;
+                mapWidth = _mapWidth;
+                mapHeight = _mapHeight;
+            }
+            float offsetX = (canvaswidth - mapWidth) / 2;
+            float offsetY = (canvasheight - mapHeight) / 2;
 
             if (ZoomMiniMode)
             {
@@ -12584,10 +13972,10 @@ namespace GnollHackX.Pages.Game
             {
                 lock (_clipLock)
                 {
-                    if (_clipX > 0 && (_mapWidth > canvaswidth || _mapHeight > canvasheight))
+                    if (_clipX > 0 && (mapWidth > canvaswidth || mapHeight > canvasheight))
                     {
-                        offsetX -= (_clipX - (GHConstants.MapCols - 1) / 2) * UsedTileWidth;
-                        offsetY -= (_clipY - GHConstants.MapRows / 2) * UsedTileHeight;
+                        offsetX -= (_clipX - (GHConstants.MapCols - 1) / 2) * usedTileWidth;
+                        offsetY -= (_clipY - GHConstants.MapRows / 2) * usedTileHeight;
                     }
                 }
             }
@@ -12598,26 +13986,30 @@ namespace GnollHackX.Pages.Game
                 offsetY += _mapOffsetY + UsedMapFontAscent;
             }
 
-            if (UsedTileWidth > 0)
-                x = (int)((e.Location.X - offsetX) / UsedTileWidth);
-            if (UsedTileHeight > 0)
-                y = (int)((e.Location.Y - offsetY) / UsedTileHeight);
+            if (usedTileWidth > 0)
+                x = (int)((e.Location.X - offsetX) / usedTileWidth);
+            if (usedTileHeight > 0)
+                y = (int)((e.Location.Y - offsetY) / usedTileHeight);
 
             if (!ShowDirections && !ShowNumberPad && !(MapWalkMode && WalkArrows))
             {
                 if (x > 0 && x < GHConstants.MapCols && y >= 0 && y < GHConstants.MapRows)
                 {
                     if (MapLookMode)
-                        mod = (int)NhGetPosMods.Click2;
+                        mod = (int)NhGetPosMods.ClickLook;
+                    else if (e.MouseButton == SKMouseButton.Right)
+                        mod = (int)NhGetPosMods.ClickSecondary;
+                    else if (e.MouseButton == SKMouseButton.Middle)
+                        mod = (int)NhGetPosMods.ClickTertiary;
                     else if (MapTravelMode)
-                        mod = (int)NhGetPosMods.Click1;
+                        mod = (int)NhGetPosMods.ClickPrimary;
                     else
-                        mod = (int)NhGetPosMods.Click3;
+                        mod = (int)NhGetPosMods.ClickMove;
 
                     ConcurrentQueue<GHResponse> queue;
-                    if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                    if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                     {
-                        queue.Enqueue(new GHResponse(_currentGame, GHRequestType.Location, x, y, mod));
+                        queue.Enqueue(new GHResponse(curGame, GHRequestType.Location, x, y, mod));
                     }
                 }
             }
@@ -12649,40 +14041,43 @@ namespace GnollHackX.Pages.Game
                             resp += -6; // ch = "l";
                         else
                         {
+                            int ux, uy;
                             lock (_uLock)
                             {
-                                if (ShowDirections && GHUtils.isok(_ux, _uy) && GHUtils.isok(x, y))
+                                ux = _ux;
+                                uy = _uy;
+                            }
+                            if (ShowDirections && GHUtils.isok(ux, uy) && GHUtils.isok(x, y))
+                            {
+                                int dx = x - ux;
+                                int dy = y - uy;
+                                if (Math.Abs(x - ux) <= 1 && Math.Abs(y - uy) <= 1)
                                 {
-                                    int dx = x - _ux;
-                                    int dy = y - _uy;
-                                    if (Math.Abs(x - _ux) <= 1 && Math.Abs(y - _uy) <= 1)
-                                    {
-                                        int dres = -1 * (5 + dx - 3 * dy);
-                                        if (dres == 5)
-                                            resp = 46; /* '.', or self */
-                                        else
-                                            resp += dres;
-                                    }
+                                    int dres = -1 * (5 + dx - 3 * dy);
+                                    if (dres == -5)
+                                        resp = GHConstants.SelfChar; /* '.', or self */
                                     else
-                                        return;
+                                        resp += dres;
                                 }
                                 else
-                                {
-                                    if (ShowNumberPad)
-                                        resp += -5;
-                                    else
-                                        resp = 46; /* '.', or self */
-                                }
+                                    return;
+                            }
+                            else
+                            {
+                                if (ShowNumberPad)
+                                    resp += -5;
+                                else
+                                    resp = GHConstants.SelfChar; /* '.', or self */
                             }
                         }
 
-                        if (ShowNumberPad)
+                        if (ShowNumberPad && resp <= -1 && resp >= -9)
                             resp -= 10;
 
                         ConcurrentQueue<GHResponse> queue;
-                        if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                        if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                         {
-                            queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetChar, resp));
+                            queue.Enqueue(new GHResponse(curGame, GHRequestType.GetChar, resp));
                         }
                     }
                     else if (ShowNumberPad && e.Location.X < _canvasButtonRect.Left
@@ -12691,9 +14086,9 @@ namespace GnollHackX.Pages.Game
                     {
                         int resp = -10;
                         ConcurrentQueue<GHResponse> queue;
-                        if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                        if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                         {
-                            queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetChar, resp));
+                            queue.Enqueue(new GHResponse(curGame, GHRequestType.GetChar, resp));
                         }
                     }
                 }
@@ -12720,74 +14115,141 @@ namespace GnollHackX.Pages.Game
 
         public void SetMapSymbol(int x, int y, int glyph, int bkglyph, int c, int color, uint special, ref LayerInfo layers)
         {
+            long generalCounter;
+            long mainCounter;
+            lock (AnimationTimerLock)
+            {
+                generalCounter = AnimationTimers.general_animation_counter;
+            }
+            lock (_mainCounterLock)
+            {
+                mainCounter = _mainCounterValue;
+            }
             lock (_mapDataLock)
             {
-                if (((layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0 && (_mapData[x, y].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) == 0) ||
-                    (layers.m_id != 0 && layers.m_id != _mapData[x, y].Layers.m_id))
+                SetMapSymbolOnTimerUnlocked(x, y, glyph, bkglyph, c, color, special, ref layers, generalCounter, mainCounter);
+            }
+        }
+
+        private void SetMapSymbolOnTimerUnlocked(int x, int y, int glyph, int bkglyph, int c, int color, uint special, ref LayerInfo layers, long generalCounter, long mainCounter)
+        {
+            if (((layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0 && (_mapData[x, y].Layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) == 0) ||
+                (layers.m_id != 0 && layers.m_id != _mapData[x, y].Layers.m_id))
+            {
+                /* Update counter value only if the monster just moved here, not, e.g. if it changes action in the same square,
+                 * or is printed in the same square again with the same origin coordinates. This way, the movement action is played only once. 
+                 */
+                _mapData[x, y].GlyphPrintAnimationCounterValue = generalCounter;
+                _mapData[x, y].GlyphPrintMainCounterValue = mainCounter;
+            }
+            if ((layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0)
+            {
+                lock (_uLock)
                 {
-                    /* Update counter value only if the monster just moved here, not, e.g. if it changes action in the same square,
-                     * or is printed in the same square again with the same origin coordinates. This way, the movement action is played only once. 
-                     */
-                    lock (AnimationTimerLock)
+                    _ux = x;
+                    _uy = y;
+                    _u_condition_bits = layers.condition_bits;
+                    _u_status_bits = layers.status_bits;
+                    if (layers.buff_bits != null)
                     {
-                        _mapData[x, y].GlyphPrintAnimationCounterValue = AnimationTimers.general_animation_counter;
-                    }
-                    lock (_mainCounterLock)
-                    {
-                        _mapData[x, y].GlyphPrintMainCounterValue = _mainCounterValue;
-                    }
-                }
-                if ((layers.layer_flags & (ulong)LayerFlags.LFLAGS_UXUY) != 0)
-                {
-                    lock(_uLock)
-                    {
-                        _ux = x;
-                        _uy = y;
-                        _u_condition_bits = layers.condition_bits;
-                        _u_status_bits = layers.status_bits;
-                        if(layers.buff_bits != null)
+                        for (int i = 0; i < GHConstants.NUM_BUFF_BIT_ULONGS; i++)
                         {
-                            for (int i = 0; i < GHConstants.NUM_BUFF_BIT_ULONGS; i++)
-                            {
-                                _u_buff_bits[i] = layers.buff_bits[i];
-                            }
+                            _u_buff_bits[i] = layers.buff_bits[i];
                         }
                     }
                 }
-                if (layers.o_id != 0 && layers.o_id != _mapData[x, y].Layers.o_id)
-                {
-                    /* Update counter value only if the object just moved here, not, e.g. if it changes action in the same square,
-                     * or is printed in the same square again with the same origin coordinates. This way, the movement action is played only once. 
-                     */
-                    lock (AnimationTimerLock)
-                    {
-                        _mapData[x, y].GlyphObjectPrintAnimationCounterValue = AnimationTimers.general_animation_counter;
-                    }
-                    lock (_mainCounterLock)
-                    {
-                        _mapData[x, y].GlyphObjectPrintMainCounterValue = _mainCounterValue;
-                    }
-                }
-                /* General counter that gets always set */
-                lock (AnimationTimerLock)
-                {
-                    _mapData[x, y].GlyphGeneralPrintAnimationCounterValue = AnimationTimers.general_animation_counter;
-                }
-                lock (_mainCounterLock)
-                {
-                    _mapData[x, y].GlyphGeneralPrintMainCounterValue = _mainCounterValue;
-                }
-                _mapData[x, y].Glyph = glyph;
-                _mapData[x, y].BkGlyph = bkglyph;
-                _mapData[x, y].Symbol = Char.ConvertFromUtf32(c);
-                _mapData[x, y].Color = UIUtils.NHColor2SKColor(color, (special & 0x00002000UL) != 0 ? (int)MenuItemAttributes.AltColors : 0);
-                _mapData[x, y].Special = special;
-                _mapData[x, y].Layers = layers;
+            }
+            if (layers.o_id != 0 && layers.o_id != _mapData[x, y].Layers.o_id)
+            {
+                /* Update counter value only if the object just moved here, not, e.g. if it changes action in the same square,
+                 * or is printed in the same square again with the same origin coordinates. This way, the movement action is played only once. 
+                 */
+                _mapData[x, y].GlyphObjectPrintAnimationCounterValue = generalCounter;
+                _mapData[x, y].GlyphObjectPrintMainCounterValue = mainCounter;
+            }
 
-                _mapData[x, y].NeedsUpdate = true;
-                _mapData[x, y].HasEnlargementOrAnimationOrSpecialHeight = AlternativeLayerDrawing ? DetermineHasEnlargementOrAnimationOrSpecialHeight(ref layers) : false;
+            /* General counter that gets always set */
+            _mapData[x, y].GlyphGeneralPrintAnimationCounterValue = generalCounter;
+            _mapData[x, y].GlyphGeneralPrintMainCounterValue = mainCounter;
+            _mapData[x, y].Glyph = glyph;
+            _mapData[x, y].BkGlyph = bkglyph;
+            _mapData[x, y].Symbol = Char.ConvertFromUtf32(c);
+            _mapData[x, y].Color = UIUtils.NHColor2SKColor(color, (special & 0x00002000UL) != 0 ? (int)MenuItemAttributes.AltColors : 0);
+            _mapData[x, y].Special = special;
+            _mapData[x, y].Layers = layers;
+
+            _mapData[x, y].NeedsUpdate = true;
+            _mapData[x, y].HasEnlargementOrAnimationOrSpecialHeight = AlternativeLayerDrawing ? DetermineHasEnlargementOrAnimationOrSpecialHeight(ref layers) : false;
+        }
+
+        public void ProcessPrintGlyphCallList(List<SavedPrintGlyphCall> list, List<SavedSendObjectDataCall> olist, List<SavedSendMonsterDataCall> mlist, List<SavedSendEngravingDataCall> elist)
+        {
+            long generalCounter;
+            long mainCounter;
+            lock (AnimationTimerLock)
+            {
+                generalCounter = AnimationTimers.general_animation_counter;
+            }
+            lock (_mainCounterLock)
+            {
+                mainCounter = _mainCounterValue;
+            }
+            lock (_mapDataLock)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    SavedPrintGlyphCall pg = list[i];
+                    SetMapSymbolOnTimerUnlocked(pg.X, pg.Y, pg.Glyph, pg.Bkglyph, pg.Symbol, pg.Ocolor, pg.Special, ref pg.Layers, generalCounter, mainCounter);
+                    if (GHUtils.isok(pg.X, pg.Y))
+                        _mapData[pg.X, pg.Y].Engraving = new EngravingInfo();
+                }
+                for (int i = 0; i < elist.Count; i++)
+                {
+                    SavedSendEngravingDataCall e = elist[i];
+                    if (e.cmdtype == 0)
+
+                        if (GHUtils.isok(e.x, e.y))
+                            _mapData[e.x, e.y].Engraving = new EngravingInfo(e.engraving_text, e.etype, e.eflags, e.gflags);
+                }
+            }
+
+            lock (_objectDataLock)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    SavedPrintGlyphCall pg = list[i];
+                    int x = pg.X;
+                    int y = pg.Y;
+                    if (_objectData[x, y] != null)
+                    {
+                        if (_objectData[x, y].FloorObjectList != null)
+                            _objectData[x, y].FloorObjectList.Clear();
+                        if (_objectData[x, y].CoverFloorObjectList != null)
+                            _objectData[x, y].CoverFloorObjectList.Clear();
+                        if (_objectData[x, y].MemoryObjectList != null)
+                            _objectData[x, y].MemoryObjectList.Clear();
+                        if (_objectData[x, y].CoverMemoryObjectList != null)
+                            _objectData[x, y].CoverMemoryObjectList.Clear();
+                    }
+                }
+                for (int i = 0; i < olist.Count; i++)
+                {
+                    SavedSendObjectDataCall o = olist[i];
+                    AddObjectData(o.x, o.y, o.otmp, o.cmdtype, o.where, o.otypdata, o.oflags);
+                }
+            }
+
+            lock (_petDataLock)
+            {
+                for (int i = 0; i < mlist.Count; i++)
+                {
+                    SavedSendMonsterDataCall m = mlist[i];
+                    if(m.cmdtype == 0)
+                        _petData.Add(new GHPetDataItem(m.monster_data));
+                }
             }
         }
+
         public void SetMapCursor(int x, int y)
         {
             lock (_mapDataLock)
@@ -12850,49 +14312,58 @@ namespace GnollHackX.Pages.Game
 
         public void SetTargetClip(int x, int y, bool immediate_pan)
         {
-            long curtimervalue = 0;
             long pantime = Math.Max(2, (long)Math.Ceiling((double)UIUtils.GetMainCanvasAnimationFrequency(MapRefreshRate) / 8.0));
-            //lock (AnimationTimerLock)
-            //{
-            //    curtimervalue = AnimationTimers.general_animation_counter;
-            //}
+
+            /* Copy some values to local variables to avoid nested locks */
+            bool forceAscii = ForceAscii;
+            long curtimervalue = 0;
+            float usedTileWidth;
+            float usedTileHeight;
+            int clipX;
+            int clipY;
+
             lock (_mainCounterLock)
             {
                 curtimervalue = _mainCounterValue;
             }
-
-            lock (_targetClipLock)
+            lock (_tileSizeLock)
             {
-                if (immediate_pan || GraphicsStyle == GHGraphicsStyle.ASCII || ForceAscii)
+                usedTileWidth = _usedTileWidth;
+                usedTileHeight = _usedTileHeight;
+            }
+            lock (_clipLock)
+            {
+                clipX = _clipX;
+                clipY = _clipY;
+
+                /* Can set these here already a bit in advance */
+                _clipX = x;
+                _clipY = y;
+            }
+
+            float newClipX;
+            float newClipY;
+            lock (_mapOffsetLock)
+            {
+                if (immediate_pan || GraphicsStyle == GHGraphicsStyle.ASCII || forceAscii)
                 {
                     _targetClipOn = false;
-                    _originMapOffsetWithNewClipX = 0;
-                    _originMapOffsetWithNewClipY = 0;
+                    newClipX = 0;
+                    newClipY = 0;
                 }
                 else
                 {
                     _targetClipOn = true;
-                    lock (_mapOffsetLock)
-                    {
-                        lock (_clipLock)
-                        {
-                            _originMapOffsetWithNewClipX = _mapOffsetX + (float)(x - _clipX) * UsedTileWidth;
-                            _originMapOffsetWithNewClipY = _mapOffsetY + (float)(y - _clipY) * UsedTileHeight;
-                        }
-                    }
+                    newClipX = _mapOffsetX + (float)(x - clipX) * usedTileWidth;
+                    newClipY = _mapOffsetY + (float)(y - clipY) * usedTileHeight;
                     _targetClipStartCounterValue = curtimervalue;
                     _targetClipPanTime = pantime; // GHConstants.DefaultPanTime;
                 }
-            }
-            lock (_clipLock)
-            {
-                _clipX = x;
-                _clipY = y;
-            }
-            lock (_mapOffsetLock)
-            {
-                _mapOffsetX = _originMapOffsetWithNewClipX;
-                _mapOffsetY = _originMapOffsetWithNewClipY;
+
+                _originMapOffsetWithNewClipX = newClipX;
+                _originMapOffsetWithNewClipY = newClipY;
+                _mapOffsetX = newClipX;
+                _mapOffsetY = newClipY;
             }
         }
 
@@ -13085,45 +14556,53 @@ namespace GnollHackX.Pages.Game
             }
         }
 
+        public void StartAtBlack()
+        {
+            FadeFrameAtStart.Opacity = 1.0;
+            FadeFrameAtStart.IsVisible = true;
+        }
+
+        public async void FadeFromBlackAtStart(uint milliseconds)
+        {
+            FadeFrameAtStart.Opacity = 1.0;
+            await FadeFrameAtStart.FadeTo(0.0, milliseconds);
+            FadeFrameAtStart.IsVisible = false;
+        }
+
+        public void SetToBlack()
+        {
+#if WINDOWS
+            FadeFrame.Opacity = 1.0;
+            FadeFrame.IsVisible = true;
+#else
+            canvasView.Opacity = 0.0;
+#endif
+        }
+
         public void FadeToBlack(uint milliseconds)
         {
             MainGrid.IsEnabled = false;
+#if WINDOWS
+            FadeFrame.Opacity = 0.0;
+            FadeFrame.IsVisible = true;
+            FadeFrame.FadeTo(1.0, milliseconds);
+#else
             canvasView.Opacity = 1.0;
             canvasView.FadeTo(0.0, milliseconds);
-            //uint timeToAnimate = milliseconds;
-            //Animation animation = new Animation(v => canvasView.Opacity = v, 1.0, 0.0);
-            //animation.Commit(canvasView, "Opacity", length: timeToAnimate, rate: 25, repeat: () => false);
+#endif
         }
 
-        public void FadeFromBlack(uint milliseconds)
+        public async void FadeFromBlack(uint milliseconds)
         {
             MainGrid.IsEnabled = true;
+#if WINDOWS
+            FadeFrame.Opacity = 1.0;
+            await FadeFrame.FadeTo(0.0, milliseconds);
+            FadeFrame.IsVisible = false;
+#else
             canvasView.Opacity = 0.0;
-            canvasView.FadeTo(1.0, milliseconds);
-            //uint timeToAnimate = milliseconds;
-            //Animation animation = new Animation(v => canvasView.Opacity = v, 0.0, 1.0);
-            //animation.Commit(canvasView, "Opacity", length: timeToAnimate, rate: 25, repeat: () => false);
-        }
-
-        private void PickupButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, ',');
-        }
-        private void SearchButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 's');
-        }
-        private void KickButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'k');
-        }
-        private void UpButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, '<');
-        }
-        private void DownButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, '>');
+            await canvasView.FadeTo(1.0, milliseconds);
+#endif
         }
 
         public void GenericButton_Clicked(object sender, EventArgs e, int resp)
@@ -13131,32 +14610,15 @@ namespace GnollHackX.Pages.Game
             if (!((resp >= '0' && resp <= '9') || (resp <= -1 && resp >= -19)))
                 ShowNumberPad = false;
 
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.GetChar, resp));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.GetChar, resp));
                 }
             }
-        }
-
-        private void InventoryButton_Clicked(object sender, EventArgs e)
-        {
-            GHApp.DebugWriteRestart("Inventory");
-            GenericButton_Clicked(sender, e, 'i');
-        }
-        private void LookHereButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, ':');
-        }
-        private void WaitButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, '.');
-        }
-        private void FireButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'f');
         }
 
         private void MoreButton_Clicked(object sender, EventArgs e)
@@ -13172,18 +14634,22 @@ namespace GnollHackX.Pages.Game
                 RefreshScreen = false;
             }
 
+            UpdateMoreNextPrevButtonVisibility(true, true);
             MoreCommandsGrid.IsVisible = true;
-            MainGrid.IsVisible = false;
-            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                canvasView.AbortAnimation("GeneralAnimationCounter");
-            _mapUpdateStopWatch.Stop();
+            //MainGrid.IsVisible = false;
+            IsMainCanvasOn = false;
+            StopMainCanvasAnimation();
             StartCommandCanvasAnimation();
         }
 
         private void YnButton_Clicked(object sender, EventArgs e)
         {
             LabeledImageButton ghb = (LabeledImageButton)sender;
+            YnButton_Pressed(sender, e, ghb.GHCommand);
+        }
 
+        private void YnButton_Pressed(object sender, EventArgs e, int resp)
+        {
             /* This is slightly slower and flickers less with two consecutive yn questions than a direct call to HideYnResponses() */
             ConcurrentQueue<GHRequest> queue;
             if (GHGame.RequestDictionary.TryGetValue(CurrentGame, out queue))
@@ -13191,45 +14657,16 @@ namespace GnollHackX.Pages.Game
                 queue.Enqueue(new GHRequest(CurrentGame, GHRequestType.HideYnResponses));
             }
 
-            GenericButton_Clicked(sender, e, ghb.GHCommand);
-        }
-
-        private void RepeatButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, GHUtils.Ctrl('A'));
-        }
-
-        private void CastButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'Z');
-        }
-
-        private void LootButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'l');
-        }
-
-        private void EatButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'e');
-        }
-
-        private void CountButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'n');
-        }
-
-        private void RunButton_Clicked(object sender, EventArgs e)
-        {
-            GenericButton_Clicked(sender, e, 'G');
+            GenericButton_Clicked(sender, e, resp);
         }
 
         private void ESCButton_Clicked(object sender, EventArgs e)
         {
             GHApp.PlayButtonClickedSound();
             TouchDictionary.Clear();
-            GenericButton_Clicked(sender, e, 27);
+            GenericButton_Clicked(sender, e, GHConstants.CancelChar);
         }
+
         public void ToggleAutoCenterMode()
         {
             ToggleAutoCenterModeButton_Clicked(ToggleAutoCenterModeButton, new EventArgs());
@@ -13248,12 +14685,19 @@ namespace GnollHackX.Pages.Game
             {
                 ToggleAutoCenterModeButton.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.stone-autocenter-on.png";
                 SimpleToggleAutoCenterModeButton.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.stone-autocenter-on.png";
-                if (sender != null && GHUtils.isok(_ux, _uy))
+                int ux, uy;
+                lock (_uLock)
                 {
-                    SetTargetClip(_ux, _uy, false);
+                    ux = _ux;
+                    uy = _uy;
+                }
+                if (sender != null && GHUtils.isok(ux, uy))
+                {
+                    SetTargetClip(ux, uy, false);
                 }
             }
         }
+
         private void ToggleTravelModeButton_Clicked(object sender, EventArgs e)
         {
             GHApp.PlayMenuSelectSound();
@@ -13267,6 +14711,7 @@ namespace GnollHackX.Pages.Game
                 ToggleTravelModeButton.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.stone-travel-off.png";
             }
         }
+
         private void LookModeButton_Clicked(object sender, EventArgs e)
         {
             GHApp.PlayMenuSelectSound();
@@ -13296,9 +14741,15 @@ namespace GnollHackX.Pages.Game
             {
                 ToggleZoomMiniButton.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.stone-minimap-off.png";
                 SimpleToggleZoomMiniButton.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.stone-minimap-off.png";
-                if (sender != null && GHUtils.isok(_ux, _uy) && !MapNoClipMode)
+                int ux, uy;
+                lock (_uLock)
                 {
-                    SetTargetClip(_ux, _uy, true);
+                    ux = _ux;
+                    uy = _uy;
+                }
+                if (sender != null && GHUtils.isok(ux, uy) && !MapNoClipMode)
+                {
+                    SetTargetClip(ux, uy, true);
                 }
             }
         }
@@ -13331,9 +14782,15 @@ namespace GnollHackX.Pages.Game
                     }
                 }
 
-                if (sender != null && GHUtils.isok(_ux, _uy) && !MapNoClipMode)
+                int ux, uy;
+                lock (_uLock)
                 {
-                    SetTargetClip(_ux, _uy, true);
+                    ux = _ux;
+                    uy = _uy;
+                }
+                if (sender != null && GHUtils.isok(ux, uy) && !MapNoClipMode)
+                {
+                    SetTargetClip(ux, uy, true);
                 }
             }
 
@@ -13345,9 +14802,7 @@ namespace GnollHackX.Pages.Game
             SimpleGameMenuButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
 
-            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                canvasView.AbortAnimation("GeneralAnimationCounter");
-            _mapUpdateStopWatch.Stop();
+            StopMainCanvasAnimation();
             TouchDictionary.Clear();
 
             await ShowGameMenu(sender, e);
@@ -13361,7 +14816,7 @@ namespace GnollHackX.Pages.Game
 
         private void PopupOkButton_Clicked(object sender, EventArgs e)
         {
-            GenericButton_Clicked(sender, e, 27);
+            GenericButton_Clicked(sender, e, GHConstants.CancelChar);
         }
 
         private void HidePopupGrid()
@@ -13404,8 +14859,12 @@ namespace GnollHackX.Pages.Game
 
         private readonly SKColor _suffixTextColor = new SKColor(220, 220, 220);
         private readonly SKColor _suffixTextColorReverted = new SKColor(35, 35, 35);
-        private readonly SKColor _menuHighlightColor = new SKColor(0xFF, 0x88, 0x00, 0x88);
-        private readonly SKColor _menuHighlight2Color = new SKColor(0xFF, 0xAA, 0x00, 0xAA);
+        private readonly SKColor _menuHighlightSelectedColor = new SKColor(0xFF, 0x88, 0x00, 0x88);
+        private readonly SKColor _menuHighlightAutoClickedColor = new SKColor(0xFF, 0xBB, 0x00, 0x99);
+        private readonly SKColor _menuHighlightHoverOverSelectableColor = new SKColor(0xFF, 0x88, 0x00, 0x44);
+        private readonly SKColor _menuHighlightHoverOverAutoClickableColor = new SKColor(0xFF, 0xBB, 0x00, 0x55);
+        private readonly SKColor _menuHighlightHoverOverSelectedColor = new SKColor(0xFF, 0x88, 0x00, 0xAA);
+        private readonly SKColor _menuHighlightHoverOverAutoClickedColor = new SKColor(0xFF, 0xBB, 0x00, 0xAA);
         private int _firstDrawnMenuItemIdx = -1;
         private int _lastDrawnMenuItemIdx = -1;
         private readonly object _totalMenuHeightLock = new object();
@@ -13426,10 +14885,6 @@ namespace GnollHackX.Pages.Game
             SwitchableCanvasView referenceCanvasView = MenuCanvas;
             float canvaswidth = referenceCanvasView.CanvasSize.Width;
             float canvasheight = referenceCanvasView.CanvasSize.Height;
-            float x, y;
-            string str;
-            SKRect textBounds = new SKRect();
-            float scale = (float)Math.Sqrt((double)(canvaswidth * canvasheight / (float)(referenceCanvasView.Width * referenceCanvasView.Height)));
 
             canvas.Clear();
             lock (_menuDrawOnlyLock)
@@ -13447,12 +14902,20 @@ namespace GnollHackX.Pages.Game
                     return;
             }
 
+            float scale = GetInverseCanvasScale(); // (float)Math.Sqrt((double)(canvaswidth * canvasheight / (float)(referenceCanvasView.Width * referenceCanvasView.Height)));
+            float customScale = GHApp.CustomScreenScale;
+            bool isHighFilterQuality = MenuHighFilterQuality;
+            bool usingGL = MenuCanvas.UseGL;
+            float x, y;
+            string str;
+            SKRect textBounds = new SKRect();
+
             using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
                 textPaint.Typeface = GHApp.UnderwoodTypeface;
-                textPaint.TextSize = GHConstants.MenuDefaultRowHeight * scale;
+                textPaint.TextSize = GHConstants.MenuDefaultRowHeight * scale * customScale;
                 float picturewidth = 64.0f * textPaint.FontSpacing / 48.0f;
-                float picturepadding = 9 * scale;
+                float picturepadding = 9 * scale * customScale;
                 float leftinnerpadding = 5;
                 float curmenuoffset = 0;
                 lock (_menuScrollLock)
@@ -13461,7 +14924,7 @@ namespace GnollHackX.Pages.Game
                 }
                 y = curmenuoffset;
                 double menumarginx = MenuCanvas.MenuButtonStyle ? 30.0 : 15.0;
-                double menuwidth = Math.Max(1, Math.Min(MenuCanvas.Width - menumarginx * 2, UIUtils.MenuViewWidthRequest(referenceCanvasView.MenuStyle)));
+                double menuwidth = Math.Max(1, Math.Min(MenuCanvas.Width - menumarginx * 2, UIUtils.MenuViewWidthRequest(referenceCanvasView.MenuStyle) * customScale));
                 float menuwidthoncanvas = (float)(menuwidth * scale);
                 float leftmenupadding = Math.Max(0, (canvaswidth - menuwidthoncanvas) / 2);
                 float rightmenupadding = leftmenupadding;
@@ -13495,29 +14958,32 @@ namespace GnollHackX.Pages.Game
 
                     lock (_refreshMenuRowCountLock)
                     {
-                        for (int idx = 0; idx < referenceCanvasView.MenuItems.Count; idx++)
+                        int idx = -1;
+                        foreach (GHMenuItem mi in referenceCanvasView.MenuItems)
                         {
-                            GHMenuItem mi = referenceCanvasView.MenuItems[idx];
+                            idx++;
                             bool IsMiButton = mi.IsButton;
                             float extra_vertical_padding = IsMiButton ? 12f : 0f;
 
                             /* Padding */
-                            bottomPadding = (mi.BottomPadding + extra_vertical_padding) * scale;
-                            topPadding = (mi.TopPadding + extra_vertical_padding) * scale;
+                            bottomPadding = (mi.BottomPadding + extra_vertical_padding) * scale * customScale;
+                            topPadding = (mi.TopPadding + extra_vertical_padding) * scale * customScale;
 
                             /* Text Size and Minimum Row Height */
-                            if ((mi.Attributes & (int)MenuItemAttributes.HalfSize) != 0)
-                                textPaint.TextSize = (mi.MinimumTouchableTextSize / 2) * scale;
+                            if ((mi.NHAttribute & (int)MenuItemAttributes.HalfSize) != 0)
+                                textPaint.TextSize = (mi.MinimumTouchableTextSize / 2) * scale * customScale;
                             else
-                                textPaint.TextSize = mi.MinimumTouchableTextSize * scale;
+                                textPaint.TextSize = mi.MinimumTouchableTextSize * scale * customScale;
                             float minrowheight = mi.MinimumRowHeight(textPaint.FontSpacing, bottomPadding, topPadding, canvaswidth, canvasheight);
 
                             x = leftmenupadding;
                             mi.DrawBounds.Left = x;
-                            float mainfontsize = (float)mi.FontSize * scale;
+                            float mainfontsize = (float)mi.FontSize * scale * customScale;
                             float relsuffixsize = (float)mi.RelativeSuffixFontSize;
                             float suffixfontsize = relsuffixsize * mainfontsize;
-                            textPaint.Typeface = GHApp.GetTypefaceByName(mi.FontFamily);
+                            string mainFontFamily = mi.FontFamily;
+                            SKTypeface mainFont = GHApp.GetTypefaceByName(mainFontFamily);
+                            textPaint.Typeface = mainFont;
                             textPaint.TextSize = mainfontsize;
                             //textPaint.TextAlign = SKTextAlign.Left;
 
@@ -13545,6 +15011,12 @@ namespace GnollHackX.Pages.Game
                             string[] maintextsplit = mi.MainTextSplit;
                             string[] suffixtextsplit = mi.SuffixTextSplit;
                             string[] suffix2textsplit = mi.Suffix2TextSplit;
+                            List<byte[]> mainattrssplit = mi.MainSplitAttrs;
+                            List<byte[]> suffixattrssplit = mi.SuffixSplitAttrs;
+                            List<byte[]> suffix2attrssplit = mi.Suffix2SplitAttrs;
+                            List<byte[]> maincolorssplit = mi.MainSplitColors;
+                            List<byte[]> suffixcolorssplit = mi.SuffixSplitColors;
+                            List<byte[]> suffix2colorssplit = mi.Suffix2SplitColors;
 
                             List<float> mainrowwidths = null, suffixrowwidths = null, suffix2rowwidths = null;
 
@@ -13584,7 +15056,7 @@ namespace GnollHackX.Pages.Game
 
                             float totalRowHeight = topPadding + bottomPadding + ((float)maintextrows + suffixtextrows * (mi.IsSuffixTextVisible ? relsuffixsize : 0.0f) + (mi.IsSuffix2TextVisible ? relsuffixsize : 0.0f)) * (textPaint.FontSpacing) + 2 * generallinepadding;
                             float totalRowWidth = canvaswidth - leftmenupadding - rightmenupadding;
-                            float totalRowExtraSpacing = IsMiButton ? 12.0f * scale : 0f;
+                            float totalRowExtraSpacing = IsMiButton ? 12.0f * scale * customScale : 0f;
 
                             if (y + totalRowHeight <= 0 || y >= canvasheight)
                             {
@@ -13597,22 +15069,38 @@ namespace GnollHackX.Pages.Game
                             else
                             {
                                 /* Selection rectangle */
+                                bool isSelectable = referenceCanvasView.SelectionHow != SelectionMode.None && mi.Identifier != 0;
                                 SKRect selectionrect = new SKRect(x, y, x + totalRowWidth, y + totalRowHeight);
+#if WINDOWS
+                                bool isHover = false;
+                                lock (_menuHoverLock)
+                                {
+                                    isHover = _menuIsHovering && selectionrect.Contains(_menuHoverPoint);
+                                }
+#else
+                                bool isHover = IsMiButton; /* On mobile, all buttons are normal / hover color automatically */
+#endif
                                 if (IsMiButton)
                                 {
-                                    canvas.DrawImage(isselected || mi.Highlighted ? GHApp.ButtonSelectedBitmap : GHApp.ButtonNormalBitmap, selectionrect);
+                                    canvas.DrawImage(isselected || mi.Highlighted ? GHApp.ButtonSelectedBitmap : isHover ? GHApp.ButtonNormalBitmap : GHApp.ButtonDisabledBitmap, selectionrect);
                                 }
                                 else
                                 {
                                     if (isselected)
                                     {
-                                        textPaint.Color = _menuHighlightColor;
+                                        textPaint.Color = isHover ? _menuHighlightHoverOverSelectedColor : _menuHighlightSelectedColor;
                                         textPaint.Style = SKPaintStyle.Fill;
                                         canvas.DrawRect(selectionrect, textPaint.Paint);
                                     }
                                     else if (mi.Highlighted)
                                     {
-                                        textPaint.Color = _menuHighlight2Color;
+                                        textPaint.Color = isHover ? _menuHighlightHoverOverAutoClickedColor : _menuHighlightAutoClickedColor;
+                                        textPaint.Style = SKPaintStyle.Fill;
+                                        canvas.DrawRect(selectionrect, textPaint.Paint);
+                                    }
+                                    else if (isHover && isSelectable)
+                                    {
+                                        textPaint.Color = mi.IsAutoClickOk || MenuCanvas.ClickOKOnSelection ? _menuHighlightHoverOverAutoClickableColor : _menuHighlightHoverOverSelectableColor;
                                         textPaint.Style = SKPaintStyle.Fill;
                                         canvas.DrawRect(selectionrect, textPaint.Paint);
                                     }
@@ -13631,8 +15119,9 @@ namespace GnollHackX.Pages.Game
                                         str = mi.FormattedSpecialMark;
                                     else
                                         str = mi.FormattedAccelerator;
-                                    textPaint.Color = SKColors.Gray;
-                                    str = str.Trim();
+                                    textPaint.Color = SKColors.Gray; /* !GHApp.IsDesktop ? SKColors.Gray:
+                                        UIUtils.NHColor2SKColorCore((int)NhColor.CLR_WHITE, 0, MenuCanvas.RevertBlackAndWhite, false); */
+                                    //str = str.Trim();
                                     float identifier_y =
                                         mi.IsSuffixTextVisible || mi.IsSuffix2TextVisible ? (selectionrect.Top + selectionrect.Bottom) / 2 - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent) / 2 - textPaint.FontMetrics.Ascent
                                         : y + singlelinepadding;
@@ -13658,7 +15147,7 @@ namespace GnollHackX.Pages.Game
                                                 float glyphxcenterpadding = (picturewidth - minrowheight * mi.GlyphImageSource.Width / mi.GlyphImageSource.Height) / 2;
                                                 canvas.Translate(x + glyphxcenterpadding, glyph_start_y);
                                                 canvas.Scale(minrowheight / mi.GlyphImageSource.Height);
-                                                mi.GlyphImageSource.DrawOnCanvas(canvas);
+                                                mi.GlyphImageSource.DrawOnCanvas(canvas, usingGL, false, isHighFilterQuality);
                                             }
                                         }
                                     }
@@ -13670,20 +15159,24 @@ namespace GnollHackX.Pages.Game
                                 }
 
                                 /* Main text */
-                                SKColor maincolor = UIUtils.NHColor2SKColorCore(mi.NHColor, mi.Attributes, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton && isselected);
-                                textPaint.Color = maincolor;
+                                SKColor maincolor = UIUtils.NHColor2SKColorCore(mi.NHColor, mi.NHAttribute, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton && isselected);
+                                textPaint.Color = !IsMiButton || isHover ? maincolor : UIUtils.NonHoveringSKColorAdjustment(maincolor);
 
                                 //int split_idx_on_row = -1;
                                 bool firstprintonrow = true;
                                 float start_x = x;
                                 float indent_start_x = start_x;
-                                string trimmed_maintext = mi.MainText.Trim();
-                                string indentstr = GHUtils.GetIndentationString(trimmed_maintext, mi.Attributes);
+                                string trimmed_maintext = mi.TrimmedMainText;
+                                string indentstr = GHUtils.GetIndentationString(trimmed_maintext, mi.NHAttribute);
                                 if (indentstr != "")
                                 {
                                     indent_start_x += textPaint.MeasureText(indentstr);
                                 }
-                                DrawTextSplit(canvas, maintextsplit, mainrowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                                string altFontFamily;
+                                if(UIUtils.MaybeSmallFontFamily(mainFontFamily, textPaint.TextSize, out altFontFamily))
+                                    textPaint.Typeface = GHApp.GetTypefaceByName(altFontFamily);
+                                DrawTextSplit(canvas, maintextsplit, mainattrssplit, maincolorssplit, mainrowwidths, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                                textPaint.Typeface = mainFont;
                                 /* Rewind and next line */
                                 x = start_x;
                                 y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -13692,11 +15185,15 @@ namespace GnollHackX.Pages.Game
                                 /* Suffix text */
                                 if (mi.IsSuffixTextVisible)
                                 {
-                                    textPaint.Color = mi.UseColorForSuffixes ? maincolor : MenuCanvas.RevertBlackAndWhite && !IsMiButton ? _suffixTextColorReverted : _suffixTextColor;
+                                    SKColor suffixcolor = mi.UseColorForSuffixes ? maincolor : MenuCanvas.RevertBlackAndWhite && !IsMiButton ? _suffixTextColorReverted : _suffixTextColor;
+                                    textPaint.Color = !IsMiButton || isHover ? suffixcolor : UIUtils.NonHoveringSKColorAdjustment(suffixcolor);
                                     textPaint.TextSize = suffixfontsize;
                                     y += fontspacingpadding;
                                     y -= textPaint.FontMetrics.Ascent;
-                                    DrawTextSplit(canvas, suffixtextsplit, suffixrowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                                    if (UIUtils.MaybeSmallFontFamily(mainFontFamily, textPaint.TextSize, out altFontFamily))
+                                        textPaint.Typeface = GHApp.GetTypefaceByName(altFontFamily);
+                                    DrawTextSplit(canvas, suffixtextsplit, suffixattrssplit, suffixcolorssplit, suffixrowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                                    textPaint.Typeface = mainFont;
                                     /* Rewind and next line */
                                     x = start_x;
                                     y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -13706,12 +15203,16 @@ namespace GnollHackX.Pages.Game
                                 /* Suffix 2 text */
                                 if (mi.IsSuffix2TextVisible)
                                 {
-                                    textPaint.Color = mi.UseColorForSuffixes ? maincolor : MenuCanvas.RevertBlackAndWhite && !IsMiButton ? _suffixTextColorReverted : _suffixTextColor;
+                                    SKColor suffix2color = mi.UseColorForSuffixes ? maincolor : MenuCanvas.RevertBlackAndWhite && !IsMiButton ? _suffixTextColorReverted : _suffixTextColor;
+                                    textPaint.Color = !IsMiButton || isHover ? suffix2color : UIUtils.NonHoveringSKColorAdjustment(suffix2color);
                                     textPaint.TextSize = suffixfontsize;
                                     fontspacingpadding = (textPaint.FontSpacing - (textPaint.FontMetrics.Descent - textPaint.FontMetrics.Ascent)) / 2;
                                     y += fontspacingpadding;
                                     y -= textPaint.FontMetrics.Ascent;
-                                    DrawTextSplit(canvas, suffix2textsplit, suffix2rowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                                    if (UIUtils.MaybeSmallFontFamily(mainFontFamily, textPaint.TextSize, out altFontFamily))
+                                        textPaint.Typeface = GHApp.GetTypefaceByName(altFontFamily);
+                                    DrawTextSplit(canvas, suffix2textsplit, suffix2attrssplit, suffix2colorssplit, suffix2rowwidths, ref x, ref y, ref firstprintonrow, start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, mi.UseSpecialSymbols, MenuCanvas.UseTextOutline || IsMiButton, MenuCanvas.RevertBlackAndWhite && !IsMiButton, IsMiButton, totalRowWidth, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                                    textPaint.Typeface = mainFont;
                                     /* Rewind and next line */
                                     x = start_x;
                                     y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -13737,7 +15238,7 @@ namespace GnollHackX.Pages.Game
                                     textPaint.Color = SKColors.White;
                                     str = mi.Count.ToString();
                                     float maxsize = 1.0f * 2.0f * circleradius / (float)Math.Sqrt(2);
-                                    textPaint.TextSize = (float)mi.FontSize * scale;
+                                    textPaint.TextSize = (float)mi.FontSize * scale * customScale;
                                     textPaint.MeasureText(str, ref textBounds);
                                     float scalex = textBounds.Width / maxsize;
                                     float scaley = textBounds.Height / maxsize;
@@ -13759,7 +15260,7 @@ namespace GnollHackX.Pages.Game
                                     textPaint.Color = SKColors.Black;
                                     str = mi.NumItems.ToString();
                                     float maxsize = 1.0f * 2.0f * circleradius / (float)Math.Sqrt(2);
-                                    textPaint.TextSize = (float)mi.FontSize * scale;
+                                    textPaint.TextSize = (float)mi.FontSize * scale * customScale;
                                     textPaint.MeasureText(str, ref textBounds);
                                     float scalex = textBounds.Width / maxsize;
                                     float scaley = textBounds.Height / maxsize;
@@ -13778,6 +15279,7 @@ namespace GnollHackX.Pages.Game
                     TotalMenuHeight = y - curmenuoffset;
                 }
             }
+            canvas.Flush();
         }
         private readonly SKColor _numItemsBackgroundColor = new SKColor(228, 203, 158);
 
@@ -13796,8 +15298,9 @@ namespace GnollHackX.Pages.Game
             float spacelength = textPaint.MeasureText(" ");
             float curendpos = calc_x_start;
 
-            foreach (string s in textsplit)
+            for (int s_idx = 0, s_cnt = textsplit.Length; s_idx < s_cnt; s_idx++)
             {
+                string s = textsplit[s_idx];
                 bool nowrap = false;
                 if (string.IsNullOrWhiteSpace(s))
                     nowrap = true;
@@ -13846,16 +15349,17 @@ namespace GnollHackX.Pages.Game
             else if (str.StartsWith("&status-") && str.Length > 8)
             {
                 int status_mark = 0;
-                if (int.TryParse(str.Substring(8).Substring(0, str.Length - 8 - 1), out status_mark))
+                GHSubstring substr = new GHSubstring(str, 8).Substring(0, str.Length - 8 - 1);
+                if (int.TryParse(substr.Value, out status_mark))
                 {
                     int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                    int mglyph = (int)game_ui_tile_types.STATUS_MARKS + GHApp.UITileOff;
+                    int mglyph = (int)game_ui_tile_types.STATUS_MARKS + status_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
                     int mtile = GHApp.Glyph2Tile[mglyph];
                     int sheet_idx = GHApp.TileSheetIdx(mtile);
                     int tile_x = GHApp.TileSheetX(mtile);
                     int tile_y = GHApp.TileSheetY(mtile);
-                    int within_tile_x = status_mark % tiles_per_row;
-                    int within_tile_y = status_mark / tiles_per_row;
+                    int within_tile_x = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                    int within_tile_y = (status_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                     int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                     int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -13870,17 +15374,18 @@ namespace GnollHackX.Pages.Game
             }
             else if (str.StartsWith("&cond-") && str.Length > 6)
             {
-                int status_mark = 0;
-                if (int.TryParse(str.Substring(6).Substring(0, str.Length - 6 - 1), out status_mark))
+                int condition_mark = 0;
+                GHSubstring substr = new GHSubstring(str, 6).Substring(0, str.Length - 6 - 1);
+                if (int.TryParse(substr.Value, out condition_mark))
                 {
                     int tiles_per_row = GHConstants.TileWidth / GHConstants.StatusMarkWidth;
-                    int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + GHApp.UITileOff;
+                    int mglyph = (int)game_ui_tile_types.CONDITION_MARKS + condition_mark / GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS + GHApp.UITileOff;
                     int mtile = GHApp.Glyph2Tile[mglyph];
                     int sheet_idx = GHApp.TileSheetIdx(mtile);
                     int tile_x = GHApp.TileSheetX(mtile);
                     int tile_y = GHApp.TileSheetY(mtile);
-                    int within_tile_x = status_mark % tiles_per_row;
-                    int within_tile_y = status_mark / tiles_per_row;
+                    int within_tile_x = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) % tiles_per_row;
+                    int within_tile_y = (condition_mark % GHConstants.MAX_UI_TILE_16_x_16_COMPONENTS) / tiles_per_row;
                     int c_x = tile_x + within_tile_x * GHConstants.StatusMarkWidth;
                     int c_y = tile_y + within_tile_y * GHConstants.StatusMarkHeight;
 
@@ -13896,7 +15401,8 @@ namespace GnollHackX.Pages.Game
             else if (str.StartsWith("&buff-") && str.Length > 6)
             {
                 int propidx = 0;
-                if (int.TryParse(str.Substring(6).Substring(0, str.Length - 6 - 1), out propidx))
+                GHSubstring substr = new GHSubstring(str, 6).Substring(0, str.Length - 6 - 1);
+                if (int.TryParse(substr.Value, out propidx))
                 {
                     if (propidx <= GHConstants.LAST_PROP)
                     {
@@ -13930,18 +15436,26 @@ namespace GnollHackX.Pages.Game
             }
         }
 
-        private void DrawTextSplit(SKCanvas canvas, string[] textsplit, List<float> rowwidths, ref float x, ref float y, ref bool isfirstprintonrow, float indent_start_x, float canvaswidth, float canvasheight, float rightmenupadding, GHSkiaFontPaint textPaint, bool usespecialsymbols, bool usetextoutline, bool revertblackandwhite, bool centertext, float totalrowwidth, float curmenuoffset, float glyphystart, float glyphyend, float glyphpadding)
+        private void DrawTextSplit(SKCanvas canvas, string[] textsplit, List<byte[]> attrs_list, List<byte[]> colors_list, List<float> rowwidths, ref float x, ref float y, ref bool isfirstprintonrow, float indent_start_x, float canvaswidth, float canvasheight, float rightmenupadding, GHSkiaFontPaint textPaint, bool usespecialsymbols, bool usetextoutline, bool revertblackandwhite, bool centertext, float totalrowwidth, float curmenuoffset, float glyphystart, float glyphyend, float glyphpadding)
         {
             if (textsplit == null)
                 return;
 
+#if !GNH_MAUI
+            SKColor oldColor = textPaint.Paint.Color;
+            SKFilterQuality oldFilterQuality = textPaint.Paint.FilterQuality;
+#endif
             float spacelength = textPaint.MeasureText(" ");
             int idx = 0;
             int rowidx = 0;
-            int special_coloring = 0;
             SKColor orig_color = textPaint.Color;
-            foreach (string split_str in textsplit)
+            GHSubstring printedsubline = new GHSubstring("");
+            for (int ss_idx = 0, ss_cnt = textsplit.Length; ss_idx < ss_cnt; ss_idx++)
             {
+                string split_str = textsplit[ss_idx];
+                byte[] attrs = attrs_list != null && idx < attrs_list.Count ? attrs_list[idx] : null;
+                byte[] colors = colors_list != null && idx < colors_list.Count ? colors_list[idx] : null;
+
                 bool nowrap = false;
                 if (string.IsNullOrWhiteSpace(split_str))
                     nowrap = true;
@@ -13965,7 +15479,6 @@ namespace GnollHackX.Pages.Game
                 SKRect source_rect = new SKRect();
                 if(usespecialsymbols && (symbolbitmap = GetGameSpecialSymbol(split_str, out source_rect)) != null)
                 {
-                    special_coloring = 0;
                     textPaint.Color = orig_color;
                     float bmpheight = textPaint.FontMetrics.Descent / 2 - textPaint.FontMetrics.Ascent;
                     float bmpwidth = bmpheight * (float)symbolbitmap.Width / (float)Math.Max(1, symbolbitmap.Height);
@@ -13984,76 +15497,91 @@ namespace GnollHackX.Pages.Game
                         float bmpx = x;
                         float bmpy = y + textPaint.FontMetrics.Ascent;
                         SKRect bmptargetrect = new SKRect(bmpx, bmpy, bmpx + bmpwidth, bmpy + bmpheight);
-                        canvas.DrawImage(symbolbitmap, source_rect, bmptargetrect);
+#if !GNH_MAUI
+                        textPaint.Paint.Color = SKColors.White;
+                        textPaint.Paint.FilterQuality = SKFilterQuality.High;
+#endif
+                        canvas.DrawImage(symbolbitmap, source_rect, bmptargetrect,
+#if GNH_MAUI
+                            new SKSamplingOptions(SKFilterMode.Linear));
+#else
+                            textPaint.Paint);
+                        textPaint.Paint.FilterQuality = oldFilterQuality;
+                        textPaint.Paint.Color = oldColor;
+#endif
                     }
-                    if (split_str == "&damage;" || split_str == "&MC;")
-                        special_coloring = 1;
-                    else if (split_str == "&AC;")
-                        special_coloring = -1;
                     isfirstprintonrow = false;
                 }
                 else
                 {
-                    float printlength = textPaint.MeasureText(split_str);
-                    endposition = x + printlength;
+                    int char_idx = 0;
+                    bool do_once_empty_string =  split_str.Length == 0;
+                    while (char_idx < split_str.Length || do_once_empty_string)
+                    {
+                        do_once_empty_string = false;
+                        int charidx_len = 0;
+                        int new_nhcolor = colors != null && colors.Length > 0 && char_idx < colors.Length ? colors[char_idx] : (int)NhColor.NO_COLOR;
+                        int new_nhattr = attrs != null && attrs.Length > 0 && char_idx < attrs.Length ? attrs[char_idx] : 0;
+                        int char_idx2 = char_idx;
+                        int new_nhcolor2 = new_nhcolor;
+                        int new_nhattr2 = new_nhattr;
+
+                        while (char_idx2 < split_str.Length && new_nhcolor == new_nhcolor2 && new_nhattr == new_nhattr2)
+                        {
+                            char_idx2++;
+                            new_nhcolor2 = colors != null && colors.Length > 0 && char_idx2 < colors.Length ? colors[char_idx2] : (int)NhColor.NO_COLOR;
+                            new_nhattr2 = attrs != null && attrs.Length > 0 && char_idx2 < attrs.Length ? attrs[char_idx2] : 0;
+                            charidx_len = char_idx2 - char_idx;
+                        }
+
+                        SKColor new_skcolor = UIUtils.NHColor2SKColorCore(new_nhcolor, new_nhattr, revertblackandwhite, false);
+                        printedsubline.SetValue(split_str, char_idx, charidx_len);
+                        if (new_nhcolor != (int)NhColor.NO_COLOR)
+                            textPaint.Color = new_skcolor;
+
+                        float printlength = textPaint.MeasureText(printedsubline.Value);
+                        endposition = x + printlength;
+                        bool pastend = x + printlength > canvaswidth - usedglyphpadding - rightmenupadding;
+                        if (pastend && !isfirstprintonrow && !nowrap)
+                        {
+                            rowidx++;
+                            isfirstprintonrow = true;
+
+                            x = indent_start_x;
+
+                            if (centertext && rowwidths != null && rowidx < rowwidths.Count)
+                                centering_padding = (totalrowwidth - rowwidths[rowidx]) / 2;
+                            x += centering_padding;
+
+                            y += textPaint.FontSpacing;
+                            endposition = x + printlength;
+                        }
+
+                        if (!(y + textPaint.FontSpacing + textPaint.FontMetrics.Ascent <= 0 || y + textPaint.FontMetrics.Ascent >= canvasheight))
+                        {
+                            if (usetextoutline)
+                            {
+                                SKColor oldcolor = textPaint.Color;
+                                textPaint.Color = revertblackandwhite ? SKColors.White : SKColors.Black;
+                                textPaint.StrokeWidth = textPaint.TextSize / 10;
+                                textPaint.Style = SKPaintStyle.Stroke;
+                                textPaint.DrawTextOnCanvas(canvas, printedsubline.Value, x, y);
+                                textPaint.Color = oldcolor;
+                                textPaint.Style = SKPaintStyle.Fill;
+                                textPaint.StrokeWidth = 0;
+                            }
+                            textPaint.DrawTextOnCanvas(canvas, printedsubline.Value, x, y);
+                        }
+
+                        if (new_nhcolor != (int)NhColor.NO_COLOR)
+                            textPaint.Color = orig_color;
+
+                        isfirstprintonrow = false;
+                        char_idx += charidx_len;
+                        x += printlength;
+                    }
                     if (idx < textsplit.Length - 1)
                         endposition += spacelength;
-                    bool pastend = x + printlength > canvaswidth - usedglyphpadding - rightmenupadding;
-                    if (pastend && !isfirstprintonrow && !nowrap)
-                    {
-                        rowidx++;
-                        isfirstprintonrow = true;
-
-                        x = indent_start_x;
-
-                        if (centertext && rowwidths != null && rowidx < rowwidths.Count)
-                            centering_padding = (totalrowwidth - rowwidths[rowidx]) / 2;
-                        x += centering_padding;
-
-                        y += textPaint.FontSpacing;
-                        endposition = x + printlength;
-                        if(idx < textsplit.Length - 1)
-                            endposition += spacelength;
-                    }
-
-                    if (!(y + textPaint.FontSpacing + textPaint.FontMetrics.Ascent <= 0 || y + textPaint.FontMetrics.Ascent >= canvasheight))
-                    {
-                        if(usetextoutline)
-                        {
-                            SKColor oldcolor = textPaint.Color;
-                            textPaint.Color = revertblackandwhite ? SKColors.White : SKColors.Black;
-                            textPaint.StrokeWidth = textPaint.TextSize / 10;
-                            textPaint.Style = SKPaintStyle.Stroke;
-                            textPaint.DrawTextOnCanvas(canvas, split_str, x, y);
-                            textPaint.Color = oldcolor;
-                            textPaint.Style = SKPaintStyle.Fill;
-                            textPaint.StrokeWidth = 0;
-                        }
-                        if (special_coloring != 0)
-                        {
-                            double res;
-                            if(double.TryParse(split_str, NumberStyles.Any, CultureInfo.InvariantCulture, out res))
-                            {
-                                res = res * special_coloring;
-                                if (res > 0)
-                                    textPaint.Color = UIUtils.NHColor2SKColorCore((int)NhColor.CLR_BRIGHT_GREEN, (int)MenuItemAttributes.None, revertblackandwhite, false);
-                                else if (res < 0)
-                                    textPaint.Color = UIUtils.NHColor2SKColorCore((int)NhColor.CLR_RED, (int)MenuItemAttributes.None, revertblackandwhite, false);
-                                else
-                                    textPaint.Color = orig_color;
-                            }
-                            else
-                                textPaint.Color = orig_color;
-                        }
-                        textPaint.DrawTextOnCanvas(canvas, split_str, x, y);
-                    }
-
-                    if(special_coloring != 0)
-                    {
-                        special_coloring = 0;
-                        textPaint.Color = orig_color;
-                    }
-                    isfirstprintonrow = false;
                 }
 
                 x = endposition;
@@ -14076,6 +15604,9 @@ namespace GnollHackX.Pages.Game
         private SKTouchEventArgs _savedMenuEventArgs = null;
         private DateTime _savedMenuTimeStamp;
         private bool _menuTouchMoved = false;
+        private bool _menuPreviousReleaseClick = false;
+        private int _menuPreviousReleaseClickIndex = -1;
+        private DateTime _savedPreviousMenuReleaseTimeStamp;
         private void MenuCanvas_Touch(object sender, SKTouchEventArgs e)
         {
             lock (_menuDrawOnlyLock)
@@ -14107,7 +15638,12 @@ namespace GnollHackX.Pages.Game
                     }
 
                     if (MenuTouchDictionary.Count > 1)
+                    {
                         _menuTouchMoved = true;
+                        _menuPreviousReleaseClick = false;
+                        _menuPreviousReleaseClickIndex = -1;
+                        _savedPreviousMenuReleaseTimeStamp = new DateTime();
+                    }
                     else
                     {
                         _savedMenuSender = sender;
@@ -14215,7 +15751,7 @@ namespace GnollHackX.Pages.Game
                                                 /* Sum up the distances and durations of current records to get an average */
                                                 float totaldistance = 0;
                                                 float totalsecs = 0;
-                                                foreach(TouchSpeedRecord r in _menuScrollSpeedRecords)
+                                                foreach (TouchSpeedRecord r in _menuScrollSpeedRecords)
                                                 {
                                                     totaldistance += r.Distance;
                                                     totalsecs += r.Duration;
@@ -14230,6 +15766,9 @@ namespace GnollHackX.Pages.Game
                                         {  /* Cancel any press, if long move */
                                             _menuTouchMoved = true;
                                             _savedMenuTimeStamp = DateTime.Now;
+                                            _menuPreviousReleaseClick = false;
+                                            _menuPreviousReleaseClickIndex = -1;
+                                            _savedPreviousMenuReleaseTimeStamp = new DateTime();
                                         }
                                     }
                                 }
@@ -14249,12 +15788,41 @@ namespace GnollHackX.Pages.Game
                         TouchEntry entry;
                         bool res = MenuTouchDictionary.TryGetValue(e.Id, out entry);
                         if (res)
-                        {
-                            long elapsedms = (DateTime.Now.Ticks - entry.PressTime.Ticks) / TimeSpan.TicksPerMillisecond;
-
+                        { 
+                            long nowTicks = _savedMenuTimeStamp.Ticks;
+                            long elapsedms = (nowTicks - entry.PressTime.Ticks) / TimeSpan.TicksPerMillisecond;
                             if (elapsedms <= GHConstants.MoveOrPressTimeThreshold && !_menuTouchMoved && MenuCanvas.SelectionHow != SelectionMode.None)
                             {
-                                MenuCanvas_NormalClickRelease(sender, e);
+                                if (e.MouseButton == SKMouseButton.Right)
+                                {
+                                    if(MenuCanvas.AllowLongTap)
+                                        MenuCanvas_LongTap(sender, e);
+                                }
+                                else
+                                {
+                                    MenuClickResult clickRes = MenuCanvas_NormalClickRelease(sender, e, false);
+                                    if (GHApp.OkOnDoubleClick && MenuCanvas.SelectionHow == SelectionMode.Single && e.MouseButton == SKMouseButton.Left)
+                                    {
+                                        long timeSincePreviousReleaseInMs = (nowTicks - _savedPreviousMenuReleaseTimeStamp.Ticks) / TimeSpan.TicksPerMillisecond;
+                                        if (!clickRes.OkClicked && MenuOKButton.IsEnabled && _menuPreviousReleaseClick &&
+                                            clickRes.MenuItemClickIndex >= 0 && clickRes.MenuItemClickIndex == _menuPreviousReleaseClickIndex &&
+                                            clickRes.ItemIdentifier != 0 &&
+                                            timeSincePreviousReleaseInMs <= GHConstants.DoubleClickTimeThreshold)
+                                        {
+                                            MenuCanvas.InvalidateSurface();
+                                            MenuOKButton_Clicked(sender, e);
+                                            _menuPreviousReleaseClick = false;
+                                            _menuPreviousReleaseClickIndex = -1;
+                                            _savedPreviousMenuReleaseTimeStamp = new DateTime();
+                                        }
+                                        else
+                                        {
+                                            _menuPreviousReleaseClick = true;
+                                            _menuPreviousReleaseClickIndex = clickRes.MenuItemClickIndex;
+                                            _savedPreviousMenuReleaseTimeStamp = _savedMenuTimeStamp;
+                                        }
+                                    }
+                                }
                             }
                             if (MenuTouchDictionary.ContainsKey(e.Id))
                             {
@@ -14396,17 +15964,27 @@ namespace GnollHackX.Pages.Game
 
                 menuItemMaxCount = MenuCanvas.MenuItems[selectedidx].MaxCount;
                 if (menuItemMaxCount <= 1)
+                {
+                    if (MenuCanvas.SpecialClickOnLongTap)
+                        MenuCanvas_NormalClickRelease(sender, e, true);
+
                     return;
+                }
 
                 _countMenuItem = MenuCanvas.MenuItems[selectedidx];
                 menuItemSelected = MenuCanvas.MenuItems[selectedidx].Selected;
                 menuItemMainText = MenuCanvas.MenuItems[selectedidx].MainText;
             }
 
-            _menuTouchMoved = true; /* No further action upon release */
+            /* No further action upon release */
+            _menuTouchMoved = true;
+            _menuPreviousReleaseClick = false;
+            _menuPreviousReleaseClickIndex = -1;
+            _savedPreviousMenuReleaseTimeStamp = new DateTime();
+
             if ((MenuCanvas.SelectionHow == SelectionMode.Multiple && !menuItemSelected)
                 || (MenuCanvas.SelectionHow == SelectionMode.Single && selectedidx != MenuCanvas.SelectionIndex))
-                MenuCanvas_NormalClickRelease(sender, e); /* Normal click selection first */
+                MenuCanvas_NormalClickRelease(sender, e, false); /* Normal click selection first */
 
             if (_countMenuItem.MaxCount > 100)
             {
@@ -14445,6 +16023,12 @@ namespace GnollHackX.Pages.Game
 
             MenuCountCaption.Text = (MenuCountEntry.IsVisible ? "Type" : "Select") + " Count for " + menuItemMainText;
             MenuCountBackgroundGrid.IsVisible = true;
+            if(MenuCountEntry.IsVisible)
+            {
+#if WINDOWS
+                MenuCountEntry.Focus();
+#endif
+            }
         }
 
         private void ClearHighlightMenuItems()
@@ -14498,13 +16082,16 @@ namespace GnollHackX.Pages.Game
             }
         }
 
-        private void MenuCanvas_NormalClickRelease(object sender, SKTouchEventArgs e)
+        private MenuClickResult MenuCanvas_NormalClickRelease(object sender, SKTouchEventArgs e, bool isLongTap)
         {
             bool doclickok = false;
+            bool okClicked = false;
+            int clickIdx = -1;
+            long identifier = 0;
             lock (MenuCanvas.MenuItemLock)
             {
                 if (MenuCanvas.MenuItems == null)
-                    return;
+                    return new MenuClickResult(okClicked, clickIdx, identifier);
 
                 for (int idx = _firstDrawnMenuItemIdx; idx >= 0 && idx <= _lastDrawnMenuItemIdx; idx++)
                 {
@@ -14512,73 +16099,161 @@ namespace GnollHackX.Pages.Game
                         break;
                     if (MenuCanvas.MenuItems[idx].DrawBounds.Contains(e.Location))
                     {
-                        GHMenuItem mi = MenuCanvas.MenuItems[idx];
-                        if (mi.Identifier == 0)
-                        {
-                            if (MenuCanvas.SelectionHow == SelectionMode.Multiple && (mi.Flags & (ulong)MenuFlags.MENU_FLAGS_IS_GROUP_HEADING) != 0)
-                            {
-                                foreach (GHMenuItem o in MenuCanvas.MenuItems)
-                                {
-                                    if (o.GroupAccelerator == mi.HeadingGroupAccelerator)
-                                    {
-                                        if (!mi.HeadingUnselectGroup)
-                                        {
-                                            o.Selected = true;
-                                            o.Count = -1;
-                                        }
-                                        else
-                                        {
-                                            o.Selected = false;
-                                            o.Count = 0;
-                                        }
-                                    }
-                                }
-                                mi.HeadingUnselectGroup = !mi.HeadingUnselectGroup;
-                            }
-                        }
-                        else
-                        {
-                            if (MenuCanvas.SelectionHow == SelectionMode.Multiple)
-                            {
-                                MenuCanvas.MenuItems[idx].Selected = !MenuCanvas.MenuItems[idx].Selected;
-                                if (MenuCanvas.MenuItems[idx].Selected)
-                                {
-                                    MenuCanvas.MenuItems[idx].Count = -1;
-                                    if(MenuCanvas.MenuItems[idx].IsAutoClickOk)
-                                        doclickok = true;
-                                }
-                                else
-                                    MenuCanvas.MenuItems[idx].Count = 0;
-                            }
-                            else
-                            {
-                                if (idx != MenuCanvas.SelectionIndex && MenuCanvas.SelectionIndex >= 0 && MenuCanvas.SelectionIndex < MenuCanvas.MenuItems.Count)
-                                    MenuCanvas.MenuItems[MenuCanvas.SelectionIndex].Count = 0;
-
-                                int oldselidx = MenuCanvas.SelectionIndex;
-                                MenuCanvas.SelectionIndex = idx;
-                                if (MenuCanvas.MenuItems[idx].Count == 0)
-                                    MenuCanvas.MenuItems[idx].Count = -1;
-
-                                /* Else keep the current selection number */
-                                if(!MenuOKButton.IsEnabled)
-                                    MenuOKButton.IsEnabled = true;
-
-                                if (MenuCanvas.MenuItems[idx].IsAutoClickOk || MenuCanvas.ClickOKOnSelection)
-                                    doclickok = true;
-                            }
-                        }
+                        clickIdx = idx;
+                        identifier = MenuCanvas.MenuItems[idx].Identifier;
+                        doclickok = ClickMenuItem(idx, isLongTap);
                         break;
                     }
                 }
             }
 
-            if (doclickok)
+            okClicked = doclickok && MenuOKButton.IsEnabled;
+            if (okClicked)
             {
                 MenuCanvas.InvalidateSurface();
                 MenuOKButton_Clicked(sender, e);
             }
+            return new MenuClickResult(okClicked, clickIdx, identifier);
         }
+
+        private bool ClickMenuItem(int menuItemIdx, bool isLongTap)
+        {
+            bool doclickok = false;
+            lock (MenuCanvas.MenuItemLock)
+            {
+                if (menuItemIdx < 0 || menuItemIdx >= MenuCanvas.MenuItems.Count)
+                    return false;
+
+                GHMenuItem mi = MenuCanvas.MenuItems[menuItemIdx];
+
+                if (MenuCanvas.MenuItems == null)
+                {
+                    _menuCountNumber = -1;
+                    return false;
+                }
+
+                if (mi.Identifier == 0)
+                {
+                    if (MenuCanvas.SelectionHow == SelectionMode.Multiple && (mi.Flags & (ulong)MenuFlags.MENU_FLAGS_IS_GROUP_HEADING) != 0)
+                    {
+                        foreach (GHMenuItem o in MenuCanvas.MenuItems)
+                        {
+                            if (o.GroupAccelerator == mi.HeadingGroupAccelerator)
+                            {
+                                if (!mi.HeadingUnselectGroup)
+                                {
+                                    o.Selected = true;
+                                    o.Count = -1;
+                                }
+                                else
+                                {
+                                    o.Selected = false;
+                                    o.Count = 0;
+                                }
+                            }
+                        }
+                        mi.HeadingUnselectGroup = !mi.HeadingUnselectGroup;
+                    }
+                }
+                else
+                {
+                    if (MenuCanvas.SelectionHow == SelectionMode.Multiple)
+                    {
+                        mi.Selected = !mi.Selected;
+                        if (mi.Selected)
+                        {
+                            mi.Count = _menuCountNumber > 0 && _menuCountNumber < mi.MaxCount ? _menuCountNumber : -1;
+                            if (mi.IsAutoClickOk)
+                                doclickok = true;
+                        }
+                        else
+                            mi.Count = 0;
+                    }
+                    else
+                    {
+                        if (MenuCanvas.SelectionIndex >= 0 && MenuCanvas.SelectionIndex < MenuCanvas.MenuItems.Count && mi != MenuCanvas.MenuItems[MenuCanvas.SelectionIndex])
+                            MenuCanvas.MenuItems[MenuCanvas.SelectionIndex].Count = 0;
+
+                        int oldselidx = MenuCanvas.SelectionIndex;
+                        MenuCanvas.SelectionIndex = menuItemIdx;
+                        if (mi.Count == 0)
+                            mi.Count = _menuCountNumber > 0 && _menuCountNumber < mi.MaxCount ? _menuCountNumber : isLongTap ? -2 : -1;
+                        else if (isLongTap)
+                            mi.Count = -2;
+
+                        /* Else keep the current selection number */
+                        if (!MenuOKButton.IsEnabled)
+                            MenuOKButton.IsEnabled = true;
+
+                        if (mi.IsAutoClickOk || MenuCanvas.ClickOKOnSelection || isLongTap)
+                            doclickok = true;
+                    }
+                }
+            }
+
+            _menuCountNumber = -1;
+            return doclickok;
+        }
+
+        private void MenuCanvas_MouseWheel(object sender, GHMouseWheelEventArgs e)
+        {
+            ScrollMenu(e.MouseWheelDelta);
+        }
+
+        private void ScrollMenu(int delta)
+        {
+            if (delta != 0)
+            {
+                float bottomScrollLimit = Math.Min(0, MenuCanvas.CanvasSize.Height - TotalMenuHeight);
+                float scrollAmount = (MenuCanvas.CanvasSize.Height * delta) / (10 * 120);
+                lock (_menuScrollLock)
+                {
+                    _menuScrollOffset += scrollAmount;
+                    if (_menuScrollOffset < bottomScrollLimit)
+                        _menuScrollOffset = bottomScrollLimit;
+                    if (_menuScrollOffset > 0)
+                        _menuScrollOffset = 0;
+
+                    _menuScrollSpeedOn = false;
+                    _menuScrollSpeed = 0;
+                    _menuScrollSpeedRecordOn = false;
+                    _menuScrollSpeedRecords.Clear();
+                }
+            }
+        }
+
+#pragma warning disable 414
+        private readonly object _menuHoverLock = new object();
+        private bool _menuIsHovering = false;
+        private SKPoint _menuHoverPoint = new SKPoint();
+
+        private void MenuCanvas_MousePointer(object sender, SKTouchEventArgs e)
+        {
+            lock (_menuDrawOnlyLock)
+            {
+                if (_menuDrawOnlyClear)
+                    return;
+            }
+
+            lock(_menuHoverLock)
+            {
+                _menuHoverPoint = e.Location;
+                switch (e?.ActionType)
+                {
+                    case SKTouchAction.Entered:
+                    case SKTouchAction.Moved:
+                        _menuIsHovering = true;
+                        break;
+                    case SKTouchAction.Cancelled:
+                    case SKTouchAction.Exited:
+                        _menuIsHovering = false;
+                        break;
+
+                }
+            }
+        }
+#pragma warning restore 414
+
 
         private readonly object _menuHideCancelledLock = new object();
         private bool _menuHideCancelled = false;
@@ -14588,6 +16263,7 @@ namespace GnollHackX.Pages.Game
             MenuOKButton.IsEnabled = false;
             MenuCancelButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
+            _menuCountNumber = -1;
 
             lock (_menuDrawOnlyLock)
             {
@@ -14597,6 +16273,13 @@ namespace GnollHackX.Pages.Game
 
             lock (_menuScrollLock)
             {
+                lock (_menuPositionLock)
+                {
+                    if (_menuPositionSavingOn[(int)MenuCanvas.MenuStyle])
+                    {
+                        _savedMenuScrollOffset[(int)MenuCanvas.MenuStyle] = _menuScrollOffset;
+                    }
+                }
                 _menuScrollOffset = 0;
                 _menuScrollSpeed = 0;
                 _menuScrollSpeedOn = false;
@@ -14630,9 +16313,10 @@ namespace GnollHackX.Pages.Game
                 }
             }
 
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.ShowMenuPage, MenuCanvas.GHWindow, resultlist, false));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.ShowMenuPage, MenuCanvas.GHWindow, resultlist, false));
             }
 
             if(!UIUtils.StyleClosesMenuUponDestroy(MenuCanvas.MenuStyle))
@@ -14644,6 +16328,7 @@ namespace GnollHackX.Pages.Game
             MenuOKButton.IsEnabled = false;
             MenuCancelButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
+            _menuCountNumber = -1;
 
             lock (_menuDrawOnlyLock)
             {
@@ -14653,6 +16338,13 @@ namespace GnollHackX.Pages.Game
 
             lock (_menuScrollLock)
             {
+                lock (_menuPositionLock)
+                {
+                    if (_menuPositionSavingOn[(int)MenuCanvas.MenuStyle])
+                    {
+                        _savedMenuScrollOffset[(int)MenuCanvas.MenuStyle] = _menuScrollOffset;
+                    }
+                }
                 _menuScrollOffset = 0;
                 _menuScrollSpeed = 0;
                 _menuScrollSpeedOn = false;
@@ -14660,9 +16352,10 @@ namespace GnollHackX.Pages.Game
             }
 
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.ShowMenuPage, MenuCanvas.GHWindow, new List<GHMenuItem>(1), true));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.ShowMenuPage, MenuCanvas.GHWindow, new List<GHMenuItem>(1), true));
             }
 
             if (!UIUtils.StyleClosesMenuUponDestroy(MenuCanvas.MenuStyle))
@@ -14680,14 +16373,7 @@ namespace GnollHackX.Pages.Game
             if(GHApp.IsiOS)
             {
                 MenuStack.CancelAnimations();
-                //if (MenuStack.AnimationIsRunning("MenuShowAnimation"))
-                //    MenuStack.AbortAnimation("MenuShowAnimation");
-                //double currentOpacity = MenuStack.Opacity;
-                //Animation menuAnimation = new Animation(v => MenuStack.Opacity = (double)v, currentOpacity, 0.0);
-                //menuAnimation.Commit(MenuStack, "MenuHideAnimation", length: 64,
-                //    rate: 16, repeat: () => false);
                 MenuStack.FadeTo(0.0, 64);
-                //MenuStack.IsVisible = false;
             }
 
 #if GNH_MAUI
@@ -14720,9 +16406,9 @@ namespace GnollHackX.Pages.Game
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 MenuGrid.IsVisible = false;
-                MainGrid.IsVisible = true;
-                if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                    MenuCanvas.AbortAnimation("GeneralAnimationCounter");
+                //MainGrid.IsVisible = true;
+                IsMainCanvasOn = true;
+                StopMenuCanvasAnimation();
                 MenuWindowGlyphImage.StopAnimation();
                 lock (RefreshScreenLock)
                 {
@@ -14745,14 +16431,7 @@ namespace GnollHackX.Pages.Game
             if (GHApp.IsiOS)
             {
                 TextStack.CancelAnimations();
-                //if (TextStack.AnimationIsRunning("TextShowAnimation"))
-                //    TextStack.AbortAnimation("TextShowAnimation");
-                //double currentOpacity = TextStack.Opacity;
-                //Animation textAnimation = new Animation(v => TextStack.Opacity = (double)v, currentOpacity, 0.0);
-                //textAnimation.Commit(TextStack, "TextHideAnimation", length: 64,
-                //    rate: 16, repeat: () => false);
                 TextStack.FadeTo(0.0, 64);
-                //TextStack.IsVisible = false;
             }
 #if GNH_MAUI
             var timer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
@@ -14784,7 +16463,8 @@ namespace GnollHackX.Pages.Game
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 TextGrid.IsVisible = false;
-                MainGrid.IsVisible = true;
+                //MainGrid.IsVisible = true;
+                IsMainCanvasOn = true;
                 TextWindowGlyphImage.StopAnimation();
                 lock (_textScrollLock)
                 {
@@ -14792,8 +16472,7 @@ namespace GnollHackX.Pages.Game
                     _textScrollSpeed = 0;
                     _textScrollSpeedOn = false;
                 }
-                if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                    TextCanvas.AbortAnimation("GeneralAnimationCounter");
+                StopTextCanvasAnimation();
                 lock (RefreshScreenLock)
                 {
                     RefreshScreen = true;
@@ -14802,8 +16481,13 @@ namespace GnollHackX.Pages.Game
             });
         }
 
-        private bool unselect_on_tap = false;
+        private bool _unselectOnTap = false;
+
+#if GNH_MAUI
+        private void MenuTapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
         private void MenuTapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
         {
             if (PlayingReplay)
                 return;
@@ -14816,7 +16500,7 @@ namespace GnollHackX.Pages.Game
                     {
                         if (o.Identifier != 0)
                         {
-                            if (!unselect_on_tap)
+                            if (!_unselectOnTap)
                             {
                                 o.Selected = true;
                                 o.Count = -1;
@@ -14828,8 +16512,9 @@ namespace GnollHackX.Pages.Game
                             }
                         }
                     }
-                    unselect_on_tap = !unselect_on_tap;
+                    _unselectOnTap = !_unselectOnTap;
                 }
+                MenuCanvas.InvalidateSurface();
             }
         }
 
@@ -14890,19 +16575,23 @@ namespace GnollHackX.Pages.Game
 
         private void MenuEntry_Completed(object sender, EventArgs e)
         {
-            if (_countMenuItem != null)
+            //if (_countMenuItem != null)
+            //{
+            //    string str = MenuCountEntry.Text;
+            //    int value;
+            //    bool res = int.TryParse(str, out value);
+            //    if (res)
+            //    {
+            //        MenuCountEntry.TextColor = GHColors.Green;
+            //    }
+            //    else
+            //    {
+            //        MenuCountEntry.TextColor = GHColors.Red;
+            //    }
+            //}
+            if(MenuGrid.IsVisible && MenuOKButton.IsEnabled)
             {
-                string str = MenuCountEntry.Text;
-                int value;
-                bool res = int.TryParse(str, out value);
-                if (res)
-                {
-                    MenuCountEntry.TextColor = GHColors.Green;
-                }
-                else
-                {
-                    MenuCountEntry.TextColor = GHColors.Red;
-                }
+                MenuOKButton_Clicked(sender, e);
             }
         }
 
@@ -14958,6 +16647,7 @@ namespace GnollHackX.Pages.Game
             float x = 0, y = 0;
             string str;
             float scale = canvaswidth / (float)TextCanvas.Width;
+            float customScale = GHApp.CustomScreenScale;
             canvas.Clear();
 
             if (canvaswidth <= 16 || canvasheight <= 16)
@@ -14973,29 +16663,6 @@ namespace GnollHackX.Pages.Game
             {
                 if (TextCanvas.GHWindow != null && TextCanvas.GHWindow.Ascension)
                 {
-                    //float ssize = 10 * scale;
-                    //float padding = ssize / 2;
-                    //float sspacing = ssize * 5;
-                    //int wsparkes = Math.Max(1, (int)Math.Ceiling((canvaswidth - 2 * padding) / sspacing));
-                    //int hsparkes = Math.Max(1, (int)Math.Ceiling((canvasheight - 2 * padding) / sspacing));
-                    //float wspacing = (canvaswidth - 2 * padding) / wsparkes;
-                    //float hspacing = (canvasheight - 2 * padding) / hsparkes;
-                    //long df = 2;
-                    //long counter;
-                    //lock (AnimationTimerLock)
-                    //{
-                    //    counter = AnimationTimers.general_animation_counter;
-                    //}
-                    //long ctr_diff = 0;
-                    //for (int i = 0; i <= wsparkes; i++)
-                    //    UIUtils.DrawSparkle(canvas, textPaint, padding + i * wspacing, padding, ssize, counter - (ctr_diff += df), true);
-                    //for (int i = 0; i <= wsparkes; i++)
-                    //    UIUtils.DrawSparkle(canvas, textPaint, padding + i * wspacing, canvasheight - padding, ssize, counter - (ctr_diff += df), true);
-                    //for (int j = 1; j < hsparkes; j++)
-                    //    UIUtils.DrawSparkle(canvas, textPaint, padding, padding + j * hspacing, ssize, counter - (ctr_diff += df), true);
-                    //for (int j = 1; j < hsparkes; j++)
-                    //    UIUtils.DrawSparkle(canvas, textPaint, canvaswidth - padding, padding + j * hspacing, ssize, counter - (ctr_diff += df), true);
-
                     long counter;
                     lock (AnimationTimerLock)
                     {
@@ -15016,7 +16683,7 @@ namespace GnollHackX.Pages.Game
                 }
                 y += curmenuoffset;
                 double canvasmaxwidth = TextCanvas.GHWindow != null ? TextCanvas.GHWindow.TextWindowMaximumWidth : GHConstants.DefaultTextWindowMaxWidth;
-                double menuwidth = Math.Max(1, Math.Min(TextCanvas.Width, canvasmaxwidth));
+                double menuwidth = Math.Max(1, Math.Min(TextCanvas.Width, canvasmaxwidth) * customScale);
                 float menuwidthoncanvas = (float)(menuwidth * scale);
                 float leftmenupadding = Math.Max(0, (canvaswidth - menuwidthoncanvas) / 2);
                 float rightmenupadding = leftmenupadding;
@@ -15034,9 +16701,9 @@ namespace GnollHackX.Pages.Game
                     {
                         int pos = 0;
                         x = leftmenupadding + leftinnerpadding;
-                        x += (float)putstritem.LeftPaddingWidth * scale;
+                        x += (float)putstritem.LeftPaddingWidth * scale * customScale;
                         textPaint.Typeface = GHApp.GetTypefaceByName(putstritem.TextWindowFontFamily);
-                        textPaint.TextSize = (float)putstritem.TextWindowFontSize * scale;
+                        textPaint.TextSize = (float)putstritem.TextWindowFontSize * scale * customScale;
                         /* Heading margin, except on the first row */
                         if(putstritem.InstructionList.Count > 0 && j > 0)
                         {
@@ -15095,7 +16762,7 @@ namespace GnollHackX.Pages.Game
                                 TextCanvas.RevertBlackAndWhite, false);
 
                             string[] split = str.Split(' ');
-                            DrawTextSplit(canvas, split, null, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, TextCanvas.GHWindow.UseSpecialSymbols, TextCanvas.UseTextOutline, TextCanvas.RevertBlackAndWhite, false, 0, curmenuoffset, glyphystart, glyphyend, glyphpadding);
+                            DrawTextSplit(canvas, split, null, null, null, ref x, ref y, ref firstprintonrow, indent_start_x, canvaswidth, canvasheight, rightmenupadding, textPaint, TextCanvas.GHWindow.UseSpecialSymbols, TextCanvas.UseTextOutline, TextCanvas.RevertBlackAndWhite, false, 0, curmenuoffset, glyphystart, glyphyend, glyphpadding);
                         }
                         j++;
                         y += textPaint.FontMetrics.Descent + fontspacingpadding;
@@ -15103,6 +16770,7 @@ namespace GnollHackX.Pages.Game
                     TotalTextHeight = y - curmenuoffset;
                 }
             }
+            canvas.Flush();
         }
 
         private void TextCanvas_Touch(object sender, SKTouchEventArgs e)
@@ -15268,9 +16936,7 @@ namespace GnollHackX.Pages.Game
                                 if (elapsedms <= GHConstants.MoveOrPressTimeThreshold && !_textTouchMoved)
                                 {
                                     /* Normal click -- Hide the canvas */
-                                    GenericButton_Clicked(sender, e, 27);
-                                    MainThread.BeginInvokeOnMainThread(() =>
-                                    { DelayedTextHide(); });                                    
+                                    TextCanvas_Pressed(sender, e);
                                 }
                                 if (TextTouchDictionary.ContainsKey(e.Id))
                                 {
@@ -15366,6 +17032,41 @@ namespace GnollHackX.Pages.Game
             }
         }
 
+        private void TextCanvas_Pressed(object sender, EventArgs e)
+        {
+            GenericButton_Clicked(sender, e, GHConstants.CancelChar);
+            MainThread.BeginInvokeOnMainThread(() =>
+            { 
+                DelayedTextHide(); 
+            });
+        }
+
+        private void TextCanvas_MouseWheel(object sender, GHMouseWheelEventArgs e)
+        {
+            ScrollTextWindow(e.MouseWheelDelta);
+        }
+
+        private void ScrollTextWindow(int delta)
+        {
+            if (delta != 0)
+            {
+                float bottomScrollLimit = Math.Min(0, TextCanvas.CanvasSize.Height - TotalTextHeight);
+                float scrollAmount = (TextCanvas.CanvasSize.Height * delta) / (10 * 120);
+                lock (_textScrollLock)
+                {
+                    _textScrollOffset += scrollAmount;
+                    if (_textScrollOffset < bottomScrollLimit)
+                        _textScrollOffset = bottomScrollLimit;
+                    if (_textScrollOffset > 0)
+                        _textScrollOffset = 0;
+
+                    _textScrollSpeedOn = false;
+                    _textScrollSpeed = 0;
+                    _textScrollSpeedRecordOn = false;
+                    _textScrollSpeedRecords.Clear();
+                }
+            }
+        }
 
         private readonly object _moreCmdLock = new object();
         private int _moreCmdPage = 1;
@@ -15374,8 +17075,7 @@ namespace GnollHackX.Pages.Game
         public int MoreCmdPage { get { lock (_moreCmdLock) { return _moreCmdPage; } } set { lock (_moreCmdLock) { _moreCmdPage = value; } } }
         public float MoreCmdOffsetX { get { lock (_moreCmdLock) { return _moreCmdOffsetX; } } set { lock (_moreCmdLock) { _moreCmdOffsetX = value; } } }
         public float MoreCmdOffsetY { get { lock (_moreCmdLock) { return _moreCmdOffsetY; } } set { lock (_moreCmdLock) { _moreCmdOffsetY = value; } } }
-        private float _moreCmdOffsetAutoSpeed = 5.0f; /* Screen widths per second */
-
+        private readonly float _moreCmdOffsetAutoSpeed = 5.0f; /* Screen widths per second */
 
         public readonly object CommandButtonLock = new object();
         private ConcurrentDictionary<long, TouchEntry> CommandTouchDictionary = new ConcurrentDictionary<long, TouchEntry>();
@@ -15414,7 +17114,7 @@ namespace GnollHackX.Pages.Game
             float scale = canvaswidth / (float)CommandCanvas.Width;
             bool isLandscape = canvaswidth > canvasheight;
 
-            canvas.Clear();
+            canvas.Clear(SKColors.Black);
             if (canvaswidth <= 16 || canvasheight <= 16)
                 return;
 
@@ -15490,27 +17190,33 @@ namespace GnollHackX.Pages.Game
 
                     lock (GHApp._moreBtnLock)
                     {
-                        for (int i = 0; i < GHConstants.MoreButtonsPerRow; i++)
+                        using(SKPaint paint = new SKPaint())
                         {
-                            int pos_j = 0;
-                            for (int j = 0; j < GHConstants.MoreButtonsPerColumn; j++)
+                            for (int i = 0; i < GHConstants.MoreButtonsPerRow; i++)
                             {
-                                if (GHApp._moreBtnMatrix[page, i, j] != null && GHApp._moreBtnBitmaps[page, i, j] != null)
+                                int pos_j = 0;
+                                for (int j = 0; j < GHConstants.MoreButtonsPerColumn; j++)
                                 {
-                                    SKRect targetrect = new SKRect();
-                                    int x = isLandscape ? pos_j : i;
-                                    int y = isLandscape ? i : pos_j;
-                                    targetrect.Left = btnOffsetX + x * btnAreaWidth + Math.Max(0, (btnAreaWidth - btnImgWidth) / 2);
-                                    targetrect.Top = btnMatrixStart + y * btnAreaHeight + Math.Max(0, (btnAreaHeight - btnImgHeight - textPaint.FontSpacing) / 2);
-                                    targetrect.Right = targetrect.Left + btnImgWidth;
-                                    targetrect.Bottom = targetrect.Top + btnImgHeight;
-                                    float text_x = (targetrect.Left + targetrect.Right) / 2;
-                                    float text_y = targetrect.Bottom - textPaint.FontMetrics.Ascent;
-
-                                    canvas.DrawImage(GHApp._moreBtnBitmaps[page, i, j], targetrect);
-                                    textPaint.DrawTextOnCanvas(canvas, GHApp._moreBtnMatrix[page, i, j].Text, text_x, text_y, SKTextAlign.Center);
+                                    if (GHApp._moreBtnMatrix[page, i, j] != null && GHApp._moreBtnBitmaps[page, i, j] != null)
+                                    {
+                                        SKRect targetrect = new SKRect();
+                                        int x = isLandscape ? pos_j : i;
+                                        int y = isLandscape ? i : pos_j;
+                                        targetrect.Left = btnOffsetX + x * btnAreaWidth + Math.Max(0, (btnAreaWidth - btnImgWidth) / 2);
+                                        targetrect.Top = btnMatrixStart + y * btnAreaHeight + Math.Max(0, (btnAreaHeight - btnImgHeight - textPaint.FontSpacing) / 2);
+                                        targetrect.Right = targetrect.Left + btnImgWidth;
+                                        targetrect.Bottom = targetrect.Top + btnImgHeight;
+                                        float text_x = (targetrect.Left + targetrect.Right) / 2;
+                                        float text_y = targetrect.Bottom - textPaint.FontMetrics.Ascent;
+                                        if (_isCommandHovering && targetrect.Contains(_commandHoverLocation))
+                                            paint.ColorFilter = UIUtils.HighlightColorFilter;
+                                        else
+                                            paint.ColorFilter = null;
+                                        canvas.DrawImage(GHApp._moreBtnBitmaps[page, i, j], targetrect, paint);
+                                        textPaint.DrawTextOnCanvas(canvas, GHApp._moreBtnMatrix[page, i, j].Text, text_x, text_y, SKTextAlign.Center);
+                                    }
+                                    pos_j++;
                                 }
-                                pos_j++;
                             }
                         }
                     }
@@ -15553,6 +17259,7 @@ namespace GnollHackX.Pages.Game
                 if (_commandFPSCounterValue < 0)
                     _commandFPSCounterValue = 0;
             }
+            canvas.Flush();
         }
 
         private void CommandCanvas_Touch(object sender, SKTouchEventArgs e)
@@ -15730,15 +17437,7 @@ namespace GnollHackX.Pages.Game
                                             }
 
                                             /* Hide the canvas */
-                                            MoreCommandsGrid.IsVisible = false;
-                                            MainGrid.IsVisible = true;
-                                            if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                                                CommandCanvas.AbortAnimation("GeneralAnimationCounter");
-                                            lock (RefreshScreenLock)
-                                            {
-                                                RefreshScreen = true;
-                                            }
-                                            StartMainCanvasAnimation();
+                                            CommandCanvas_Pressed(sender, e);
                                         }
 
                                     }
@@ -15752,6 +17451,7 @@ namespace GnollHackX.Pages.Game
                                         {
                                             MoreCmdPage = cmdPage - 1;
                                             MoreCmdOffsetX = cmdOffset - btnMatrixWidth;
+                                            UpdateMoreNextPrevButtonVisibility(true, true);
                                         }
 
                                         _commandChangedPage = true;
@@ -15762,6 +17462,7 @@ namespace GnollHackX.Pages.Game
                                         {
                                             MoreCmdPage = cmdPage + 1;
                                             MoreCmdOffsetX = cmdOffset + btnMatrixWidth;
+                                            UpdateMoreNextPrevButtonVisibility(true, true);
                                         }
 
                                         _commandChangedPage = true;
@@ -15775,6 +17476,7 @@ namespace GnollHackX.Pages.Game
                                         {
                                             MoreCmdPage = cmdPage - 1;
                                             MoreCmdOffsetX = cmdOffset - btnMatrixWidth;
+                                            UpdateMoreNextPrevButtonVisibility(true, true);
                                         }
 
                                         _commandChangedPage = true;
@@ -15785,6 +17487,7 @@ namespace GnollHackX.Pages.Game
                                         {
                                             MoreCmdPage = cmdPage + 1;
                                             MoreCmdOffsetX = cmdOffset + btnMatrixWidth;
+                                            UpdateMoreNextPrevButtonVisibility(true, true);
                                         }
 
                                         _commandChangedPage = true;
@@ -15820,6 +17523,55 @@ namespace GnollHackX.Pages.Game
                     case SKTouchAction.WheelChanged:
                         break;
                     default:
+                        break;
+                }
+            }
+        }
+
+        private void CommandCanvas_Pressed(object sender, EventArgs e)
+        {
+            MoreCommandsGrid.IsVisible = false;
+            //MainGrid.IsVisible = true;
+            IsMainCanvasOn = true;
+            UpdateMoreNextPrevButtonVisibility(true, true);
+            StopCommandCanvasAnimation();
+            lock (RefreshScreenLock)
+            {
+                RefreshScreen = true;
+            }
+            StartMainCanvasAnimation();
+        }
+
+        private void CommandCanvas_MouseWheel(object sender, GHMouseWheelEventArgs e)
+        {
+            if (e.MouseWheelDelta > 0)
+            {
+                MorePreviousButton_BtnClicked(sender, new EventArgs());
+            }
+            else if (e.MouseWheelDelta < 0)
+            {
+                MoreNextButton_BtnClicked(sender, new EventArgs());
+            }
+        }
+
+        private readonly object _commandHighlightLock = new object();
+        private bool _isCommandHovering = false;
+        private SKPoint _commandHoverLocation = new SKPoint();
+
+        private void CommandCanvas_MousePointer(object sender, SKTouchEventArgs e)
+        {
+            lock(_commandHighlightLock)
+            {
+                _commandHoverLocation = e.Location;
+                switch (e.ActionType)
+                {
+                    case SKTouchAction.Entered:
+                    case SKTouchAction.Moved:
+                        _isCommandHovering = true;
+                        break;
+                    case SKTouchAction.Exited:
+                    case SKTouchAction.Cancelled:
+                        _isCommandHovering = false;
                         break;
                 }
             }
@@ -15883,7 +17635,7 @@ namespace GnollHackX.Pages.Game
                 float target_scale_canvas = 1.0f;
                 float mult_canvas = 1.0f;
                 float prev_bottom = 0;
-                float sbheight = GetStatusBarSkiaHeight();
+                float sbheight = GetStatusBarSkiaHeightEx(canvasView.Width, canvasView.Height, DesktopButtons, UseSimpleCmdLayout);
                 SKRect statusBarCenterRect = new SKRect(canvaswidth / 2 - sbheight / 2, 0, canvaswidth / 2 + sbheight / 2, sbheight);
 
                 switch (ShownTip)
@@ -15953,22 +17705,22 @@ namespace GnollHackX.Pages.Game
                         PaintTipButton(canvas, textPaint, ToggleTravelModeButton, "Use this to set how you move around.", "Travel Mode", 1.5f, centerfontsize, fontsize, false, landscape ? -1.5f : -0.15f, landscape ? -0.5f : 0);
                         break;
                     case 8:
-                        PaintTipButtonByRect(canvas, textPaint, statusBarCenterRect, "You can tap the status bar.", "Open status screen", 1.0f, centerfontsize, fontsize, false, -0.15f, 1.0f);
+                        PaintTipButtonByRect(canvas, textPaint, statusBarCenterRect, "You can " + GHApp.GetClickTapWord(false, false) + " the status bar.", "Open status screen", 1.0f, centerfontsize, fontsize, false, -0.15f, 1.0f);
                         break;
                     case 9:
-                        PaintTipButton(canvas, textPaint, lAbilitiesButton, "Some commands do not have buttons.", "Character and game status", 1.0f, centerfontsize, fontsize, true, 0.15f, 1.0f);
+                        PaintTipButton(canvas, textPaint, DesktopButtons ? lRowAbilitiesButton : lAbilitiesButton, DesktopButtons ? "Some commands are specially located." : "Some commands do not have buttons.", "Character and game status", 1.0f, centerfontsize, fontsize, true, 0.15f, DesktopButtons ? -1.0f : 1.0f);
                         break;
                     case 10:
-                        PaintTipButton(canvas, textPaint, lWornItemsButton, "", "Tap here to access worn items", 1.0f, centerfontsize, fontsize, false, landscape ? -2.0f : -0.5f, 2.0f);
+                        PaintTipButton(canvas, textPaint, DesktopButtons ? lRowWornItemsButton : lWornItemsButton, "", GHApp.GetClickTapWord(true, false) + " here to access worn items", 1.0f, centerfontsize, fontsize, false, landscape ? -2.0f : -0.5f, DesktopButtons ? -2.0f : 2.0f);
                         break;
                     case 11:
-                        PaintTipButton(canvas, textPaint, ToggleMessageNumberButton, "", "Tap here to see more messages", 1.0f, centerfontsize, fontsize, true, 0.5f, -1.0f);
+                        PaintTipButton(canvas, textPaint, ToggleMessageNumberButton, "", GHApp.GetClickTapWord(true, false) + " here to see more messages", 1.0f, centerfontsize, fontsize, true, 0.5f, -1.0f);
                         break;
                     case 12:
-                        PaintTipButtonByRect(canvas, textPaint, HealthRect, "Tapping shows your maximum health.", "Health Orb", 1.1f, centerfontsize, fontsize, true, 0.15f, 0.0f);
+                        PaintTipButtonByRect(canvas, textPaint, HealthRect, GHApp.GetClickTapWord(true, true) + " shows your maximum health.", "Health Orb", 1.1f, centerfontsize, fontsize, true, 0.15f, 0.0f);
                         break;
                     case 13:
-                        PaintTipButtonByRect(canvas, textPaint, ManaRect, "Tapping reveals your maximum mana.", "Mana Orb", 1.1f, centerfontsize, fontsize, true, 0.15f, 0.0f);
+                        PaintTipButtonByRect(canvas, textPaint, ManaRect, GHApp.GetClickTapWord(true, true) + " reveals your maximum mana.", "Mana Orb", 1.1f, centerfontsize, fontsize, true, 0.15f, 0.0f);
                         break;
                     case 14:
                         textPaint.TextSize = 36;
@@ -15995,7 +17747,7 @@ namespace GnollHackX.Pages.Game
 
                         textPaint.TextSize = 36;
                         textPaint.Typeface = GHApp.UnderwoodTypeface;
-                        str = "Tap to start playing";
+                        str = GHApp.GetClickTapWord(true, false) + " to start playing";
                         textPaint.MeasureText(str, ref bounds);
                         scale_canvas = bounds.Width / Math.Max(1, Math.Min(canvaswidth, canvasheight)); //Math.Max(bounds.Width / canvaswidth, bounds.Height / canvasheight);
                         target_scale_canvas = 0.8f;
@@ -16018,6 +17770,7 @@ namespace GnollHackX.Pages.Game
                         break;
                 }
             }
+            canvas.Flush();
         }
 
         private void TipView_Touch(object sender, SKTouchEventArgs e)
@@ -16051,9 +17804,10 @@ namespace GnollHackX.Pages.Game
                         if (_blockingTipView)
                         {
                             ConcurrentQueue<GHResponse> queue;
-                            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                            GHGame curGame = CurrentGame;
+                            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                             {
-                                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.ShowGUITips));
+                                queue.Enqueue(new GHResponse(curGame, GHRequestType.ShowGUITips));
                             }
                         }
                     }
@@ -16213,7 +17967,7 @@ namespace GnollHackX.Pages.Game
             textPaint.DrawTextOnCanvas(canvas, str, rect.Left + padding, ty + usedoffsety + (textPaint.FontMetrics.Ascent - textPaint.FontMetrics.Descent) / 2 - textPaint.FontMetrics.Ascent);
         }
 
-        private void DrawOrb(SKCanvas canvas, GHSkiaFontPaint textPaint, SKRect orbBorderDest, SKColor fillcolor, string val, string maxval, float orbfillpercentage, bool showmax)
+        private void DrawOrb(SKCanvas canvas, GHSkiaFontPaint textPaint, SKRect orbBorderDest, SKColor fillcolor, string val, string maxval, float orbfillpercentage, bool showmax, bool isHighlighted)
         {
             float orbwidth = orbBorderDest.Width / 230.0f * 210.0f;
             float orbheight = orbBorderDest.Width / 230.0f * 210.0f;
@@ -16226,16 +17980,32 @@ namespace GnollHackX.Pages.Game
 #if GNH_MAP_PROFILING && DEBUG
             StartProfiling(GHProfilingStyle.Bitmap);
 #endif
-            canvas.DrawImage(GHApp._orbBorderBitmap, orbBorderDest);
-            if (orbfillpercentage < 0)
-                orbfillpercentage = 0;
-            if (orbfillpercentage > 1)
-                orbfillpercentage = 1;
-            SKImage fillBitmap = fillcolor == SKColors.Red ? GHApp._orbFillBitmapRed : fillcolor == SKColors.Blue ? GHApp._orbFillBitmapBlue : GHApp._orbFillBitmap;
-            SKRect orbFillSrc = new SKRect(0.0f, (float)fillBitmap.Height * (1.0f - orbfillpercentage), (float)fillBitmap.Width, (float)fillBitmap.Height);
-            SKRect orbFillDest = new SKRect(orbDest.Left, orbDest.Top + orbDest.Height * (1.0f - orbfillpercentage), orbDest.Right, orbDest.Bottom);
-            canvas.DrawImage(fillBitmap, orbFillSrc, orbFillDest);
-            canvas.DrawImage(GHApp._orbGlassBitmap, orbDest);
+            using(SKPaint paint = new SKPaint())
+            {
+#if !GNH_MAUI
+                paint.FilterQuality = SKFilterQuality.High;
+#endif
+                if (isHighlighted)
+                    paint.ColorFilter = UIUtils.HighlightColorFilter;
+                canvas.DrawImage(GHApp._orbBorderBitmap, orbBorderDest, paint);
+                if (orbfillpercentage < 0)
+                    orbfillpercentage = 0;
+                if (orbfillpercentage > 1)
+                    orbfillpercentage = 1;
+                SKImage fillBitmap = fillcolor == SKColors.Red ? GHApp._orbFillBitmapRed : fillcolor == SKColors.Blue ? GHApp._orbFillBitmapBlue : GHApp._orbFillBitmap;
+                SKRect orbFillSrc = new SKRect(0.0f, (float)fillBitmap.Height * (1.0f - orbfillpercentage), (float)fillBitmap.Width, (float)fillBitmap.Height);
+                SKRect orbFillDest = new SKRect(orbDest.Left, orbDest.Top + orbDest.Height * (1.0f - orbfillpercentage), orbDest.Right, orbDest.Bottom);
+                canvas.DrawImage(fillBitmap, orbFillSrc, orbFillDest,
+#if GNH_MAUI
+                    new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                    paint);
+                canvas.DrawImage(GHApp._orbGlassBitmap, orbDest,
+#if GNH_MAUI
+                    new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                    paint);
+            }
 #if GNH_MAP_PROFILING && DEBUG
             StopProfiling(GHProfilingStyle.Bitmap);
 #endif
@@ -16315,9 +18085,10 @@ namespace GnollHackX.Pages.Game
             }
 
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.Panic));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.Panic));
             }
         }
 
@@ -16326,9 +18097,10 @@ namespace GnollHackX.Pages.Game
             await DisplayAlert("Message", text != null ? text : "No message.", "OK");
 
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.Message));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.Message));
             }
         }
 
@@ -16338,9 +18110,10 @@ namespace GnollHackX.Pages.Game
                 accept != null ? accept : "Yes", cancel != null ? cancel : "No");
 
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.YnConfirmation, res));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.YnConfirmation, res));
             }
         }
 
@@ -16371,25 +18144,11 @@ namespace GnollHackX.Pages.Game
             }
 
             ConcurrentQueue<GHResponse> queue;
-            if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+            GHGame curGame = CurrentGame;
+            if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
             {
-                queue.Enqueue(new GHResponse(_currentGame, GHRequestType.CrashReport));
+                queue.Enqueue(new GHResponse(curGame, GHRequestType.CrashReport));
             }
-        }
-
-        public async Task RunPerformanceTests()
-        {
-            Debug.WriteLine("Starting Performance Tests");
-            await Task.Delay(1000);
-            Debug.WriteLine("Hide all Xamarin components");
-            WornItemsLayout.IsVisible = false;
-            AbilityLayout.IsVisible = false;
-            UIGrid.IsVisible = false;
-            await Task.Delay(5000);
-            WornItemsLayout.IsVisible = true;
-            AbilityLayout.IsVisible = true;
-            UIGrid.IsVisible = true;
-            Debug.WriteLine("Finished Performance Tests");
         }
 
         private void GetLineEntryText_TextChanged(object sender, TextChangedEventArgs e)
@@ -16398,7 +18157,20 @@ namespace GnollHackX.Pages.Game
                 UpdateGetLineAutoComplete();
         }
 
+        private void GetLineEntryText_Completed(object sender, EventArgs e)
+        {
+            if (GetLineGrid.IsVisible && GetLineOkButton.IsEnabled)
+            {
+                GetLineOkButton_Clicked(sender, e);
+            }
+        }
+
+
+#if GNH_MAUI
+        private void GetLineAutoCompleteTapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
         private void GetLineAutoCompleteTapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
         {
             if(GetLineAutoComplete.Text != "")
             {
@@ -16452,14 +18224,34 @@ namespace GnollHackX.Pages.Game
             targetButton.ImgSourcePath = sourceButton.ImageSourcePath;
         }
 
+        public void SetFullLayoutCommandButton(int btnCol, int btnSelectionIndex)
+        {
+            LabeledImageButton[] _simpleButtions = new LabeledImageButton[13]
+            { lInventoryButton, lSearchButton, lWaitButton, lDropManyButton, lChatButton, lKickButton, lRepeatButton,
+                lSwapWeaponButton,lFireButton, lThrowButton, lCastButton, lZapButton, lApplyButton  };
+            if (btnCol < 0 || btnCol >= _simpleButtions.Length)
+                return;
+            LabeledImageButton targetButton = _simpleButtions[btnCol];
+            if (btnSelectionIndex < 0 || btnSelectionIndex >= GHApp.SelectableShortcutButtons.Count)
+                return;
+            SelectableShortcutButton sourceButton = GHApp.SelectableShortcutButtons[btnSelectionIndex];
+            targetButton.LblText = sourceButton.Label;
+            targetButton.BtnCommand = sourceButton.RawCommand;
+            targetButton.BtnLetter = sourceButton.Letter;
+            targetButton.BtnCtrl = sourceButton.Ctrl;
+            targetButton.BtnMeta = sourceButton.Meta;
+            targetButton.ImgSourcePath = sourceButton.ImageSourcePath;
+        }
+
         public void StopWaitAndResumeSavedGame()
         {
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.StopWaitAndRestoreSavedGame));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.StopWaitAndRestoreSavedGame));
                 }
             }
         }
@@ -16472,53 +18264,51 @@ namespace GnollHackX.Pages.Game
 
         public void SaveGameAndWaitForResume()
         {
-            if (_currentGame != null) // && !IgnoreSave()
+            GHGame curGame = CurrentGame;
+            if (curGame != null) // && !IgnoreSave()
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.SaveGameAndWaitForResume));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.SaveGameAndWaitForResume));
                 }
             }
         }
 
         public void SaveCheckPoint()
         {
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.SaveInsuranceCheckPoint));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.SaveInsuranceCheckPoint));
                 }
             }
         }
 
-        public void TallyRealTime()
+        public void SendRequestForTallyRealTime()
         {
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.TallyRealTime));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.TallyRealTime));
                 }
             }
         }
 
         public void Suspend()
         {
-            if (canvasView.AnimationIsRunning("GeneralAnimationCounter"))
-                canvasView.AbortAnimation("GeneralAnimationCounter");
-            if (CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                CommandCanvas.AbortAnimation("GeneralAnimationCounter");
-            if (MenuCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                MenuCanvas.AbortAnimation("GeneralAnimationCounter");
+            StopMainCanvasAnimation();
+            StopCommandCanvasAnimation();
+            StopMenuCanvasAnimation();
             MenuWindowGlyphImage.StopAnimation();
-            if (TextCanvas.AnimationIsRunning("GeneralAnimationCounter"))
-                TextCanvas.AbortAnimation("GeneralAnimationCounter");
+            StopTextCanvasAnimation();
             TextWindowGlyphImage.StopAnimation();
-            _mapUpdateStopWatch.Stop();
         }
 
         public void Resume()
@@ -16537,7 +18327,7 @@ namespace GnollHackX.Pages.Game
             }
             else if (MoreCommandsGrid.IsVisible && !CommandCanvas.AnimationIsRunning("GeneralAnimationCounter"))
                 StartCommandCanvasAnimation();
-            else if (!LoadingGrid.IsVisible && MainGrid.IsVisible && !canvasView.AnimationIsRunning("GeneralAnimationCounter"))
+            else if (!LoadingGrid.IsVisible && IsMainCanvasOn /* && MainGrid.IsVisible */ && !canvasView.AnimationIsRunning("GeneralAnimationCounter"))
                 StartMainCanvasAnimation();
         }
 
@@ -16545,27 +18335,31 @@ namespace GnollHackX.Pages.Game
         {
             lock (_msgHistoryLock)
             {
-                if (_msgHistory != null)
+                GHMsgHistoryItem[] msgHistoryPtr = _msgHistory;
+                if (msgHistoryPtr != null)
                 {
-                    if(LongerMessageHistory)
+                    int cnt = msgHistoryPtr.Length;
+                    if (_longerMessageHistory)
                     {
-                        foreach (GHMsgHistoryItem msg in _msgHistory)
+                        for (int i = 0; i < cnt; i++)
                         {
-                            if(msg != null)
+                            GHMsgHistoryItem msg = msgHistoryPtr[i];
+                            if (msg != null)
                                 msg.Filter = MessageFilterEntry.Text;
                         }
                     }
                     else
                     {
-                        foreach (GHMsgHistoryItem msg in _msgHistory)
+                        for (int i = 0; i < cnt; i++)
                         {
+                            GHMsgHistoryItem msg = msgHistoryPtr[i];
                             if (msg != null)
                                 msg.Filter = null;
                         }
                     }
                 }
+                _refreshMsgHistoryRowCounts = true;
             }
-            RefreshMsgHistoryRowCounts = true;
         }
 
         private void MessageFilterEntry_TextChanged(object sender, TextChangedEventArgs e)
@@ -16575,12 +18369,13 @@ namespace GnollHackX.Pages.Game
 
         public void RequestEndReplayFile()
         {
-            if (_currentGame != null)
+            GHGame curGame = CurrentGame;
+            if (curGame != null)
             {
                 ConcurrentQueue<GHResponse> queue;
-                if (GHGame.ResponseDictionary.TryGetValue(_currentGame, out queue))
+                if (GHGame.ResponseDictionary.TryGetValue(curGame, out queue))
                 {
-                    queue.Enqueue(new GHResponse(_currentGame, GHRequestType.EndReplayFile));
+                    queue.Enqueue(new GHResponse(curGame, GHRequestType.EndReplayFile));
                 }
             }
         }
@@ -16713,7 +18508,11 @@ namespace GnollHackX.Pages.Game
             if (GotoStylePicker.SelectedIndex < 1)
                 GotoTurnEntryText.Text = "";
             GotoTurnEntryText.IsEnabled = true;
+#if GNH_MAUI
+            GotoTurnFrame.Stroke = SolidColorBrush.Black;
+#else
             GotoTurnFrame.BorderColor = GHColors.Black;
+#endif
             GotoTurnOkButton.IsEnabled = true;
             GotoTurnCancelButton.IsEnabled = true;
             if (GotoStylePicker.SelectedIndex < 0)
@@ -16755,7 +18554,11 @@ namespace GnollHackX.Pages.Game
                         }
                         else
                         {
+#if GNH_MAUI
+                            GotoTurnFrame.Stroke = SolidColorBrush.Red;
+#else
                             GotoTurnFrame.BorderColor = GHColors.Red;
+#endif
                             GotoTurnEntryText.Focus();
                             GotoTurnOkButton.IsEnabled = true;
                             GotoTurnCancelButton.IsEnabled = true;
@@ -16777,7 +18580,11 @@ namespace GnollHackX.Pages.Game
                         }
                         else
                         {
+#if GNH_MAUI
+                            GotoTurnFrame.Stroke = SolidColorBrush.Red;
+#else
                             GotoTurnFrame.BorderColor = GHColors.Red;
+#endif
                             GotoTurnEntryText.Focus();
                             GotoTurnOkButton.IsEnabled = true;
                             GotoTurnCancelButton.IsEnabled = true;
@@ -16832,5 +18639,487 @@ namespace GnollHackX.Pages.Game
                     break;
             }
         }
+
+#if GNH_MAUI
+        private async void GetLineCaptionTapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
+        private async void GetLineCaptionTapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
+        {
+            switch (_getLineStyle)
+            {
+                case (int)getline_types.GETLINE_WISHING:
+                case (int)getline_types.GETLINE_GENESIS:
+                case (int)getline_types.GETLINE_POLYMORPH:
+                case (int)getline_types.GETLINE_GENOCIDE:
+                case (int)getline_types.GETLINE_MONSTER:
+                case (int)getline_types.GETLINE_MONSTER_CLASS:
+                    GetLineCaption.IsEnabled = false;
+                    GHApp.PlayButtonClickedSound();
+                    var menuPage = new GameMenuPage(this, true);
+                    await GHApp.Navigation.PushModalAsync(menuPage);
+                    GetLineCaption.IsEnabled = true;
+                    break;
+                default:
+                    break;
+
+            }
+        }
+
+        private async void GetLineMenuButton_BtnClicked(object sender, EventArgs e)
+        {
+            GetLineMenuButton.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            var menuPage = new GameMenuPage(this, true);
+            await GHApp.Navigation.PushModalAsync(menuPage);
+            GetLineMenuButton.IsEnabled = true;
+        }
+
+        public void SendEnterPressed()
+        {
+#if WINDOWS
+            HandleKeyDown(this, VirtualKey.Enter);
+#endif
+        }
+
+        private void SetupKeyListening()
+        {
+#if WINDOWS
+            try
+            {
+                var window = this.Window;
+                var handler = window.Handler;
+                var platformView = handler.PlatformView;
+                Microsoft.UI.Xaml.Window xamlWindow = platformView as Microsoft.UI.Xaml.Window;
+                if (xamlWindow != null)
+                {
+                    xamlWindow.Content.KeyDown += PageContent_KeyDown;
+                    xamlWindow.Content.KeyUp += PageContent_KeyUp;
+                    xamlWindow.Content.CharacterReceived += PageContent_CharacterReceived;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+#endif
+        }
+
+        private void StopKeyListening()
+        {
+#if WINDOWS
+            try
+            {
+                var window = this.Window;
+                var handler = window.Handler;
+                var platformView = handler.PlatformView;
+                Microsoft.UI.Xaml.Window xamlWindow = platformView as Microsoft.UI.Xaml.Window;
+                if (xamlWindow != null)
+                {
+                    xamlWindow.Content.KeyDown -= PageContent_KeyDown;
+                    xamlWindow.Content.KeyUp -= PageContent_KeyUp;
+                    xamlWindow.Content.CharacterReceived -= PageContent_CharacterReceived;
+                }
+            }
+            catch(Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+#endif
+        }
+
+        private void GotoTurnEntryText_Completed(object sender, EventArgs e)
+        {
+            if(ReplayGrid.IsVisible && GotoTurnOkButton.IsEnabled)
+            {
+                GotoTurnOkButton_Clicked(sender, e);
+            }
+        }
+
+        private int _menuCountNumber = -1;
+
+        private void MorePreviousButton_BtnClicked(object sender, EventArgs e)
+        {
+            int cmdPage = MoreCmdPage;
+            if (cmdPage > (EnableWizardMode ? 0 : 1))
+            {
+                MoreCmdPage = cmdPage - 1;
+            }
+            UpdateMoreNextPrevButtonVisibility(false, true);
+        }
+
+        private void MoreNextButton_BtnClicked(object sender, EventArgs e)
+        {
+            int cmdPage = MoreCmdPage;
+            if (cmdPage < CurrentMoreButtonPageMaxNumber - 1)
+            {
+                MoreCmdPage = cmdPage + 1;
+            }
+            UpdateMoreNextPrevButtonVisibility(true, false);
+        }
+
+        private void UpdateMoreNextPrevButtonVisibility(bool resetPrevButton, bool resetNextButton)
+        {
+            if(GHApp.IsDesktop) /* Assuming mouse pointer usage */
+            {
+                int cmdPage = MoreCmdPage;
+                MorePreviousGrid.IsVisible = cmdPage > (EnableWizardMode ? 0 : 1);
+                MoreNextGrid.IsVisible = cmdPage < CurrentMoreButtonPageMaxNumber - 1;
+            }
+            else
+            {
+                MorePreviousGrid.IsVisible = false;
+                MoreNextGrid.IsVisible = false;
+            }
+
+            if (resetPrevButton || !MorePreviousGrid.IsVisible)
+                MorePreviousButton.IsVisible = false;
+            if(resetNextButton || !MoreNextGrid.IsVisible)
+                MoreNextButton.IsVisible = false;
+        }
+
+        private readonly object _quickLock = new object();
+        private int _quickWandGlyph = 0;
+        private int _quickWandExceptionality = 0;
+        private string _quickWandName = "";
+        private int _quickSpellGlyph = 0;
+        private int _quickSpellOtyp = 0;
+        private string _quickSpellName = "";
+
+        public void SetQuickZapWand(int glyph, int exceptionality, string name)
+        {
+            lock(_quickLock)
+            {
+                _quickWandGlyph = glyph;
+                _quickWandExceptionality = exceptionality;
+                _quickWandName = name;
+            }
+        }
+
+        public void SetQuickCastSpell(int glyph, int otyp, string name)
+        {
+            lock (_quickLock)
+            {
+                _quickSpellGlyph = glyph;
+                _quickSpellOtyp = otyp;
+                _quickSpellName = name;
+            }
+        }
+
+#if WINDOWS
+        private void PageContent_CharacterReceived(Microsoft.UI.Xaml.UIElement sender, Microsoft.UI.Xaml.Input.CharacterReceivedRoutedEventArgs args)
+        {
+            if (LoadingGrid.IsVisible || !GHApp.IsPageOnTopOfModalNavigationStack(this))
+            {
+                /* Nothing */
+            }
+            else if(YnGrid.IsVisible && !string.IsNullOrWhiteSpace(_ynResponses) && _ynResponses.Contains(args.Character))
+            {
+                char c = args.Character;
+                YnButton_Pressed(sender, new EventArgs(), (int)c);
+                args.Handled = true;
+            }
+            else if (MenuGrid.IsVisible)
+            {
+                char c = args.Character;
+                if(MenuCanvas.SelectionHow == SelectionMode.Multiple && c == '.')
+                {
+                    MenuTapGestureRecognizer_Tapped(sender, new TappedEventArgs(new object()));
+                    args.Handled = true;
+                }
+                else
+                {
+                    //SKPoint location = new SKPoint();
+                    bool doclickok = false;
+                    bool somethingFound = false;
+                    lock (MenuCanvas.MenuItemLock)
+                    {
+                        if (MenuCanvas.MenuItems == null)
+                            return;
+
+                        for (int idx = 0; idx < MenuCanvas.MenuItems.Count; idx++)
+                        {
+                            if (MenuCanvas.MenuItems[idx].Accelerator == c)
+                            {
+                                somethingFound = true;
+                                doclickok = ClickMenuItem(idx, false);
+                                //location = new SKPoint(MenuCanvas.MenuItems[idx].DrawBounds.MidX, MenuCanvas.MenuItems[idx].DrawBounds.MidY);
+                                break;
+                            }
+                            else if (MenuCanvas.SelectionHow == SelectionMode.Multiple && (MenuCanvas.MenuItems[idx].Flags & (ulong)MenuFlags.MENU_FLAGS_IS_GROUP_HEADING) != 0 && MenuCanvas.MenuItems[idx].HeadingGroupAccelerator == c
+                                && (_menuCountNumber < 0 || MenuCanvas.MenuItems[idx].HeadingGroupAccelerator < '0' || MenuCanvas.MenuItems[idx].HeadingGroupAccelerator > '9'))
+                            {
+                                somethingFound = true;
+                                doclickok = ClickMenuItem(idx, false);
+                                //location = new SKPoint(MenuCanvas.MenuItems[idx].DrawBounds.MidX, MenuCanvas.MenuItems[idx].DrawBounds.MidY);
+                                break;
+                            }
+                        }
+                    }
+                    if(somethingFound)
+                    {
+                        _menuCountNumber = -1;
+                        if (MenuOKButton.IsEnabled)
+                        {
+                            if (doclickok)
+                            {
+                                MenuCanvas.InvalidateSurface();
+                                MenuOKButton_Clicked(sender, new EventArgs());
+                            }
+                            else
+                            {
+                                if (MenuCanvas.SelectionHow == SelectionMode.Single)
+                                    MenuOKButton_Clicked(sender, new EventArgs());
+                            }
+                        }
+                        args.Handled = true;
+                    }
+                    else if (c >= '0' && c <= '9' && _menuCountNumber < int.MaxValue / 10 - 10)
+                    {
+                        int res;
+                        if(int.TryParse(c.ToString(), out res))
+                        {
+                            if (_menuCountNumber >= 0)
+                                _menuCountNumber *= 10;
+                            else
+                                _menuCountNumber = 0;
+                            _menuCountNumber += res;
+                        }
+                    }
+
+                    //if (location.X > 0 && location.Y > 0)
+                    //{
+                    //    SKTouchEventArgs e = new SKTouchEventArgs(-1, SKTouchAction.Released, location, false);
+                    //    MenuCanvas_NormalClickRelease(sender, e);
+                    //    if (MenuCanvas.SelectionHow == SelectionMode.Single)
+                    //        MenuOKButton_Clicked(sender, new EventArgs());
+                    //    args.Handled = true;
+                    //}
+                }
+            }
+            else if (!MenuGrid.IsVisible && !TextGrid.IsVisible && !PopupGrid.IsVisible && !GetLineGrid.IsVisible && !YnGrid.IsVisible)
+            {
+                if (MoreCommandsGrid.IsVisible)
+                {
+                    CommandCanvas_Pressed(sender, new EventArgs());
+                }
+
+                char c = args.Character;
+                if(c != 0)
+                {
+                    if (GHApp.AltDown)
+                        GenericButton_Clicked(sender, new EventArgs(), GHUtils.Meta((int)c));
+                    if (GHApp.CtrlDown)
+                        GenericButton_Clicked(sender, new EventArgs(), GHUtils.Ctrl((int)c));
+                    else
+                        GenericButton_Clicked(sender, new EventArgs(), (int)c);
+
+                    args.Handled = true;
+                }
+            }
+        }
+
+        private void PageContent_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if(HandleKeyDown(sender, e.Key))
+                e.Handled = true;
+        }
+
+        private bool HandleKeyDown(object sender, VirtualKey key)
+        {
+            bool handled = false;
+            if (key == VirtualKey.LeftControl || key == VirtualKey.RightControl || key == VirtualKey.Control)
+            {
+                GHApp.CtrlDown = true;
+                handled = true;
+            }
+            else if (key == VirtualKey.LeftMenu || key == VirtualKey.RightMenu || key == VirtualKey.Menu)
+            {
+                GHApp.AltDown = true;
+                handled = true;
+            }
+            else if (key == VirtualKey.LeftShift || key == VirtualKey.RightShift || key == VirtualKey.Shift)
+            {
+                GHApp.ShiftDown = true;
+                handled = true;
+            }
+            else if (LoadingGrid.IsVisible || !GHApp.IsPageOnTopOfModalNavigationStack(this))
+            {
+                /* Nothing */
+            }
+            else if (MoreCommandsGrid.IsVisible && (key == Windows.System.VirtualKey.Escape || key == Windows.System.VirtualKey.Enter || key == Windows.System.VirtualKey.Space))
+            {
+                CommandCanvas_Pressed(sender, new EventArgs());
+                handled = true;
+            }
+            else if (MoreCommandsGrid.IsVisible && (key == Windows.System.VirtualKey.Left || key == Windows.System.VirtualKey.Right))
+            {
+                int cmdPage = MoreCmdPage;
+                if (key == Windows.System.VirtualKey.Left)
+                {
+                    if (cmdPage > (EnableWizardMode ? 0 : 1))
+                    {
+                        MoreCmdPage = cmdPage - 1;
+                        MoreCmdOffsetX = 0;
+                        CommandCanvas.InvalidateSurface();
+                        UpdateMoreNextPrevButtonVisibility(true, true);
+                    }
+                    handled = true;
+                }
+                else if (key == Windows.System.VirtualKey.Right)
+                {
+                    if (cmdPage < CurrentMoreButtonPageMaxNumber - 1)
+                    {
+                        MoreCmdPage = cmdPage + 1;
+                        MoreCmdOffsetX = 0;
+                        CommandCanvas.InvalidateSurface();
+                        UpdateMoreNextPrevButtonVisibility(true, true);
+                    }
+                    handled = true;
+                }
+            }
+            else if (TextGrid.IsVisible && (key == Windows.System.VirtualKey.Escape || key == Windows.System.VirtualKey.Enter || key == Windows.System.VirtualKey.Space || key == Windows.System.VirtualKey.Up || key == Windows.System.VirtualKey.Down))
+            {
+                if (key == Windows.System.VirtualKey.Enter || TextGrid.IsVisible && key == Windows.System.VirtualKey.Escape)
+                    TextCanvas_Pressed(sender, new EventArgs());
+                else if (key == Windows.System.VirtualKey.Up)
+                    ScrollTextWindow(120);
+                else if (key == Windows.System.VirtualKey.Down)
+                    ScrollTextWindow(-120);
+                else if (key == Windows.System.VirtualKey.Space)
+                    ScrollTextWindow(-1200);
+                handled = true;
+            }
+            else if (MenuGrid.IsVisible && (key == Windows.System.VirtualKey.Escape || (MenuOKButton.IsEnabled && (key == Windows.System.VirtualKey.Enter)) || key == Windows.System.VirtualKey.Up || key == Windows.System.VirtualKey.Down || key == Windows.System.VirtualKey.Space))
+            {
+                if(key == Windows.System.VirtualKey.Escape)
+                    MenuCancelButton_Clicked(sender, new EventArgs());
+                else if (MenuOKButton.IsEnabled && (key == Windows.System.VirtualKey.Enter))
+                    MenuOKButton_Clicked(sender, new EventArgs());
+                else if (key == Windows.System.VirtualKey.Up)
+                    ScrollMenu(120);
+                else if (key == Windows.System.VirtualKey.Down)
+                    ScrollMenu(-120);
+                else if (key == Windows.System.VirtualKey.Space)
+                    ScrollMenu(-1200);
+                handled = true;
+            }
+            else if (GetLineGrid.IsVisible && (key == Windows.System.VirtualKey.Escape))
+            {
+                GetLineCancelButton_Clicked(sender, new EventArgs());
+                handled = true;
+            }
+            else if (YnGrid.IsVisible && (key == Windows.System.VirtualKey.Escape))
+            {
+                YnButton_Pressed(sender, new EventArgs(), GHConstants.CancelChar);
+                handled = true;
+            }
+            else if (PopupGrid.IsVisible && (key == Windows.System.VirtualKey.Escape || key == Windows.System.VirtualKey.Enter || key == Windows.System.VirtualKey.Space))
+            {
+                PopupOkButton_Clicked(sender, new EventArgs());
+                handled = true;
+            }
+            else if (!MenuGrid.IsVisible && !PopupGrid.IsVisible && !GetLineGrid.IsVisible && !YnGrid.IsVisible && !TextGrid.IsVisible && !PopupGrid.IsVisible)
+            {
+                if (MoreCommandsGrid.IsVisible)
+                {
+                    CommandCanvas_Pressed(sender, new EventArgs());
+                }
+
+                if (GHApp.CtrlDown && key == Windows.System.VirtualKey.Number0)
+                {
+                    if (ZoomAlternateMode)
+                        MapFontAlternateSize = DefaultMapFontSize * GHConstants.MapFontRelativeAlternateSize;
+                    else if (ZoomMiniMode)
+                        MapFontMiniRelativeSize = 1.0f;
+                    else
+                        MapFontSize = DefaultMapFontSize;
+                    handled = true;
+                }
+                else if (GHApp.CtrlDown &&  (key == Windows.System.VirtualKey.Add || key == Windows.System.VirtualKey.Subtract))
+                {
+                    if (ZoomMiniMode)
+                    {
+                        float canvaswidth = canvasView.CanvasSize.Width;
+                        float canvasheight = canvasView.CanvasSize.Height;
+                        SKPoint point = new SKPoint(canvaswidth / 2, canvasheight / 2);
+                        float ratio = key == Windows.System.VirtualKey.Add ? (1 + (GHApp.AltDown ? 0.001f : 0.01f)) : 1 / (1 + (GHApp.AltDown ? 0.001f : 0.01f));
+                        AdjustZoomByRatio(ratio, point, point, point);
+                    }
+                    else
+                    {
+                        float multiplier = key == Windows.System.VirtualKey.Subtract ? -1.0f : 1.0f;
+                        float newfontsize;
+                        if (ZoomAlternateMode)
+                            newfontsize = MapFontAlternateSize + multiplier * (GHApp.AltDown ? 0.001f : 0.01f) * DefaultMapFontSize;
+                        else
+                            newfontsize = MapFontSize + multiplier * (GHApp.AltDown ? 0.001f : 0.01f) * DefaultMapFontSize;
+
+                        float canvaswidth = canvasView.CanvasSize.Width;
+                        float canvasheight = canvasView.CanvasSize.Height;
+                        SKPoint point = new SKPoint(canvaswidth / 2, canvasheight / 2);
+                        SetZoomFontSize(newfontsize, point, point, point);
+                    }
+                    MapFontShowPercentageDecimal = GHApp.AltDown;
+                    handled = true;
+                }
+                else if (ForceAllMessages)
+                {
+                    if (key == Windows.System.VirtualKey.Up)
+                        ScrollMessages(120);
+                    else if (key == Windows.System.VirtualKey.Down)
+                        ScrollMessages(-120);
+                    else if (key == Windows.System.VirtualKey.Space)
+                        ScrollMessages(1200);
+                    handled = true;
+                }
+                else
+                {
+                    int resp = 0;
+                    if (key == Windows.System.VirtualKey.Left)
+                        resp = -4;
+                    else if (key == Windows.System.VirtualKey.Right)
+                        resp = -6;
+                    else if (key == Windows.System.VirtualKey.Up)
+                        resp = -8;
+                    else if (key == Windows.System.VirtualKey.Down)
+                        resp = -2;
+                    else if (key >= Windows.System.VirtualKey.NumberPad1 && key <= Windows.System.VirtualKey.NumberPad9)
+                        resp = -1 - (key - Windows.System.VirtualKey.NumberPad1);
+                    else if (GHApp.AltDown && key >= Windows.System.VirtualKey.A && key <= Windows.System.VirtualKey.Z)
+                        resp = GHUtils.Meta((GHApp.ShiftDown ? (int)'A' : (int)'a') + (int)key - (int)Windows.System.VirtualKey.A);
+
+                    if (resp != 0)
+                    {
+                        if (GHApp.ShiftDown && resp <= -1 && resp >= -9)
+                            GenericButton_Clicked(sender, new EventArgs(), -100 - (int)nh_keyfunc.NHKF_RUN);
+                        GenericButton_Clicked(sender, new EventArgs(), resp);
+                        handled = true;
+                    }
+                }
+            }
+            return handled;
+        }
+
+        private void PageContent_KeyUp(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.LeftControl || e.Key == VirtualKey.RightControl || e.Key == VirtualKey.Control)
+            {
+                GHApp.CtrlDown = false;
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.LeftMenu || e.Key == VirtualKey.RightMenu || e.Key == VirtualKey.Menu)
+            {
+                GHApp.AltDown = false;
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.LeftShift || e.Key == VirtualKey.RightShift || e.Key == VirtualKey.Shift)
+            {
+                GHApp.ShiftDown = false;
+                e.Handled = true;
+            }
+        }
+#endif
     }
+
 }

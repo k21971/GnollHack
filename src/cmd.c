@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    cmd.c    $NHDT-Date: 1557088405 2019/05/05 20:33:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.333 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -47,11 +47,14 @@ extern const char *enc_stat[]; /* encumbrance status from botl.c */
 #endif
 #endif
 
-#define CMD_TRAVEL (char) 0xFC //0x90
-#define CMD_CLICKLOOK (char) 0xFD //0x8F
-#define CMD_TRAVEL_ATTACK (char) 0xFE
-#define CMD_TRAVEL_WALK (char) 0xFB
+#define CMD_TRAVEL (char) 0xFC //(Meta-0x7C) //0x90
+#define CMD_CLICKLOOK (char) 0xFD //(Meta-0x7D) //0x8F
+#define CMD_TRAVEL_ATTACK (char) 0xFE //(Meta-0x7E)
+#define CMD_TRAVEL_WALK (char) 0xFB //(Meta-0x7B)
 #define CMD_CLICKFIRE (char) 0xE0 //(Meta-0x60)
+#define CMD_CLICKCAST (char) 0xDE //(Meta-0x5E)
+#define CMD_CLICKZAP (char) 0xDD //(Meta-0x5D)
+ /* Meta-DB-DC available */
 
 #ifdef DEBUG
 extern int NDECL(wiz_debug_cmd_bury);
@@ -77,6 +80,7 @@ extern int NDECL(doremring);          /**/
 extern int NDECL(dowear);             /**/
 extern int NDECL(doputon);            /**/
 extern int NDECL(doddoremarm);        /**/
+extern int NDECL(ddowear);            /**/
 extern int NDECL(dokick);             /**/
 extern int NDECL(dofire);             /**/
 extern int NDECL(dothrow);            /**/
@@ -195,16 +199,16 @@ STATIC_PTR int NDECL(wiz_migrate_mons);
 #endif
 STATIC_DCL size_t FDECL(size_monst, (struct monst *, BOOLEAN_P));
 STATIC_DCL size_t FDECL(size_obj, (struct obj *));
-STATIC_DCL void FDECL(count_obj, (struct obj *, long *, size_t *,
+STATIC_DCL void FDECL(count_obj, (struct obj *, int64_t *, size_t *,
                                   BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL void FDECL(obj_chain, (winid, const char *, struct obj *,
-                                  BOOLEAN_P, long *, size_t *));
+                                  BOOLEAN_P, int64_t *, size_t *));
 STATIC_DCL void FDECL(mon_invent_chain, (winid, const char *, struct monst *,
-                                         long *, size_t *));
+                                         int64_t *, size_t *));
 STATIC_DCL void FDECL(mon_chain, (winid, const char *, struct monst *,
-                                  BOOLEAN_P, long *, size_t *));
-STATIC_DCL void FDECL(contained_stats, (winid, const char *, long *, size_t *));
-STATIC_DCL void FDECL(misc_stats, (winid, long *, size_t *));
+                                  BOOLEAN_P, int64_t *, size_t *));
+STATIC_DCL void FDECL(contained_stats, (winid, const char *, int64_t *, size_t *));
+STATIC_DCL void FDECL(misc_stats, (winid, int64_t *, size_t *));
 STATIC_PTR int NDECL(wiz_show_stats);
 STATIC_DCL boolean FDECL(accept_menu_prefix, (int NDECL((*))));
 STATIC_PTR int NDECL(wiz_rumor_check);
@@ -1028,14 +1032,14 @@ doability(VOID_ARGS)
                     char namebuf[MAXNAMELENGTH];
                     if (UMNAME(mtmp))
                     {
-                        char umnbuf[BUFSIZ];
+                        char umnbuf[BUFSZ * 2];
                         Strcpy(umnbuf, UMNAME(mtmp));
                         umnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
                         Strcpy(namebuf, umnbuf);
                     }
                     else if (MNAME(mtmp) && mtmp->u_know_mname)
                     {
-                        char mnbuf[BUFSIZ];
+                        char mnbuf[BUFSZ * 2];
                         Strcpy(mnbuf, MNAME(mtmp));
                         mnbuf[min(MAXNAMELENGTH, PL_PSIZ) - 1] = '\0'; /* Limit the length of the name */
                         Strcpy(namebuf, mnbuf);
@@ -1254,7 +1258,7 @@ int abilitynum;
                 const char* gazefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
                     "Gaze%s (&mana; %d)" : "Gaze%s (%d mana)";
 
-                char gazebuf[BUFSIZ];
+                char gazebuf[BUFSZ * 2];
                 Sprintf(gazebuf, gazefmt, youmonst.data->mlet == S_EYE ? " with central eye" : "", gazemanacost);
                 Strcpy(available_ability_list[abilitynum].name, gazebuf);
                 available_ability_list[abilitynum].function_ptr = &dogaze;
@@ -1761,7 +1765,7 @@ wiz_map(VOID_ARGS)
 {
     if (wizard) {
         struct trap *t;
-        long save_Hconf = HConfusion, save_Hhallu = HHallucination;
+        int64_t save_Hconf = HConfusion, save_Hhallu = HHallucination;
 
         HConfusion = HHallucination = 0L;
         for (t = ftrap; t != 0; t = t->ntrap) {
@@ -2236,7 +2240,7 @@ wiz_save_monsters(VOID_ARGS) /* Save a csv file for monsters */
 #else
         fd = open(fq_save, O_WRONLY | O_TEXT | O_CREAT | O_TRUNC, FCMASK);
 #endif
-        char buf[BUFSIZ];
+        char buf[BUFSZ * 2];
 
         Sprintf(buf, "Name,Level,Move,AC,MC,MR,Alignment,GenoFlags,");
         (void)write(fd, buf, strlen(buf));
@@ -2294,11 +2298,11 @@ wiz_save_monsters(VOID_ARGS) /* Save a csv file for monsters */
 
         for (i = LOW_PM; i < NUM_MONSTERS; i++)
         {
-            Sprintf(buf, "%s,%d,%d,%d,%d,%d,%d,%lu,",
+            Sprintf(buf, "%s,%d,%d,%d,%d,%d,%d,%llu,",
                 mons[i].mname, 
                 (int)mons[i].mlevel, (int)mons[i].mmove, 
                 (int)mons[i].ac, (int)mons[i].mc, (int)mons[i].mr, 
-                (int)mons[i].maligntyp, mons[i].geno);
+                (int)mons[i].maligntyp, (unsigned long long)mons[i].geno);
             (void)write(fd, buf, strlen(buf));
             for (j = 0; j < NATTK; j++)
             {
@@ -2318,35 +2322,35 @@ wiz_save_monsters(VOID_ARGS) /* Save a csv file for monsters */
             (void)write(fd, buf, strlen(buf));
             for (j = 0; j < 32; j++)
             {
-                Sprintf(buf, "%d,", (mons[i].mresists & (1L << j)) ? 1 : 0);
+                Sprintf(buf, "%d,", (mons[i].mresists & ((uint64_t)1 << j)) ? 1 : 0);
                 (void)write(fd, buf, strlen(buf));
             }
             Sprintf(buf, ",");
             (void)write(fd, buf, strlen(buf));
             for (j = 0; j < 32; j++)
             {
-                Sprintf(buf, "%d,", (mons[i].mconveys & (1L << j)) ? 1 : 0);
+                Sprintf(buf, "%d,", (mons[i].mconveys & ((uint64_t)1 << j)) ? 1 : 0);
                 (void)write(fd, buf, strlen(buf));
             }
             Sprintf(buf, ",");
             (void)write(fd, buf, strlen(buf));
             for (j = 0; j < 32; j++)
             {
-                Sprintf(buf, "%d,", (mons[i].mflags1 & (1L << j)) ? 1 : 0);
+                Sprintf(buf, "%d,", (mons[i].mflags1 & ((uint64_t)1 << j)) ? 1 : 0);
                 (void)write(fd, buf, strlen(buf));
             }
             Sprintf(buf, ",");
             (void)write(fd, buf, strlen(buf));
             for (j = 0; j < 32; j++)
             {
-                Sprintf(buf, "%d,", (mons[i].mflags2 & (1L << j)) ? 1 : 0);
+                Sprintf(buf, "%d,", (mons[i].mflags2 & ((uint64_t)1 << j)) ? 1 : 0);
                 (void)write(fd, buf, strlen(buf));
             }
             Sprintf(buf, ",");
             (void)write(fd, buf, strlen(buf));
             for (j = 0; j < 32; j++)
             {
-                Sprintf(buf, "%d,", (mons[i].mflags3 & (1L << j)) ? 1 : 0);
+                Sprintf(buf, "%d,", (mons[i].mflags3 & ((uint64_t)1 << j)) ? 1 : 0);
                 (void)write(fd, buf, strlen(buf));
             }
             Sprintf(buf, ",%d,%d,",
@@ -2859,7 +2863,7 @@ wiz_intrinsic(VOID_ARGS)
         anything any;
         char buf[BUFSZ];
         int i, j, n, p, amt;
-        long oldtimeout, newtimeout;
+        int64_t oldtimeout, newtimeout;
         const char *propname;
         menu_item *pick_list = (menu_item *) 0;
 
@@ -2885,7 +2889,7 @@ wiz_intrinsic(VOID_ARGS)
             any.a_int = i + 1; /* +1: avoid 0 */
             oldtimeout = u.uprops[p].intrinsic & TIMEOUT;
             if (oldtimeout)
-                Sprintf(buf, "%-27s [%li]", propname, oldtimeout);
+                Sprintf(buf, "%-27s [%lli]", propname, (long long)oldtimeout);
             else
                 Sprintf(buf, "%s", propname);
             add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
@@ -2900,7 +2904,7 @@ wiz_intrinsic(VOID_ARGS)
             i = pick_list[j].item.a_int - 1; /* -1: reverse +1 above */
             p = propertynames[i].prop_num;
             oldtimeout = u.uprops[p].intrinsic & TIMEOUT;
-            newtimeout = oldtimeout + (long) amt;
+            newtimeout = oldtimeout + (int64_t) amt;
             switch (p) 
             {
             case SICK:
@@ -3277,7 +3281,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
     en_win = create_nhwindow_ex(NHW_MENU, GHWINDOW_STYLE_ENLIGHTENMENT_SCREEN, gui_glyph, extended_create_window_info_from_mon(&youmonst));
-    en_via_menu = !final;
+    en_via_menu = !final && !iflags.in_dumplog;
     if (en_via_menu)
         start_menu_ex(en_win, GHMENU_STYLE_ATTRIBUTES);
 
@@ -3286,7 +3290,7 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
     /* as in background_enlightenment, when poly'd we need to use the saved
        gender in u.mfemale rather than the current you-as-monster gender */
 #ifdef GNH_MOBILE
-    if (final)
+    if (final || iflags.in_dumplog)
 #endif
     {
         Sprintf(buf, "%s the %s's attributes:", tmpbuf,
@@ -3431,7 +3435,7 @@ int final;
 
     boolean usenextrow = TRUE;
 #ifdef GNH_MOBILE
-    usenextrow = (boolean)final;
+    usenextrow = (boolean)(final || iflags.in_dumplog);
 #endif
     if (usenextrow)
     {
@@ -3517,22 +3521,22 @@ int final;
         you_have("just started your adventure", "");
     } else {
         /* 'turns' grates on the nerves in this context... */
-        Sprintf(buf, "the dungeon %ld turn%s ago", moves, plur(moves));
+        Sprintf(buf, "the dungeon %lld turn%s ago", (long long)moves, plur(moves));
         /* same phrasing for current and final: "entered" is unconditional */
         enlght_line(You_, "entered ", buf, "", FALSE);
     }
     if (!Upolyd) {
         /* flags.showexp does not matter */
         /* experience level is already shown above */
-        Sprintf(buf, "%-1ld experience point%s", u.uexp, plur(u.uexp));
+        Sprintf(buf, "%-1lld experience point%s", (long long)u.uexp, plur(u.uexp));
         if (wizard) {
             if (u.ulevel < 30) {
                 int ulvl = (int) u.ulevel;
-                long nxtlvl = newuexp(ulvl);
-                /* long oldlvl = (ulvl > 1) ? newuexp(ulvl - 1) : 0; */
+                int64_t nxtlvl = newuexp(ulvl);
+                /* int64_t oldlvl = (ulvl > 1) ? newuexp(ulvl - 1) : 0; */
 
-                Sprintf(eos(buf), ", %ld %s%sneeded to attain level %d",
-                        (nxtlvl - u.uexp), (u.uexp > 0) ? "more " : "",
+                Sprintf(eos(buf), ", %lld %s%sneeded to attain level %d",
+                    (long long)(nxtlvl - u.uexp), (u.uexp > 0) ? "more " : "",
                         !final ? "" : "were ", (ulvl + 1));
             }
         }
@@ -3600,12 +3604,12 @@ int final;
        same amount as shown on status line which ignores container contents */
     {
         static const char Your_wallet[] = "Your wallet ";
-        long umoney = money_cnt(invent);
+        int64_t umoney = money_cnt(invent);
 
         if (!umoney) {
             enl_msg(Your_wallet, "is ", "was ", "empty", "");
         } else {
-            Sprintf(buf, "%ld %s", umoney, currency(umoney));
+            Sprintf(buf, "%lld %s", (long long)umoney, currency(umoney));
             enl_msg(Your_wallet, "contains ", "contained ", buf, "");
         }
     }
@@ -3638,15 +3642,15 @@ int final;
     get_game_difficulty_multipliers(&monster_damage_mult, &monster_hp_mult);
     int pct_monster_dmg_mult = (int)(monster_damage_mult * 100);
     int pct_player_dmg_mult = (int)((1 / monster_hp_mult) * 100);
-    char difficultybuf[BUFSIZ];
+    char difficultybuf[BUFSZ * 2];
     Sprintf(difficultybuf, " (%d%% damage by monsters, %d%% by player)", pct_monster_dmg_mult, pct_player_dmg_mult);
     enl_msg("Your game difficulty ", "is ", "was ", buf, difficultybuf);
 
-    char modebuf[BUFSIZ];
+    char modebuf[BUFSZ * 2];
     Sprintf(modebuf, " mode (%s)", get_game_mode_description());
     enl_msg("You ", "are playing in ", "were playing in ", get_game_mode_text(TRUE), modebuf);
 
-    Sprintf(buf, "%ld", get_current_game_score());
+    Sprintf(buf, "%lld", (long long)get_current_game_score());
     enl_msg("Your game score ", "is ", "was ", buf, "");
 
     print_realtime(modebuf, get_current_game_duration());
@@ -3758,8 +3762,8 @@ int mode, final, attrindx;
         int dmgbonus_constant = (currstr < STR18(100) ? (int)strength_damage_bonus_core(min(18, currstr), TRUE) : (int)strength_damage_bonus_core(currstr, TRUE));
         int dmgbonus_random = ((currstr > 18 && currstr < STR18(100)) ? 2 : 0);
         //int random_chance = ((currstr > 18 && currstr < STR18(100)) ? currstr - 18 : 0);
-        char tohitbuf[BUFSIZ];
-        char dmgbuf[BUFSIZ];
+        char tohitbuf[BUFSZ * 2];
+        char dmgbuf[BUFSZ * 2];
 
         Sprintf(tohitbuf, "-%d", tohitbonus_constant + tohitbonus_random);
         Sprintf(dmgbuf, "-%d", dmgbonus_constant + dmgbonus_random);
@@ -3883,7 +3887,7 @@ int final;
     if (Strangled) {
         Strcpy(buf, "being strangled");
         if (wizard)
-            Sprintf(eos(buf), " (%ld)", (Strangled & TIMEOUT));
+            Sprintf(eos(buf), " (%lld)", (long long)(Strangled & TIMEOUT));
         you_are(buf, !(magic || cause_known(STRANGLED)) ? "" : from_what(STRANGLED));
     }
 
@@ -3895,7 +3899,7 @@ int final;
     {
         Strcpy(buf, "in an airless environment");
             if (wizard)
-                Sprintf(eos(buf), " (%ld)", (HAirless_environment & TIMEOUT));
+                Sprintf(eos(buf), " (%lld)", (long long)(HAirless_environment & TIMEOUT));
             you_are(buf, from_what(AIRLESS_ENVIRONMENT));
     }
 
@@ -4022,7 +4026,7 @@ int final;
         if (magic || cause_known(SLEEPY)) {
             Strcpy(buf, from_what(SLEEPY));
             if (wizard)
-                Sprintf(eos(buf), " (%ld)", (HSleepy & TIMEOUT));
+                Sprintf(eos(buf), " (%lld)", (long long)(HSleepy & TIMEOUT));
             enl_msg("You ", "fall", "fell", " asleep uncontrollably", buf);
         }
     }
@@ -4151,8 +4155,8 @@ int final;
         /* "you have no/basic/expert/master/grand-master skill with <skill>"
            or "you are unskilled/skilled in <skill>" */
 
-        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
-        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
+        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE, FALSE); /* Gives only pure skill bonuses */
+        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE, FALSE); /* Gives only pure skill bonuses */
 
         Sprintf(buf, "%s %s %s%s (%s%d to hit and %s%d to damage)", sklvlbuf,
             hav ? "skill with" : "in", skill_name(wtype, TRUE), 
@@ -4203,8 +4207,8 @@ int final;
         /* "you have no/basic/expert/master/grand-master skill with <skill>"
            or "you are unskilled/skilled in <skill>" */
 
-        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
-        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
+        int hitbonus = weapon_skill_hit_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE, FALSE); /* Gives only pure skill bonuses */
+        int dmgbonus = weapon_skill_dmg_bonus(uwep, wtype, FALSE, FALSE, FALSE, 0, TRUE, FALSE); /* Gives only pure skill bonuses */
 
         Sprintf(buf, "%s %s %s (%s%d to hit and %s%d to damage)", sklvlbuf,
             hav ? "skill with" : "in", skill_name(wtype, TRUE), hitbonus >= 0 ? "+" : "", hitbonus, dmgbonus >= 0 ? "+" : "", dmgbonus);
@@ -4261,8 +4265,8 @@ int final;
         char ebuf[BUFSZ] = "";
         if (printweaponstats)
         {
-            int hitbonus = weapon_skill_hit_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
-            int dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0, TRUE); /* Gives only pure skill bonuses */
+            int hitbonus = weapon_skill_hit_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0, TRUE, FALSE); /* Gives only pure skill bonuses */
+            int dmgbonus = weapon_skill_dmg_bonus((struct obj*)0, wtype, FALSE, FALSE, FALSE, 0, TRUE, FALSE); /* Gives only pure skill bonuses */
             Sprintf(ebuf, "%s%d to hit%s%s%d to damage",
                 hitbonus >= 0 ? "+" : "", hitbonus,
                 wtype == P_SHIELD ? ", " : " and ",
@@ -4881,28 +4885,28 @@ int final;
     if (Super_fast)
     {
         if (Lightning_fast)
-            you_have("latent super-fastness", from_what(SUPER_FAST));
+            you_are("latently super fast", from_what(SUPER_FAST));
         else
             you_are("super fast", from_what(SUPER_FAST));
     }
     if (Ultra_fast)
     {
         if (Super_fast || Lightning_fast)
-            you_have("latent ultra-fastness", from_what(ULTRA_FAST));
+            you_are("latently ultra fast", from_what(ULTRA_FAST));
         else
             you_are("ultra fast", from_what(ULTRA_FAST));
     }
     if (Very_fast)
     {
         if (Ultra_fast || Super_fast || Lightning_fast)
-            you_have("latent very-fastness", from_what(VERY_FAST));
+            you_are("latently very fast", from_what(VERY_FAST));
         else
             you_are("very fast", from_what(VERY_FAST));
     }
     if (Fast)
     {
         if (Very_fast || Ultra_fast || Super_fast || Lightning_fast)
-            you_have("latent fastness", from_what(FAST));
+            you_are("latently fast", from_what(FAST));
         else
             you_are("fast", from_what(FAST));
     }
@@ -5457,7 +5461,6 @@ int final;
 {
     char buf[BUFSZ];
     char goalbuf[BUFSZ];
-    int ngenocided;
     int dumpwin;
 
     /* Create the conduct window */
@@ -5476,7 +5479,7 @@ int final;
     {
         added_goals = TRUE;
         putstr(en_win, ATR_TITLE, "Goals:");
-        if (!final)
+        if (!final && !iflags.in_dumplog)
             putstr(en_win, ATR_HALF_SIZE, " ");
 
         if (!u.uachieve.amulet)
@@ -5511,7 +5514,7 @@ int final;
         if(added_goals)
             putstr(dumpwin, ATR_NONE, "");
         putstr(en_win, ATR_TITLE, "Quests:");
-        if (!final)
+        if (!final && !iflags.in_dumplog)
             putstr(en_win, ATR_HALF_SIZE, " ");
 
         if (!(u.uevent.qcompleted || u.uevent.qexpelled || quest_status.leader_is_dead))
@@ -5619,7 +5622,7 @@ int final;
 
         if (!u.uachieve.role_achievement)
         {
-            Sprintf(goalbuf, "an optional quest to %s", get_role_achievement_description(FALSE));
+            Sprintf(goalbuf, "an optional quest to %s", get_role_achievement_description(0));
             you_have(goalbuf, "");
         }
     }
@@ -5629,8 +5632,10 @@ int final;
         putstr(dumpwin, ATR_NONE, "");
     
     putstr(en_win, ATR_TITLE, "Achievements:");
-    if (!final)
+    if (!final && !iflags.in_dumplog)
         putstr(en_win, ATR_HALF_SIZE, " ");
+    
+    /* Major achievements */
     if (u.uachieve.ascended)
     {
         you_have("ascended to demigodhood", "");
@@ -5655,7 +5660,8 @@ int final;
     }
     if (u.uachieve.role_achievement)
     {
-        you_have(get_role_achievement_description(TRUE), "");
+        Sprintf(goalbuf, "completed your optional quest by %s", get_role_achievement_description(2));
+        you_have(goalbuf, "");
         num_achievements++;
     }
     if (u.uachieve.bell)
@@ -5693,14 +5699,26 @@ int final;
         you_have("entered the Elemental Planes", "");
         num_achievements++;
     }
-    if (u.uachieve.enter_gehennom)
-    {
-        you_have("entered Gehennom", "");
-        num_achievements++;
-    }
     if (u.uachieve.killed_medusa)
     {
         you_have("defeated Medusa", "");
+        num_achievements++;
+    }
+    if (u.uachieve.learned_castle_tune)
+    {
+        you_have("solved the castle tune", "");
+        num_achievements++;
+    }
+    if (u.uachieve.killed_demogorgon)
+    {
+        you_have("defeated Demogorgon, the Prince of Demons", "");
+        num_achievements++;
+    }
+
+    /* Minor achievements + a couple of related major ones */
+    if (u.uachieve.enter_gehennom)
+    {
+        you_have("entered Gehennom", "");
         num_achievements++;
     }
     if (u.uachieve.consulted_oracle)
@@ -5753,11 +5771,6 @@ int final;
         you_have("found the Big Room", "");
         num_achievements++;
     }
-    if (u.uachieve.learned_castle_tune)
-    {
-        you_have("learned the castle tune", "");
-        num_achievements++;
-    }
     if (u.uachieve.entered_large_circular_dungeon)
     {
         you_have("entered the Large Circular Dungeon", "");
@@ -5778,11 +5791,6 @@ int final;
         you_have("defeated Yacc, the Demon Lord of Bovines", "");
         num_achievements++;
     }
-    if (u.uachieve.killed_demogorgon)
-    {
-        you_have("defeated Demogorgon, the Prince of Demons", "");
-        num_achievements++;
-    }
     if (!num_achievements)
     {
         you_have_not("earned any achievements", "");
@@ -5790,7 +5798,7 @@ int final;
 
     putstr(dumpwin, ATR_NONE, "");
     putstr(en_win, ATR_TITLE, "Voluntary challenges:");
-    if(!final)
+    if(!final && !iflags.in_dumplog)
         putstr(en_win, ATR_HALF_SIZE, " ");
 
     if (u.uroleplay.blind)
@@ -5812,7 +5820,7 @@ int final;
     if (!u.uconduct.weaphit) {
         you_have_never("hit with a wielded weapon");
     } else if (wizard) {
-        Sprintf(buf, "used a wielded weapon %ld time%s", u.uconduct.weaphit,
+        Sprintf(buf, "used a wielded weapon %lld time%s", (long long)u.uconduct.weaphit,
                 plur(u.uconduct.weaphit));
         you_have_X(buf);
     }
@@ -5822,24 +5830,23 @@ int final;
     if (!u.uconduct.literate) {
         you_have_been("illiterate");
     } else if (wizard) {
-        Sprintf(buf, "read items or engraved %ld time%s", u.uconduct.literate,
+        Sprintf(buf, "read items or engraved %lld time%s", (long long)u.uconduct.literate,
                 plur(u.uconduct.literate));
         you_have_X(buf);
     }
 
-    ngenocided = num_genocides();
-    if (ngenocided == 0) {
+    if (!u.uconduct.genocides) {
         you_have_never("genocided any monsters");
     } else {
-        Sprintf(buf, "genocided %d type%s of monster%s", ngenocided,
-                plur(ngenocided), plur(ngenocided));
+        Sprintf(buf, "genocided %lld type%s of monster%s", (long long)u.uconduct.genocides,
+                plur(u.uconduct.genocides), plur(u.uconduct.genocides));
         you_have_X(buf);
     }
 
     if (!u.uconduct.polypiles) {
         you_have_never("polymorphed an object");
     } else if (wizard) {
-        Sprintf(buf, "polymorphed %ld item%s", u.uconduct.polypiles,
+        Sprintf(buf, "polymorphed %lld item%s", (long long)u.uconduct.polypiles,
                 plur(u.uconduct.polypiles));
         you_have_X(buf);
     }
@@ -5847,7 +5854,7 @@ int final;
     if (!u.uconduct.polyselfs) {
         you_have_never("changed form");
     } else if (wizard) {
-        Sprintf(buf, "changed form %ld time%s", u.uconduct.polyselfs,
+        Sprintf(buf, "changed form %lld time%s", (long long)u.uconduct.polyselfs,
                 plur(u.uconduct.polyselfs));
         you_have_X(buf);
     }
@@ -5855,7 +5862,7 @@ int final;
     if (!u.uconduct.wishes) {
         you_have_X("used no wishes");
     } else {
-        Sprintf(buf, "used %ld wish%s", u.uconduct.wishes,
+        Sprintf(buf, "used %lld wish%s", (long long)u.uconduct.wishes,
                 (u.uconduct.wishes > 1L) ? "es" : "");
         if (u.uconduct.wisharti) {
             /* if wisharti == wishes
@@ -5871,7 +5878,7 @@ int final;
                         (u.uconduct.wisharti > 2L) ? "all "
                           : (u.uconduct.wisharti == 2L) ? "both " : "");
             else
-                Sprintf(eos(buf), " (%ld ", u.uconduct.wisharti);
+                Sprintf(eos(buf), " (%lld ", (long long)u.uconduct.wisharti);
 
             Sprintf(eos(buf), "for %s)",
                     (u.uconduct.wisharti == 1L) ? "an artifact"
@@ -5884,9 +5891,30 @@ int final;
                     " for any artifacts", "");
     }
 
+    if (u.uevent.elbereth_known)
+    {
+        if (!u.uconduct.elbereths) {
+            you_have_never("engraved Elbereth");
+        }
+        else if (wizard) {
+            Sprintf(buf, "engraved Elbereth %lld time%s", (long long)u.uconduct.elbereths,
+                plur(u.uconduct.elbereths));
+            you_have_X(buf);
+        }
+    }
+
+    if (!u.uconduct.conflicts) {
+        you_have_never("caused conflict");
+    }
+    else if (wizard) {
+        Sprintf(buf, "caused conflict %lld time%s", (long long)u.uconduct.conflicts,
+            plur(u.uconduct.conflicts));
+        you_have_X(buf);
+    }
+
     putstr(dumpwin, ATR_NONE, "");
     putstr(en_win, ATR_TITLE, "Role score:");
-    if (!final)
+    if (!final && !iflags.in_dumplog)
         putstr(en_win, ATR_HALF_SIZE, " ");
 
     if (u.uachieve.role_achievement)
@@ -5895,43 +5923,55 @@ int final;
         if (Role_if(PM_KNIGHT) || Role_if(PM_TOURIST))
             putstr(en_win, ATR_HALF_SIZE, " ");
     }
-
+    
+    const char* chest_name = objects[MAGIC_CHEST].oc_name_known || !OBJ_DESCR(objects[MAGIC_CHEST]) ? OBJ_NAME(objects[MAGIC_CHEST]) : OBJ_DESCR(objects[MAGIC_CHEST]);
     if (Role_if(PM_ARCHAEOLOGIST))
     {
         struct item_score_count_result artifacts = count_artifacts(invent);
-        long score_percentage = ((artifacts.score + (long)u.uachieve.role_achievement * ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct item_score_count_result artifacts2 = count_artifacts(magic_objs);
+        int64_t score_percentage = ((artifacts.score + artifacts2.score + (int64_t)u.uachieve.role_achievement * ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld %sartifact%s with you",artifacts.quantity, program_state.gameover ? "" : "known ", plur(artifacts.quantity));
+        Sprintf(goalbuf, "%lld %sartifact%s with you", (long long)artifacts.quantity, program_state.gameover ? "" : "known ", plur(artifacts.quantity));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld %sartifact%s in your %s", (long long)artifacts2.quantity, program_state.gameover ? "" : "known ", plur(artifacts2.quantity), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_BARBARIAN))
     {
         struct item_score_count_result valuables = count_powerful_melee_weapon_score(invent);
-        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * BARBARIAN_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct item_score_count_result valuables2 = count_powerful_melee_weapon_score(magic_objs);
+        int64_t score_percentage = ((valuables.score + valuables2.score + (int64_t)u.uachieve.role_achievement * BARBARIAN_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld %smelee weapon%s of artifact or legendary quality with you", valuables.quantity, program_state.gameover ? "" : "known ", plur(valuables.quantity));
+        Sprintf(goalbuf, "%lld %smelee weapon%s of artifact or legendary quality with you", (long long)valuables.quantity, program_state.gameover ? "" : "known ", plur(valuables.quantity));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld %smelee weapon%s of artifact or legendary quality in your %s", (long long)valuables2.quantity, program_state.gameover ? "" : "known ", plur(valuables2.quantity), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_CAVEMAN))
     {
         struct amulet_count_result amulets = count_amulets(invent);
-        long score_percentage = ((amulets.score + (long)u.uachieve.role_achievement * CAVEMAN_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct amulet_count_result amulets2 = count_amulets(magic_objs);
+        int64_t score_percentage = ((amulets.score + amulets2.score + (int64_t)u.uachieve.role_achievement * CAVEMAN_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld amulet%s of life saving with you", amulets.amulets_of_life_saving, plur(amulets.amulets_of_life_saving));
+        Sprintf(goalbuf, "%lld amulet%s of life saving with you", (long long)amulets.amulets_of_life_saving, plur(amulets.amulets_of_life_saving));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "%ld non-prediscovered amulet%s with you", amulets.other_amulets, plur(amulets.other_amulets));
+        Sprintf(goalbuf, "%lld non-prediscovered amulet%s with you", (long long)amulets.other_amulets, plur(amulets.other_amulets));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld amulet%s of life saving in your %s", (long long)amulets2.amulets_of_life_saving, plur(amulets2.amulets_of_life_saving), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld non-prediscovered amulet%s in your %s", (long long)amulets2.other_amulets, plur(amulets2.other_amulets), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_KNIGHT) && u.ualign.type != A_NEUTRAL)
     { 
         putstr(en_win, ATR_SUBTITLE, u.ualign.type == A_LAWFUL ? " Demons, devils, and chaotic dragons slain:" : " Angels and lawful dragons slain:");
-        if (!final)
+        if (!final && !iflags.in_dumplog)
             putstr(en_win, ATR_HALF_SIZE, " ");
 
         print_knight_slayings(en_win, final);
@@ -5939,41 +5979,54 @@ int final;
     else if (Role_if(PM_RANGER))
     {
         struct item_score_count_result valuables = count_powerful_ranged_weapon_score(invent);
-        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * RANGER_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct item_score_count_result valuables2 = count_powerful_ranged_weapon_score(magic_objs);
+        int64_t score_percentage = ((valuables.score + valuables2.score + (int64_t)u.uachieve.role_achievement * RANGER_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld %sranged weapon%s of at least artifact, elite, or mythic quality with you", valuables.quantity_nonammo, program_state.gameover ? "" : "known ", plur(valuables.quantity_nonammo));
+        Sprintf(goalbuf, "%lld %sranged weapon%s of at least artifact, elite, or mythic quality with you", (long long)valuables.quantity_nonammo, program_state.gameover ? "" : "known ", plur(valuables.quantity_nonammo));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "%ld %sammo of at least artifact, elite, or mythic quality with you", valuables.quantity_ammo, program_state.gameover ? "" : "known ");
+        Sprintf(goalbuf, "%lld %sammo of at least artifact, elite, or mythic quality with you", (long long)valuables.quantity_ammo, program_state.gameover ? "" : "known ");
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld %sranged weapon%s of at least artifact, elite, or mythic quality in your %s", (long long)valuables2.quantity_nonammo, program_state.gameover ? "" : "known ", plur(valuables2.quantity_nonammo), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld %sammo of at least artifact, elite, or mythic quality in your %s", (long long)valuables2.quantity_ammo, program_state.gameover ? "" : "known ", chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_ROGUE))
     {
-        long valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
-        long score_percentage = ((valuableworth + (long)u.uachieve.role_achievement * ROGUE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        int64_t valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
+        int64_t valuableworth2 =  magic_gold() + magic_gem_value();
+        int64_t score_percentage = ((valuableworth + valuableworth2 + (int64_t)u.uachieve.role_achievement * ROGUE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld %s worth of %svaluables with you", valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
+        Sprintf(goalbuf, "%lld %s worth of %svaluables with you", (long long)valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld %s worth of %svaluables in your %s", (long long)valuableworth2, currency(valuableworth2), program_state.gameover ? "" : "known ", chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_SAMURAI))
     {
         struct item_score_count_result valuables = count_powerful_Japanese_item_score(invent);
-        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * SAMURAI_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct item_score_count_result valuables2 = count_powerful_Japanese_item_score(magic_objs);
+        int64_t score_percentage = ((valuables.score + valuables2.score + (int64_t)u.uachieve.role_achievement * SAMURAI_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld Japanese non-ammo item%s of at least artifact, exceptional, or mythic quality with you", valuables.quantity_nonammo, plur(valuables.quantity_nonammo));
+        Sprintf(goalbuf, "%lld Japanese non-ammo item%s of at least artifact, exceptional, or mythic quality with you", (long long)valuables.quantity_nonammo, plur(valuables.quantity_nonammo));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "%ld Japanese ammo of at least artifact, exceptional, or mythic quality with you", valuables.quantity_ammo);
+        Sprintf(goalbuf, "%lld Japanese ammo of at least artifact, exceptional, or mythic quality with you", (long long)valuables.quantity_ammo);
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld Japanese non-ammo item%s of at least artifact, exceptional, or mythic quality in your %s", (long long)valuables2.quantity_nonammo, plur(valuables2.quantity_nonammo), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld Japanese ammo of at least artifact, exceptional, or mythic quality in your %s", (long long)valuables2.quantity_ammo, chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_TOURIST))
     {
         putstr(en_win, ATR_SUBTITLE, " Selfies taken with:");
-        if (!final)
+        if (!final && !iflags.in_dumplog)
             putstr(en_win, ATR_HALF_SIZE, " ");
 
         print_selfies(en_win, final);
@@ -5981,50 +6034,55 @@ int final;
     else if (Role_if(PM_VALKYRIE))
     {
         struct item_score_count_result valuables = count_powerful_valkyrie_item_score(invent);
-        long score_percentage = ((valuables.score + (long)u.uachieve.role_achievement * VALKYRIE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct item_score_count_result valuables2 = count_powerful_valkyrie_item_score(magic_objs);
+        int64_t score_percentage = ((valuables.score + valuables2.score + (int64_t)u.uachieve.role_achievement * VALKYRIE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "%ld non-ammo item%s of %s quality with you", valuables.quantity_nonammo, plur(valuables.quantity_nonammo), u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial");
+        Sprintf(goalbuf, "%lld non-ammo item%s of %s quality with you", (long long)valuables.quantity_nonammo, plur(valuables.quantity_nonammo), u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial");
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "%ld ammo of %s quality with you", valuables.quantity_ammo, u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial");
+        Sprintf(goalbuf, "%lld ammo of %s quality with you", (long long)valuables.quantity_ammo, u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial");
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "%lld non-ammo item%s of %s quality in your %s", (long long)valuables2.quantity_nonammo, plur(valuables2.quantity_nonammo), u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial", chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld ammo of %s quality in your %s", (long long)valuables2.quantity_ammo, u.ualign.type == A_CHAOTIC ? "infernal" : u.ualign.type == A_LAWFUL ? "celestial" : "primordial", chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_HEALER) || Role_if(PM_PRIEST) || Role_if(PM_WIZARD))
     {
-        long newspells = 0L;
-        long score_gained = 0L;
+        int64_t newspells = 0L;
+        int64_t score_gained = 0L;
         int i;
         for (i = 0; i < MAXSPELL && spl_book[i].sp_id != NO_SPELL; i++)
         {
             if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
             {
                 newspells++;
-                score_gained += (Role_if(PM_HEALER) ? HEALER_PER_SPELL_LEVEL_SCORE : Role_if(PM_PRIEST) ? PRIEST_PER_SPELL_LEVEL_SCORE : WIZARD_PER_SPELL_LEVEL_SCORE) * (long)(spl_book[i].sp_lev + 2);
+                score_gained += (Role_if(PM_HEALER) ? HEALER_PER_SPELL_LEVEL_SCORE : Role_if(PM_PRIEST) ? PRIEST_PER_SPELL_LEVEL_SCORE : WIZARD_PER_SPELL_LEVEL_SCORE) * (int64_t)(spl_book[i].sp_lev + 2);
             }
         }
-        long score_percentage = ((score_gained + (long)u.uachieve.role_achievement * (Role_if(PM_HEALER) ? HEALER_ROLE_ACHIEVEMENT_SCORE : Role_if(PM_PRIEST) ? PRIEST_ROLE_ACHIEVEMENT_SCORE : WIZARD_ROLE_ACHIEVEMENT_SCORE)) * 100) / MAXIMUM_ROLE_SCORE;
+        int64_t score_percentage = ((score_gained + (int64_t)u.uachieve.role_achievement * (Role_if(PM_HEALER) ? HEALER_ROLE_ACHIEVEMENT_SCORE : Role_if(PM_PRIEST) ? PRIEST_ROLE_ACHIEVEMENT_SCORE : WIZARD_ROLE_ACHIEVEMENT_SCORE)) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(goalbuf, "learnt %ld new spell%s in unrestricted schools", newspells, plur(newspells));
+        Sprintf(goalbuf, "learnt %lld new spell%s in unrestricted schools", (long long)newspells, plur(newspells));
         you_have(goalbuf, "");
-        Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+        Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
     }
     else if (Role_if(PM_MONK))
     {
-        long score_upon_ascension = get_conduct_score_upon_ascension() * MONK_EXTRA_CONDUCT_SCORE_MULTIPLIER;
-        long score_percentage = ((0L + (long)u.uachieve.role_achievement * MONK_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
-        long score_percentage_upon_ascension = ((score_upon_ascension + (long)u.uachieve.role_achievement * MONK_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        int64_t score_upon_ascension = get_conduct_score_upon_ascension() * MONK_EXTRA_CONDUCT_SCORE_MULTIPLIER;
+        int64_t score_percentage = ((0L + (int64_t)u.uachieve.role_achievement * MONK_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        int64_t score_percentage_upon_ascension = ((score_upon_ascension + (int64_t)u.uachieve.role_achievement * MONK_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = max(0, min(100, score_percentage));
         score_percentage_upon_ascension = max(0, min(100, score_percentage_upon_ascension));
         if(u.uachieve.ascended)
-            Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage_upon_ascension);
+            Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage_upon_ascension);
         else
-            Sprintf(goalbuf, "gained %ld%% of your maximum role score", score_percentage);
+            Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
         if (!u.uachieve.ascended)
         {
-            Sprintf(goalbuf, "%ld%% of your maximum role score upon ascension with current conducts intact", score_percentage_upon_ascension);
+            Sprintf(goalbuf, "%lld%% of your maximum role score upon ascension with current conducts intact", (long long)score_percentage_upon_ascension);
             enl_msg(You_, "will gain ", "would have gained ", goalbuf, "");
         }
     }
@@ -6037,46 +6095,34 @@ int final;
 
 /* ordered by command name */
 struct ext_func_tab extcmdlist[] = {
-    { '#', "#", "perform an extended command",
-            doextcmd, IFBURIED | GENERALCMD },
-    { M('?'), "?", "list all extended commands",
-            doextlist, IFBURIED | GENERALCMD },
-    { M('a'), "adjust", "adjust inventory letters",
-            doorganize, IFBURIED | AUTOCOMPLETE | INCMDMENU },
-    { M('A'), "annotate", "name current level",
-            donamelevel, IFBURIED | AUTOCOMPLETE },
-    { 'a', "apply", "apply (use) a tool (pick-axe, key, lamp...)",
-            doapply, SINGLE_OBJ_CMD_SPECIFIC, 0, 0, "use or apply" },
-    { 'A', "ability", "view and use skills and abilities",
-            doability, IFBURIED | AUTOCOMPLETE },
-    { M(2), "attributes", "show your attributes",
-            doattributes, IFBURIED | AUTOCOMPLETE },
-    { '@', "autopickup", "toggle the pickup option on/off",
-            dotogglepickup, IFBURIED },
+    { '#', "#", "perform an extended command", doextcmd, IFBURIED | GENERALCMD },
+    { M('?'), "?", "list all extended commands", doextlist, IFBURIED | GENERALCMD },
+    { 'A', "ability", "view and use skills and abilities", doability, IFBURIED | AUTOCOMPLETE },
+    { M('a'), "adjust", "adjust inventory letters", doorganize, IFBURIED | AUTOCOMPLETE | INCMDMENU },
+    { M('A'), "annotate", "name current level", donamelevel, IFBURIED | AUTOCOMPLETE },
+    { 'a', "apply", "apply (use) a tool (pick-axe, key, lamp...)", doapply, SINGLE_OBJ_CMD_SPECIFIC, 0, 0, "use or apply" },
+    { M(2), "attributes", "show your attributes", doattributes, IFBURIED | AUTOCOMPLETE },
+    { '@', "autopickup", "toggle the pickup option on/off", dotogglepickup, IFBURIED },
     { M(15), "autostash", "auto-stash specific item types", doautostash, AUTOCOMPLETE },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
-    { M('b'), "bars", "toggle tile hit point bars on/off",
-            dotogglehpbars, IFBURIED | AUTOCOMPLETE },
+    { M('b'), "bars", "toggle tile hit point bars on/off", dotogglehpbars, IFBURIED | AUTOCOMPLETE },
 #endif
     { C('b'), "break", "break something", dobreak, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_GENERAL, 0, 0, "break" },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
-    { M('y'), "bufftimers", "toggle tile buff timers on/off",
-            dotogglebufftimers, IFBURIED | AUTOCOMPLETE },
+    { M('y'), "bufftimers", "toggle tile buff timers on/off", dotogglebufftimers, IFBURIED | AUTOCOMPLETE },
 #endif
-    { 'c', "close", "close a door", doclose },
+    { C('c'), "call", "call (name) something", docallcmd, IFBURIED | AUTOCOMPLETE, 0, getobj_callable, "call" },
+    { 'Z', "cast", "cast a spell", docast, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
+    { M(26), "castquick", "cast the quick spell", docastquick, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
     { 'C', "chat", "talk to someone", dotalk, IFBURIED | AUTOCOMPLETE },
     { M(10), "chatsteed", "talk to steed", dotalksteed, IFBURIED },
     { M(11), "chatnearby", "talk to someone nearby", dotalknearby, IFBURIED },
-    { M(13), "chronicle", "show journal of major events",
-              do_gamelog, IFBURIED | AUTOCOMPLETE | GENERALCMD },
-    { C('c'), "call", "call (name) something", docallcmd, IFBURIED | AUTOCOMPLETE, 0, getobj_callable, "call" },
-    { M('c'), "commands", "list of additional actions",
-            docommandmenu, IFBURIED | GENERALCMD | AUTOCOMPLETE },
-    { M(3) /*M('c')*/, "conduct", "list voluntary challenges you have maintained",
-            doconduct, IFBURIED | AUTOCOMPLETE },
+    { M(13), "chronicle", "show journal of major events", do_gamelog, IFBURIED | AUTOCOMPLETE | GENERALCMD },
+    { 'c', "close", "close a door", doclose },
+    { M('c'), "commands", "list of additional actions", docommandmenu, IFBURIED | GENERALCMD | AUTOCOMPLETE },
+    { M(3) /*M('c')*/, "conduct", "list voluntary challenges you have maintained", doconduct, IFBURIED | AUTOCOMPLETE },
     { '\0', "decorations", "toggle display of decorations on and off", dotoggledecorations, IFBURIED | AUTOCOMPLETE },
-    { M(6), "deletesavedgame", "delete saved game if it exists",
-            dodeletesavedgame, IFBURIED | CASUALMODECMD | AUTOCOMPLETE },
+    { M(6), "deletesavedgame", "delete saved game if it exists", dodeletesavedgame, IFBURIED | CASUALMODECMD | AUTOCOMPLETE },
     { C('g'), "dig", "dig the ground", dodig, INCMDMENU },
     { M('d'), "dip", "dip an object into something", dodip, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_GENERAL, 0, getobj_allowall, "dip" },
     { '>', "down", "go down a staircase", dodown },
@@ -6085,210 +6131,181 @@ struct ext_func_tab extcmdlist[] = {
     { 'D', "droptype", "drop specific item types", doddrop },
     { 'e', "eat", "eat something", doeat, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_allobj, "eat" },
     { 'E', "engrave", "engrave writing on the floor", doengrave, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_styluses, "write with" },
-    { '\0', "enhance", "advance or check weapon and spell skills",
-            enhance_weapon_skill, IFBURIED | AUTOCOMPLETE },
-    { '\0', "exploremode", "enter explore (discovery) mode",
-            enter_explore_mode, IFBURIED },
+    { '\0', "enhance", "advance or check weapon and spell skills", enhance_weapon_skill, IFBURIED | AUTOCOMPLETE },
+    { M('x'), "examine", "describe an item", 
+        doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO | ALLOW_RETURN_TO_INVENTORY | ALLOW_RETURN_TO_CMD_MENU | CMD_MENU_AUTO_CLICK_OK, 0, 
+        getobj_allobj, "examine" },
+    { '\0', "exploremode", "enter explore (discovery) mode", enter_explore_mode, IFBURIED },
     { 'f', "fire", "fire ammunition from quiver", dofire, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_allowall, "fire" },
     { M('f'), "force", "force a lock", doforce, AUTOCOMPLETE | INCMDMENU },
-    { '\'', "glance", "show what type of thing a map symbol corresponds to",
-            doquickwhatis, IFBURIED | GENERALCMD },
-    { M('g'), "genocided", "list genocided monsters",
-            dogenocidedmonsters, IFBURIED },
+    { M('g'), "genocided", "list genocided monsters", dogenocidedmonsters, IFBURIED },
+    { '\'', "glance", "show what type of thing a map symbol corresponds to", doquickwhatis, IFBURIED | GENERALCMD },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
-    { M('_'), "grid", "toggle tile grid on/off",
-            dotogglegrid, IFBURIED | AUTOCOMPLETE },
+    { M('_'), "grid", "toggle tile grid on/off", dotogglegrid, IFBURIED | AUTOCOMPLETE },
 #endif
-    { M('h'), "handedness", "toggle swap weapon handedness",
-            doswaphandedness, IFBURIED | AUTOCOMPLETE | INCMDMENU },
+    { M('h'), "handedness", "toggle swap weapon handedness", doswaphandedness, IFBURIED | AUTOCOMPLETE | INCMDMENU },
     { '?', "help", "give a help message", dohelp, IFBURIED | GENERALCMD },
-    { '\0', "herecmdmenu", "show menu of commands you can do here",
-            doherecmdmenu, IFBURIED },
+    { '\0', "herecmdmenu", "show menu of commands you can do here", doherecmdmenu, IFBURIED },
     { 'i', "inventory", "show your inventory", ddoinv, IFBURIED },
-    { 'I', "inventtype", "inventory specific item types",
-            dotypeinv, IFBURIED },
-    { M('i'), "invoke", "invoke an object's special powers",
-            doinvoke, IFBURIED | AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_invoke_types, "invoke" },
+    { 'I', "inventtype", "inventory specific item types", dotypeinv, IFBURIED },
+    { M('i'), "invoke", "invoke an object's special powers", 
+        doinvoke, IFBURIED | AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, 
+        getobj_invoke_types, "invoke" },
     { M('j'), "jump", "jump to another location", dojump, AUTOCOMPLETE | INCMDMENU },
     { C('d'), "kick", "kick something", dokick, AUTOCOMPLETE | INCMDMENU },
-    { M('k'), "killed", "list killed monsters",
-            dokilledmonsters, IFBURIED },
-    { '\\', "known", "show what object types have been discovered",
-            dodiscovered, IFBURIED | GENERALCMD },
-    { '`', "knownclass", "show discovered types for one class of objects",
-            doclassdisco, IFBURIED | GENERALCMD },
-    { M(0), "levelchange", "change experience level", /* Special hotkey launchable from GUI */
-            wiz_level_change, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { M('k'), "killed", "list killed monsters", dokilledmonsters, IFBURIED },
+    { '\\', "known", "show what object types have been discovered", dodiscovered, IFBURIED | GENERALCMD },
+    { '`', "knownclass", "show discovered types for one class of objects", doclassdisco, IFBURIED | GENERALCMD },
+    { M('<'), "lastpickeditem", "use the last picked item", dolastpickeditem, IFBURIED },
+    { M(0), "levelchange", "change experience level", wiz_level_change, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { C('l'), "light", "light or snuff out something around you", dolight, AUTOCOMPLETE | INCMDMENU },
     { ':', "look", "look at what is here", dolook, IFBURIED },
-    { 'L', "lookat", "show what type of thing a symbol corresponds to",
-            dowhatis, IFBURIED | GENERALCMD },
+    { 'L', "lookat", "show what type of thing a symbol corresponds to", dowhatis, IFBURIED | GENERALCMD },
     { M('l'), "loot", "loot a box on the floor", doloot, AUTOCOMPLETE },
+    { '\0', "managespell", "manage spells", dospellmanage, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
+    { M(8), "favorite", "mark an item as favorite",
+        dofavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0,
+        getobj_favorites, "mark as favorite", "mark as favorite" },
+    { M(9), "unfavorite", "unmark an item as favorite",
+        dounfavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0,
+        getobj_favorites, "unmark as favorite", "unmark as favorite" },
 #ifdef DEBUG_MIGRATING_MONS
-    { '\0', "migratemons", "migrate N random monsters",
-            wiz_migrate_mons, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "migratemons", "migrate N random monsters", wiz_migrate_mons, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #endif
-    { M(4), "monster", "use monster ability or skill",
-            domonsterability, IFBURIED | AUTOCOMPLETE },
-    { 'N', "name", "name a monster or an object",
-            docallcmd, IFBURIED | AUTOCOMPLETE },
+    { 'X', "mix", "prepare a spell from material components", domix, AUTOCOMPLETE | INSPELLMENU },
+    { M('M'), "monster", "use monster ability or skill", domonsterability, IFBURIED | AUTOCOMPLETE },
+    { 'N', "name", "name a monster or an object", docallcmd, IFBURIED | AUTOCOMPLETE },
     { '\0', "namespecificitem", "name a specific object",
-            doname_specific_object, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_GENERAL, 0, getobj_callable, "name", "name this specific object" },
+            doname_specific_object, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_GENERAL, 0, 
+            getobj_callable, "name", "name this specific object" },
     { '\0', "nameitemtype", "name a type of object",
-            doname_type_of_object, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_GENERAL, 0, getobj_callable, "name the type for", "name the type of this object" },
+            doname_type_of_object, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_GENERAL, 0, 
+            getobj_callable, "name the type for", "name the type of this object" },
     { M('o'), "offer", "offer a sacrifice to the gods",
-            dosacrifice, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_offerfodder, "sacrifice" },
+            dosacrifice, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, 
+            getobj_offerfodder, "sacrifice" },
     { 'o', "open", "open a door", doopen },
-    { 'O', "options", "show option settings, possibly change them",
-            doset, IFBURIED | GENERALCMD },
-    { C('o'), "overview", "show a summary of the explored dungeon",
-            dooverview, IFBURIED | AUTOCOMPLETE },
+    { 'O', "options", "show option settings, possibly change them", doset, IFBURIED | GENERALCMD },
+    { C('o'), "overview", "show a summary of the explored dungeon", dooverview, IFBURIED | AUTOCOMPLETE },
 #if defined(DEBUG)
-    { '\0', "panic", "test panic routine (fatal to game)",
-            wiz_panic, IFBURIED },
+    { '\0', "panic", "test panic routine (fatal to game)", wiz_panic, IFBURIED },
 #endif
     { 'p', "pay", "pay your shopping bill", dopay },
     { ';', "pickstash", "pick up things at the current location and stash them into a container", doput2bag },
     { ',', "pickup", "pick up things at the current location", dopickup },
-    { M(1), "polyself", "polymorph self", /* Special hotkey launchable from GUI */
-            wiz_polyself, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { M('p'), "pray", "pray to the gods for help",
-            dopray, IFBURIED | AUTOCOMPLETE | INCMDMENU },
-    { C('p'), "prevmsg", "view recent game messages",
-            doprev_message, IFBURIED | GENERALCMD },
-    { M(16), "prevwep", "wield a previously wielded weapon", dowieldprevwep }, /* For wielding back weapons that were wielded before wielding a pick-axe or a saw */
+    { M(1), "polyself", "polymorph self", wiz_polyself, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { M('p'), "pray", "pray to the gods for help", dopray, IFBURIED | AUTOCOMPLETE | INCMDMENU },
+    { C('p'), "prevmsg", "view recent game messages", doprev_message, IFBURIED | GENERALCMD },
+    { M('P'), "prevwep", "wield a previously wielded weapon", dowieldprevwep}, /* For wielding back weapons that were wielded before wielding a pick-axe or a saw */
     { 'P', "puton", "put on an accessory (ring, amulet, etc)", doputon, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_accessories, "put on", "put on" },
     { 'q', "quaff", "quaff (drink) something", dodrink, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_beverages, "drink", "drink" },
-    { M('q'), "quit", "exit without saving current game",
-            done2, IFBURIED | AUTOCOMPLETE | GENERALCMD },
+    { M('q'), "quit", "exit without saving current game", done2, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { 'Q', "quiver", "select ammunition for quiver", dowieldquiver, SINGLE_OBJ_CMD_SPECIFIC, 0, 0, "ready" },
     { 'r', "read", "read a scroll or spellbook", doread, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_readable, "read" },
     { C('r'), "redraw", "redraw screen", doredraw, IFBURIED | GENERALCMD },
     { 'R', "remove", "remove an accessory (ring, amulet, etc)", doremring, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_accessories, "remove" },
-    { M('R'), "ride", "mount or dismount a saddled steed",
-            doride, AUTOCOMPLETE },
-    { M(12), "ridenearby", "mount or dismount a saddled steed nearby",
-            doridenearby, 0 },
+    { '\0', "reorderspells", "reorder known spells", dovspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
+    { M('R'), "ride", "mount or dismount a saddled steed", doride, AUTOCOMPLETE },
+    { M(12), "ridenearby", "mount or dismount a saddled steed nearby", doridenearby, 0 },
     { M('r'), "rub", "rub a lamp or a stone", dorub, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_cuddly, "rub" },
-    { 's', "search", "search for traps and secret doors",
-            dosearch, IFBURIED, "searching" },
-    { 'S', "skill", "view and advance skills",
-            doskill, IFBURIED | AUTOCOMPLETE },
     { M('s'), "save", "save the game and exit", dosave, IFBURIED | AUTOCOMPLETE | GENERALCMD },
+    { 's', "search", "search for traps and secret doors", dosearch, IFBURIED, "searching" },
     { '*', "seeall", "show all equipment in use", doprinuse, IFBURIED },
-    { AMULET_SYM, "seeamulet", "show the amulet currently worn",
-            dopramulet, IFBURIED },
-    { ARMOR_SYM, "seearmor", "show the armor currently worn",
-            doprarm, IFBURIED },
+    { AMULET_SYM, "seeamulet", "show the amulet currently worn", dopramulet, IFBURIED },
+    { ARMOR_SYM, "seearmor", "show the armor currently worn", doprarm, IFBURIED },
     { GOLD_SYM, "seegold", "count your gold", doprgold, IFBURIED },
-    { '\0', "seenv", "show seen vectors",
-            wiz_show_seenv, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { RING_SYM, "seerings", "show the ring(s) currently worn",
-            doprring, IFBURIED },
-    { SPBOOK_SYM, "spellmenu", "spell main menu",
-            dospellmainmenu, AUTOCOMPLETE | IFBURIED | INCMDMENU },
-    { TOOL_SYM, "seetools", "show the tools currently in use",
-            doprtool, IFBURIED },
+    { '\0', "seenv", "show seen vectors", wiz_show_seenv, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { RING_SYM, "seerings", "show the ring(s) currently worn", doprring, IFBURIED },
+    { SPBOOK_SYM, "spellmenu", "spell main menu", dospellmainmenu, AUTOCOMPLETE | IFBURIED | INCMDMENU },
+    { TOOL_SYM, "seetools", "show the tools currently in use", doprtool, IFBURIED },
     { '^', "seetrap", "show the type of adjacent trap", doidtrap, IFBURIED },
-    { WEAPON_SYM, "seeweapon", "show the weapon currently wielded",
-            doprwep, IFBURIED },
-    { ILLOBJ_SYM, "seeworn", "show the currently worn items",
-            doseeworn, IFBURIED },
-    { '!', "shell", "do a shell escape",
-            dosh_core, IFBURIED | GENERALCMD
+    { WEAPON_SYM, "seeweapon", "show the weapon currently wielded", doprwep, IFBURIED },
+    { ILLOBJ_SYM, "seeworn", "show the currently worn items", doseeworn, IFBURIED },
+    { M(4), "setquickspell", "set quick spell", dosetquickspell, IFBURIED | AUTOCOMPLETE | INSPELLMENU },
+    { '\0', "setquickwand", "set quick wand", 
+        dosetquickwand, IFBURIED | SINGLE_OBJ_CMD_SPECIFIC, 0, 
+        getobj_zap_syms, "set as quick wand", "set as quick wand" },
+    { '\0', "unsetquickwand", "unset quick wand", 
+        dounsetquickwand, IFBURIED | SINGLE_OBJ_CMD_SPECIFIC, 0, 
+        getobj_zap_syms, "unset as quick wand", "unset as quick wand" },
+    { '!', "shell", "do a shell escape", dosh_core, IFBURIED | GENERALCMD
 #ifndef SHELL
                        | CMD_NOT_AVAILABLE
 #endif /* SHELL */
     },
     { C('s'), "sit", "sit down", dosit, AUTOCOMPLETE | INCMDMENU },
-    { M(7), "stash", "stash an item into a container", dostash, SINGLE_OBJ_CMD_GENERAL, 0, getobj_stash_objs, "stash", "stash into a container" },
-    { M(14), "stashfloor", "stash an item into a container on the floor", dostashfloor, SINGLE_OBJ_CMD_GENERAL, 0, getobj_stash_objs, "stash into a container on the floor", "stash into a container on the floor" },
-    { '\0', "stats", "show memory statistics",
-            wiz_show_stats, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { C('z'), "suspend", "suspend the game",
-            dosuspend_core, IFBURIED | GENERALCMD
+    { 'S', "skill", "view and advance skills", doskill, IFBURIED | AUTOCOMPLETE },
+#if defined (DUMPLOG) || defined (DUMPHTML)
+    { M(28), "snapshot", "save a snapshot log", dosnapshot, IFBURIED
+#if defined (ALLOW_SNAPSHOT)
+        | AUTOCOMPLETE
+#endif
+    },
+#endif
+    { '\0', "sortspells", "sort known spells", dosortspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
+    { M(7), "stash", "stash an item into a container",
+        dostash, SINGLE_OBJ_CMD_GENERAL, 0, 
+        getobj_stash_objs, "stash", "stash into a container" },
+    { M(14), "stashfloor", "stash an item into a container on the floor", 
+        dostashfloor, SINGLE_OBJ_CMD_GENERAL, 0, 
+        getobj_stash_objs, "stash into a container on the floor", "stash into a container on the floor" },
+    { '\0', "stats", "show memory statistics", wiz_show_stats, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { C('z'), "suspend", "suspend the game", dosuspend_core, IFBURIED | GENERALCMD
 #ifndef SUSPEND
                             | CMD_NOT_AVAILABLE
 #endif /* SUSPEND */
     },
-
+    { 'x', "swap", "swap wielded and secondary weapons", doswapweapon_right_or_both, INCMDMENU },
     { 'T', "takeoff", "take off one piece of armor", dotakeoff, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_clothes, "take off", "take off" },
     { M('t')/*'A'*/, "takeoffall", "remove all armor", doddoremarm },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
-    { M(';'), "targeting", "toggle tile targeting graphics on/off",
-            dotogglemonstertargeting, IFBURIED | AUTOCOMPLETE },
-    { M(':'), "umark", "toggle tile player mark graphics on/off",
-            dotoggleumark, IFBURIED | AUTOCOMPLETE },
+    { M(';'), "targeting", "toggle tile targeting graphics on/off", dotogglemonstertargeting, IFBURIED | AUTOCOMPLETE },
 #endif
     { C('t'), "teleport", "teleport around the level", dotelecmd, IFBURIED },
-    { '\0', "terrain", "show map without obstructions",
-            doterrain, IFBURIED | AUTOCOMPLETE },
+    { '\0', "terrain", "show map without obstructions", doterrain, IFBURIED | AUTOCOMPLETE },
     { '\0', "therecmdmenu",
             "menu of commands you can do from here to adjacent spot",
             dotherecmdmenu },
     { 't', "throw", "throw something", dothrow, SINGLE_OBJ_CMD_GENERAL, 0, getobj_toss_objs, "throw" },
-    { '\0', "timeout", "look at timeout queue and hero's timed intrinsics",
-            wiz_timeout_queue, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "timeout", "look at timeout queue and hero's timed intrinsics", wiz_timeout_queue, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { M('T'), "tip", "empty a container", dotip, AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_tippables, "tip" },
     { '_', "travel", "travel to a specific location on the map", dotravel },
  //   { M('t'), "turn", "turn undead away", doturn, IFBURIED | AUTOCOMPLETE }, //Replaced by holy symbol
-    { C('x'), "twoweapon", "toggle two-weapon combat",
-            dotwoweapon, AUTOCOMPLETE | INCMDMENU },
+    { C('x'), "twoweapon", "toggle two-weapon combat", dotwoweapon, AUTOCOMPLETE | INCMDMENU },
+#if defined (USE_TILES) && !defined(GNH_MOBILE)
+    { M(':'), "umark", "toggle tile player mark graphics on/off", dotoggleumark, IFBURIED | AUTOCOMPLETE },
+#endif
     { M('u'), "untrap", "untrap something", dountrap, AUTOCOMPLETE },
     { '<', "up", "go up a staircase", doup },
-    { M('<'), "lastpickeditem", "use the last picked item", dolastpickeditem, IFBURIED },
-    { '\0', "vanquished", "list vanquished monsters",
-            dovanquished, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "vanquished", "list vanquished monsters", dovanquished, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { M('v'), "version",
             "list compile time options for this version of GnollHack",
             doextversion, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { 'v', "versionshort", "show version", doversion, IFBURIED | GENERALCMD },
-    { 'V', "history", "show long version and game history",
-            dohistory, IFBURIED | GENERALCMD },
-    { '\0', "vision", "show vision array",
-            wiz_show_vision, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
-    { '.', "wait", "rest one move while doing nothing",
-            donull, IFBURIED, "waiting" },
-    { 'W', "wear", "wear a piece of armor", dowear, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_clothes, "wear" },
-    { '&', "whatdoes", "tell what a command does", dowhatdoes, IFBURIED },
-    { '/', "whatis", "show what type of thing a symbol corresponds to",
-            dowhatis, IFBURIED | GENERALCMD },
-    { 'w', "wield", "wield (put in use) a weapon", dowield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_wield_objs, "wield" },
-    { M('w'), "wipe", "wipe off your face", dowipe, AUTOCOMPLETE | INCMDMENU },
-    { 'x', "swap", "swap wielded and secondary weapons", doswapweapon_right_or_both, INCMDMENU },
-    { M('x'), "examine", "describe an item", doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO | ALLOW_RETURN_TO_INVENTORY | ALLOW_RETURN_TO_CMD_MENU | CMD_MENU_AUTO_CLICK_OK, 0, getobj_allobj, "examine" },
-    { M(5), "unwield", "unwield a weapon", dounwield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_unwield_objs, "unwield"},
-    { '}', "you", "describe your character", docharacterstatistics, IFBURIED | AUTOCOMPLETE },
-    { C('y'), "yell", "yell for your companions",
-            doyell, IFBURIED | AUTOCOMPLETE | INCMDMENU },
-    { 'z', "zap", "zap a wand", dozap, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_zap_syms, "zap" },
-    { M(8), "favorite", "mark an item as favorite", dofavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "mark as favorite", "mark as favorite"  },
-    { M(9), "unfavorite", "unmark an item as favorite", dounfavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0, getobj_favorites, "unmark as favorite", "unmark as favorite" },
-    { 'Z', "cast", "cast a spell", docast, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
-    { 'X', "mix", "prepare a spell from material components",
-            domix, AUTOCOMPLETE | INSPELLMENU },
+    { 'V', "history", "show long version and game history", dohistory, IFBURIED | GENERALCMD },
     { M('z'), "viewspell", "view spells", dospellview, IFBURIED | AUTOCOMPLETE | INSPELLMENU },
-    { '\0', "managespell", "manage spells",
-            dospellmanage, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
-    { '\0', "sortspells", "sort known spells",
-            dosortspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
-    { '\0', "reorderspells", "reorder known spells",
-            dovspell, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
+    { '\0', "vision", "show vision array", wiz_show_vision, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '.', "wait", "rest one move while doing nothing", donull, IFBURIED, "waiting" },
+    { 'W', "wear", "wear a piece of armor", dowear, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_clothes, "wear" },
+    { M('w'), "wearall", "wear many pieces of armor", ddowear, AUTOCOMPLETE },
+    { '&', "whatdoes", "tell what a command does", dowhatdoes, IFBURIED },
+    { '/', "whatis", "show what type of thing a symbol corresponds to", dowhatis, IFBURIED | GENERALCMD },
+    { 'w', "wield", "wield (put in use) a weapon", dowield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_wield_objs, "wield" },
+    { M('e'), "wipe", "wipe off your face", dowipe, AUTOCOMPLETE | INCMDMENU },
+    { M(5), "unwield", "unwield a weapon", dounwield, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_unwield_objs, "unwield"},
+    { C('y'), "yell", "yell for your companions", doyell, IFBURIED | AUTOCOMPLETE | INCMDMENU },
+    { '}', "you", "describe your character", docharacterstatistics, IFBURIED | AUTOCOMPLETE },
+    { 'z', "zap", "zap a wand", dozap, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_zap_syms, "zap" },
+    { M(27), "zapquick", "zap the quick wand", dozapquick, 0, 0, getobj_zap_syms, "zap" },
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
-    { M('.'), "zoomnormal", "revert to normal zoom level",
-            dozoomnormal, IFBURIED | AUTOCOMPLETE },
-    { M('+'), "zoomin", "zoom map out",
-            dozoomin, IFBURIED | AUTOCOMPLETE },
-    { M('-'), "zoomout", "zoom map in",
-            dozoomout, IFBURIED | AUTOCOMPLETE },
-    { M(','), "zoommini", "zoom map to fit to screen",
-            dozoommini, IFBURIED | AUTOCOMPLETE },
-    { C(','), "zoomhalf", "zoom map out to 50% of normal",
-            dozoomhalf, IFBURIED | AUTOCOMPLETE },
+    { M('.'), "zoomnormal", "revert to normal zoom level", dozoomnormal, IFBURIED | AUTOCOMPLETE },
+    { M('+'), "zoomin", "zoom map out", dozoomin, IFBURIED | AUTOCOMPLETE },
+    { M('-'), "zoomout", "zoom map in", dozoomout, IFBURIED | AUTOCOMPLETE },
+    { M(','), "zoommini", "zoom map to fit to screen", dozoommini, IFBURIED | AUTOCOMPLETE },
+    { C(','), "zoomhalf", "zoom map out to 50% of normal", dozoomhalf, IFBURIED | AUTOCOMPLETE },
 #endif
 #ifdef GNH_MOBILE
-    { '{', "viewpet", "view currently active pet",
-            doviewpet, IFBURIED },
+    { '{', "viewpet", "view currently active pet", doviewpet, IFBURIED },
 #endif
 
 #ifdef DEBUG
@@ -6310,8 +6327,7 @@ struct ext_func_tab extcmdlist[] = {
     { '\0', "wizlightsources", "show mobile light sources",
             wiz_light_sources, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #if defined (DUMPLOG) || defined (DUMPHTML)
-    { '\0', "wizdumplog", "write the dumplog",
-            wiz_dumplog, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
+    { '\0', "wizdumplog", "write the dumplog", wiz_dumplog, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
 #endif
     { '\0', "wizmakemap", "recreate the current level",
             wiz_makemap, IFBURIED | WIZMODECMD },
@@ -6678,7 +6694,7 @@ struct obj *otmp;
         if (OMID(otmp))
             sz += sizeof (unsigned);
         if (OLONG(otmp))
-            sz += sizeof (long);
+            sz += sizeof (int64_t);
         if (OMAILCMD(otmp))
             sz += strlen(OMAILCMD(otmp)) + 1;
     }
@@ -6688,12 +6704,12 @@ struct obj *otmp;
 STATIC_OVL void
 count_obj(chain, total_count, total_size, top, recurse)
 struct obj *chain;
-long *total_count;
+int64_t *total_count;
 size_t *total_size;
 boolean top;
 boolean recurse;
 {
-    long count;
+    int64_t count;
     size_t size;
     struct obj *obj;
 
@@ -6715,11 +6731,11 @@ winid win;
 const char *src;
 struct obj *chain;
 boolean force;
-long *total_count;
+int64_t *total_count;
 size_t *total_size;
 {
     char buf[BUFSZ];
-    long count = 0L;
+    int64_t count = 0L;
     size_t size = 0;
 
     count_obj(chain, &count, &size, TRUE, FALSE);
@@ -6737,11 +6753,11 @@ mon_invent_chain(win, src, chain, total_count, total_size)
 winid win;
 const char *src;
 struct monst *chain;
-long *total_count;
+int64_t *total_count;
 size_t *total_size;
 {
     char buf[BUFSZ];
-    long count = 0;
+    int64_t count = 0;
     size_t size = 0;
     struct monst *mon;
 
@@ -6760,17 +6776,18 @@ STATIC_OVL void
 contained_stats(win, src, total_count, total_size)
 winid win;
 const char *src;
-long *total_count;
+int64_t *total_count;
 size_t *total_size;
 {
     char buf[BUFSZ];
-    long count = 0;
+    int64_t count = 0;
     size_t size = 0;
     struct monst *mon;
 
     count_obj(invent, &count, &size, FALSE, TRUE);
     count_obj(fobj, &count, &size, FALSE, TRUE);
     count_obj(level.buriedobjlist, &count, &size, FALSE, TRUE);
+    count_obj(magic_objs, &count, &size, FALSE, TRUE);
     count_obj(migrating_objs, &count, &size, FALSE, TRUE);
     /* DEADMONSTER check not required in this loop since they have no
      * inventory */
@@ -6832,11 +6849,11 @@ winid win;
 const char *src;
 struct monst *chain;
 boolean force;
-long *total_count;
+int64_t *total_count;
 size_t *total_size;
 {
     char buf[BUFSZ];
-    long count = 0L;
+    int64_t count = 0L;
     size_t size = 0;
     struct monst *mon;
     /* mon->wormno means something different for migrating_mons and mydogs */
@@ -6857,11 +6874,11 @@ size_t *total_size;
 STATIC_OVL void
 misc_stats(win, total_count, total_size)
 winid win;
-long *total_count;
+int64_t *total_count;
 size_t *total_size;
 {
     char buf[BUFSZ], hdrbuf[QBUFSZ];
-    long count = 0L;
+    int64_t count = 0L;
     size_t size = 0;
     int idx;
     struct trap *tt;
@@ -6964,7 +6981,7 @@ size_t *total_size;
     size = 0;
     for (bi = level.bonesinfo; bi; bi = bi->next) {
         ++count;
-        size += (long) sizeof *bi;
+        size += sizeof *bi;
     }
     if (count || size) {
         *total_count += count;
@@ -6999,7 +7016,7 @@ wiz_show_stats(VOID_ARGS)
 {
     char buf[BUFSZ];
     winid win;
-    long total_obj_count, total_mon_count, total_ovr_count, total_misc_count;
+    int64_t total_obj_count, total_mon_count, total_ovr_count, total_misc_count;
     size_t total_obj_size, total_mon_size, total_ovr_size, total_misc_size;
     
     win = create_nhwindow(NHW_TEXT);
@@ -7013,6 +7030,8 @@ wiz_show_stats(VOID_ARGS)
     obj_chain(win, "fobj", fobj, TRUE, &total_obj_count, &total_obj_size);
     obj_chain(win, "buried", level.buriedobjlist, FALSE,
               &total_obj_count, &total_obj_size);
+    obj_chain(win, "magic obj", magic_objs, FALSE,
+        &total_obj_count, &total_obj_size);
     obj_chain(win, "migrating obj", migrating_objs, FALSE,
               &total_obj_count, &total_obj_size);
     obj_chain(win, "billobjs", billobjs, FALSE,
@@ -7146,6 +7165,8 @@ struct {
     { NHKF_TRAVEL_WALK,      CMD_TRAVEL_WALK, (char*)0 }, /* no binding */
     { NHKF_CLICKFIRE,        CMD_CLICKFIRE, (char*)0 }, /* no binding */
     { NHKF_CLICKLOOK,        CMD_CLICKLOOK, (char *) 0 }, /* no binding */
+    { NHKF_CLICKCAST,        CMD_CLICKCAST, (char*)0 }, /* no binding */
+    { NHKF_CLICKZAP,         CMD_CLICKZAP, (char*)0 }, /* no binding */
     { NHKF_REDRAW,           C('r'), "redraw" },
     { NHKF_REDRAW2,          C('l'), "redraw.numpad" },
     { NHKF_GETDIR_SELF,      '.', "getdir.self" },
@@ -7642,7 +7663,7 @@ register char *cmd;
     /* handle most movement commands */
     prefix_seen = FALSE;
     clear_run_and_travel();
-    spkey = ch2spkeys(*cmd, NHKF_RUN, NHKF_CLICKLOOK);
+    spkey = ch2spkeys(*cmd, NHKF_RUN, NHKF_CLICKZAP);
 
     if (flags.prefer_fast_move)
     {
@@ -7732,19 +7753,30 @@ register char *cmd;
         context.move = FALSE;
         return;
     case NHKF_CLICKLOOK:
-        if (iflags.clicklook) {
-            context.move = FALSE;
-            do_look(2, &clicklook_cc);
-        }
+        context.move = FALSE;
+        do_look(2, &clicklook_cc);
         return;
     case NHKF_CLICKFIRE:
-        if (iflags.clickfire) {
-            //context.move = FALSE;
+        {
             int fireres = dofire();
             if (!fireres)
                 readchar_queue = ""; //Prevent movement if firing failed.
         }
         return;
+    case NHKF_CLICKCAST:
+        {
+            int castres = docastquick();
+            if (!castres)
+                readchar_queue = ""; //Prevent movement if casting failed.
+        }
+        return;
+    case NHKF_CLICKZAP:
+    {
+        int zapres = dozapquick();
+        if (!zapres)
+            readchar_queue = ""; //Prevent movement if casting failed.
+    }
+    return;
     case NHKF_TRAVEL:
     case NHKF_TRAVEL_ATTACK:
     case NHKF_TRAVEL_WALK:
@@ -8641,7 +8673,21 @@ int x, y, mod;
     int target_y = y;
     memset(cmd, 0, sizeof(cmd));
 
-    if (iflags.clicklook && mod == CLICK_2) 
+    /* mod can be any value except CLICK_OFF */
+    if (mod == CLICK_SECONDARY)
+        mod = flags.right_click_command >= CLICK_OFF ? flags.right_click_command : iflags.clicklook ? CLICK_LOOK : CLICK_PRIMARY;
+    else if (mod == CLICK_TERTIARY)
+        mod = flags.middle_click_command >= CLICK_OFF ? flags.middle_click_command : CLICK_OFF;
+
+    /* Nothing */
+    if (mod == CLICK_OFF)
+    {
+        cmd[0] = '\0';
+        return cmd;
+    }
+
+    /* Look */
+    if (mod == CLICK_LOOK)
     {
         clicklook_cc.x = target_x;
         clicklook_cc.y = target_y;
@@ -8652,13 +8698,331 @@ int x, y, mod;
     x -= u.ux;
     y -= u.uy;
 
-    if (flags.travelcmd) 
+    struct monst* mtmp = 0;
+    if (isok(target_x, target_y))
+    {
+        mtmp = m_at(target_x, target_y);
+    }
+
+    boolean mon_mimic = FALSE;
+    boolean sensed = FALSE;
+    if (mtmp)
+    {
+        mon_mimic = (M_AP_TYPE(mtmp) != M_AP_NOTHING);
+        sensed = (mon_mimic && (Protection_from_shape_changers || sensemon(mtmp)));
+    }
+    boolean is_mtmp_spotted = mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp) && (!mon_mimic || sensed);
+
+    /* Cast spell */
+    if (mod == CLICK_CAST)
+    {
+        if (!context.quick_cast_spell_set || context.quick_cast_spell_no < 0 || spl_book[context.quick_cast_spell_no].sp_id <= STRANGE_OBJECT)
+        {
+            /* Quick cast handles error messaging */
+            cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
+            cmd[1] = '\0';
+            return cmd;
+        }
+        
+        int targeting_type = objects[spl_book[context.quick_cast_spell_no].sp_id].oc_dir;
+        boolean is_directional = targeting_type > NODIR && targeting_type != TARGETED;
+        if (!is_directional)
+        {
+            cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
+            cmd[1] = '\0';
+            return cmd;
+        }
+        else if (abs(x) <= 1 && abs(y) <= 1)
+        {
+            x = sgn(x), y = sgn(y);
+            cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
+            if (!x && !y)
+            {
+                cmd[1] = Cmd.spkeys[NHKF_GETDIR_SELF];
+            }
+            else
+            {
+                dir = xytod(x, y);
+                cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+            }
+            cmd[2] = '\0';
+            return cmd;
+        }
+        else
+        {
+            cmd[0] = cmd[1] = '\0';
+            if (is_mtmp_spotted)
+            {
+                const char* spellnam = spl_book[context.quick_cast_spell_no].sp_id > STRANGE_OBJECT ? OBJ_NAME(objects[spl_book[context.quick_cast_spell_no].sp_id]) : "";
+                if (!x || !y || abs(x) == abs(y)) /* straight line or diagonal */
+                {
+                    boolean path_is_clear = clear_path(u.ux, u.uy, target_x, target_y);
+                    struct monst* mtmpinway = spotted_linedup_monster_in_way(u.ux, u.uy, target_x, target_y);
+                    if (path_is_clear && !mtmpinway)
+                    {
+                        cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
+                        x = sgn(x), y = sgn(y);
+                        dir = xytod(x, y);
+                        cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                        cmd[2] = '\0';
+                    }
+                    else if (!path_is_clear)
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot cast \'%s\' at %s; the path to it is not clear.", spellnam, mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                    else if (mtmpinway)
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot cast \'%s\' at %s; %s is in the way.", spellnam, mon_nam(mtmp), mon_nam(mtmpinway));
+                        cmd[0] = '\0';
+                    }
+                    else
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot cast \'%s\' at %s; there is something in the way.", spellnam, mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                }
+                else
+                {
+                    play_sfx_sound(SFX_GENERAL_CANNOT);
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot cast \'%s\' at %s; it is not lined up.", spellnam, mon_nam(mtmp));
+                    cmd[0] = '\0';
+                }
+            }
+            else
+            {
+                /* Normal cast */
+                if (abs(y) <= (max(0, abs(x) - 1) / 2))
+                    y = 0;
+
+                if (abs(x) <= (max(0, abs(y) - 1) / 2))
+                    x = 0;
+
+                x = sgn(x), y = sgn(y);
+                cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
+                if (!x && !y)
+                {
+                    cmd[1] = Cmd.spkeys[NHKF_GETDIR_SELF];
+                }
+                else
+                {
+                    dir = xytod(x, y);
+                    cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                }
+                cmd[2] = '\0';
+            }
+            return cmd;
+        }
+    }
+
+    /* Zap Wand */
+    if (mod == CLICK_ZAP)
+    {
+        struct obj* obj;
+        if (!context.quick_zap_wand_oid || !(obj = o_on(context.quick_zap_wand_oid, invent)))
+        {
+            /* Quick zap handles error messaging */
+            cmd[0] = Cmd.spkeys[NHKF_CLICKZAP];
+            cmd[1] = '\0';
+            return cmd;
+        }
+
+        int targeting_type = objects[obj->otyp].oc_dir;
+        boolean is_directional = targeting_type > NODIR && targeting_type != TARGETED;
+        if (!is_directional)
+        {
+            cmd[0] = Cmd.spkeys[NHKF_CLICKZAP];
+            cmd[1] = '\0';
+            return cmd;
+        }
+        else if (abs(x) <= 1 && abs(y) <= 1)
+        {
+            x = sgn(x), y = sgn(y);
+            cmd[0] = Cmd.spkeys[NHKF_CLICKZAP];
+            if (!x && !y)
+            {
+                cmd[1] = Cmd.spkeys[NHKF_GETDIR_SELF];
+            }
+            else
+            {
+                dir = xytod(x, y);
+                cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+            }
+            cmd[2] = '\0';
+            return cmd;
+        }
+        else
+        {
+            cmd[0] = cmd[1] = '\0';
+            if (is_mtmp_spotted)
+            {
+                if (!x || !y || abs(x) == abs(y)) /* straight line or diagonal */
+                {
+                    boolean path_is_clear = clear_path(u.ux, u.uy, target_x, target_y);
+                    struct monst* mtmpinway = spotted_linedup_monster_in_way(u.ux, u.uy, target_x, target_y);
+                    if (path_is_clear && !mtmpinway)
+                    {
+                        cmd[0] = Cmd.spkeys[NHKF_CLICKZAP];
+                        x = sgn(x), y = sgn(y);
+                        dir = xytod(x, y);
+                        cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                        cmd[2] = '\0';
+                    }
+                    else if (!path_is_clear)
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot zap %s at %s; the path to it is not clear.", yname(obj), mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                    else if (mtmpinway)
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot zap %s at %s; %s is in the way.", yname(obj), mon_nam(mtmp), mon_nam(mtmpinway));
+                        cmd[0] = '\0';
+                    }
+                    else
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot zap %s at %s; there is something in the way.", yname(obj), mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                }
+                else
+                {
+                    play_sfx_sound(SFX_GENERAL_CANNOT);
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot zap %s at %s; it is not lined up.", yname(obj), mon_nam(mtmp));
+                    cmd[0] = '\0';
+                }
+            }
+            else
+            {
+                /* Normal zap */
+                if (abs(y) <= (max(0, abs(x) - 1) / 2))
+                    y = 0;
+
+                if (abs(x) <= (max(0, abs(y) - 1) / 2))
+                    x = 0;
+
+                x = sgn(x), y = sgn(y);
+                cmd[0] = Cmd.spkeys[NHKF_CLICKZAP];
+                if (!x && !y)
+                {
+                    cmd[1] = Cmd.spkeys[NHKF_GETDIR_SELF];
+                }
+                else
+                {
+                    dir = xytod(x, y);
+                    cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                }
+                cmd[2] = '\0';
+            }
+            return cmd;
+        }
+    }
+
+    boolean has_launcher = (uwep && is_launcher(uwep));
+    boolean has_swapped_launcher_and_ammo = (uswapwep && is_launcher(uswapwep) && ammo_and_launcher(uquiver, uswapwep));
+    boolean has_throwing_weapon_quivered = (uquiver && throwing_weapon(uquiver));
+    boolean cursed_weapon_blocks_swap = (uswapwep && objects[uswapwep->otyp].oc_bimanual) || (uswapwep && uswapwep2 && !flags.swap_rhand_only) ? ((uwep && welded(uwep, &youmonst)) || (uarms && welded(uarms, &youmonst))) : (uwep && welded(uwep, &youmonst));
+
+    /* Fire a bow */
+    if (mod == CLICK_FIRE)
+    {
+        if (has_launcher || (iflags.autoswap_launchers && has_swapped_launcher_and_ammo && !cursed_weapon_blocks_swap) || has_throwing_weapon_quivered)
+        {
+            if (is_mtmp_spotted)
+            {
+                if (!x || !y || abs(x) == abs(y)) /* straight line or diagonal */
+                {
+                    boolean path_is_clear = clear_path(u.ux, u.uy, target_x, target_y);
+                    struct monst* mtmpinway = spotted_linedup_monster_in_way(u.ux, u.uy, target_x, target_y);
+                    if (path_is_clear && !mtmpinway)
+                    {
+                        if (iflags.autoswap_launchers && !has_launcher && has_swapped_launcher_and_ammo && !cursed_weapon_blocks_swap)
+                        {
+                            if (uswapwep && objects[uswapwep->otyp].oc_bimanual)
+                                (void)doswapweapon();
+                            else
+                                (void)doswapweapon_right_or_both();
+                        }
+                        cmd[0] = Cmd.spkeys[NHKF_CLICKFIRE];
+                        x = sgn(x), y = sgn(y);
+                        dir = xytod(x, y);
+                        cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                        cmd[2] = '\0';
+                    }
+                    else if (!path_is_clear)
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; the path to it is not clear.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                    else if (mtmpinway)
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; %s is in the way.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp), mon_nam(mtmpinway));
+                        cmd[0] = '\0';
+                    }
+                    else
+                    {
+                        play_sfx_sound(SFX_GENERAL_CANNOT);
+                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; there is something in the way.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                        cmd[0] = '\0';
+                    }
+                }
+                else
+                {
+                    play_sfx_sound(SFX_GENERAL_CANNOT);
+                    pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s at %s; it is not lined up.", uwep && is_launcher(uwep) ? "fire" : "throw", mon_nam(mtmp));
+                    cmd[0] = '\0';
+                }
+            }
+            else
+            {
+                if (iflags.autoswap_launchers && !has_launcher && has_swapped_launcher_and_ammo && !cursed_weapon_blocks_swap)
+                {
+                    if (uswapwep && objects[uswapwep->otyp].oc_bimanual)
+                        (void)doswapweapon();
+                    else
+                        (void)doswapweapon_right_or_both();
+                }
+
+                if (abs(y) <= (max(0, abs(x) - 1) / 2))
+                    y = 0;
+
+                if (abs(x) <= (max(0, abs(y) - 1) / 2))
+                    x = 0;
+
+                cmd[0] = Cmd.spkeys[NHKF_CLICKFIRE];
+                x = sgn(x), y = sgn(y);
+                dir = xytod(x, y);
+                cmd[1] = dir >= 0 ? Cmd.dirchars[dir] : '\0';
+                cmd[2] = '\0';
+            }
+        }
+        else
+        {
+            play_sfx_sound(SFX_GENERAL_CANNOT);
+            if (iflags.autoswap_launchers && has_swapped_launcher_and_ammo) /* Cursed weapon blocks swap */
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot swap your weapons to %s; a cursed item blocks the swap.", "fire");
+            else
+                pline_ex(ATR_NONE, CLR_MSG_FAIL, "You cannot %s; you have no throwing weapons quivered.", "throw");
+            cmd[0] = '\0';
+        }
+        return cmd;
+    }
+
+    /* Travel, move, or attack */
+    if (flags.travelcmd)
     {
         if (abs(x) <= 1 && abs(y) <= 1)
         {
             x = sgn(x), y = sgn(y);
         }
-        else if (mod == CLICK_3)
+        else if (mod == CLICK_MOVE)
         {
             if (abs(y) <= (max(0, abs(x) - 1) / 2))
                 y = 0;
@@ -8670,26 +9034,8 @@ int x, y, mod;
         }
         else 
         {
-            struct monst* mtmp = 0;
-            if (isok(target_x, target_y))
+            if (is_mtmp_spotted)
             {
-                mtmp = m_at(target_x, target_y);
-            }
-
-            boolean mon_mimic = FALSE;
-            boolean sensed = FALSE;
-            if (mtmp)
-            {
-                mon_mimic = (M_AP_TYPE(mtmp) != M_AP_NOTHING);
-                sensed = (mon_mimic && (Protection_from_shape_changers || sensemon(mtmp)));
-            }
-
-            if (mtmp && canspotmon(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp) && (!mon_mimic || sensed))
-            {
-                boolean has_launcher = (uwep && is_launcher(uwep));
-                boolean has_swapped_launcher_and_ammo = (uswapwep && is_launcher(uswapwep) && ammo_and_launcher(uquiver, uswapwep));
-                boolean has_throwing_weapon_quivered = (uquiver && throwing_weapon(uquiver));
-                boolean cursed_weapon_blocks_swap = (uswapwep && objects[uswapwep->otyp].oc_bimanual) || (uswapwep && uswapwep2 && !flags.swap_rhand_only) ? ((uwep && welded(uwep, &youmonst)) || (uarms && welded(uarms, &youmonst))) : (uwep && welded(uwep, &youmonst));
                 if (iflags.clickfire && dist2(u.ux, u.uy, target_x, target_y) > 2 &&
                     (has_launcher || (iflags.autoswap_launchers && has_swapped_launcher_and_ammo && !cursed_weapon_blocks_swap) || has_throwing_weapon_quivered))
                 {
@@ -8706,8 +9052,6 @@ int x, y, mod;
                                 else
                                     (void)doswapweapon_right_or_both();
                             }
-                            //clickfire_cc.x = target_x;
-                            //clickfire_cc.y = target_y;
                             cmd[0] = Cmd.spkeys[NHKF_CLICKFIRE];
                             x = sgn(x), y = sgn(y);
                             dir = xytod(x, y);
@@ -8782,7 +9126,7 @@ int x, y, mod;
             if (IS_FOUNTAIN(levl[u.ux][u.uy].typ)
                 || IS_SINK(levl[u.ux][u.uy].typ)) 
             {
-                cmd[0] = cmd_from_func(mod == CLICK_1 || mod == CLICK_3 ? dodrink : dodip);
+                cmd[0] = cmd_from_func(mod == CLICK_PRIMARY || mod == CLICK_MOVE ? dodrink : dodip);
                 return cmd;
             } 
             else if (IS_THRONE(levl[u.ux][u.uy].typ)) 
@@ -8905,7 +9249,7 @@ int x, y, mod;
 
     /* move, attack, etc. */
     cmd[1] = '\0';
-    if (mod == CLICK_1 || mod == CLICK_3) 
+    if (mod == CLICK_PRIMARY || mod == CLICK_MOVE) 
     {
         cmd[0] = Cmd.dirchars[dir];
     } 
@@ -8923,13 +9267,13 @@ char
 get_count(allowchars, inkey, maxcount, count, historical)
 char *allowchars;
 char inkey;
-long maxcount;
-long *count;
+int64_t maxcount;
+int64_t *count;
 boolean historical; /* whether to include in message history: True => yes */
 {
     char qbuf[QBUFSZ];
     int key;
-    long cnt = 0L;
+    int64_t cnt = 0L;
     boolean backspaced = FALSE;
     /* this should be done in port code so that we have erase_char
        and kill_char available; we can at least fake erase_char */
@@ -8943,7 +9287,7 @@ boolean historical; /* whether to include in message history: True => yes */
             key = readchar();
 
         if (digit(key)) {
-            cnt = 10L * cnt + (long) (key - '0');
+            cnt = 10L * cnt + (int64_t) (key - '0');
             if (cnt < 0)
                 cnt = 0;
             else if (maxcount > 0 && cnt > maxcount)
@@ -8963,7 +9307,7 @@ boolean historical; /* whether to include in message history: True => yes */
             if (backspaced && !cnt) {
                 Sprintf(qbuf, "Count: ");
             } else {
-                Sprintf(qbuf, "Count: %ld", cnt);
+                Sprintf(qbuf, "Count: %lld", (long long)cnt);
                 backspaced = FALSE;
             }
             custompline(SUPPRESS_HISTORY, "%s", qbuf);
@@ -8972,7 +9316,7 @@ boolean historical; /* whether to include in message history: True => yes */
     }
 
     if (historical) {
-        Sprintf(qbuf, "Count: %ld ", *count);
+        Sprintf(qbuf, "Count: %lld ", (long long)*count);
         (void) key2txt((uchar) key, eos(qbuf));
         putmsghistory(qbuf, FALSE);
     }
@@ -9002,7 +9346,7 @@ parse(VOID_ARGS)
     escape_sequence_key_start_allowed = 1;
 
     if ((!Cmd.num_pad && !Cmd.gnh_layout) || ((foo = readchar()) == Cmd.spkeys[NHKF_COUNT])) {
-        long tmpmulti = (long)multi;
+        int64_t tmpmulti = (int64_t)multi;
 
         foo = get_count((char *) 0, '\0', LARGEST_INT, &tmpmulti, FALSE);
         last_multi = multi = (int)tmpmulti;
@@ -9287,7 +9631,7 @@ yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, in
 int style, attr, color, glyph;
 const char *title, *query, *resp, *resp_desc, * introline;
 char def;
-unsigned long ynflags; /* 1 means use upper side for half-sized tile */
+uint64_t ynflags; /* 1 means use upper side for half-sized tile */
 {
     char res, qbuf[QBUFSZ];
 #if defined(DUMPLOG) || defined(DUMPHTML)
@@ -9576,6 +9920,7 @@ dolight(VOID_ARGS)
             char ans = yn_query(qbuf);
             if (ans == 'y')
             {
+                Strcpy(debug_buf_4, "dolight1");
                 levl[u.ux][u.uy].lamplit = FALSE;
                 del_light_source(LS_LOCATION, xy_to_any(u.ux, u.uy));
                 newsym(u.ux, u.uy);
@@ -9670,6 +10015,7 @@ dolight(VOID_ARGS)
         }
         else
         {
+            Strcpy(debug_buf_4, "dolight2");
             levl[cc.x][cc.y].lamplit = FALSE;
             del_light_source(LS_LOCATION, xy_to_any(cc.x, cc.y));
             newsym(cc.x, cc.y);
@@ -9951,19 +10297,6 @@ enum create_context_menu_types menu_type;
         {
             add_context_menu(':', cmd_from_func(dolook), CONTEXT_MENU_STYLE_GENERAL, NO_GLYPH, "Look Here", "", 0, NO_COLOR);
         }
-
-        //if (uwep && !cantwield(youmonst.data) && (is_pick(uwep) || is_saw(uwep) || is_lamp(uwep))) // Axes are too often main weapons
-        //{
-        //    struct obj* prevwep;
-        //    for (prevwep = invent; prevwep; prevwep = prevwep->nobj)
-        //    {
-        //        if (prevwep->speflags & SPEFLAGS_PREVIOUSLY_WIELDED)
-        //        {
-        //            add_context_menu(M(16), cmd_from_func(dowieldprevwep), CONTEXT_MENU_STYLE_GENERAL, prevwep->gui_glyph, "Wield Last", "", 0, NO_COLOR);
-        //            break;
-        //        }
-        //    }
-        //}
 
         if (context.last_picked_obj_oid > 0 && context.last_picked_obj_show_duration_left > 0)
         {

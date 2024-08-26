@@ -1,22 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-
+using System.Threading.Tasks;
+#if GNH_MAUI
+namespace GnollHackM
+#else
 namespace GnollHackX
+#endif
 {
     public interface IFmodService
     {
         void InitializeFmod();
         void ReleaseAllSoundInstances();
         void ClearLoadableSoundBanks();
-        void AddLoadableSoundBank(string fullFilePath, int subType, bool isResource, bool readToMemory);
-        void LoadBanks(int subType);
-        void UnloadBanks(int subType);
+        Task AddLoadableSoundBank(string fullFilePath, int subType, bool isResource, bool readToMemory);
+        void LoadBanks(sound_bank_loading_type loadingType);
+        void UnloadBanks(sound_bank_loading_type loadingType);
         void LoadIntroSoundBank();
         void UnloadIntroSoundBank();
         void PlayTestSound();
         void StopTestSound();
-        int PlayImmediateSound(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume, string[] parameterNames, float[] parameterValues, int arraysize, int sound_type, int play_group, uint dialogue_mid, ulong play_flags);
+        int PlayUISound(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume);
+        int PlayImmediateSound(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume, string[] parameterNames, float[] parameterValues, int arraysize, int sound_type, int play_group, uint dialogue_mid, uint play_flags);
         int PlayMusic(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume);
         int PlayLevelAmbient(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume);
         int PlayEnvironmentAmbient(int ghsound, string eventPath, int bankid, float eventVolume, float soundVolume);

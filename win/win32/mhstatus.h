@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhstatus.h    $NHDT-Date: 1432512812 2015/05/25 00:13:32 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -9,7 +9,6 @@
 
 #include "winMS.h"
 #include "config.h"
-#include "global.h"
 #include "botl.h"
 
 #define NHSW_LINES MAX_STATUS_LINES
@@ -54,7 +53,7 @@ typedef struct mswin_status_field {
 } mswin_status_field;
 
 typedef struct mswin_condition_field {
-    unsigned long mask;
+    uint64_t mask;
     const char * name;
     int bit_position;
 } mswin_condition_field;

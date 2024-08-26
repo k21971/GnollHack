@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    light.c    $NHDT-Date: 1446191876 2015/10/30 07:57:56 $  $NHDT-Branch: master $:$NHDT-Revision: 1.28 $ */
 /* Copyright (c) Dean Luick, 1994                                       */
@@ -142,8 +142,8 @@ anything *id;
             return;
         }
     }
-    impossible("del_light_source: not found type=%d, id=%s", type,
-               fmt_ptr((genericptr_t) id->a_obj));
+    impossible("del_light_source: not found type=%d, id=%s, otyp=%d, where=%d, ox=%d, oy=%d, debug3=%s, debug4=%s", type,
+               fmt_ptr((genericptr_t) id->a_obj), id->a_obj->otyp, id->a_obj->where, id->a_obj->ox, id->a_obj->oy, debug_buf_3, debug_buf_4);
 }
 
 /* Mark locations that are temporarily lit via mobile light sources. */
@@ -388,7 +388,7 @@ void
 light_stats(hdrfmt, hdrbuf, count, size)
 const char *hdrfmt;
 char *hdrbuf;
-long* count;
+int64_t* count;
 size_t *size;
 {
     light_source *ls;
@@ -614,23 +614,6 @@ light_source *ls;
     }
 }
 
-/* Change light source's ID from src to dest. */
-void
-obj_move_light_source(src, dest)
-struct obj *src, *dest;
-{
-    light_source *ls;
-
-    for (ls = light_base; ls; ls = ls->next)
-    {
-        if (ls->type == LS_OBJECT && ls->id.a_obj == src)
-            ls->id.a_obj = dest;
-    }
-
-    src->lamplit = 0;
-    dest->lamplit = 1;
-}
-
 /* return true if there exist any light sources */
 boolean
 any_light_source()
@@ -666,6 +649,7 @@ int x, y;
                  */
                 if (artifact_light(obj))
                     continue;
+                Strcpy(debug_buf_3, "snuff_light_source");
                 end_burn(obj, obj->otyp != MAGIC_LAMP && obj->otyp != MAGIC_CANDLE);
                 /*
                  * The current ls element has just been removed (and
@@ -679,6 +663,7 @@ int x, y;
         {
             if (levl[x][y].lamplit)
             {
+                Strcpy(debug_buf_4, "snuff_light_source");
                 levl[x][y].lamplit = 0;
                 del_light_source(LS_LOCATION, xy_to_any(x, y));
                 newsym(x, y);
@@ -746,6 +731,7 @@ struct obj *src, *dest;
 {
     light_source *ls;
 
+    Strcpy(debug_buf_3, "obj_merge_light_sources");
     /* src == dest implies adding to candelabrum */
     if (src != dest)
         end_burn(src, TRUE); /* extinguish candles */
@@ -809,7 +795,7 @@ struct obj *obj;
          *       7..48  candles, range 3;
          *      49..342 candles, range 4; &c.
          */
-        long n = obj->quan;
+        int64_t n = obj->quan;
 
         radius = 1; /* always incremented at least once */
         do {
@@ -857,7 +843,7 @@ struct obj *obj;
 }
 
 
-long
+int64_t
 obj_light_maximum_burn_time(obj)
 struct obj* obj;
 {
@@ -867,7 +853,7 @@ struct obj* obj;
     if (!is_obj_light_source(obj))
         return 0;
 
-    long maxburntime = 0; //Normal lamps
+    int64_t maxburntime = 0; //Normal lamps
     if (objects[obj->otyp].oc_flags5 & O5_BURNS_INFINITELY)
         maxburntime = -1;
     else if (artifact_light(obj) || obj_shines_magical_light(obj) || has_obj_mythic_magical_light(obj))
@@ -908,24 +894,24 @@ struct obj* obj;
     return radius;
 }
 
-long
+int64_t
 burn_time_left_from_timer(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0L;
 
-    long timeout = peek_timer(BURN_OBJECT, obj_to_any(obj));
+    int64_t timeout = peek_timer(BURN_OBJECT, obj_to_any(obj));
 
     if (!timeout)
         return 0L;
 
-    long howlong = monstermoves - timeout;
-    long age = obj->age - howlong;
+    int64_t howlong = monstermoves - timeout;
+    int64_t age = obj->age - howlong;
     return age;
 }
 
-long
+int64_t
 obj_light_burn_time_left(obj)
 struct obj* obj;
 {
@@ -935,7 +921,7 @@ struct obj* obj;
     if (!is_obj_light_source(obj))
         return 0;
 
-    long burntimeleft = 0;
+    int64_t burntimeleft = 0;
     if (objects[obj->otyp].oc_flags5 & O5_BURNS_INFINITELY)
         burntimeleft = -1;
     else if (artifact_light(obj) || (obj_shines_magical_light(obj) || has_obj_mythic_magical_light(obj)))

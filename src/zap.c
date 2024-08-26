@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    zap.c    $NHDT-Date: 1551395521 2019/02/28 23:12:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.307 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -37,6 +37,7 @@ STATIC_DCL int FDECL(m_spell_hit_dex_bonus, (struct monst*, int));
 STATIC_DCL int FDECL(m_wand_hit_skill_bonus, (struct monst*, int));
 STATIC_DCL void FDECL(wishcmdassist, (int));
 STATIC_DCL int FDECL(get_summon_monster_type, (int));
+STATIC_DCL int FDECL(dozapcore, (struct obj*));
 
 #define ZT_MAGIC_MISSILE (AD_MAGM - 1)
 #define ZT_FIRE (AD_FIRE - 1)
@@ -1708,10 +1709,11 @@ struct permonst* ptr;
         boolean has_extrinsic = FALSE;
         boolean has_instrinsic_acquired = FALSE;
         boolean has_temporary = FALSE;
+        boolean has_recurring = FALSE;
         unsigned short temp_dur = 0;
 
-        unsigned long ibit = prop_to_innate(i);
-        unsigned long ibit2 = prop_to_innate2(i);
+        uint64_t ibit = prop_to_innate(i);
+        uint64_t ibit2 = prop_to_innate2(i);
 
         if (ptr->mresists & ibit)
             has_innate = TRUE;
@@ -1727,9 +1729,13 @@ struct permonst* ptr;
         
         temp_dur = mtmp  ? (mtmp->mprops[i] & M_TIMEOUT) : 0;
         if (temp_dur)
-            has_temporary = TRUE;
-
-        boolean has_property = has_innate || has_innate2 || has_extrinsic || has_instrinsic_acquired || has_temporary;
+        {
+            if(property_definitions[i].recurring)
+                has_recurring = TRUE;
+            else
+                has_temporary = TRUE;
+        }
+        boolean has_property = has_innate || has_innate2 || has_extrinsic || has_instrinsic_acquired || has_temporary || has_recurring;
 
         if (has_property)
         {
@@ -1804,11 +1810,11 @@ struct permonst* ptr;
     {
         for (int i = 0; i < NUM_UNSIGNED_LONG_BITS; i++)
         {
-            unsigned long bit = 0x00000001UL;
+            uint64_t bit = 0x00000001UL;
             if (i > 0)
                 bit = bit << i;
 
-            unsigned long mflags = 
+            uint64_t mflags = 
                 j == 1 ? ptr->mflags1 : j == 2 ? ptr->mflags2 : j == 3 ? ptr->mflags3 : j == 4 ? ptr->mflags4 :
                 j == 5 ? ptr->mflags5 : j == 6 ? ptr->mflags6 : j == 7 ? ptr->mflags7 : j == 8 ? ptr->mflags8 :
                 ptr->mflags1; /* Fall back case*/
@@ -2248,8 +2254,8 @@ struct monst* mtmp;
     xchar sx = mtmp == &youmonst ? u.ux : mtmp->mx;
     xchar sy = mtmp == &youmonst ? u.uy : mtmp->my;
     struct layer_info li = isok(sx, sy) ? layers_at(sx, sy) : zerolayerinfo;
-    //unsigned long layerflags = li.layer_flags;
-    unsigned long layermflags = li.monster_flags;
+    //uint64_t layerflags = li.layer_flags;
+    uint64_t layermflags = li.monster_flags;
     boolean loc_is_you = mtmp == &youmonst; // (layerflags & LFLAGS_UXUY) != 0; //So you can separately see your steed stats properly
     boolean ispeaceful = is_peaceful(mtmp) && !is_tame(mtmp);
     boolean ispet = is_tame(mtmp);
@@ -2262,14 +2268,14 @@ struct monst* mtmp;
     putstr(datawin, ATR_HEADING, buf);
     
     /* Petmark and other status marks */
-    unsigned long m_status_bits = get_m_status_bits(mtmp, loc_is_you, ispeaceful, ispet, isdetected);
+    uint64_t m_status_bits = get_m_status_bits(mtmp, loc_is_you, ispeaceful, ispet, isdetected);
     for (int statusorder_idx = 0; statusorder_idx < SIZE(statusmarkorder); statusorder_idx++)
     {
         int status_mark = (int)statusmarkorder[statusorder_idx];
         const char* statusname = 0;
         if (status_mark < MAX_STATUS_MARKS && (statusname = get_status_name(mtmp, status_mark)) != 0)
         {
-            unsigned long status_bit = 1UL << status_mark;
+            uint64_t status_bit = (uint64_t)1 << status_mark;
             if(m_status_bits & status_bit)
             {
                 condition_count++;
@@ -2285,13 +2291,13 @@ struct monst* mtmp;
     }
 
     /* Conditions */
-    unsigned long m_conditions = get_m_condition_bits(mtmp);
-    for (int cond = 0; cond < ui_tile_component_array[CONDITION_MARKS].number; cond++)
+    uint64_t m_conditions = get_m_condition_bits(mtmp);
+    for (int cond = 0; cond < NUM_BL_CONDITIONS; cond++)
     {
-        int condition_bit = 1 << cond;
+        uint64_t condition_bit = (uint64_t)1 << cond;
         if (m_conditions & condition_bit)
         {
-            if (cond < NUM_BL_CONDITIONS && condition_names[cond])
+            if (condition_names[cond])
             {
                 condition_count++;
                 if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0)
@@ -2310,7 +2316,7 @@ struct monst* mtmp;
         if (!property_definitions[propidx].show_buff)
             continue;
 
-        long duration = loc_is_you ? (u.uprops[propidx].intrinsic & TIMEOUT) : (long)(mtmp->mprops[propidx] & M_TIMEOUT);
+        int64_t duration = loc_is_you ? (u.uprops[propidx].intrinsic & TIMEOUT) : (int64_t)(mtmp->mprops[propidx] & M_TIMEOUT);
         if (duration == 0L)
             continue;
 
@@ -2470,6 +2476,31 @@ int locflags;
         if (locflags & CONTAINED_TOO)
             return get_obj_location(obj->ocontainer, xp, yp, locflags);
         break;
+    case OBJ_MAGIC:
+    {
+        struct obj* otmp;
+        for (otmp = invent; otmp; otmp = otmp->nobj)
+            if (Is_magic_chest(otmp))
+            {
+                *xp = u.ux;
+                *yp = u.uy;
+                return TRUE;
+            }
+
+        for (otmp = fobj; otmp; otmp = otmp->nobj)
+            if (Is_magic_chest(otmp))
+                return get_obj_location(otmp, xp, yp, locflags);
+
+        struct monst* mtmp;
+        for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
+            for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+                if (Is_magic_chest(otmp))
+                {
+                    *xp = mtmp->mx;
+                    *yp = mtmp->my;
+                    return TRUE;
+                }
+    }
     }
     *xp = *yp = 0;
     return FALSE;
@@ -2561,7 +2592,7 @@ struct obj *obj;
 coord *cc;
 boolean adjacentok; /* False: at obj's spot only, True: nearby is allowed */
 int mnum_override, mnum_replaceundead; /* Use this mnum instead */
-unsigned long mmflags;
+uint64_t mmflags;
 {
     struct monst *mtmp = (struct monst *) 0;
     struct monst *mtmp2 = (struct monst *) 0;
@@ -2770,6 +2801,7 @@ boolean replaceundead;
         case OBJ_INVENT:
             x = u.ux, y = u.uy;
             break;
+        case OBJ_MAGIC:
         case OBJ_FLOOR:
             (void) get_obj_location(corpse, &x, &y, CONTAINED_TOO);
             break;
@@ -2877,6 +2909,8 @@ boolean replaceundead;
         /* use saved traits */
         xy.x = x, xy.y = y;
         mtmp = montraits(corpse, &xy, FALSE, animateintomon >= 0 ? montype : NON_PM, animateintomon < 0 && replaceundead ? montype : NON_PM, MM_PLAY_SUMMON_ANIMATION | MM_ANIMATE_DEAD_ANIMATION | MM_PLAY_SUMMON_SOUND);
+        if (mtmp && has_edog(mtmp))
+            EDOG(mtmp)->hungrytime = monstermoves + 500L;
         if (mtmp && mtmp->mtame && !mtmp->isminion && !mtmp->isfaithful)
             wary_dog(mtmp, TRUE);
     }
@@ -3035,6 +3069,10 @@ boolean replaceundead;
         obj_extract_self(corpse);
         obfree(corpse, (struct obj *) 0);
         break;
+    case OBJ_MAGIC:
+        obj_extract_self(corpse);
+        obfree(corpse, (struct obj*)0);
+        break;
     default:
         panic("revive");
     }
@@ -3069,12 +3107,12 @@ int montype;
             }
             else if (artifact_has_flag(uitem, AF_DMONS))
             {
-                if ((unsigned long)montype == artilist[uitem->oartifact].mtype)
+                if ((uint64_t)montype == artilist[uitem->oartifact].mtype)
                     return TRUE;
             }
             else if (artifact_has_flag(uitem, AF_DCLAS))
             {
-                if ((unsigned long)mons[montype].mlet == artilist[uitem->oartifact].mtype)
+                if ((uint64_t)mons[montype].mlet == artilist[uitem->oartifact].mtype)
                     return TRUE;
             }
             else if (artifact_has_flag(uitem, AF_DALIGN))
@@ -3084,7 +3122,7 @@ int montype;
             }
             else
             {
-                if ((unsigned long)montype == artilist[uitem->oartifact].mtype)
+                if ((uint64_t)montype == artilist[uitem->oartifact].mtype)
                     return TRUE;
             }
         }
@@ -3134,7 +3172,7 @@ int montype;
                     }
                     else
                     {
-                        if ((unsigned long)mons[montype].mlet == objects[otyp].oc_target_permissions)
+                        if ((uint64_t)mons[montype].mlet == objects[otyp].oc_target_permissions)
                             return TRUE;
                     }
                 }
@@ -3158,7 +3196,7 @@ int montype;
                 if (!mythic_powers[i].name)
                     break;
 
-                unsigned long mythic_power_bit = 1UL << ((unsigned long)i);
+                uint64_t mythic_power_bit = (uint64_t)1 << ((uint64_t)i);
 
                 if ((mythic_definitions[mythic_quality].mythic_powers & mythic_power_bit) && mythic_power_applies_to_obj(uitem, mythic_powers[i].power_flags))
                 {
@@ -3198,12 +3236,12 @@ int montype;
             }
             else if (artifact_has_flag(uitem, AF_DMONS))
             {
-                if ((unsigned long)montype == artilist[uitem->oartifact].mtype)
+                if ((uint64_t)montype == artilist[uitem->oartifact].mtype)
                     return TRUE;
             }
             else if (artifact_has_flag(uitem, AF_DCLAS))
             {
-                if ((unsigned long)mons[montype].mlet == artilist[uitem->oartifact].mtype)
+                if ((uint64_t)mons[montype].mlet == artilist[uitem->oartifact].mtype)
                     return TRUE;
             }
             else if (artifact_has_flag(uitem, AF_DALIGN))
@@ -3213,7 +3251,7 @@ int montype;
             }
             else
             {
-                if ((unsigned long)montype == artilist[uitem->oartifact].mtype)
+                if ((uint64_t)montype == artilist[uitem->oartifact].mtype)
                     return TRUE;
             }
         }
@@ -3264,7 +3302,7 @@ int montype;
                     }
                     else
                     {
-                        if ((unsigned long)mons[montype].mlet == objects[otyp].oc_target_permissions)
+                        if ((uint64_t)mons[montype].mlet == objects[otyp].oc_target_permissions)
                             return TRUE;
                     }
                 }
@@ -3663,7 +3701,7 @@ void
 do_osshock(obj)
 struct obj *obj;
 {
-    long i;
+    int64_t i;
 
     if (obj->otyp == SCR_MAIL)
         return;
@@ -3682,9 +3720,9 @@ struct obj *obj;
     /* if quan > 1 then some will survive intact */
     if (obj->quan > 1L) {
         if (obj->quan > LARGEST_INT)
-            obj = splitobj(obj, (long) rnd(30000));
+            obj = splitobj(obj, (int64_t) rnd(30000));
         else
-            obj = splitobj(obj, (long) rnd((int) obj->quan - 1));
+            obj = splitobj(obj, (int64_t) rnd((int) obj->quan - 1));
     }
 
     /* appropriately add damage to bill */
@@ -3717,7 +3755,7 @@ int id;
 {
     struct obj *otmp;
     xchar ox = 0, oy = 0;
-    long old_wornmask, new_wornmask = 0L;
+    int64_t old_wornmask, new_wornmask = 0L;
     boolean can_merge = (id == STRANGE_OBJECT);
     int obj_location = obj->where;
 
@@ -3842,17 +3880,30 @@ int id;
     if (obj->opoisoned && is_poisonable(otmp))
         otmp->opoisoned = TRUE;
 
-    if (obj->elemental_enchantment > 0)
-        otmp->elemental_enchantment = 0; //Special enchantments do not get passed at the moment
+    boolean multigendif = objects[obj->otyp].oc_multigen_type > MULTIGEN_SINGLE && objects[otmp->otyp].oc_multigen_type == MULTIGEN_SINGLE;
+    if (obj->elemental_enchantment > 0 && is_elemental_enchantable(otmp))
+    {
+        if (obj->elemental_enchantment < DEATH_ENCHANTMENT || (obj->elemental_enchantment == DEATH_ENCHANTMENT && is_death_enchantable(otmp)))
+        {
+            if(!multigendif || !rn2(3))
+                otmp->elemental_enchantment = obj->elemental_enchantment;
+        }
+    }
 
-    if (obj->exceptionality > 0)
-        otmp->exceptionality = 0; //Special crafting does not get passed at the moment
+    if (obj->exceptionality > 0 && can_have_exceptionality(otmp) && otmp->oartifact == 0 && !is_normally_non_exceptional(otmp))
+    {
+        if (!multigendif || !rn2(3))
+        {
+            otmp->exceptionality = obj->exceptionality;
+            exceptionality_checks(otmp);
+        }
+    }
     
-    if (obj->mythic_prefix > 0)
-        otmp->mythic_prefix = 0; //Mythic status does not get passed at the moment
-
-    if (obj->mythic_suffix > 0)
-        otmp->mythic_suffix = 0; //Mythic status does not get passed at the moment
+    if ((obj->mythic_prefix > 0 || obj->mythic_suffix > 0) && can_obj_have_mythic(otmp) && otmp->oartifact == 0)
+    {
+        if (!multigendif || !rn2(3))
+            randomize_mythic_quality(otmp, obj->mythic_prefix > 0 && obj->mythic_suffix > 0 ? 2 : 1, &otmp->mythic_prefix, &otmp->mythic_suffix);
+    }
 
     if (id == STRANGE_OBJECT && obj->otyp == CORPSE)
     {
@@ -3877,7 +3928,7 @@ int id;
 
     /* 'n' merged objects may be fused into 1 object */
     if (otmp->quan > 1L && (!objects[otmp->otyp].oc_merge
-                            || (can_merge && otmp->quan > (long) rn2(1000))))
+                            || (can_merge && otmp->quan > (int64_t) rn2(1000))))
         otmp->quan = 1L;
 
     switch (otmp->oclass) 
@@ -3934,7 +3985,7 @@ int id;
         break;
 
     case GEM_CLASS:
-        if (otmp->quan > (long) rnd(4)
+        if (otmp->quan > (int64_t) rnd(4)
             && obj->material == MAT_MINERAL
             && otmp->material != MAT_MINERAL)
         {
@@ -4722,6 +4773,104 @@ boolean stop_at_first_hit_object;
     return hitanything;
 }
 
+
+/*
+ * Trap t was hit by the effect of the wand/spell otmp.  Return
+ * non-zero if the wand/spell had any effect.
+ */
+int
+bhitt(t, otmp, origmonst)
+struct trap* t;
+struct obj* otmp;
+struct monst* origmonst;
+{
+    if (!otmp || !t)
+        return 0;
+
+    int res = 0;
+    boolean learn_it = FALSE;
+    int otyp = otmp->otyp;
+    int ttyp = t->ttyp;
+    boolean iswand = objects[otyp].oc_class == WAND_CLASS;
+    boolean zapped_by_u = origmonst == &youmonst;
+    boolean gainwandskill = iswand && zapped_by_u && (otmp->speflags & SPEFLAGS_BEING_BROKEN) == 0;
+    int wandskilladded = 0;
+    int tx = t->tx, ty = t->ty;
+
+    switch (otyp) 
+    {
+    case WAN_CANCELLATION:
+        switch (ttyp)
+        {
+        case TELEP_TRAP:
+        case LEVEL_TELEP:
+        case MAGIC_TRAP:
+        case ANTI_MAGIC_TRAP:
+        case POLY_TRAP:
+            if (cansee(tx, ty))
+            {
+                play_special_effect_at(SPECIAL_EFFECT_PUFF_OF_SMOKE, 0, tx, ty, FALSE);
+                play_sfx_sound_at_location(SFX_VANISHES_IN_PUFF_OF_SMOKE, tx, ty);
+                special_effect_wait_until_action(0);
+                if (t->tseen)
+                {
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The %s vanishes in a puff of smoke!", trap_type_definitions[ttyp].name);
+                    learn_it = TRUE;
+                }
+                else
+                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "see a puff of smoke!");
+            }
+            deltrap(t);
+            res = 1;
+            if (cansee(tx, ty))
+            {
+                special_effect_wait_until_end(0);
+                newsym(tx, ty);
+            }
+            break;
+        case MAGIC_PORTAL:
+        case MODRON_PORTAL:
+            if (cansee(tx, ty))
+            {
+                play_sfx_sound_at_location(SFX_ITEM_APPEARS, tx, ty);
+                learn_it = TRUE;
+                if (t->tseen)
+                {
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The %s scintillates for a moment, but the effect then subsides.", trap_type_definitions[ttyp].name);
+                }
+                else
+                {
+                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "A scintillating %s suddenly appears.  The scintillation then stops.", trap_type_definitions[ttyp].name);
+                }
+            }
+            t->tseen = 1;
+            res = 1;
+            newsym(tx, ty);
+            break;
+        default:
+            break;
+        }
+
+        if (res)
+        {
+            if (gainwandskill)
+                wandskilladded = 1;
+            learn_it = TRUE;
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (wandskilladded > 0)
+        use_skill(P_WAND, wandskilladded);
+    /* if effect was observable then discover the wand type provided
+       that the wand itself has been seen */
+    if (learn_it)
+        learnwand(otmp);
+    return res;
+}
+
 /*
  * zappable - returns 1 if zap is available, 0 otherwise.
  *            it removes a charge from the wand if zappable.
@@ -4773,8 +4922,8 @@ register struct obj *obj;
     case SPE_BLACK_BLADE_OF_DISASTER:
         known = TRUE;
         You_ex(ATR_NONE, CLR_MSG_SPELL, "chant an invocation:");
-        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Sword of Cold and Darkness, free yourself from the heaven's bonds.");
-        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Become one with my power, one with my body,");
+        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Sword of Cold and Darkness, free thyself from the heaven's bonds.");
+        verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Become one with my power, one with my body.");
         verbalize_ex(ATR_NONE, CLR_MSG_GOD, "And let us walk the path of destruction together!");
         play_sfx_sound(SFX_ITEM_APPEARS);
         pline_ex(ATR_NONE, CLR_MSG_SPELL, "A sword-shaped planar rift forms before you!");
@@ -5269,7 +5418,7 @@ register struct obj *obj;
             SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
     case SPE_RAISE_SKELETON_LORD:
-        mtmp = summoncreature(obj->otyp, PM_SKELETON_WARRIOR, "%s raises before you.", MM_UNDEAD_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
+        mtmp = summoncreature(obj->otyp, PM_SKELETON_LORD, "%s raises before you.", MM_UNDEAD_SUMMON_ANIMATION | MM_NO_MONSTER_INVENTORY,
             SUMMONCREATURE_FLAGS_CAPITALIZE | SUMMONCREATURE_FLAGS_DISREGARDS_STRENGTH | SUMMONCREATURE_FLAGS_DISREGARDS_HEALTH | SUMMONCREATURE_FLAGS_FAITHFUL);
         break;
     case SPE_RAISE_SKELETON_KING:
@@ -5355,7 +5504,7 @@ register struct obj *obj;
     }
     case SPE_MASS_CREATE_MUMMY:
     {
-        You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully permormed the embalming magic.");
+        You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully performed the embalming magic.");
         int zombietype;
         int monstcount = 0;
         int radius = (int)objects[obj->otyp].oc_spell_radius;
@@ -5390,46 +5539,46 @@ register struct obj *obj;
     }
     case SPE_MASS_CREATE_DRACOLICH:
     {
-        You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully permormed the necromantic magic.");
+        You_ex(ATR_NONE, CLR_MSG_SPELL, "successfully performed the necromantic magic.");
         int zombietype;
         int monstcount = 0;
         int hatchlingcount = 0;
         int radius = (int)objects[obj->otyp].oc_spell_radius;
-        struct obj* sobj;
-        sobj = fobj;
+        struct obj* corpse;
+        corpse = fobj;
 
-        while (sobj)
+        while (corpse)
         {
             zombietype = -1;
-            if ((radius < 0 || dist2(u.ux, u.uy, sobj->ox, sobj->oy) <= radius * (radius + 1)) //+1 to make a bit larger and square-like
-                && cansee(sobj->ox, sobj->oy)
-                && !IS_STWALL(levl[sobj->ox][sobj->oy].typ))
+            if ((radius < 0 || dist2(u.ux, u.uy, corpse->ox, corpse->oy) <= radius * (radius + 1)) //+1 to make a bit larger and square-like
+                && cansee(corpse->ox, corpse->oy)
+                && !IS_STWALL(levl[corpse->ox][corpse->oy].typ))
             {
-                if (sobj->otyp == CORPSE && sobj->corpsenm >= LOW_PM)
+                if (corpse->otyp == CORPSE && corpse->corpsenm >= LOW_PM)
                 {
-                    if ((obj->corpsenm >= PM_GRAY_DRAGON && obj->corpsenm <= PM_ANCIENT_YELLOW_DRAGON)
-                        || obj->corpsenm == PM_GOLD_DRAGON || obj->corpsenm == PM_ANCIENT_GOLD_DRAGON
-                        || obj->corpsenm == PM_BAHAMUT || obj->corpsenm == PM_TIAMAT
+                    if ((corpse->corpsenm >= PM_GRAY_DRAGON && corpse->corpsenm <= PM_ANCIENT_YELLOW_DRAGON)
+                        || corpse->corpsenm == PM_GOLD_DRAGON || corpse->corpsenm == PM_ANCIENT_GOLD_DRAGON
+                        || corpse->corpsenm == PM_BAHAMUT || corpse->corpsenm == PM_TIAMAT
                         )
                     {
-                        if ((mons[obj->corpsenm].geno & G_UNIQ) || (obj->corpsenm >= PM_ANCIENT_GRAY_DRAGON && obj->corpsenm <= PM_ANCIENT_YELLOW_DRAGON) || obj->corpsenm == PM_ANCIENT_GOLD_DRAGON)
+                        if ((mons[corpse->corpsenm].geno & G_UNIQ) || (corpse->corpsenm >= PM_ANCIENT_GRAY_DRAGON && corpse->corpsenm <= PM_ANCIENT_YELLOW_DRAGON) || corpse->corpsenm == PM_ANCIENT_GOLD_DRAGON)
                             zombietype = PM_ELDER_DRACOLICH;
                         else
                             zombietype = PM_DRACOLICH;
 
-                        if (animate_corpse(sobj, zombietype))
+                        if (animate_corpse(corpse, zombietype))
                             monstcount++;
-                        sobj = fobj; //The corpse got deleted, so move to the beginning
+                        corpse = fobj; //The corpse got deleted, so move to the beginning
                         continue;
                     }
-                    else if (sobj->corpsenm >= PM_GRAY_DRAGON_HATCHLING && sobj->corpsenm <= PM_YELLOW_DRAGON_HATCHLING)
+                    else if (corpse->corpsenm >= PM_GRAY_DRAGON_HATCHLING && corpse->corpsenm <= PM_YELLOW_DRAGON_HATCHLING)
                     {
                         hatchlingcount++;
-                        pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s twitches for a moment, but nothing else happens.", The(cxname(sobj)));
+                        pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s twitches for a moment, but nothing else happens.", The(cxname(corpse)));
                     }
                 }
             }
-            sobj = sobj->nobj;
+            corpse = corpse->nobj;
         }
 
         if (monstcount == 0)
@@ -6075,13 +6224,43 @@ STATIC_VAR NEARDATA const char zap_syms[] = { WAND_CLASS, 0 };
 int
 dozap()
 {
-    register struct obj *obj;
-    double damage;
-    boolean taketurn = TRUE;
-
+    struct obj *obj;
     if (check_capacity((char *) 0))
         return 0;
     obj = getobj(zap_syms, "zap", 0, "");
+    return dozapcore(obj);
+}
+
+int
+dozapquick()
+{
+    struct obj* obj;
+    if (check_capacity((char*)0))
+        return 0;
+
+    if (!context.quick_zap_wand_oid)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Your quick zap wand is not set.");
+        return 0;
+    }
+    obj = o_on(context.quick_zap_wand_oid, invent);
+    if (!obj)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Your quick zap wand is not in your inventory.");
+        return 0;
+    }
+    return dozapcore(obj);
+}
+
+STATIC_OVL int
+dozapcore(obj)
+struct obj* obj;
+{
+    double damage;
+    boolean taketurn = TRUE;
+
     if (!obj)
         return 0;
 
@@ -6111,7 +6290,7 @@ dozap()
         pline_ex1(ATR_NONE, CLR_MSG_FAIL, nothing_happens);
 
         //Mark empty query
-        if((obj->speflags & SPEFLAGS_EMPTY_NOTICED) == 0 && obj->charges >= 0)
+        if ((obj->speflags & SPEFLAGS_EMPTY_NOTICED) == 0 && obj->charges >= 0)
         {
             obj->speflags |= SPEFLAGS_EMPTY_NOTICED;
             boolean canstash = can_stash_objs();
@@ -6132,10 +6311,10 @@ dozap()
                 Sprintf(markbuf, "Mark %s empty and then ", the(cxname(obj)));
 
             Sprintf(querybuf, "%s%sDrop it?", markbuf, canstash ? "Stash or " : "");
-            char ans = yn_function_es(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, 
-                markempty ? "Mark Empty" : obj->oclass == WAND_CLASS ? "Wand Empty" : "Item Empty", 
-                querybuf, markempty ? (!canstash ? "dmq" : "sdmq") : (!canstash ? "dq" : "sdq"), 'q', 
-                markempty ? (!canstash ? "Drop\nMark Only\nQuit" : "Stash\nDrop\nMark Only\nQuit") : (!canstash ? "Drop\nQuit" : "Stash\nDrop\nQuit"), 
+            char ans = yn_function_es(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR,
+                markempty ? "Mark Empty" : obj->oclass == WAND_CLASS ? "Wand Empty" : "Item Empty",
+                querybuf, markempty ? (!canstash ? "dmq" : "sdmq") : (!canstash ? "dq" : "sdq"), 'q',
+                markempty ? (!canstash ? "Drop\nMark Only\nQuit" : "Stash\nDrop\nMark Only\nQuit") : (!canstash ? "Drop\nQuit" : "Stash\nDrop\nQuit"),
                 (const char*)0);
 
             if (ans != 'q' && markempty && !(has_uoname(obj) && strstri(UONAME(obj), "empty")))
@@ -6177,26 +6356,26 @@ dozap()
             }
         }
     }
-    else if (obj->cursed && !rn2(WAND_BACKFIRE_CHANCE)) 
+    else if (obj->cursed && !rn2(WAND_BACKFIRE_CHANCE))
     {
         backfire(obj); /* the wand blows up in your face! */
         exercise(A_STR, FALSE);
         return taketurn;
     }
-    else if (!(objects[obj->otyp].oc_dir == NODIR) && !getdir((char *) 0)) 
+    else if (!(objects[obj->otyp].oc_dir == NODIR) && !getdir((char*)0))
     {
         play_sfx_sound(SFX_WALL_GLOWS_THEN_FADES);
         if (!Blind)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s glows and fades.", The(xname(obj)));
         /* make him pay for knowing !NODIR */
-    } 
+    }
     else if (!u.dx && !u.dy && !u.dz
-               && !(objects[obj->otyp].oc_dir == NODIR)) 
+        && !(objects[obj->otyp].oc_dir == NODIR))
     {
 
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_ZAP);
 
-        if ((damage = zapyourself(obj, TRUE)) != 0) 
+        if ((damage = zapyourself(obj, TRUE)) != 0)
         {
             char buf[BUFSZ];
 
@@ -6220,7 +6399,7 @@ dozap()
         obj = current_wand;
         current_wand = 0;
     }
-    if (obj && obj->charges < 0) 
+    if (obj && obj->charges < 0)
     {
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         pline("%s to dust.", Tobjnam(obj, "turn"));
@@ -6229,6 +6408,50 @@ dozap()
     update_inventory(); /* maybe used a charge */
     return taketurn;
 }
+
+int
+dosetquickwand()
+{
+    struct obj* obj;
+    obj = getobj(zap_syms, "set as quick wand", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+    if (obj == &zeroobj)
+    {
+        context.quick_zap_wand_oid = 0;
+        issue_gui_command(GUI_CMD_TOGGLE_QUICK_ZAP_WAND, NO_GLYPH, 0, "");
+        pline_ex(ATR_NONE, CLR_MSG_HINT, "Your quick zap wand selection has been cleared.");
+        return 0;
+    }
+    if (obj->oclass != WAND_CLASS)
+    {
+        pline_ex(ATR_NONE, CLR_MSG_HINT, "You cannot set that as a quick wand; it is not a wand!.");
+        return 0;
+    }
+
+    context.quick_zap_wand_oid = obj->o_id;
+    issue_gui_command(GUI_CMD_TOGGLE_QUICK_ZAP_WAND, (int)obj_to_glyph(obj, rn2_on_display_rng), Hallucination ? 0 : (int)obj->exceptionality, cxname(obj));
+    pline_ex(ATR_NONE, CLR_MSG_HINT, "Your quick zap wand is now set to \'%s\'.", cxname(obj));
+    return 0;
+}
+
+int
+dounsetquickwand()
+{
+    struct obj* obj;
+    obj = getobj(zap_syms, "unset as quick wand", 0, "");
+    if (!obj)
+        return 0;
+
+    context.quick_zap_wand_oid = 0;
+    issue_gui_command(GUI_CMD_TOGGLE_QUICK_ZAP_WAND, 0, NO_GLYPH, "");
+    pline_ex(ATR_NONE, CLR_MSG_HINT, "Your quick zap wand selection has been cleared.");
+    return 0;
+}
+
 
 double
 zapyourself(obj, ordinary)
@@ -6394,7 +6617,7 @@ boolean ordinary;
         }
         destroy_item(WAND_CLASS, AD_ELEC);
         destroy_item(RING_CLASS, AD_ELEC);
-        (void) flashburn((long) rnd(100));
+        (void) flashburn((int64_t) rnd(100));
         item_destruction_hint(AD_ELEC, TRUE);
         break;
     case SPE_FIREBALL:
@@ -6824,7 +7047,7 @@ boolean ordinary;
         if (is_undead(youmonst.data)) {
             You_feel("frightened and %sstunned.",
                      Stunned ? "even more " : "");
-            make_stunned((HStun & TIMEOUT) + (long) rnd(30), FALSE); //Not strictly the same effect, so keep hard coding for the time being
+            make_stunned((HStun & TIMEOUT) + (int64_t) rnd(30), FALSE); //Not strictly the same effect, so keep hard coding for the time being
         } else
             You("don't feel much different than you did before.");
         break;
@@ -6995,7 +7218,7 @@ boolean ordinary;
             basedmg = 5;
         damage = lightdamage(obj, ordinary, basedmg);
         damage += adjust_damage(rnd(25), &youmonst, &youmonst, AD_PHYS, ADFLAGS_NONE);
-        if (flashburn((long)ceil(damage)))
+        if (flashburn((int64_t)ceil(damage)))
             learn_it = TRUE;
         damage = 0; /* reset */
         break;
@@ -7209,7 +7432,7 @@ int amt;          /* pseudo-damage used to determine blindness duration */
 /* light[ning] causes blindness */
 boolean
 flashburn(duration)
-long duration;
+int64_t duration;
 {
     if (!resists_blnd(&youmonst) && !Flash_resistance) {
         if (!Blinded)
@@ -7823,7 +8046,7 @@ struct obj *obj;
             else if (objects[otyp].oc_dir == IMMEDIATE_TWO_TO_SIX_TARGETS)
                 hit_only_one = 4; /* 2- 6 targets based on BUC status */
 
-            (void) bhit(u.dx, u.dy, range, radius, ZAPPED_WAND, bhitm, bhito, &obj, &youmonst, hit_only_one, !!(objects[otyp].oc_spell_flags & S1_SPELL_STOPS_AT_FIRST_HIT_OBJECT));
+            (void) bhit(u.dx, u.dy, range, radius, ZAPPED_WAND, bhitm, bhito, bhitt, &obj, &youmonst, hit_only_one, !!(objects[otyp].oc_spell_flags & S1_SPELL_STOPS_AT_FIRST_HIT_OBJECT));
         }
         zapwrapup(); /* give feedback for obj_zapped */
 
@@ -8117,11 +8340,12 @@ int range, *skipstart, *skipend;
  *  one is revealed for a weapon, but if not a weapon is left up to fhitm().
  */
 struct monst *
-bhit(ddx, ddy, range, radius, weapon, fhitm, fhito, pobj, origmonst, hit_only_one, stop_at_first_hit_object)
+bhit(ddx, ddy, range, radius, weapon, fhitm, fhito, fhitt, pobj, origmonst, hit_only_one, stop_at_first_hit_object)
 register int ddx, ddy, range, radius;          /* direction, range, and effect radius */
 enum bhit_call_types weapon;           /* defined in hack.h */
 int FDECL((*fhitm), (MONST_P, OBJ_P, MONST_P)), /* fns called when mon/obj hit */
-    FDECL((*fhito), (OBJ_P, OBJ_P, MONST_P));
+    FDECL((*fhito), (OBJ_P, OBJ_P, MONST_P)),
+    FDECL((*fhitt), (TRAP_P, OBJ_P, MONST_P));
 struct obj **pobj; /* object tossed/used, set to NULL
                     * if object is destroyed */
 struct monst* origmonst;
@@ -8273,6 +8497,7 @@ boolean stop_at_first_hit_object;
             break;
         }
 
+        /* Drawbridges */
         if (weapon == ZAPPED_WAND && !drawbridge_hit && find_drawbridge(&x, &y))
         {
             boolean learn_it = FALSE;
@@ -8314,6 +8539,7 @@ boolean stop_at_first_hit_object;
 
         }
 
+        /* Trees */
         if (weapon == ZAPPED_WAND && !tree_hit && IS_TREE(typ))
         {
             boolean learn_it = FALSE;
@@ -8333,6 +8559,7 @@ boolean stop_at_first_hit_object;
                 learnwand(obj);
         }
 
+        /* Monsters */
         mtmp = m_at(bhitpos.x, bhitpos.y);
 
         /*
@@ -8506,6 +8733,8 @@ boolean stop_at_first_hit_object;
                 newsym(x, y);
             }
         }
+
+        /* Objects */
         if (fhito)
         {
             if (bhitpile(obj, origmonst, fhito, bhitpos.x, bhitpos.y, 0, hit_only_one, stop_at_first_hit_object))
@@ -8534,6 +8763,25 @@ boolean stop_at_first_hit_object;
                 return (struct monst *) 0;
             }
         }
+
+        /* Traps */
+        if (fhitt)
+        {
+            struct trap* t = t_at(bhitpos.x, bhitpos.y);
+            if (t)
+            {
+                int had_effect = (*fhitt)(t, obj, origmonst);
+                if (had_effect)
+                {
+                    if (obj && (weapon == ZAPPED_WAND || weapon == FLASHED_LIGHT || weapon == INVIS_BEAM))
+                        play_immediate_ray_sound_at_location(object_soundsets[objects[obj->otyp].oc_soundset].ray_soundset, RAY_SOUND_TYPE_HIT_OBJECT, bhitpos.x, bhitpos.y);
+
+                    range--;
+                }
+            }
+        }
+
+        /* Doors */
         if (weapon == ZAPPED_WAND && (IS_DOOR(typ) || typ == SDOOR))
         {
             switch (obj->otyp) 
@@ -9036,7 +9284,7 @@ const char *fltxt;
 {
     int dam = 0, abstyp = abs(type);
     enum hit_tile_types hit_tile = HIT_GENERAL;
-    char killername[BUFSIZ] = "";
+    char killername[BUFSZ * 2] = "";
 
     //Base damage here, set to zero, if not needed
     if (origobj)
@@ -9358,9 +9606,9 @@ boolean give_feedback; /* caller needs to decide about visibility checks */
 boolean u_caused;
 {
     struct obj *obj, *obj2;
-    long i, scrquan, delquan;
+    int64_t i, scrquan, delquan;
     char buf1[BUFSZ], buf2[BUFSZ];
-    int cnt = 0;
+    int64_t cnt = 0;
 
     for (obj = level.objects[x][y]; obj; obj = obj2) 
     {
@@ -9403,14 +9651,14 @@ boolean u_caused;
                 if (give_feedback)
                 {
                     if (delquan > 1L)
-                        pline("%ld %s burn.", delquan, buf2);
+                        pline("%lld %s burn.", (long long)delquan, buf2);
                     else
                         pline("%s burns.", An(buf1));
                 }
             }
         }
     }
-    return cnt;
+    return (int)cnt;
 }
 
 /* will zap/spell/breath attack score a hit against armor class `ac'? */
@@ -9763,18 +10011,18 @@ boolean say; /* Announce out of sight hit/miss events if true */
 
                     if (animations[anim].action_execution_frame > 0)
                     {
-                        long intervals_to_execution = (long)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
+                        int64_t intervals_to_execution = (int64_t)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
 #if 0
                         if (prev_anim_counter_idx > -1 && context.zap_animation_counter_on[prev_anim_counter_idx])
                         {
-                            long diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution -1; // -1;
+                            int64_t diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution -1; // -1;
                             if (abs((int)diff) <= 3) /* Extra check that something else is not going on */
                             {
                                 context.zap_animation_counter[prev_anim_counter_idx] -= diff;
                             }
                         }
 #endif
-                        context.zap_aggregate_intervals_to_wait_until_action = (unsigned long)intervals_to_execution;
+                        context.zap_aggregate_intervals_to_wait_until_action = (uint64_t)intervals_to_execution;
                     }
 
                     //prev_anim_counter_idx = idx;
@@ -9806,18 +10054,18 @@ boolean say; /* Announce out of sight hit/miss events if true */
                 /* Wait as though the zap would be going forward */
                 if (animations[anim].action_execution_frame > 0)
                 {
-                    long intervals_to_execution = (long)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
+                    int64_t intervals_to_execution = (int64_t)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
 #if 0
                     if (prev_anim_counter_idx > -1 && context.zap_animation_counter_on[prev_anim_counter_idx])
                     {
-                        long diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution - 1;
+                        int64_t diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution - 1;
                         if (abs((int)diff) <= 3) /* Extra check that something else is not going on */
                         {
                             context.zap_animation_counter[prev_anim_counter_idx] -= diff;
                         }
                     }
 #endif
-                    context.zap_aggregate_intervals_to_wait_until_action = (unsigned long)intervals_to_execution;
+                    context.zap_aggregate_intervals_to_wait_until_action = (uint64_t)intervals_to_execution;
                 }
                 if (animations[anim].sound_play_frame > 0)
                 {
@@ -10032,11 +10280,11 @@ boolean say; /* Announce out of sight hit/miss events if true */
             {
                 if (origobj)
                 {
-                    long dam = (long)get_spell_damage(origobj_copy.otyp, origobj_copy.exceptionality, origmonst, &youmonst);
+                    int64_t dam = (int64_t)get_spell_damage(origobj_copy.otyp, origobj_copy.exceptionality, origmonst, &youmonst);
                     (void)flashburn(dam);
                 }
                 else
-                    (void)flashburn((long)d(dmgdice, dicesize) + dmgplus);
+                    (void)flashburn((int64_t)d(dmgdice, dicesize) + dmgplus);
             }
 
             stop_occupation();
@@ -10289,7 +10537,7 @@ const char *msg;
 void
 start_melt_ice_timeout(x, y, min_time)
 xchar x, y;
-long min_time; /* <x,y>'s old melt timeout (deleted by time we get here) */
+int64_t min_time; /* <x,y>'s old melt timeout (deleted by time we get here) */
 {
     int when;
     long where;
@@ -10308,7 +10556,7 @@ long min_time; /* <x,y>'s old melt timeout (deleted by time we get here) */
     if (when <= MAX_ICE_TIME) 
     {
         where = ((long) x << 16) | (long) y;
-        (void) start_timer((long) when, TIMER_LEVEL, MELT_ICE_AWAY,
+        (void) start_timer((int64_t) when, TIMER_LEVEL, MELT_ICE_AWAY,
                            long_to_any(where));
     }
 }
@@ -10321,7 +10569,7 @@ long min_time; /* <x,y>'s old melt timeout (deleted by time we get here) */
 void
 melt_ice_away(arg, timeout)
 anything *arg;
-long timeout UNUSED;
+int64_t timeout UNUSED;
 {
     xchar x, y;
     long where = arg->a_long;
@@ -10505,7 +10753,7 @@ short exploding_wand_typ;
         }
         else if (is_ice(x, y))
         {
-            long melt_time;
+            int64_t melt_time;
 
             /* Already ice here, so just firm it up. */
             /* Now ensure that only ice that is already timed is affected */
@@ -10854,7 +11102,7 @@ boolean verbose;
     obj->otyp = ROCK;
     obj->material = objects[obj->otyp].oc_material;
     obj->oclass = GEM_CLASS;
-    obj->quan = (long) rn1(60, 7);
+    obj->quan = (int64_t) rn1(60, 7);
     obj->owt = weight(obj);
     obj->dknown = obj->bknown = obj->rknown = obj->nknown = 0;
     obj->known = objects[obj->otyp].oc_uses_known ? 0 : 1;
@@ -10948,7 +11196,7 @@ struct obj *obj;
 int osym, dmgtyp;
 boolean forcedestroy;
 {
-    long i, cnt, quan;
+    int64_t i, cnt, quan;
     int dmg, xresist, skip, dindx;
     const char *mult;
     boolean physical_damage;
@@ -11219,7 +11467,7 @@ int osym, dmgtyp;
 {
     struct obj *obj;
     int skip, tmp = 0;
-    long i, cnt, quan;
+    int64_t i, cnt, quan;
     int dindx;
     boolean vis;
     int obj_sound_type = OBJECT_SOUND_TYPE_BREAK;
@@ -11722,7 +11970,7 @@ boolean is_wiz_wish, play_sound;
     char promptbuf[BUFSZ];
     struct obj *otmp, nothing;
     int tries = 0;
-    long prev_artwish = u.uconduct.wisharti;
+    int64_t prev_artwish = u.uconduct.wisharti;
 
     promptbuf[0] = '\0';
     nothing = zeroobj; /* lint suppression; only its address matters */
@@ -11881,8 +12129,8 @@ struct monst*
 summoncreature(spl_otyp, monst_id, message_fmt, mmflags, scflags) // capitalize, markassummoned, disregardstrength, disregardhealth, bloodlust, pacifist, faithful
 int spl_otyp, monst_id;
 const char* message_fmt; //input the summoning message with one %s, which is for the monster name
-unsigned long mmflags;
-unsigned long scflags;
+uint64_t mmflags;
+uint64_t scflags;
 {
     if (monst_id < LOW_PM)
         return (struct monst*)0;
@@ -12103,7 +12351,7 @@ int duration;
 {
     pline_ex(ATR_NONE, CLR_MSG_SPELL, "The flow of time seems to slow down!");
     context.time_stopped = TRUE;
-    begin_timestoptimer((long)duration);
+    begin_timestoptimer((int64_t)duration);
 }
 
 int
@@ -12230,6 +12478,7 @@ reset_zap(VOID_ARGS)
 {
     obj_zapped = FALSE;
     poly_zapped = 0;
+    m_using = FALSE;
 }
 
 /*zap.c*/

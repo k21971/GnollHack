@@ -32,10 +32,26 @@ namespace GnollHackX.Pages.MainScreen
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _fileName = fileName;
             ScoresView.BindingContext = this;
             MainGrid.BindingContext = this;
+            if(GHApp.DarkMode)
+            {
+                HeaderLabel.TextColor = GHColors.White;
+                NoScoresLabel.TextColor = GHColors.White;
+                foreach(View view in HeaderGrid.Children)
+                {
+                    if(view is Label)
+                    {
+                        Label l = (Label)view;
+                        l.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+                    }
+                }
+            }
             if(GHApp.HasInternetAccess)
             {
                 CloseButton.IsVisible = false;
@@ -47,6 +63,9 @@ namespace GnollHackX.Pages.MainScreen
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _fileName = "";
             NoScoresLabel.IsVisible = true;
@@ -58,7 +77,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         public bool ReadFile(out string errorMessage)
@@ -70,12 +89,7 @@ namespace GnollHackX.Pages.MainScreen
                 List<GHTopScoreItem> newTopScores = new List<GHTopScoreItem>();
                 foreach (string line in lines)
                 {
-                    string[] lineitems = line.Split('\t');
-                    GHTopScoreItem tsi = new GHTopScoreItem(this);
-                    foreach(string lineitem in lineitems)
-                    {
-                        tsi.AddXlogLineItemData(lineitem);
-                    }
+                    GHTopScoreItem tsi = new GHTopScoreItem(line);
                     newTopScores.Add(tsi);
                 }
 
@@ -128,7 +142,7 @@ namespace GnollHackX.Pages.MainScreen
                 HeaderLabel.Margin = UIUtils.GetHeaderMarginWithBorder(bkgView.BorderStyle, width, height);
                 CloseButton.Margin = UIUtils.GetFooterMarginWithBorderWithTop(bkgView.BorderStyle, width, height, 20.0);
                 double bordermargin = UIUtils.GetBorderWidth(bkgView.BorderStyle, width, height);
-                ScoresView.Margin = new Thickness(bordermargin, 0, bordermargin, 0);
+                ScoresView.Margin = new Thickness(bordermargin + 6, 0, bordermargin + 6, 0);
 
                 if (ScoresView.ItemsSource != null)
                 {
@@ -260,19 +274,6 @@ namespace GnollHackX.Pages.MainScreen
             }
         }
 
-        public async Task<bool> OpenBrowser(Uri uri)
-        {
-            try
-            {
-                await Browser.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
-                return false;
-            }
-        }
         public async Task<bool> OpenFileInLauncher(string fullPath)
         {
             try
@@ -327,7 +328,7 @@ namespace GnollHackX.Pages.MainScreen
                             }
                             else
                             {
-                                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                                await GHApp.Navigation.PushModalAsync(displFilePage);
                                 HTMLDumplogDisplayed = true;
                             }
                         }
@@ -352,7 +353,7 @@ namespace GnollHackX.Pages.MainScreen
                             }
                             else
                             {
-                                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                                await GHApp.Navigation.PushModalAsync(displFilePage);
                             }
                         }
                         else
@@ -377,7 +378,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             ServerButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await OpenBrowser(new Uri(GHApp.XlogTopScoreAddress));
+            await GHApp.OpenBrowser(this, "Top Scores", new Uri(GHApp.XlogTopScoreAddress));
             ServerButton.IsEnabled = true;
         }
     }

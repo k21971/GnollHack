@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0  wintype.h       $NHDT-Date: 1549327486 2019/02/05 00:44:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.19 $ */
 /* Copyright (c) David Cohrs, 1991                                */
@@ -6,6 +6,8 @@
 
 #ifndef WINTYPE_H
 #define WINTYPE_H
+
+#include "config.h"
 
 typedef int winid; /* a window identifier */
 
@@ -22,13 +24,16 @@ typedef union any {
     long a_long;
     unsigned long a_ulong;
     long long a_longlong;
+    unsigned long long a_ulonglong;
+    int64_t a_int64;
+    uint64_t a_uint64;
     int *a_iptr;
     long *a_lptr;
     unsigned long *a_ulptr;
     unsigned *a_uptr;
     const char *a_string;
     int NDECL((*a_nfunc));
-    unsigned long a_mask32; /* used by status highlighting */
+    uint64_t a_mask64; /* used by status highlighting */
     coord a_coord;
     struct nhregion *a_nhregion;
     float a_float;
@@ -52,19 +57,21 @@ enum any_types {
     ANY_UINT,        /* unsigned int */
     ANY_LONG,        /* long */
     ANY_ULONG,       /* unsigned long */
+    ANY_INT64,       /* int64_t */
+    ANY_UINT64,      /* uint64_t */
     ANY_IPTR,        /* pointer to int */
     ANY_UPTR,        /* pointer to unsigned int */
     ANY_LPTR,        /* pointer to long */
     ANY_ULPTR,       /* pointer to unsigned long */
     ANY_STR,         /* pointer to null-terminated char string */
     ANY_NFUNC,       /* pointer to function taking no args, returning int */
-    ANY_MASK32       /* 32-bit mask (stored as unsigned long) */
+    ANY_MASK64       /* 64-bit mask (stored as uint64_t) */
 };
 
 /* menu return list */
 typedef struct mi {
     anything item; /* identifier */
-    long count;    /* count */
+    int64_t count;    /* count */
 } menu_item;
 #define MENU_ITEM_P struct mi
 
@@ -147,9 +154,22 @@ typedef struct mi {
 #define ATR_LINE_ATTR_MASK      0x7FFFFFF0 /* because this is signed integer */
 
 /* nh_poskey() modifier types */
-#define CLICK_1 1
-#define CLICK_2 2
-#define CLICK_3 3 /* Precision mode click, move only single squares */
+#define CLICK_DEFAULT       0 /* Not set; default behaviour, clicking primary for right, nothing for middle */
+
+#define DEFCLICK_ROLE       1 /* Set at start based on Role */
+
+#define CLICK_PRIMARY       1 /* Primary (left): Travel or attack */
+#define CLICK_SECONDARY     2 /* Secondary (right): flags.right_click_command */
+#define CLICK_TERTIARY      3 /* Tertiary (middle): flags.middle_click_command */
+
+#define CLICK_OFF           3 /* Nothing */
+#define CLICK_LOOK          4 /* Look */
+#define CLICK_MOVE          5 /* Move (no travel) */
+#define CLICK_CAST          6 /* Cast the selected directional spell (normally right mouse button) */
+#define CLICK_FIRE          7 /* Fire a ranged weapon */
+#define CLICK_ZAP           8 /* Zap the selected wand */
+#define MAX_CLICK_TYPES     9
+
 
 /* invalid winid */
 #define WIN_ERR ((winid) -1)

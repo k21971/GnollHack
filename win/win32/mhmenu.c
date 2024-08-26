@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhmenu.c    $NHDT-Date: 1432512811 2015/05/25 00:13:31 $  $NHDT-Branch: master $:$NHDT-Revision: 1.48 $ */
 /* Copyright (c) Alex Kompel, 2002                                */
@@ -41,7 +41,7 @@ typedef struct mswin_menu_item {
     int count;
     BOOL has_focus;
     boolean is_animated;
-    unsigned long miflags;
+    uint64_t miflags;
 } NHMenuItem, *PNHMenuItem;
 
 typedef struct mswin_gnollhack_menu_window {
@@ -627,8 +627,8 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         if (!data->text.text)
             break;
 
-        char msgbuf[BUFSIZ] = "";
-        write_CP437_to_buf_unicode(msgbuf, BUFSIZ, msg_data->text);
+        char msgbuf[BUFSZ * 4] = "";
+        write_CP437_to_buf_unicode(msgbuf, BUFSZ * 4, msg_data->text);
 
         _tcscat(data->text.text, NH_A2W(msgbuf /*msg_data->text*/, wbuf, BUFSZ));
         if(msg_data->attrs)
@@ -1702,7 +1702,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                                 tileDC[a_sheet_idx], source_rt.left, source_rt.top, width, height, SRCCOPY);
 
                             /* Color */
-                            unsigned long draw_color = autodraws[autodraw].parameter1;
+                            uint64_t draw_color = autodraws[autodraw].parameter1;
                             unsigned char blue = (&((unsigned char)draw_color))[0];
                             unsigned char green = (&((unsigned char)draw_color))[1];
                             unsigned char red = (&((unsigned char)draw_color))[2];
@@ -1977,7 +1977,8 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                         if (cnt >= max_marks)
                             break;
 
-                        int src_x = (ipm_idx % marks_per_row) * mark_width, src_y = (ipm_idx / marks_per_row) * mark_height;
+                        int src_tile = ITEM_PROPERTY_MARKS + (ipm_idx / MAX_UI_TILE_8_x_24_COMPONENTS);
+                        int src_x = ((ipm_idx % MAX_UI_TILE_8_x_24_COMPONENTS) % marks_per_row) * mark_width, src_y = ((ipm_idx % MAX_UI_TILE_8_x_24_COMPONENTS) / marks_per_row) * mark_height;
                         int dest_x = 0, dest_y = 0;
 
                         switch (ipm_idx)
@@ -2089,7 +2090,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
                         dest_y = y_start + (int)((double)(y_padding) * mark_scale_factor);
                         dest_x = x_start + (int)((double)item_xpos * scale_factor);
 
-                        int source_glyph = ITEM_PROPERTY_MARKS + GLYPH_UI_TILE_OFF;
+                        int source_glyph = src_tile + GLYPH_UI_TILE_OFF;
                         int atile = glyph2tile[source_glyph];
                         int a_sheet_idx = TILE_SHEET_IDX(atile);
                         int at_x = TILEBMP_X(atile);

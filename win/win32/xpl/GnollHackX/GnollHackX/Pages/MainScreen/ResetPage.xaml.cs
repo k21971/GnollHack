@@ -26,10 +26,21 @@ namespace GnollHackX.Pages.MainScreen
     [XamlCompilation(XamlCompilationOptions.Compile)]
     public partial class ResetPage : ContentPage
     {
-        public ResetPage()
+        private MainPage _mainPage;
+        public ResetPage(MainPage mainPage)
         {
+            _mainPage = mainPage;
+            Disappearing += (s, e) => { _mainPage.StartCarouselViewAndEnableButtons(); };
+
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            if (GHApp.DarkMode)
+            {
+                lblHeader.TextColor = GHColors.White;
+            }
 #if !DEBUG
             btnDownloadTestFiles.IsVisible = false;
             btnImportTestFiles.IsVisible = false;
@@ -44,7 +55,7 @@ namespace GnollHackX.Pages.MainScreen
             if (answer)
             {
                 GHApp.GnollHackService.ClearCoreFiles();
-                GHApp.GnollHackService.InitializeGnollHack();
+                await GHApp.GnollHackService.InitializeGnollHack();
                 btnDeleteFiles.Text = "Done";
                 btnDeleteFiles.TextColor = GHColors.Red;
             }
@@ -213,7 +224,7 @@ namespace GnollHackX.Pages.MainScreen
             ResetGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel(); 
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private bool _backPressed = false;
@@ -224,7 +235,7 @@ namespace GnollHackX.Pages.MainScreen
                 _backPressed = true;
                 ResetGrid.IsEnabled = false;
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             return false;
         }
@@ -323,6 +334,8 @@ namespace GnollHackX.Pages.MainScreen
                     btnDownloadTestFiles.TextColor = GHColors.Red;
                 }
             }
+#else
+            await DisplayAlert("Command Unavailable", "This command is unavailable in Release mode.", "OK");
 #endif
             ResetGrid.IsEnabled = true;
         }
@@ -498,6 +511,8 @@ namespace GnollHackX.Pages.MainScreen
             {
                 await DisplayAlert("Error", "An error occurred while trying to import files: " + ex.Message, "OK");
             }
+#else
+            await DisplayAlert("Command Unavailable", "This command is unavailable in Release mode.", "OK");
 #endif
             ResetGrid.IsEnabled = true;
         }

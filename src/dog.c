@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    dog.c    $NHDT-Date: 1554580624 2019/04/06 19:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.85 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -778,7 +778,7 @@ makedog()
             ismale = TRUE;
     }
 
-    unsigned long extrammflags = 0UL;
+    uint64_t extrammflags = 0UL;
     if (isfemale && !isneuter)
     {
         petname_female = petname;
@@ -983,7 +983,7 @@ boolean with_you;
      * specify its final destination.
      */
 
-    long nmv = monstermoves - 1L - mtmp->mlstmv;
+    int64_t nmv = monstermoves - 1L - mtmp->mlstmv;
     if (nmv > 0) 
     {
         /* mtmp->mlstmv < monstermoves - 1L */
@@ -1135,7 +1135,7 @@ boolean with_you;
 void
 mon_catchup_elapsed_time(mtmp, nmv)
 struct monst *mtmp;
-long nmv; /* number of moves */
+int64_t nmv; /* number of moves */
 {
     int imv = 0; /* avoid zillions of casts and lint warnings */
 
@@ -1951,11 +1951,9 @@ boolean was_dead;
 {
     struct edog *edog;
     boolean quietly = was_dead;
+    schar was_tame = mtmp->mtame;
 
     finish_meating(mtmp);
-
-    if (!mtmp->mtame)
-        return;
     edog = !mtmp->isminion ? EDOG(mtmp) : 0;
 
     /* if monster was starving when it died, undo that now */
@@ -1997,7 +1995,7 @@ boolean was_dead;
             mtmp->mpeaceful = rn2(2);
     }
 
-    if (!mtmp->mtame)
+    if (was_tame && !mtmp->mtame)
     {
         if (!quietly && canspotmon(mtmp))
             pline("%s %s.", Monnam(mtmp),
@@ -2010,7 +2008,8 @@ boolean was_dead;
         if (mtmp == u.usteed)
             dismount_steed(DISMOUNT_THROWN);
     }
-    else if (edog)
+    
+    if (edog)
     {
         /* it's still a pet; start a clean pet-slate now */
         edog->revivals++;

@@ -1,4 +1,4 @@
-# GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16
+# GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11
 
 #      GnollHack Top-level Makefile.
 # GnollHack 3.6  Makefile.top    $NHDT-Date: 1524689449 2018/04/25 20:50:49 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.36 $
@@ -89,8 +89,8 @@ SPEC_LEVS = dispater.lev baalz.lev bigrm-*.lev bovine?.lev quantum?.lev castle.l
 	astral.lev air.lev earth.lev fire.lev water.lev
 QUEST_LEVS = ???-goal.lev ???-fil?.lev ???-loca.lev ???-strt.lev
 
-DATNODLB = $(VARDATND) license credits symbols
-DATDLB = $(DATHELP) dungeon tribute $(SPEC_LEVS) $(QUEST_LEVS) $(VARDATD)
+DATNODLB = $(VARDATND) license symbols
+DATDLB = $(DATHELP) credits dungeon tribute $(SPEC_LEVS) $(QUEST_LEVS) $(VARDATD)
 DAT = $(DATNODLB) $(DATDLB)
 
 $(GAME):

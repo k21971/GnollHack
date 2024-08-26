@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    extralev.c    $NHDT-Date: 1446975468 2015/11/08 09:37:48 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /*      Copyright 1988, 1989 by Ken Arromdee                      */
@@ -328,7 +328,7 @@ makerogueghost()
 
     if (rn2(4)) {
         ghostobj = mksobj_at(FOOD_RATION, x, y, FALSE, FALSE);
-        ghostobj->quan = (long) rnd(7);
+        ghostobj->quan = (int64_t) rnd(7);
         ghostobj->owt = weight(ghostobj);
     }
     if (rn2(2)) {
@@ -349,7 +349,7 @@ makerogueghost()
 
     ghostobj = mksobj_at(ARROW, x, y, FALSE, FALSE);
     ghostobj->enchantment = 0;
-    ghostobj->quan = (long) rn1(10, 25);
+    ghostobj->quan = (int64_t) rn1(10, 25);
     ghostobj->owt = weight(ghostobj);
     if (rn2(4))
         curse(ghostobj);

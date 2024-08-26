@@ -61,6 +61,9 @@ win/win32/vs/dumplog/*.*
 *assetpack.zip
 libgnollhackdroid.so*
 libgnollhackios.a
+gnollhackwin.dll
+gnollhackwin.lib
+gnollhackwin.exp
 win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/credits
 win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/xcredits
 win/win32/xpl/GnollHackX/GnollHackX.Android/gnh/symbols
@@ -89,6 +92,14 @@ win/win32/xpl/GnollHackM/Platforms/iOS/gnh/license
 win/win32/xpl/GnollHackM/Platforms/iOS/gnh/nhdat
 win/win32/xpl/GnollHackM/Platforms/iOS/gnh/sysconf
 win/win32/xpl/GnollHackM/Platforms/iOS/gnh/defaults.gnh
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/credits
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/xcredits
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/symbols
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/license
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/nhdat
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/sysconf
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/defaults.gnh
+win/win32/xpl/GnollHackM/Platforms/Windows/gnh/record
 dat/dlb.lst
 win/win32/xpl/gnollhackdroid/date*.h
 win/win32/xpl/gnollhackios/date*.h
@@ -186,6 +197,7 @@ StyleCopReport.xml
 *.tli
 *.tlh
 *.tmp
+*.TMP
 *.tmp_proj
 *.log
 *.vspscc

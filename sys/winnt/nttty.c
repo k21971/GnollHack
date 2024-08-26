@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    nttty.c    $NHDT-Date: 1554215932 2019/04/02 14:38:52 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.99 $ */
 /* Copyright (c) GnollHack PC Development Team 1993    */
@@ -1186,7 +1186,7 @@ synch_cursor()
 void
 tty_change_color(color_number, rgb, reverse)
 int color_number, reverse;
-long rgb;
+int64_t rgb;
 {
     /* Map GnollHack color index to NT Console palette index */
     int idx, win32_color_number[] = {

@@ -2,12 +2,11 @@
  * soundset.h
  * Copyright (c) Janne Gustafsson, 2020
  */
-#include "general.h"
-#include "action.h" 
-
 #ifndef SOUNDSET_H
 #define SOUNDSET_H
 
+#include "action.h" 
+#include "general.h" 
 
 /*
 * GHSOUNDS
@@ -2181,6 +2180,9 @@ enum ghsound_types {
     GHSOUND_VOICE_SHOPKEEPER_MODRON_ILL_ADD_THAT_TO_YOUR_BILL,
     GHSOUND_VOICE_SHOPKEEPER_MODRON_COSTLY_ALTERATION,
 
+    GHSOUND_MUSIC_OUR_MOUNTAIN,
+    GHSOUND_MUSIC_THE_SWORD_AND_THE_RAVEN,
+
     MAX_GHSOUNDS
 };
 
@@ -2786,13 +2788,14 @@ struct ghsound_immediate_info {
     enum immediate_sound_types sound_type;
     enum sound_play_groups play_group;
     unsigned int dialogue_mid; /* Monster who's speaking, if any */
-    unsigned long play_flags;
+    unsigned int play_flags;
 };
 
-#define PLAY_FLAGS_NONE                                   0x00000000UL
-#define PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING             0x00000001UL
-#define PLAY_FLAGS_NO_PLAY_IF_ALREADY_QUEUED              0x00000002UL
+#define PLAY_FLAGS_NONE                                   0x00000000U
+#define PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING             0x00000001U
+#define PLAY_FLAGS_NO_PLAY_IF_ALREADY_QUEUED              0x00000002U
 #define PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING_OR_QUEUED (PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING | PLAY_FLAGS_NO_PLAY_IF_ALREADY_QUEUED)
+#define PLAY_FLAGS_SONG                                   0x00000004U
 
 
 struct ghsound_music_info {
@@ -4082,12 +4085,6 @@ enum sound_bank_types {
     SOUND_BANK_NONE = 0,
     SOUND_BANK_MASTER,
     MAX_SOUND_BANKS
-};
-
-struct sound_bank_definition {
-    boolean isresource;
-    int resource_id;
-    const char* filename;
 };
 
 

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mkmap.c    $NHDT-Date: 1432512767 2015/05/25 00:12:47 $  $NHDT-Branch: master $:$NHDT-Revision: 1.16 $ */
 /* Copyright (c) J. C. Collet, M. Stephenson and D. Cohrs, 1992   */
@@ -49,7 +49,7 @@ init_fill(init_lev)
 lev_init* init_lev;
 {
     register int i, j;
-    long limit, count;
+    int64_t limit, count;
     schar bg_typ = init_lev->bg, fg_typ = init_lev->fg;
 
     limit = (WIDTH * HEIGHT * 2) / 5;

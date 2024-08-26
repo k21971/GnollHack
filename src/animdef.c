@@ -2,12 +2,12 @@
 /* Copyright (c) Janne Gustafsson, 2021. */
 /* GnollHack may be freely redistributed.  See license for details. */
 
+#include "config.h"
 #include "animation.h"
 #include "general.h"
+#include "obj.h"
 #include "rm.h"
 #include "tiledata.h"
-#include "config.h"
-#include "obj.h"
 
  /* Stuff used also in makedefs, not relying on pm.h or onames.h */
 
@@ -10727,7 +10727,18 @@ NEARDATA const struct replacement_definition replacements[MAX_REPLACEMENTS] =
       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
     },
     { "golden-chest-replacement",
-      GOLDEN_CHEST_REPLACEMENT_TILES,
+      CHEST_REPLACEMENT_TILES,
+      REPLACEMENT_EVENT_NO_EVENT,
+      REPLACEMENT_ACTION_CHEST,
+      AUTODRAW_NONE, -1,
+      { "locked", "broken", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "" },
+      { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+      { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+      { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+      { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    },
+    { "sandalwood-chest-replacement",
+      CHEST_REPLACEMENT_TILES,
       REPLACEMENT_EVENT_NO_EVENT,
       REPLACEMENT_ACTION_CHEST,
       AUTODRAW_NONE, -1,

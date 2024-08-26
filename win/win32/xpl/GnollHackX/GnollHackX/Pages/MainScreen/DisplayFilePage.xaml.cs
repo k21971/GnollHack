@@ -50,6 +50,9 @@ namespace GnollHackX.Pages.MainScreen
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _fileName = fileName;
             _fixedWidth = fixedWidth;
@@ -58,6 +61,11 @@ namespace GnollHackX.Pages.MainScreen
             CloseButton.IsVisible = !displayshare;
             _isHtml = isHtml;
             TextLabel.InitiallyRolledDown = isScrolledDown;
+            if(GHApp.DarkMode)
+            {
+                HeaderLabel.TextColor = GHColors.White;
+                TextLabel.TextColor = GHColors.White;
+            }
             if (GHApp.IsiOS && _isHtml)
                 DisplayWebView.Opacity = 0.0;
         }
@@ -66,7 +74,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         public bool ReadFile(out string errorMessage)
@@ -106,7 +114,6 @@ namespace GnollHackX.Pages.MainScreen
                                 text = text.Substring(0, firstLineBreak) + new string(' ', _fixedWidth - len) + text.Substring(firstLineBreak);
                             }
                         }
-
                     }
                     TextLabel.Text = text;
                     TextLabel.IsVisible = true;

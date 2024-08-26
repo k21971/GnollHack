@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    lev.h    $NHDT-Date: 1432512781 2015/05/25 00:13:01 $  $NHDT-Branch: master $:$NHDT-Revision: 1.12 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -88,16 +88,16 @@ struct save_game_stats {
     xchar dlevel;
     schar depth;
     schar game_difficulty;
-    long umoves;
+    int64_t umoves;
     boolean debug_mode;
     boolean explore_mode;
     boolean modern_mode;
     boolean casual_mode;
     uchar save_flags;
-    time_t time_stamp;
+    int64_t time_stamp;
 
     /* Other information */
-    unsigned long num_recoveries;
+    uint64_t num_recoveries;
 };
 
 #define SAVEFLAGS_NONE              0x00

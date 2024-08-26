@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	macwin.c	$NHDT-Date: 1432512796 2015/05/25 00:13:16 $  $NHDT-Branch: master $:$NHDT-Revision: 1.26 $ */
 /* Copyright (c) Jon W{tte, Hao-Yang Wang, Jonathan Handler 1992. */
@@ -2199,7 +2199,7 @@ BaseClick(NhWindow *wind, Point pt, UInt32 modifiers)
 {
     pt.h = pt.h / wind->char_width + 1;
     pt.v = pt.v / wind->row_height;
-    clicked_mod = (modifiers & shiftKey) ? CLICK_2 : CLICK_1;
+    clicked_mod = (modifiers & shiftKey) ? CLICK_SECONDARY : CLICK_PRIMARY;
 
     if (strchr(topl_resp, *click_to_cmd(pt.h, pt.v, clicked_mod)))
         nhbell();
@@ -2228,7 +2228,7 @@ BaseCursor(NhWindow *wind, Point pt)
         dir_bas = (char *) Cmd.dirchars;
         dir =
             strchr(dir_bas, *click_to_cmd(pt.h / wind->char_width + 1,
-                                          pt.v / wind->row_height, CLICK_1));
+                                          pt.v / wind->row_height, CLICK_PRIMARY));
     }
     ch = GetCursor(dir ? dir - dir_bas + 513 : 512);
     if (ch) {

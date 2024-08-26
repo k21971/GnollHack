@@ -1,14 +1,14 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /*
  * Layers. Copyright (c) Janne Gustafsson, 2020
  *
  */
-#include "tradstdc.h"
-#include "config.h"
-
 #ifndef LAYER_H
 #define LAYER_H
+
+#include "config.h"
+#include "tradstdc.h"
 
 enum layer_types
 {
@@ -46,7 +46,7 @@ struct layer_info {
     int layer_glyphs[MAX_LAYERS];
     int layer_gui_glyphs[MAX_LAYERS];
 
-    unsigned long layer_flags;
+    uint64_t layer_flags;
 
     unsigned m_id;  /* check that the monster found at the square is the one that is supposed to be drawn by comparing their m_ids */
     unsigned o_id;  /* this is the o_id of the possibly moving boulder */
@@ -64,12 +64,12 @@ struct layer_info {
     int monster_maxhp;
     int rider_glyph;
     int rider_gui_glyph;
-    unsigned long status_bits;
-    unsigned long condition_bits;
-    unsigned long buff_bits[NUM_BUFF_BIT_ULONGS];
+    uint64_t status_bits;
+    uint64_t condition_bits;
+    uint64_t buff_bits[NUM_BUFF_BIT_ULONGS];
     xchar wsegdir;
     xchar reverse_prev_wsegdir;
-    unsigned long monster_flags;
+    uint64_t monster_flags;
 
     short object_height;
 
@@ -82,7 +82,7 @@ struct layer_info {
     uchar missile_mythic_suffix;
     uchar missile_eroded;
     uchar missile_eroded2;
-    unsigned long missile_flags;
+    uint64_t missile_flags;
     short missile_height;
     xchar missile_origin_x;
     xchar missile_origin_y;
@@ -173,6 +173,35 @@ struct layer_info {
 #define MISSILE_FLAGS_TETHERED      0x00000040UL /* Missile is tethered */
 #define MISSILE_FLAGS_LIT           0x00000080UL
 
+struct replacement_info {
+    int signed_glyph;
+    int layer;
+    struct obj* object;
+    struct monst* monster;
+    uint64_t layer_flags;
+    uint64_t monster_flags;
+    uint64_t missile_flags;
+    unsigned char missile_material;
+    short missile_special_quality;
+};
+
+struct extended_menu_info {
+    struct obj* object;
+    struct monst* monster;
+    char heading_for_group_accelerator;
+    const char* attrs;
+    const char* colors;
+    int style; /* Generic style or subtype; used in menu data */
+    char special_mark;
+    int num_items; /* Number of items in e.g. category */
+    uint64_t menu_flags;
+};
+
+struct extended_create_window_info {
+    struct obj* object;
+    struct monst* monster;
+    uint64_t create_flags;
+};
 
 struct monst_info {
     int glyph;
@@ -184,11 +213,33 @@ struct monst_info {
     int mhp;
     int mhpmax;
 
-    unsigned long status_bits;
-    unsigned long condition_bits;
-    unsigned long buff_bits[NUM_BUFF_BIT_ULONGS];
+    uint64_t status_bits;
+    uint64_t condition_bits;
+    uint64_t buff_bits[NUM_BUFF_BIT_ULONGS];
 
-    unsigned long monster_flags;
+    uint64_t monster_flags;
 };
+
+struct amulet_count_result
+{
+    int64_t score;
+    int64_t quantity;
+    int64_t amulets_of_life_saving;
+    int64_t other_amulets;
+};
+
+struct item_score_count_result
+{
+    int64_t score;
+    int64_t quantity;
+    int64_t quantity_nonammo;
+    int64_t quantity_ammo;
+};
+
+/*
+ * type nhsym: loadable symbols go into this type
+ */
+typedef int64_t nhsym;
+
 
 #endif /* LAYER_H */

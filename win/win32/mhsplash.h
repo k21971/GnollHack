@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* Copyright (C) 2002 by Alex Kompel */
 /* GnollHack may be freely redistributed.  See license for details. */
@@ -11,7 +11,6 @@ $NHDT-Date: 1432512811 2015/05/25 00:13:31 $  $NHDT-Branch: master $:$NHDT-Revis
 
 #include "winMS.h"
 #include "config.h"
-#include "global.h"
 
 void mswin_display_splash_window(BOOL);
 

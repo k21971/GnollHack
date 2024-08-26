@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    tradstdc.h    $NHDT-Date: 1555361295 2019/04/15 20:48:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.36 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -162,7 +162,7 @@
  * almost certainly break this, as would any integer type bigger than
  * sizeof (char *).
  * GnollHack avoids floating point, and any configuration able to use
- * 'long long int' or I64P32 or the like should be using USE_STDARG.
+ * 'int64_t int64_t int' or I64P32 or the like should be using USE_STDARG.
  */
 #ifndef VA_TYPE
 typedef const char *vA;
@@ -298,7 +298,7 @@ typedef genericptr genericptr_t; /* (void *) or (char *) */
  * Due to the presence of things like gcc, NHSTDC is not a good test.
  * So we assume microcomputers have all converted to ANSI and bigger
  * computers which may have older libraries give reasonable results with
- * casting pointers to unsigned long int (fmt_ptr() in alloc.c).
+ * casting pointers to unsigned long long int (fmt_ptr() in alloc.c).
  */
 #define HAS_PTR_FMT
 #endif
@@ -403,9 +403,11 @@ typedef genericptr genericptr_t; /* (void *) or (char *) */
  */
 #define OBJ_P void *
 #define MONST_P void *
+#define TRAP_P void *
 #else
 #define OBJ_P struct obj *
 #define MONST_P struct monst *
+#define TRAP_P struct trap *
 #endif
 
 #if 0

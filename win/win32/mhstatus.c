@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhstatus.c    $NHDT-Date: 1536411224 2018/09/08 12:53:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.29 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -189,8 +189,8 @@ StatusWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (wParam) {
         case MSNH_MSG_PUTSTR: {
             PMSNHMsgPutstr msg_data = (PMSNHMsgPutstr) lParam;
-            char msgbuf[BUFSIZ] = "";
-            write_CP437_to_buf_unicode(msgbuf, BUFSIZ, msg_data->text);
+            char msgbuf[BUFSZ * 4] = "";
+            write_CP437_to_buf_unicode(msgbuf, BUFSZ * 4, msg_data->text);
             (void)strncpy(data->window_text[data->index], msgbuf,
                     MAXWINDOWTEXT);
             data->index = (data->index + 1) % NHSW_LINES;
@@ -353,8 +353,8 @@ onWMPaint(HWND hWnd, WPARAM wParam, LPARAM lParam)
                 atr = status_string->attribute;
 
                 const char *str = status_string->str;
-                char msgbuf[BUFSIZ] = "";
-                write_CP437_to_buf_unicode(msgbuf, BUFSIZ, str);
+                char msgbuf[BUFSZ * 4] = "";
+                write_CP437_to_buf_unicode(msgbuf, BUFSZ * 4, str);
 
                 vlen = strlen(msgbuf);
 

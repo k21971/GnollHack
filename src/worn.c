@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    worn.c    $NHDT-Date: 1550524569 2019/02/18 21:16:09 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -9,13 +9,13 @@
 
 STATIC_DCL void FDECL(m_lose_armor, (struct monst *, struct obj *));
 STATIC_DCL boolean FDECL(m_dowear_type,
-                      (struct monst *, long, BOOLEAN_P, BOOLEAN_P));
+                      (struct monst *, int64_t, BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL int FDECL(extra_pref, (struct monst *, struct obj *));
 STATIC_DCL void FDECL(set_mon_temporary_property, (struct monst*, int, UNSIGNED_SHORT_P));
 
 
 const struct worn {
-    long w_mask;
+    int64_t w_mask;
     struct obj **w_obj;
 } worn[] = { { W_ARM, &uarm },
              { W_ARMC, &uarmc },
@@ -47,7 +47,7 @@ const struct worn {
 void
 setworn(obj, mask)
 register struct obj* obj;
-long mask;
+int64_t mask;
 {
     setworncore(obj, mask, TRUE);
 }
@@ -56,7 +56,7 @@ long mask;
 void
 setwornquietly(obj, mask)
 register struct obj* obj;
-long mask;
+int64_t mask;
 {
     setworncore(obj, mask, FALSE);
 }
@@ -69,7 +69,7 @@ long mask;
 void
 setworncore(obj, mask, verbose_and_update_stats)
 register struct obj *obj;
-long mask;
+int64_t mask;
 boolean verbose_and_update_stats;
 {
     register const struct worn *wp;
@@ -376,7 +376,7 @@ boolean verbose;
 /* return item worn in slot indiciated by wornmask; needed by poly_obj() */
 struct obj *
 wearmask_to_obj(wornmask)
-long wornmask;
+int64_t wornmask;
 {
     const struct worn *wp;
 
@@ -387,14 +387,14 @@ long wornmask;
 }
 
 /* return a bitmask of the equipment slot(s) a given item might be worn in */
-long
+int64_t
 wearslot(obj)
 struct obj *obj;
 {
     int otyp = obj->otyp;
     /* practically any item can be wielded or quivered; it's up to
        our caller to handle such things--we assume "normal" usage */
-    long res = 0L; /* default: can't be worn anywhere */
+    int64_t res = 0L; /* default: can't be worn anywhere */
 
     switch (obj->oclass) {
     case AMULET_CLASS:
@@ -672,10 +672,10 @@ boolean silently;
     boolean res = FALSE;
 
     /* works for fast, very fast, and slowed */
-    char savedname[BUFSIZ] = "";
+    char savedname[BUFSZ * 2] = "";
     Strcpy(savedname, mon_nam(mtmp));
 
-    char SavedName[BUFSIZ] = "";
+    char SavedName[BUFSZ * 2] = "";
     Strcpy(SavedName, Monnam(mtmp));
 
     boolean could_spot_mon = canspotmon(mtmp);
@@ -1207,7 +1207,7 @@ boolean silently;
                         if (!mythic_powers[k].name)
                             break;
 
-                        unsigned long mythic_power_bit = 1UL << ((unsigned long)k);
+                        uint64_t mythic_power_bit = (uint64_t)1 << ((uint64_t)k);
 
                         if ((mythic_definitions[mythic_quality].mythic_powers & mythic_power_bit) && mythic_power_applies_to_obj(otmp, mythic_powers[k].power_flags))
                         {
@@ -1252,7 +1252,7 @@ boolean silently;
                     {
                         for (k = 0; k < 32; k++)
                         {
-                            unsigned long bit = 1UL << k;
+                            uint64_t bit = (uint64_t)1 << k;
                             int propnum = spfx_to_prop(bit);
                             if (artilist[otmp->oartifact].spfx & bit)
                                 mon->mprops[propnum] |= M_EXTRINSIC;
@@ -1261,7 +1261,7 @@ boolean silently;
 
                     for (k = 0; k < 32; k++)
                     {
-                        unsigned long bit = 1UL << k;
+                        uint64_t bit = (uint64_t)1 << k;
                         int propnum = spfx_to_prop(bit);
                         if (artilist[otmp->oartifact].cspfx & bit)
                             mon->mprops[propnum] |= M_EXTRINSIC;
@@ -1319,7 +1319,7 @@ register struct monst *mon;
     int armor_bonus = 0;
     int armor_ac = 10;
     int mac = 0;
-    long mwflags = mon->worn_item_flags;
+    int64_t mwflags = mon->worn_item_flags;
 
     for (obj = mon->minvent; obj; obj = obj->nobj) {
         if (obj->owornmask & mwflags)
@@ -1541,7 +1541,7 @@ boolean creation, commanded;
 STATIC_OVL boolean
 m_dowear_type(mon, flag, creation, racialexception)
 struct monst *mon;
-long flag;
+int64_t flag;
 boolean creation;
 boolean racialexception;
 {
@@ -1719,7 +1719,7 @@ outer_break:
 struct obj *
 which_armor(mon, flag)
 struct monst *mon;
-long flag;
+int64_t flag;
 {
     if (mon == &youmonst) {
         switch (flag) {
@@ -1821,6 +1821,8 @@ clear_bypasses()
     for (otmp = invent; otmp; otmp = otmp->nobj)
         otmp->bypass = 0;
     for (otmp = migrating_objs; otmp; otmp = otmp->nobj)
+        otmp->bypass = 0;
+    for (otmp = magic_objs; otmp; otmp = otmp->nobj)
         otmp->bypass = 0;
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
         if (DEADMONSTER(mtmp))

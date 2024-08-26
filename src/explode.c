@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    explode.c    $NHDT-Date: 1545182146 2018/12/19 01:15:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright (C) 1990 by Ken Arromdee */
@@ -813,7 +813,7 @@ struct scatter_chain {
  */
 
 /* returns number of scattered objects */
-long
+int64_t
 scatter(sx, sy, blastforce, scflags, obj)
 int sx, sy;     /* location of objects to scatter */
 int blastforce; /* force behind the scattering */
@@ -824,13 +824,13 @@ struct obj *obj; /* only scatter this obj        */
     register int tmp;
     int farthest = 0;
     uchar typ;
-    long qtmp;
+    int64_t qtmp;
     boolean used_up;
     boolean individual_object = obj ? TRUE : FALSE;
     struct monst *mtmp;
     struct scatter_chain *stmp, *stmp2 = 0;
     struct scatter_chain *schain = (struct scatter_chain *) 0;
-    long total = 0L;
+    int64_t total = 0L;
 
     if (individual_object && (obj->ox != sx || obj->oy != sy))
         impossible("scattered object <%d,%d> not at scatter site <%d,%d>",
@@ -841,7 +841,7 @@ struct obj *obj; /* only scatter this obj        */
             qtmp = otmp->quan - 1L;
             if (qtmp > LARGEST_INT)
                 qtmp = LARGEST_INT;
-            qtmp = (long) rnd((int) qtmp);
+            qtmp = (int64_t) rnd((int) qtmp);
             otmp = splitobj(otmp, qtmp);
         } else {
             obj = (struct obj *) 0; /* all used */
@@ -1021,6 +1021,7 @@ int x, y;
 
     if (!obj->lamplit)
         impossible("exploding unlit oil");
+    Strcpy(debug_buf_3, "explode_oil");
     end_burn(obj, TRUE);
     splatter_burning_oil(x, y, diluted_oil);
 }

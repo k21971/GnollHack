@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    pickup.c    $NHDT-Date: 1545785547 2018/12/26 00:52:27 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.222 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -27,12 +27,12 @@ STATIC_DCL boolean FDECL(allow_cat_no_uchain, (struct obj *));
 STATIC_DCL int FDECL(autopick, (struct obj *, int, menu_item **));
 STATIC_DCL int FDECL(count_categories, (struct obj *, int));
 STATIC_DCL int FDECL(delta_cwt, (struct obj *, struct obj *));
-STATIC_DCL long FDECL(carry_count, (struct obj *, struct obj *, long,
+STATIC_DCL int64_t FDECL(carry_count, (struct obj *, struct obj *, int64_t,
                                     BOOLEAN_P, int *, int *));
-STATIC_DCL int FDECL(lift_object, (struct obj *, struct obj *, long *,
+STATIC_DCL int FDECL(lift_object, (struct obj *, struct obj *, int64_t *,
                                    BOOLEAN_P));
 STATIC_DCL boolean FDECL(mbag_explodes, (struct obj *, struct obj*, int));
-STATIC_DCL long FDECL(boh_loss, (struct obj *container, int));
+STATIC_DCL int64_t FDECL(boh_loss, (struct obj *container, int));
 STATIC_PTR int FDECL(in_container_core, (struct obj*, BOOLEAN_P));
 STATIC_PTR int FDECL(out_container_core, (struct obj*, BOOLEAN_P, BOOLEAN_P, uchar*));
 STATIC_PTR int FDECL(move_container_core, (struct obj*, BOOLEAN_P));
@@ -51,7 +51,7 @@ STATIC_PTR int FDECL(move_container_nobot, (struct obj*));
 STATIC_PTR int FDECL(out_container_and_drop_nobot, (struct obj*));
 STATIC_PTR int FDECL(pickup_and_in_container_nobot, (struct obj*));
 STATIC_DCL void FDECL(removed_from_icebox, (struct obj *));
-STATIC_DCL long FDECL(mbag_item_gone, (int, struct obj *));
+STATIC_DCL int64_t FDECL(mbag_item_gone, (int, struct obj *));
 STATIC_DCL void FDECL(explain_container_prompt, (BOOLEAN_P));
 STATIC_DCL int FDECL(traditional_loot, (int, struct obj*, struct obj*));
 STATIC_DCL int FDECL(menu_loot, (int, int, struct obj*, struct obj*));
@@ -322,16 +322,19 @@ boolean remotely;
 
 /* attempting to manipulate a Rider's corpse triggers its revival */
 boolean
-rider_corpse_revival(obj, remotely)
+rider_corpse_revival(obj, remotely, was_revived_ptr)
 struct obj *obj;
 boolean remotely;
+boolean* was_revived_ptr;
 {
-    if (!obj || obj->otyp != CORPSE || !is_rider(&mons[obj->corpsenm]))
+    if (!obj || obj->otyp != CORPSE || obj->corpsenm < LOW_PM || !is_rider(&mons[obj->corpsenm]))
         return FALSE;
 
     pline_ex(ATR_NONE, CLR_MSG_WARNING, "At your %s, the corpse suddenly moves...",
           remotely ? "attempted acquisition" : "touch");
-    (void) revive_corpse(obj);
+    boolean res = revive_corpse(obj);
+    if (was_revived_ptr)
+        *was_revived_ptr = res;
     exercise(A_WIS, FALSE);
     return TRUE;
 }
@@ -362,7 +365,7 @@ boolean picked_some;
 }
 
 /* Value set by query_objlist() for n_or_more(). */
-STATIC_VAR long val_for_n_or_more;
+STATIC_VAR int64_t val_for_n_or_more;
 
 /* query_objlist callback: return TRUE if obj's count is >= reference value */
 STATIC_OVL boolean
@@ -555,6 +558,13 @@ register struct obj *otmp;
     return (is_worn(otmp) && allow_category(otmp)) ? TRUE : FALSE;
 }
 
+boolean
+is_wearable_by_type(otmp)
+register struct obj* otmp;
+{
+    return (is_wearable(otmp) && allow_category(otmp)) ? TRUE : FALSE;
+}
+
 /*
  * Have the hero pick things from the ground
  * or a monster's inventory if swallowed.
@@ -569,7 +579,7 @@ register struct obj *otmp;
  */
 int
 pickup(what, do_auto_in_bag)
-int what; /* should be a long */
+int what; /* should be a int64_t */
 boolean do_auto_in_bag;
 {
     int i, n, res = 0, count, n_tried = 0, n_picked = 0;
@@ -705,7 +715,7 @@ boolean do_auto_in_bag;
     {
         /* old style interface */
         int ct = 0;
-        long lcount;
+        int64_t lcount;
         boolean all_of_a_type, selective, bycat;
         char oclasses[MAX_OBJECT_CLASSES + 10]; /* +10: room for B,U,C,X plus slop */
         struct obj *obj, *obj2;
@@ -722,7 +732,7 @@ boolean do_auto_in_bag;
         {
             /* if only one thing, then pick it */
             obj = *objchain_p;
-            lcount = min(obj->quan, (long) count);
+            lcount = min(obj->quan, (int64_t) count);
             n_tried++;
             if (pickup_object(obj, lcount, FALSE, do_auto_in_bag, (uchar*)0) > 0)
                 n_picked++; /* picked something */
@@ -785,7 +795,7 @@ boolean do_auto_in_bag;
                 case '#': /* count was entered */
                     if (!yn_number)
                         continue; /* 0 count => No */
-                    lcount = (long) yn_number;
+                    lcount = (int64_t) yn_number;
                     if (lcount > obj->quan)
                         lcount = obj->quan;
                     /*FALLTHRU*/
@@ -1172,8 +1182,17 @@ int show_weights;
 
                 char applied_invlet = (qflags & USE_INVLET) ? curr->invlet
                     : (first && curr->oclass == COIN_CLASS) ? GOLD_SYM : 0;
-                
+
                 char applied_group_accelerator = def_oc_syms[(int)objects[curr->otyp].oc_class].sym;
+
+                int used_color = NO_COLOR;
+                if ((qflags & WORN_UNSELECTABLE) && is_worn(curr))
+                {
+                    applied_invlet = 0;
+                    applied_group_accelerator = 0;
+                    any = zeroany;
+                    used_color = CLR_GRAY;
+                }
 
                 xchar x = 0, y = 0;
                 get_obj_location(curr, &x, &y, CONTAINED_TOO | BURIED_TOO);
@@ -1199,7 +1218,7 @@ int show_weights;
                 }
 
                 add_extended_menu(win, gui_glyph, &any,
-                    applied_invlet, applied_group_accelerator, ATR_NONE, NO_COLOR, 
+                    applied_invlet, applied_group_accelerator, ATR_NONE, used_color,
                     objbuf,
                     MENU_UNSELECTED, eminfo);
                 first = FALSE;
@@ -1301,6 +1320,8 @@ int how;               /* type of query */
 
     if (qflags & WORN_TYPES)
         ofilter = is_worn;
+    else if (qflags & WEARABLE_TYPES)
+        ofilter = is_wearable;
 
     int objcnt = count_objects(olist, ofilter, (qflags & BY_NEXTHERE) != 0);
     if (!objcnt)
@@ -1371,8 +1392,9 @@ int how;               /* type of query */
         info.num_items = objcnt;
         info.menu_flags |= MENU_FLAGS_AUTO_CLICK_OK;
         add_extended_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
-                 (qflags & WORN_TYPES) ? "Auto-select every item being worn"
-                                       : "Auto-select every item",
+                 (qflags & WORN_TYPES) ? "Auto-select every item being worn" :
+                 (qflags & WEARABLE_TYPES) ? "Auto-select every wearable item" :
+                 "Auto-select every item",
                  MENU_UNSELECTED, info);
 
         any = zeroany;
@@ -1386,7 +1408,7 @@ int how;               /* type of query */
         info.num_items = objcnt;
         info.menu_flags |= MENU_FLAGS_AUTO_CLICK_OK;
         add_extended_menu(win, NO_GLYPH, &any, invlet, 0, ATR_NONE, NO_COLOR,
-                 (qflags & WORN_TYPES) ? "All worn types" : "All types",
+                 (qflags & WORN_TYPES) ? "All worn types" : (qflags & WEARABLE_TYPES) ? "All wearable types" : "All types",
                  MENU_UNSELECTED, info);
         invlet = 'b';
     } else
@@ -1528,6 +1550,9 @@ int qflags;
                 if ((qflags & WORN_TYPES)
                     && !(curr->owornmask & (W_ARMOR | W_ACCESSORY | W_WEAPON)))
                     continue;
+                if ((qflags & WEARABLE_TYPES)
+                    && (!(curr->oclass == ARMOR_CLASS || curr->oclass == AMULET_CLASS || curr->oclass == RING_CLASS || curr->oclass == MISCELLANEOUS_CLASS)))
+                    continue;
                 if (!counted_category) {
                     ccount++;
                     counted_category = TRUE;
@@ -1556,7 +1581,7 @@ struct obj *container, *obj;
 
     owt = nwt = container->owt;
     /* find the object so that we can remove it */
-    for (prev = &container->cobj; *prev; prev = &(*prev)->nobj)
+    for (prev = contained_object_chain_ptr(container); *prev; prev = &(*prev)->nobj)
         if (*prev == obj)
             break;
     if (!*prev) {
@@ -1572,17 +1597,17 @@ struct obj *container, *obj;
 }
 
 /* could we carry `obj'? if not, could we carry some of it/them? */
-STATIC_OVL long
+STATIC_OVL int64_t
 carry_count(obj, container, count, telekinesis, wt_before, wt_after)
 struct obj *obj, *container; /* object to pick up, bag it's coming out of */
-long count;
+int64_t count;
 boolean telekinesis;
 int *wt_before, *wt_after;
 {
     boolean adjust_wt = container && carried(container),
             is_gold = obj->oclass == COIN_CLASS;
     int wt, iw, ow, oow;
-    long qq, savequan, umoney;
+    int64_t qq, savequan, umoney;
     unsigned saveowt;
     const char *verb, *prefx1, *prefx2, *suffx;
     char obj_nambuf[BUFSZ], where[BUFSZ];
@@ -1601,7 +1626,7 @@ int *wt_before, *wt_after;
         wt -= delta_cwt(container, obj);
     /* This will go with silver+copper & new gold weight */
     if (is_gold) /* merged gold might affect cumulative weight */
-        wt -= (GOLD_WT(umoney) + GOLD_WT(count) - GOLD_WT(umoney + count));
+        wt -= (int)(GOLD_WT(umoney) + GOLD_WT(count) - GOLD_WT(umoney + count));
     if (count != savequan) {
         obj->quan = savequan;
         obj->owt = saveowt;
@@ -1616,7 +1641,7 @@ int *wt_before, *wt_after;
     if (is_gold) {
         iw -= (int) GOLD_WT(umoney);
         if (!adjust_wt) {
-            qq = GOLD_CAPACITY((long) iw, umoney);
+            qq = GOLD_CAPACITY((int64_t) iw, umoney);
         } else {
             oow = 0;
             qq = 50L - (umoney % 100L) - 1L;
@@ -1713,7 +1738,7 @@ STATIC_OVL
 int
 lift_object(obj, container, cnt_p, telekinesis)
 struct obj *obj, *container; /* object to pick up, bag it's coming out of */
-long *cnt_p;
+int64_t *cnt_p;
 boolean telekinesis;
 {
     int result, old_wt, new_wt, prev_encumbr, next_encumbr;
@@ -1768,7 +1793,7 @@ boolean telekinesis;
                 result = 0; /* don't lift */
             } else {
                 char qbuf[BUFSZ];
-                long savequan = obj->quan;
+                int64_t savequan = obj->quan;
 
                 obj->quan = *cnt_p;
                 Strcpy(qbuf, (next_encumbr > HVY_ENCUMBER)
@@ -1811,7 +1836,7 @@ boolean telekinesis;
 int
 pickup_object(obj, count, telekinesis, do_auto_in_bag, obj_gone_ptr)
 struct obj *obj;
-long count;
+int64_t count;
 boolean telekinesis, do_auto_in_bag; /* not picking it up directly by hand */
 uchar* obj_gone_ptr; /* 1 = merged, 2 = put in bag, 3 = gone */
 {
@@ -1838,9 +1863,13 @@ uchar* obj_gone_ptr; /* 1 = merged, 2 = put in bag, 3 = gone */
     }
     else if (obj->otyp == CORPSE) 
     {
-        if (fatal_corpse_mistake(obj, telekinesis)
-            || rider_corpse_revival(obj, telekinesis))
+        boolean corpse_revived = FALSE;
+        if (fatal_corpse_mistake(obj, telekinesis) || rider_corpse_revival(obj, telekinesis, &corpse_revived))
+        {
+            if (corpse_revived && obj_gone_ptr)
+                *obj_gone_ptr = 3;
             return -1;
+        }
     } 
     else if (obj->otyp == SCR_SCARE_MONSTER) 
     {
@@ -1862,6 +1891,8 @@ uchar* obj_gone_ptr; /* 1 = merged, 2 = put in bag, 3 = gone */
                 && !(objects[SCR_SCARE_MONSTER].oc_uname))
                 docall(obj, dcbuf);
             useupf(obj, obj->quan);
+            if (obj_gone_ptr) /* gone */
+                *obj_gone_ptr = 3;
             return 1; /* tried to pick something up and failed, but
                          don't want to terminate pickup loop yet   */
         }
@@ -2063,7 +2094,7 @@ struct obj *otmp;
     boolean robshop = (!u.uswallow && otmp != uball && costly_spot(ox, oy));
 
     /* Play first so the location is still available */
-    if (iflags.using_gui_sounds)
+    if (iflags.using_gui_sounds && !ui_has_input())
     {
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_PICK_UP);
         delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
@@ -2417,6 +2448,7 @@ boolean* got_something_ptr;
         {
             if (levl[x][y].lamplit)
             {
+                Strcpy(debug_buf_4, "loot_decoration");
                 itemlit = TRUE;
                 del_light_source(LS_LOCATION, xy_to_any(x, y));
                 levl[x][y].lamplit = 0;
@@ -2433,7 +2465,7 @@ boolean* got_something_ptr;
             boolean subtyp_is_item_special_quality = (decoration_type_definitions[levl[x][y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_SUBTYP_IS_OBJ_SPECIAL_QUALITY) != 0;
             boolean item_is_statue = decoration_type_definitions[levl[x][y].decoration_typ].lootable_item == STATUE;
             int mnum = decoration_type_definitions[levl[x][y].decoration_typ].mnum;
-            struct obj* newobj = mksobj_with_flags(decoration_type_definitions[levl[x][y].decoration_typ].lootable_item, TRUE, FALSE, MKOBJ_TYPE_GENERATED, (struct monst*)0, MAT_NONE, item_is_statue ? mnum : subtyp_is_item_special_quality ? (long)levl[x][y].decoration_subtyp : 0L, 0L, item_is_statue ? MKOBJ_FLAGS_PARAM_IS_MNUM : subtyp_is_item_special_quality ? MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY : 0UL);
+            struct obj* newobj = mksobj_with_flags(decoration_type_definitions[levl[x][y].decoration_typ].lootable_item, TRUE, FALSE, MKOBJ_TYPE_GENERATED, (struct monst*)0, MAT_NONE, item_is_statue ? mnum : subtyp_is_item_special_quality ? (int64_t)levl[x][y].decoration_subtyp : 0L, 0L, item_is_statue ? MKOBJ_FLAGS_PARAM_IS_MNUM : subtyp_is_item_special_quality ? MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY : 0UL);
             if (newobj)
             {
                 *got_something_ptr = TRUE;
@@ -2720,7 +2752,7 @@ doloot()
                         if (has_item1)
                         {
                             any.a_int = 1;
-                            char itembuf[BUFSIZ] = "";
+                            char itembuf[BUFSZ * 2] = "";
                             int item_otyp = decoration_type_definitions[levl[cc.x][cc.y].decoration_typ].lootable_item;
                             Sprintf(itembuf, "%s", an(OBJ_NAME(objects[item_otyp])));
 
@@ -2733,7 +2765,7 @@ doloot()
                         if (has_item2)
                         {
                             any.a_int = 2;
-                            char itembuf[BUFSIZ] = "";
+                            char itembuf[BUFSZ * 2] = "";
                             int item_otyp = decoration_type_definitions[levl[cc.x][cc.y].decoration_typ].lootable_item2;
                             Sprintf(itembuf, "%s", an(OBJ_NAME(objects[item_otyp])));
 
@@ -2746,7 +2778,7 @@ doloot()
                         if (has_item3)
                         {
                             any.a_int = 3;
-                            char itembuf[BUFSIZ] = "";
+                            char itembuf[BUFSZ * 2] = "";
                             int item_otyp = decoration_type_definitions[levl[cc.x][cc.y].decoration_typ].lootable_item3;
                             Sprintf(itembuf, "%s", an(OBJ_NAME(objects[item_otyp])));
 
@@ -2865,7 +2897,7 @@ reverse_loot()
 {
     struct obj *goldob = 0, *coffers, *otmp, boxdummy;
     struct monst *mon;
-    long contribution;
+    int64_t contribution;
     int n, x = u.ux, y = u.uy;
 
     if (!rn2(3)) {
@@ -2882,7 +2914,7 @@ reverse_loot()
     /* find a money object to mess with */
     for (goldob = invent; goldob; goldob = goldob->nobj)
         if (goldob->oclass == COIN_CLASS) {
-            contribution = ((long) rnd(5) * goldob->quan + 4L) / 5L;
+            contribution = ((int64_t) rnd(5) * goldob->quan + 4L) / 5L;
             if (contribution < goldob->quan)
                 goldob = splitobj(goldob, contribution);
             break;
@@ -2957,7 +2989,7 @@ boolean do_auto_in_bag;
      */
     if (mtmp && mtmp != u.usteed && (otmp = which_armor(mtmp, W_SADDLE)))
     {
-        long unwornmask;
+        int64_t unwornmask;
 
         if (passed_info)
             *passed_info = 1;
@@ -3057,7 +3089,7 @@ int depthin;
     return FALSE;
 }
 
-STATIC_OVL long
+STATIC_OVL int64_t
 boh_loss(container, held)
 struct obj *container;
 int held;
@@ -3065,7 +3097,7 @@ int held;
     /* sometimes toss objects if a cursed magic bag */
     if (Is_mbag(container) && container->cursed && Has_contents(container))
     {
-        long loss = 0L;
+        int64_t loss = 0L;
         struct obj *curr, *otmp;
 
         for (curr = container->cobj; curr; curr = otmp) 
@@ -3300,7 +3332,7 @@ boolean dobot;
         /* stop any corpse timeouts when frozen */
         if (obj->otyp == CORPSE && obj->timed) 
         {
-            long rot_alarm = stop_timer(ROT_CORPSE, obj_to_any(obj));
+            int64_t rot_alarm = stop_timer(ROT_CORPSE, obj_to_any(obj));
 
             (void) stop_timer(REVIVE_MON, obj_to_any(obj));
             /* mark a non-reviving corpse as such */
@@ -3379,7 +3411,7 @@ boolean dobot;
     {
         Strcpy(buf, the(xname(current_container)));
         You("put %s into %s.", doname(obj), buf);
-        if (iflags.using_gui_sounds)
+        if (iflags.using_gui_sounds && !ui_has_input())
         {
             play_object_container_in_sound(obj, current_container);
             delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
@@ -3388,7 +3420,10 @@ boolean dobot;
         /* gold in container always needs to be added to credit */
         if (floor_container && obj->oclass == COIN_CLASS)
             sellobj(obj, current_container->ox, current_container->oy);
-        (void) add_to_container(current_container, obj);
+        if (Is_magic_chest(current_container))
+            (void) add_to_magic_chest(obj);
+        else
+            (void) add_to_container(current_container, obj);
         current_container->owt = weight(current_container);
     }
     /* gold needs this, and freeinv() many lines above may cause
@@ -3597,7 +3632,7 @@ uchar* obj_gone_ptr;
     register struct obj *otmp;
     boolean is_gold = (obj->oclass == COIN_CLASS);
     int res = 0, loadlev;
-    long count;
+    int64_t count;
     if (!dobot)
         context.skip_botl = TRUE;
 
@@ -3654,7 +3689,7 @@ uchar* obj_gone_ptr;
                         : "You have much trouble removing")
                   : (char *) 0,
           otmp, count);
-    if (iflags.using_gui_sounds)
+    if (iflags.using_gui_sounds && !ui_has_input())
     {
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_PICK_UP);
         delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
@@ -3690,13 +3725,13 @@ struct obj *obj;
 }
 
 /* an object inside a cursed bag of holding is being destroyed */
-STATIC_OVL long
+STATIC_OVL int64_t
 mbag_item_gone(held, item)
 int held;
 struct obj *item;
 {
     struct monst *shkp;
-    long loss = 0L;
+    int64_t loss = 0L;
 
     if (item->dknown)
         pline("%s %s vanished!", Doname2(item), otense(item, "have"));
@@ -3860,7 +3895,7 @@ boolean more_containers; /* True iff #loot multiple and this isn't last one */
         pickup_and_loot_in, inokay, outokay, outmaybe;
     char c, emptymsg[BUFSZ], qbuf[QBUFSZ], pbuf[QBUFSZ], xbuf[QBUFSZ];
     int used = 0;
-    long loss;
+    int64_t loss;
 
     abort_looting = FALSE;
     emptymsg[0] = '\0';
@@ -3870,7 +3905,16 @@ boolean more_containers; /* True iff #loot multiple and this isn't last one */
         return 0;
 #endif
 
-    if (obj->olocked) 
+    boolean insider = (*u.ushops && inside_shop(u.ux, u.uy)
+        && *in_rooms(u.ux, u.uy, SHOPBASE) == *u.ushops);
+
+    if (Is_magic_chest(obj) && insider)
+    {
+        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "A mysterious force prevents you from opening %s.", thecxname(obj));
+        play_sfx_sound(SFX_MYSTERIOUS_FORCE_PREVENTS);
+        return 0;
+    }
+    else if (obj->olocked)
     {
         pline("%s locked.", Tobjnam(obj, "are"));
         if (held)
@@ -3928,7 +3972,7 @@ boolean more_containers; /* True iff #loot multiple and this isn't last one */
 
     inokay = (invent != 0
               && !(invent == current_container && !current_container->nobj));
-    outokay = Has_contents(current_container);
+    outokay = Has_contained_contents(current_container);
 
     if (!outokay) /* preformat the empty-container message */
         Sprintf(emptymsg, "%s is %sempty.", Ysimple_name2(current_container),
@@ -4055,7 +4099,7 @@ boolean more_containers; /* True iff #loot multiple and this isn't last one */
     /* out-only or out before in */
     if (move_to_another || move_to_another_on_floor || (loot_out && !loot_in_first) || loot_out_and_drop || loot_out_and_stash)
     {
-        if (!Has_contents(current_container)) 
+        if (!Has_contained_contents(current_container)) 
         {
             pline1(emptymsg); /* <whatever> is empty. */
             if (!current_container->cknown)
@@ -4138,7 +4182,7 @@ boolean more_containers; /* True iff #loot multiple and this isn't last one */
     /* out after in */
     if (loot_out && loot_in_first) 
     {
-        if (!Has_contents(current_container)) 
+        if (!Has_contained_contents(current_container)) 
         {
             pline1(emptymsg); /* <whatever> is empty. */
             if (!current_container->cknown)
@@ -4204,7 +4248,7 @@ struct obj* other_container;
     default:
     case 0:
         action = "take out";
-        objlist = &(current_container->cobj);
+        objlist = contained_object_chain_ptr(current_container);
         actionfunc = out_container;
         checkfunc = (int FDECL((*), (OBJ_P))) 0;
         break;
@@ -4229,7 +4273,7 @@ struct obj* other_container;
         }
 
         action = "move to another container in inventory";
-        objlist = &(current_container->cobj);
+        objlist = contained_object_chain_ptr(current_container);
         actionfunc = move_container;
         checkfunc = (int FDECL((*), (OBJ_P))) 0;
         break;
@@ -4249,19 +4293,19 @@ struct obj* other_container;
         }
 
         action = "move to another container on floor";
-        objlist = &(current_container->cobj);
+        objlist = contained_object_chain_ptr(current_container);
         actionfunc = move_container;
         checkfunc = (int FDECL((*), (OBJ_P))) 0;
         break;
     case 4:
         action = "take out and drop";
-        objlist = &(current_container->cobj);
+        objlist = contained_object_chain_ptr(current_container);
         actionfunc = out_container_and_drop;
         checkfunc = (int FDECL((*), (OBJ_P))) 0;
         break;
     case 5:
         action = "take out and auto-stash";
-        objlist = &(current_container->cobj);
+        objlist = contained_object_chain_ptr(current_container);
         actionfunc = out_container_and_autostash;
         checkfunc = (int FDECL((*), (OBJ_P))) 0;
         break;
@@ -4314,7 +4358,7 @@ struct obj* other_container UNUSED;
     struct obj* otmp, * otmp2;
     menu_item *pick_list;
     int mflags, res = 0;
-    long count;
+    int64_t count;
     int more_action = 0;
 
     const char* action = "";
@@ -4390,7 +4434,7 @@ struct obj* other_container UNUSED;
         mflags = (ALL_TYPES | UNPAID_TYPES | BUCX_TYPES | UNIDENTIFIED_TYPES | UNKNOWN_TYPES | CHOOSE_ALL);
         if (command_id == 6)
             mflags |= BY_NEXTHERE;
-        n = query_category(buf, command_id == 1 ? invent : command_id == 6 ? level.objects[u.ux][u.uy] : current_container->cobj,
+        n = query_category(buf, command_id == 1 ? invent : command_id == 6 ? level.objects[u.ux][u.uy] : contained_object_chain(current_container),
                            mflags, &pick_list, PICK_ANY);
         if (!n)
             return 0;
@@ -4428,14 +4472,14 @@ struct obj* other_container UNUSED;
     if (loot_everything)
     {
         n = 0;
-        for (otmp = current_container->cobj; otmp; otmp = otmp->nobj)
+        for (otmp = contained_object_chain(current_container); otmp; otmp = otmp->nobj)
             n++;
         uchar obj_gone;
         switch (command_id)
         {
         case 0:
             current_container->cknown = 1;
-            for (otmp = current_container->cobj, i = 0; otmp; otmp = otmp2, i++)
+            for (otmp = contained_object_chain(current_container), i = 0; otmp; otmp = otmp2, i++)
             {
                 otmp2 = otmp->nobj;
                 obj_gone = FALSE;
@@ -4463,7 +4507,7 @@ struct obj* other_container UNUSED;
             break;
         case 2:
             current_container->cknown = 1;
-            for (otmp = current_container->cobj; otmp; otmp = otmp2)
+            for (otmp = contained_object_chain(current_container); otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
                 res = move_container_nobot(otmp);
@@ -4475,7 +4519,7 @@ struct obj* other_container UNUSED;
             break;
         case 3:
             current_container->cknown = 1;
-            for (otmp = current_container->cobj; otmp; otmp = otmp2)
+            for (otmp = contained_object_chain(current_container); otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
                 res = move_container_nobot(otmp);
@@ -4487,7 +4531,7 @@ struct obj* other_container UNUSED;
             break;
         case 4:
             current_container->cknown = 1;
-            for (otmp = current_container->cobj; otmp; otmp = otmp2)
+            for (otmp = contained_object_chain(current_container); otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
                 res = out_container_and_drop_nobot(otmp);
@@ -4499,7 +4543,7 @@ struct obj* other_container UNUSED;
             break;
         case 5:
             current_container->cknown = 1;
-            for (otmp = current_container->cobj; otmp; otmp = otmp2)
+            for (otmp = contained_object_chain(current_container); otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nobj;
                 res = out_container_and_autostash_nobot(otmp);
@@ -4541,7 +4585,7 @@ struct obj* other_container UNUSED;
             Sprintf(movebuf, " from %s to %s", cxname(current_container), cxname(move_target_container));
 
         Sprintf(buf, "%s what%s?", action, movebuf);
-        n = query_objlist(buf, command_id == 1 ? &invent : command_id == 6 ? &level.objects[u.ux][u.uy] : &(current_container->cobj),
+        n = query_objlist(buf, command_id == 1 ? &invent : command_id == 6 ? &level.objects[u.ux][u.uy] : contained_object_chain_ptr(current_container),
                           mflags, &pick_list, PICK_ANY,
                           all_categories ? allow_all : allow_category, 2);
         if (n)
@@ -5022,26 +5066,26 @@ struct obj *box; /* or bag */
         char yourbuf[BUFSZ];
 
         observe_quantum_cat(box, TRUE, TRUE);
-        if (!Has_contents(box)) /* evidently a live cat came out */
+        if (!Has_contained_contents(box)) /* evidently a live cat came out */
             /* container type of "large box" is inferred */
             pline("%sbox is now empty.", Shk_Your(yourbuf, box));
         else /* holds cat corpse */
             empty_it = TRUE;
         box->cknown = 1;
-    } else if (!Has_contents(box)) {
+    } else if (!Has_contained_contents(box)) {
         box->cknown = 1;
         pline("It's empty.");
     } else {
         empty_it = TRUE;
     }
 
-    if (empty_it) {
+    if (empty_it && contained_object_chain(box) != 0) {
         struct obj *otmp, *nobj;
         boolean terse, highdrop = !can_reach_floor(TRUE),
                 altarizing = IS_ALTAR(levl[ox][oy].typ),
                 cursed_mbag = (Is_mbag(box) && box->cursed);
         int held = carried(box);
-        long loss = 0L;
+        int64_t loss = 0L;
 
         if (u.uswallow)
             highdrop = altarizing = FALSE;
@@ -5053,10 +5097,10 @@ struct obj *box; /* or bag */
          * "ObjK drops to the floor.", "ObjL drops to the floor.", &c.
          */
         pline("%s out%c",
-              box->cobj->nobj ? "Objects spill" : "An object spills",
+              contained_object_chain(box)->nobj ? "Objects spill" : "An object spills",
               terse ? ':' : '.');
         Strcpy(debug_buf_2, "tip_container");
-        for (otmp = box->cobj; otmp; otmp = nobj) {
+        for (otmp = contained_object_chain(box); otmp; otmp = nobj) {
             nobj = otmp->nobj;
             obj_extract_self(otmp);
             otmp->ox = box->ox, otmp->oy = box->oy;

@@ -16,13 +16,10 @@ using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
 
 namespace GnollHackM
 #else
-using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
-using GnollHackX.Pages.Game;
-using static Xamarin.Essentials.AppleSignInAuthenticator;
 
 namespace GnollHackX.Pages.MainScreen
 #endif
@@ -34,9 +31,17 @@ namespace GnollHackX.Pages.MainScreen
         public AboutPage(MainPage mainPage)
         {
             _mainPage = mainPage;
+            Disappearing += (s, e) => { _mainPage.StartCarouselViewAndEnableButtons(); };
 
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            if (GHApp.DarkMode)
+            {
+                lblHeader.TextColor = GHColors.White;
+            }
         }
 
         private async void btnCreditsX_Clicked(object sender, EventArgs e)
@@ -44,7 +49,7 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             string fulltargetpath = Path.Combine(GHApp.GHPath, "xcredits");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "Cross-Platform Credits", 80);
+            var displFilePage = new DisplayFilePage(fulltargetpath, "Credits", 77);
             string errormsg = "";
             if (!displFilePage.ReadFile(out errormsg))
             {
@@ -52,28 +57,28 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                await GHApp.Navigation.PushModalAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
 
-        private async void btnCreditsW_Clicked(object sender, EventArgs e)
-        {
-            AboutGrid.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
-            string fulltargetpath = Path.Combine(GHApp.GHPath, "credits");
-            var displFilePage = new DisplayFilePage(fulltargetpath, "Credits", 77);
-            string errormsg = "";
-            if (!displFilePage.ReadFile(out errormsg))
-            {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the credits file.", "OK");
-            }
-            else
-            {
-                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
-            }
-            AboutGrid.IsEnabled = true;
-        }
+        //private async void btnCreditsW_Clicked(object sender, EventArgs e)
+        //{
+        //    AboutGrid.IsEnabled = false;
+        //    GHApp.PlayButtonClickedSound();
+        //    string fulltargetpath = Path.Combine(GHApp.GHPath, "credits");
+        //    var displFilePage = new DisplayFilePage(fulltargetpath, "Credits", 77);
+        //    string errormsg = "";
+        //    if (!displFilePage.ReadFile(out errormsg))
+        //    {
+        //        await DisplayAlert("Error Opening File", "GnollHack cannot open the credits file.", "OK");
+        //    }
+        //    else
+        //    {
+        //        await GHApp.Navigation.PushModalAsync(displFilePage);
+        //    }
+        //    AboutGrid.IsEnabled = true;
+        //}
 
         private async void btnLicense_Clicked(object sender, EventArgs e)
         {
@@ -88,7 +93,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                await GHApp.Navigation.PushModalAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -96,27 +101,15 @@ namespace GnollHackX.Pages.MainScreen
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await OpenBrowser(new Uri(GHConstants.GnollHackGitHubPage));
+            await GHApp.OpenBrowser(this, "Source", new Uri(GHConstants.GnollHackGitHubPage));
             AboutGrid.IsEnabled = true;
-        }
-
-        public async Task OpenBrowser(Uri uri)
-        {
-            try
-            {
-                await Browser.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
-            }
         }
 
         private async void btnWebPage_Clicked(object sender, EventArgs e)
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await OpenBrowser(new Uri(GHConstants.GnollHackWebPage));
+            await GHApp.OpenBrowser(this, "GnollHack.com", new Uri(GHConstants.GnollHackWebPage));
             AboutGrid.IsEnabled = true;
         }
 
@@ -124,7 +117,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await OpenBrowser(new Uri(GHConstants.GnollHackWikiPage));
+            await GHApp.OpenBrowser(this, "Wiki", new Uri(GHConstants.GnollHackWikiPage));
             AboutGrid.IsEnabled = true;
         }
 
@@ -132,7 +125,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await OpenBrowser(new Uri(GHApp.IsAndroid ? GHConstants.GnollHackAndroidDowngradePage : GHApp.IsiOS ? GHConstants.GnollHackiOSDowngradePage :  GHConstants.GnollHackGeneralDowngradePage));
+            await GHApp.OpenBrowser(this, "Downgrade", new Uri(GHApp.IsAndroid ? GHConstants.GnollHackAndroidDowngradePage : GHApp.IsiOS ? GHConstants.GnollHackiOSDowngradePage :  GHConstants.GnollHackGeneralDowngradePage));
             AboutGrid.IsEnabled = true;
         }
 
@@ -140,7 +133,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await OpenBrowser(new Uri(GHConstants.GnollHackSponsorPage));
+            await GHApp.OpenBrowser(this, "Sponsor", new Uri(GHConstants.GnollHackSponsorPage));
             AboutGrid.IsEnabled = true;
         }
 
@@ -149,7 +142,7 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private bool _backPressed = false;
@@ -160,7 +153,7 @@ namespace GnollHackX.Pages.MainScreen
                 _backPressed = true;
                 AboutGrid.IsEnabled = false;
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             return false;
         }
@@ -204,7 +197,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                await GHApp.Navigation.PushModalAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -227,7 +220,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await App.Current.MainPage.Navigation.PushModalAsync(displFilePage);
+                await GHApp.Navigation.PushModalAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -252,7 +245,7 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var verPage = new VersionPage(null);
-            await App.Current.MainPage.Navigation.PushModalAsync(verPage);
+            await GHApp.Navigation.PushModalAsync(verPage);
             AboutGrid.IsEnabled = true;
 
         }
@@ -263,7 +256,7 @@ namespace GnollHackX.Pages.MainScreen
             GHApp.PlayButtonClickedSound();
 
             ReplayPage selectFilePage = new ReplayPage(_mainPage);
-            await App.Current.MainPage.Navigation.PushModalAsync(selectFilePage);
+            await GHApp.Navigation.PushModalAsync(selectFilePage);
 
             AboutGrid.IsEnabled = true;
         }
@@ -274,7 +267,7 @@ namespace GnollHackX.Pages.MainScreen
             GHApp.PlayButtonClickedSound();
 
             ImportExportPage manageFilesPage = new ImportExportPage();
-            await App.Current.MainPage.Navigation.PushModalAsync(manageFilesPage);
+            await GHApp.Navigation.PushModalAsync(manageFilesPage);
 
             AboutGrid.IsEnabled = true;
         }

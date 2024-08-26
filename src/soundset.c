@@ -2264,6 +2264,8 @@ NEARDATA const struct ghsound_eventmapping ghsound2event[MAX_GHSOUNDS] = {
     { SOUND_BANK_MASTER, "event:/Voice Acting/Shopkeeper/Modron/General/Ill Add That to Your Bill", 1.0f },
     { SOUND_BANK_MASTER, "event:/Voice Acting/Shopkeeper/Modron/Costly Alteration/Alter Pay", 1.0f },
 
+    { SOUND_BANK_MASTER, "event:/Music/Sound Tracks/Our Mountain", BACKGROUND_MUSIC_VOLUME },
+    { SOUND_BANK_MASTER, "event:/Music/Sound Tracks/The Sword and the Raven", BACKGROUND_MUSIC_VOLUME },
 };
 
 NEARDATA struct player_soundset_definition player_soundsets[MAX_PLAYER_SOUNDSETS] =
@@ -16498,10 +16500,7 @@ update_game_music(VOID_ARGS)
     musicinfo.volume = 1.0f;
     musicinfo.ghsound = GHSOUND_NONE;
 
-    boolean gamestarted;
-    lock_thread_lock();
-    gamestarted = context.game_started;
-    unlock_thread_lock();
+    boolean gamestarted = context.game_started;
 
     if (!gamestarted)
     {
@@ -16535,10 +16534,7 @@ play_level_ambient_sounds(VOID_ARGS)
     struct ghsound_level_ambient_info lainfo = { 0 };
     lainfo.volume = 1.0f;
     lainfo.ghsound = GHSOUND_NONE;
-    boolean gamestarted;
-    lock_thread_lock();
-    gamestarted = context.game_started;
-    unlock_thread_lock();
+    boolean gamestarted = context.game_started;
 
     if (!gamestarted || program_state.gameover > 0)
     {
@@ -16572,10 +16568,7 @@ play_environment_ambient_sounds(VOID_ARGS)
     struct ghsound_environment_ambient_info eainfo = { 0 };
     eainfo.volume = 1.0f;
     eainfo.ghsound = GHSOUND_NONE;
-    boolean gamestarted;
-    lock_thread_lock();
-    gamestarted = context.game_started;
-    unlock_thread_lock();
+    boolean gamestarted = context.game_started;
 
     if (!gamestarted || program_state.gameover > 0)
     {
@@ -17408,7 +17401,7 @@ enum monster_sound_types sound_type;
 void
 play_simple_player_sound_with_flags(sound_type, play_flags)
 enum monster_sound_types sound_type;
-unsigned long play_flags;
+unsigned int play_flags;
 {
     /* Do not use for hit sounds */
     if (!iflags.using_gui_sounds || Deaf)
@@ -17459,7 +17452,7 @@ enum monster_sound_types sound_type;
 int line_id;
 enum sound_play_groups play_group;
 enum immediate_sound_types sfx_sound_type;
-unsigned long pflags;
+unsigned int pflags;
 {
     /* Do not use for hit sounds */
     if (!iflags.using_gui_sounds || Deaf)
@@ -17568,7 +17561,7 @@ void
 play_simple_monster_sound_with_flags(mon, sound_type, play_flags)
 struct monst* mon;
 enum monster_sound_types sound_type;
-unsigned long play_flags;
+unsigned int play_flags;
 {
     /* Do not use for hit sounds */
     if (!iflags.using_gui_sounds || Deaf)
@@ -18106,7 +18099,7 @@ enum sfx_sound_types sfx_sound_id;
 void
 play_sfx_sound_with_flags(sfx_sound_id, play_flags)
 enum sfx_sound_types sfx_sound_id;
-unsigned long play_flags;
+unsigned int play_flags;
 {
     if (!iflags.using_gui_sounds)
         return;
@@ -19104,7 +19097,7 @@ void
 sound_stats(hdrfmt, hdrbuf, count, size)
 const char* hdrfmt;
 char* hdrbuf;
-long* count;
+int64_t* count;
 size_t* size;
 {
     sound_source* ss;
@@ -19450,7 +19443,7 @@ struct obj* src, * dest;
             new_ss->id.a_obj = dest;
             new_ss->next = sound_base;
             sound_base = new_ss;
-            //dest->lamplit = 1; /* now an active sound source */
+            dest->makingsound = 1; /* now an active sound source */
         }
 }
 
@@ -19500,7 +19493,7 @@ begin_sound(obj, already_making_noise)
 struct obj* obj;
 boolean already_making_noise;
 {
-    long turns = 0;
+    int64_t turns = 0;
     boolean do_timer = TRUE;
 
     obj->makingsound = 1;
@@ -21304,7 +21297,7 @@ void
 play_voice_shopkeeper_for_you(shkp, honorific_idx, base_line_idx, quan)
 struct monst* shkp;
 int honorific_idx, base_line_idx;
-long quan;
+int64_t quan;
 {
     if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
@@ -21357,7 +21350,7 @@ long quan;
 void
 play_voice_shopkeeper_pay_before_buying(shkp, obj_quan, save_quan)
 struct monst* shkp;
-long obj_quan, save_quan;
+int64_t obj_quan, save_quan;
 {
     if (!iflags.using_gui_sounds || !shkp || !has_eshk(shkp) || Deaf)
         return;
@@ -21881,7 +21874,7 @@ int line_id;
 enum sound_play_groups play_group;
 enum immediate_sound_types sfx_sound_type;
 double minimum_volume;
-unsigned long pflags;
+unsigned int pflags;
 {
     play_monster_simply_indexed_sound(mtmp, sound_id, line_id, play_group, sfx_sound_type, minimum_volume, "LineIndex", pflags);
 }
@@ -21894,7 +21887,7 @@ int line_id;
 enum sound_play_groups play_group;
 enum immediate_sound_types sfx_sound_type;
 double minimum_volume;
-unsigned long pflags;
+unsigned int pflags;
 {
     play_monster_simply_indexed_sound(mtmp, sound_id, line_id, play_group, sfx_sound_type, minimum_volume, "MsgIndex", pflags);
 }
@@ -21909,7 +21902,7 @@ enum sound_play_groups play_group;
 enum immediate_sound_types sfx_sound_type;
 double minimum_volume;
 const char* index_name;
-unsigned long pflags;
+unsigned int pflags;
 {
     if (!iflags.using_gui_sounds || !mtmp || Deaf)
         return;
@@ -21964,14 +21957,14 @@ play_monster_special_dialogue_line(mtmp, line_id)
 struct monst* mtmp;
 int line_id;
 {
-    play_monster_special_dialogue_line_with_flags(mtmp, line_id, 0UL);
+    play_monster_special_dialogue_line_with_flags(mtmp, line_id, 0U);
 }
 
 void
 play_monster_special_dialogue_line_with_flags(mtmp, line_id, pflags)
 struct monst* mtmp;
 int line_id;
-unsigned long pflags;
+unsigned int pflags;
 {
     play_monster_msg_indexed_sound(mtmp, MONSTER_SOUND_TYPE_SPECIAL_DIALOGUE_LINE, line_id, SOUND_PLAY_GROUP_LONG, IMMEDIATE_SOUND_DIALOGUE, 0.15f, pflags);
 }
@@ -21989,14 +21982,14 @@ play_monster_special_sound(mtmp, line_id)
 struct monst* mtmp;
 int line_id;
 {
-    play_monster_special_sound_with_flags(mtmp, line_id, 0UL);
+    play_monster_special_sound_with_flags(mtmp, line_id, 0U);
 }
 
 void
 play_monster_special_sound_with_flags(mtmp, line_id, pflags)
 struct monst* mtmp;
 int line_id;
-unsigned long pflags;
+unsigned int pflags;
 {
     play_monster_msg_indexed_sound(mtmp, MONSTER_SOUND_TYPE_SPECIAL_SOUND, line_id, SOUND_PLAY_GROUP_NORMAL, IMMEDIATE_SOUND_SFX, 0.0f, pflags);
 }

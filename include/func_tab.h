@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-06-05 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    func_tab.h    $NHDT-Date: 1543797823 2018/12/03 00:43:43 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.11 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -28,7 +28,7 @@ struct ext_func_tab {
     uchar key;
     const char *ef_txt, *ef_desc;
     int NDECL((*ef_funct));
-    unsigned long flags;
+    uint64_t flags;
     const char *f_text;
     const char* getobj_classes;
     const char* getobj_word;

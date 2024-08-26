@@ -44,6 +44,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>NotSet</CharacterSet>
+    <EnableASAN>false</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -76,19 +77,19 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(GnollHackDllOutputDir)</OutDir>
+    <OutDir>$(MauiWindowsLibsDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(GnollHackDllOutputDir)</OutDir>
+    <OutDir>$(MauiWindowsLibsDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(GnollHackDllOutputDir)</OutDir>
+    <OutDir>$(MauiWindowsLibsDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(GnollHackDllOutputDir)</OutDir>
+    <OutDir>$(MauiWindowsLibsDir)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -97,7 +98,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;LIBGNOLLHACK_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>$(DllDir)pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>$(LibWinDir)pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -114,7 +115,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;LIBGNOLLHACK_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>$(DllDir)pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>$(LibWinDir)pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -128,18 +129,18 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;LIBGNOLLHACK_EXPORTS;_WINDOWS;_USRDLL;USE_TILES;DLB;DLL_GRAPHICS;SAFEPROCS;NOTTYGRAPHICS;EXIT_THREAD_ON_EXIT;GNOLLHACK_MAIN_PROGRAM;GNOLLHACK_SERVER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;DEBUG;GNH_MOBILE;GNH_WIN;USE_TILES;DLB;LIB_GRAPHICS;SAFEPROCS;NOTTYGRAPHICS;GNOLLHACK_MAIN_PROGRAM;EXIT_THREAD_ON_EXIT;DUMPLOG;DUMPHTML;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(WinWin32Dir);$(IncDir);$(SysWinntDir);$(SysShareDir);$(WinShareDir);$(LibShareDir);$(WinFmodDir)core\inc\;$(WinFmodDir)fsbank\inc\;$(WinFmodDir)studio\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WinWin32Dir);$(IncDir);$(SysWinntDir);$(SysShareDir);$(WinShareDir);$(LibWinDir);$(LibShareDir);$(WinFmodDir)core\inc\;$(WinFmodDir)fsbank\inc\;$(WinFmodDir)studio\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -148,11 +149,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;LIBGNOLLHACK_EXPORTS;_WINDOWS;_USRDLL;DLB;DLL_GRAPHICS;SAFEPROCS;NOTTYGRAPHICS;EXIT_THREAD_ON_EXIT;GNOLLHACK_MAIN_PROGRAM;GNOLLHACK_SERVER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;GNH_MOBILE;GNH_WIN;USE_TILES;DLB;LIB_GRAPHICS;SAFEPROCS;NOTTYGRAPHICS;GNOLLHACK_MAIN_PROGRAM;EXIT_THREAD_ON_EXIT;DUMPLOG;DUMPHTML;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>$(DllDir)pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(WinWin32Dir);$(IncDir);$(SysWinntDir);$(SysShareDir);$(WinShareDir);$(LibShareDir);$(WinFmodDir)core\inc\;$(WinFmodDir)fsbank\inc\;$(WinFmodDir)studio\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>$(LibWinDir)pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(WinWin32Dir);$(IncDir);$(SysWinntDir);$(SysShareDir);$(WinShareDir);$(LibWinDir);$(LibShareDir);$(WinFmodDir)core\inc\;$(WinFmodDir)fsbank\inc\;$(WinFmodDir)studio\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -160,7 +161,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>comctl32.lib;winmm.lib;bcrypt.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -209,6 +210,7 @@
     <ClInclude Include="$(IncDir)obj.h" />
     <ClInclude Include="$(IncDir)objclass.h" />
     <ClInclude Include="$(IncDir)onames.h" />
+    <ClInclude Include="$(IncDir)patchlevel.h" />
     <ClInclude Include="$(IncDir)permonst.h" />
     <ClInclude Include="$(IncDir)pm.h" />
     <ClInclude Include="$(IncDir)prop.h" />
@@ -233,9 +235,12 @@
     <ClInclude Include="$(IncDir)you.h" />
     <ClInclude Include="$(IncDir)youprop.h" />
     <ClInclude Include="$(LibShareDir)callback.h" />
-    <ClInclude Include="$(DllDir)dllhack.h" />
-    <ClInclude Include="$(DllDir)dllproc.h" />
-    <ClInclude Include="$(DllDir)resource.h" />
+    <ClInclude Include="$(LibShareDir)gnhapi.h" />
+    <ClInclude Include="$(LibShareDir)libproc.h" />
+    <ClInclude Include="$(LibWinDir)winconf.h" />
+    <!--<ClInclude Include="$(LibWinDir)date_win.h" />-->
+    <ClInclude Include="$(LibWinDir)gnollhackwin.h" />
+    <ClInclude Include="$(LibWinDir)resource.h" />
     <ClInclude Include="..\resource.h" />
     <ClInclude Include="..\soundfx.h" />
     <ClInclude Include="..\winMS.h" />
@@ -362,42 +367,35 @@
     <ClCompile Include="$(SysShareDir)cppregex.cpp" />
     <ClCompile Include="$(SysShareDir)nhlan.c" />
     <ClCompile Include="$(SysShareDir)random.c" />
-    <ClCompile Include="$(SysWinntDir)ntsound.c" />
+    <ClCompile Include="$(SysWinntDir)winnt.c" />
     <ClCompile Include="$(SysWinntDir)stubs.c">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">TTYSTUB;</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">TTYSTUB;</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">TTYSTUB;</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">TTYSTUB;</PreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="$(SysWinntDir)win10.c" />
-    <ClCompile Include="$(SysWinntDir)windmain.c" />
-    <ClCompile Include="$(SysWinntDir)winnt.c" />
     <ClCompile Include="$(WinShareDir)safeproc.c" />
-    <ClCompile Include="$(DllDir)dllhack.c" />
-    <ClCompile Include="$(DllDir)dllmain.c" />
-    <ClCompile Include="$(DllDir)dllproc.c" />
+    <ClCompile Include="$(LibShareDir)libproc.c" />
     <ClCompile Include="$(LibShareDir)callback.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="..\GnollHackNew.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="$(DllDir)dllhack.rc" />
+    <ClCompile Include="$(LibShareDir)gnhapi.c" />
+    <ClCompile Include="$(LibShareDir)gnhmain.c" />
+    <ClCompile Include="$(LibWinDir)gnhwin.c" />
+    <ClCompile Include="$(LibWinDir)gnollhackwin.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <Target Name="AfterBuild">
-	  <Message Text="Start building aftergnollhack.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
-	  <Message Text="Start building aftergnollhackdll.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhackdll.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start building aftergnollhack.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhack.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start building aftergnollhackdll.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhackdll.proj" Targets="Build" Properties="Configuration=$(Configuration)" />
   </Target>
   <Target Name="AfterClean">
-	  <Message Text="Start cleaning aftergnollhack.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhack.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
-	  <Message Text="Start cleaning aftergnollhackdll.proj" Importance="High" />
-	  <MSBuild Projects="aftergnollhackdll.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start cleaning aftergnollhack.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhack.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
+    <Message Text="Start cleaning aftergnollhackdll.proj" Importance="High" />
+    <MSBuild Projects="aftergnollhackdll.proj" Targets="Clean" Properties="Configuration=$(Configuration)" />
   </Target>
   <!--<Target Name="AfterRebuild">
 	  <Message Text="Start rebuilding aftergnollhack.proj" Importance="High" />

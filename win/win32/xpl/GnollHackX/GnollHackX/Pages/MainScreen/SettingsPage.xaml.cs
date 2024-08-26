@@ -43,15 +43,32 @@ namespace GnollHackX.Pages.MainScreen
 
         public SettingsPage(GameMenuPage gameMenuPage, MainPage mainPage)
         {
+            _mainPage = mainPage;
+            if(_mainPage != null)
+            {
+                Disappearing += (s, e) => { _mainPage.StartCarouselViewAndEnableButtons(); };
+            }
+
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            GHApp.SetViewCursorOnHandler(TournamentLabel, GameCursorType.Info);
+            GHApp.SetViewCursorOnHandler(BonesAllowedUsersLabel, GameCursorType.Info);
+            GHApp.SetViewCursorOnHandler(RecordLabel, GameCursorType.Info);
+            GHApp.SetViewCursorOnHandler(GZipLabel, GameCursorType.Info);
 
             _gameMenuPage = gameMenuPage;
             if (_gameMenuPage != null)
                 _gamePage = _gameMenuPage._gamePage;
             else
                 _gamePage = null;
-            _mainPage = mainPage;
+
+            lblHeader.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+            SetTournamentModeLabelColors(GHApp.TournamentMode);
+            SetChildrenDarkModeTextColor(RootLayout, GHApp.DarkMode);
+
             List<string> list = new List<string>
             {
                 "20 fps",
@@ -59,6 +76,7 @@ namespace GnollHackX.Pages.MainScreen
                 "40 fps",
                 "60 fps"
             };
+
             if (GHApp.DisplayRefreshRate >= 80.0f)
                 list.Add("80 fps");
             if (GHApp.DisplayRefreshRate >= 90.0f)
@@ -67,10 +85,21 @@ namespace GnollHackX.Pages.MainScreen
                 list.Add("120 fps");
             RefreshRatePicker.ItemsSource = list;
 
-
             PrimaryGPUCachePicker.ItemsSource = GHApp.GetGPUCacheSizeList(false);
             SecondaryGPUCachePicker.ItemsSource = GHApp.GetGPUCacheSizeList(true);
 
+            List<MouseCommandItem> mouseCommandItems = new List<MouseCommandItem>();
+            mouseCommandItems.AddRange(GHApp.MouseCommandItems);
+
+            if(_gamePage == null)
+            {
+                mouseCommandItems.Add(new MouseCommandItem("By Role", (int)NhGetPosMods.DefClickRole));
+            }
+
+            RightMousePicker.ItemsSource = mouseCommandItems;
+            MiddleMousePicker.ItemsSource = mouseCommandItems;
+
+            ScreenScalePicker.ItemsSource = GHApp.ScreenScaleItems;
 
             SimpleCommandBarButton1Picker.ItemsSource = GHApp.SelectableShortcutButtons;
             SimpleCommandBarButton2Picker.ItemsSource = GHApp.SelectableShortcutButtons;
@@ -85,13 +114,40 @@ namespace GnollHackX.Pages.MainScreen
             SimpleCommandBarButton5Picker.ItemDisplayBinding = new Binding("Name");
             SimpleCommandBarButton6Picker.ItemDisplayBinding = new Binding("Name");
 
+            FullCommandBarButton1Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton2Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton3Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton4Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton5Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton6Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton7Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton8Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton9Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton10Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton11Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton12Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton13Picker.ItemsSource = GHApp.SelectableShortcutButtons;
+            FullCommandBarButton1Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton2Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton3Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton4Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton5Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton6Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton7Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton8Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton9Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton10Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton11Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton12Picker.ItemDisplayBinding = new Binding("Name");
+            FullCommandBarButton13Picker.ItemDisplayBinding = new Binding("Name");
+
             XlogUserNameValidationExpression = new Regex(@"^[A-Za-z0-9_]{1,31}$");
             BonesAllowedUsersValidationExpression = new Regex(@"^([A-Za-z0-9_]*[ \,]+)*([A-Za-z0-9_]*)?$");
 
             SetInitialValues();
 
             ClassicStatusBarSwitch_Toggled(null, new ToggledEventArgs(ClassicStatusBarSwitch.IsToggled));
-            BonesSwitch_Toggled(null, new ToggledEventArgs(BonesSwitch.IsToggled));
+            AllowBonesSwitch_Toggled(null, new ToggledEventArgs(AllowBonesSwitch.IsToggled));
             BonesListSwitch_Toggled(null, new ToggledEventArgs(BonesListSwitch.IsToggled));
 
             if(!GHApp.RecommendedSettingsChecked)
@@ -109,6 +165,88 @@ namespace GnollHackX.Pages.MainScreen
             }
 
             _isManualTogglingEnabled = true;
+        }
+
+        private void SetChildrenDarkModeTextColor(View view, bool darkmode)
+        {
+            if (view == null) 
+                return; 
+
+            if(view is Grid)
+            {
+                Grid grid = (Grid)view;
+                foreach(View child in grid.Children)
+                {
+                    SetChildrenDarkModeTextColor(child, darkmode);
+                }
+            }
+            else if (view is StackLayout)
+            {
+                StackLayout layout = (StackLayout)view;
+                foreach (View child in layout.Children)
+                {
+                    SetChildrenDarkModeTextColor(child, darkmode);
+                }
+            }
+            else if (view is Label)
+            {
+                Label l = (Label)view;
+                if(darkmode ? l.TextColor == GHColors.Black : l.TextColor == GHColors.White)
+                    l.TextColor = darkmode ? GHColors.White : GHColors.Black;
+                else if (darkmode ? l.TextColor == GHColors.Green : l.TextColor == GHColors.LightGreen)
+                    l.TextColor = darkmode ? GHColors.LightGreen : GHColors.Green;
+            }
+#if GNH_MAUI
+            else if (view is Microsoft.Maui.Controls.Entry)
+            {
+                Microsoft.Maui.Controls.Entry l = (Microsoft.Maui.Controls.Entry)view;
+                if (darkmode ? l.TextColor == GHColors.Black : l.TextColor == GHColors.White)
+                    l.TextColor = darkmode ? GHColors.White : GHColors.Black;
+            }
+            else if (view is Microsoft.Maui.Controls.Picker)
+            {
+                Microsoft.Maui.Controls.Picker l = (Microsoft.Maui.Controls.Picker)view;
+                l.TextColor = darkmode ? GHColors.White : GHColors.Black;
+                l.TitleColor = darkmode ? GHColors.White : GHColors.Black;
+            }
+#else
+            else if (view is Xamarin.Forms.Entry)
+            {
+                Xamarin.Forms.Entry l = (Xamarin.Forms.Entry)view;
+                if (darkmode ? l.TextColor == GHColors.Black : l.TextColor == GHColors.White)
+                    l.TextColor = darkmode ? GHColors.White : GHColors.Black;
+            }
+            else if (view is Xamarin.Forms.Picker)
+            {
+                Xamarin.Forms.Picker l = (Xamarin.Forms.Picker)view;
+                l.TextColor = darkmode ? GHColors.White : GHColors.Black;
+                l.TitleColor = darkmode ? GHColors.White : GHColors.Black;
+            }
+#endif
+        }
+
+        private void SetTournamentModeLabelColors(bool isTournament)
+        {
+            Color offColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+            Color onColor = GHApp.DarkMode ? GHColors.LightGreen : GHColors.Green;
+            Color usedColor = isTournament ? onColor : offColor;
+
+            RecordLabel.TextColor = RecordSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            AutoUploadReplaysLabel.TextColor = AutoUploadReplaysSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            SaveStyleLabel.TextColor = SaveStylePicker.IsEnabled ? usedColor : GHColors.Gray;
+            PostGameStatusLabel.TextColor = PostGameStatusSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            PostXlogLabel.TextColor = PostXlogSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            PostReplaysLabel.TextColor = PostReplaysSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            PostBonesLabel.TextColor = PostBonesSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            AllowBonesLabel.TextColor= AllowBonesSwitch.IsEnabled ? usedColor : GHColors.Gray;
+            GZipLabel.TextColor = GZipSwitch.IsEnabled ? usedColor : GHColors.Gray;
+
+            CustomWebHookLinkTitleLabel.TextColor = usedColor;
+            AccountTitleLabel.TextColor = usedColor;
+            PostingTitleLabel.TextColor = usedColor;
+            PostXlogUserNameLabel.TextColor = usedColor;
+            PostXlogPasswordLabel.TextColor = usedColor;
+            CloudStorageTitleLabel.TextColor = usedColor;
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
@@ -141,6 +279,13 @@ namespace GnollHackX.Pages.MainScreen
                 Preferences.Set("MapRefreshRate", RefreshRatePicker.SelectedIndex);
             }
 
+            if (ScreenScalePicker.SelectedIndex > -1 && ScreenScalePicker.SelectedItem != null && ScreenScalePicker.SelectedItem is ScreenScaleItem)
+            {
+                float val = ((ScreenScaleItem)ScreenScalePicker.SelectedItem).Value;
+                GHApp.CustomScreenScale = val;
+                Preferences.Set("CustomScreenScale", val);
+            }
+
             if (PrimaryGPUCachePicker.SelectedIndex > -1 && PrimaryGPUCachePicker.SelectedItem != null && PrimaryGPUCachePicker.SelectedItem is CacheSizeItem)
             {
                 long size = ((CacheSizeItem)PrimaryGPUCachePicker.SelectedItem).Size;
@@ -160,8 +305,8 @@ namespace GnollHackX.Pages.MainScreen
             }
 
             if (_gamePage != null)
-                _gamePage.ShowMemoryUsage = MemorySwitch.IsToggled;
-            Preferences.Set("ShowMemoryUsage", MemorySwitch.IsToggled);
+                _gamePage.ShowMemory = MemorySwitch.IsToggled;
+            Preferences.Set("ShowMemory", MemorySwitch.IsToggled);
 
             if (_gamePage != null)
                 _gamePage.ShowFPS = FPSSwitch.IsToggled;
@@ -172,16 +317,36 @@ namespace GnollHackX.Pages.MainScreen
             Preferences.Set("ShowBattery", BatterySwitch.IsToggled);
 
             if (_gamePage != null)
+                _gamePage.ShowZoom = ZoomSwitch.IsToggled;
+            Preferences.Set("ShowZoom", ZoomSwitch.IsToggled);
+
+            if (_gamePage != null)
                 _gamePage.ShowRecording = ShowRecordingSwitch.IsToggled;
             Preferences.Set("ShowRecording", ShowRecordingSwitch.IsToggled);
 
+            if(MipMapGrid.IsVisible && MipMapSwitch.IsEnabled)
+            {
+                GHApp.UseMipMap = MipMapSwitch.IsToggled;
+                if (_gamePage != null)
+                    _gamePage.UseMainMipMap = MipMapSwitch.IsToggled;
+                Preferences.Set("UseMainMipMap", MipMapSwitch.IsToggled);
+            }
 
+            GHApp.UseGPU = GPUSwitch.IsToggled;
             if (_gamePage != null)
                 _gamePage.UseMainGLCanvas = GPUSwitch.IsToggled;
             Preferences.Set("UseMainGLCanvas", GPUSwitch.IsToggled);
 
-            GHApp.AllowBones = BonesSwitch.IsToggled;
-            Preferences.Set("AllowBones", BonesSwitch.IsToggled);
+            GHApp.DisableAuxGPU = DisableAuxGPUSwitch.IsToggled;
+            Preferences.Set("DisableAuxiliaryGLCanvas", DisableAuxGPUSwitch.IsToggled);
+            bool useAuxGPU = GPUSwitch.IsToggled && !DisableAuxGPUSwitch.IsToggled;
+            GHApp.UseAuxGPU = useAuxGPU;
+            if (_gamePage != null)
+                _gamePage.UseAuxiliaryGLCanvas = useAuxGPU;
+            Preferences.Set("UseAuxiliaryGLCanvas", useAuxGPU);
+
+            GHApp.AllowBones = AllowBonesSwitch.IsToggled;
+            Preferences.Set("AllowBones", AllowBonesSwitch.IsToggled);
 
             if (RecordSwitch.IsEnabled)
             {
@@ -197,9 +362,41 @@ namespace GnollHackX.Pages.MainScreen
                 GHApp.UseGZipForReplays = GZipSwitch.IsToggled;
                 Preferences.Set("UseGZipForReplays", GZipSwitch.IsToggled);
             }
+            if (FixRectsSwitch.IsEnabled)
+            {
+                GHApp.FixRects = FixRectsSwitch.IsToggled;
+                Preferences.Set("FixRects", FixRectsSwitch.IsToggled);
+            }
 
             GHApp.EmptyWishIsNothing = EmptyWishIsNothingSwitch.IsToggled;
             Preferences.Set("EmptyWishIsNothing", EmptyWishIsNothingSwitch.IsToggled);
+
+            GHApp.MirroredCharacterClickAction = CharacterClickActionSwitch.IsToggled;
+            if (_gamePage != null) /* During game only doubles as the option; outside of game sets the default */
+                _gamePage.SetCharacterClickAction(CharacterClickActionSwitch.IsToggled);
+            else
+                Preferences.Set("CharacterClickAction", CharacterClickActionSwitch.IsToggled);
+
+            if (RightMousePicker.SelectedIndex > -1 && RightMousePicker.SelectedItem != null && RightMousePicker.SelectedItem is MouseCommandItem)
+            {
+                GHApp.MirroredRightMouseCommand = ((MouseCommandItem)RightMousePicker.SelectedItem).Value;
+                if (_gamePage != null)  /* During game only doubles as the option; outside of game sets the default */
+                    _gamePage.SetRightMouseCommand(((MouseCommandItem)RightMousePicker.SelectedItem).Value);
+                else
+                    Preferences.Set("RightMouseCommand", ((MouseCommandItem)RightMousePicker.SelectedItem).Value);
+            }
+
+            if (MiddleMousePicker.SelectedIndex > -1 && MiddleMousePicker.SelectedItem != null && MiddleMousePicker.SelectedItem is MouseCommandItem)
+            {
+                GHApp.MirroredMiddleMouseCommand = ((MouseCommandItem)MiddleMousePicker.SelectedItem).Value;
+                if (_gamePage != null)  /* During game only doubles as the option; outside of game sets the default */
+                    _gamePage.SetMiddleMouseCommand(((MouseCommandItem)MiddleMousePicker.SelectedItem).Value);
+                else
+                    Preferences.Set("MiddleMouseCommand", ((MouseCommandItem)MiddleMousePicker.SelectedItem).Value);
+            }
+
+            GHApp.OkOnDoubleClick = DoubleClickSwitch.IsToggled;
+            Preferences.Set("OkOnDoubleClick", DoubleClickSwitch.IsToggled);
 
             GHApp.PostingGameStatus = PostGameStatusSwitch.IsToggled;
             Preferences.Set("PostingGameStatus", PostGameStatusSwitch.IsToggled);
@@ -256,6 +453,37 @@ namespace GnollHackX.Pages.MainScreen
             Preferences.Set("ClassicStatusBar", ClassicStatusBarSwitch.IsToggled);
 
             if (_gamePage != null)
+                _gamePage.DesktopStatusBar = DesktopStatusBarSwitch.IsToggled;
+            Preferences.Set("DesktopStatusBar", DesktopStatusBarSwitch.IsToggled);
+
+            if (_gamePage != null)
+                _gamePage.DesktopButtons = DesktopButtonsSwitch.IsToggled;
+            Preferences.Set("DesktopButtons", DesktopButtonsSwitch.IsToggled);
+
+            if(MenuFadeEffectsGrid.IsVisible)
+            {
+                if (_gamePage != null)
+                    _gamePage.MenuFadeEffects = MenuFadeEffectsSwitch.IsToggled;
+                Preferences.Set("MenuFadeEffects", MenuFadeEffectsSwitch.IsToggled);
+            }
+
+            if (_gamePage != null)
+                _gamePage.MenuHighFilterQuality = MenuHighFilterQualitySwitch.IsToggled;
+            Preferences.Set("MenuHighFilterQuality", MenuHighFilterQualitySwitch.IsToggled);
+
+            if (_gamePage != null)
+                _gamePage.ShowScore = ShowScoreSwitch.IsToggled;
+            Preferences.Set("ShowScore", ShowScoreSwitch.IsToggled);
+
+            if (_gamePage != null)
+                _gamePage.ShowXP = ShowXPSwitch.IsToggled;
+            Preferences.Set("ShowXP", ShowXPSwitch.IsToggled);
+
+            if (_gamePage != null)
+                _gamePage.RightAligned2ndRow = RightAligned2ndRowSwitch.IsToggled;
+            Preferences.Set("RightAligned2ndRow", RightAligned2ndRowSwitch.IsToggled);
+
+            if (_gamePage != null)
                 _gamePage.ShowPets = PetSwitch.IsToggled;
             Preferences.Set("ShowPets", PetSwitch.IsToggled);
 
@@ -283,6 +511,7 @@ namespace GnollHackX.Pages.MainScreen
                 _gamePage.WalkArrows = WalkArrowSwitch.IsToggled;
             Preferences.Set("WalkArrows", WalkArrowSwitch.IsToggled);
 
+            GHApp.DrawWallEnds = WallEndSwitch.IsToggled;
             if (_gamePage != null)
                 _gamePage.DrawWallEnds = WallEndSwitch.IsToggled;
             Preferences.Set("DrawWallEnds", WallEndSwitch.IsToggled);
@@ -319,25 +548,45 @@ namespace GnollHackX.Pages.MainScreen
 
             Preferences.Set("DefaultMapNoClipMode", !YesClipNormalSwitch.IsToggled);
 
-            for(int i = 0; i < 6; i++)
-            {
 #if GNH_MAUI
-                Microsoft.Maui.Controls.Picker[] pickers = new Microsoft.Maui.Controls.Picker[6] 
+            Microsoft.Maui.Controls.Picker[] simplePickers = new Microsoft.Maui.Controls.Picker[6] 
 #else
-                Xamarin.Forms.Picker[] pickers = new Xamarin.Forms.Picker[6] 
+            Xamarin.Forms.Picker[] simplePickers = new Xamarin.Forms.Picker[6]
 #endif
-                {
+            {
                     SimpleCommandBarButton1Picker,
                     SimpleCommandBarButton2Picker,
                     SimpleCommandBarButton3Picker,
                     SimpleCommandBarButton4Picker,
                     SimpleCommandBarButton5Picker,
                     SimpleCommandBarButton6Picker,
-                };
+            };
 #if GNH_MAUI
-                Microsoft.Maui.Controls.Picker targetPicker = pickers[i]; 
+            Microsoft.Maui.Controls.Picker[] fullPickers = new Microsoft.Maui.Controls.Picker[13] 
 #else
-                Xamarin.Forms.Picker targetPicker = pickers[i];
+            Xamarin.Forms.Picker[] fullPickers = new Xamarin.Forms.Picker[13]
+#endif
+            {
+                    FullCommandBarButton1Picker,
+                    FullCommandBarButton2Picker,
+                    FullCommandBarButton3Picker,
+                    FullCommandBarButton4Picker,
+                    FullCommandBarButton5Picker,
+                    FullCommandBarButton6Picker,
+                    FullCommandBarButton7Picker,
+                    FullCommandBarButton8Picker,
+                    FullCommandBarButton9Picker,
+                    FullCommandBarButton10Picker,
+                    FullCommandBarButton11Picker,
+                    FullCommandBarButton12Picker,
+                    FullCommandBarButton13Picker,
+            };
+            for (int i = 0; i < 6; i++)
+            {
+#if GNH_MAUI
+                Microsoft.Maui.Controls.Picker targetPicker = simplePickers[i];
+#else
+                Xamarin.Forms.Picker targetPicker = simplePickers[i];
 #endif
                 string keystr = "SimpleUILayoutCommandButton" + (i + 1);
                 if (targetPicker.SelectedIndex < 0 || targetPicker.SelectedIndex >= GHApp.SelectableShortcutButtons.Count)
@@ -352,9 +601,28 @@ namespace GnollHackX.Pages.MainScreen
                         _gamePage.SetSimpleLayoutCommandButton(i, targetPicker.SelectedIndex);
                 }
             }
+            for (int i = 0; i < 13; i++)
+            {
+#if GNH_MAUI
+                Microsoft.Maui.Controls.Picker targetPicker = fullPickers[i]; 
+#else
+                Xamarin.Forms.Picker targetPicker = fullPickers[i];
+#endif
+                string keystr = "FullUILayoutCommandButton" + (i + 1);
+                if (targetPicker.SelectedIndex < 0 || targetPicker.SelectedIndex >= GHApp.SelectableShortcutButtons.Count)
+                {
+                    if (Preferences.ContainsKey(keystr))
+                        Preferences.Remove(keystr);
+                }
+                else
+                {
+                    Preferences.Set(keystr, GHApp.SelectableShortcutButtons[targetPicker.SelectedIndex].GetCommand());
+                    if (_gamePage != null)
+                        _gamePage.SetFullLayoutCommandButton(i, targetPicker.SelectedIndex);
+                }
+            }
 
-            Assembly assembly = GetType().GetTypeInfo().Assembly;
-            GHApp.InitializeMoreCommandButtons(assembly, SimpleCmdLayoutSwitch.IsToggled);
+            GHApp.InitializeMoreCommandButtons(SimpleCmdLayoutSwitch.IsToggled);
             if (_gamePage != null)
             {
                 _gamePage.UseSimpleCmdLayout = SimpleCmdLayoutSwitch.IsToggled;
@@ -362,8 +630,17 @@ namespace GnollHackX.Pages.MainScreen
             }
             Preferences.Set("UseSimpleCmdLayout", SimpleCmdLayoutSwitch.IsToggled);
 
+            GHApp.DarkMode = DarkModeSwitch.IsToggled;
+            Preferences.Set("DarkMode", GHApp.DarkMode);
+
             GHApp.SilentMode = SilentModeSwitch.IsToggled;
             Preferences.Set("SilentMode", GHApp.SilentMode);
+
+            if(WindowedModeStackLayout.IsVisible && WindowedModeSwitch.IsEnabled)
+            {
+                /* Do not update GHApp.WindowedMode, because it needs a restart */
+                Preferences.Set("WindowedMode", WindowedModeSwitch.IsToggled);
+            }
 
             Preferences.Set("GeneralVolume", (float)GeneralVolumeSlider.Value);
             Preferences.Set("MusicVolume", (float)MusicVolumeSlider.Value);
@@ -434,12 +711,17 @@ namespace GnollHackX.Pages.MainScreen
                 try
                 {
                     GHApp.FmodService.ReleaseAllSoundInstances();
-                    GHApp.FmodService.UnloadBanks(0);
-                    GHApp.FmodService.UnloadBanks(2);
+                    GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Master);
+                    GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Preliminary);
+                    if(_gamePage != null)
+                    {
+                        GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Music);
+                        GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Game);
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    Debug.WriteLine(ex.Message);
                 }
             }
 
@@ -447,29 +729,34 @@ namespace GnollHackX.Pages.MainScreen
             {
                 try
                 {
-                    GHApp.GnollHackService.InitializeSecrets(GHApp.CurrentSecrets);
+                    await GHApp.GnollHackService.InitializeSecrets(GHApp.CurrentSecrets);
                 }
                 catch (Exception ex)
                 {
                     await DisplayAlert("Secrets Initialization Failed", "Initializing secrets failed: " + ex.Message, "OK");
                 }
-                GHApp.SetSoundBanksUpForLoading();
+                await GHApp.SetSoundBanksUpForLoading();
             }
 
             if (loadbanks)
             {
                 try
                 {
-                    GHApp.FmodService.LoadBanks(0);
-                    GHApp.FmodService.LoadBanks(2);
+                    GHApp.FmodService.LoadBanks(sound_bank_loading_type.Master);
+                    GHApp.FmodService.LoadBanks(sound_bank_loading_type.Preliminary);
+                    if(_gamePage != null)
+                    {
+                        GHApp.FmodService.LoadBanks(sound_bank_loading_type.Music);
+                        GHApp.FmodService.LoadBanks(sound_bank_loading_type.Game);
+                    }
                     if (_gamePage == null)
                     {
-                        GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, 0.5f, 1.0f);
+                        GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    Debug.WriteLine(ex.Message);
                 }
             }
 
@@ -501,6 +788,9 @@ namespace GnollHackX.Pages.MainScreen
 
             if (_gameMenuPage != null)
                 _gameMenuPage.UpdateLayout();
+
+            if(_gamePage != null)
+                _gamePage.UpdateButtonAndUISizes();
         }
 
         private void ContentPage_Appearing(object sender, EventArgs e)
@@ -511,14 +801,16 @@ namespace GnollHackX.Pages.MainScreen
         private void SetInitialValues()
         {
             int cursor = 0, graphics = 0, savestyle = 0, maprefresh = (int)UIUtils.GetDefaultMapFPS(), msgnum = 0, petrows = 0;
-            bool mem = false, fps = false, battery = false, showrecording = true, autoupload = false, gpu = GHApp.IsGPUDefault, simplecmdlayout = true, bank = true, navbar = GHConstants.DefaultHideNavigation, statusbar = GHConstants.DefaultHideStatusBar;
-            bool allowbones = true, emptywishisnothing = true, recordgame = false, gzip = GHConstants.GZipIsDefaultReplayCompression, lighterdarkening = false, accuratedrawing = GHConstants.DefaultAlternativeLayerDrawing, html = GHConstants.DefaultHTMLDumpLogs, singledumplog = GHConstants.DefaultUseSingleDumpLog, streamingbanktomemory = false, streamingbanktodisk = false, wallends = GHConstants.DefaultDrawWallEnds;
+            bool mem = false, fps = false, zoom = false, battery = false, showrecording = true, autoupload = false, gpu = GHApp.IsGPUDefault, disableauxgpu = false, mipmap = false, simplecmdlayout = GHConstants.DefaultSimpleCmdLayout, darkmode = false, windowedmode = false, bank = true, navbar = GHConstants.DefaultHideNavigation, statusbar = GHConstants.DefaultHideStatusBar;
+            bool allowbones = true, emptywishisnothing = true, doubleclick = GHApp.IsDesktop, recordgame = false, gzip = GHConstants.GZipIsDefaultReplayCompression, lighterdarkening = false, accuratedrawing = GHConstants.DefaultAlternativeLayerDrawing, html = GHConstants.DefaultHTMLDumpLogs, singledumplog = GHConstants.DefaultUseSingleDumpLog, streamingbanktomemory = false, streamingbanktodisk = false, wallends = GHConstants.DefaultDrawWallEnds;
             bool breatheanimations = GHConstants.DefaultBreatheAnimations; //, put2bag = GHConstants.DefaultShowPickNStashContextCommand, prevwep = GHConstants.DefaultShowPrevWepContextCommand;
-            bool devmode = GHConstants.DefaultDeveloperMode, logmessages = GHConstants.DefaultLogMessages, tournament = false, hpbars = false, nhstatusbarclassic = GHConstants.IsDefaultStatusBarClassic, pets = true, orbs = true, orbmaxhp = false, orbmaxmana = false, mapgrid = false, playermark = false, monstertargeting = false, walkarrows = true;
-            bool forcemaxmsg = false, showexstatus = false, noclipmode = GHConstants.DefaultMapNoClipMode, silentmode = false;
+            bool devmode = GHConstants.DefaultDeveloperMode, logmessages = GHConstants.DefaultLogMessages, tournament = false, hpbars = false, nhstatusbarclassic = GHConstants.IsDefaultStatusBarClassic, desktopstatusbar = false, rightaligned2ndrow = false, showscore = false, showxp = false, desktopbuttons = false, menufadeeffects = false, menuhighfilterquality = true, pets = true, orbs = true, orbmaxhp = false, orbmaxmana = false, mapgrid = false, playermark = false, monstertargeting = false, walkarrows = true;
+            bool forcemaxmsg = false, showexstatus = false, noclipmode = GHConstants.DefaultMapNoClipMode, silentmode = false, characterclickaction = false;
             bool postgamestatus = GHConstants.DefaultPosting, postdiagnostics = GHConstants.DefaultPosting, postxlog = GHConstants.DefaultPosting, postreplays = GHConstants.DefaultPosting, postbones = GHConstants.DefaultPosting, boneslistisblack = false;
-            bool longermsghistory = false, xlog_release_account = false, forcepostbones = false;
+            bool longermsghistory = false, xlog_release_account = false, forcepostbones = false, fixrects = false;
             long primarygpucache = -2, secondarygpucache = -2;
+            int rightmouse = GHConstants.DefaultRightMouseCommand, middlemouse = GHConstants.DefaultMiddleMouseCommand;
+            float screenscale = 0.0f;
             float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
             string customlink = "";
             string customxlogaccountlink = "";
@@ -538,6 +830,18 @@ namespace GnollHackX.Pages.MainScreen
                 cmdidxs[i] = listselidx;
             }
 
+            int[] fullCmdIdxs = new int[13];
+            for (int i = 0; i < 13; i++)
+            {
+                string keystr = "FullUILayoutCommandButton" + (i + 1);
+                int defCmd = GHApp.DefaultShortcutButton(0, i, false).GetCommand();
+                int savedCmd = Preferences.Get(keystr, defCmd);
+                int listselidx = GHApp.SelectableShortcutButtonIndexInList(savedCmd, defCmd);
+                fullCmdIdxs[i] = listselidx;
+            }
+
+            darkmode = GHApp.DarkMode; // Preferences.Get("DarkMode", false);
+            windowedmode = Preferences.Get("WindowedMode", false);
             silentmode = Preferences.Get("SilentMode", false);
             generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
             musicVolume = Preferences.Get("MusicVolume", GHConstants.DefaultMusicVolume);
@@ -572,12 +876,16 @@ namespace GnollHackX.Pages.MainScreen
             forcepostbones = Preferences.Get("ForcePostBones", false);
             allowbones = Preferences.Get("AllowBones", true);
             emptywishisnothing = Preferences.Get("EmptyWishIsNothing", true);
+            doubleclick = Preferences.Get("OkOnDoubleClick", GHApp.IsDesktop);
             recordgame = Preferences.Get("RecordGame", false);
             gzip = Preferences.Get("UseGZipForReplays", GHConstants.GZipIsDefaultReplayCompression);
+            fixrects = Preferences.Get("FixRects", GHApp.IsFixRectsDefault);
             noclipmode = Preferences.Get("DefaultMapNoClipMode", GHConstants.DefaultMapNoClipMode);
-            savestyle = Preferences.Get("AppSwitchSaveStyle", 0);
+            savestyle = Preferences.Get("AppSwitchSaveStyle", GHApp.IsDesktop ? 1 : 0);
             primarygpucache = Preferences.Get("PrimaryGPUCacheLimit", -2L);
             secondarygpucache = Preferences.Get("SecondaryGPUCacheLimit", -2L);
+            disableauxgpu = Preferences.Get("DisableAuxiliaryGLCanvas", GHApp.IsDisableAuxGPUDefault);
+            screenscale = Preferences.Get("CustomScreenScale", 0.0f);
             if (_gamePage == null)
             {
                 cursor = Preferences.Get("CursorStyle", 1);
@@ -592,6 +900,13 @@ namespace GnollHackX.Pages.MainScreen
                 ShowExtendedStatusBarLabel.TextColor = GHColors.Gray;
                 hpbars = Preferences.Get("HitPointBars", false);
                 nhstatusbarclassic = Preferences.Get("ClassicStatusBar", GHConstants.IsDefaultStatusBarClassic);
+                desktopstatusbar = Preferences.Get("DesktopStatusBar", GHApp.IsDesktop);
+                desktopbuttons = Preferences.Get("DesktopButtons", GHApp.IsDesktop);
+                menufadeeffects = Preferences.Get("MenuFadeEffects", GHConstants.AreMenuFadeEffectsDefault);
+                menuhighfilterquality = Preferences.Get("MenuHighFilterQuality", GHApp.IsMenuHighFilterQualityDefault);
+                showscore = Preferences.Get("ShowScore", GHApp.IsDesktop);
+                showxp = Preferences.Get("ShowXP", GHApp.IsDesktop);
+                rightaligned2ndrow = Preferences.Get("RightAligned2ndRow", false);
                 pets = Preferences.Get("ShowPets", true);
                 orbs = Preferences.Get("ShowOrbs", true);
                 orbmaxhp = Preferences.Get("ShowMaxHealthInOrb", false);
@@ -599,13 +914,15 @@ namespace GnollHackX.Pages.MainScreen
                 playermark = Preferences.Get("PlayerMark", false);
                 monstertargeting = Preferences.Get("MonsterTargeting", false);
                 walkarrows = Preferences.Get("WalkArrows", true);
-                mem = Preferences.Get("ShowMemoryUsage", false);
+                mem = Preferences.Get("ShowMemory", false);
                 fps = Preferences.Get("ShowFPS", false);
+                zoom = Preferences.Get("ShowZoom", false);
                 battery = Preferences.Get("ShowBattery", false);
                 showrecording = Preferences.Get("ShowRecording", true);
                 autoupload = Preferences.Get("AutoUploadReplays", false);
-                gpu = Preferences.Get("UseMainGLCanvas", GHApp.IsGPUDefault);
-                simplecmdlayout = Preferences.Get("UseSimpleCmdLayout", true);
+                mipmap = Preferences.Get("UseMainMipMap", GHApp.IsUseMainMipMapDefault);
+                gpu = Preferences.Get("UseMainGLCanvas", GHApp.IsUseMainGPUDefault);
+                simplecmdlayout = Preferences.Get("UseSimpleCmdLayout", GHConstants.DefaultSimpleCmdLayout);
                 msgnum = Preferences.Get("NumDisplayedMessages", GHConstants.DefaultMessageRows);
                 petrows = Preferences.Get("NumDisplayedPetRows", GHConstants.DefaultPetRows);
                 lighterdarkening = Preferences.Get("LighterDarkening", GHConstants.DefaultLighterDarkening);
@@ -615,6 +932,9 @@ namespace GnollHackX.Pages.MainScreen
                 //put2bag = Preferences.Get("ShowPut2BagContextCommand", GHConstants.DefaultShowPickNStashContextCommand);
                 //prevwep = Preferences.Get("ShowPrevWepContextCommand", GHConstants.DefaultShowPrevWepContextCommand);
                 longermsghistory = GHApp.SavedLongerMessageHistory; // Preferences.Get("LongerMessageHistory", false);
+                characterclickaction = Preferences.Get("CharacterClickAction", GHConstants.DefaultCharacterClickAction); /* Default value */
+                rightmouse = Preferences.Get("RightMouseCommand", GHConstants.DefaultRightMouseCommand);
+                middlemouse = Preferences.Get("MiddleMouseCommand", GHConstants.DefaultMiddleMouseCommand);
             }
             else
             {
@@ -624,11 +944,18 @@ namespace GnollHackX.Pages.MainScreen
                 mapgrid = _gamePage.MapGrid;
                 forcemaxmsg = _gamePage.ForceAllMessages;
                 ForceMaxMessageSwitch.IsEnabled = true;
-                ForceMaxMessageLabel.TextColor = GHColors.Black;
+                ForceMaxMessageLabel.TextColor = darkmode ? GHColors.White : GHColors.Black;
                 showexstatus = _gamePage.ShowExtendedStatusBar;
                 ShowExtendedStatusBarSwitch.IsEnabled = true;
-                ShowExtendedStatusBarLabel.TextColor = GHColors.Black;
+                ShowExtendedStatusBarLabel.TextColor = darkmode ? GHColors.White : GHColors.Black;
                 nhstatusbarclassic = _gamePage.ClassicStatusBar;
+                desktopstatusbar = _gamePage.DesktopStatusBar;
+                desktopbuttons = _gamePage.DesktopButtons;
+                menufadeeffects = _gamePage.MenuFadeEffects;
+                menuhighfilterquality = _gamePage.MenuHighFilterQuality;
+                showscore = _gamePage.ShowScore;
+                showxp = _gamePage.ShowXP;
+                rightaligned2ndrow = _gamePage.RightAligned2ndRow;
                 hpbars = _gamePage.HitPointBars;
                 pets = _gamePage.ShowPets;
                 orbs = _gamePage.ShowOrbs;
@@ -637,10 +964,12 @@ namespace GnollHackX.Pages.MainScreen
                 playermark = _gamePage.PlayerMark;
                 monstertargeting = _gamePage.MonsterTargeting;
                 walkarrows = _gamePage.WalkArrows;
-                mem = _gamePage.ShowMemoryUsage;
+                mem = _gamePage.ShowMemory;
                 fps = _gamePage.ShowFPS;
+                zoom = _gamePage.ShowZoom;
                 battery = _gamePage.ShowBattery;
                 showrecording = _gamePage.ShowRecording;
+                mipmap = _gamePage.UseMainMipMap;
                 gpu = _gamePage.UseMainGLCanvas;
                 simplecmdlayout = _gamePage.UseSimpleCmdLayout;
                 msgnum = _gamePage.NumDisplayedMessages;
@@ -652,15 +981,51 @@ namespace GnollHackX.Pages.MainScreen
                 //put2bag = _gamePage.ShowPut2BagContextCommand;
                 //prevwep = _gamePage.ShowPrevWepContextCommand;
                 longermsghistory = _gamePage.LongerMessageHistory;
+                characterclickaction = GHApp.MirroredCharacterClickAction; // _gamePage.GetCharacterClickAction(); /* Value of the option in the (saved) game */
+                rightmouse = GHApp.MirroredRightMouseCommand; //_gamePage.GetRightMouseCommand();
+                middlemouse = GHApp.MirroredMiddleMouseCommand; //_gamePage.GetMiddleMouseCommand();
             }
 
             CursorPicker.SelectedIndex = cursor;
             GraphicsPicker.SelectedIndex = graphics;
             RefreshRatePicker.SelectedIndex = Math.Min(RefreshRatePicker.Items.Count - 1, maprefresh);
+
+            if (ScreenScalePicker.ItemsSource != null)
+            {
+                for (int i = 0; i < ScreenScalePicker.ItemsSource.Count; i++)
+                {
+                    object o = ScreenScalePicker.ItemsSource[i];
+                    if (o is ScreenScaleItem)
+                    {
+                        if (((ScreenScaleItem)o).Value == screenscale)
+                        {
+                            ScreenScalePicker.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
             SaveStylePicker.SelectedIndex = savestyle;
             GridSwitch.IsToggled = mapgrid;
             HitPointBarSwitch.IsToggled = hpbars;
             ClassicStatusBarSwitch.IsToggled = nhstatusbarclassic;
+            DesktopStatusBarSwitch.IsToggled = desktopstatusbar;
+            ShowScoreSwitch.IsToggled = showscore;
+            ShowXPSwitch.IsToggled = showxp;
+            RightAligned2ndRowSwitch.IsToggled = rightaligned2ndrow;
+            DesktopButtonsSwitch.IsToggled = desktopbuttons;
+            if (GHApp.IsiOS)
+            {
+                MenuFadeEffectsGrid.IsVisible = false;
+                MenuFadeEffectsSwitch.IsEnabled = false;
+                MenuFadeEffectsLabel.TextColor = GHColors.Gray;
+            }
+            else
+            {
+                MenuFadeEffectsSwitch.IsToggled = menufadeeffects;
+            }
+            MenuHighFilterQualitySwitch.IsToggled = menuhighfilterquality;
             PetSwitch.IsToggled = pets;
             OrbSwitch.IsToggled = orbs;
             MaxHealthInOrbSwitch.IsToggled = orbmaxhp;
@@ -669,14 +1034,56 @@ namespace GnollHackX.Pages.MainScreen
             MonsterTargetingSwitch.IsToggled = monstertargeting;
             WalkArrowSwitch.IsToggled = walkarrows;
             YesClipNormalSwitch.IsToggled = !noclipmode;
-            SilentModeSwitch.IsToggled = silentmode;
             MemorySwitch.IsToggled = mem;
             FPSSwitch.IsToggled = fps;
+            ZoomSwitch.IsToggled = zoom;
             BatterySwitch.IsToggled = battery;
             ShowRecordingSwitch.IsToggled = showrecording;
             AutoUploadReplaysSwitch.IsToggled = autoupload;
-            GPUSwitch.IsToggled = gpu;
+            DisableAuxGPUSwitch.IsToggled = disableauxgpu;
+            FixRectsSwitch.IsToggled = fixrects;
+            MipMapSwitch.IsToggled = mipmap;
+            if (!GHApp.IsMaui)
+            {
+                MipMapGrid.IsVisible = false;
+            }
+            if (GHApp.IsGPUAvailable)
+            {
+                GPUSwitch.IsToggled = gpu;
+                DisableAuxGPUSwitch.IsEnabled = gpu;
+                DisableAuxGPULabel.TextColor = gpu ? (GHApp.DarkMode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+                FixRectsSwitch.IsEnabled = gpu;
+                FixRectsLabel.TextColor = gpu ? (GHApp.DarkMode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+                MipMapSwitch.IsEnabled = gpu;
+                MipMapLabel.TextColor = gpu ? (GHApp.DarkMode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            }
+            else
+            {
+                GPUSwitch.IsToggled = false;
+                GPUSwitch.IsEnabled = false;
+                GPULabel.IsEnabled = false;
+                GPULabel.TextColor = GHColors.Gray;
+
+                FixRectsSwitch.IsEnabled = false;
+                FixRectsLabel.TextColor = GHColors.Gray;
+
+                DisableAuxGPUSwitch.IsEnabled = false;
+                DisableAuxGPULabel.TextColor = GHColors.Gray;
+
+                MipMapSwitch.IsEnabled = false;
+                MipMapLabel.TextColor = GHColors.Gray;
+            }
             SimpleCmdLayoutSwitch.IsToggled = simplecmdlayout;
+            DarkModeSwitch.IsToggled = darkmode;
+            SilentModeSwitch.IsToggled = silentmode;
+            WindowedModeSwitch.IsToggled = windowedmode;
+            if (!GHApp.IsDesktop)
+            {
+                WindowedModeSwitch.IsEnabled = false;
+                WindowedModeLabel.IsEnabled = false;
+                WindowedModeLabel.TextColor = GHColors.Gray;
+                WindowedModeStackLayout.IsVisible = false;
+            }
             NavBarSwitch.IsToggled = navbar;
             if (!GHApp.IsAndroid)
             {
@@ -718,7 +1125,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             StreamingBankToMemorySwitch.IsToggled = streamingbanktomemory;
             StreamingBankToDiskSwitch.IsToggled = streamingbanktodisk;
-            BonesSwitch.IsToggled = allowbones;
+            AllowBonesSwitch.IsToggled = allowbones;
             RecordSwitch.IsToggled = recordgame;
             if (_gamePage != null || (!RecordSwitch.IsToggled && GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes() < GHConstants.LowFreeDiskSpaceThresholdInBytes)) /* Cannot turn on or off in the middle of the game; need to save and restart; otherwise either relevant commands are not recorded or things may get prone to bugs */
             {
@@ -732,6 +1139,40 @@ namespace GnollHackX.Pages.MainScreen
                 GZipLabel.TextColor = GHColors.Gray;
             }
             EmptyWishIsNothingSwitch.IsToggled = emptywishisnothing;
+            CharacterClickActionSwitch.IsToggled = characterclickaction;
+            DoubleClickSwitch.IsToggled = doubleclick;
+
+            if(RightMousePicker.ItemsSource != null)
+            {
+                for (int i = 0; i < RightMousePicker.ItemsSource.Count; i++)
+                {
+                    object o = RightMousePicker.ItemsSource[i];
+                    if (o is MouseCommandItem)
+                    {
+                        if (((MouseCommandItem)o).Value == rightmouse)
+                        {
+                            RightMousePicker.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (MiddleMousePicker.ItemsSource != null)
+            {
+                for (int i = 0; i < MiddleMousePicker.ItemsSource.Count; i++)
+                {
+                    object o = MiddleMousePicker.ItemsSource[i];
+                    if (o is MouseCommandItem)
+                    {
+                        if (((MouseCommandItem)o).Value == middlemouse)
+                        {
+                            MiddleMousePicker.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
 
             PostGameStatusSwitch.IsToggled = postgamestatus;
             PostDiagnosticDataSwitch.IsToggled = postdiagnostics;
@@ -763,24 +1204,40 @@ namespace GnollHackX.Pages.MainScreen
             CustomCloudStorageLabel.Text = customcloudstorage == "" ? "Default" : "Custom";
             CustomCloudStorageButton.Text = customcloudstorage == "" ? "Add" : "Edit";
 
+            SimpleCommandBarButtonsLayout.IsVisible = simplecmdlayout;
             SimpleCommandBarButton1Picker.SelectedIndex = cmdidxs[0];
             SimpleCommandBarButton2Picker.SelectedIndex = cmdidxs[1];
             SimpleCommandBarButton3Picker.SelectedIndex = cmdidxs[2];
             SimpleCommandBarButton4Picker.SelectedIndex = cmdidxs[3];
             SimpleCommandBarButton5Picker.SelectedIndex = cmdidxs[4];
             SimpleCommandBarButton6Picker.SelectedIndex = cmdidxs[5];
-            SimpleCommandBarButton1Picker.IsEnabled = simplecmdlayout;
-            SimpleCommandBarButton2Picker.IsEnabled = simplecmdlayout;
-            SimpleCommandBarButton3Picker.IsEnabled = simplecmdlayout;
-            SimpleCommandBarButton4Picker.IsEnabled = simplecmdlayout;
-            SimpleCommandBarButton5Picker.IsEnabled = simplecmdlayout;
-            SimpleCommandBarButton6Picker.IsEnabled = simplecmdlayout;
-            SimpleCommandBarButton1Label.TextColor = simplecmdlayout ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton2Label.TextColor = simplecmdlayout ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton3Label.TextColor = simplecmdlayout ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton4Label.TextColor = simplecmdlayout ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton5Label.TextColor = simplecmdlayout ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton6Label.TextColor = simplecmdlayout ? GHColors.Black : GHColors.Gray;
+            //SimpleCommandBarButton1Picker.IsEnabled = simplecmdlayout;
+            //SimpleCommandBarButton2Picker.IsEnabled = simplecmdlayout;
+            //SimpleCommandBarButton3Picker.IsEnabled = simplecmdlayout;
+            //SimpleCommandBarButton4Picker.IsEnabled = simplecmdlayout;
+            //SimpleCommandBarButton5Picker.IsEnabled = simplecmdlayout;
+            //SimpleCommandBarButton6Picker.IsEnabled = simplecmdlayout;
+            //SimpleCommandBarButton1Label.TextColor = simplecmdlayout ? (darkmode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            //SimpleCommandBarButton2Label.TextColor = simplecmdlayout ? (darkmode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            //SimpleCommandBarButton3Label.TextColor = simplecmdlayout ? (darkmode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            //SimpleCommandBarButton4Label.TextColor = simplecmdlayout ? (darkmode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            //SimpleCommandBarButton5Label.TextColor = simplecmdlayout ? (darkmode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            //SimpleCommandBarButton6Label.TextColor = simplecmdlayout ? (darkmode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+
+            FullCommandBarButtonsLayout.IsVisible = !simplecmdlayout;
+            FullCommandBarButton1Picker.SelectedIndex = fullCmdIdxs[0];
+            FullCommandBarButton2Picker.SelectedIndex = fullCmdIdxs[1];
+            FullCommandBarButton3Picker.SelectedIndex = fullCmdIdxs[2];
+            FullCommandBarButton4Picker.SelectedIndex = fullCmdIdxs[3];
+            FullCommandBarButton5Picker.SelectedIndex = fullCmdIdxs[4];
+            FullCommandBarButton6Picker.SelectedIndex = fullCmdIdxs[5];
+            FullCommandBarButton7Picker.SelectedIndex = fullCmdIdxs[6];
+            FullCommandBarButton8Picker.SelectedIndex = fullCmdIdxs[7];
+            FullCommandBarButton9Picker.SelectedIndex = fullCmdIdxs[8];
+            FullCommandBarButton10Picker.SelectedIndex = fullCmdIdxs[9];
+            FullCommandBarButton11Picker.SelectedIndex = fullCmdIdxs[10];
+            FullCommandBarButton12Picker.SelectedIndex = fullCmdIdxs[11];
+            FullCommandBarButton13Picker.SelectedIndex = fullCmdIdxs[12];
 
             if (PrimaryGPUCachePicker.ItemsSource != null)
             {
@@ -867,16 +1324,32 @@ namespace GnollHackX.Pages.MainScreen
             if (ClassicStatusBarSwitch.IsToggled)
             {
                 OrbSwitch.IsEnabled = true;
-                OrbsLabel.TextColor = GHColors.Black;
+                OrbsLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                 PetSwitch.IsEnabled = false;
                 PetsLabel.TextColor = GHColors.Gray;
+                DesktopStatusBarSwitch.IsEnabled = false;
+                DesktopStatusBarLabel.TextColor = GHColors.Gray;
+                ShowScoreSwitch.IsEnabled = false;
+                ShowScoreLabel.TextColor = GHColors.Gray;
+                ShowXPSwitch.IsEnabled = false;
+                ShowXPLabel.TextColor = GHColors.Gray;
+                RightAligned2ndRowSwitch.IsEnabled = false;
+                RightAligned2ndRowLabel.TextColor = GHColors.Gray;
             }
             else
             {
                 OrbSwitch.IsEnabled = false;
                 OrbsLabel.TextColor = GHColors.Gray;
                 PetSwitch.IsEnabled = true;
-                PetsLabel.TextColor = GHColors.Black;
+                PetsLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+                DesktopStatusBarSwitch.IsEnabled = true;
+                DesktopStatusBarLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+                ShowScoreSwitch.IsEnabled = true;
+                ShowScoreLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+                ShowXPSwitch.IsEnabled = true;
+                ShowXPLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+                RightAligned2ndRowSwitch.IsEnabled = true;
+                RightAligned2ndRowLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             }
             OrbSwitch_Toggled(sender, new ToggledEventArgs(OrbSwitch.IsToggled));
             PetSwitch_Toggled(sender, new ToggledEventArgs(PetSwitch.IsToggled));
@@ -887,9 +1360,9 @@ namespace GnollHackX.Pages.MainScreen
             if (!ClassicStatusBarSwitch.IsToggled || OrbSwitch.IsToggled)
             {
                 MaxHealthInOrbSwitch.IsEnabled = true;
-                MaxHealthInOrbLabel.TextColor = GHColors.Black;
+                MaxHealthInOrbLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                 MaxManaInOrbSwitch.IsEnabled = true;
-                MaxManaInOrbLabel.TextColor = GHColors.Black;
+                MaxManaInOrbLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             }
             else
             {
@@ -905,7 +1378,7 @@ namespace GnollHackX.Pages.MainScreen
             if (!ClassicStatusBarSwitch.IsToggled && PetSwitch.IsToggled)
             {
                 PetRowPicker.IsEnabled = true;
-                PetRowsLabel.TextColor = GHColors.Black;
+                PetRowsLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             }
             else
             {
@@ -938,7 +1411,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 LogMessageSwitch.IsEnabled = true;
                 LogMessageLabel.IsEnabled = true;
-                LogMessageLabel.TextColor = GHColors.Black;
+                LogMessageLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             }
             else
             {
@@ -955,7 +1428,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 HTMLDumpLogSwitch.IsEnabled = true;
                 HTMLDumpLogLabel.IsEnabled = true;
-                HTMLDumpLogLabel.TextColor = GHColors.Black;
+                HTMLDumpLogLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             }
             else
             {
@@ -977,7 +1450,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 WaitLayout.IsVisible = true;
                 ForceLayout();
-                await Task.Delay(50);
+                await Task.Delay(100);
             }
         }
 
@@ -1010,8 +1483,9 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            PostXlogUserNameLabel.TextColor = GHColors.Black;
-            BonesAllowedUsersLabel.TextColor = GHColors.Black;
+            SetTournamentModeLabelColors(TournamentSwitch.IsToggled);
+            //PostXlogUserNameLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+            BonesAllowedUsersLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             if (PostXlogUserNameEntry.Text != null && PostXlogUserNameEntry.Text != "")
             {
                 if (!XlogUserNameValidationExpression.IsMatch(PostXlogUserNameEntry.Text))
@@ -1051,7 +1525,7 @@ namespace GnollHackX.Pages.MainScreen
             await MaybeShowPleaseWait();
             await SetSettingValues();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
 
@@ -1108,7 +1582,11 @@ namespace GnollHackX.Pages.MainScreen
 
             if (res != "" && !isValid)
             {
+#if GNH_MAUI
+                TextFrame.Stroke = SolidColorBrush.Red;
+#else
                 TextFrame.BorderColor = GHColors.Red;
+#endif
                 TextEntry.Focus();
                 TextOkButton.IsEnabled = true;
                 TextCancelButton.IsEnabled = true;
@@ -1153,7 +1631,11 @@ namespace GnollHackX.Pages.MainScreen
             TextEntry.Unfocus();
             TextEntry.IsEnabled = false;
             TextCaption.Text = "";
+#if GNH_MAUI
+            TextFrame.Stroke = SolidColorBrush.Black;
+#else
             TextFrame.BorderColor = GHColors.Black;
+#endif
 
             _linkButtonClicked.IsEnabled = true;
         }
@@ -1170,7 +1652,11 @@ namespace GnollHackX.Pages.MainScreen
             TextEntry.Unfocus();
             TextEntry.IsEnabled = false;
             TextCaption.Text = "";
+#if GNH_MAUI
+            TextFrame.Stroke = SolidColorBrush.Black;
+#else
             TextFrame.BorderColor = GHColors.Black;
+#endif
 
             if (_linkButtonClicked == null) _linkButtonClicked = CustomLinkButton;
             _linkButtonClicked.IsEnabled = true;
@@ -1185,7 +1671,7 @@ namespace GnollHackX.Pages.MainScreen
                 await MaybeShowPleaseWait();
                 await SetSettingValues();
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             return false;
         }
@@ -1213,18 +1699,8 @@ namespace GnollHackX.Pages.MainScreen
 
         private void SimpleCmdLayoutSwitch_Toggled(object sender, ToggledEventArgs e)
         {
-            SimpleCommandBarButton1Picker.IsEnabled = e.Value;
-            SimpleCommandBarButton2Picker.IsEnabled = e.Value;
-            SimpleCommandBarButton3Picker.IsEnabled = e.Value;
-            SimpleCommandBarButton4Picker.IsEnabled = e.Value;
-            SimpleCommandBarButton5Picker.IsEnabled = e.Value;
-            SimpleCommandBarButton6Picker.IsEnabled = e.Value;
-            SimpleCommandBarButton1Label.TextColor = e.Value ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton2Label.TextColor = e.Value ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton3Label.TextColor = e.Value ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton4Label.TextColor = e.Value ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton5Label.TextColor = e.Value ? GHColors.Black : GHColors.Gray;
-            SimpleCommandBarButton6Label.TextColor = e.Value ? GHColors.Black : GHColors.Gray;
+            SimpleCommandBarButtonsLayout.IsVisible = e.Value;
+            FullCommandBarButtonsLayout.IsVisible = !e.Value;
         }
 
         private async void XlogAccountButton_Clicked(object sender, EventArgs e)
@@ -1232,7 +1708,7 @@ namespace GnollHackX.Pages.MainScreen
             XlogAccountButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.XlogReleaseAccount = XlogReleaseAccountSwitch.IsToggled;
-            await OpenBrowser(new Uri(GHApp.XlogAccountAddress));
+            await GHApp.OpenBrowser(this, "GnollHack Account", new Uri(GHApp.XlogAccountAddress));
             XlogAccountButton.IsEnabled = true;
         }
 
@@ -1268,18 +1744,6 @@ namespace GnollHackX.Pages.MainScreen
             TextOkButton.IsEnabled = true;
             TextCancelButton.IsEnabled = true;
             TextGrid.IsVisible = true;
-        }
-
-        public async Task OpenBrowser(Uri uri)
-        {
-            try
-            {
-                await Browser.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
-            }
         }
 
         private async void XlogTestButton_Clicked(object sender, EventArgs e)
@@ -1319,21 +1783,26 @@ namespace GnollHackX.Pages.MainScreen
             XlogTestButton.IsEnabled = true;
         }
 
-        private void BonesSwitch_Toggled(object sender, ToggledEventArgs e)
+        private void AllowBonesSwitch_Toggled(object sender, ToggledEventArgs e)
         {
             PostBonesSwitch.IsEnabled = e.Value;
-            if (e.Value)
-            {
-                PostBonesLabel.TextColor = GHColors.Black;
-            }
-            else
-            {
-                PostBonesLabel.TextColor = GHColors.Gray;
-            }
+            //if (e.Value)
+            //{
+            //    PostBonesLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+            //}
+            //else
+            //{
+            //    PostBonesLabel.TextColor = GHColors.Gray;
+            //}
             PostBonesSwitch_Toggled(sender, new ToggledEventArgs(PostBonesSwitch.IsToggled));
+            SetTournamentModeLabelColors(TournamentSwitch.IsToggled);
         }
 
+#if GNH_MAUI
+        private void BonesAllowedUsersLabel_TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
         private void BonesAllowedUsersLabel_TapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
         {
             PopupTitleLabel.TextColor = UIUtils.NHColor2XColor((int)NhColor.NO_COLOR, 0, false, true);
             PopupTitleLabel.Text = BonesListSwitch.IsToggled ? "Disallowed Users for Received Bones" : "Allowed Users for Received Bones";
@@ -1371,8 +1840,8 @@ namespace GnollHackX.Pages.MainScreen
             BonesAllowedUsersEntry.IsEnabled = val;
             if (val)
             {
-                BonesListLabel.TextColor = GHColors.Black;
-                BonesAllowedUsersLabel.TextColor = GHColors.Black;
+                BonesListLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+                BonesAllowedUsersLabel.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
             }
             else
             {
@@ -1386,7 +1855,11 @@ namespace GnollHackX.Pages.MainScreen
 
         }
 
+#if GNH_MAUI
+        private void RecordLabel_TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
         private void RecordLabel_TapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
         {
             if(RecordSwitch.IsEnabled)
             {
@@ -1413,7 +1886,11 @@ namespace GnollHackX.Pages.MainScreen
             }
         }
 
+#if GNH_MAUI
+        private void GZipLabel_TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
         private void GZipLabel_TapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
         {
             if (GZipSwitch.IsEnabled)
             {
@@ -1461,7 +1938,14 @@ namespace GnollHackX.Pages.MainScreen
 
         private void GPUSwitch_Toggled(object sender, ToggledEventArgs e)
         {
-            if(_isManualTogglingEnabled && e.Value && !GHApp.IsGPUDefault)
+            FixRectsSwitch.IsEnabled = e.Value;
+            FixRectsLabel.TextColor = e.Value ? (GHApp.DarkMode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            DisableAuxGPUSwitch.IsEnabled = e.Value;
+            DisableAuxGPULabel.TextColor = e.Value ? (GHApp.DarkMode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+            MipMapSwitch.IsEnabled = e.Value;
+            MipMapLabel.TextColor = e.Value ? (GHApp.DarkMode ? GHColors.White : GHColors.Black) : GHColors.Gray;
+
+            if (_isManualTogglingEnabled && e.Value && !GHApp.IsGPUDefault)
             {
                 PopupTitleLabel.TextColor = GHColors.Orange;
                 PopupTitleLabel.Text = "Unstable GPU Acceleration";
@@ -1511,16 +1995,22 @@ namespace GnollHackX.Pages.MainScreen
             }
         }
 
+        private void ShowTournamentInfoPopup()
+        {
+            PopupTitleLabel.TextColor = GHColors.Orange;
+            PopupTitleLabel.Text = "Tournament Mode";
+            PopupLabel.Text = "Tournament Mode will force on Post Game Progress, Post Top Scores, Allow Ghost Levels, Share Bones Files, Record Game, and Auto-Upload to Cloud settings. The mode will also disable all special game play modes, custom links, and custom webhooks." + (GHApp.XlogUserNameVerified ? "" : Environment.NewLine + Environment.NewLine + "Please make sure that your user name and password for Server Posting are verified before proceeding.");
+            PopupOkButton.IsEnabled = true;
+            PopupGrid.IsVisible = true;
+        }
+
         private void TournamentSwitch_Toggled(object sender, ToggledEventArgs e)
         {
             if(e.Value && !GHApp.TournamentMode)
             {
-                PopupTitleLabel.TextColor = GHColors.Orange;
-                PopupTitleLabel.Text = "Tournament Mode";
-                PopupLabel.Text = "Tournament Mode will force on Post Game Progress, Post Top Scores, Allow Ghost Levels, Share Bones Files, Record Game, and Auto-Upload to Cloud settings. The mode will also disable all special game play modes, custom links, and custom webhooks." + (GHApp.XlogUserNameVerified ? "" : Environment.NewLine + Environment.NewLine + "Please make sure that your user name and password for Server Posting are verified before proceeding.");
-                PopupOkButton.IsEnabled = true;
-                PopupGrid.IsVisible = true;
+                ShowTournamentInfoPopup();
             }
+            SetTournamentModeLabelColors(e.Value);
         }
 
         private void PostDiagnosticDataSwitch_Toggled(object sender, ToggledEventArgs e)
@@ -1534,5 +2024,74 @@ namespace GnollHackX.Pages.MainScreen
                 PopupGrid.IsVisible = true;
             }
         }
+
+        private void DarkModeSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            if (_isManualTogglingEnabled)
+            {
+                GHApp.DarkMode = e.Value;
+                bkgView.InvalidateSurface();
+                lblHeader.TextColor = e.Value ? GHColors.White : GHColors.Black;
+                SetChildrenDarkModeTextColor(RootLayout, e.Value);
+                if (_gameMenuPage != null)
+                {
+                    _gameMenuPage.UpdateDarknessMode();
+                }
+            }
+        }
+
+        private void TextEntry_Completed(object sender, EventArgs e)
+        {
+            if (TextOkButton.IsEnabled)
+            {
+                TextOkButton_Clicked(sender, e);
+            }
+        }
+
+        private void TournamentLabel_TapGestureRecognizer_Tapped(object sender, EventArgs e)
+        {
+            ShowTournamentInfoPopup();
+        }
+
+        private void WindowedModeSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            if(_isManualTogglingEnabled)
+            {
+                bool oldValue = GHApp.WindowedMode;
+                if (oldValue != e.Value)
+                {
+                    PopupTitleLabel.TextColor = UIUtils.NHColor2XColor((int)NhColor.NO_COLOR, 0, false, true);
+                    PopupTitleLabel.Text = "Restart Required";
+                    PopupLabel.Text = "Please restart GnollHack for the changes in Windowed Mode to take effect.";
+                    PopupOkButton.IsEnabled = true;
+                    PopupGrid.IsVisible = true;
+                }
+            }
+        }
+
+        private void MipMapSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            if (_isManualTogglingEnabled)
+            {
+                bool oldValue = GHApp.UseMipMap;
+                if (oldValue != e.Value)
+                {
+                    PopupTitleLabel.TextColor = UIUtils.NHColor2XColor((int)NhColor.CLR_ORANGE, 0, false, true);
+                    PopupTitleLabel.Text = "Resource Usage Warning";
+                    //ulong memreq = GHConstants.UseMipMapThresholdInBytes / 1024 / 1024;
+                    //ulong mem = GHApp.TotalMemory / 1024 / 1024;
+                    PopupLabel.Text = "Changing the mipmap setting may require more memory or CPU power than normal.";
+                    //"It is recommended for the device to have at least " + 
+                    //    memreq + " MB of memory. Your device has " + mem + " MB of memory.";
+                    PopupOkButton.IsEnabled = true;
+                    PopupGrid.IsVisible = true;
+                }
+            }
+        }
+        protected override bool OnBackButtonPressed()
+        {
+            return true;
+        }
+
     }
 }

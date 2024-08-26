@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    prop.h    $NHDT-Date: 1547514641 2019/01/15 01:10:41 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.20 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -190,15 +190,17 @@ enum prop_types {
     LAUGHING          = 167,
     TOTTERING         = 168,
     MARTIAL_PROWESS   = 169,
-    MAX_PROPS         = 170
+    RESERVED_PROP_1   = 170,
+    RESERVED_PROP_24  = 193,  /* Keep this - 1 divisible by 24 so MAX_BUFF_TILES is exactly an integer */
+    MAX_PROPS         = 194   /* Keep this - 2 divisible by 24 so MAX_BUFF_TILES is exactly an integer */
 };
-#define LAST_PROP (MAX_PROPS - 1)
+#define LAST_PROP (MAX_PROPS - 1) /* Keep this - 1 divisible by 24 so MAX_BUFF_TILES is exactly an integer */
 
 /*** Where the properties come from ***/
 /* Definitions were moved here from obj.h and you.h */
 struct prop {
     /*** Properties conveyed by objects ***/
-    long extrinsic;
+    int64_t extrinsic;
 /* Armor */
 #define W_ARM  0x00000001L  /* Body armor */
 #define W_ARMC 0x00000002L  /* Cloak */
@@ -260,7 +262,7 @@ struct prop {
 #define W_CARRIED 0x80000000L              /* Carried */
 
     /*** Timeouts, permanent properties, and other flags ***/
-    long intrinsic;
+    int64_t intrinsic;
 
 /* Timed properties */
 #define TIMEOUT 0x00ffffffL       /* Up to 16 million turns */
@@ -280,9 +282,9 @@ struct prop_color {
 struct prop_info {
     const char* prop_tile_name;
 
-    Bitfield(show_buff, 1);
-    Bitfield(buff_text_needs_background, 1);
-    Bitfield(recurring, 1);            /* Is property recurring? EProperty causes timeout in HProperty to increase by recurring_constant + rnd(recurring_random) */
+    boolean show_buff;
+    boolean buff_text_needs_background;
+    boolean recurring;            /* Is property recurring? EProperty causes timeout in HProperty to increase by recurring_constant + rnd(recurring_random) */
 
     short recurring_constant;
     short recurring_random;
@@ -290,7 +292,7 @@ struct prop_info {
     struct prop_color buff_text_color;
     struct prop_color buff_bk_color;
 
-    unsigned long pflags;
+    uint64_t pflags;
 };
 
 #define PROPFLAGS_NONE                  0x00000000UL

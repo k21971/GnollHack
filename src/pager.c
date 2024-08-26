@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    pager.c    $NHDT-Date: 1555627307 2019/04/18 22:41:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.151 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -108,8 +108,8 @@ char *outbuf;
 {
     struct obj *otmp;
     boolean fakeobj, isyou = (mon == &youmonst);
-    int x = isyou ? u.ux : mon->mx, y = isyou ? u.uy : mon->my,
-        glyph = abs((level.flags.hero_memory && !isyou) ? levl[x][y].hero_memory_layers.glyph
+    int x = isyou ? u.ux : mon->mx, y = isyou ? u.uy : mon->my;
+    int glyph = !isok(x, y) ? NO_GLYPH : abs((level.flags.hero_memory && !isyou) ? levl[x][y].hero_memory_layers.glyph
                                                     : glyph_at(x, y));
 
     *outbuf = '\0';
@@ -167,9 +167,12 @@ struct obj **obj_p;
     boolean fakeobj = FALSE, mimic_obj = FALSE;
     struct monst *mtmp;
     struct obj *otmp;
-    int glyphotyp = glyph_to_obj(glyph);
 
     *obj_p = (struct obj *) 0;
+    if (!isok(x, y))
+        return FALSE;
+
+    int glyphotyp = glyph_to_obj(glyph);
     otmp = any_obj_at(glyphotyp, x, y);
 
     /* there might be a mimic here posing as an object */
@@ -254,6 +257,9 @@ look_at_object(buf, x, y, glyph)
 char *buf; /* output buffer */
 int x, y, glyph;
 {
+    if (!isok(x, y))
+        return;
+
     struct obj *otmp = 0;
     boolean fakeobj = object_from_map(glyph, x, y, &otmp);
 
@@ -413,7 +419,7 @@ int x, y;
                 if (Hallucination) {
                     Strcat(extrabuf, "paranoid delusion");
                 } else {
-                    unsigned long mW = (context.warntype.obj
+                    uint64_t mW = (context.warntype.obj
                                         | context.warntype.polyd),
                                   m2 = mtmp->data->mflags2;
                     const char *whom = ((mW & M2_HUMAN & m2) ? "humans"
@@ -480,12 +486,18 @@ lookat(x, y, buf, simplebuf, extrabuf)
 int x, y;
 char *buf, *simplebuf, *extrabuf;
 {
+    if (!buf || !simplebuf || !extrabuf)
+        return (struct permonst*)0;
+
     struct monst* mtmp = (struct monst*)0;
     struct permonst* pm = (struct permonst*)0;
     int glyph;
     boolean noarticle = FALSE;
 
     buf[0] = simplebuf[0] = extrabuf[0] = '\0';
+    if (!isok(x, y))
+        return (struct permonst*)0;
+
     glyph = glyph_at(x, y);
     if (u.ux == x && u.uy == y && canspotself()
         && !(iflags.save_uswallow &&
@@ -718,7 +730,7 @@ char *buf, *simplebuf, *extrabuf;
                     )
                 ) && cansee(x, y))
             {
-                char buf2[BUFSIZ];
+                char buf2[BUFSZ * 2];
                 Sprintf(buf2, "%s%s", levl[x][y].lamplit ? "lit " : "unlit ", buf);
                 Strcpy(buf, buf2);
             }
@@ -727,7 +739,7 @@ char *buf, *simplebuf, *extrabuf;
         }
     }
 
-    char exbuf[BUFSIZ];
+    char exbuf[BUFSZ * 2];
     Strcpy(exbuf, buf);
     int article = strstri(exbuf, " of a room")? 2 :
         (!noarticle && pm && (pm->geno & G_UNIQ)) ? (is_mname_proper_name(pm) ? 0 : 2) : /* for unique monsters have no article if the name is a proper name, otherwise they have the */
@@ -764,7 +776,7 @@ char *supplemental_name;
     dlb *fp;
     char buf[BUFSZ], newstr[BUFSZ], givenname[BUFSZ];
     char *ep, *dbase_str;
-    unsigned long txt_offset = 0L;
+    long txt_offset = 0L;
     winid datawin = WIN_ERR;
 
     fp = dlb_fopen(DATAFILE, "r");
@@ -978,7 +990,7 @@ char *supplemental_name;
                 } while (!digit(*buf));
                 if (sscanf(buf, "%ld,%d\n", &entry_offset, &entry_count) < 2)
                     goto bad_data_file;
-                fseekoffset = (long) txt_offset + entry_offset;
+                fseekoffset = txt_offset + entry_offset;
                 if (pass == 1)
                     pass1offset = fseekoffset;
                 else if (fseekoffset == pass1offset)
@@ -1061,7 +1073,7 @@ struct permonst **for_supplement;
         if (looked)
         {
             int oc;
-            unsigned long os;
+            uint64_t os;
 
             struct layer_info layers = layers_at(cc.x, cc.y);
             glyph = abs(layers.glyph);
@@ -1262,7 +1274,7 @@ struct permonst **for_supplement;
                             && ((decoration_type_definitions[levl[cc.x][cc.y].decoration_typ].dflags & DECORATION_TYPE_FLAGS_LOOTABLE) == 0 || (levl[cc.x][cc.y].decoration_flags & DECORATION_FLAGS_ITEM_IN_HOLDER) != 0)
                             ) && cansee(cc.x, cc.y))
                         {
-                            char buf2[BUFSIZ];
+                            char buf2[BUFSZ * 2];
                             Sprintf(buf2, "%s%s", levl[cc.x][cc.y].lamplit ? "lit " : "unlit ", decoration_buf);
                             Strcpy(decoration_buf, buf2);
                         }

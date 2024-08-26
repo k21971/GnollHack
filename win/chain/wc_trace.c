@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	wc_trace.c	$NHDT-Date: 1501464799 2017/07/31 01:33:19 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.8 $ */
 /* Copyright (c) Kenneth Lorber, 2012				  */
@@ -780,7 +780,7 @@ void *vp;
 int style, attr, color, glyph;
 const char *title, *query, *resp, *resp_desc, *introline;
 char def;
-unsigned long ynflags;
+uint64_t ynflags;
 {
     struct trace_data *tdp = vp;
     char rv;
@@ -938,7 +938,7 @@ void
 trace_change_color(vp, color, value, reverse)
 void *vp;
 int color;
-long value;
+int64_t value;
 int reverse;
 {
     struct trace_data *tdp = vp;
@@ -1188,7 +1188,7 @@ trace_status_update(vp, idx, ptr, chg, percent, color, colormasks)
 void *vp;
 int idx, chg, percent, color;
 genericptr_t ptr;
-unsigned long *colormasks;
+uint64_t *colormasks;
 {
     struct trace_data *tdp = vp;
 

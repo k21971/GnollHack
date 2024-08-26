@@ -4,26 +4,11 @@
 
 #include "hack.h"
 #include "libproc.h"
-
 #include "dlb.h"
-#include <sys/stat.h>
-#include <pwd.h>
-#include <sys/types.h>
-#include <dirent.h>
-#ifndef O_RDONLY
-#include <fcntl.h>
-#endif
+extern void NDECL(gnh_umask);
 
-#include <pthread.h>
-
-extern struct passwd *FDECL( getpwuid, ( uid_t));
-extern struct passwd *FDECL( getpwnam, (const char *));
-
-#if 0
-STATIC_DCL boolean NDECL( whoami);
-#endif
-STATIC_DCL void FDECL( process_command_line_arguments, (int, char **));
-STATIC_DCL void NDECL(make_dumplog_dir);
+STATIC_DCL void FDECL(process_command_line_arguments, (int, char **));
+STATIC_DCL void NDECL(notify_gui_pregame);
 
 STATIC_OVL char*
 make_lockname(filename, lockname)
@@ -52,23 +37,6 @@ const char* filename;
     unlink(lockname);
 }
 
-void
-gnollhack_exit(code)
-int code;
-{
-    if (exit_hack)
-        exit_hack(exit_hack_code);
-
-#if defined(EXIT_THREAD_ON_EXIT)
-    char retbuf[BUFSZ];
-    Sprintf(retbuf, "GnollHack thread exit with value %d", code);
-
-    pthread_exit(retbuf);
-#else
-    exit(code);
-#endif
-}
-
 int
 GnollHackMain(argc, argv)
 int argc;
@@ -83,7 +51,8 @@ char** argv;
 
     hname = argv[0];
     hackpid = getpid();
-    (void)umask(0777 & ~FCMASK);
+
+    gnh_umask();
 
     // hack
     // remove dangling locks
@@ -97,7 +66,9 @@ char** argv;
 
     /* Now initialize windows */
     choose_windows(DEFAULT_WINDOW_SYS);
+    maybe_issue_simple_gui_command(!exit_hack_code_at_start, GUI_CMD_LOAD_GLYPHS);
     init_nhwindows(&argc, argv);
+    maybe_issue_simple_gui_command(!exit_hack_code_at_start, GUI_CMD_SET_TO_BLACK);
     process_options_file();
 
     /*
@@ -147,38 +118,50 @@ char** argv;
 
     if (!load_saved_game(exit_hack_code_at_start))
     {
-        player_selection();
         resuming = FALSE;
+        maybe_issue_simple_gui_command(exit_hack_code_at_start, GUI_CMD_SET_TO_BLACK);
+        player_selection();
 
         /* CHOOSE DIFFICULTY */
         choose_game_difficulty();
 
         newgame();
         mode_message();
+        set_mouse_buttons();
     }
     else
     {
         resuming = exit_hack_code_at_start == 1 ? 2 : TRUE;
     }
-
-    if(wizard)
-        issue_simple_gui_command(GUI_CMD_ENABLE_WIZARD_MODE); /* Notification may be needed if loaded a wizard mode saved game */
-    else
-        issue_simple_gui_command(GUI_CMD_DISABLE_WIZARD_MODE); /* Notification may be needed */
-
-    if (CasualMode)
-        issue_simple_gui_command(GUI_CMD_ENABLE_CASUAL_MODE); /* Notification may be needed if loaded a casual mode saved game */
-    else
-        issue_simple_gui_command(GUI_CMD_DISABLE_CASUAL_MODE); /* Notification may be needed */
-
-    if (TournamentMode)
-        issue_simple_gui_command(GUI_CMD_ENABLE_TOURNAMENT_MODE); /* Notification may be needed if loaded a tournament mode saved game */
-    else
-        issue_simple_gui_command(GUI_CMD_DISABLE_TOURNAMENT_MODE); /* Notification may be needed */
-
+    notify_gui_pregame();
     moveloop(resuming);
     gnollhack_exit(EXIT_SUCCESS);
     return (0);
+}
+
+STATIC_OVL void
+notify_gui_pregame(VOID_ARGS)
+{
+    issue_simple_gui_command(wizard ? GUI_CMD_ENABLE_WIZARD_MODE : GUI_CMD_DISABLE_WIZARD_MODE); /* Notification may be needed if loaded a wizard mode saved game */
+    issue_simple_gui_command(CasualMode ? GUI_CMD_ENABLE_CASUAL_MODE : GUI_CMD_DISABLE_CASUAL_MODE); /* Notification may be needed if loaded a casual mode saved game */
+    issue_simple_gui_command(TournamentMode ? GUI_CMD_ENABLE_TOURNAMENT_MODE : GUI_CMD_DISABLE_TOURNAMENT_MODE); /* Notification may be needed if loaded a tournament mode saved game */
+    issue_boolean_gui_command(GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION, flags.self_click_action); /* Notification is needed */
+    issue_gui_command(GUI_CMD_REPORT_MOUSE_COMMAND, (int)flags.right_click_command, 0, (const char*)0); /* Notification is needed */
+    issue_gui_command(GUI_CMD_REPORT_MOUSE_COMMAND, (int)flags.middle_click_command, 1, (const char*)0); /* Notification is needed */
+    
+    if (context.quick_cast_spell_set)
+    {
+        const char* spellnam = spl_book[context.quick_cast_spell_no].sp_id > STRANGE_OBJECT ? OBJ_NAME(objects[spl_book[context.quick_cast_spell_no].sp_id]) : "";
+        issue_gui_command(GUI_CMD_TOGGLE_QUICK_CAST_SPELL, spell_to_glyph(context.quick_cast_spell_no), spellid(context.quick_cast_spell_no), spellnam); /* Notification is needed */
+    }
+    else
+        issue_gui_command(GUI_CMD_TOGGLE_QUICK_CAST_SPELL, NO_GLYPH, 0, "");
+
+    struct obj* obj;
+    if (context.quick_zap_wand_oid > 0 && (obj = o_on(context.quick_zap_wand_oid, invent)) != 0)
+        issue_gui_command(GUI_CMD_TOGGLE_QUICK_ZAP_WAND, (int)obj_to_glyph(obj, rn2_on_display_rng), Hallucination ? 0 : (int)obj->exceptionality, cxname(obj)); /* Notification is needed */
+    else
+        issue_gui_command(GUI_CMD_TOGGLE_QUICK_ZAP_WAND, NO_GLYPH, 0, "");
 }
 
 boolean 
@@ -322,71 +305,3 @@ port_help()
     display_file(PORT_HELP, TRUE);
 }
 #endif
-
-#ifdef NOCWD_ASSUMPTIONS
-/*
- * Add a slash to any name not ending in /. There must
- * be room for the /
- */
-void 
-append_slash(name)
-char *name;
-{
-    char *ptr;
-
-    if(!*name)
-        return;
-    ptr = name + (strlen(name) - 1);
-    if(*ptr != '/')
-    {
-        *++ptr = '/';
-        *++ptr = '\0';
-    }
-    return;
-}
-#endif
-
-unsigned long
-sys_random_seed()
-{
-    unsigned long seed = 0L;
-    unsigned long pid = (unsigned long) getpid();
-    boolean no_seed = TRUE;
-#ifdef DEV_RANDOM
-    FILE *fptr;
-
-    fptr = fopen(DEV_RANDOM, "r");
-    if (fptr) {
-        fread(&seed, sizeof (long), 1, fptr);
-        has_strong_rngseed = TRUE;  /* decl.c */
-        no_seed = FALSE;
-        (void) fclose(fptr);
-    } else {
-        /* leaves clue, doesn't exit */
-        paniclog("sys_random_seed", "falling back to weak seed");
-    }
-#endif
-    if (no_seed) {
-        seed = (unsigned long) getnow(); /* time((TIME_type) 0) */
-        /* Quick dirty band-aid to prevent PRNG prediction */
-        if (pid) {
-            if (!(pid & 3L))
-                pid -= 1L;
-            seed *= pid;
-        }
-    }
-    return seed;
-}
-
-STATIC_OVL void
-make_dumplog_dir(VOID_ARGS)
-{
-#if (defined(DUMPLOG) || defined(DUMPHTML)) && defined(DUMPLOG_DIR)
-    /* Make DUMPLOG_DIR if defined */
-    struct stat st = { 0 };
-
-    if (stat(DUMPLOG_DIR, &st) == -1) {
-        (void)mkdir(DUMPLOG_DIR, 0700);
-    }
-#endif
-}

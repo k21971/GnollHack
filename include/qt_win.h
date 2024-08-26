@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 // NetHack 3.6	qt_win.h	$NHDT-Date: 1447755972 2015/11/17 10:26:12 $  $NHDT-Branch: master $:$NHDT-Revision: 1.17 $
 // Copyright (c) Warwick Allison, 1999.
@@ -877,7 +877,7 @@ class NetHackQtBind : NetHackQtBindBase
     static void qt_nhbell();
     static int qt_doprev_message();
     static char qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices,
-                               CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags);
+                               CHAR_P def, const char* resp_desc, const char* introline, uint64_t ynflags);
     static void qt_getlin_ex(int style, int attr, int color, const char *prompt, char *line, const char* placeholder, const char* linesuffix, const char* introtext);
     static int qt_get_ext_cmd();
     static void qt_number_pad(int);

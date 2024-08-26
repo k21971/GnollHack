@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    artifact.h    $NHDT-Date: 1433050871 2015/05/31 05:41:11 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -8,11 +8,11 @@
 #ifndef ARTIFACT_H
 #define ARTIFACT_H
 
+#include "config.h"
 #include "general.h"
 #include "soundset.h"
 #include "permonst.h"
 #include "prop.h"
-#include "config.h"
 
 /* general and attack-based flags */
 #define AF_NONE        0x00000000UL  /* no special effects, just a bonus */
@@ -142,11 +142,11 @@ struct artifact {
     uchar exceptionality;
     uchar mythic_prefix;
     uchar mythic_suffix;
-    unsigned long aflags;  /* artifact flags */
-    unsigned long aflags2; /* artifact flags2 */
-    unsigned long spfx;    /* special effect from wielding/wearing */
-    unsigned long cspfx;   /* special effect just from carrying obj */
-    unsigned long mtype;   /* monster type, symbol, or flag */
+    uint64_t aflags;  /* artifact flags */
+    uint64_t aflags2; /* artifact flags2 */
+    uint64_t spfx;    /* special effect from wielding/wearing */
+    uint64_t cspfx;   /* special effect just from carrying obj */
+    uint64_t mtype;   /* monster type, symbol, or flag */
     int tohit_dice;
     int tohit_diesize;
     int tohit_plus;
@@ -162,7 +162,7 @@ struct artifact {
     aligntyp alignment; /* alignment of bequeathing gods */
     short role;         /* character role associated with */
     short race;         /* character race associated with */
-    long cost; /* price when sold to hero (default 100 x base cost) */
+    int64_t cost; /* price when sold to hero (default 100 x base cost) */
     char acolor;        /* color to use if artifact 'glows' */
     char ocolor;        /* color used for object instead of its normal color */
     int tile_floor_height;
@@ -174,8 +174,9 @@ struct artifact {
 };
 
 /* invoked properties with special powers */
+#define FIRST_ARTINVOKE (LAST_PROP + 1)
 enum invoke_prop_types {
-    ARTINVOKE_TAMING = (LAST_PROP + 1), /* Keep first */
+    ARTINVOKE_TAMING = FIRST_ARTINVOKE, /* Keep first */
     ARTINVOKE_HEALING,
     ARTINVOKE_ENERGY_BOOST,
     ARTINVOKE_UNTRAP,
@@ -194,10 +195,19 @@ enum invoke_prop_types {
     ARTINVOKE_INVOKE_WITH_TIMER,
     ARTINVOKE_TIME_STOP,
     ARTINVOKE_RUBY_ROD,
+    ARTINVOKE_EARTHQUAKE,
+    ARTINVOKE_RESERVED_1,
+    ARTINVOKE_RESERVED_2,
+    ARTINVOKE_RESERVED_3,
+    ARTINVOKE_RESERVED_4,
+    ARTINVOKE_RESERVED_5,
+    ARTINVOKE_RESERVED_6,
+    ARTINVOKE_RESERVED_7,
+    ARTINVOKE_RESERVED_8,
     MAX_ARTINVOKES /* this is NOT the number of artifact invokes*/
 };
 
-#define NUM_ARTINVOKES (MAX_ARTINVOKES - ARTINVOKE_TAMING)
+#define NUM_ARTINVOKES (MAX_ARTINVOKES - FIRST_ARTINVOKE)
 
 extern const char* artifact_invoke_names[NUM_ARTINVOKES];
 extern NEARDATA struct artifact artilist[];

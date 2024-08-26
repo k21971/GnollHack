@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    ntconf.h    $NHDT-Date: 1447424077 2015/11/13 14:14:37 $  $NHDT-Branch: master $:$NHDT-Revision: 1.48 $ */
 /* Copyright (c) GnollHack PC Development Team 1993, 1994.  */
@@ -30,11 +30,18 @@
 
 #define DUMPLOG      /* Enable dumplog files */
 #define DUMPHTML     /* Enable HTML dumplog files */
+#define ALLOW_SNAPSHOT
+#define WRITE_SNAPSHOT_JSON
+
 /*#define DUMPLOG_FILE "GnollHack-%n-%d.txt"*/
 #ifdef DUMPLOG_DIR
 #undef DUMPLOG_DIR
 #endif
 #define DUMPLOG_DIR        "dumplog" /* Note: this is just used to create a directory, DUMPLOG_FILE still needs to have the full path */
+#ifdef SNAPSHOT_DIR
+#undef SNAPSHOT_DIR
+#endif
+#define SNAPSHOT_DIR        "snapshot" /* Note: this is just used to create a directory, SNAPSHOT_DIR still needs to have the full path */
 #define DUMPLOG_MSG_COUNT 50
 
 #define USER_SOUNDS
@@ -47,7 +54,7 @@
  *  The remaining code shouldn't need modification.
  * -----------------------------------------------------------------
  */
-/* #define SHORT_FILENAMES */ /* All NT filesystems support long names now
+/* #define SHORT_FILENAMES */ /* All NT filesystems support int64_t names now
  */
 
 #ifdef MICRO
@@ -251,7 +258,7 @@ int _RTLENTRY _EXPFUNC close(int __handle);
 int _RTLENTRY _EXPFUNC _close(int __handle);
 int _RTLENTRY _EXPFUNC
 open(const char _FAR *__path, int __access, ... /*unsigned mode*/);
-long _RTLENTRY _EXPFUNC lseek(int __handle, long __offset, int __fromwhere);
+int64_t _RTLENTRY _EXPFUNC lseek(int __handle, int64_t __offset, int __fromwhere);
 int _RTLENTRY _EXPFUNC read(int __handle, void _FAR *__buf, unsigned __len);
 #endif
 #ifndef CURSES_GRAPHICS

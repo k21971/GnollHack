@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    end.c    $NHDT-Date: 1557094801 2019/05/05 22:20:01 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.170 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -19,12 +19,12 @@
 #include "dlb.h"
 #include <math.h>
 
-/* add b to long a, convert wraparound to max value */
+/* add b to int64_t a, convert wraparound to max value */
 #define nowrap_add(a, b) (a = ((a + game_score_difficulty_adjustment(b)) < 0 ? LONG_MAX : (a + game_score_difficulty_adjustment(b))))
 
 #if 0
 struct valuable_data {
-    long count;
+    int64_t count;
     int typ;
 };
 
@@ -303,7 +303,7 @@ STATIC_VAR NEARDATA const char *deaths[NUM_GAME_END_TYPES] = {
     "died", "choked", "poisoned", "starvation", "drowning", "drowned", "burning",
     "dissolving under the heat and pressure", "crushed", "strangled", "suffocated", "turned to stone", "disintegrated",
     "turned into slime", "illness", "mummy rot", "genocided", "panic", "trickery", "quit",
-    "escaped", "ascended"
+    "escaped", "ascended", "snapshot"
 };
 
 STATIC_VAR NEARDATA const char *ends[NUM_GAME_END_TYPES] = {
@@ -314,7 +314,7 @@ STATIC_VAR NEARDATA const char *ends[NUM_GAME_END_TYPES] = {
     "were crushed", "were strangled", "suffocated", "turned to stone", "were disintegrated",
     "turned into slime", "died of your illness", "died of mummy rot", "were genocided",
     "panicked", "were tricked", "quit",
-    "escaped", "ascended"
+    "escaped", "ascended", "snapshot"
 };
 
 STATIC_VAR boolean Schroedingers_cat = FALSE;
@@ -352,7 +352,7 @@ done2()
     char paranoidbuf[BUFSZ] = "";
     Sprintf(paranoidbuf, "%s%s%s", 
         !has_existing_save_file && (wizard || discover || CasualMode) ? "There is no saved game. " : "",
-        !wizard && !has_existing_save_file ? "This will end the game and delete your character! " : "", 
+        !wizard && !has_existing_save_file ? "This will delete your character! " : "", 
         has_existing_save_file ? "Your progress will not be saved in the existing save file. Really quit?" : "Are you sure to quit?");
     if (!paranoid_query_ex(ATR_NONE, CLR_MSG_NEGATIVE, ParanoidQuit, "Confirm Quit", paranoidbuf)) {
 #ifndef NO_SIGNAL
@@ -915,7 +915,8 @@ time_t when; /* date+time at end of game */
             &datetimebuf[0], &datetimebuf[4], &datetimebuf[6],
             &datetimebuf[8], &datetimebuf[10], &datetimebuf[12]);
     Strcpy(datetimebuf, yyyymmddhhmmss(when));
-    Sprintf(eos(pbuf), ", ended %4.4s-%2.2s-%2.2s %2.2s:%2.2s:%2.2s",
+    Sprintf(eos(pbuf), ", %s %4.4s-%2.2s-%2.2s %2.2s:%2.2s:%2.2s",
+            how == SNAPSHOT ? "snapshot at" : "ended",
             &datetimebuf[0], &datetimebuf[4], &datetimebuf[6],
             &datetimebuf[8], &datetimebuf[10], &datetimebuf[12]);
     putstr(0, ATR_SUBHEADING, pbuf);
@@ -962,23 +963,23 @@ time_t when; /* date+time at end of game */
     putstr(NHW_DUMPTXT, 0, "");
     putstr(0, ATR_HEADING, "Inventory:");
     (void) display_inventory((char *) 0, TRUE, 0);
-    container_contents(invent, TRUE, TRUE, FALSE, 0);
-    enlightenment((BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
-                  (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
+    container_contents(invent, how != SNAPSHOT, TRUE, FALSE, 0);
+    enlightenment(how == SNAPSHOT ? BASICENLIGHTENMENT : (BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
+                  how == SNAPSHOT ? ENL_GAMEINPROGRESS : (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
     putstr(NHW_DUMPTXT, 0, "");
     dump_skills();
     putstr(NHW_DUMPTXT, 0, "");
     dump_spells();
     putstr(NHW_DUMPTXT, 0, "");
-    show_gamelog((how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
+    show_gamelog(how == SNAPSHOT ? ENL_GAMEINPROGRESS : (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
     putstr(NHW_DUMPTXT, 0, "");
     list_vanquished('d', FALSE, TRUE); /* 'd' => 'y' */
     putstr(NHW_DUMPTXT, 0, "");
     list_genocided('d', FALSE, TRUE); /* 'd' => 'y' */
     putstr(NHW_DUMPTXT, 0, "");
-    show_conduct((how >= PANICKED) ? 1 : 2);
+    show_conduct(how == SNAPSHOT ? 0 : (how >= PANICKED) ? 1 : 2);
     putstr(NHW_DUMPTXT, 0, "");
-    show_overview((how >= PANICKED) ? 1 : 2, how);
+    show_overview(how == SNAPSHOT ? 0 : (how >= PANICKED) ? 1 : 2, how);
     putstr(NHW_DUMPTXT, 0, "");
     dump_redirect(FALSE);
 #else
@@ -994,21 +995,24 @@ wiz_dumplog(VOID_ARGS)
 #if defined (DUMPLOG) || defined (DUMPHTML)
     if (wizard) {
         time_t dumptime = getnow();
-        char buf[BUFSZ] = "";
-        char htmlbuf[BUFSZ] = "";
         char* dumplogfilename = 0;
         char* htmldumplogfilename = 0;
+        char buf[BUFSIZ] = "";
+
+        dump_open_log(dumptime, TRUE);
+
 #if defined (DUMPLOG)
         dumplogfilename = print_dumplog_filename_to_buffer(buf);
 #endif
-#if defined (DUMPHTML)
-        htmldumplogfilename = print_dumphtml_filename_to_buffer(htmlbuf);
-#endif
-        if(dumplogfilename)
+        if (dumplogfilename)
             pline("Writing dumplog to %s...", dumplogfilename);
+
+#if defined (DUMPHTML)
+        htmldumplogfilename = print_dumphtml_filename_to_buffer(buf);
+#endif
         if (htmldumplogfilename)
-            pline("Writing HTML dumplog to %s...", htmldumplogfilename);
-        dump_open_log(dumptime);
+            pline("Writing HTML dumplog to %s...", buf);
+
         dump_everything(ASCENDED, dumptime);
         dump_close_log();
         pline1("Done.");
@@ -1016,6 +1020,49 @@ wiz_dumplog(VOID_ARGS)
     else
 #endif
         pline(unavailcmd, visctrl((int)cmd_from_func(wiz_dumplog)));
+
+    return 0;
+}
+
+int
+dosnapshot(VOID_ARGS)
+{
+#if (defined (DUMPLOG) || defined (DUMPHTML)) && defined(ALLOW_SNAPSHOT)
+    time_t dumptime = getnow();
+    char* dumplogfilename = 0;
+    char* htmldumplogfilename = 0;
+    char* buf = (char*)alloc(BUFSIZ); /* BUFSIZ can be a big number, and perhaps cannot be allocated twice from the stack */
+    char* htmlbuf = (char*)alloc(BUFSIZ);
+    if (!buf || !htmlbuf)
+        return 0;
+
+    dump_open_log(dumptime, TRUE);
+
+#if defined (DUMPLOG)
+    dumplogfilename = print_dumplog_filename_to_buffer(buf);
+#endif
+#if defined (DUMPHTML)
+    htmldumplogfilename = print_dumphtml_filename_to_buffer(htmlbuf);
+#endif
+
+    dump_everything(SNAPSHOT, dumptime);
+    dump_close_log();
+
+    write_snapshot_json(dumptime, dumplogfilename, htmldumplogfilename);
+
+    free(buf);
+    free(htmlbuf);
+    if (windowprocs.wincap2 & WC2_SCREEN_TEXT)
+    {
+        display_screen_text("Snapshot taken", (const char*)0, (const char*)0, SCREEN_TEXT_SNAPSHOT, ATR_NONE, NO_COLOR, 0UL);
+    }
+    else
+    {
+        custompline(SUPPRESS_HISTORY, "%s", "Snapshot taken.");
+    }
+#else
+    pline(unavailcmd, visctrl((int)cmd_from_func(dosnapshot)));
+#endif
 
     return 0;
 }
@@ -1273,7 +1320,7 @@ winid endwin;
 {
     char pbuf[BUFSZ];
     struct obj *otmp;
-    long value, points;
+    int64_t value, points;
     short dummy; /* object type returned by artifact_name() */
 
     for (otmp = list; otmp; otmp = otmp->nobj) {
@@ -1446,7 +1493,7 @@ struct obj* list;
         }
         if (Has_contents(otmp))
         {
-            struct item_score_count_result cont_cnt = count_powerful_melee_weapon_score(otmp->cobj);
+            struct item_score_count_result cont_cnt = count_powerful_valkyrie_item_score(otmp->cobj);
             cnt.quantity += cont_cnt.quantity;
             cnt.quantity_nonammo += cont_cnt.quantity_nonammo;
             cnt.quantity_ammo += cont_cnt.quantity_ammo;
@@ -1730,10 +1777,10 @@ int how;
     boolean bones_ok, have_windows = iflags.window_inited;
     struct obj *corpse = (struct obj *) 0;
     time_t endtime;
-    long umoney;
+    int64_t umoney;
     boolean has_existing_save_file = (wizard || discover || CasualMode) && check_existing_save_file();
     boolean disclose_and_dumplog_ok = !(how < ASCENDED && CasualMode && has_existing_save_file);
-    //long tmp;
+    //int64_t tmp;
 
     /*
      *  The game is now over...
@@ -1747,15 +1794,14 @@ int how;
 #endif
     /* render vision subsystem inoperative */
     iflags.vision_inited = 0;
-    
+    issue_simple_gui_command(GUI_CMD_GAME_ENDED);
+
     if (stop_all_sounds && how != ASCENDED)
     {
         struct stop_all_info sainfo = { 0 };
         stop_all_sounds(sainfo);
     }
     update_game_music();
-
-    issue_simple_gui_command(GUI_CMD_GAME_ENDED);
 
     const char* endtext = 0;
     const char* endinfotext = 0;
@@ -1832,7 +1878,7 @@ int how;
     {
         delete_tmp_backup_savefile();
         delete_backup_savefile();
-        delete_error_savefile(); /* Normal end from a loaded game, so do´not leave any error save files behind, either */
+        delete_error_savefile(); /* Normal end from a loaded game, so doï¿½not leave any error save files behind, either */
     }
 
     /* might have been killed while using a disposable item, so make sure
@@ -1848,19 +1894,18 @@ int how;
     /* remember time of death here instead of having bones, rip, and
        topten figure it out separately and possibly getting different
        time or even day if player is slow responding to --More-- */
-    long realtime;
-    lock_thread_lock();
-    urealtime.finish_time = endtime = getnow();
-    urealtime.realtime += (long) (endtime - urealtime.start_timing);
+    int64_t realtime;
+    endtime = getnow();
+    urealtime.finish_time = (int64_t)endtime;
+    urealtime.realtime += ((int64_t)endtime - urealtime.start_timing);
     realtime = urealtime.realtime;
-    unlock_thread_lock();
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
 
     fixup_death(how); /* actually, fixup multi_reason */
 
     /* Write dumplog */
     if (disclose_and_dumplog_ok)
-        dump_open_log(endtime);
+        dump_open_log(endtime, FALSE);
 
     char postbuf[BUFSZ * 3];
     Strcpy(postbuf, "");
@@ -2031,7 +2076,7 @@ int how;
     /* calculate score, before creating bones [container gold] */
     {
         umoney = money_cnt(invent);
-        umoney += hidden_gold(); /* accumulate gold from containers */
+        umoney += hidden_gold() + magic_gold(); /* accumulate gold from containers */
 #if 0
         int deepest = deepest_lev_reached(FALSE);
 
@@ -2044,9 +2089,9 @@ int how;
             tmp = 0L;
         if (how < PANICKED)
             tmp -= tmp / 10L;
-        tmp += 50L * (long) (deepest - 1);
+        tmp += 50L * (int64_t) (deepest - 1);
         if (deepest > 20)
-            tmp += 1000L * (long) ((deepest > 30) ? 10 : deepest - 20);
+            tmp += 1000L * (int64_t) ((deepest > 30) ? 10 : deepest - 20);
 #endif
         u.u_gamescore = get_current_game_score();
 
@@ -2222,10 +2267,10 @@ int how;
             {
                 Strcat(pbuf, " ");
             }
-            Sprintf(eos(pbuf), "%s with %ld point%s, ",
+            Sprintf(eos(pbuf), "%s with %lld point%s, ",
                 how == ASCENDED ? "went to your reward"
                 : "escaped from the dungeon",
-                u.u_gamescore, plur(u.u_gamescore));
+                (long long)u.u_gamescore, plur(u.u_gamescore));
             dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
 
 #if 0
@@ -2246,7 +2291,7 @@ int how;
                 for (i = 0; i < val->size && !done_stopprint; i++)
                 {
                     int typ = val->list[i].typ;
-                    long count = val->list[i].count;
+                    int64_t count = val->list[i].count;
 
                     if (count == 0L)
                         continue;
@@ -2299,12 +2344,12 @@ int how;
                         In_quest(&u.uz) ? dunlev(&u.uz) : depth(&u.uz));
             }
 
-            Sprintf(eos(pbuf), " with %ld point%s, ", u.u_gamescore, plur(u.u_gamescore));
+            Sprintf(eos(pbuf), " with %lld point%s, ", (long long)u.u_gamescore, plur(u.u_gamescore));
             dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 1);
         }
 
-        Sprintf(pbuf, "and %ld piece%s of gold, after %ld move%s.", umoney,
-            plur(umoney), moves, plur(moves));
+        Sprintf(pbuf, "and %lld piece%s of gold, after %lld move%s.", (long long)umoney,
+            plur(umoney), (long long)moves, plur(moves));
         dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
 
         char realtimebuf[BUFSZ] = "";
@@ -2315,7 +2360,7 @@ int how;
         if (!n_game_recoveries)
             Strcpy(pbuf, "The dungeon never collapsed on you.");
         else
-            Sprintf(pbuf, "The dungeon collapsed on you %lu time%s.", n_game_recoveries, plur(n_game_recoveries));
+            Sprintf(pbuf, "The dungeon collapsed on you %llu time%s.", (unsigned long long)n_game_recoveries, plur(n_game_recoveries));
         dump_forward_putstr(endwin, ATR_NONE, pbuf, done_stopprint, 0);
         Sprintf(pbuf,
             "You were level %d with a maximum of %d hit point%s when you %s.",
@@ -2359,7 +2404,7 @@ int how;
                 urace.filecode, genders[flags.female].filecode,
                 aligns[1 - u.ualign.type].filecode, u.ulevel);
             char* duration = format_duration_with_units(realtime);
-            Sprintf(totalpostbuf, "%s (%s), %ld point%s, T:%ld (%s), %s [%s]", plname, cbuf, u.u_gamescore, plur(u.u_gamescore), moves, duration, postbuf, mbuf);
+            Sprintf(totalpostbuf, "%s (%s), %lld point%s, T:%lld (%s), %s [%s]", plname, cbuf, (long long)u.u_gamescore, plur(u.u_gamescore), (long long)moves, duration, postbuf, mbuf);
             issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_RESULT, how, totalpostbuf);
         }
     }
@@ -2451,14 +2496,22 @@ int show_weights;
     {
         if (Is_container(box) || box->otyp == STATUE) 
         {
-            box->cknown = 1; /* we're looking at the contents now */
+            if (dumping)
+            {
+                if (identified)
+                    box->cknown = 1; /* we're looking at the contents now */
+                else if (!box->cknown) /* Do not list containers whose contents we do not know */
+                    continue;
+            }
+            else
+                box->cknown = 1; /* we're looking at the contents now */
             if (identified)
                 box->lknown = 1;
             if (Is_noncontainer(box) /*->otyp == BAG_OF_TRICKS*/) 
             {
                 continue; /* wrong type of container */
             } 
-            else if (box->cobj) 
+            else if (contained_object_chain(box))
             {
                 winid tmpwin = create_nhwindow(NHW_MENU);
                 Loot *sortedcobj, *srtc;
@@ -2478,13 +2531,13 @@ int show_weights;
                 if (!dumping)
                     putstr(tmpwin, ATR_HALF_SIZE, " ");
                 buf[0] = buf[1] = ' '; /* two leading spaces */
-                if (box->cobj && !cat) 
+                if (contained_object_chain(box) && !cat)
                 {
                     sortflags = (((flags.sortloot == 'l'
                                    || flags.sortloot == 'f')
                                      ? SORTLOOT_LOOT : 0)
                                  | (flags.sortpack ? SORTLOOT_PACK : 0));
-                    sortedcobj = sortloot(&box->cobj, sortflags, FALSE,
+                    sortedcobj = sortloot(contained_object_chain_ptr(box), sortflags, FALSE,
                                           (boolean FDECL((*), (OBJ_P))) 0);
                     totalweight = 0;
                     for (srtc = sortedcobj; ((obj = srtc->obj) != 0); ++srtc) 
@@ -2528,7 +2581,7 @@ int show_weights;
                 display_nhwindow(tmpwin, TRUE);
                 destroy_nhwindow(tmpwin);
                 if (all_containers)
-                    container_contents(box->cobj, identified, TRUE,
+                    container_contents(contained_object_chain(box), identified, TRUE,
                                        reportempty, show_weights);
             } 
             else if (reportempty) 
@@ -2778,7 +2831,7 @@ boolean ask, isend;
     int pfx, nkilled, fkilled;
     boolean all_female, no_female;
     unsigned ntypes, ni;
-    long total_killed = 0L;
+    int64_t total_killed = 0L;
     winid klwin;
     short mindx[NUM_MONSTERS];
     char c, buf[BUFSZ], buftoo[BUFSZ];
@@ -2796,7 +2849,7 @@ boolean ask, isend;
         if (nkilled == 0)
             continue;
         mindx[ntypes++] = i;
-        total_killed += (long) nkilled;
+        total_killed += (int64_t) nkilled;
     }
 
     /* vanquished creatures list;
@@ -2903,7 +2956,7 @@ boolean ask, isend;
             {
                 if (!dumping)
                     putstr(klwin, ATR_NONE, "");
-                Sprintf(buf, "%ld creatures vanquished.", total_killed);
+                Sprintf(buf, "%lld creatures vanquished.", (long long)total_killed);
                 putstr(klwin, ATR_PARAGRAPH_LINE, buf);
             }
             display_nhwindow(klwin, TRUE);
@@ -2956,7 +3009,7 @@ int final;
 
         char buf[BUFSZ], buftoo[BUFSZ];
         int ni;
-        long selfiescore = 0L;
+        int64_t selfiescore = 0L;
         for (ni = 0; ni < ntypes; ni++)
         {
             i = mindx[ni];
@@ -2986,14 +3039,14 @@ int final;
         if (selfiescore != context.role_score)
         {
             char dbuf[BUFSZ];
-            Sprintf(dbuf, "print_selfies: selfiescore of %ld does not match context.role_score of %ld.", selfiescore, context.role_score);
+            Sprintf(dbuf, "print_selfies: selfiescore of %lld does not match context.role_score of %lld.", (long long)selfiescore, (long long)context.role_score);
             issue_debuglog(DEBUGLOG_GENERAL, dbuf);
             context.role_score = selfiescore;
         }
-        long score_percentage = ((selfiescore + (long)u.uachieve.role_achievement * TOURIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        int64_t score_percentage = ((selfiescore + (int64_t)u.uachieve.role_achievement * TOURIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(buf, " You %s gained %ld%% of your maximum role score.", final ? "had" : "have", score_percentage);
-        putstr(enwin, ATR_NONE, buf);
+        Sprintf(buf, " You %s gained %lld%% of your maximum role score.", final ? "had" : "have", (long long)score_percentage);
+        putstr(enwin, ATR_PARAGRAPH_LINE, buf);
     }
 }
 
@@ -3027,7 +3080,7 @@ int final;
         int ni;
         boolean no_female, all_female;
         uchar nkilled, fkilled;
-        long killscore = 0L;
+        int64_t killscore = 0L;
         for (ni = 0; ni < ntypes; ni++)
         {
             i = mindx[ni];
@@ -3086,14 +3139,14 @@ int final;
         if (killscore != context.role_score)
         {
             char dbuf[BUFSZ];
-            Sprintf(dbuf, "print_knight_slayings: killscore of %ld does not match context.role_score of %ld.", killscore, context.role_score);
+            Sprintf(dbuf, "print_knight_slayings: killscore of %lld does not match context.role_score of %lld.", (long long)killscore, (long long)context.role_score);
             issue_debuglog(DEBUGLOG_GENERAL, dbuf);
             context.role_score = killscore;
         }
-        long score_percentage = ((killscore + (long)u.uachieve.role_achievement * KNIGHT_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        int64_t score_percentage = ((killscore + (int64_t)u.uachieve.role_achievement * KNIGHT_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
-        Sprintf(buf, " You %s gained %ld%% of your maximum role score.", final ? "had" : "have", score_percentage);
-        putstr(enwin, ATR_NONE, buf);
+        Sprintf(buf, " You %s gained %lld%% of your maximum role score.", final ? "had" : "have", (long long)score_percentage);
+        putstr(enwin, ATR_PARAGRAPH_LINE, buf);
     }
 }
 
@@ -3101,7 +3154,7 @@ void
 recalculate_knight_slaying_score(VOID_ARGS)
 {
     int i;
-    long score = 0L;
+    int64_t score = 0L;
     for (i = LOW_PM; i < NUM_MONSTERS; i++)
     {
         if (mvitals[i].died > 0 && is_knight_bounty(&mons[i]))
@@ -3112,7 +3165,7 @@ recalculate_knight_slaying_score(VOID_ARGS)
             }
             else
             {
-                score += (long)mvitals[i].died * KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+                score += (int64_t)mvitals[i].died * KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
             }
         }
     }
@@ -3441,11 +3494,10 @@ char *in;
     return out;
 }
 
-long
+int64_t
 get_conduct_score_upon_ascension(VOID_ARGS)
 {
-    int ngenocided = num_genocides();
-    return (long)(
+    return (int64_t)(
         50 * (u.uconduct.food == 0)
         + 15 * (u.uconduct.gnostic == 0)
         + 60 * (u.uconduct.killer == 0)
@@ -3457,21 +3509,24 @@ get_conduct_score_upon_ascension(VOID_ARGS)
         + 5 * (u.uconduct.weaphit == 0)
         + 5 * (u.uconduct.wisharti == 0)
         + 15 * (u.uconduct.wishes == 0)
+        + 15 * (u.uconduct.genocides == 0)
+        + 10 * (u.uconduct.elbereths == 0)
+        + 15 * (u.uconduct.conflicts == 0)
+        + 10 * (u.umortality == 0)
         + 80 * (u.uroleplay.blind)
         + 60 * (u.uroleplay.nudist)
-        + 15 * (ngenocided == 0)
         - 20 * (u.ualign.type != u.ualignbase[A_ORIGINAL])
         - 20 * (u.ualignbase[A_CURRENT] != u.ualignbase[A_ORIGINAL])
         );
 }
 
-long
+int64_t
 get_current_game_score(VOID_ARGS)
 {
 #if 0
     /* Old NetHack score */
-    long deepest = deepest_lev_reached(FALSE);
-    long utotal;
+    int64_t deepest = deepest_lev_reached(FALSE);
+    int64_t utotal;
 
     utotal = money_cnt(invent) + hidden_gold();
     if ((utotal -= u.umoney0) < 0L)
@@ -3485,45 +3540,51 @@ get_current_game_score(VOID_ARGS)
     if (discover || CasualMode || flags.non_scoring)
         return 0L;
 
-    long utotal = 0;
-    long Deepest_Dungeon_Level = deepest_lev_reached(FALSE);
-    long Achievements_Score = (long)(u.uachieve.amulet + u.uachieve.ascended + u.uachieve.bell + u.uachieve.book + u.uachieve.enter_gehennom + u.uachieve.finish_sokoban +
+    int64_t utotal = 0;
+    int64_t Deepest_Dungeon_Level = deepest_lev_reached(FALSE);
+    int64_t Achievements_Score = (int64_t)(u.uachieve.amulet + u.uachieve.ascended + u.uachieve.bell + u.uachieve.book + u.uachieve.enter_gehennom + u.uachieve.finish_sokoban +
         u.uachieve.killed_medusa + u.uachieve.killed_yacc + u.uachieve.killed_demogorgon + u.uachieve.menorah + u.uachieve.prime_codex + u.uachieve.mines_luckstone +
-        + u.uachieve.entered_astral_plane + u.uachieve.entered_elemental_planes + u.uevent.invoked + u.uachieve.crowned
+        + u.uachieve.entered_astral_plane + u.uachieve.entered_elemental_planes + u.uevent.invoked + u.uachieve.crowned + u.uachieve.learned_castle_tune
         );
 
-    long Small_Achievements_Score = (long)(u.uachieve.consulted_oracle + u.uachieve.read_discworld_novel
-        + u.uachieve.entered_gnomish_mines + u.uachieve.entered_mine_town + u.uachieve.entered_shop + u.uachieve.entered_temple
-        + u.uachieve.entered_sokoban + u.uachieve.entered_bigroom + u.uachieve.learned_castle_tune 
-        + u.uachieve.entered_large_circular_dungeon + u.uachieve.entered_plane_of_modron + u.uachieve.entered_hellish_pastures
+    int64_t Small_Achievements_Score = (int64_t)(u.uachieve.consulted_oracle + u.uachieve.read_discworld_novel
+        + u.uachieve.entered_gnomish_mines + u.uachieve.entered_mine_town 
+        + u.uachieve.entered_shop + u.uachieve.entered_temple
+        + u.uachieve.entered_sokoban + u.uachieve.entered_bigroom
+        + u.uachieve.entered_large_circular_dungeon + u.uachieve.entered_plane_of_modron 
+        + u.uachieve.entered_hellish_pastures
         );
 
-    long Conduct_Score = (long)(u.uachieve.ascended) * get_conduct_score_upon_ascension();
+    int64_t Conduct_Score = (int64_t)(u.uachieve.ascended) * get_conduct_score_upon_ascension();
 
-    long Role_Specific_Score = 0L;
-    long Role_Achievement_Score = 0L;  /* Special role-specific achievement */
+    int64_t Role_Specific_Score = 0L;
+    int64_t Role_Achievement_Score = 0L;  /* Special role-specific achievement */
 
     switch (Role_switch)
     {
     case PM_ARCHAEOLOGIST:
     {
         struct item_score_count_result cnt = count_artifacts(invent);
-        Role_Specific_Score = cnt.score;
-        Role_Achievement_Score = ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        struct item_score_count_result cnt2 = count_artifacts(magic_objs);
+        Role_Specific_Score = cnt.score + cnt2.score;
+        Role_Achievement_Score = ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_BARBARIAN:
     {
         struct item_score_count_result cnt = count_powerful_melee_weapon_score(invent);
-        Role_Specific_Score = cnt.score;
-        Role_Achievement_Score = BARBARIAN_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        struct item_score_count_result cnt2 = count_powerful_melee_weapon_score(magic_objs);
+        Role_Specific_Score = cnt.score + cnt2.score;
+        Role_Achievement_Score = BARBARIAN_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_CAVEMAN:
     {
         struct amulet_count_result cnt = count_amulets(invent);
+        struct amulet_count_result cnt2 = count_amulets(magic_objs);
         Role_Specific_Score = CAVEMAN_PER_AMULET_OF_LIFE_SAVING_SCORE * cnt.amulets_of_life_saving + CAVEMAN_PER_OTHER_AMULET_SCORE * cnt.other_amulets;
-        Role_Achievement_Score = CAVEMAN_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Specific_Score += CAVEMAN_PER_AMULET_OF_LIFE_SAVING_SCORE * cnt2.amulets_of_life_saving + CAVEMAN_PER_OTHER_AMULET_SCORE * cnt2.other_amulets;
+        Role_Achievement_Score = CAVEMAN_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_HEALER:
@@ -3534,9 +3595,9 @@ get_current_game_score(VOID_ARGS)
             if (spl_book[i].sp_id == NO_SPELL)
                 break;
             if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
-                Role_Specific_Score += HEALER_PER_SPELL_LEVEL_SCORE * (long)(spl_book[i].sp_lev + 2); /* Healer has the fewest spells */
+                Role_Specific_Score += HEALER_PER_SPELL_LEVEL_SCORE * (int64_t)(spl_book[i].sp_lev + 2); /* Healer has the fewest spells */
         }
-        Role_Achievement_Score = HEALER_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = HEALER_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_KNIGHT:
@@ -3552,18 +3613,18 @@ get_current_game_score(VOID_ARGS)
         //        }
         //        else
         //        {
-        //            Role_Specific_Score += (long)mvitals[i].died * KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
+        //            Role_Specific_Score += (int64_t)mvitals[i].died * KNIGHT_NORMAL_MONSTER_PER_LEVEL_SCORE * (mons[i].difficulty + 1);
         //        }
         //    }
         //}
         Role_Specific_Score = context.role_score;
-        Role_Achievement_Score = KNIGHT_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = KNIGHT_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_MONK:
     {
         Role_Specific_Score = Conduct_Score * MONK_EXTRA_CONDUCT_SCORE_MULTIPLIER;
-        Role_Achievement_Score = MONK_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = MONK_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_PRIEST:
@@ -3574,33 +3635,35 @@ get_current_game_score(VOID_ARGS)
             if (spl_book[i].sp_id == NO_SPELL)
                 break;
             if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
-                Role_Specific_Score += PRIEST_PER_SPELL_LEVEL_SCORE * (long)(spl_book[i].sp_lev + 2); /* Priest has the fewer spell than wizard */
+                Role_Specific_Score += PRIEST_PER_SPELL_LEVEL_SCORE * (int64_t)(spl_book[i].sp_lev + 2); /* Priest has the fewer spell than wizard */
         }
-        Role_Achievement_Score = PRIEST_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = PRIEST_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_RANGER:
     {
         struct item_score_count_result cnt = count_powerful_ranged_weapon_score(invent);
-        Role_Specific_Score = cnt.score;
-        Role_Achievement_Score = RANGER_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        struct item_score_count_result cnt2 = count_powerful_ranged_weapon_score(magic_objs);
+        Role_Specific_Score = cnt.score + cnt2.score;
+        Role_Achievement_Score = RANGER_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_ROGUE:
     {
-        long lootvalue = 0L;
+        int64_t lootvalue = 0L;
         lootvalue += money_cnt(invent);
-        lootvalue += hidden_gold(); /* accumulate gold from containers */
-        lootvalue += carried_gem_value();
+        lootvalue += hidden_gold() + magic_gold(); /* accumulate gold from containers */
+        lootvalue += carried_gem_value() + magic_gem_value();
         Role_Specific_Score = lootvalue;
-        Role_Achievement_Score = ROGUE_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = ROGUE_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_SAMURAI:
     {
         struct item_score_count_result cnt = count_powerful_Japanese_item_score(invent);
-        Role_Specific_Score = cnt.score;
-        Role_Achievement_Score = SAMURAI_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        struct item_score_count_result cnt2 = count_powerful_Japanese_item_score(magic_objs);
+        Role_Specific_Score = cnt.score + cnt2.score;
+        Role_Achievement_Score = SAMURAI_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_TOURIST:
@@ -3614,14 +3677,15 @@ get_current_game_score(VOID_ARGS)
         //    }
         //}
         Role_Specific_Score = context.role_score;
-        Role_Achievement_Score = TOURIST_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = TOURIST_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_VALKYRIE:
     {
         struct item_score_count_result cnt = count_powerful_valkyrie_item_score(invent);
-        Role_Specific_Score = cnt.score;
-        Role_Achievement_Score = VALKYRIE_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        struct item_score_count_result cnt2 = count_powerful_valkyrie_item_score(magic_objs);
+        Role_Specific_Score = cnt.score + cnt2.score;
+        Role_Achievement_Score = VALKYRIE_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     case PM_WIZARD:
@@ -3632,17 +3696,17 @@ get_current_game_score(VOID_ARGS)
             if (spl_book[i].sp_id == NO_SPELL)
                 break;
             if (!P_RESTRICTED(objects[spl_book[i].sp_id].oc_skill) && !objects[spl_book[i].sp_id].oc_pre_discovered)
-                Role_Specific_Score += WIZARD_PER_SPELL_LEVEL_SCORE * (long)(spl_book[i].sp_lev + 2);
+                Role_Specific_Score += WIZARD_PER_SPELL_LEVEL_SCORE * (int64_t)(spl_book[i].sp_lev + 2);
         }
-        Role_Achievement_Score = WIZARD_ROLE_ACHIEVEMENT_SCORE * (long)u.uachieve.role_achievement;
+        Role_Achievement_Score = WIZARD_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
     default:
         break;
     }
 
-    long Total_Role_Score = Role_Specific_Score + Role_Achievement_Score;
-    long Base_Score = (long)(Deepest_Dungeon_Level - 1) * SCORE_PER_DUNGEON_LEVEL + Small_Achievements_Score * SCORE_PER_MINOR_ACHIEVEMENT + Achievements_Score * SCORE_PER_MAJOR_ACHIEVEMENT 
+    int64_t Total_Role_Score = Role_Specific_Score + Role_Achievement_Score;
+    int64_t Base_Score = (int64_t)(Deepest_Dungeon_Level - 1) * SCORE_PER_DUNGEON_LEVEL + Small_Achievements_Score * SCORE_PER_MINOR_ACHIEVEMENT + Achievements_Score * SCORE_PER_MAJOR_ACHIEVEMENT 
         + Conduct_Score * CONDUCT_SCORE_MULTIPLIER + min(Total_Role_Score, MAXIMUM_ROLE_SCORE);
     
     Base_Score = max(0L, Base_Score);
@@ -3654,7 +3718,7 @@ get_current_game_score(VOID_ARGS)
     double mortmult = (double)(u.utruemortality > 6 ? u.utruemortality - 5 : 1);
     double Modern_Multiplier = ModernMode ? 1.0 / (pow(3, mortexp) * mortmult) : 1.0;
 
-    utotal = (long)(round((double)Base_Score * Ascension_Multiplier * Difficulty_Multiplier * Modern_Multiplier));
+    utotal = (int64_t)(round((double)Base_Score * Ascension_Multiplier * Difficulty_Multiplier * Modern_Multiplier));
     return utotal;
 }
 
@@ -3674,6 +3738,7 @@ struct obj* otmp;
         otmp->cobj = NULL;      /* contents handled above */
         otmp->timed = 0;        /* not timed any more */
         otmp->lamplit = 0;      /* caller handled lights */
+        otmp->makingsound = 0;  /* caller handled sounds */
         dealloc_obj(otmp);
         otmp = otmp2;
     }
@@ -3824,11 +3889,8 @@ reset_msghistory(VOID_ARGS)
 STATIC_OVL void
 reset_gamestate(VOID_ARGS)
 {
-    lock_thread_lock();
     memset((genericptr_t)&context, 0, sizeof(struct context_info));
     memset((genericptr_t)&urealtime.realtime, 0, sizeof urealtime.realtime);
-    unlock_thread_lock();
-
     memset((genericptr_t)&flags, 0, sizeof(struct flag));
 #ifdef SYSFLAGS
     memset((genericptr_t)&sysflags, 0, sizeof(struct sysflag));
@@ -3851,11 +3913,13 @@ reset_gamestate(VOID_ARGS)
         reset_objchn(uball);
     }
 
+    reset_objchn(magic_objs);
     reset_objchn(migrating_objs);
     reset_monchn(migrating_mons);
     reset_monchn(mydogs);
 
     invent = 0;
+    magic_objs = 0;
     migrating_objs = 0;
     migrating_mons = 0;
     mydogs = 0;
@@ -3962,19 +4026,14 @@ reset_gamestate_ex(VOID_ARGS)
 void
 tally_realtime(VOID_ARGS)
 {
-    lock_thread_lock();
     if (!context.game_started)
     {
-        unlock_thread_lock();
         return;
     }
     urealtime.finish_time = getnow();
-    urealtime.realtime += (long)(urealtime.finish_time - urealtime.start_timing);
-    unlock_thread_lock();
+    urealtime.realtime += (urealtime.finish_time - urealtime.start_timing);
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);
-    lock_thread_lock();
     urealtime.start_timing = urealtime.finish_time;
-    unlock_thread_lock();
 }
 
 /* yes/no question via GUI when the game windows may already have been closed */

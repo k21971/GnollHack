@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    region.h    $NHDT-Date: 1432512779 2015/05/25 00:12:59 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) 1996 by Jean-Christophe Collet              */
@@ -69,7 +69,7 @@ struct region_type_definition {
     boolean blocks_vision;
     xchar is_light_source;
     enum region_soundset_types soundset;
-    unsigned long rt_flags;
+    uint64_t rt_flags;
 };
 
 extern struct region_type_definition region_type_definitions[MAX_REGION_TYPES];
@@ -99,7 +99,7 @@ typedef struct nhregion {
     boolean enter_proc_is_on;
     boolean can_leave_proc_is_on;
     boolean leave_proc_is_on;
-    long time_to_live;          /* Time to live. -1 is forever */
+    int64_t time_to_live;          /* Time to live. -1 is forever */
     unsigned int player_flags; /* (see above) */
     unsigned int *monsters;    /* Monsters currently inside this region */
     short n_monst;             /* Number of monsters inside this region */
@@ -118,7 +118,7 @@ typedef struct nhregion {
     int dmg_diesize;
     int dmg_plus;
     double dmg_adjustment;
-    unsigned long region_flags; /* No teleport region etc. */
+    uint64_t region_flags; /* No teleport region etc. */
 
     boolean lamplit;        /* region is attached to a light source, which temp-lights the region */
     boolean makingsound;    /* region is attached to a sound source, which may cause ambient sounds outside and inside the region */

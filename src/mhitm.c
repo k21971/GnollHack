@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhitm.c    $NHDT-Date: 1555720096 2019/04/20 00:28:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -11,7 +11,7 @@
 extern boolean notonhead;
 
 STATIC_VAR NEARDATA boolean vis, far_noise;
-STATIC_VAR NEARDATA long noisetime;
+STATIC_VAR NEARDATA int64_t noisetime;
 STATIC_VAR NEARDATA struct obj *otmp;
 
 STATIC_VAR const char brief_feeling[] =
@@ -1312,7 +1312,7 @@ register struct obj* omonwep;
         && !resists_ston(magr)) 
     {
         /* Note: no cancellation applies because the mon touches the petrifying creature by attacking bare handed */
-        long protector = attk_protection((int) mattk->aatyp),
+        int64_t protector = attk_protection((int) mattk->aatyp),
              wornitems = magr->worn_item_flags;
 
         /* wielded weapon gives same protection as gloves here */
@@ -2712,11 +2712,11 @@ boolean givemsg;
 
 /* "aggressive defense"; what type of armor prevents specified attack
    from touching its target? */
-long
+int64_t
 attk_protection(aatyp)
 int aatyp;
 {
-    long w_mask = 0L;
+    int64_t w_mask = 0L;
 
     switch (aatyp) 
     {

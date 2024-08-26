@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    artifact.c    $NHDT-Date: 1553363416 2019/03/23 17:50:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -25,7 +25,8 @@ STATIC_VAR boolean touch_blasted; /* for retouch_object() */
 const char* artifact_invoke_names[NUM_ARTINVOKES] = {
     "taming", "healing", "mana replenishment", "untrapping", "charging",
     "level teleportation", "portal creation", "enlightenment", "arrow creation", "arrow of Diana", "death ray", "blessing of contents", "wishing",
-    "summon demon", "summon elder air elemental", "recharge itself", "activates the artifact", "time stop", "bolt of cold, lightning or fire"
+    "summon demon", "summon elder air elemental", "recharge itself", "activates the artifact", "time stop", "bolt of cold, lightning or fire",
+    "earthquake", "", "", "", "", "", "", "", ""
 };
 
 #define get_artifact(o) \
@@ -421,7 +422,7 @@ nartifact_exist()
 boolean
 artifact_has_flag(otmp, abil)
 struct obj *otmp;
-unsigned long abil;
+uint64_t abil;
 {
     const struct artifact *arti = get_artifact(otmp);
 
@@ -461,7 +462,7 @@ int prop_index;
         return TRUE;
 
     /* Properties from spfx and cspx flags */
-    unsigned long abil = prop_to_spfx(prop_index);
+    uint64_t abil = prop_to_spfx(prop_index);
     boolean worn_mask_ok = FALSE;
     if (is_wielded_item(otmp))
         worn_mask_ok = !!(otmp->owornmask & W_WIELDED_WEAPON);
@@ -718,12 +719,12 @@ struct obj *otmp;
 void
 set_artifact_intrinsic(otmp, wp_mask)
 struct obj *otmp;
-long wp_mask;
+int64_t wp_mask;
 {
-    long *propptr = 0;
+    int64_t *propptr = 0;
     register const struct artifact *oart = get_artifact(otmp);
     register uchar proptyp;
-    register unsigned long spfx;
+    register uint64_t spfx;
 
     if (!oart)
         return;
@@ -740,7 +741,7 @@ long wp_mask;
     /* intrinsics from the spfx and cspfx fields; there could be more than one */
     spfx = (wp_mask != W_ARTIFACT_CARRIED) ? oart->spfx : oart->cspfx;
 
-    unsigned long bit = 0x00000001UL;
+    uint64_t bit = 0x00000001UL;
     for (int i = 0; i < 32; i++)
     {
         if (i > 0)
@@ -931,7 +932,7 @@ struct monst *mtmp;
     } 
     else if (weap->aflags & AF_DCLAS) 
     {
-        return (weap->mtype == (unsigned long) ptr->mlet);
+        return (weap->mtype == (uint64_t) ptr->mlet);
     } 
     else if (weap->aflags & AF_DFLAG1) 
     {
@@ -1045,7 +1046,7 @@ int dmgtype;
 }
 /* return the M2 flags of monster that an artifact's special attacks apply
  * against */
-long
+uint64
 spec_m2(otmp)
 struct obj *otmp;
 {
@@ -1053,7 +1054,7 @@ struct obj *otmp;
 
     if (artifact)
         return artifact->mtype;
-    return 0L;
+    return 0UL;
 }
 
 /* special attack bonus */
@@ -1437,11 +1438,11 @@ int dieroll; /* needed for Magicbane and vorpal blades */
 {
     boolean youattack = (magr == &youmonst);
     boolean youdefend = (mdef == &youmonst);
-    boolean vis = (!youattack && magr && cansee(magr->mx, magr->my))
-                  || (!youdefend && cansee(mdef->mx, mdef->my))
+    boolean vis = (!youattack && magr && canseemon(magr))
+                  || (!youdefend && mdef && canseemon(mdef))
                   || (youattack && u.uswallow && mdef == u.ustuck && !Blind);
     boolean realizes_damage;
-    char wepdesc[BUFSIZ] ="";
+    char wepdesc[BUFSZ * 2] = "";
     static const char you[] = "you";
     char hittee[BUFSZ];
 
@@ -1569,19 +1570,24 @@ int dieroll; /* needed for Magicbane and vorpal blades */
 
                 if (bigmonst(mdef->data)) 
                 {
-                    if (youattack)
-                        You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "slice deeply into %s!", mon_nam(mdef));
-                    else if (vis)
-                        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts deeply into %s!", Monnam(magr),
-                              hittee);
+                    if (vis)
+                    {
+                        if (youattack)
+                            You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "slice deeply into %s!", mon_nam(mdef));
+                        else
+                            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts deeply into %s!", Monnam(magr), hittee);
+                    }
                     *dmgptr *= 2;
                     return 2;
                 }
                 //*dmgptr = 2 * (double)mdef->mhp + FATAL_DAMAGE_MODIFIER;
                 //mdef->mhp = 0;
                 *instakillptr = TRUE;
-                pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts %s in half!", wepdesc, mon_nam(mdef));
-                otmp->dknown = TRUE;
+                if (vis)
+                {
+                    pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts %s in half!", wepdesc, mon_nam(mdef));
+                    otmp->dknown = TRUE;
+                }
                 return 2;
             } 
             else
@@ -1623,26 +1629,33 @@ int dieroll; /* needed for Magicbane and vorpal blades */
             {
                 if (!has_neck(mdef->data) || notonhead || u.uswallow || mdef->heads_left == 0)
                 {
-                    if (youattack)
-                        pline_ex(ATR_NONE, CLR_MSG_FAIL, "Somehow, you miss %s wildly.", mon_nam(mdef));
-                    else if (vis)
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Somehow, %s misses wildly.", mon_nam(magr));
+                    if (vis)
+                    {
+                        if (youattack)
+                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Somehow, you miss %s wildly.", mon_nam(mdef));
+                        else
+                            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Somehow, %s misses wildly.", mon_nam(magr));
+                    }
                     *dmgptr = 0;
-                    return (youattack || vis) * 2;
+                    return (vis) * 2;
                 }
                 if (is_incorporeal(mdef->data) || amorphous(mdef->data) || (is_shade(mdef->data) && !shade_glare(otmp)))
                 {
-                    pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s slices through %s %s.", The(wepdesc),
-                          s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                    if (vis)
+                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s slices through %s %s.", The(wepdesc),
+                              s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
                     return 2;
                 }
                 if (mdef->heads_left > 1)
                 {
                     mdef->heads_left--;
                     *dmgptr += 0.625 * (double)mdef->mhpmax / (double)max(1, mdef->data->heads); //Adjusted based on Tiamat in AD&D
-                    pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts one of %s heads off!", The(wepdesc),
-                        s_suffix(mon_nam(mdef)));
-                    otmp->dknown = TRUE;
+                    if (vis)
+                    {
+                        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts one of %s heads off!", The(wepdesc),
+                            s_suffix(mon_nam(mdef)));
+                        otmp->dknown = TRUE;
+                    }
                     return 1;
                 }
                 else
@@ -1653,14 +1666,17 @@ int dieroll; /* needed for Magicbane and vorpal blades */
                     //mdef->mhp = 0;
                     *instakillptr = TRUE;
 
-                    if(mdef->data->heads <= 1)
-                        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, behead_msg[rn2(SIZE(behead_msg))], The(wepdesc),mon_nam(mdef));
-                    else
-                        pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts off %s last head!", The(wepdesc), s_suffix(mon_nam(mdef)));
+                    if (vis)
+                    {
+                        if (mdef->data->heads <= 1)
+                            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, behead_msg[rn2(SIZE(behead_msg))], The(wepdesc), mon_nam(mdef));
+                        else
+                            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "%s cuts off %s last head!", The(wepdesc), s_suffix(mon_nam(mdef)));
 
-                    if (Hallucination && !flags.female)
-                        pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "Good job Henry, but that wasn't Anne.");
-                    otmp->dknown = TRUE;
+                        if (Hallucination && !flags.female)
+                            pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "Good job Henry, but that wasn't Anne.");
+                        otmp->dknown = TRUE;
+                    }
                     return 2;
                 }
             }
@@ -1814,8 +1830,8 @@ short* adtyp_ptr; /* return value is the type of damage caused */
 
     boolean youattack = (magr == &youmonst);
     boolean youdefend = (mdef == &youmonst);
-    boolean vis = (!youattack && magr && cansee(magr->mx, magr->my))
-        || (!youdefend && cansee(mdef->mx, mdef->my))
+    boolean vis = (!youattack && magr && canseemon(magr))
+        || (!youdefend && mdef && canseemon(mdef))
         || (youattack && u.uswallow && mdef == u.ustuck && !Blind);
     boolean realizes_damage;
     boolean extradamagedone = (extradmg > 0);
@@ -1924,15 +1940,22 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                     )
                 )
             {
-                if (youattack && u.uswallow && mdef == u.ustuck) {
+                if (youattack && u.uswallow && mdef == u.ustuck) 
+                {
                     You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "slice %s wide open!", mon_nam(mdef));
                     lethaldamage = TRUE;
                 }
                 else if (!youdefend)
                 {
-                    if (is_incorporeal(mdef->data) || amorphous(mdef->data)) {
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s body.", Yobjnam2(otmp, "cut"),
-                            s_suffix(mon_nam(mdef)));
+                    if (is_incorporeal(mdef->data) || amorphous(mdef->data)) 
+                    {
+                        if (vis)
+                        {
+                            if (youattack)
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s body.", Yobjnam2(otmp, "cut"), s_suffix(mon_nam(mdef)));
+                            else
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s body.", Tobjnam(otmp, "cut"), s_suffix(mon_nam(mdef)));
+                        }
                     }
                     else if (notonhead)
                         ;
@@ -1954,22 +1977,28 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                             else
                                 update_mon_maxhp(mdef);
                         }
-                        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s slices a part of %s off!", The(xname(otmp)),
-                            mon_nam(mdef));
-                        if (Hallucination && !lethaldamage)
+                        if (vis)
                         {
-                            pline("But %s retorts:", mon_nam(mdef));
-                            if (rn2(2))
-                                verbalize_talk1("Hah! It's just a scratch.");
-                            else
-                                verbalize_talk1("Hah! It's just a flesh wound.");
+                            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s slices a part of %s off!", The(xname(otmp)),
+                                mon_nam(mdef));
+                            if (Hallucination && !lethaldamage)
+                            {
+                                pline("But %s retorts:", mon_nam(mdef));
+                                if (rn2(2))
+                                    verbalize_talk1("Hah! It's just a scratch.");
+                                else
+                                    verbalize_talk1("Hah! It's just a flesh wound.");
+                            }
+                            otmp->dknown = TRUE;
                         }
-                        otmp->dknown = TRUE;
                     }
                     else
                     {
-                        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s cuts %s in half!", The(xname(otmp)), mon_nam(mdef));
-                        otmp->dknown = TRUE;
+                        if (vis)
+                        {
+                            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s cuts %s in half!", The(xname(otmp)), mon_nam(mdef));
+                            otmp->dknown = TRUE;
+                        }
                         lethaldamage = TRUE;
                     }
                 }
@@ -2056,9 +2085,17 @@ short* adtyp_ptr; /* return value is the type of damage caused */
             {
                 if (!youdefend)
                 {
-                    if (is_incorporeal(mdef->data) || amorphous(mdef->data)) {
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s %s.", Yobjnam2(otmp, "slice"),
-                            s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                    if (is_incorporeal(mdef->data) || amorphous(mdef->data)) 
+                    {
+                        if (vis)
+                        {
+                            if (youattack)
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s %s.", Yobjnam2(otmp, "slice"),
+                                    s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                            else
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s %s.", Tobjnam(otmp, "slice"),
+                                    s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                        }
                     }
                     else
                     {
@@ -2067,23 +2104,26 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                             damagedone = 1;
 
                         totaldamagedone += damagedone;
-
-                        pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s slices a part of %s off!", The(xname(otmp)),
-                            mon_nam(mdef));
-                        if (Hallucination && !lethaldamage)
+                        if (vis)
                         {
-                            pline("But %s retorts:", mon_nam(mdef));
-                            if (rn2(2))
-                                verbalize_talk1("Hah! It's just a scratch.");
-                            else
-                                verbalize_talk1("Hah! It's just a flesh wound.");
+                            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s slices a part of %s off!", The(xname(otmp)),
+                                mon_nam(mdef));
+                            if (Hallucination && !lethaldamage)
+                            {
+                                pline("But %s retorts:", mon_nam(mdef));
+                                if (rn2(2))
+                                    verbalize_talk1("Hah! It's just a scratch.");
+                                else
+                                    verbalize_talk1("Hah! It's just a flesh wound.");
+                            }
+                            otmp->dknown = TRUE;
                         }
-                        otmp->dknown = TRUE;
                     }
                 }
                 else
                 {
-                    if (is_incorporeal(youmonst.data) || amorphous(youmonst.data)) {
+                    if (is_incorporeal(youmonst.data) || amorphous(youmonst.data)) 
+                    {
                         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s slices through your %s.", The(xname(otmp)),
                             body_part(NECK));
                     }
@@ -2137,16 +2177,29 @@ short* adtyp_ptr; /* return value is the type of damage caused */
 
                 if (youattack && u.uswallow && mdef == u.ustuck)
                     ;
-                else if (!youdefend) {
-                    if (!has_neck(mdef->data) || notonhead || u.uswallow) {
-                        if (youattack)
-                            pline_ex(ATR_NONE, CLR_MSG_FAIL, "Somehow, you miss %s wildly.", mon_nam(mdef));
-                        else if (vis)
-                            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Somehow, %s misses wildly.", mon_nam(magr));
+                else if (!youdefend) 
+                {
+                    if (!has_neck(mdef->data) || notonhead || u.uswallow) 
+                    {
+                        if (vis)
+                        {
+                            if (youattack)
+                                pline_ex(ATR_NONE, CLR_MSG_FAIL, "Somehow, you miss %s wildly.", mon_nam(mdef));
+                            else
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Somehow, %s misses wildly.", mon_nam(magr));
+                        }
                     }
-                    else if (is_incorporeal(mdef->data) || amorphous(mdef->data)) {
-                        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s %s.", Yobjnam2(otmp, "slice"),
-                            s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                    else if (is_incorporeal(mdef->data) || amorphous(mdef->data)) 
+                    {
+                        if (vis)
+                        {
+                            if (youattack)
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s %s.", Yobjnam2(otmp, "slice"),
+                                    s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                            else
+                                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s through %s %s.", Tobjnam(otmp, "slice"),
+                                    s_suffix(mon_nam(mdef)), mbodypart(mdef, NECK));
+                        }
                     }
                     else
                     {
@@ -2154,19 +2207,25 @@ short* adtyp_ptr; /* return value is the type of damage caused */
                         {
                             mdef->heads_left--;
                             totaldamagedone += (int)(0.625 * (double)mdef->mhpmax / (double)max(1, mdef->data->heads)); //Adjusted based on Tiamat in AD&D
-                            pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s cuts one of %s heads off!", The(xname(otmp)), s_suffix(mon_nam(mdef)));
-                            otmp->dknown = TRUE;
+                            if (vis)
+                            {
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s cuts one of %s heads off!", The(xname(otmp)), s_suffix(mon_nam(mdef)));
+                                otmp->dknown = TRUE;
+                            }
                         }
                         else
                         {
                             if (mdef->heads_left > 0)
                                 mdef->heads_left--;
 
-                            pline_ex(ATR_NONE, CLR_MSG_WARNING, behead_msg[rn2(SIZE(behead_msg))], The(xname(otmp)),
-                                mon_nam(mdef));
-                            if (Hallucination && !flags.female)
-                                pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "Good job Henry, but that wasn't Anne.");
-                            otmp->dknown = TRUE;
+                            if (vis)
+                            {
+                                pline_ex(ATR_NONE, CLR_MSG_WARNING, behead_msg[rn2(SIZE(behead_msg))], The(xname(otmp)),
+                                    mon_nam(mdef));
+                                if (Hallucination && !flags.female)
+                                    pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "Good job Henry, but that wasn't Anne.");
+                                otmp->dknown = TRUE;
+                            }
                             lethaldamage = TRUE;
                         }
                     }
@@ -2662,7 +2721,7 @@ struct obj *obj;
         case ARTINVOKE_HEALING:
         {
             int healamt = (u.uhpmax + 1 - u.uhp) / 2;
-            long creamed = (long) u.ucreamed;
+            int64_t creamed = (int64_t) u.ucreamed;
             play_sfx_sound(SFX_HEALING);
             play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, u.ux, u.uy, FALSE);
             special_effect_wait_until_action(0);
@@ -2852,7 +2911,7 @@ struct obj *obj;
         case ARTINVOKE_BLESS_CONTENTS:
         {
             int cnt = 0;
-            for (struct obj* otmp = obj->cobj; otmp; otmp = otmp->nobj)
+            for (struct obj* otmp = contained_object_chain(obj); otmp; otmp = otmp->nobj)
             {
                 cnt++;
             }
@@ -2869,7 +2928,7 @@ struct obj *obj;
                     selected_item = rn2(cnt);
                 int i = 0;
                 boolean blessed = FALSE;
-                for (struct obj* otmp = obj->cobj; otmp; otmp = otmp->nobj)
+                for (struct obj* otmp = contained_object_chain(obj); otmp; otmp = otmp->nobj)
                 {
                     if (i == selected_item)
                     {
@@ -3008,11 +3067,20 @@ struct obj *obj;
             else
                 Strcpy(artifact_hit_desc, cxname(obj));
 
-            pline("As you invoke %s, a surge of power surronds %s." , the(cxname(obj)), the(artifact_hit_desc));
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "As you invoke %s, a surge of power surronds %s." , the(cxname(obj)), the(artifact_hit_desc));
             obj->invokeleft = duration;
             break;
         }
-
+        case ARTINVOKE_EARTHQUAKE:
+        {
+            play_sfx_sound(SFX_RUMBLING_EARTH);
+            You_feel_ex(ATR_NONE, CLR_MSG_MYSTICAL, "a surge of power from %s, and then a heavy, thunderous rolling fills the air!", yname(obj));
+            pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "entire %s is shaking around you!", generic_lvl_desc());
+            do_earthquake((u.ulevel - 1) / 3 + 1);
+            /* shake up monsters in a much larger radius... */
+            awaken_monsters(ROWNO * COLNO, TRUE);
+            break;
+        }
         } /* switch */
     } 
     else 
@@ -3055,6 +3123,8 @@ struct obj *obj;
             {
                 play_sfx_sound(SFX_CONFLICT);
                 You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "like a rabble-rouser.");
+                if (!u.uconduct.conflicts++)
+                    livelog_printf(LL_CONDUCT, "caused conflict for the first time");
             }
             else
                 You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "the tension decrease around you.");
@@ -3280,7 +3350,7 @@ uchar inv_prop;
 }
 
 /* Return the price sold to the hero of a given artifact or unique item */
-long
+int64_t
 arti_cost(otmp)
 struct obj *otmp;
 {
@@ -3349,7 +3419,7 @@ uchar adtyp_index;
 
 STATIC_VAR const struct abil2spfx_tag {
     int prop;
-    unsigned long spfx;
+    uint64_t spfx;
 } abil2spfx[] = {
     { DEATH_RESISTANCE, SPFX_DEATH_RES },
     { DRAIN_RESISTANCE, SPFX_DRAIN_RES },
@@ -3385,7 +3455,7 @@ STATIC_VAR const struct abil2spfx_tag {
     { DIVINE_CHARISMA, SPFX_CHA_25 },
 };
 
-unsigned long
+uint64_t
 prop_to_spfx(prop_index)
 int prop_index;
 {
@@ -3401,7 +3471,7 @@ int prop_index;
 
 int
 spfx_to_prop(spfx_bit)
-unsigned long spfx_bit;
+uint64_t spfx_bit;
 {
 
     int k;
@@ -3421,8 +3491,8 @@ what_gives(prop_index)
 int prop_index;
 {
     struct obj *obj;
-    long wornbits;
-    long spfx = prop_to_spfx(prop_index);
+    int64_t wornbits;
+    uint64_t spfx = prop_to_spfx(prop_index);
 
     wornbits = u.uprops[prop_index].extrinsic;
 
@@ -3498,7 +3568,7 @@ int prop_index;
         /* Do nothing, since mon is not being used */
     }
 
-    long spfx = prop_to_spfx(prop_index);
+    uint64_t spfx = prop_to_spfx(prop_index);
 
     return (obj && obj->oartifact && (artilist[obj->oartifact].carried_prop == prop_index || (artilist[obj->oartifact].cspfx & spfx)));
 }
@@ -3791,7 +3861,7 @@ boolean drop_untouchable;
 {
     struct artifact *art;
     boolean beingworn, carryeffect, invoked;
-    long wearmask = ~(W_QUIVER | W_SWAP_WEAPON | W_BALL);
+    int64_t wearmask = ~(W_QUIVER | W_SWAP_WEAPON | W_BALL);
 
     beingworn = ((obj->owornmask & wearmask) != 0L
                  /* some items in use don't have any wornmask setting */
@@ -3999,10 +4069,10 @@ struct monst *mon; /* if null, hero assumed */
 const char* get_artifact_invoke_name(specialpropindex)
 int specialpropindex;
 {
-    if (specialpropindex < ARTINVOKE_TAMING || specialpropindex >= ARTINVOKE_TAMING + SIZE(artifact_invoke_names))
+    if (specialpropindex < FIRST_ARTINVOKE || specialpropindex >= FIRST_ARTINVOKE + SIZE(artifact_invoke_names))
         return empty_string;
 
-    return artifact_invoke_names[specialpropindex - ARTINVOKE_TAMING];
+    return artifact_invoke_names[specialpropindex - FIRST_ARTINVOKE];
 }
 
 boolean

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	mhmap.c	$NHDT-Date: 1432512799 2015/05/25 00:13:19 $  $NHDT-Branch: master $:$NHDT-Revision: 1.40 $ */
 /* Copyright (C) 2001 by Alex Kompel 	 */
@@ -405,7 +405,7 @@ MapWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                                   + (HIWORD(lParam) - data->map_orig.y)
                                         / data->yScrTile));
 
-        NHEVENT_MS(CLICK_1, x, y);
+        NHEVENT_MS(CLICK_PRIMARY, x, y);
 
         data->xLastMouseClick = x;
         data->yLastMouseClick = y;
@@ -422,7 +422,7 @@ MapWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         /* if map has scrolled since the last mouse click - ignore
          * double-click message */
         if (data->xLastMouseClick == x && data->yLastMouseClick == y) {
-            NHEVENT_MS(CLICK_1, x, y);
+            NHEVENT_MS(CLICK_PRIMARY, x, y);
         }
         return 0;
 

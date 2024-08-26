@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 #include <string.h>
 #include <errno.h>
@@ -49,7 +49,7 @@ static int NDECL(and_nhgetch);
 static int FDECL(and_nh_poskey, (int *, int *, int *));
 static void NDECL(and_nhbell);
 static int NDECL(and_doprev_message);
-static char FDECL(and_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+static char FDECL(and_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, uint64_t));
 static void FDECL(and_getlin_ex, (int, int, int, const char *,char *, const char*, const char*, const char*));
 static int NDECL(and_get_ext_cmd);
 static void FDECL(and_number_pad, (int));
@@ -57,7 +57,7 @@ static void NDECL(and_delay_output);
 static void FDECL(and_delay_output_milliseconds, (int));
 static void FDECL(and_delay_output_intervals, (int));
 #ifdef CHANGE_COLOR
-static void FDECL(and_change_color,(int color,long rgb,int reverse));
+static void FDECL(and_change_color,(int color, int64_t rgb,int reverse));
 static char * NDECL(and_get_color_string);
 #endif
 static void NDECL(and_start_screen);
@@ -65,7 +65,7 @@ static void NDECL(and_end_screen);
 static char* FDECL(and_getmsghistory_ex, (char**, char**, BOOLEAN_P));
 static void FDECL(and_putmsghistory_ex, (const char *, const char *, const char *, BOOLEAN_P));
 static void save_msg(const char* msg);
-static void FDECL(and_status_update, (int, genericptr_t, int, int, int, unsigned long *));
+static void FDECL(and_status_update, (int, genericptr_t, int, int, int, uint64_t *));
 static void and_status_flush();
 
 int GnollHackMain(int argc, char** argv);
@@ -963,7 +963,7 @@ int hl_attrmask_to_attrmask(int mask)
 	return attr;
 }
 
-void and_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, unsigned long *colormasks)
+void and_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, uint64_t *colormasks)
 {
 	long cond, *condptr = (long *) ptr;
 	char *nb, *text = (char *) ptr;
@@ -1518,8 +1518,8 @@ void and_you_die()
 //		   a position in the MAP window is returned in x, y and mod.
 //		   mod may be one of
 //
-//			CLICK_1		/* mouse click type 1 */
-//			CLICK_2		/* mouse click type 2 */
+//			CLICK_PRIMARY		/* mouse click type 1 */
+//			CLICK_SECONDARY	    /* mouse click type 2 */
 //
 //		   The different click types can map to whatever the
 //		   hardware supports.  If no mouse is supported, this
@@ -1542,7 +1542,7 @@ int and_nh_poskey(int *x, int *y, int *mod)
 		int* e = (*jEnv)->GetIntArrayElements(jEnv, a, 0);
 		*x = e[0];
 		*y = e[1];
-		*mod = CLICK_1;
+		*mod = CLICK_PRIMARY;
 		(*jEnv)->ReleaseIntArrayElements(jEnv, a, e, 0);
 	}
 	quit_if_possible = FALSE;
@@ -1602,7 +1602,7 @@ int and_doprev_message()
 //		   returned, preserving case (upper or lower.) This means that
 //		   if the calling function needs an exact match, it must handle
 //		   user input correctness itself.
-char and_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
+char and_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, uint64_t ynflags)
 {
 	char ch;
 	char message[BUFSZ];
@@ -2176,7 +2176,7 @@ void and_delay_output_intervals(int intervals)
 
 //____________________________________________________________________________________
 #ifdef CHANGE_COLOR
-void and_change_color(int color_number, long rgb, int reverse)
+void and_change_color(int color_number, int64_t rgb, int reverse)
 {
 	// debuglog("and_change_color %d == 0x%X %s", color_number, rgb, reverse?" reverse":"");
 	if(color_number >= 0 && color_number < CLR_MAX)

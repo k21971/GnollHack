@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    role.c    $NHDT-Date: 1547086250 2019/01/10 02:10:50 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.56 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
@@ -82,7 +82,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_INI_UNSKILLED, /* P_ARCANE_SPELL */
@@ -102,6 +101,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -160,7 +160,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -180,6 +179,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -238,7 +238,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -258,6 +257,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -315,7 +315,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -335,6 +334,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -392,7 +392,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -412,6 +411,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_BASIC, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -476,7 +476,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -496,6 +495,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -554,7 +554,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -574,6 +573,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -633,7 +633,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -653,6 +652,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_BASIC, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -725,7 +725,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -745,6 +744,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -802,7 +802,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -822,6 +821,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -879,7 +879,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_INI_UNSKILLED, /* P_ARCANE_SPELL */
@@ -899,6 +898,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -956,7 +956,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_NONE, /* P_ARCANE_SPELL */
@@ -976,6 +975,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_INI_BASIC, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -1034,7 +1034,6 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_BOW */
             SKILL_PROGRESS_NONE, /* P_SLING */
             SKILL_PROGRESS_NONE, /* P_CROSSBOW */
-            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_NONE, /* P_WHIP */
 
             SKILL_PROGRESS_INI_BASIC, /* P_ARCANE_SPELL */
@@ -1054,6 +1053,7 @@ const struct Role roles[] = {
             SKILL_PROGRESS_NONE, /* P_MARTIAL_ARTS */
             SKILL_PROGRESS_NONE, /* P_DUAL_WEAPON_COMBAT */
             SKILL_PROGRESS_NONE, /* P_TWO_HANDED_WEAPON */
+            SKILL_PROGRESS_NONE, /* P_THROWN_WEAPON */
             SKILL_PROGRESS_INI_UNSKILLED, /* P_DODGE */
             SKILL_PROGRESS_NONE, /* P_SHIELD */
             SKILL_PROGRESS_NONE, /* P_WAND */
@@ -1288,7 +1288,7 @@ const struct Align aligns[] = {
 /* Filters */
 STATIC_VAR struct {
     boolean roles[SIZE(roles)];
-    unsigned long mask;
+    uint64_t mask;
 } rfilter;
 
 STATIC_DCL int NDECL(randrole_filtered);
@@ -1575,7 +1575,7 @@ ok_role(rolenum, racenum, gendnum, alignnum)
 int rolenum, racenum, gendnum, alignnum;
 {
     int i;
-    unsigned long allow;
+    uint64_t allow;
 
     if (rolenum >= 0 && rolenum < SIZE(roles) - 1) {
         if (rfilter.roles[rolenum])
@@ -1643,7 +1643,7 @@ ok_race(rolenum, racenum, gendnum, alignnum)
 int rolenum, racenum, gendnum, alignnum;
 {
     int i;
-    unsigned long allow;
+    uint64_t allow;
 
     if (racenum >= 0 && racenum < SIZE(races) - 1) {
         if (rfilter.mask & races[racenum].selfmask)
@@ -1716,7 +1716,7 @@ int rolenum, racenum, gendnum;
 int alignnum UNUSED;
 {
     int i;
-    unsigned long allow;
+    uint64_t allow;
 
     if (gendnum >= 0 && gendnum < ROLE_GENDERS) {
         if (rfilter.mask & genders[gendnum].allow)
@@ -1785,7 +1785,7 @@ int gendnum UNUSED;
 int alignnum;
 {
     int i;
-    unsigned long allow;
+    uint64_t allow;
 
     if (alignnum >= 0 && alignnum < ROLE_ALIGNS) {
         if (rfilter.mask & aligns[alignnum].allow)
@@ -2182,7 +2182,7 @@ boolean add_ynq;
     (void) root_plselection_prompt(eos(tmpbuf), buflen - strlen(tmpbuf),
                                    rolenum, racenum, gendnum, alignnum);
     /* "Shall I pick a character's role, race, gender, and alignment for you?"
-       plus " [ynaq] (y)" is a little too long for a conventional 80 columns;
+       plus " [ynaq] (y)" is a little too int64_t for a conventional 80 columns;
        also, "pick a character's <anything>" sounds a bit stilted */
     strsubst(tmpbuf, "pick a character", "pick character");
     Sprintf(buf, "%s", s_suffix(tmpbuf));
@@ -2307,7 +2307,7 @@ winid where;
                                rand_choice[] = " random";
     char buf[BUFSZ];
     int r, c, g, a;
-    unsigned long allowmask;
+    uint64_t allowmask;
 
     r = flags.initrole;
     c = flags.initrace;
@@ -2404,7 +2404,7 @@ boolean preselect;
     char buf[BUFSZ];
     const char *what = 0, *constrainer = 0, *forcedvalue = 0;
     int f = 0, r, c, g, a, i;
-    unsigned long allowmask;
+    uint64_t allowmask;
 
     r = flags.initrole;
     c = flags.initrace;
@@ -2955,7 +2955,7 @@ int roleidx, raceidx, genderidx, alignmentidx, levelidx;
     return FALSE;
 }
 
-unsigned long
+uint64_t
 get_player_action_flags(action, roleidx, raceidx, genderidx, alignmentidx, levelidx)
 enum action_tile_types action;
 int roleidx, raceidx, genderidx UNUSED, alignmentidx UNUSED, levelidx;
@@ -3015,7 +3015,7 @@ int roleidx, raceidx, genderidx UNUSED, alignmentidx UNUSED, levelidx;
     return ACTION_ITEM_USE_FLAGS_NONE;
 }
 
-unsigned long
+uint64_t
 u_action_flags(action)
 enum action_tile_types action; 
 {
@@ -3023,7 +3023,7 @@ enum action_tile_types action;
         get_player_action_flags(action, urole.rolenum, urace.racenum, flags.female, u.ualign.type + 1, 0);
 }
 
-unsigned long 
+uint64_t 
 u_item_use_flags(VOID_ARGS)
 {
     return u_action_flags(ACTION_TILE_ITEM_USE);

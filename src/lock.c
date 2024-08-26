@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    lock.c    $NHDT-Date: 1548978605 2019/01/31 23:50:05 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.84 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -63,7 +63,7 @@ lock_action()
     if (xlock.door && !(xlock.door->doormask & D_LOCKED))
         return actions[0] + 2; /* "locking the door" */
     else if (xlock.box && !xlock.box->olocked)
-        return xlock.box->otyp == CHEST ? actions[1] + 2 : actions[2] + 2;
+        return is_chest(xlock.box) ? actions[1] + 2 : actions[2] + 2;
     /* otherwise we're trying to unlock it */
     else if (xlock.picktyp == LOCK_PICK)
         return actions[3]; /* "picking the lock" */
@@ -72,7 +72,7 @@ lock_action()
     else if (xlock.door)
         return actions[0]; /* "unlocking the door" */
     else if (xlock.box)
-        return xlock.box->otyp == CHEST ? actions[1] : actions[2];
+        return is_chest(xlock.box) ? actions[1] : actions[2];
     else
         return actions[3];
 }
@@ -189,7 +189,7 @@ picklock(VOID_ARGS)
                 alreadyunlocked = !(xlock.door->doormask & D_LOCKED);
             } else {
                 xlock.box->otrapped = 0;
-                what = (xlock.box->otyp == CHEST) ? "chest" : "box";
+                what = is_chest(xlock.box) ? "chest" : "box";
                 alreadyunlocked = !xlock.box->olocked;
             }
             You_ex(ATR_NONE, CLR_MSG_SUCCESS, "succeed in disarming the trap.  The %s is still %slocked.",
@@ -337,7 +337,7 @@ boolean destroyit;
                                  : 0;
         boolean costly = (boolean) (shkp != 0),
                 peaceful_shk = costly && is_peaceful(shkp);
-        long loss = 0L;
+        int64_t loss = 0L;
 
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "In fact, you've totally destroyed %s.", the(xname(box)));
         /* Put the contents on ground at the hero's feet. */
@@ -1100,7 +1100,7 @@ int x, y;
             if(!unlocked && context.click_kick_query) /* Click */
             {
                 char ans = 'n';
-                char qbuf[BUFSIZ];
+                char qbuf[BUFSZ * 2];
                 context.click_kick_query = 0;
 
                 Sprintf(qbuf, "Do you want to start kicking this door?");
@@ -1654,7 +1654,7 @@ int x, y;
 
     const char *disposition;
     const char *thing;
-    long save_Blinded;
+    int64_t save_Blinded;
 
     play_simple_object_sound_at_location(otmp, x, y, OBJECT_SOUND_TYPE_BREAK);
     if (otmp->oclass == POTION_CLASS) {

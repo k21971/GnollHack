@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    skills.h    $NHDT-Date: 1547255911 2019/01/12 01:18:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.15 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
@@ -35,7 +35,6 @@ enum p_skills {
     P_BOW,                     /* launchers */
     P_SLING,
     P_CROSSBOW,
-    P_THROWN_WEAPON,           /* hand-thrown missiles */
     P_WHIP,                    /* flexible, one-handed */
 
     /* Spell Skills added by Larry Stewart-Zerba */
@@ -54,9 +53,10 @@ enum p_skills {
 
     /* Other types of combat */
     P_BARE_HANDED_COMBAT,      /* actually weaponless; gloves are ok */
-    P_MARTIAL_ARTS,            /* actually weaponless; gloves are ok */
+    P_MARTIAL_ARTS,            /* extra bare-handed, also kicking; boots are ok */
     P_DUAL_WEAPON_COMBAT,      /* pair of weapons, one in each hand */
     P_TWO_HANDED_WEAPON,       /* two-handed weapons */
+    P_THROWN_WEAPON,           /* hand-thrown missiles */
     P_DODGE,                   /* increases AC */
     P_SHIELD,                  /* increases AC and MC, and for figthing with weapon shields */
     P_WAND,                    /* shooting rays with wands */
@@ -77,8 +77,8 @@ enum p_skills {
 #define P_FIRST_SPELL P_ARCANE_SPELL
 #define P_LAST_SPELL P_NECROMANCY_SPELL
 
-#define P_FIRST_H_TO_H P_BARE_HANDED_COMBAT
-#define P_LAST_H_TO_H P_WAND
+#define P_FIRST_COMBAT P_BARE_HANDED_COMBAT
+#define P_LAST_COMBAT P_WAND
 
 #define P_FIRST_NONCOMBAT P_RIDING
 #define P_LAST_NONCOMBAT P_DISARM_TRAP
@@ -93,7 +93,7 @@ enum p_skills {
 enum skill_levels {
     P_ISRESTRICTED = 0, /* unskilled and can't be advanced */
     P_UNSKILLED    = 1, /* unskilled so far but can be advanced */
-    /* Skill levels Basic/Advanced/Expert had long been used by
+    /* Skill levels Basic/Advanced/Expert had int64_t been used by
        Heroes of Might and Magic (tm) and its sequels... */
     P_BASIC        = 2,
     P_SKILLED      = 3,

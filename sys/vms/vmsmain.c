@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	vmsmain.c	$NHDT-Date: 1449801742 2015/12/11 02:42:22 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.32 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -486,13 +486,13 @@ wd_message()
         You("are in non-scoring explore/discovery mode.");
 }
 
-unsigned long
+uint64_t
 sys_random_seed()
 {
-    unsigned long seed;
-    unsigned long pid = (unsigned long) getpid();
+    uint64_t seed;
+    uint64_t pid = (uint64_t) getpid();
 
-    seed = (unsigned long) getnow(); /* time((TIME_type) 0) */
+    seed = (uint64_t) getnow(); /* time((TIME_type) 0) */
     /* Quick dirty band-aid to prevent PRNG prediction */
     if (pid) {
         if (!(pid & 3L))

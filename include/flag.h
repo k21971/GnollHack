@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    flag.h    $NHDT-Date: 1554155745 2019/04/01 21:55:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.150 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -142,10 +142,6 @@ struct flag {
     boolean tournament_mode;
 #define TournamentMode flags.tournament_mode
 
-    /* Emergency reserved booleans to make non-save-game-breaking changes */
-    boolean reserved_bool2;
-    boolean reserved_bool3;
-
     int animation_frame_interval_in_milliseconds; /* custom animation frame interval in milliseconds. If 0, then the default at 25 milliseconds is used. Delay output is twice this amount, defaulting at 50 milliseconds */
     int move_interval_in_milliseconds; /* custom move step interval in milliseconds. If 0, then the default at 50 milliseconds is used. Delay output is twice this amount, defaulting at 50 milliseconds */
     int crawl_interval_in_milliseconds; /* custom crawl step interval in milliseconds. If 0, then the default at 250 milliseconds is used. Delay output is twice this amount, defaulting at 50 milliseconds */
@@ -168,7 +164,7 @@ struct flag {
 
     int end_top, end_around; /* describe desired score list */
     unsigned moonphase;
-    unsigned long suppress_alert;
+    uint64_t suppress_alert;
 #define NEW_MOON 0
 #define FULL_MOON 4
     unsigned paranoia_bits; /* alternate confirmation prompting */
@@ -235,24 +231,45 @@ struct flag {
     int initalign; /* starting alignment (index into aligns[])  */
     int randomall; /* randomly assign everything not specified */
     int pantheon;  /* deity selection for priest character */
+
+    int runmode;       /* update screen display during run moves */
+    int64_t reserved_int64_special1; /* to have highest alignment before the following booleans */
+
     /* Items which were in iflags in 3.4.x to preserve savefile compatibility
      */
     boolean lootabc;   /* use "a/b/c" rather than "o/i/b" when looting */
     boolean showrace;  /* show hero glyph by race rather than by role */
     boolean travelcmd; /* allow travel command */
-    int runmode;       /* update screen display during run moves */
     uchar spellorder;
     schar max_hint_difficulty; /* Maximum difficulty level where hints are shown */
     boolean non_scoring; /* The game has been, for example, loaded from an imported save file and has thereby become non-scoring */
     uchar auto_bag_in_style;
+    boolean reserved_special_bool; /* to have 8 chars in a row */
+
+    uchar right_click_command;
+    uchar middle_click_command;
+    uchar reserved_uchar1;
+    uchar reserved_uchar2;
+    uchar reserved_uchar3;
+    uchar reserved_uchar4;
+    uchar reserved_uchar5;
+    uchar reserved_uchar6;
 
     /* Emergency reserved variables to make non-save-game-breaking changes */
-    short reserved_short1;
-    short reserved_short2;
+    uint64_t reserved_ulong1;
+    uint64_t reserved_ulong2;
     int reserved_int1;
     int reserved_int2;
-    unsigned long reserved_ulong1;
-    unsigned long reserved_ulong2;
+    short reserved_short1;
+    short reserved_short2;
+    char reserved_char1;
+    char reserved_char2;
+
+    /* Emergency reserved booleans to make non-save-game-breaking changes */
+    boolean reserved_bool1;
+    boolean reserved_bool2;
+    boolean reserved_bool3;
+    boolean reserved_bool4;
 };
 
 /*
@@ -403,8 +420,8 @@ struct instance_flags {
     boolean use_background_glyph; /* use background glyph when appropriate */
     boolean use_menu_color;   /* use color in menus; only if wc_color */
 #ifdef STATUS_HILITES
-    long hilite_delta;     /* number of moves to leave a temp hilite lit */
-    long unhilite_deadline; /* time when oldest temp hilite should be unlit */
+    int64_t hilite_delta;     /* number of moves to leave a temp hilite lit */
+    int64_t unhilite_deadline; /* time when oldest temp hilite should be unlit */
 #endif
     boolean zerocomp;         /* write zero-compressed save files */
     boolean rlecomp;          /* alternative to zerocomp; run-length encoding
@@ -461,7 +478,7 @@ struct instance_flags {
     boolean vt_tiledata;     /* output console codes for tile support in TTY */
 #endif
     boolean clicklook;       /* allow right-clicking for look */
-    boolean clickfire;       /* allow right-clicking for look */
+    boolean clickfire;       /* allow left-click to fire */
     boolean cmdassist;       /* provide detailed assistance for some comnds */
     boolean time_botl;       /* context.botl for 'time' (moves) only */
     boolean wizweight;       /* display weight of everything in wizard mode */
@@ -545,9 +562,9 @@ struct instance_flags {
     /* copies of values in struct u, used during detection when the
        originals are temporarily cleared; kept here rather than
        locally so that they can be restored during a hangup save */
-    Bitfield(save_uswallow, 1);
-    Bitfield(save_uinwater, 1);
-    Bitfield(save_uburied, 1);
+    boolean save_uswallow;
+    boolean save_uinwater;
+    boolean save_uburied;
     /* item types used to acomplish "special achievements"; find the target
        object and you'll be flagged as having achieved something... */
     short mines_prize_type;     /* luckstone */
@@ -679,6 +696,8 @@ enum nh_keyfunc {
     NHKF_TRAVEL_WALK,
     NHKF_CLICKFIRE,
     NHKF_CLICKLOOK,
+    NHKF_CLICKCAST,
+    NHKF_CLICKZAP,
 
     NHKF_REDRAW,
     NHKF_REDRAW2,
@@ -752,5 +771,14 @@ struct cmd {
 };
 
 extern NEARDATA struct cmd Cmd;
+
+struct startup_flags {
+    boolean click_action_set;
+    boolean click_action_value;
+    uchar right_click_action;
+    uchar middle_click_action;
+};
+
+extern NEARDATA struct startup_flags initial_flags;
 
 #endif /* FLAG_H */

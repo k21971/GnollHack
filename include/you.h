@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    you.h    $NHDT-Date: 1547514642 2019/01/15 01:10:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.35 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -9,13 +9,13 @@
 #define YOU_H
 
 #include "config.h"
-#include "dungeon.h"
 #include "attrib.h"
+#include "dungeon.h"
+#include "flag.h"
+#include "general.h"
 #include "monst.h"
 #include "prop.h" /* (needed here for util/makedefs.c) */
 #include "skills.h"
-#include "general.h"
-#include "flag.h"
 #include <time.h>
 
 enum role_types
@@ -77,6 +77,8 @@ struct u_have {
     Bitfield(questart, 1); /* carrying the Quest Artifact */
     Bitfield(prime_codex, 1);  /* carrying Prime Codex */
     Bitfield(unused, 2);
+
+    unsigned reserved;
 };
 
 struct u_event {
@@ -96,21 +98,23 @@ struct u_event {
     Bitfield(bovine_portal_hint, 1); /* bovine portal hint given */
     Bitfield(hellish_pastures_entered, 1); /* entered the Hellish Pastures */
     Bitfield(quantum_portal_hint, 1); /* quantum portal hint given */
+
     Bitfield(large_circular_dgn_entered, 1); /* entered the Large Circular Dungeon */
     Bitfield(polymorph_trap_warning, 1); /* polymorph trap warning given */
     Bitfield(uhand_of_elbereth, 2); /* became Hand of Elbereth */
     Bitfield(ukilled_wizard, 1);    /* killed the wiz */
     Bitfield(uvibrated, 1);         /* stepped on "vibrating square" */
     Bitfield(ascended, 1);          /* has offered the Amulet */
-
     Bitfield(role_achievement_1, 1);  /* passed the first requirement of the role achievement */
-    Bitfield(role_achievement_2, 1);  /* passed the second requirement of the role achievement */
 
+    Bitfield(role_achievement_2, 1);  /* passed the second requirement of the role achievement */
     Bitfield(elbereth_known, 1);      /* has learned of Elbereth */
     Bitfield(invocation_ritual_known, 1); /* has learned how to conduct the invocation ritual from the Oracle */
     Bitfield(heard_of_invocation_ritual, 1); /* has heard of the invocation ritual and the items necessary for it; enables the quest update */
 
-    unsigned short ranks_attained;
+    unsigned reserved;
+
+    unsigned ranks_attained;
 };
 
 struct u_achieve {
@@ -123,16 +127,17 @@ struct u_achieve {
     Bitfield(enter_gehennom, 1); /* entered Gehennom (or Valley) by any means */
     Bitfield(ascended, 1); /* not quite the same as u.uevent.ascended */
     Bitfield(mines_luckstone, 1); /* got a luckstone at end of mines */
+
     Bitfield(finish_sokoban, 1);  /* obtained the sokoban prize */
     Bitfield(killed_medusa, 1);
     Bitfield(killed_yacc, 1);
-
     /* Minor Achievements */
     Bitfield(consulted_oracle, 1);
     Bitfield(read_discworld_novel, 1);
     Bitfield(entered_gnomish_mines, 1);
     Bitfield(entered_mine_town, 1);
     Bitfield(entered_shop, 1);
+
     Bitfield(entered_temple, 1);
     Bitfield(entered_sokoban, 1);
     Bitfield(entered_bigroom, 1);
@@ -147,6 +152,8 @@ struct u_achieve {
     Bitfield(role_achievement, 1); /* Special achievement for the role */
     Bitfield(crowned, 1); /* Became Hand of Elbereth, Envoy of Balance, or Glory of Arioch */
     Bitfield(killed_demogorgon, 1);
+
+    unsigned reserved;
 };
 
 enum kill_hints
@@ -188,7 +195,7 @@ enum kill_hints
 
 #define NUM_KILL_HINT_ULONGS 2
 struct u_hint {
-    unsigned long kill_hints_given[NUM_KILL_HINT_ULONGS]; //One bit per kill hint enum
+    uint64_t kill_hints_given[NUM_KILL_HINT_ULONGS]; //One bit per kill hint enum, now up to 128
 
     boolean ate_rotten_corpse; 
     boolean ate_tainted_corpse;
@@ -203,7 +210,6 @@ struct u_hint {
     boolean ate_poisonous_food;
     boolean ate_sickening_food;
     boolean ate_hallucinating_food;
-
     boolean poisoned_by_fountain;
     boolean drank_potion_of_sickness;
     boolean drank_potion_of_poison;
@@ -214,7 +220,6 @@ struct u_hint {
     boolean being_drowned;
     boolean being_strangled_by_item;
     boolean being_strangled_by_monster;
-
     boolean paralyzed_by_thrown_potion;
     boolean fell_asleep_by_thrown_potion;
     boolean fell_asleep_by_trap;
@@ -224,48 +229,52 @@ struct u_hint {
     boolean damaged_by_passive_electricity;
     boolean monster_revived;
     boolean got_grabbed;
-
     boolean stuff_got_stolen;
     boolean stuff_got_stolen_by_harpy;
     boolean paralyzed_by_floating_eye; //Passive defense
+
     boolean paralyzed_by_cube; //Passive defense
     boolean paralyzed_by_monster;
     boolean got_hungry;
     boolean got_weak;
     boolean got_fainting;
-
     boolean low_hit_points;
     boolean got_mobbed;
     boolean got_digested;
-    boolean brain_got_eaten;
 
+    boolean brain_got_eaten;
     boolean items_destroyed_by_shock;
     boolean items_destroyed_by_fire;
     boolean items_destroyed_by_cold;
-
     boolean bag_destroyed_by_cancellation;
     boolean got_burdened;
-
     boolean got_food_poisoning;
     boolean got_mummy_rot;
+
     boolean got_sliming;
     boolean got_stoning;
-
     boolean got_stunned;
     boolean got_terminal_illness;
     boolean pet_got_mummy_rot;
-
     boolean elbereth;
     boolean secret_doors_and_corridors;
     boolean closed_for_inventory;
+
+    boolean reserved1;
+    boolean reserved2;
+    boolean reserved3;
     boolean reserved4;
+    boolean reserved5;
+    boolean reserved6;
+    boolean reserved7;
+    boolean reserved8;
 };
 
 struct u_realtime {
-    long   realtime;     /* accumulated playing time in seconds */
-    time_t start_timing; /* time game was started or restored or 'realtime'
+    int64_t realtime;     /* accumulated playing time in seconds */
+    int64_t start_timing; /* time game was started or restored or 'realtime'
                             was last updated (savegamestate for checkpoint) */
-    time_t finish_time;  /* end of 'realtime' interval: time of save or
+    int64_t finish_time;  /* end of 'realtime' interval: time of save or
                             end of game; used for topten/logfile/xlogfile */
 };
 
@@ -274,24 +283,38 @@ struct u_realtime {
  * times a challenge has been violated.
  */
 struct u_conduct {     /* number of times... */
-    long unvegetarian; /* eaten any animal */
-    long unvegan;      /* ... or any animal byproduct */
-    long food;         /* ... or any comestible */
-    long gnostic;      /* used prayer, priest, or altar */
-    long weaphit;      /* hit a monster with a weapon */
-    long killer;       /* killed a monster yourself */
-    long literate;     /* read something (other than BotD) */
-    long polypiles;    /* polymorphed an object */
-    long polyselfs;    /* transformed yourself */
-    long wishes;       /* used a wish */
-    long wisharti;     /* wished for an artifact */
-    /* genocides already listed at end of game */
+    int64_t unvegetarian; /* eaten any animal */
+    int64_t unvegan;      /* ... or any animal byproduct */
+    int64_t food;         /* ... or any comestible */
+    int64_t gnostic;      /* used prayer, priest, or altar */
+    int64_t weaphit;      /* hit a monster with a weapon */
+    int64_t killer;       /* killed a monster yourself */
+    int64_t literate;     /* read something (other than BotD) */
+    int64_t polypiles;    /* polymorphed an object */
+    int64_t polyselfs;    /* transformed yourself */
+    int64_t wishes;       /* used a wish */
+    int64_t wisharti;     /* wished for an artifact */
+
+    /* New conducts */
+    int64_t genocides;     /* genocided a monster */
+    int64_t elbereths;     /* wrote Elbereth */
+    int64_t conflicts;     /* caused conflict */
+
+    /* Reserved */
+    int64_t reserved1;    /* reserved for new conducts */
+    int64_t reserved2;    /* reserved for new conducts */
+    int64_t reserved3;    /* reserved for new conducts */
+    int64_t reserved4;    /* reserved for new conducts */
+    int64_t reserved5;    /* reserved for new conducts */
+    int64_t reserved6;    /* reserved for new conducts */
+    int64_t reserved7;    /* reserved for new conducts */
+    int64_t reserved8;    /* reserved for new conducts */
 };
 
 struct u_roleplay {
     boolean blind;  /* permanently blind */
     boolean nudist; /* has not worn any armor, ever */
-    long numbones;  /* # of bones files loaded  */
+    int64_t numbones;  /* # of bones files loaded  */
 };
 
 #define MAX_TRAIT_DESCRIPTIONS 5
@@ -324,7 +347,7 @@ struct Role {
     short questarti; /* index (ART_) of quest artifact (questpgr.c) */
 
     /*** Bitmasks ***/
-    unsigned long allow;                  /* bit mask of allowed variations */
+    uint64_t allow;                  /* bit mask of allowed variations */
 #define ROLE_ALIGNMENT_TILES  0x80000000UL     /* has alignment-specific tiles */
 #define ROLE_GENDMASK         0x70000000UL     /* allowable genders */
 #define ROLE_MALE             0x10000000UL
@@ -390,8 +413,8 @@ struct Race {
         zombienum; /* PM_ as a zombie */
 
     /*** Bitmasks ***/
-    unsigned long allow;    /* bit mask of allowed variations */
-    unsigned long selfmask, /* your own race's bit mask */
+    uint64_t allow;    /* bit mask of allowed variations */
+    uint64_t selfmask, /* your own race's bit mask */
         lovemask,   /* bit mask of always peaceful */
         hatemask;   /* bit mask of always hostile */
 
@@ -427,7 +450,7 @@ struct Gender {
     const char *him;      /* him/her/it */
     const char *his;      /* his/her/its */
     const char *filecode; /* file code */
-    unsigned long allow;  /* equivalent ROLE_ mask */
+    uint64_t allow;  /* equivalent ROLE_ mask */
 };
 #define ROLE_GENDERS 2    /* number of permitted player genders
                              increment to 3 if you allow neuter roles */
@@ -451,7 +474,7 @@ struct Align {
     const char *noun;     /* law/balance/chaos */
     const char *adj;      /* lawful/neutral/chaotic */
     const char *filecode; /* file code */
-    unsigned long allow;  /* equivalent ROLE_ mask */
+    uint64_t allow;  /* equivalent ROLE_ mask */
     aligntyp value;       /* equivalent A_ value */
 };
 #define ROLE_ALIGNS 3     /* number of permitted player alignments */
@@ -478,26 +501,14 @@ struct you {
     d_level uz, uz0;    /* your level on this and the previous turn */
     d_level utolev;     /* level monster teleported you to, or uz */
     short utotype;      /* bitmask of goto_level() flags for utolev */
-    boolean umoved;     /* changed map location (post-move) */
+    short ureserved_short;
+
     int last_str_turn;  /* 0: none, 1: half turn, 2: full turn
                            +: turn right, -: turn left */
     int ulevel;         /* 1 to MAXULEV */
     int ulevelmax;
-    unsigned long utrap;    /* trap timeout */
-    uchar utraptype; /* defined if utrap nonzero. one of utraptypes */
-    char urooms[5];         /* rooms (roomno + 3) occupied now */
-    char urooms0[5];        /* ditto, for previous position */
-    char uentered[5];       /* rooms (roomno + 3) entered this turn */
-    char ushops[5];         /* shop rooms (roomno + 3) occupied now */
-    char ushops0[5];        /* ditto, for previous position */
-    char ushops_entered[5]; /* ditto, shops entered this turn */
-    char ushops_left[5];    /* ditto, shops exited this turn */
-
     int uhunger;  /* refd only in eat.c and shk.c */
     unsigned uhs; /* hunger state - see eat.c */
-
-    struct prop uprops[LAST_PROP + 1];
-
     unsigned umconf;
 
     /* These ranges can never be more than MAX_RANGE (vision.h). */
@@ -518,31 +529,41 @@ struct you {
     int umonnum;                /* current monster number */
 
     int mh, mhmax, basemhmax, basemhdrain, mtimedone;   /* for polymorph-self */
-    struct attribs macurr,      /* for monster attribs */
-                   mamin,       /* for monster attribs */
-                   mamax;       /* for monster attribs */
     int ulycn;                  /* lycanthrope type */
 
     unsigned ucreamed;
     unsigned uswldtim;          /* time you have been swallowed */
-    boolean mfemale;            /* saved human value of flags.female (your true gender before polymorph) */
-
-    Bitfield(uswallow, 1);      /* true if swallowed */
-    Bitfield(uinwater, 1);      /* if you're currently in water (only
-                                   underwater possible currently) */
-    Bitfield(uundetected, 1);   /* if you're a hiding monster/piercer */
-    Bitfield(uinvulnerable, 1); /* you're invulnerable (praying) */
-    Bitfield(uburied, 1);       /* you're buried */
-    Bitfield(uedibility, 1);    /* blessed food detect; sense unsafe food */
-    /* 1 free bit! */
-
     unsigned uintervene_timer;  /* how timer until next intervention by Wizard of Yendor */
-    struct u_achieve uachieve;  /* achievements */
-    struct u_event uevent;      /* certain events have happened */
-    struct u_hint uhint;        /* certain hints have been given */
-    struct u_have uhave;        /* you're carrying special objects */
-    struct u_conduct uconduct;  /* KMH, conduct */
-    struct u_roleplay uroleplay;
+
+    align ualign;               /* character alignment */
+#define CONVERT    2
+#define A_ORIGINAL 1
+#define A_CURRENT  0
+    aligntyp ualignbase[CONVERT]; /* for ualign conversion record */
+
+    struct attribs macurr,      /* for monster attribs */
+        mamin,       /* for monster attribs */
+        mamax;       /* for monster attribs */
+
+    char urooms[5];         /* rooms (roomno + 3) occupied now */
+    char urooms0[5];        /* ditto, for previous position */
+    char uentered[5];       /* rooms (roomno + 3) entered this turn */
+    char ushops[5];         /* shop rooms (roomno + 3) occupied now */
+    char ushops0[5];        /* ditto, for previous position */
+    char ushops_entered[5]; /* ditto, shops entered this turn */
+    char ushops_left[5];    /* ditto, shops exited this turn */
+
+    boolean mfemale;       /* saved human value of flags.female (your true gender before polymorph) */
+
+    boolean umoved;        /* changed map location (post-move) */
+    boolean uswallow;      /* true if swallowed */
+    boolean uinwater;      /* if you're currently in water (only
+                                   underwater possible currently) */
+    boolean uundetected;   /* if you're a hiding monster/piercer */
+    boolean uinvulnerable; /* you're invulnerable (praying) */
+    boolean uburied;       /* you're buried */
+    boolean uedibility;    /* blessed food detect; sense unsafe food */
+
     struct attribs acurr,       /* your current attributes (eg. str)*/
                     aexe,       /* for gain/loss via "exercise" */
                     abonus,     /* your bonus attributes (eg. str) */
@@ -552,19 +573,15 @@ struct you {
                     amax,       /* your max attributes (eg. str) */
                    atemp,       /* used for temporary loss/gain */
                    atime;       /* used for loss/gain countdown */
-    align ualign;               /* character alignment */
-#define CONVERT    2
-#define A_ORIGINAL 1
-#define A_CURRENT  0
-    aligntyp ualignbase[CONVERT]; /* for ualign conversion record */
+
     schar uluck;
-    long moreluck;    /* luck and luck bonus */
     boolean luck_does_not_timeout, unluck_does_not_timeout;
 #define LUCKADD    3  /* value of u.moreluck when carrying luck stone;
                          + when blessed or uncursed, - when cursed */
 #define Luck (u.uluck + (u.moreluck > 0 ? LUCKADD : u.moreluck < 0 ? -LUCKADD : 0))
 #define LUCKMAX   10  /* maximum value of u.uluck */
 #define LUCKMIN (-10) /* minimum value of u.uluck */
+
     schar ubasehitinc;        /* permanent intrinsic values not affected by items or anything else */
     schar ubasedaminc;
     schar ubaseacbonus;
@@ -576,43 +593,73 @@ struct you {
     schar uspellcastingbonus_all;
     schar uexperiencebonus;
     schar uarcherybonus;
-    short uac;                 /* current armor class */
-    schar umc;                 /* current magic cancellation */
+
+    uchar utraptype;         /* defined if utrap nonzero. one of utraptypes */
+
     int uhp, uhpmax, ubasehpmax, ubasehpdrain;         /* hit points, aka health */
     int uen, uenmax, ubaseenmax, ubaseendrain;         /* magical energy - M. Stephenson */
+    int uhp_fraction, uen_fraction, mh_fraction;
+    short uac;                 /* current armor class */
+    schar umc;                 /* current magic cancellation */
     xchar uhpinc[MAXULEV],   /* increases to uhpmax for each level gain */
           ueninc[MAXULEV];   /* increases to uenmax for each level gain */
-    int uhp_fraction, uen_fraction, mh_fraction;
+
     int ugangr;              /* if the gods are angry at you */
     int ugifts;              /* number of artifacts bestowed */
     int ublessed;            /* amount of permanent divine protection bestowed upon you */
     int uprayer_timeout;     /* duration from #pray */
-    long umoney0;
-    long uspare1;
-    long uexp, u_gamescore;
-    long ucleansed;          /* to record moves when player was cleansed */
-    long usleep;             /* sleeping; monstermove you last started */
     int uinvault;
-    struct monst *ustuck;    /* engulfer or grabber, maybe grabbee if Upolyd */
-    struct monst *usteed;    /* mount when riding */
-    long ugallop;            /* turns steed will run after being kicked */
+    int ureserved_int;
+
+    /* Int64s */
+    int64_t umoney0;
+    int64_t uexp, u_gamescore;
+    int64_t ucleansed;          /* to record moves when player was cleansed */
+    int64_t usleep;             /* sleeping; monstermove you last started */
+    int64_t ugallop;            /* turns steed will run after being kicked */
+    int64_t moreluck;           /* luck and luck bonus */
+    int64_t uspare1;
+
+    /* Pointers */
+    struct monst* ustuck;    /* engulfer or grabber, maybe grabbee if Upolyd */
+    struct monst* usteed;    /* mount when riding */
+
+    /* Uint64s */
+    uint64_t utrap;             /* trap timeout */
+
+    /* Structs in the desceding order or alignment */
+    struct prop uprops[LAST_PROP + 1];
+
+    struct u_conduct uconduct;  /* KMH, conduct */
+    struct u_roleplay uroleplay;
+    struct u_hint uhint;        /* certain hints have been given */
+    struct u_achieve uachieve;  /* achievements */
+    struct u_event uevent;      /* certain events have happened */
+    struct u_have uhave;        /* you're carrying special objects */
+
     int urideturns;          /* time spent riding, for skill advancement */
     int umortality;          /* how many times you died */
     int utruemortality;      /* how many times you truly died without counting life saving, just revives due to wizard, explore, and modern mode */
     int ugrave_arise;        /* you die and become something aside from a ghost */
+    int carrying_capacity_level;
     int weapon_slots;        /* unused skill slots */
     int max_weapon_slots;    /* max skill slots */
     int skills_advanced;     /* # of advances made so far */
-    xchar skill_record[P_SKILL_LIMIT]; /* skill advancements */
     struct skills weapon_skills[P_NUM_SKILLS];
+    xchar skill_record[P_SKILL_LIMIT]; /* skill advancements */
     boolean twoweap;         /* KMH -- Using two-weapon combat */
     boolean canadvanceskill; /* Can advance skill */
-    int carrying_capacity_level;
 
     /* Data influencing what is shown in tiles */
     boolean facing_right;
     uchar action;
 
+    /* A few extra bools that do not take space because of alignment padding */
+    boolean ureserved_bool1;
+    boolean ureserved_bool2;
+    boolean ureserved_bool3;
+    boolean ureserved_bool4;
+    /* All padding taken */
 }; /* end of `struct you' */
 
 #define Upolyd (u.umonnum != u.umonster)

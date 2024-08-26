@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    pline.c    $NHDT-Date: 1549327495 2019/02/05 00:44:55 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.73 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -306,7 +306,12 @@ VA_DECL(const char *, line)
                         if (ep > p && *(ep - 1) == 'h')
                             Sprintf(cbuf, sbuf, va_arg(the_args, SHORT_P));
                         else if (ep > p && *(ep - 1) == 'l')
-                            Sprintf(cbuf, sbuf, va_arg(the_args, long));
+                        {
+                            if (ep > p + 1 && *(ep - 2) == 'l')
+                                Sprintf(cbuf, sbuf, va_arg(the_args, long long));
+                            else
+                                Sprintf(cbuf, sbuf, va_arg(the_args, long));
+                        }
                         else
                             Sprintf(cbuf, sbuf, va_arg(the_args, int));
                         break;
@@ -322,7 +327,12 @@ VA_DECL(const char *, line)
                         if(ep > p && *(ep - 1) == 'h')
                             Sprintf(cbuf, sbuf, va_arg(the_args, UNSIGNED_SHORT_P));
                         else if (ep > p && *(ep - 1) == 'l')
-                            Sprintf(cbuf, sbuf, va_arg(the_args, unsigned long));
+                        {
+                            if (ep > p + 1 && *(ep - 2) == 'l')
+                                Sprintf(cbuf, sbuf, va_arg(the_args, unsigned long long));
+                            else
+                                Sprintf(cbuf, sbuf, va_arg(the_args, unsigned long));
+                        }
                         else
                             Sprintf(cbuf, sbuf, va_arg(the_args, unsigned int));
                         break;

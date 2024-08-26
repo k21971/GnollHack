@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* vim:set cin ft=c sw=4 sts=4 ts=8 et ai cino=Ls\:0t0(0 : -*- mode:c;fill-column:80;tab-width:8;c-basic-offset:4;indent-tabs-mode:nil;c-file-style:"k&r" -*-*/
 /* GnollHack 4.0 cursmain.c */
@@ -734,7 +734,7 @@ curses_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
     nhsym ch;
     int cch;
     int color;
-    unsigned long special;
+    uint64_t special;
     int attr = -1;
 
     int glyph = layers.glyph;
@@ -835,8 +835,8 @@ int nh_poskey(int *x, int *y, int *mod)
                    a position in the MAP window is returned in x, y and mod.
                    mod may be one of
 
-                        CLICK_1         -- mouse click type 1
-                        CLICK_2         -- mouse click type 2
+                        CLICK_PRIMARY         -- mouse click type 1
+                        CLICK_SECONDARY       -- mouse click type 2
 
                    The different click types can map to whatever the
                    hardware supports.  If no mouse is supported, this
@@ -899,7 +899,7 @@ char yn_function(const char *ques, const char *choices, char default)
                    ports might use a popup.
 */
 char
-curses_yn_function_ex(int style UNUSED, int attr, int color, int glyph UNUSED, const char* title UNUSED, const char *question, const char *choices, CHAR_P def, const char* resp_desc UNUSED, const char* introline UNUSED, unsigned long ynflags UNUSED)
+curses_yn_function_ex(int style UNUSED, int attr, int color, int glyph UNUSED, const char* title UNUSED, const char *question, const char *choices, CHAR_P def, const char* resp_desc UNUSED, const char* introline UNUSED, uint64_t ynflags UNUSED)
 {
     return (char) curses_character_input_dialog(attr, color, question, choices, def);
 }

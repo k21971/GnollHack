@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-03-17 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    alloc.c    $NHDT-Date: 1454376505 2016/02/02 01:28:25 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.16 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -61,8 +61,8 @@ register size_t lth;
 #define PTR_FMT "%p"
 #define PTR_TYP genericptr_t
 #else
-#define PTR_FMT "%06lx"
-#define PTR_TYP unsigned long
+#define PTR_FMT "%06llx"
+#define PTR_TYP unsigned long long
 #endif
 
 /* A small pool of static formatting buffers.

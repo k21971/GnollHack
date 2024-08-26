@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    do_name.c    $NHDT-Date: 1555627306 2019/04/18 22:41:46 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -20,11 +20,11 @@ STATIC_DCL void FDECL(do_uoname, (struct obj *));
 STATIC_PTR char *FDECL(docall_xname, (struct obj *));
 STATIC_DCL void NDECL(namefloorobj);
 STATIC_DCL char *FDECL(bogusmon, (char *,char *));
-STATIC_DCL void FDECL(print_catalogue, (winid, struct obj*, int, unsigned long));
+STATIC_DCL void FDECL(print_catalogue, (winid, struct obj*, int, uint64_t));
 STATIC_DCL void FDECL(print_artifact_catalogue, (winid, struct obj*));
 STATIC_DCL int FDECL(CFDECLSPEC citemsortcmp, (const void*, const void*));
 STATIC_DCL int FDECL(CFDECLSPEC artilistsortcmp, (const void*, const void*));
-STATIC_DCL const char* FDECL(gettitle, (short*, const char* const*, int, int, unsigned long, unsigned long));
+STATIC_DCL const char* FDECL(gettitle, (short*, const char* const*, int, int, uint64_t, uint64_t));
 STATIC_DCL void NDECL(set_valid_pos_flags);
 STATIC_DCL void NDECL(clear_valid_pos_flags);
 
@@ -1507,17 +1507,20 @@ register struct obj *obj;
     //char *bufp, buf[BUFSZ] = DUMMY, bufcpy[BUFSZ], qbuf[QBUFSZ];
     //short objtyp;
 
-    /* Do this now because there's no point in even asking for a name */
-    if (obj->oclass == SPBOOK_CLASS && (objects[obj->otyp].oc_subtyp == BOOKTYPE_NOVEL || objects[obj->otyp].oc_subtyp == BOOKTYPE_MANUAL))
-    {
-        pline("%s already has a published name.", Ysimple_name2(obj));
-        return;
-    }
+    ///* Do this now because there's no point in even asking for a name */
+    //if (obj->oclass == SPBOOK_CLASS && (objects[obj->otyp].oc_subtyp == BOOKTYPE_NOVEL || objects[obj->otyp].oc_subtyp == BOOKTYPE_MANUAL))
+    //{
+    //    play_sfx_sound(SFX_GENERAL_CANNOT);
+    //    pline_ex(AT_NONE,CLR_MSG_FAIL, "%s already has a published name.", Ysimple_name2(obj));
+    //    return;
+    //}
 
-    if (has_oname(obj) && obj->nknown) {
-        pline("%s already has a true name.", Yname2(obj));
-        return;
-    }
+    //if (has_oname(obj) && obj->nknown) 
+    //{
+    //    play_sfx_sound(SFX_GENERAL_CANNOT);
+    //    pline_ex(AT_NONE, CLR_MSG_FAIL, "%s already has a true name.", Yname2(obj));
+    //    return;
+    //}
 
     Sprintf(qbuf, "What do you want to name %s ",
             is_plural(obj) ? "these" : "this");
@@ -2035,7 +2038,7 @@ boolean called;
     if (mtmp->ispriest || mtmp->isminion) {
         char priestnambuf[BUFSZ];
         char *name;
-        long save_prop = EHalluc_resistance;
+        int64_t save_prop = EHalluc_resistance;
         unsigned short save_invis = mtmp->mprops[INVISIBILITY];
 
         /* when true name is wanted, explicitly block Hallucination */
@@ -2135,7 +2138,7 @@ boolean called;
         } 
         else 
         {
-            char tmpbuf[BUFSIZ];
+            char tmpbuf[BUFSZ * 2];
             Strcpy(tmpbuf, buf);
             boolean npc_with_name_only = has_enpc(mtmp) && mtmp->isnpc && (npc_subtype_definitions[ENPC(mtmp)->npc_typ].general_flags & NPC_FLAGS_DISPLAY_NAME_ONLY) != 0;
             if (!is_tame(mtmp) && !npc_with_name_only)
@@ -2861,7 +2864,7 @@ char* s;
     if (s)
     {
         Strcpy(s, "");
-        char ns[BUFSIZ];
+        char ns[BUFSZ * 2];
         (void)randomize_gnoll_name(ns);
         Sprintf(s, "yee%s", ns);
     }
@@ -3949,7 +3952,7 @@ short* titleidx;
 const char* const* titlearray;
 int arraysize;
 int numrandomized; /* Only this first elements are included in randomization */
-unsigned long excludedtitles, excludedtitles2; /* Requires a 64-bit long to work for more than 32 novels */
+uint64_t excludedtitles, excludedtitles2; /* Requires a 64-bit long to work for more than 32 novels */
 {
     short num = (short)min(arraysize, numrandomized); /* num is the titles randomized before exclusions */
     short j, k = num; /* k is the titles randomized after exclusions */
@@ -3958,7 +3961,7 @@ unsigned long excludedtitles, excludedtitles2; /* Requires a 64-bit long to work
         int i;
         for (i = 0; i < 32 && i < num; i++)
         {
-            unsigned long bit = 1UL << i;
+            uint64_t bit = (uint64_t)1 << i;
             if (excludedtitles & bit)
             {
                 k--;
@@ -3970,7 +3973,7 @@ unsigned long excludedtitles, excludedtitles2; /* Requires a 64-bit long to work
         int i;
         for (i = 32; i < 64 && i < num; i++)
         {
-            unsigned long bit = 1UL << (i - 32);
+            uint64_t bit = (uint64_t)1 << (i - 32);
             if (excludedtitles2 & bit)
             {
                 k--;
@@ -3987,16 +3990,16 @@ unsigned long excludedtitles, excludedtitles2; /* Requires a 64-bit long to work
         {
             for (j = 0; j < num; j++)
             {
-                unsigned long bit = 0UL;
+                uint64_t bit = 0UL;
                 if (j < 32)
                 {
-                    bit = 1UL << j;
+                    bit = (uint64_t)1 << j;
                     if (excludedtitles & bit)
                         continue;
                 }
                 else if (j < 64)
                 {
-                    bit = 1UL << (j - 32);
+                    bit = (uint64_t)1 << (j - 32);
                     if (excludedtitles2 & bit)
                         continue;
                 }
@@ -4022,7 +4025,7 @@ unsigned long excludedtitles, excludedtitles2; /* Requires a 64-bit long to work
 const char *
 noveltitle(novidx, excludedtitles, excludedtitles2)
 short* novidx;
-unsigned long excludedtitles, excludedtitles2;
+uint64_t excludedtitles, excludedtitles2;
 {
     return gettitle(novidx, sir_Terry_novels, SIZE(sir_Terry_novels), SIZE(sir_Terry_novels), excludedtitles, excludedtitles2);
 }
@@ -4049,7 +4052,7 @@ STATIC_VAR const char* const manual_names[MAX_MANUAL_TYPES] = {
 const char*
 manualtitle(mnlidx, excludedtitles, excludedtitles2)
 short* mnlidx;
-unsigned long excludedtitles, excludedtitles2;
+uint64_t excludedtitles, excludedtitles2;
 {
     return gettitle(mnlidx, manual_names, SIZE(manual_names), NUM_RANDOM_MANUALS, excludedtitles, excludedtitles2);
 }
@@ -4107,7 +4110,7 @@ print_catalogue(datawin, obj, objectclass, cflags)
 winid datawin;
 struct obj* obj;
 int objectclass;
-unsigned long cflags;
+uint64_t cflags;
 {
     short i, cnt = 0;
     char buf[BUFSZ];
@@ -4292,7 +4295,7 @@ struct obj* obj;
         else
         {
             int itemclass = ILLOBJ_CLASS;
-            unsigned long cflags = 0UL;
+            uint64_t cflags = 0UL;
             switch (mnlidx)
             {
             case MANUAL_CATALOGUE_OF_WEAPONS:
@@ -4604,6 +4607,10 @@ struct obj* obj;
             putstr(datawin, ATR_INDENT_AT_PERIOD, "1. Demons and devils are immune to death attacks.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "2. Some devils can spawn with a bullwhip that can disarm you from your weapon. It is best to kill them from a distance.");
             putstr(datawin, ATR_INDENT_AT_PERIOD, "3. Demons and devils can gate in more of their kind with their melee attack. It is often best to kill them from a distance.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "4. The topmost level of Gehennom is the Valley of the Dead, which is inhabited by a large number of undead beings.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "5. You will need at least drain resistance to successfully fight these creatures.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "6. The entrance to lower levels of Gehennom is guarded by the dreaded dracolich, which can breathe a death ray.");
+            putstr(datawin, ATR_INDENT_AT_PERIOD, "7. Be sure to possess either reflection or death resistance before engaging with the dracolich.");
             break;
         case MANUAL_ADVANCED_READING_IN_KNOWN_MONSTERS:
             putstr(datawin, ATR_INDENT_AT_PERIOD, "1. Some sea monsters, such as eels, can drown you. It is often a good idea to kill them from a distance.");

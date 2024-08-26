@@ -11,6 +11,7 @@ using Xamarin.Forms;
 using Xamarin.Essentials;
 #endif
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using GnollHackX;
 
 #if __IOS__
@@ -56,7 +57,7 @@ namespace GnollHackX.Unknown
         public const string dll     = @"libgnollhackdroid.so";
         public const string library = "gnollhackdroid";
 #elif GNH_MAUI && WINDOWS
-        public const string dll = @"libgnollhackwin.dll";
+        public const string dll = @"gnollhackwin.dll";
         public const string library = "gnollhackwin";
 #else
         public const string dll     = @"libgnollhackunknown.so";
@@ -84,13 +85,13 @@ namespace GnollHackX.Unknown
             VoidVoidCallback callback_resume_nhwindows,
             CreateGHWindowCallback callback_create_nhwindow_ex,
             VoidIntCallback callback_clear_nhwindow,
-            VoidIntBooleanCallback callback_display_nhwindow,
+            DisplayWindowCallback callback_display_nhwindow,
             VoidIntCallback callback_destroy_nhwindow,
-            VoidIntIntIntCallback callback_curs,
+            CursCallback callback_curs,
             PutStrExColorCallback callback_putstr_ex,
             PutStrEx2ColorCallback callback_putstr_ex2,
             PutStrExColorCallback callback_putmixed_ex,
-            VoidConstCharBooleanCallback callback_display_file,
+            DisplayFileCallback callback_display_file,
             StartMenuCallback callback_start_menu_ex,
             AddMenuCallback callback_add_menu,
             AddExtendedMenuCallback callback_add_extended_menu,
@@ -101,9 +102,9 @@ namespace GnollHackX.Unknown
             VoidVoidCallback callback_mark_synch,
             VoidVoidCallback callback_wait_synch,
             /* If clipping is on */
-            VoidIntIntBooleanCallback callback_cliparound,
+            ClipAroundCallback callback_cliparound,
             /* If positionbar is on */
-            VoidCharCallback callback_update_positionbar,
+            UpdatePositionBarCallback callback_update_positionbar,
             PrintGlyphCallback callback_print_glyph,
             IssueGuiCommandCallback callback_issue_gui_command,
             VoidConstCharCallback callback_raw_print,
@@ -133,9 +134,9 @@ namespace GnollHackX.Unknown
             PutMsgHistoryCallback callback_putmsghistory,
             VoidIntCallback callback_status_init,
             VoidVoidCallback callback_status_finish,
-            VoidIntConstCharPtrConstCharPtrBooleanCallback callback_status_enablefield,
+            StatusEnableFieldCallback callback_status_enablefield,
             StatusUpdateCallback callback_status_update,
-            BooleanVoidCallback callback_can_suspend_yes,
+            CanSuspendYesCallback callback_can_suspend_yes,
             VoidVoidCallback callback_stretch_window,
             VoidUlongCallback callback_set_animation_timer_interval,
             OpenSpecialViewCallback callback_open_special_view,
@@ -192,7 +193,9 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern int CountTotalTiles();
         [DllImport(PlatformConstants.dll)]
-        public static extern int LibSetArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl, IntPtr ptr_ti2an, int size_ti2an);
+        public static extern void LibSetGlyphArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl);
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetTile2AnimationArray(IntPtr ptr_ti2an, int size_ti2an);
         [DllImport(PlatformConstants.dll)]
         public static extern int LibGetUnexploredGlyph();
         [DllImport(PlatformConstants.dll)]
@@ -259,7 +262,7 @@ namespace GnollHackX.Unknown
         public static extern int LibGetAutoDrawArraySize(int glyph);
 
         [DllImport(PlatformConstants.dll)]
-        public static extern int get_tile_animation_index_from_glyph(int glyph);
+        public static extern int LibGetTileAnimationIndexFromGlyph(int glyph);
 
 
         [DllImport(PlatformConstants.dll)]
@@ -269,7 +272,7 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern byte LibGlyphIsAnyDying(int glyph);
         [DllImport(PlatformConstants.dll)]
-        public static extern int maybe_get_animated_tile(int ntile, int tile_animation_idx, int play_type, long interval_counter, 
+        public static extern int LibMaybeGetAnimatedTile(int ntile, int tile_animation_idx, int play_type, long interval_counter, 
             out int frame_idx_ptr, out int main_tile_idx_ptr, out sbyte mapAnimated, ref int autodraw_ptr);
         [DllImport(PlatformConstants.dll)]
         public static extern int LibZapGlyphToCornerGlyph(int adjglyph, ulong adjflags, int source_dir);
@@ -284,6 +287,10 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern int LibGetMaxManuals();
         [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetFirstCatalogue();
+        [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetNumCatalogues();
+        [DllImport(PlatformConstants.dll)]
         public static extern int LibIsDebug();
         [DllImport(PlatformConstants.dll)]
         public static extern int LibValidateSaveFile(string filename, [MarshalAs(UnmanagedType.LPArray), Out] byte[] out_buffer);
@@ -295,6 +302,20 @@ namespace GnollHackX.Unknown
         public static extern int LibIncreaseFileDescriptorLimitToAtLeast(int min_cur);
         [DllImport(PlatformConstants.dll)]
         public static extern int LibGetFileDescriptorLimit(int is_max_limit);
+        [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetCharacterClickAction();
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetCharacterClickAction(int new_value);
+        [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetMouseCommand(int is_middle);
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetMouseCommand(int new_value, int is_middle);
+
+        [DllImport(PlatformConstants.dll)]
+        public static extern IntPtr LibGetEventPathForGHSound(int ghsound);
+        [DllImport(PlatformConstants.dll)]
+        public static extern float LibGetVolumeForGHSound(int ghsound);
+
 
         private void LoadNativeLibrary(string libName)
         {
@@ -323,6 +344,7 @@ namespace GnollHackX.Unknown
             ClearTopScores();
             ClearSavedGames();
             ClearDumplogs();
+            ClearSnapshots();
         }
 
         public void ClearAllFilesInMainDirectory()
@@ -403,7 +425,35 @@ namespace GnollHackX.Unknown
                 DirectoryInfo disave = new DirectoryInfo(fulldirepath);
                 foreach (FileInfo file in disave.GetFiles())
                 {
-                    file.Delete();
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+                }
+            }
+        }
+
+        public void ClearSnapshots()
+        {
+            string filesdir = GetGnollHackPath();
+            string fulldirepath = Path.Combine(filesdir, GHConstants.SnapshotDirectory);
+            if (Directory.Exists(fulldirepath))
+            {
+                DirectoryInfo disave = new DirectoryInfo(fulldirepath);
+                foreach (FileInfo file in disave.GetFiles())
+                {
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
                 }
             }
         }
@@ -416,39 +466,58 @@ namespace GnollHackX.Unknown
             {
                 if(file.Name.Length > 4 && file.Name.Substring(0, 4) == "bon-")
                 {
-                    file.Delete();
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
                 }
             }
         }
 
-        public void ResetDefaultsFile()
+        public async Task ResetDefaultsFile()
         {
-            string content;
-            string filesdir = GetGnollHackPath();
-            string assetsourcedir = "gnh";
-            string txtfile = "defaults.gnh";
+            try
+            {
+                string content;
+                string filesdir = GetGnollHackPath();
+                string assetsourcedir = "gnh";
+                string txtfile = "defaults.gnh";
 #if __IOS__
-            string fullsourcepath = NSBundle.MainBundle.PathForResource("defaults", "gnh", assetsourcedir);
-            using (StreamReader sr = new StreamReader(fullsourcepath))
+                string fullsourcepath = NSBundle.MainBundle.PathForResource("defaults", "gnh", assetsourcedir);
+                using (StreamReader sr = new StreamReader(fullsourcepath))
 #elif __ANDROID__
-            string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
-            AssetManager assets = MainActivity.StaticAssets;
-            using (StreamReader sr = new StreamReader(assets.Open(fullsourcepath)))
+                string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
+                AssetManager assets = MainActivity.StaticAssets;
+                using Stream assetsStream = assets.Open(fullsourcepath);
+                using (StreamReader sr = new StreamReader(assetsStream))
+#elif WINDOWS
+                string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
+                using Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath);
+                using (StreamReader sr = new StreamReader(fullsourcepath))
 #else
-            string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
-            using (StreamReader sr = new StreamReader(fullsourcepath))
+                string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
+                using (StreamReader sr = new StreamReader(fullsourcepath))
 #endif
-            {
-                content = sr.ReadToEnd();
+                {
+                    content = sr.ReadToEnd();
+                }
+                string fulltargetpath = Path.Combine(filesdir, txtfile);
+                if (File.Exists(fulltargetpath))
+                {
+                    File.Delete(fulltargetpath);
+                }
+                using (StreamWriter sw = new StreamWriter(fulltargetpath))
+                {
+                    sw.Write(content);
+                }
             }
-            string fulltargetpath = Path.Combine(filesdir, txtfile);
-            if (File.Exists(fulltargetpath))
+            catch (Exception)
             {
-                File.Delete(fulltargetpath);
-            }
-            using (StreamWriter sw = new StreamWriter(fulltargetpath))
-            {
-                sw.Write(content);
+                await Task.Delay(5);
             }
         }
 
@@ -481,56 +550,59 @@ namespace GnollHackX.Unknown
             {
                 return ".";
             }
+#elif WINDOWS
+            return FileSystem.Current.AppDataDirectory;
 #else
             return ".";
 #endif
         }
 
 
-        private string[] _txtfileslist = { "credits", "xcredits", "license", "logfile", "perm", "record", "recover", "symbols", "sysconf", "xlogfile", "defaults.gnh" };
+        private string[] _txtfileslist = { "xcredits", "license", "logfile", "perm", "record", "symbols", "sysconf", "xlogfile", "defaults.gnh" };
         private string[] _binfileslist = { "nhdat" };
 
-        public void InitializeGnollHack()
+        public async Task InitializeGnollHack()
         {
             /* Unpack GnollHack files */
             /* Add a check whether to unpack if there are existing files or not */
-
-            string filesdir = GetGnollHackPath();
-
-            /* For debugging purposes now, delete all existing files in filesdir first */
-            //System.IO.DirectoryInfo di = new DirectoryInfo(filesdir);
-
-            //foreach (FileInfo file in di.GetFiles())
-            //{
-            //    file.Delete();
-            //}
-
-            /* Make relevant directories */
-            string[] ghdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory };
-            foreach (string ghdir in ghdirlist)
+            try
             {
-                string fulldirepath = Path.Combine(filesdir, ghdir);
-                GHApp.CheckCreateDirectory(fulldirepath);
-            }
+                string filesdir = GetGnollHackPath();
 
-            /* Copy missing files from resources */
-            string content;
-            string assetsourcedir = "gnh";
-//#if GNH_MAUI
-//#if __ANDROID__
-//            assetsourcedir = Path.Combine("Platforms", "Android", assetsourcedir);
-//#elif __IOS__
-//            assetsourcedir = Path.Combine("Platforms", "iOS", assetsourcedir);
-//#else                
-//            assetsourcedir = Path.Combine("Platforms", "Unknown", assetsourcedir);
-//#endif
-//#endif
+                /* For debugging purposes now, delete all existing files in filesdir first */
+                //System.IO.DirectoryInfo di = new DirectoryInfo(filesdir);
+
+                //foreach (FileInfo file in di.GetFiles())
+                //{
+                //    file.Delete();
+                //}
+
+                /* Make relevant directories */
+                string[] ghdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory, GHConstants.SnapshotDirectory };
+                foreach (string ghdir in ghdirlist)
+                {
+                    string fulldirepath = Path.Combine(filesdir, ghdir);
+                    GHApp.CheckCreateDirectory(fulldirepath);
+                }
+
+                /* Copy missing files from resources */
+                string content;
+                string assetsourcedir = "gnh";
+                //#if GNH_MAUI
+                //#if __ANDROID__
+                //            assetsourcedir = Path.Combine("Platforms", "Android", assetsourcedir);
+                //#elif __IOS__
+                //            assetsourcedir = Path.Combine("Platforms", "iOS", assetsourcedir);
+                //#else                
+                //            assetsourcedir = Path.Combine("Platforms", "Unknown", assetsourcedir);
+                //#endif
+                //#endif
 #if __ANDROID__
-            AssetManager assets = MainActivity.StaticAssets;
+                AssetManager assets = MainActivity.StaticAssets;
 #endif
 
-            foreach (string txtfile in _txtfileslist)
-            {
+                foreach (string txtfile in _txtfileslist)
+                {
 #if __IOS__
                 string extension = Path.GetExtension(txtfile);
                 if (extension != null && extension.Length > 0)
@@ -539,32 +611,37 @@ namespace GnollHackX.Unknown
                 string fullsourcepath = NSBundle.MainBundle.PathForResource(fname, extension, assetsourcedir);
                 using (StreamReader sr = new StreamReader(fullsourcepath))
 #elif __ANDROID__
+                    string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
+                    using Stream assetsStream = assets.Open(fullsourcepath);
+                    using (StreamReader sr = new StreamReader(assetsStream))
+#elif WINDOWS
                 string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
-                using (StreamReader sr = new StreamReader(assets.Open(fullsourcepath)))
+                using Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath);
+                using (StreamReader sr = new StreamReader(fileStream))
 #else
-                string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
+                string fullsourcepath = Path.Combine(filesdir, assetsourcedir, txtfile);
                 using (StreamReader sr = new StreamReader(fullsourcepath))
 #endif
-                {
-                    content = sr.ReadToEnd();
-                }
-                string fulltargetpath = Path.Combine(filesdir, txtfile);
-                if (File.Exists(fulltargetpath))
-                {
-                    continue;
-                    //File.Delete(fulltargetpath);
+                    {
+                        content = sr.ReadToEnd();
+                    }
+                    string fulltargetpath = Path.Combine(filesdir, txtfile);
+                    if (File.Exists(fulltargetpath))
+                    {
+                        continue;
+                        //File.Delete(fulltargetpath);
+                    }
+
+                    using (StreamWriter sw = new StreamWriter(fulltargetpath))
+                    {
+                        sw.Write(content);
+                    }
                 }
 
-                using (StreamWriter sw = new StreamWriter(fulltargetpath))
+                byte[] data;
+                int maxsize = 2048 * 1024;
+                foreach (string binfile in _binfileslist)
                 {
-                    sw.Write(content);
-                }
-            }
-
-            byte[] data;
-            int maxsize = 2048 * 1024;
-            foreach (string binfile in _binfileslist)
-            {
 #if __IOS__
                 string extension = Path.GetExtension(binfile);
                 if (extension != null && extension.Length > 0)
@@ -573,32 +650,41 @@ namespace GnollHackX.Unknown
                 string fullsourcepath = NSBundle.MainBundle.PathForResource(fname, extension, assetsourcedir);
                 using (BinaryReader br = new BinaryReader(File.OpenRead(fullsourcepath)))
 #elif __ANDROID__
+                    string fullsourcepath = Path.Combine(assetsourcedir, binfile);
+                    using (BinaryReader br = new BinaryReader(assets.Open(fullsourcepath)))
+#elif WINDOWS
                 string fullsourcepath = Path.Combine(assetsourcedir, binfile);
-                using (BinaryReader br = new BinaryReader(assets.Open(fullsourcepath)))
+                using Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath);
+                using (BinaryReader br = new BinaryReader(fileStream))
 #else
                 string fullsourcepath = Path.Combine(assetsourcedir, binfile);
                 using (BinaryReader br = new BinaryReader(File.OpenRead(fullsourcepath)))
 #endif
-                {
-                    data = br.ReadBytes(maxsize);
-                }
+                    {
+                        data = br.ReadBytes(maxsize);
+                    }
 
-                string fulltargetpath = Path.Combine(filesdir, binfile);
-                if (File.Exists(fulltargetpath))
-                {
-                    /* Should check whether the current one is an up-to-date version; assume for now that it is not */
-                    File.Delete(fulltargetpath);
-                    //continue;
-                }
+                    string fulltargetpath = Path.Combine(filesdir, binfile);
+                    if (File.Exists(fulltargetpath))
+                    {
+                        /* Should check whether the current one is an up-to-date version; assume for now that it is not */
+                        File.Delete(fulltargetpath);
+                        //continue;
+                    }
 
-                using (BinaryWriter sw = new BinaryWriter(File.Open(fulltargetpath, FileMode.Create)))
-                {
-                    sw.Write(data);
+                    using (BinaryWriter sw = new BinaryWriter(File.Open(fulltargetpath, FileMode.Create)))
+                    {
+                        sw.Write(data);
+                    }
                 }
+            }
+            catch (Exception)
+            {
+                await Task.Delay(5);
             }
         }
 
-        public void InitializeSecrets(Secrets secrets)
+        public async Task InitializeSecrets(Secrets secrets)
         {
             if (secrets == null)
                 return;
@@ -624,15 +710,15 @@ namespace GnollHackX.Unknown
             {
                 string assetfile = sfile.name;
                 string sfiledir = sfile.source_directory;
-//#if GNH_MAUI
-//#if __IOS__
-//                sfiledir = Path.Combine("Platforms", "iOS", sfiledir);
-//#elif __ANDROID__
-//                sfiledir = Path.Combine("Platforms", "Android", sfiledir);
-//#else
-//                sfiledir = Path.Combine("Platforms", "Unknown", sfiledir);
-//#endif
-//#endif
+                //#if GNH_MAUI
+                //#if __IOS__
+                //                sfiledir = Path.Combine("Platforms", "iOS", sfiledir);
+                //#elif __ANDROID__
+                //                sfiledir = Path.Combine("Platforms", "Android", sfiledir);
+                //#else
+                //                sfiledir = Path.Combine("Platforms", "Unknown", sfiledir);
+                //#endif
+                //#endif
 #if __IOS__
                 string extension = Path.GetExtension(assetfile);
                 if (extension != null && extension.Length > 0)
@@ -640,6 +726,8 @@ namespace GnollHackX.Unknown
                 string fname = Path.GetFileNameWithoutExtension(assetfile);
                 string fullsourcepath = NSBundle.MainBundle.PathForResource(fname, extension, sfiledir);
 #elif __ANDROID__
+                string fullsourcepath = Path.Combine(sfiledir, assetfile);
+#elif WINDOWS
                 string fullsourcepath = Path.Combine(sfiledir, assetfile);
 #else
                 string fullsourcepath = Path.Combine(sfiledir, assetfile);
@@ -653,8 +741,9 @@ namespace GnollHackX.Unknown
                         long curlength = curfile.Length;
                         string curfileversion = Preferences.Get("Verify_" + sfile.id + "_Version", "");
                         DateTime moddate = Preferences.Get("Verify_" + sfile.id + "_LastWriteTime", DateTime.MinValue);
+                        long used_length = GHApp.IsDesktop ? sfile.length_desktop : sfile.length_mobile;
 
-                        if (curlength != sfile.length || curfileversion != sfile.version || moddate != curfile.LastWriteTimeUtc)
+                        if (curlength != used_length || curfileversion != sfile.version || moddate != curfile.LastWriteTimeUtc)
                         {
                             File.Delete(fulltargetpath);
                             if (Preferences.ContainsKey("Verify_" + sfile.id + "_Version"))
@@ -674,6 +763,8 @@ namespace GnollHackX.Unknown
                     using (Stream s = assets.Open(fullsourcepath))
 #elif __IOS__
                     using (Stream s = File.OpenRead(fullsourcepath))
+#elif WINDOWS
+                    using (Stream s = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath))
 #else
                     using (Stream s = File.OpenRead(fullsourcepath))
 #endif
@@ -728,7 +819,8 @@ namespace GnollHackX.Unknown
                         if (curfile.Exists)
                         {
                             long curlength = curfile.Length;
-                            if (curlength == sfile.length)
+                            long used_length = GHApp.IsDesktop ? sfile.length_desktop : sfile.length_mobile;
+                            if (curlength == used_length)
                             {
                                 Preferences.Set("Verify_" + sfile.id + "_Version", sfile.version);
                                 Preferences.Set("Verify_" + sfile.id + "_LastWriteTime", curfile.LastWriteTimeUtc);
@@ -762,10 +854,9 @@ namespace GnollHackX.Unknown
                     //    sw.Write(data);
                     //}
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    string str1 = ex.Message;
-                    /* Likely asset at fullsourcepath did not exist */
+                    await Task.Delay(5);
                 }
             }            
         }
@@ -867,13 +958,18 @@ namespace GnollHackX.Unknown
 
             return array;
         }
-        public void SetArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl, IntPtr ptr_ti2an, int size_ti2an)
+        public void SetGlyphArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl)
         {
-            LibSetArrays(ptr_gl2ti, size_gl2ti, ptr_gltifl, size_gltifl, ptr_ti2an, size_ti2an);
+            LibSetGlyphArrays(ptr_gl2ti, size_gl2ti, ptr_gltifl, size_gltifl);
         }
+        public void SetTile2AnimationArray(IntPtr ptr_ti2an, int size_ti2an)
+        {
+            LibSetTile2AnimationArray(ptr_ti2an, size_ti2an);
+        }
+
         public int GetTileAnimationIndexFromGlyph(int glyph)
         {
-            return get_tile_animation_index_from_glyph(glyph);
+            return LibGetTileAnimationIndexFromGlyph(glyph);
         }
         public bool GlyphIsExplosion(int glyph)
         {
@@ -894,7 +990,7 @@ namespace GnollHackX.Unknown
             //frame_idx_ptr = main_tile_idx_ptr = autodraw_ptr = 0;
             //mapAnimated = 0;
 
-            return maybe_get_animated_tile(ntile, tile_animation_idx, play_type, interval_counter,
+            return LibMaybeGetAnimatedTile(ntile, tile_animation_idx, play_type, interval_counter,
                 out frame_idx_ptr, out main_tile_idx_ptr, out mapAnimated, ref autodraw_ptr);
         }
 
@@ -971,6 +1067,16 @@ namespace GnollHackX.Unknown
             return LibGetMaxManuals();
         }
 
+        public int GetFirstCatalogue()
+        {
+            return LibGetFirstCatalogue();
+        }
+
+        public int GetNumCatalogues()
+        {
+            return LibGetNumCatalogues();
+        }
+
         public bool IsDebug()
         {
             return LibIsDebug() != 0;
@@ -1002,10 +1108,45 @@ namespace GnollHackX.Unknown
             return LibGetFileDescriptorLimit(is_max_limit ? 1 : 0);
         }
 
+        public bool GetCharacterClickAction()
+        {
+            return LibGetCharacterClickAction() != 0;
+        }
+
+        public void SetCharacterClickAction(bool newValue)
+        {
+            LibSetCharacterClickAction(newValue ? 1 : 0);
+        }
+
+        public int GetMouseCommand(bool isMiddle)
+        {
+            return LibGetMouseCommand(isMiddle ? 1 : 0);
+        }
+
+        public void SetMouseCommand(int newValue, bool isMiddle)
+        {
+            LibSetMouseCommand(newValue, isMiddle ? 1 : 0);
+        }
+
+        public string GetEventPathForGHSound(int ghsound)
+        {
+            IntPtr resptr = LibGetEventPathForGHSound(ghsound);
+            string ret = Marshal.PtrToStringAnsi(resptr);
+            return ret;
+        }
+
+        public float GetVolumeForGHSound(int ghsound)
+        {
+            return LibGetVolumeForGHSound(ghsound);
+        }
+
         public int StartGnollHack(GHGame ghGame)
         {
+            GHApp.SetMirroredOptionsToDefaults();
             string filesdir = GetGnollHackPath();
             bool allowbones = GHApp.AllowBones;
+            ulong rightmouse = (ulong)GHApp.MirroredRightMouseCommand << GHConstants.RightMouseBitIndex;
+            ulong middlemouse = (ulong)GHApp.MirroredMiddleMouseCommand << GHConstants.MiddleMouseBitIndex;
             ulong runflags = (ulong)(ghGame.WizardMode ? RunGnollHackFlags.WizardMode : 0) |
                 (ulong)(GHApp.FullVersionMode ? RunGnollHackFlags.FullVersion : 0) |
                 (ulong)(ghGame.ModernMode ? RunGnollHackFlags.ModernMode : 0) |
@@ -1013,8 +1154,9 @@ namespace GnollHackX.Unknown
                 (ulong)(allowbones ? 0 : RunGnollHackFlags.DisableBones) |
                 (ulong)(GHApp.TournamentMode ? RunGnollHackFlags.TournamentMode : 0) |
                 (ulong)(GHApp.IsDebug ? RunGnollHackFlags.GUIDebugMode : 0) |
-                (ulong)ghGame.StartFlags;
-            string lastusedplname = GHApp.TournamentMode && !ghGame.PlayingReplay ? Preferences.Get("LastUsedTournamentPlayerName", "") : Preferences.Get("LastUsedPlayerName", "");
+                (ulong)(GHApp.MirroredCharacterClickAction ? RunGnollHackFlags.CharacterClickAction : 0) | /* Use the default; GHApp.CharacterClickAction may contain the option value from the last game */
+                rightmouse | middlemouse | (ulong)ghGame.StartFlags;
+            string lastusedplname = GHApp.TournamentMode && !ghGame.PlayingReplay ? GHApp.LastUsedTournamentPlayerName : GHApp.LastUsedPlayerName;
 
             return RunGnollHack(
                 filesdir,

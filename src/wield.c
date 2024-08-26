@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    wield.c    $NHDT-Date: 1543492132 2018/11/29 11:48:52 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.58 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -55,8 +55,7 @@
  */
 
 STATIC_DCL boolean FDECL(cant_wield_corpse, (struct obj *));
-STATIC_DCL int FDECL(ready_weapon, (struct obj *, long));
-STATIC_DCL int FDECL(wield_weapon, (struct obj*));
+STATIC_DCL int FDECL(ready_weapon, (struct obj *, int64_t));
 
 /* used by will_weld() */
 /* probably should be renamed */
@@ -87,7 +86,7 @@ STATIC_DCL int FDECL(wield_weapon, (struct obj*));
 void
 setuwep(obj, mask)
 register struct obj* obj;
-long mask;
+int64_t mask;
 {
     setuwepcore(obj, mask, TRUE);
 }
@@ -95,7 +94,7 @@ long mask;
 void
 setuwepquietly(obj, mask)
 register struct obj* obj;
-long mask;
+int64_t mask;
 {
     setuwepcore(obj, mask, FALSE);
 }
@@ -103,7 +102,7 @@ long mask;
 void
 setuwepcore(obj, mask, verbose)
 register struct obj *obj;
-long mask;
+int64_t mask;
 boolean verbose;
 {
     struct obj* olduwep = (struct obj*)0;
@@ -123,10 +122,15 @@ boolean verbose;
      */
     setworncore(obj, mask, verbose);
 
+    boolean invneedsupdate = FALSE;
     if (obj && (objects[obj->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED))
+    {
+        invneedsupdate = verbose && obj->known != 1;
         obj->known = 1;
+    }
 
     if (uwep == obj && olduwep && (artifact_light(olduwep) || has_obj_mythic_magical_light(olduwep) || obj_shines_magical_light(olduwep)) && olduwep->lamplit) {
+        Strcpy(debug_buf_3, "setuwepcore");
         end_burn(olduwep, FALSE);
         if (!Blind && verbose)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shining.", Tobjnam(olduwep, "stop"));
@@ -139,6 +143,9 @@ boolean verbose;
      * 3.2.2:  Wielding arbitrary objects will give bashing message too.
      */
     update_unweapon();
+
+    if (invneedsupdate)
+        update_inventory();
 }
 
 void
@@ -194,7 +201,7 @@ struct obj *obj;
 STATIC_OVL int
 ready_weapon(wep, mask)
 struct obj *wep;
-long mask;
+int64_t mask;
 {
     /* Separated function so swapping works easily */
     int res = 0;
@@ -282,7 +289,7 @@ long mask;
 
             //Kludge removed by Janne Gustafsson; items may now be identified by setuwep
             /*
-            long dummy = wep->owornmask;
+            int64_t dummy = wep->owornmask;
 
             wep->owornmask |= W_WEP;
             if (is_obj_tethered_weapon(wep, wep->owornmask))
@@ -333,7 +340,7 @@ register struct obj *obj;
 void
 setuswapwep(obj, mask)
 register struct obj *obj;
-long mask;
+int64_t mask;
 {
     setworncore(obj, mask, TRUE);
     return;
@@ -352,7 +359,7 @@ register struct obj* obj;
 void
 setuswapwepquietly(obj, mask)
 register struct obj* obj;
-long mask;
+int64_t mask;
 {
     setworncore(obj, mask, FALSE);
     return;
@@ -452,7 +459,6 @@ dowieldprevwep()
     }
 }
 
-STATIC_OVL
 int
 wield_weapon(wep)
 struct obj* wep;
@@ -469,7 +475,7 @@ struct obj* wep;
             return 0;
         }
 
-        long mask = 0;
+        int64_t mask = 0;
         char qbuf[BUFSZ] = "";
         if (wep == &zeroobj)
         {
@@ -686,7 +692,7 @@ dounwield()
     if (!otmp || !(otmp->owornmask & W_WEAPON))
         return 0;
 
-    long mask = 0L;
+    int64_t mask = 0L;
     
     if (otmp == uwep)
         mask = W_WEP;
@@ -755,7 +761,7 @@ dounwield()
 
 int
 dosingleswapweapon(swap_wep_mask, swap_target_mask)
-long swap_wep_mask, swap_target_mask; // swap_wep_mask = mask of original weapon in swapwep, swap_target_mask is the mask it is going to swapped to
+int64_t swap_wep_mask, swap_target_mask; // swap_wep_mask = mask of original weapon in swapwep, swap_target_mask is the mask it is going to swapped to
 {
     register struct obj *oldwep, * oldswap;
     register struct obj *wep = (struct obj*)0, *altwep = (struct obj*)0, *swapwep = (struct obj*)0, *altswapwep = (struct obj*)0;
@@ -1244,8 +1250,8 @@ dowieldquiver()
         /* offer to split stack if wielding more than 1 */
         if (uwep->quan > 1L && inv_cnt(FALSE) < 52 && splittable(uwep))
         {
-            Sprintf(qbuf, "You are wielding %ld %s.  Ready %ld of them?",
-                    uwep->quan, simpleonames(uwep), uwep->quan - 1L);
+            Sprintf(qbuf, "You are wielding %lld %s.  Ready %lld of them?",
+                (long long)uwep->quan, simpleonames(uwep), (long long)uwep->quan - 1);
             switch (ynq(qbuf)) 
             {
             case 'q':
@@ -1296,8 +1302,8 @@ dowieldquiver()
         /* offer to split stack if wielding more than 1 */
         if (uarms->quan > 1L && inv_cnt(FALSE) < 52 && splittable(uarms))
         {
-            Sprintf(qbuf, "You are wielding %ld %s.  Ready %ld of them?",
-                uarms->quan, simpleonames(uarms), uarms->quan - 1L);
+            Sprintf(qbuf, "You are wielding %lld %s.  Ready %lld of them?",
+                (long long)uarms->quan, simpleonames(uarms), (long long)uarms->quan - 1);
             switch (ynq(qbuf))
             {
             case 'q':
@@ -1339,10 +1345,10 @@ dowieldquiver()
         if (uswapwep->quan > 1L && inv_cnt(FALSE) < 52
             && splittable(uswapwep)) 
         {
-            Sprintf(qbuf, "%s %ld %s.  Ready %ld of them?",
+            Sprintf(qbuf, "%s %lld %s.  Ready %lld of them?",
                     "Your alternate weapon is",
-                    uswapwep->quan, simpleonames(uswapwep),
-                    uswapwep->quan - 1L);
+                    (long long)uswapwep->quan, simpleonames(uswapwep),
+                    (long long)uswapwep->quan - 1);
             switch (ynq(qbuf)) 
             {
             case 'q':
@@ -1385,10 +1391,10 @@ dowieldquiver()
         if (uswapwep2->quan > 1L && inv_cnt(FALSE) < 52
             && splittable(uswapwep2)) 
         {
-            Sprintf(qbuf, "%s %ld %s.  Ready %ld of them?",
+            Sprintf(qbuf, "%s %lld %s.  Ready %lld of them?",
                 "Your alternate weapon is",
-                uswapwep2->quan, simpleonames(uswapwep2),
-                uswapwep2->quan - 1L);
+                (long long)uswapwep2->quan, simpleonames(uswapwep2),
+                (long long)uswapwep2->quan - 1);
             switch (ynq(qbuf))
             {
             case 'q':
@@ -1592,8 +1598,8 @@ const char *verb; /* "rub",&c */
     }
     else
     {
-        long wepslot = selected_hand_is_right ? W_WEP : W_WEP2;
-        long swapwepslot = selected_hand_is_right ? W_SWAPWEP : W_SWAPWEP2;
+        int64_t wepslot = selected_hand_is_right ? W_WEP : W_WEP2;
+        int64_t swapwepslot = selected_hand_is_right ? W_SWAPWEP : W_SWAPWEP2;
 
         /* if not two-weaponing, unwield first if the obj is uarms or swapweapon2, so that it can be wielded normally */
         if (!u.twoweap && uarms == obj)
@@ -1712,6 +1718,7 @@ uwepgone()
 {
     if (uwep) {
         if ((artifact_light(uwep) || has_obj_mythic_magical_light(uwep) || obj_shines_magical_light(uwep)) && uwep->lamplit) {
+            Strcpy(debug_buf_3, "uwepgone");
             end_burn(uwep, FALSE);
             if (!Blind)
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shining.", Tobjnam(uwep, "stop"));
@@ -1728,6 +1735,7 @@ uwep2gone()
 {
     if (uarms) {
         if ((artifact_light(uarms) || has_obj_mythic_magical_light(uarms) || obj_shines_magical_light(uarms)) && uarms->lamplit) {
+            Strcpy(debug_buf_3, "uwep2gone");
             end_burn(uarms, FALSE);
             if (!Blind)
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shining.", Tobjnam(uarms, "stop"));
@@ -1920,12 +1928,8 @@ boolean dopopup;
 
     int max_ench = get_obj_max_enchantment(weapon);
 
-    int ench_limit_multiplier = 1;
-    if(bimanual(weapon) && !is_launcher(weapon))
-        ench_limit_multiplier = 2;
-
     /* there is a (soft) upper and lower limit to weapon->enchantment */
-    if (((weapon->enchantment > max_ench * ench_limit_multiplier && amount >= 0) || (weapon->enchantment < -max_ench * ench_limit_multiplier && amount < 0)) && rn2(3))
+    if (((weapon->enchantment > max_ench && amount >= 0) || (weapon->enchantment < -max_ench && amount < 0)) && rn2(3))
     {
         if (((weapon->speflags & SPEFLAGS_GIVEN_OUT_BLUE_SMOKE) == 0 || rn2(3)) && (weapon->material == MAT_ORICHALCUM || obj_resists(weapon, 0, 75)))
         {
@@ -1944,10 +1948,9 @@ boolean dopopup;
             {
                 Sprintf(buf, "%s for a while, and then suddenly %s out a puff of smoke.", Yobjnam2(weapon, "violently vibrate"), otense(weapon, "give"));
                 pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, Blind ? "Puff of Smoke" : "Puff of Blue Smoke", dopopup);
-                otmp->enchantment = 0;
             }
-            otmp->enchantment = 0;
-            otmp->speflags |= SPEFLAGS_GIVEN_OUT_BLUE_SMOKE;
+            weapon->enchantment = 0;
+            weapon->speflags |= SPEFLAGS_GIVEN_OUT_BLUE_SMOKE;
             update_inventory();
             special_effect_wait_until_end(0);
         }
@@ -2053,7 +2056,7 @@ void
 weldmsg(obj)
 register struct obj *obj;
 {
-    long savewornmask;
+    int64_t savewornmask;
 
     savewornmask = obj->owornmask;
     play_sfx_sound(SFX_GENERAL_WELDED);

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0  decl.h  $NHDT-Date: 1547025154 2019/01/09 09:12:34 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.147 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -9,8 +9,10 @@
 #define DECL_H
 
 #include "general.h"
-#include "soundset.h"
+#include "layer.h"
+#include "monsym.h"
 #include "objclass.h"
+#include "soundset.h"
 
 #define E extern
 
@@ -247,7 +249,7 @@ E const char dnqdescs[];
 E const char sdqdescs[];
 E const char sadqdescs[];
 
-E NEARDATA long yn_number;
+E NEARDATA int64_t yn_number;
 
 E const char disclosure_options[];
 
@@ -294,7 +296,7 @@ E NEARDATA const char getobj_favorites[];
 
 E NEARDATA boolean is_gui_in_debug_mode;
 
-E long done_money;
+E int64_t done_money;
 E NEARDATA char plname[PL_NSIZ];
 E NEARDATA char recovery_plname[PL_NSIZ];
 E NEARDATA boolean plname_from_error_savefile;
@@ -321,7 +323,7 @@ struct breed_definition {
     const char* breed_name;
     const char* short_coat_color;
     const char* long_coat_color;
-    unsigned long breed_flags;
+    uint64_t breed_flags;
 };
 
 E const struct breed_definition dog_breed_definitions[NUM_DOG_BREEDS];
@@ -329,7 +331,7 @@ E const struct breed_definition cat_breed_definitions[NUM_CAT_BREEDS];
 
 E char preferred_pet;
 
-E NEARDATA unsigned long n_game_recoveries;
+E NEARDATA uint64_t n_game_recoveries;
 
 E const char *occtxt; /* defined when occupation != NULL */
 E enum object_soundset_types occsoundset; /* defined when occupation != NULL */
@@ -350,8 +352,8 @@ E NEARDATA struct multishot {
     boolean s;
 } m_shot;
 
-E NEARDATA long moves, monstermoves;
-E NEARDATA long wailmsg;
+E NEARDATA int64_t moves, monstermoves;
+E NEARDATA int64_t wailmsg;
 
 E NEARDATA boolean in_mklev;
 E NEARDATA boolean unweapon1;
@@ -404,6 +406,7 @@ E NEARDATA const struct explosion_type_definition explosion_type_definitions[MAX
 
 E NEARDATA struct obj *uchain; /* defined only when punished */
 E NEARDATA struct obj *uball;
+E NEARDATA struct obj *magic_objs;
 E NEARDATA struct obj *migrating_objs;
 E NEARDATA struct obj *billobjs;
 E NEARDATA struct obj *memoryobjs;
@@ -445,8 +448,8 @@ E NEARDATA struct mvitals {
     uchar mvflags;
 } mvitals[NUM_MONSTERS];
 
-E NEARDATA long domove_attempting;
-E NEARDATA long domove_succeeded;
+E NEARDATA int64_t domove_attempting;
+E NEARDATA int64_t domove_succeeded;
 #define DOMOVE_WALK         0x00000001L
 #define DOMOVE_RUSH         0x00000002L
 
@@ -613,7 +616,7 @@ struct opvar {
     xchar spovartyp; /* one of SPOVAR_foo */
     union {
         char *str;
-        long l;
+        int64_t l;
     } vardata;
 };
 
@@ -670,12 +673,12 @@ E const char cmdnotavail[];
 
 E const char* const hofe_titles[3];
 
-E unsigned long file_end_marker;
+E uint64_t file_end_marker;
 
-E char debug_buf_1[BUFSIZ];
-E char debug_buf_2[BUFSIZ];
-E char debug_buf_3[BUFSIZ];
-E char debug_buf_4[BUFSIZ];
+E char debug_buf_1[BUFSZ * 2];
+E char debug_buf_2[BUFSZ * 2];
+E char debug_buf_3[BUFSZ * 2];
+E char debug_buf_4[BUFSZ * 2];
 
 #undef E
 

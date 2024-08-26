@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhmap.h    $NHDT-Date: 1432512810 2015/05/25 00:13:30 $  $NHDT-Branch: master $:$NHDT-Revision: 1.15 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -9,7 +9,6 @@
 
 #include "winMS.h"
 #include "config.h"
-#include "global.h"
 
 COLORREF nhcolor_to_RGB(int c);
 HWND mswin_init_map_window(void);

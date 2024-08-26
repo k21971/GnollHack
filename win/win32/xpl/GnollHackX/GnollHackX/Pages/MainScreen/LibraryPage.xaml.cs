@@ -29,13 +29,21 @@ namespace GnollHackX.Pages.MainScreen
 		{
 			InitializeComponent ();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            if (GHApp.DarkMode)
+            {
+                lblHeader.TextColor = GHColors.White;
+                EmptyLabel.TextColor = GHColors.White;
+            }
         }
 
         private async void Button_Clicked(object sender, EventArgs e)
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         Dictionary<int, StoredManual> _manuals = new Dictionary<int, StoredManual>();
@@ -78,32 +86,44 @@ namespace GnollHackX.Pages.MainScreen
             }
 
             int maxManuals = GHApp.GnollHackService.GetMaxManuals();
+            int firstCatalogue = GHApp.GnollHackService.GetFirstCatalogue();
+            int numCatalogues = GHApp.GnollHackService.GetNumCatalogues();
             List<StoredManual> manuallist = _manuals.Values.ToList();
-            if(manuallist.Count > 0)
+            lblSubtitle.Text = "Found " + manuallist.Count + " of " + maxManuals + " manuals";
+            if (manuallist.Count > 0)
             {
                 Comparison<StoredManual> comp = new Comparison<StoredManual>((m1, m2) => { return string.Compare(m1.Name, m2.Name); });
                 manuallist.Sort(comp);
                 foreach (StoredManual sm in manuallist)
                 {
                     RowImageButton rib = new RowImageButton();
-                    rib.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.examine.png";
+                    if(sm.Id >= firstCatalogue && sm.Id < firstCatalogue + numCatalogues)
+                        rib.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.catalogue.png";
+                    else
+                        rib.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.manual.png";
+                    rib.ImgHighFilterQuality = true;
                     rib.LblText = sm.Name;
+                    rib.LblTextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
                     rib.LblFontSize = 17;
                     rib.ImgWidth = 80;
                     rib.ImgHeight = 80;
                     rib.GridWidth = 480;
                     rib.GridHeight = 80;
+#if GNH_MAUI
+                    rib.MaximumWidthRequest = 480;
+#else
                     rib.WidthRequest = 480;
+#endif
                     rib.HeightRequest = 80;
                     rib.GridMargin = new Thickness(rib.ImgWidth / 15, 0);
                     rib.BtnCommand = sm.Id;
                     rib.BtnClicked += LibraryButton_Clicked;
                     LibraryLayout.Children.Add(rib);
                 }
-                lblSubtitle.Text = "Found " + manuallist.Count + " of " + maxManuals + " manuals";
             }
             else
                 EmptyLabel.IsVisible = true;
+
         }
 
         private async void LibraryButton_Clicked(object sender, EventArgs e)
@@ -121,7 +141,7 @@ namespace GnollHackX.Pages.MainScreen
                     dispfilepage.UseFixedFontSize = true;
                     dispfilepage.FontSize = 14;
                     if (dispfilepage.ReadFile(out errormsg))
-                        await App.Current.MainPage.Navigation.PushModalAsync(dispfilepage);
+                        await GHApp.Navigation.PushModalAsync(dispfilepage);
                     else
                         await DisplayAlert("Error Reading Manual", "Reading the manual entitled " + sm.Name + " failed: " + errormsg, "OK");
                 }
@@ -151,7 +171,7 @@ namespace GnollHackX.Pages.MainScreen
             if (!_backPressed)
             {
                 _backPressed = true;
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             return false;
         }

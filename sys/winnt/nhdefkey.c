@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    nhdefkey.c    $NHDT-Date: 1432512793 2015/05/25 00:13:13 $  $NHDT-Branch: master $:$NHDT-Revision: 1.14 $ */
 /* Copyright (c) GnollHack PC Development Team 2003                      */
@@ -258,8 +258,7 @@ INPUT_RECORD *ir;
                 }
 
             } else if ((ir->EventType == MOUSE_EVENT
-                        && (ir->Event.MouseEvent.dwButtonState
-                            & MOUSEMASK))) {
+                        && (ir->Event.MouseEvent.dwButtonState & MOUSEMASK))) {
                 done = 1;
                 retval = 1;
             }
@@ -317,14 +316,11 @@ coord *cc;
                         cc->y = ir->Event.MouseEvent.dwMousePosition.Y - 1;
 
                         if (ir->Event.MouseEvent.dwButtonState & LEFTBUTTON)
-                            *mod = CLICK_1;
-                        else if (ir->Event.MouseEvent.dwButtonState
-                                 & RIGHTBUTTON)
-                            *mod = CLICK_2;
-#if 0 /* middle button */
+                            *mod = CLICK_PRIMARY;
+                        else if (ir->Event.MouseEvent.dwButtonState & RIGHTBUTTON)
+                            *mod = CLICK_SECONDARY;
                     else if (ir->Event.MouseEvent.dwButtonState & MIDBUTTON)
-                          *mod = CLICK_3;
-#endif
+                          *mod = CLICK_TERTIARY;
                         return 0;
                     }
                 }

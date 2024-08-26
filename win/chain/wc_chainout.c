@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	wc_chainout.c	$NHDT-Date: 1433806611 2015/06/08 23:36:51 $  $NHDT-Branch: master $:$NHDT-Revision: 1.7 $ */
 /* Copyright (c) Kenneth Lorber, 2012				  */
@@ -468,7 +468,7 @@ void *vp;
 int style, attr, color, glyph;
 const char *title, *query, *resp, *resp_desc, *introline;
 char def;
-unsigned long ynflags;
+uint64_t ynflags;
 {
     struct chainout_data *tdp = vp;
     int rv;
@@ -546,7 +546,7 @@ void
 chainout_change_color(vp, color, value, reverse)
 void *vp;
 int color;
-long value;
+int64_t value;
 int reverse;
 {
     struct chainout_data *tdp = vp;
@@ -698,7 +698,7 @@ chainout_status_update(vp, idx, ptr, chg, percent, color, colormasks)
 void *vp;
 int idx, chg, percent, color;
 genericptr_t ptr;
-unsigned long *colormasks;
+uint64_t *colormasks;
 {
     struct chainout_data *tdp = vp;
 

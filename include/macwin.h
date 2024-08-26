@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	macwin.h	$NHDT-Date: 1447755970 2015/11/17 10:26:10 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -242,7 +242,7 @@ E void FDECL(mac_cliparound, (int, int, BOOLEAN_P));
 E int NDECL(mac_nhgetch);
 E int FDECL(mac_nh_poskey, (int *, int *, int *));
 E int NDECL(mac_doprev_message);
-E char FDECL(mac_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+E char FDECL(mac_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, uint64_t));
 E void FDECL(mac_getlin_ex, (int, int, int, const char *, char *, const char*, const char*, const char*));
 E int NDECL(mac_get_ext_cmd);
 E void FDECL(mac_number_pad, (int));

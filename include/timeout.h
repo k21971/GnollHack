@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    timeout.h    $NHDT-Date: 1432512775 2015/05/25 00:12:55 $  $NHDT-Branch: master $:$NHDT-Revision: 1.10 $ */
 /* Copyright 1994, Dean Luick                      */
@@ -7,8 +7,10 @@
 #ifndef TIMEOUT_H
 #define TIMEOUT_H
 
+#include "wintype.h"
+
 /* generic timeout function */
-typedef void FDECL((*timeout_proc), (ANY_P *, long));
+typedef void FDECL((*timeout_proc), (ANY_P *, int64_t));
 
 /* kind of timer */
 enum timer_type {
@@ -45,12 +47,12 @@ enum timeout_types {
 /* used in timeout.c */
 typedef struct fe {
     struct fe *next;          /* next item in chain */
-    long timeout;             /* when we time out */
-    unsigned long tid;        /* timer ID */
+    int64_t timeout;             /* when we time out */
+    uint64_t tid;        /* timer ID */
     short kind;               /* kind of use */
     short func_index;         /* what to call when we time out */
     anything arg;             /* pointer to timeout argument */
-    Bitfield(needs_fixup, 1); /* does arg need to be patched? */
+    boolean needs_fixup; /* does arg need to be patched? */
 } timer_element;
 
 #endif /* TIMEOUT_H */

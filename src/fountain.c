@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    fountain.c    $NHDT-Date: 1544442711 2018/12/10 11:51:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /*      Copyright Scott R. Turner, srt@ucla, 10/27/86 */
@@ -1142,7 +1142,7 @@ register struct obj *obj;
         case 28: /* Strange feeling */
             pline_ex(ATR_NONE, CLR_MSG_WARNING, "An urge to take a bath overwhelms you.");
             {
-                long money = money_cnt(invent);
+                int64_t money = money_cnt(invent);
                 struct obj *otmp;
                 if (money > 10) {
                     /* Amount to lose.  Might get rounded up as fountains don't
@@ -1150,8 +1150,8 @@ register struct obj *obj;
                     money = somegold(money) / 10;
                     for (otmp = invent; otmp && money > 0; otmp = otmp->nobj)
                         if (otmp->oclass == COIN_CLASS) {
-                            long denomination = objects[otmp->otyp].oc_cost;
-                            long coin_loss =
+                            int64_t denomination = objects[otmp->otyp].oc_cost;
+                            int64_t coin_loss =
                                 (money + denomination - 1) / denomination;
                             coin_loss = min(coin_loss, otmp->quan);
                             otmp->quan -= coin_loss;
@@ -1173,7 +1173,7 @@ register struct obj *obj;
             if (FOUNTAIN_IS_LOOTED(u.ux, u.uy))
                 break;
             SET_FOUNTAIN_LOOTED(u.ux, u.uy);
-            (void) mkgold((long) (rnd((dunlevs_in_dungeon(&u.uz) - dunlev(&u.uz)
+            (void) mkgold((int64_t) (rnd((dunlevs_in_dungeon(&u.uz) - dunlev(&u.uz)
                                        + 1) * 2) + 5),
                           u.ux, u.uy);
             if (!Blind)

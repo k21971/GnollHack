@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhrip.c    $NHDT-Date: 1432512812 2015/05/25 00:13:32 $  $NHDT-Branch: master $:$NHDT-Revision: 1.19 $ */
 /* Copyright (C) 2001 by Alex Kompel      */
@@ -268,8 +268,8 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         PMSNHMsgPutstr msg_data = (PMSNHMsgPutstr) lParam;
         TCHAR wbuf[BUFSZ];
         size_t text_size;
-        char msgbuf[BUFSIZ] = "";
-        write_CP437_to_buf_unicode(msgbuf, BUFSIZ, msg_data->text);
+        char msgbuf[BUFSZ * 4] = "";
+        write_CP437_to_buf_unicode(msgbuf, BUFSZ * 4, msg_data->text);
 
         if (!data->window_text) {
             text_size = strlen(msgbuf) + 4;

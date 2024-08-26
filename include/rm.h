@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    rm.h    $NHDT-Date: 1547255911 2019/01/12 01:18:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.60 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -8,11 +8,10 @@
 #ifndef RM_H
 #define RM_H
 
+#include "color.h"
+#include "general.h"
 #include "layer.h"
 #include "soundset.h"
-#include "general.h"
-#include "color.h"
-
 
  /*
  * The screen symbols may be the default or defined at game startup time.
@@ -429,7 +428,7 @@ struct decoration_type_definition {
     schar color;
     schar color_filled;
     enum location_soundset_types soundset;
-    unsigned long dflags;
+    uint64_t dflags;
 };
 
 extern NEARDATA const struct decoration_type_definition decoration_type_definitions[MAX_DECORATIONS];
@@ -474,7 +473,7 @@ enum banner_types {
 struct banner_definition {
     const char* name;
     const char* description;
-    long cost;
+    int64_t cost;
 };
 extern NEARDATA struct banner_definition banner_definitions[MAX_BANNERS];
 
@@ -517,7 +516,7 @@ struct painting_definition {
     const char* artist;  /* a painting of description by artist */
     const char* paint_date; /* known painting date */
     const char* provenance; /* list of notable previous owners */
-    long cost;
+    int64_t cost;
 };
 extern NEARDATA struct painting_definition painting_definitions[MAX_PAINTINGS];
 
@@ -726,7 +725,7 @@ struct door_subtype_definition {
     const char* short_description;
     enum obj_material_types material;
     enum location_soundset_types soundset;
-    unsigned long flags;
+    uint64_t flags;
 };
 
 #define DSTFLAGS_NONE                                       0x00000000
@@ -813,7 +812,7 @@ struct tree_subtype_definition {
     short fruit_drop_p;
     short burning_subtype;
     short burnt_subtype;
-    unsigned long tree_flags;
+    uint64_t tree_flags;
 };
 
 #define TREE_FLAGS_NONE                     0x00000000
@@ -1053,10 +1052,9 @@ struct symsetentry {
     char *desc;               /* ptr to description                   */
     int idx;                  /* an index value                       */
     int handling;             /* known handlers value                 */
-    Bitfield(nocolor, 1);     /* don't use color if set               */
-    Bitfield(primary, 1);     /* restricted for use as primary set    */
-    Bitfield(rogue, 1);       /* restricted for use as rogue lev set  */
-                              /* 5 free bits */
+    boolean nocolor;          /* don't use color if set               */
+    boolean primary;          /* restricted for use as primary set    */
+    boolean rogue;            /* restricted for use as rogue lev set  */
 };
 
 /*
@@ -1228,7 +1226,8 @@ struct rm {
     short special_quality;   /* For doors, the special quality of the key that unlocks the door */
 
     uchar seenv;             /* seen vector */
-    unsigned short flags;    /* extra information for typ */
+    /* unsigned int to make sure bitfields are aligned properly across platforms */
+    unsigned flags;          /* extra information for typ */
     Bitfield(horizontal, 1); /* wall/door/etc is horiz. (more typ info) */
     Bitfield(lit, 1);        /* speed hack for lit rooms */
     Bitfield(waslit, 1);     /* remember if a location was lit */
@@ -1246,11 +1245,13 @@ struct rm {
     Bitfield(click_kick_ok, 1); /* No query when clicking to kick  */
 };
 
-#define DECORATION_FLAGS_NONE               ((uchar)0x00)
-#define DECORATION_FLAGS_ITEM_IN_HOLDER     ((uchar)0x01)
-#define DECORATION_FLAGS_ITEM2_IN_HOLDER    ((uchar)0x02)
-#define DECORATION_FLAGS_ITEM3_IN_HOLDER    ((uchar)0x04)
-#define DECORATION_FLAGS_SEEN               ((uchar)0x08)
+#define DECORATION_FLAGS_NONE                   ((uchar)0x00)
+#define DECORATION_FLAGS_ITEM_IN_HOLDER         ((uchar)0x01)
+#define DECORATION_FLAGS_ITEM2_IN_HOLDER        ((uchar)0x02)
+#define DECORATION_FLAGS_ITEM3_IN_HOLDER        ((uchar)0x04)
+#define DECORATION_FLAGS_SEEN                   ((uchar)0x08)
+#define DECORATION_FLAGS_HORIZONTAL_MIRRORING   ((uchar)0x10)
+#define DECORATION_FLAGS_VERTICAL_MIRRORING     ((uchar)0x20)
 
 #define SET_TYPLIT(x, y, ttyp, tsubtyp, llit)                              \
     {                                                             \
@@ -1383,7 +1384,7 @@ struct rm {
 
 struct damage {
     struct damage *next;
-    long when, cost;
+    int64_t when, cost;
     coord place;
     schar typ;
 };
@@ -1424,8 +1425,8 @@ struct levelflags {
     schar boundary_type; /* floor style to replace boundary tiles */
 
     uchar tileset;
-    uchar nfountains; /* number of fountains on level */
-    uchar nsinks;     /* number of sinks on the level */
+    unsigned nfountains; /* number of fountains on level */
+    unsigned nsinks;     /* number of sinks on the level */
     /* Several flags that give hints about what's on the level */
     Bitfield(has_tileset, 1);
 
@@ -1466,6 +1467,11 @@ struct levelflags {
                                   rather than ROOM */
     Bitfield(mapping_does_not_reveal_special, 1); /* Magic mapping does not reveal the special nature of the level */
     Bitfield(no_special_level_naming_checks, 1);
+
+    unsigned reserved;
+    unsigned reserved2;
+    unsigned reserved3;
+    unsigned reserved4;
 };
 
 typedef struct {

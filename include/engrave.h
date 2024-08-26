@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    engrave.h    $NHDT-Date: 1432512777 2015/05/25 00:12:57 $  $NHDT-Branch: master $:$NHDT-Revision: 1.8 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -12,8 +12,8 @@ struct engr {
     struct engr *nxt_engr;
     char *engr_txt;
     xchar engr_x, engr_y;
-    size_t engr_lth; /* for save & restore; not length of text */
-    long engr_time;    /* moment engraving was (will be) finished */
+    uint64_t engr_lth; /* for save & restore; not length of text */
+    int64_t engr_time;    /* moment engraving was (will be) finished */
     xchar engr_type;
 #define DUST 1
 #define ENGRAVE 2

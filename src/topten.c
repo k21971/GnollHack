@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    topten.c    $NHDT-Date: 1450451497 2015/12/18 15:11:37 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -26,7 +26,7 @@
  * which reads the scores will ignore it.
  */
 #ifdef UPDATE_RECORD_IN_PLACE
-STATIC_VAR long final_fpos;
+STATIC_VAR int64_t final_fpos;
 #endif
 
 #define done_stopprint program_state.stopprint
@@ -43,13 +43,13 @@ STATIC_VAR long final_fpos;
 struct toptenentry {
     struct toptenentry *tt_next;
 #ifdef UPDATE_RECORD_IN_PLACE
-    long fpos;
+    int64_t fpos;
 #endif
-    long points;
+    int64_t points;
     int deathdnum, deathlev;
     int maxlvl, hp, maxhp, deaths;
     int ver_major, ver_minor, patchlevel;
-    long deathdate, birthdate;
+    int64_t deathdate, birthdate;
     int uid;
     char plrole[ROLESZ + 1];
     char plrace[ROLESZ + 1];
@@ -72,7 +72,7 @@ STATIC_DCL void FDECL(writeentry, (FILE *, struct toptenentry *));
 #ifdef XLOGFILE
 STATIC_DCL void FDECL(print_xlog_entry, (char*, struct toptenentry*, int));
 STATIC_DCL void FDECL(writexlentry, (FILE *, struct toptenentry *, int));
-STATIC_DCL long NDECL(encodexlogflags);
+STATIC_DCL int64_t NDECL(encodexlogflags);
 STATIC_DCL void FDECL(add_achieveX, (char*, const char*, BOOLEAN_P));
 STATIC_DCL char* NDECL(encode_extended_achievements);
 STATIC_DCL char* NDECL(encode_extended_conducts);
@@ -103,8 +103,8 @@ boolean incl_helpless;
         "drowned in ", "drowned by ", "burned by ", "dissolved in ", "crushed to death by ", "strangled to death by ", "suffocated by ",
         /* STONING, DISINTEGRATION, TURNED_SLIME, ILLNESS, ROTTED, GENOCIDED,   */
         "petrified by ", "disintegrated by ", "turned to slime by ", "died of an illness contracted by ", "died of mummy rot contracted by ", "killed by ",
-        /* PANICKED, TRICKED, QUIT, ESCAPED, ASCENDED */
-        "", "", "", "", ""
+        /* PANICKED, TRICKED, QUIT, ESCAPED, ASCENDED, SNAPSHOT */
+        "", "", "", "", "", ""
     };
     size_t l;
     char c, *kname = killer.name;
@@ -341,10 +341,10 @@ struct toptenentry *tt;
 #endif
 }
 
-long
+int64_t
 encodeconduct()
 {
-    long e = 0L;
+    int64_t e = 0L;
 
     if (!u.uconduct.food)
         e |= 1L << 0;
@@ -368,20 +368,26 @@ encodeconduct()
         e |= 1L << 9;
     if (!u.uconduct.wisharti)
         e |= 1L << 10;
-    if (!num_genocides())
+    if (!u.uconduct.genocides)
         e |= 1L << 11;
     if (u.uroleplay.blind)
         e |= 1L << 12;
     if (u.uroleplay.nudist)
         e |= 1L << 13;
+    if (!u.uconduct.elbereths)
+        e |= 1L << 14;
+    if (!u.uconduct.conflicts)
+        e |= 1L << 15;
+    if (!u.umortality)
+        e |= 1L << 16;
 
     return e;
 }
 
-long
+int64_t
 encodeachieve()
 {
-    long r = 0L;
+    int64_t r = 0L;
 
     if (u.uachieve.bell)
         r |= 1L << 0;
@@ -480,13 +486,13 @@ int how;
 //#else
 //    Sprintf(eos(buffer), "%cplatform=%s", XLOG_SEP, "unknown");
 //#endif
-    Sprintf(eos(buffer), "%cpoints=%ld%cdeathdnum=%d%cdeathlev=%d", XLOG_SEP,
-        tt->points, XLOG_SEP, tt->deathdnum, XLOG_SEP, tt->deathlev);
+    Sprintf(eos(buffer), "%cpoints=%lld%cdeathdnum=%d%cdeathlev=%d", XLOG_SEP,
+        (long long)tt->points, XLOG_SEP, tt->deathdnum, XLOG_SEP, tt->deathlev);
     Sprintf(eos(buffer), "%cmaxlvl=%d%chp=%d%cmaxhp=%d", XLOG_SEP, tt->maxlvl,
         XLOG_SEP, tt->hp, XLOG_SEP, tt->maxhp);
-    Sprintf(eos(buffer), "%cdeaths=%d%cdeathdate=%ld%cbirthdate=%ld%cuid=%d",
-        XLOG_SEP, tt->deaths, XLOG_SEP, tt->deathdate, XLOG_SEP,
-        tt->birthdate, XLOG_SEP, tt->uid);
+    Sprintf(eos(buffer), "%cdeaths=%d%cdeathdate=%lld%cbirthdate=%lld%cuid=%d",
+        XLOG_SEP, tt->deaths, XLOG_SEP, (long long)tt->deathdate, XLOG_SEP,
+        (long long)tt->birthdate, XLOG_SEP, tt->uid);
     Sprintf(eos(buffer), "%crole=%s%crace=%s%cgender=%s%calign=%s", XLOG_SEP,
         tt->plrole, XLOG_SEP, tt->plrace, XLOG_SEP, tt->plgend, XLOG_SEP,
         tt->plalign);
@@ -497,24 +503,32 @@ int how;
     if (multi)
         Sprintf(eos(buffer), "%cwhile=%s", XLOG_SEP,
             multi_reason ? multi_reason : "helpless");
-    Sprintf(eos(buffer), "%cconduct=0x%lx%cturns=%ld%cachieve=0x%lx", XLOG_SEP,
-        encodeconduct(), XLOG_SEP, moves, XLOG_SEP, encodeachieve());
+    Sprintf(eos(buffer), "%cconduct=0x%llx%cturns=%lld%cachieve=0x%llx", XLOG_SEP,
+        (long long)encodeconduct(), XLOG_SEP, (long long)moves, XLOG_SEP, (long long)encodeachieve());
     Sprintf(eos(buffer), "%cachieveX=%s", XLOG_SEP, encode_extended_achievements());
     Sprintf(eos(buffer), "%cconductX=%s", XLOG_SEP, encode_extended_conducts());
-    lock_thread_lock();
-    Sprintf(eos(buffer), "%crealtime=%ld%cstarttime=%ld%cendtime=%ld%cstarttimeUTC=%ld%cendtimeUTC=%ld", XLOG_SEP,
-        (long)urealtime.realtime, XLOG_SEP,
-        (long)ubirthday, XLOG_SEP, (long)urealtime.finish_time, XLOG_SEP, (long)convert2UTC(ubirthday), XLOG_SEP, (long)convert2UTC(urealtime.finish_time));
-    unlock_thread_lock();
+    Sprintf(eos(buffer), "%crealtime=%lld%cstarttime=%lld%cendtime=%lld%cstarttimeUTC=%lld%cendtimeUTC=%lld", XLOG_SEP,
+        (long long)urealtime.realtime, XLOG_SEP,
+        (long long)ubirthday, XLOG_SEP, (long long)urealtime.finish_time, XLOG_SEP, (long long)convert2UTC(ubirthday), XLOG_SEP, (long long)convert2UTC(urealtime.finish_time));
     Sprintf(eos(buffer), "%cgender0=%s%calign0=%s", XLOG_SEP,
         genders[flags.initgend].filecode, XLOG_SEP,
         aligns[1 - u.ualignbase[A_ORIGINAL]].filecode);
-    Sprintf(eos(buffer), "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
+    Sprintf(eos(buffer), "%cxplvl=%d", XLOG_SEP, u.ulevel);
+    Sprintf(eos(buffer), "%cflags=0x%llx", XLOG_SEP, (long long)encodexlogflags());
     Sprintf(eos(buffer), "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
     Sprintf(eos(buffer), "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
     Sprintf(eos(buffer), "%cscoring=%s", XLOG_SEP, discover || CasualMode || flags.non_scoring ? "no" : "yes");
     Sprintf(eos(buffer), "%ctournament=%s", XLOG_SEP, TournamentMode ? "yes" : "no");
-    Sprintf(eos(buffer), "%ccollapse=%lu", XLOG_SEP, n_game_recoveries);
+#if 0
+    Sprintf(eos(buffer), "%cservergame=%s", XLOG_SEP, 
+#ifdef DGAMELAUNCH
+        "yes"
+#else
+        "no"
+#endif
+    );
+#endif
+    Sprintf(eos(buffer), "%ccollapse=%llu", XLOG_SEP, (unsigned long long)n_game_recoveries);
     Strcat(buffer, "\n");
 #undef XLOG_SEP
 }
@@ -550,53 +564,12 @@ int how;
 #endif
         issue_gui_command(GUI_CMD_POST_XLOG_ENTRY, GAME_STATUS_RESULT, 0, buf);
     }
-
-//#define XLOG_SEP '\t' /* xlogfile field separator. */
-//    Sprintf(buf, "version=%d.%d.%d", tt->ver_major, tt->ver_minor,
-//            tt->patchlevel);
-//    Sprintf(eos(buf), "%cpoints=%ld%cdeathdnum=%d%cdeathlev=%d", XLOG_SEP,
-//            tt->points, XLOG_SEP, tt->deathdnum, XLOG_SEP, tt->deathlev);
-//    Sprintf(eos(buf), "%cmaxlvl=%d%chp=%d%cmaxhp=%d", XLOG_SEP, tt->maxlvl,
-//            XLOG_SEP, tt->hp, XLOG_SEP, tt->maxhp);
-//    Sprintf(eos(buf), "%cdeaths=%d%cdeathdate=%ld%cbirthdate=%ld%cuid=%d",
-//            XLOG_SEP, tt->deaths, XLOG_SEP, tt->deathdate, XLOG_SEP,
-//            tt->birthdate, XLOG_SEP, tt->uid);
-//    Fprintf(rfile, "%s", buf);
-//    Sprintf(buf, "%crole=%s%crace=%s%cgender=%s%calign=%s", XLOG_SEP,
-//            tt->plrole, XLOG_SEP, tt->plrace, XLOG_SEP, tt->plgend, XLOG_SEP,
-//            tt->plalign);
-//    /* make a copy of death reason that doesn't include ", while helpless" */
-//    formatkiller(tmpbuf, sizeof tmpbuf, how, FALSE);
-//    Fprintf(rfile, "%s%cname=%s%cdeath=%s",
-//            buf, /* (already includes separator) */
-//            XLOG_SEP, plname, XLOG_SEP, tmpbuf);
-//    if (multi)
-//        Fprintf(rfile, "%cwhile=%s", XLOG_SEP,
-//                multi_reason ? multi_reason : "helpless");
-//    Fprintf(rfile, "%cconduct=0x%lx%cturns=%ld%cachieve=0x%lx", XLOG_SEP,
-//            encodeconduct(), XLOG_SEP, moves, XLOG_SEP, encodeachieve());
-//    Fprintf(rfile, "%cachieveX=%s", XLOG_SEP, encode_extended_achievements());
-//    Fprintf(rfile, "%cconductX=%s", XLOG_SEP, encode_extended_conducts());
-//    lock_thread_lock();
-//    Fprintf(rfile, "%crealtime=%ld%cstarttime=%ld%cendtime=%ld", XLOG_SEP,
-//            (long) urealtime.realtime, XLOG_SEP,
-//            (long) ubirthday, XLOG_SEP, (long) urealtime.finish_time);
-//    unlock_thread_lock();
-//    Fprintf(rfile, "%cgender0=%s%calign0=%s", XLOG_SEP,
-//            genders[flags.initgend].filecode, XLOG_SEP,
-//            aligns[1 - u.ualignbase[A_ORIGINAL]].filecode);
-//    Fprintf(rfile, "%cflags=0x%lx", XLOG_SEP, encodexlogflags());
-//    Fprintf(rfile, "%cdifficulty=%d", XLOG_SEP, (int)context.game_difficulty);
-//    Fprintf(rfile, "%cmode=%s", XLOG_SEP, wizard ? "debug" : discover ? "explore" : CasualMode ? (ModernMode ? "casual" : "reloadable") : ModernMode ? "modern" : "normal");
-//    Fprintf(rfile, "%cscoring=%s", XLOG_SEP, discover || CasualMode || flags.non_scoring ? "no" : "yes");
-//    Fprintf(rfile, "\n");
-//#undef XLOG_SEP
 }
 
-STATIC_OVL long
+STATIC_OVL int64_t
 encodexlogflags()
 {
-    long e = 0L;
+    int64_t e = 0L;
 
     if (wizard)
         e |= 1L << 0;
@@ -709,7 +682,10 @@ encode_extended_conducts()
     add_achieveX(buf, "polyselfless", !u.uconduct.polyselfs);
     add_achieveX(buf, "wishless", !u.uconduct.wishes);
     add_achieveX(buf, "artiwishless", !u.uconduct.wisharti);
-    add_achieveX(buf, "genocideless", !num_genocides());
+    add_achieveX(buf, "genocideless", !u.uconduct.genocides);
+    add_achieveX(buf, "elberethless", !u.uconduct.elbereths);
+    add_achieveX(buf, "conflictless", !u.uconduct.conflicts);
+    add_achieveX(buf, "never_died", !u.umortality);
     add_achieveX(buf, "blind", u.uroleplay.blind);
     add_achieveX(buf, "nudist", u.uroleplay.nudist);
 
@@ -909,9 +885,8 @@ time_t when;
                 HUP {
                     char pbuf[BUFSZ];
 
-                    Sprintf(pbuf,
-                        "You didn't beat your previous score of %ld points.",
-                            t1->points);
+                    Sprintf(pbuf, "You didn't beat your previous score of %lld points.",
+                        (long long)t1->points);
                     topten_print(pbuf);
                     topten_print("");
                 }
@@ -1070,7 +1045,7 @@ boolean so;
     else
         Strcat(linebuf, "   ");
 
-    Sprintf(eos(linebuf), " %10ld  %.10s", t1->points ? t1->points : u.u_gamescore,
+    Sprintf(eos(linebuf), " %10lld  %.10s", (long long)(t1->points ? t1->points : u.u_gamescore),
             t1->name);
     Sprintf(eos(linebuf), "-%s", t1->plrole);
     if (t1->plrace[0] != '?')

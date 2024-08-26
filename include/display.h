@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    display.h    $NHDT-Date: 1546212620 2018/12/30 23:30:20 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.29 $ */
 /* Copyright (c) Dean Luick, with acknowledgements to Kevin Darcy */
@@ -8,13 +8,13 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
-#include "vision.h"
-#include "mondata.h" /* for mindless() */
-#include "you.h"
-#include "layer.h"
-#include "general.h"
 #include "animtotals.h"
+#include "general.h"
+#include "layer.h"
+#include "mondata.h" /* for mindless() */
 #include "tiledata.h"
+#include "vision.h"
+#include "you.h"
 
 /* Flags for newsym */
 #define NEWSYM_FLAGS_NONE                               0x00000000UL

@@ -8,15 +8,15 @@
              Appearing="ContentPage_Appearing" 
              Disappearing="ContentPage_Disappearing">
     
-        <Grid HorizontalOptions="Fill" VerticalOptions="Fill">
-            <gnh:BackgroundView x:Name="bkgView" BackgroundStyle="StretchedBitmap" BackgroundBitmap="OldPaper" BorderStyle="Simple" HorizontalOptions="Fill" VerticalOptions="Fill"/>
+        <Grid x:Name="RootGrid" HorizontalOptions="Fill" VerticalOptions="Fill">
+            <gnh:BackgroundView x:Name="bkgView" BackgroundStyle="Automatic" BackgroundBitmap="AutoMenuBackground" BorderStyle="Simple" HorizontalOptions="Fill" VerticalOptions="Fill"/>
             <Grid x:Name="ImportExportGrid" RowSpacing="6" BackgroundColor="Transparent" HorizontalOptions="Fill" VerticalOptions="Fill" >
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Label Grid.Row="0" x:Name="lblHeader" Text="Manage Files" HorizontalTextAlignment="Center" FontSize="Large" FontAttributes="Bold" FontFamily="Diablo" TextColor="Black"
+                <Label Grid.Row="0" x:Name="lblHeader" Text="Manage Files" HorizontalTextAlignment="Center" FontSize="23" FontAttributes="Bold" FontFamily="Diablo" TextColor="Black"
                     HorizontalOptions="CenterAndExpand" VerticalOptions="Fill" Margin="0,10,0,30" />
                 <Grid Grid.Row="1" MaximumWidthRequest="400" HorizontalOptions="Fill" VerticalOptions="Fill">
                     <ScrollView x:Name="ImportExportScrollView" HorizontalOptions="Fill" VerticalOptions="Fill" BackgroundColor="Transparent">
@@ -41,6 +41,8 @@
                                         HorizontalOptions="Center" VerticalOptions="Center"  Clicked="btnExportDumplogs_Clicked" UseVaryingBackgroundImages ="True" />
                             <controls:CustomImageButton x:Name="btnDeleteDumplogs" WidthRequest="320" HeightRequest="50" FontFamily="Diablo" Text="Delete Dumplogs" BackgroundColor="Transparent" TextColor="White"
                                         Margin="0,0,0,16" HorizontalOptions="Center" Clicked="btnDeleteDumplogs_Clicked" UseVaryingBackgroundImages ="True" />
+                            <controls:CustomImageButton x:Name="btnDeleteSnapshots" WidthRequest="320" HeightRequest="50" FontFamily="Diablo" Text="Delete Snapshots" BackgroundColor="Transparent" TextColor="White"
+                                        Margin="0,0,0,16" HorizontalOptions="Center" Clicked="btnDeleteSnapshots_Clicked" UseVaryingBackgroundImages ="True" />
 
                             <controls:CustomImageButton x:Name="btnClearPendingTasks" Text="Clear Pending Tasks" WidthRequest="320" HeightRequest="50" FontFamily="Diablo" BackgroundColor="Transparent" TextColor="White"
                                         HorizontalOptions="Center" VerticalOptions="Center"  Clicked="btnClearPendingTasks_Clicked" UseVaryingBackgroundImages ="True" />

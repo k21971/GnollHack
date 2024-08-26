@@ -2,22 +2,22 @@
 /* Copyright (c) Janne Gustafsson, 2021. */
 /* GnollHack may be freely redistributed.  See license for details. */
 
-#include "config.h"
-#include "layer.h"
-#include "general.h"
-
 #ifndef CALLBACK_H
 #define CALLBACK_H
 
+#include "config.h"
+#include "general.h"
+#include "layer.h"
+
 #ifdef WIN32
 #define __callconv __stdcall
-#define DLL __declspec(dllexport)
-#define OSAPI WINAPI
+#define DLLEXPORT __declspec(dllexport)
 #else
 #define __callconv 
-#define DLL
-#define OSAPI
+#define DLLEXPORT
 #endif
+
+typedef short cschar; /* For use with C# chars in callback functions; assuming (default) value of CharSet.Ansi */
 
 struct objclassdata
 {
@@ -41,34 +41,16 @@ struct objclassdata
 
     uchar is_uchain;
     uchar is_uball;
-    xchar obj_loc_x;
-    xchar obj_loc_y;
+    schar obj_loc_x;
+    schar obj_loc_y;
 };
 
  /* General callback types */
 typedef void(__callconv* VoidVoidCallback)();
-typedef void(__callconv* VoidCharCallback)(char*);
 typedef void(__callconv* VoidConstCharCallback)(const char*);
-typedef int(__callconv* IntIntCallback)(int);
 typedef void(__callconv* VoidIntCallback)(int);
-typedef void(__callconv* VoidIntIntBooleanCallback)(int, int, BOOLEAN_P);
-typedef void(__callconv* VoidIntIntIntCallback)(int, int, int);
-typedef void(__callconv* VoidIntBooleanCallback)(int, UCHAR_P);
-typedef void(__callconv* VoidIntIntConstCharCallback)(int, int, const char*);
-typedef void(__callconv* PutStrExColorCallback)(int, const char*, int, int, int);
-typedef void(__callconv* PutStrEx2ColorCallback)(int, const char*, const char*, const char*, int, int, int);
-typedef void(__callconv* VoidConstCharIntCallback)(const char*, int);
-typedef void(__callconv* VoidConstCharBooleanCallback)(const char*, BOOLEAN_P);
 typedef int(__callconv* IntVoidCallback)();
-typedef unsigned char(__callconv* BooleanVoidCallback)();
 typedef char*(__callconv* CharVoidCallback)();
-typedef unsigned char(__callconv* BooleanIntDoubleCallback)(int, double);
-typedef unsigned char(__callconv* BooleanIntDoubleVoidPtrCallback)(int, double, void*);
-typedef unsigned char(__callconv* BooleanVoidPtrDoubleCallback)(void* , double);
-typedef unsigned char(__callconv* BooleanVoidPtrCallback)(void*);
-typedef int(__callconv* GetLineCallback)(int, int, int, const char*, const char*, const char*, const char*, char*);
-typedef char*(__callconv* CharPtrBooleanCallback)(BOOLEAN_P);
-typedef void(__callconv* VoidIntConstCharPtrConstCharPtrBooleanCallback)(int, const char*, const char*, UCHAR_P);
 
 /* Specific callback types */
 typedef VoidVoidCallback InitWindowsCallback;
@@ -78,28 +60,30 @@ typedef VoidVoidCallback GetEventCallback;
 typedef VoidConstCharCallback ExitWindowsCallback;
 typedef VoidConstCharCallback SuspendWindowsCallback;
 typedef VoidVoidCallback ResumeWindowsCallback;
-typedef int(__callconv* CreateWindowCallback)(int, int, int, UCHAR_P, struct obj*, struct objclassdata*);
+typedef int(__callconv* CreateWindowCallback)(int, int, int, uchar, struct obj*, struct objclassdata*);
 typedef VoidIntCallback ClearWindowCallback;
-typedef VoidIntBooleanCallback DisplayWindowCallback;
+typedef void(__callconv* DisplayWindowCallback)(int, uchar);
 typedef VoidIntCallback DestroyWindowCallback;
-typedef VoidIntIntIntCallback CursCallback;
+typedef void(__callconv* CursCallback)(int, int, int);
+typedef void(__callconv* PutStrExColorCallback)(int, const char*, int, int, int);
+typedef void(__callconv* PutStrEx2ColorCallback)(int, const char*, const char*, const char*, int, int, int);
 typedef PutStrExColorCallback PutStrExCallback;
 typedef PutStrEx2ColorCallback PutStrEx2Callback;
 typedef PutStrExColorCallback PutMixedCallback;
-typedef VoidConstCharBooleanCallback DisplayFileCallback;
+typedef void(__callconv* DisplayFileCallback)(const char*, uchar);
 typedef void(__callconv* StartMenuCallback)(int, int);
-typedef void(__callconv* AddMenuCallback)(int, int, long long, CHAR_P, CHAR_P, int, int, const char*, UCHAR_P);
-typedef void(__callconv* AddExtendedMenuCallback)(int, int, long long, CHAR_P, CHAR_P, int, int, const char*, UCHAR_P, int,
-    unsigned long long, unsigned long long, CHAR_P, CHAR_P, unsigned long, UCHAR_P, int, struct obj*, struct objclassdata*);
+typedef void(__callconv* AddMenuCallback)(int, int, int64_t, cschar, cschar, int, int, const char*, uchar);
+typedef void(__callconv* AddExtendedMenuCallback)(int, int, int64_t, cschar, cschar, int, int, const char*, uchar, int,
+    uint64_t, uint64_t, cschar, cschar, uint64_t, uchar, int, struct obj*, struct objclassdata*, const char*, const char*);
 typedef void(__callconv* EndMenuCallback)(int, const char*, const char*);
-typedef int(__callconv* SelectMenuCallback)(int, int, long long**, int*);
+typedef int(__callconv* SelectMenuCallback)(int, int, int64_t**, int*);
 typedef void(__callconv* MessageMenuCallback)(int);
 typedef VoidVoidCallback UpdateInventoryCallback;
 typedef VoidVoidCallback MarkSynchCallback;
 typedef VoidVoidCallback WaitSynchCallback;
-typedef VoidIntIntBooleanCallback ClipAroundCallback;
-typedef VoidCharCallback UpdatePositionBarCallback;
-typedef void(__callconv* PrintGlyphCallback)(int, int, int, int, int, long, int, unsigned long, struct layer_info*);
+typedef void(__callconv* ClipAroundCallback)(int, int, uchar);
+typedef void(__callconv* UpdatePositionBarCallback)(char*);
+typedef void(__callconv* PrintGlyphCallback)(int, int, int, int, int, int32_t, int, uint32_t, struct layer_info*);
 typedef void(__callconv* IssueGuiCommandCallback)(int, int, int, const char*);
 typedef VoidConstCharCallback RawPrintCallback;
 typedef VoidConstCharCallback RawPrintBoldCallback;
@@ -107,7 +91,8 @@ typedef IntVoidCallback GetChCallback;
 typedef int(__callconv* PosKeyCallback)(int*, int*, int*);
 typedef VoidVoidCallback BellCallback;
 typedef IntVoidCallback DoPrevMessageCallback;
-typedef int(__callconv* YnFunctionCallback)(int, int, int, int, const char*, const char*, const char*, const char*, const char*, const char*, unsigned long);
+typedef int(__callconv* GetLineCallback)(int, int, int, const char*, const char*, const char*, const char*, char*);
+typedef int(__callconv* YnFunctionCallback)(int, int, int, int, const char*, const char*, const char*, const char*, const char*, const char*, uint64_t);
 typedef IntVoidCallback GetExtCmdCallback;
 typedef VoidIntCallback NumberPadCallback;
 typedef VoidVoidCallback DelayOutputCallback;
@@ -121,48 +106,48 @@ typedef VoidVoidCallback StartScreenCallback;
 typedef VoidVoidCallback EndScreenCallback;
 typedef void(__callconv* OutRipCallback)(int, char*, int, char*, char*);
 typedef VoidConstCharCallback PreferenceUpdateCallback;
-typedef int (__callconv* GetMsgHistoryCallback)(char*, char*, char*, BOOLEAN_P);
-typedef void(__callconv* PutMsgHistoryCallback)(const char*, const char*, const char*, BOOLEAN_P);
+typedef int (__callconv* GetMsgHistoryCallback)(char*, char*, char*, uchar);
+typedef void(__callconv* PutMsgHistoryCallback)(const char*, const char*, const char*, uchar);
 typedef VoidIntCallback StatusInitCallback;
 typedef VoidVoidCallback StatusFinishCallback;
-typedef VoidIntConstCharPtrConstCharPtrBooleanCallback StatusEnableFieldCallback;
-typedef void(__callconv* StatusUpdateCallback)(int, char*, long, int, int, int, short*);
-typedef BooleanVoidCallback CanSuspendYesCallback;
+typedef void(__callconv* StatusEnableFieldCallback)(int, const char*, const char*, uchar);
+typedef void(__callconv* StatusUpdateCallback)(int, char*, int64_t, int, int, int, short*);
+typedef uchar(__callconv* CanSuspendYesCallback)();
 typedef VoidVoidCallback StretchWindowCallback;
-typedef void(__callconv* SetAnimationTimerCallback)(unsigned long);
+typedef void(__callconv* SetAnimationTimerCallback)(uint64_t);
 typedef int(__callconv* OpenSpecialViewCallback)(int, const char*, const char*, int, int);
 typedef int(__callconv* StopAllSoundsCallback)(unsigned int, unsigned int);
-typedef int(__callconv* PlayImmediateSoundCallback)(int, const char*, int, double, double, const char**, float*, int, int, int, unsigned int, unsigned long);
+typedef int(__callconv* PlayImmediateSoundCallback)(int, const char*, int, double, double, const char**, float*, int, int, int, uint32_t, uint32_t);
 typedef int(__callconv* PlayMusicCallback)(int, const char*, int, double, double);
 typedef PlayMusicCallback PlayOccupationAmbientCallback;
 typedef PlayMusicCallback PlayEffectAmbientCallback;
 typedef int(__callconv* SetEffectAmbientVolumeCallback)(double);
 typedef PlayMusicCallback PlayLevelAmbientCallback;
 typedef PlayMusicCallback PlayEnvironmentAmbientCallback;
-typedef unsigned char(__callconv* AdjustGeneralVolumesCallback)(double, double, double, double, double, double);
-typedef int(__callconv* AddAmbientSoundCallback)(int, const char*, int, double, double, unsigned long long*);
-typedef int(__callconv* DeleteAmbientSoundCallback)(unsigned long long);
-typedef int(__callconv* SetAmbientVolumeCallback)(unsigned long long, double);
+typedef uchar(__callconv* AdjustGeneralVolumesCallback)(double, double, double, double, double, double);
+typedef int(__callconv* AddAmbientSoundCallback)(int, const char*, int, double, double, uint64_t*);
+typedef int(__callconv* DeleteAmbientSoundCallback)(uint64_t);
+typedef int(__callconv* SetAmbientVolumeCallback)(uint64_t, double);
 typedef void(__callconv* ClearContextMenuCallback)(void);
 typedef void(__callconv* AddContextMenuCallback)(int, int, int, int, const char*, const char*, int, int);
-typedef void(__callconv* UpdateStatusButtonCallback)(int, int, int, unsigned long);
-typedef void(__callconv* ToggleAnimationTimerCallback)(int, int, int, int, int, int, unsigned long);
-typedef void(__callconv* DisplayFloatingTextCallback)(int, int, const char*, int, int, int, unsigned long);
-typedef void(__callconv* DisplayScreenTextCallback)(const char*, const char*, const char*, int, int, int, unsigned long);
-typedef void(__callconv* DisplayPopupTextCallback)(const char*, const char*, int, int, int, int, unsigned long);
-typedef void(__callconv* DisplayGUIEffectCallback)(int, int, int, int, int, int, unsigned long);
+typedef void(__callconv* UpdateStatusButtonCallback)(int, int, int, uint64_t);
+typedef void(__callconv* ToggleAnimationTimerCallback)(int, int, int, int, int, int, uint64_t);
+typedef void(__callconv* DisplayFloatingTextCallback)(int, int, const char*, int, int, int, uint64_t);
+typedef void(__callconv* DisplayScreenTextCallback)(const char*, const char*, const char*, int, int, int, uint64_t);
+typedef void(__callconv* DisplayPopupTextCallback)(const char*, const char*, int, int, int, int, uint64_t);
+typedef void(__callconv* DisplayGUIEffectCallback)(int, int, int, int, int, int, uint64_t);
 typedef void(__callconv* UpdateCursorCallback)(int, int, int);
 typedef int(__callconv* UIHasInputCallback)(void);
 typedef void(__callconv* ExitHackCallback)(int);
 
 typedef char*(__callconv* GetCwdCallback)();
 typedef int (__callconv* MessageBoxCallback)(char*, char*, unsigned int);
-typedef void(__callconv* FreeMemoryCallback)(long long**);
+typedef void(__callconv* FreeMemoryCallback)(int64_t**);
 typedef void (__callconv* ReportPlayerNameCallback)(char*);
-typedef void (__callconv* ReportPlayTimeCallback)(long, long);
-typedef void(__callconv* SendObjectDataCallback)(int, int, struct obj*, int, int, struct objclassdata*, unsigned long);
-typedef void(__callconv* SendMonsterDataCallback)(int, int, int, struct monst_info*, unsigned long);
-typedef void(__callconv* SendEngravingDataCallback)(int, int, int, const char*, int, unsigned long, unsigned long);
+typedef void (__callconv* ReportPlayTimeCallback)(int64_t, int64_t);
+typedef void(__callconv* SendObjectDataCallback)(int, int, struct obj*, int, int, struct objclassdata*, uint64_t);
+typedef void(__callconv* SendMonsterDataCallback)(int, int, int, struct monst_info*, uint64_t);
+typedef void(__callconv* SendEngravingDataCallback)(int, int, int, const char*, int, uint64_t, uint64_t);
 
 struct callback_procs {
     InitWindowsCallback callback_init_nhwindows;
@@ -263,8 +248,6 @@ struct callback_procs {
     SendEngravingDataCallback callback_send_engraving_data;
 };
 
-
-extern int common_player_selection();
 extern struct objclassdata get_objclassdata(struct obj* otmp);
 
 #endif /* CALLBACK_H */

@@ -100,12 +100,24 @@ namespace GnollHackX
 
         public void CheckStartAnimation()
         {
-            if (ActiveGlyphImageSource != null && GHApp.Glyph2Tile != null && GHApp.Tile2Animation != null)
+            if (ActiveGlyphImageSource != null)
             {
                 int glyph = ActiveGlyphImageSource.Glyph;
                 int absglyph = Math.Abs(glyph);
-                int tile = absglyph < GHApp.Glyph2Tile.Length ? GHApp.Glyph2Tile[absglyph] : 0;
-                short anim = tile < GHApp.Tile2Animation.Length ? GHApp.Tile2Animation[tile] : (short)0;
+                int tile = 0;
+                short anim = 0;
+                //lock (GHApp.Glyph2TileLock)
+                //{
+                    if (GHApp.Glyph2Tile == null || GHApp.Tile2Animation == null)
+                    {
+                        if (_TimerOn)
+                            _StopAnimation = true;
+                        return;
+                    }
+                    tile = absglyph < GHApp.Glyph2Tile.Length ? GHApp.Glyph2Tile[absglyph] : 0;
+                    anim = tile < GHApp.Tile2Animation.Length ? GHApp.Tile2Animation[tile] : (short)0;
+                //}
+
                 long _refreshFrequency = (long)Math.Min(60, UIUtils.GetAuxiliaryCanvasAnimationFrequency());
                 if(anim > 0 &&  !_TimerOn)
                 {
@@ -137,15 +149,25 @@ namespace GnollHackX
 
         private bool DoStartCheck()
         {
-            if (ActiveGlyphImageSource == null || GHApp.Glyph2Tile == null || GHApp.Tile2Animation == null || _StopAnimation)
+            if (ActiveGlyphImageSource == null || _StopAnimation)
             {
                 _TimerOn = false;
                 return false;
             }
             int glyph = ActiveGlyphImageSource.Glyph;
             int absglyph = Math.Abs(glyph);
-            int tile = absglyph < GHApp.Glyph2Tile.Length ? GHApp.Glyph2Tile[absglyph] : 0;
-            short anim = tile < GHApp.Tile2Animation.Length ? GHApp.Tile2Animation[tile] : (short)0;
+            int tile = 0;
+            short anim = 0;
+            //lock(GHApp.Glyph2TileLock)
+            //{
+                if (GHApp.Glyph2Tile == null || GHApp.Tile2Animation == null)
+                {
+                    _TimerOn = false;
+                    return false;
+                }
+                tile = absglyph < GHApp.Glyph2Tile.Length ? GHApp.Glyph2Tile[absglyph] : 0;
+                anim = tile < GHApp.Tile2Animation.Length ? GHApp.Tile2Animation[tile] : (short)0;
+            //}
             _TimerOn = anim > 0;
             if (anim > 0)
             {
@@ -156,21 +178,6 @@ namespace GnollHackX
             }
             return anim > 0;
         }
-
-        //private GHAspect _aspect = GHAspect.AspectFit;
-        //public GHAspect Aspect
-        //{
-        //    get { return _aspect;  }
-        //    set 
-        //    { 
-        //        if (_aspect != value) 
-        //        { 
-        //            _aspect = value; 
-        //            InvalidateSurface(); 
-        //        } 
-        //    }
-        //}
-
 
         public static readonly BindableProperty AspectProperty = BindableProperty.Create(nameof(Aspect), typeof(GHAspect), typeof(GHCachedImage), GHAspect.AspectFit, propertyChanged: OnAspectChanged);
         public GHAspect Aspect
@@ -202,6 +209,37 @@ namespace GnollHackX
             }
         }
 
+        public static readonly BindableProperty IsHighlightedProperty = BindableProperty.Create(nameof(IsHighlighted), typeof(bool), typeof(GHCachedImage), false, propertyChanged: OnIsHighlightedChanged);
+
+        public bool IsHighlighted
+        {
+            get => (bool)GetValue(IsHighlightedProperty);
+            set => SetValue(IsHighlightedProperty, value);
+        }
+
+        private static void OnIsHighlightedChanged(BindableObject bindable, object oldValue, object newValue)
+        {
+            GHCachedImage img = bindable as GHCachedImage;
+            if (img != null)
+                img.InvalidateSurface();
+        }
+
+        public static readonly BindableProperty HighFilterQualityProperty = BindableProperty.Create(nameof(HighFilterQuality), typeof(bool), typeof(GHCachedImage), false, propertyChanged: OnHighFilterQualityChanged);
+
+        public bool HighFilterQuality
+        {
+            get => (bool)GetValue(HighFilterQualityProperty);
+            set => SetValue(HighFilterQualityProperty, value);
+        }
+
+        private static void OnHighFilterQualityChanged(BindableObject bindable, object oldValue, object newValue)
+        {
+            GHCachedImage img = bindable as GHCachedImage;
+            if (img != null && oldValue is bool && newValue is bool && (bool)oldValue != (bool)newValue)
+                img.InvalidateSurface();
+        }
+
+
         private readonly object _sourceBitmapLock = new object();
         private SKImage _sourceBitmap = null;
 
@@ -219,7 +257,7 @@ namespace GnollHackX
             {
                 ActiveGlyphImageSource.Width = (int)canvaswidth;
                 ActiveGlyphImageSource.Height = (int)canvasheight;
-                ActiveGlyphImageSource.DrawOnCanvas(canvas);
+                ActiveGlyphImageSource.DrawOnCanvas(canvas, false, false, false);
             }
             else
             {
@@ -263,7 +301,18 @@ namespace GnollHackX
                         targetrect = new SKRect(0, 0, canvaswidth, canvasheight);
                         break;
                 }
-                canvas.DrawImage(targetBitmap, sourcerect, targetrect);
+                using(SKPaint paint = new SKPaint())
+                {
+                    if (IsHighlighted)
+                        paint.ColorFilter = UIUtils.HighlightColorFilter;
+#if GNH_MAUI
+                    canvas.DrawImage(targetBitmap, sourcerect, targetrect, new SKSamplingOptions(HighFilterQuality ? SKFilterMode.Linear : SKFilterMode.Nearest), paint);
+#else
+                    if (HighFilterQuality)
+                        paint.FilterQuality = SKFilterQuality.High;
+                    canvas.DrawImage(targetBitmap, sourcerect, targetrect, paint);
+#endif
+                }
             }
         }
 

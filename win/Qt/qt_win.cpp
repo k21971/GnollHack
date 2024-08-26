@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 // NetHack 3.6	qt_win.cpp	$NHDT-Date: 1524684508 2018/04/25 19:28:28 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.77 $
 // Copyright (c) Warwick Allison, 1999.
@@ -1591,7 +1591,7 @@ void NetHackQtMapWindow::Clear()
 
 void NetHackQtMapWindow::clickCursor()
 {
-    clicksink.Put(cursor.x(),cursor.y(),CLICK_1);
+    clicksink.Put(cursor.x(),cursor.y(),CLICK_PRIMARY);
     qApp->exit_loop();
 }
 
@@ -1600,7 +1600,7 @@ void NetHackQtMapWindow::mousePressEvent(QMouseEvent* event)
     clicksink.Put(
 	event->pos().x()/qt_settings->glyphs().width(),
 	event->pos().y()/qt_settings->glyphs().height(),
-	event->button()==LeftButton ? CLICK_1 : CLICK_2
+	event->button()==LeftButton ? CLICK_PRIMARY : CLICK_SECONDARY
     );
     qApp->exit_loop();
 }
@@ -4969,7 +4969,7 @@ int NetHackQtBind::qt_doprev_message()
     return 0;
 }
 
-char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
+char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, uint64_t ynflags)
 {
     if (qt_settings->ynInMessages() && WIN_MESSAGE!=WIN_ERR) {
 	// Similar to X11 windowport `slow' feature.

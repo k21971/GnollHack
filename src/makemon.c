@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    makemon.c    $NHDT-Date: 1556150377 2019/04/24 23:59:37 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.134 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -17,7 +17,7 @@
 
 STATIC_DCL boolean FDECL(ungeneratable_monster_type, (int));
 STATIC_DCL int FDECL(align_shift, (struct permonst *));
-STATIC_DCL boolean FDECL(mk_gen_ok, (int, UCHAR_P, unsigned long, BOOLEAN_P, BOOLEAN_P));
+STATIC_DCL boolean FDECL(mk_gen_ok, (int, UCHAR_P, uint64_t, BOOLEAN_P, BOOLEAN_P));
 #if 0
 STATIC_DCL void FDECL(m_initgrp, (struct monst *, int, int, int, int));
 #endif
@@ -26,7 +26,7 @@ STATIC_DCL void FDECL(m_initinv, (struct monst *));
 STATIC_DCL void FDECL(m_init_background, (struct monst*));
 STATIC_DCL struct obj* FDECL(m_inityour, (struct monst*, struct obj*)); 
 STATIC_DCL boolean FDECL(makemon_rnd_goodpos, (struct monst *,
-                                               unsigned long, coord *));
+                                               uint64_t, coord *));
 
 #if 0
 #define m_initsgrp(mtmp, x, y, mmf) m_initgrp(mtmp, x, y, 3, mmf)
@@ -172,7 +172,7 @@ int elemental_enchantment, exceptionality, material;
 
     otmp = mksobj_with_flags(otyp, TRUE, FALSE, MKOBJ_TYPE_NORMAL, mtmp, material, 0L, 0L, 0UL);
     if(!(oquan_const == 0 && oquan_rnd == 0))
-        otmp->quan = (long) rn1(oquan_rnd, oquan_const);
+        otmp->quan = (int64_t) rn1(oquan_rnd, oquan_const);
     otmp->owt = weight(otmp);
     if (is_poisonable(otmp) && poisoned)
         otmp->opoisoned = TRUE;
@@ -183,10 +183,10 @@ int elemental_enchantment, exceptionality, material;
     (void) mpickobj(mtmp, otmp);
 }
 
-long
+int64_t
 mongetsgold(mon, amount)
 struct monst* mon;
-long amount;
+int64_t amount;
 {
     if (amount <= 0)
         return 0;
@@ -693,7 +693,7 @@ register struct monst *mtmp;
                 aligntyp alignment = mon_aligntyp(mtmp);
                 int aligntyp_major_weapon = LONG_SWORD;
                 int aligntyp_minor_weapon = LONG_SWORD;
-                unsigned long weapon_flags = MKOBJ_FLAGS_FORCE_BASE_MATERIAL;
+                uint64_t weapon_flags = MKOBJ_FLAGS_FORCE_BASE_MATERIAL;
                 uchar material = MAT_NONE;
                 boolean is_major_weapon = !rn2(3) || is_lord(ptr) || is_prince(ptr);
                 switch (alignment)
@@ -1267,7 +1267,7 @@ default_equipment_here:
 void
 mkmonmoney(mtmp, amount)
 struct monst *mtmp;
-long amount;
+int64_t amount;
 {
     struct obj *gold = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE);
 
@@ -1510,7 +1510,7 @@ register struct monst *mtmp;
                     : rn2(3) ? CLOAK_OF_PROTECTION
                     : CLOAK_OF_MAGIC_RESISTANCE);
                 (void)mongets(mtmp, SMALL_SHIELD);
-                mkmonmoney(mtmp, (long)rn1(10, 20));
+                mkmonmoney(mtmp, (int64_t)rn1(10, 20));
             }
         }
         else if (quest_mon_represents_role(ptr, PM_MONK)) {
@@ -1580,7 +1580,7 @@ register struct monst *mtmp;
             for (cnt = rn2((int)(mtmp->m_lev / 2)); cnt; cnt--) {
                 otmp = mksobj(rnd_class(DILITHIUM_CRYSTAL, LUCKSTONE - 1),
                     FALSE, FALSE, FALSE);
-                otmp->quan = (long)rn1(2, 3);
+                otmp->quan = (int64_t)rn1(2, 3);
                 otmp->owt = weight(otmp);
                 (void)mpickobj(mtmp, otmp);
             }
@@ -1824,7 +1824,7 @@ register struct monst *mtmp;
             otmp = mksobj(rn2(4) ? TALLOW_CANDLE : WAX_CANDLE, TRUE, FALSE, FALSE);
             otmp->quan = 1;
             otmp->owt = weight(otmp);
-            if (!mpickobj(mtmp, otmp) && !levl[mtmp->mx][mtmp->my].lit)
+            if (!mpickobj(mtmp, otmp) && !otmp->lamplit && !levl[mtmp->mx][mtmp->my].lit)
                 begin_burn(otmp, FALSE);
         }
 
@@ -1943,7 +1943,7 @@ register struct monst *mtmp;
         }
         break;
     case S_LEPRECHAUN:
-        mkmonmoney(mtmp, (long)d(level_difficulty(), 30));
+        mkmonmoney(mtmp, (int64_t)d(level_difficulty(), 30));
         break;
     case S_UNICORN:
         break;
@@ -2088,10 +2088,13 @@ register struct monst *mtmp;
             struct obj* sack = mksobj(!rn2(20) ? BAG_OF_TREASURE_HAULING : SACK, FALSE, FALSE, FALSE);
             (void)mpickobj(mtmp, sack);
             otmp = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE);
-            otmp->quan =  ptr == &mons[PM_GNOME_KING] ? rn2(1501) + 1000 : ptr == &mons[PM_GNOME_LORD] ? rn2(751) + 500 : rn2(376) + 250;
-            otmp->owt = weight(otmp);
-            (void)add_to_container(sack, otmp);
-            sack->owt = weight(sack);
+            if (otmp)
+            {
+                otmp->quan = ptr == &mons[PM_GNOME_KING] ? rn2(1501) + 1000 : ptr == &mons[PM_GNOME_LORD] ? rn2(751) + 500 : rn2(376) + 250;
+                otmp->owt = weight(otmp);
+                (void)add_to_container(sack, otmp);
+                sack->owt = weight(sack);
+            }
             boolean gothat = FALSE;
             if (!rn2(2))
             {
@@ -2170,7 +2173,7 @@ register struct monst *mtmp;
             otmp = mksobj(rn2(4) ? TALLOW_CANDLE : WAX_CANDLE, TRUE, FALSE, FALSE);
             otmp->quan = 1;
             otmp->owt = weight(otmp);
-            if (!mpickobj(mtmp, otmp) && !levl[mtmp->mx][mtmp->my].lit)
+            if (!mpickobj(mtmp, otmp) && !otmp->lamplit && !levl[mtmp->mx][mtmp->my].lit)
                 begin_burn(otmp, FALSE);
         }
         break;
@@ -2227,7 +2230,7 @@ register struct monst *mtmp;
         (void) mongets(mtmp, rnd_misc_item(mtmp));
     if (likes_gold(ptr) && !findgold(mtmp->minvent) && !rn2(5))
         mkmonmoney(mtmp,
-                   (long) d(level_difficulty(), mtmp->minvent ? 5 : 10));
+                   (int64_t) d(level_difficulty(), mtmp->minvent ? 5 : 10));
 }
 
 /* Note: for long worms, always call cutworm (cutworm calls clone_mon) */
@@ -2497,7 +2500,7 @@ void
 newmonhp(mon, mndx, level_adjustment, mmflags)
 struct monst *mon;
 int mndx, level_adjustment;
-unsigned long mmflags;
+uint64_t mmflags;
 {
     struct permonst *ptr = &mons[mndx];
     boolean use_maxhp = !!(mmflags & MM_MAX_HP);
@@ -2587,7 +2590,7 @@ newmextra()
 boolean
 makemon_rnd_goodpos(mon, gpflags, cc)
 struct monst *mon;
-unsigned long gpflags;
+uint64_t gpflags;
 coord *cc;
 {
     int tryct = 0;
@@ -2659,7 +2662,7 @@ struct monst*
 makemon(ptr, x, y, mmflags)
 register struct permonst* ptr;
 register int x, y;
-unsigned long mmflags;
+uint64_t mmflags;
 {
     return makemon_limited(ptr, x, y, mmflags, 0UL, 0, 0, 0, 0, 0, 0);
 }
@@ -2668,7 +2671,7 @@ struct monst*
 makemon2(ptr, x, y, mmflags, mmflags2)
 register struct permonst* ptr;
 register int x, y;
-unsigned long mmflags, mmflags2;
+uint64_t mmflags, mmflags2;
 {
     return makemon_limited(ptr, x, y, mmflags, mmflags2, 0, 0, 0, 0, 0, 0);
 }
@@ -2677,7 +2680,7 @@ struct monst*
 makemon_ex(ptr, x, y, mmflags, mmflags2, subtype, npcsubtype, level_adjustment)
 register struct permonst* ptr;
 register int x, y;
-unsigned long mmflags, mmflags2;
+uint64_t mmflags, mmflags2;
 unsigned short subtype;
 int npcsubtype, level_adjustment;
 {
@@ -2695,7 +2698,7 @@ struct monst *
 makemon_limited(ptr, x, y, mmflags, mmflags2, subtype, subtype_female, npcsubtype, level_limit, level_adjustment, alignment)
 register struct permonst *ptr;
 register int x, y;
-unsigned long mmflags, mmflags2;
+uint64_t mmflags, mmflags2;
 unsigned short subtype, subtype_female;
 int npcsubtype;
 int level_limit, level_adjustment;
@@ -2713,7 +2716,7 @@ aligntyp alignment;
     boolean reviving = ((mmflags2 & MM2_REVIVING) != 0);
     boolean randomize_subtype = ((mmflags2 & MM2_RANDOMIZE_SUBTYPE) != 0);
     
-    unsigned long gpflags = (mmflags & MM_IGNOREWATER) ? MM_IGNOREWATER : 0;
+    uint64_t gpflags = (mmflags & MM_IGNOREWATER) ? MM_IGNOREWATER : 0;
     int origin_x = x, origin_y = y;
     
     /* if caller wants random location, do it here */
@@ -2813,7 +2816,7 @@ aligntyp alignment;
     enum special_effect_types spef_type = SPECIAL_EFFECT_SUMMON_MONSTER;
     if (!in_mklev && (mmflags & MM_PLAY_SUMMON_ANIMATION))
     {
-        unsigned long atype = (mmflags & MM_SUMMON_ANIMATION_TYPE_MASK);
+        uint64_t atype = (mmflags & MM_SUMMON_ANIMATION_TYPE_MASK);
         enum sfx_sound_types startsound = SFX_GENERAL_SUMMON_START;
         enum sfx_sound_types sfxsound = SFX_SUMMON_MONSTER;
         if (atype == MM_CHAOTIC_SUMMON_ANIMATION)
@@ -3299,7 +3302,7 @@ struct permonst* ptr;
     else if (is_neuter(ptr))
         return FALSE;
 
-    unsigned long genderfrequence = (ptr->geno & G_GENDER_GEN_MASK);
+    uint64_t genderfrequence = (ptr->geno & G_GENDER_GEN_MASK);
     boolean malerare = ((ptr->geno & G_GENDER_MALE_RARE) != 0);
     int chancepower = genderfrequence != 0UL ? (int)(genderfrequence - G_GENDER_ONE_FOURTH + 1UL) : 0;
     int oneinchance = 2 << chancepower; /* 2 to the power of chancepower */
@@ -3407,7 +3410,7 @@ int mndx;
  *      comparing the dungeon alignment and monster alignment.
  *      return an integer in the range of 0-5.
  */
-STATIC_VAR NEARDATA long oldmoves = 0L; /* != 1, starting value of moves */
+STATIC_VAR NEARDATA int64_t oldmoves = 0L; /* != 1, starting value of moves */
 STATIC_VAR NEARDATA s_level* align_lev;
 
 STATIC_OVL int
@@ -3682,7 +3685,7 @@ STATIC_OVL boolean
 mk_gen_ok(mndx, excluded_mvflags, genomask, ispoly, issummon)
 int mndx;
 uchar excluded_mvflags;
-unsigned long genomask;
+uint64_t genomask;
 boolean ispoly, issummon;
 {
     struct permonst *ptr = &mons[mndx];
@@ -3750,7 +3753,7 @@ mkclass_aligned(mclass, spc, atyp, mflags)
 char mclass;
 int spc;
 aligntyp atyp;
-unsigned long mflags;
+uint64_t mflags;
 {
     return mkclass_core(mclass, spc, atyp, 0, mflags);
 }
@@ -3761,7 +3764,7 @@ char mclass;
 int spc;
 aligntyp atyp;
 int difficulty_adj;
-unsigned long mflags;
+uint64_t mflags;
 {
     register int first = 0, last = 0, num = 0;
     int k, nums[SPECIAL_PM + 1]; /* +1: insurance for final return value */
@@ -4013,9 +4016,12 @@ struct monst *mtmp, *victim;
         if (mvitals[newtype].mvflags & MV_GENOCIDED)
         { /* allow MV_EXTINCT */
             if (canspotmon(mtmp))
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As %s grows up into %s, %s %s!", mon_nam(mtmp),
-                      an(pm_monster_name(ptr, mtmp->female)), mhe(mtmp),
-                      is_not_living(ptr) ? "expires" : "dies");
+            {
+                int multi_colors[4] = { NO_COLOR, CLR_MSG_HINT, NO_COLOR, NO_COLOR };
+                pline_multi_ex(ATR_NONE, CLR_MSG_WARNING, no_multiattrs, multi_colors, "As %s grows up into %s, %s %s!", mon_nam(mtmp),
+                    an(pm_monster_name(ptr, mtmp->female)), mhe(mtmp),
+                    is_not_living(ptr) ? "expires" : "dies");
+            }
             set_mon_data(mtmp, ptr, mtmp->subtype); /* keep mvitals[] accurate */
             change_mon_ability_scores(mtmp, oldtype, newtype);
             mondied(mtmp);
@@ -4037,7 +4043,8 @@ struct monst *mtmp, *victim;
                            slightly less sexist if prepared for it...) */
                       : (fem && !mtmp->female) ? "female " : "",
                     pm_monster_name(ptr, !!fem));
-            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s %s.", upstart(y_monnam(mtmp)),
+            int multi_colors[3] = { NO_COLOR, NO_COLOR, CLR_MSG_HINT };
+            pline_multi_ex(ATR_NONE, is_tame(mtmp) ? CLR_MSG_SUCCESS : CLR_MSG_ATTENTION, no_multiattrs, multi_colors, "%s %s %s.", upstart(y_monnam(mtmp)),
                   (fem != mtmp->female) ? "changes into"
                                         : humanoid(ptr) ? "becomes"
                                                         : "grows up into",
@@ -4159,7 +4166,6 @@ uchar material;
             otmp->enchantment = 0;
             otmp->special_quality = 0;
             otmp->age = 0L;
-            otmp->lamplit = FALSE;
             otmp->blessed = otmp->cursed = FALSE;
         }
         else if (otmp->otyp == BELL_OF_OPENING)
@@ -4755,7 +4761,7 @@ int *seencount;  /* secondary output */
 struct monst*
 make_level_monster(x, y, mmflags, mmflags2)
 register int x, y;
-unsigned long mmflags, mmflags2; 
+uint64_t mmflags, mmflags2; 
 {
     if (level.flags.nmgeninfos <= 0)
     {

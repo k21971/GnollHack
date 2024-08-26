@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	wingem1.c	$NHDT-Date: 1433806613 2015/06/08 23:36:53 $  $NHDT-Branch: master $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Christian Bressler 1999 	  */
@@ -3198,7 +3198,7 @@ Gem_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc
 int style, attr, color, glyph;
 const char *title, *query, *resp, *resp_desc, *introline;
 char def;
-unsigned long ynflags;
+uint64_t ynflags;
 {
     OBJECT *z_ob = zz_oblist[YNCHOICE];
     int d_exit, i, len;

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    rip.c    $NHDT-Date: 1488788514 2017/03/06 08:21:54 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -94,7 +94,7 @@ time_t when;
     register char **dp;
     register char *dpx;
     char buf[BUFSZ];
-    long year;
+    int64_t year;
     register int x;
     int line;
 
@@ -109,7 +109,7 @@ time_t when;
     center(NAME_LINE, buf);
 
     /* Put $ on stone */
-    Sprintf(buf, "%ld Au", done_money);
+    Sprintf(buf, "%lld Au", (long long)done_money);
     buf[STONE_LINE_LEN] = 0; /* It could be a *lot* of gold :-) */
     center(GOLD_LINE, buf);
 
@@ -140,7 +140,7 @@ time_t when;
 
     /* Put year on stone */
     year = yyyymmdd(when) / 10000L;
-    Sprintf(buf, "%4ld", year);
+    Sprintf(buf, "%4lld", (long long)year);
     center(YEAR_LINE, buf);
 
 #if defined (DUMPLOG) || defined (DUMPHTML)

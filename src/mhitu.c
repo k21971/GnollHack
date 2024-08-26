@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mhitu.c    $NHDT-Date: 1556649298 2019/04/30 18:34:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -597,7 +597,7 @@ register struct monst *mtmp;
                 if (obj || u.umonnum == PM_TRAPPER
                     || (youmonst.data->mlet == S_EEL
                         && is_pool(u.ux, u.uy))) {
-                    unsigned long save_speflags = 0; /* suppress warning */
+                    uint64_t save_speflags = 0; /* suppress warning */
 
                     if (obj) {
                         save_speflags = obj->speflags;
@@ -1345,7 +1345,7 @@ struct monst *mtmp;
     {
         /* Sound is played always to indicate reduced timer */
         play_sfx_sound(SFX_CATCH_TERMINAL_ILLNESS);
-        make_sick(Sick ? Sick / 3L + 1L : (long) rn1(ACURR(A_CON), 20),
+        make_sick(Sick ? Sick / 3L + 1L : (int64_t) rn1(ACURR(A_CON), 20),
                   mon_monster_name(mtmp), TRUE, HINT_KILLED_TERMINAL_ILLNESS);
         return TRUE;
     }
@@ -1527,7 +1527,7 @@ struct monst *mon;
         return 0;
 
     struct obj *o;
-    long wearmask;
+    int64_t wearmask;
 
     int natural_mc_base = mons[mon->mnum].mc;
     int natural_mc = natural_mc_base;
@@ -1587,7 +1587,7 @@ struct monst *mon;
             /* Note u.umcbonus is not being used at the moment, even though it contains appropriate bonuses for you */
             if (objects[o->otyp].oc_bonus_attributes & BONUS_TO_MC)
             {
-                item_mc_bonus += objects[o->otyp].oc_attribute_bonus / ((objects[o->otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3);
+                item_mc_bonus += (int)objects[o->otyp].oc_attribute_bonus / ((objects[o->otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3);
                 if (!(objects[o->otyp].oc_bonus_attributes & IGNORE_ENCHANTMENT))
                     item_mc_bonus += o->enchantment / ((objects[o->otyp].oc_bonus_attributes & FULL_MC_BONUS) != 0 ? 1 : 3);
             }
@@ -1857,16 +1857,15 @@ register struct obj* omonwep;
     {
         /* Strength bonus*/
         //dmg += m_str_dmg_bonus(mtmp);
-
     }
     else 
     {
-        /*This happens almost always*/
-        /*  Negative armor class reduces damage done instead of fully protecting against hits. */
+        /* This happens almost always */
+        /* Negative armor class reduces damage done instead of fully protecting against hits. */
         if (damage > 1 && u.uac < 0)
         {
-            int absac = -u.uac;
-            int damage_reduction_max = absac <= 20 ? absac : absac <= 40 ? (20 + (absac - 20) / 2) : (30 + (absac - 40) / 3);
+            //int absac = -u.uac;
+            int damage_reduction_max = AC_DAMAGE_REDUCTION_MAX(u.uac); // absac <= 20 ? absac : absac <= 60 ? (20 + (absac - 20) / 2) : (40 + (absac - 60) / 3);
 
             damage -= (double)rnd(damage_reduction_max);
             if (damage < 1)
@@ -2237,7 +2236,7 @@ register struct obj* omonwep;
                 play_sfx_sound(SFX_ACQUIRE_BLINDNESS);
                 pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s blinds you!", Monnam(mtmp));
             }
-            make_blinded(Blinded + 1 + (long)ceil(damage), FALSE);
+            make_blinded(Blinded + 1 + (int64_t)ceil(damage), FALSE);
             if (!Blind)
                 Your1(vision_clears);
         }
@@ -2353,7 +2352,7 @@ register struct obj* omonwep;
         break;
     case AD_LEGS:
     {
-        long side = rn2(2) ? RIGHT_SIDE : LEFT_SIDE;
+        int64_t side = rn2(2) ? RIGHT_SIDE : LEFT_SIDE;
         const char *sidestr = (side == RIGHT_SIDE) ? "right" : "left",
                    *Monst_name = Monnam(mtmp), *leg = body_part(LEG);
 
@@ -2858,7 +2857,7 @@ register struct obj* omonwep;
             hitmsg(mtmp, mattk, damagedealt, TRUE);
             if (!Stunned)
                 play_sfx_sound(SFX_ACQUIRE_STUN);
-            make_stunned((HStun & TIMEOUT) + (long) ceil(damage * 2), TRUE);
+            make_stunned((HStun & TIMEOUT) + (int64_t) ceil(damage * 2), TRUE);
         } 
         else
             hitmsg(mtmp, mattk, damagedealt, TRUE);
@@ -3250,7 +3249,7 @@ register struct obj* omonwep;
             char onmbuf[BUFSZ], knmbuf[BUFSZ];
 
             Strcpy(onmbuf, xname(mweapon));
-            Strcpy(knmbuf, killer_xname(mweapon));
+            Sprintf(knmbuf, "%s wielded by %s", killer_xname(mweapon), a_monnam(mtmp));
 
             extra_enchantment_damage(onmbuf, omonwep->elemental_enchantment, knmbuf, (u.umortality > oldumort));
 
@@ -3499,11 +3498,11 @@ struct attack *mattk;
         {
             if (!Blind) 
             {
-                long was_blinded = Blinded;
+                int64_t was_blinded = Blinded;
 
                 if (!Blinded)
                     You_cant_ex(ATR_NONE, CLR_MSG_WARNING, "see in here!");
-                make_blinded(1 + (long)ceil(damage), FALSE);
+                make_blinded(1 + (int64_t)ceil(damage), FALSE);
                 if (!was_blinded && !Blind)
                     Your1(vision_clears);
             }
@@ -3744,7 +3743,7 @@ boolean ufound;
                 if (mon_visible(mtmp) || (rnd(basedmg /= 2) > u.ulevel)) 
                 {
                     You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are blinded by a blast of light!");
-                    make_blinded(1 + (long)basedmg, FALSE);
+                    make_blinded(1 + (int64_t)basedmg, FALSE);
                     if (!Blind)
                         Your1(vision_clears);
                 } 
@@ -3766,7 +3765,7 @@ boolean ufound;
                 mondead_with_flags(mtmp, MONDEAD_FLAGS_NO_DEATH_ACTION);    /* remove it from map now */
                 kill_agr = FALSE; /* already killed (maybe lifesaved) */
                 chg =
-                    make_hallucinated(HHallucination + (long)basedmg, FALSE, 0L);
+                    make_hallucinated(HHallucination + (int64_t)basedmg, FALSE, 0L);
                 if(chg)
                     play_sfx_sound(SFX_ACQUIRE_HALLUCINATION);
                 else
@@ -3945,7 +3944,7 @@ struct attack *mattk;
                     mtmp->mspec_used = mtmp->mspec_used + (stun + rn2(6));
                     if (!Stunned)
                         play_sfx_sound(SFX_ACQUIRE_STUN);
-                    make_stunned((HStun & TIMEOUT) + (long)stun, TRUE);
+                    make_stunned((HStun & TIMEOUT) + (int64_t)stun, TRUE);
                     stop_occupation();
                 }
                 else
@@ -3980,7 +3979,7 @@ struct attack *mattk;
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are blinded by %s radiance!", s_suffix(mon_nam(mtmp)));
                 if (!Blind)
                     play_sfx_sound(SFX_ACQUIRE_BLINDNESS);
-                make_blinded(1 + (long) blnd, FALSE);
+                make_blinded(1 + (int64_t) blnd, FALSE);
                 stop_occupation();
                 /* not blind at this point implies you're wearing
                    the Eyes of the Overworld; make them block this
@@ -3992,7 +3991,7 @@ struct attack *mattk;
                 } 
                 else 
                 {
-                    long oldstun = (HStun & TIMEOUT), newstun = (long) rnd(3);
+                    int64_t oldstun = (HStun & TIMEOUT), newstun = (int64_t) rnd(3);
 
                     /* we don't want to increment stun duration every time
                        or sighted hero will become incapacitated */
@@ -4501,13 +4500,13 @@ struct monst *mon;
     } else if (u.umonnum == PM_LEPRECHAUN) {
         pline("%s tries to take your money, but fails...", noit_Monnam(mon));
     } else {
-        long cost;
-        long umoney = money_cnt(invent);
+        int64_t cost;
+        int64_t umoney = money_cnt(invent);
 
-        if (umoney > (long) LARGEST_INT - 10L)
-            cost = (long) rnd(LARGEST_INT) + 500L;
+        if (umoney > (int64_t) LARGEST_INT - 10L)
+            cost = (int64_t) rnd(LARGEST_INT) + 500L;
         else
-            cost = (long) rnd((int) umoney + 10) + 500L;
+            cost = (int64_t) rnd((int) umoney + 10) + 500L;
         if (is_peaceful(mon))
         {
             cost /= 5L;
@@ -4660,7 +4659,7 @@ struct attack *mattk;
         goto assess_dmg;
     case AD_STON: /* cockatrice */
     {
-        long protector = attk_protection((int) mattk->aatyp),
+        int64_t protector = attk_protection((int) mattk->aatyp),
              wornitems = mtmp->worn_item_flags;
 
         /* wielded weapon gives same protection as gloves here */
@@ -5005,7 +5004,7 @@ enum action_tile_types action;
     if (action == ACTION_TILE_NO_ACTION || action == ACTION_TILE_DEATH)
         return TRUE;
 
-    unsigned long tile_mflag = (1UL << ((unsigned long)action - 1UL));
+    uint64_t tile_mflag = ((uint64_t)1 << ((uint64_t)action - 1UL));
     boolean has_action_tile = (mtmp->data->mflags5 & tile_mflag) != 0UL;
     return has_action_tile;
 }

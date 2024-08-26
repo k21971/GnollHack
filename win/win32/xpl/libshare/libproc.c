@@ -83,7 +83,7 @@ struct window_procs lib_procs = {
 struct callback_procs lib_callbacks = { 0 }; /* To be set by RunGnollHack in gnhapi.c */
 
 char convert_gnhch(int ch);
-void __lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, unsigned long* colormasks);
+void __lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, uint64_t* colormasks);
 void monst_to_info(struct monst*, struct monst_info*);
 int get_condition_color(int cond_mask);
 
@@ -258,8 +258,8 @@ winid lib_create_nhwindow_ex(int type, int style, int glyph, struct extended_cre
 {
     struct objclassdata ocdata = get_objclassdata(info.object);
     return lib_callbacks.callback_create_nhwindow_ex(type, style, glyph,
-        (info.object ? 1 : 0) | (info.monster ? 2 : 0) | (Hallucination ? 4 : 0) | (info.create_flags & WINDOW_CREATE_FLAGS_ACTIVE ? 8 : 0)
-        | (info.create_flags & WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS ? 16 : 0) | (info.create_flags & WINDOW_CREATE_FLAGS_ASCENDED ? 32 : 0),
+        (uchar)((info.object ? 1 : 0) | (info.monster ? 2 : 0) | (Hallucination ? 4 : 0) | (info.create_flags & WINDOW_CREATE_FLAGS_ACTIVE ? 8 : 0)
+        | (info.create_flags & WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS ? 16 : 0) | (info.create_flags & WINDOW_CREATE_FLAGS_ASCENDED ? 32 : 0)),
         info.object, &ocdata);
 }
 
@@ -270,7 +270,7 @@ void lib_clear_nhwindow(winid wid)
 
 void lib_display_nhwindow(winid wid, BOOLEAN_P block)
 {
-    lib_callbacks.callback_display_nhwindow(wid, block);
+    lib_callbacks.callback_display_nhwindow(wid, (uchar)block);
 }
 
 void lib_destroy_nhwindow(winid wid)
@@ -364,7 +364,7 @@ void lib_add_menu(winid wid, int glyph, const ANY_P* identifier,
     if(iflags.use_menu_color && menu_style_allows_menu_coloring(last_menu_style))
         get_menu_coloring(str, &color, &attr);
 #endif
-    lib_callbacks.callback_add_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color, str ? buf : 0, presel);
+    lib_callbacks.callback_add_menu(wid, glyph, identifier->a_int64, (cschar)accelerator, (cschar)group_accel, attr, color, str ? buf : 0, (uchar)presel);
 }
 
 void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier,
@@ -386,14 +386,14 @@ void lib_add_extended_menu(winid wid, int glyph, const ANY_P* identifier,
         set_obj_glyph(info.object);
 
     struct objclassdata ocdata = get_objclassdata(info.object);
-    lib_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_longlong, accelerator, group_accel, attr, color, str ? buf : 0, presel, 
+    lib_callbacks.callback_add_extended_menu(wid, glyph, identifier->a_int64, (cschar)accelerator, (cschar)group_accel, attr, color, str ? buf : 0, (uchar)presel,
         (info.object ? (!(info.menu_flags & MENU_FLAGS_COUNT_DISALLOWED) ? (int)info.object->quan : 0) : ((info.menu_flags & MENU_FLAGS_USE_NUM_ITEMS) ? info.num_items : 0)),
-        (unsigned long long)(info.object ? info.object->o_id : 0), 
-        (unsigned long long)(info.monster ? info.monster->m_id : 0), 
-        info.heading_for_group_accelerator, info.special_mark,
-        info.menu_flags,
-        (info.object ? MENU_DATAFLAGS_HAS_OBJECT_DATA : 0) | (info.monster ? MENU_DATAFLAGS_HAS_MONSTER_DATA : 0) | (Hallucination ? MENU_DATAFLAGS_HALLUCINATED : 0) | (info.monster && info.monster->female ? MENU_DATAFLAGS_FEMALE : 0),
-        info.style, info.object, &ocdata);
+        (uint64_t)(info.object ? info.object->o_id : 0), 
+        (uint64_t)(info.monster ? info.monster->m_id : 0),
+        (cschar)info.heading_for_group_accelerator, (cschar)info.special_mark,
+        (uint64_t)info.menu_flags,
+        (uchar)((info.object ? MENU_DATAFLAGS_HAS_OBJECT_DATA : 0) | (info.monster ? MENU_DATAFLAGS_HAS_MONSTER_DATA : 0) | (Hallucination ? MENU_DATAFLAGS_HALLUCINATED : 0) | (info.monster && info.monster->female ? MENU_DATAFLAGS_FEMALE : 0)),
+        info.style, info.object, &ocdata, info.attrs, info.colors);
 }
 
 void lib_end_menu_ex(winid wid, const char* prompt, const char* subtitle)
@@ -410,7 +410,7 @@ void lib_end_menu_ex(winid wid, const char* prompt, const char* subtitle)
 
 int lib_select_menu(winid wid, int how, MENU_ITEM_P** selected)
 {
-    long long* picklist = 0;
+    int64_t* picklist = 0;
     int picklistsize = 0;
     int cnt = lib_callbacks.callback_select_menu(wid, how, &picklist, &picklistsize);
     int i;
@@ -428,8 +428,8 @@ int lib_select_menu(winid wid, int how, MENU_ITEM_P** selected)
         *selected = (MENU_ITEM_P*)malloc(sizeof(MENU_ITEM_P) * cnt);
         for (i = 0; i < cnt; i++)
         {
-            (*selected)[i].item.a_longlong = *picklist++;;
-            (*selected)[i].count = *picklist++;
+            (*selected)[i].item.a_int64 = *picklist++;
+            (*selected)[i].count = (int64_t)*picklist++;
         }
     }
 
@@ -455,20 +455,20 @@ void lib_wait_synch(void)
 
 void lib_cliparound(int x, int y, BOOLEAN_P force)
 {
-    lib_callbacks.callback_cliparound(x, y, force);
+    lib_callbacks.callback_cliparound(x, y, (uchar)force);
 }
 
 extern const nhsym cp437toUnicode[256];
 
 void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
 {
-    long symbol;
+    int64_t symbol;
     nhsym sym = 0;
     int ocolor = 0;
-    unsigned long special = 0UL;
+    uint64_t special = 0UL;
 
     (void)mapglyph(layers, &sym, &ocolor, &special, x, y);
-    symbol = SYMHANDLING(H_IBM) && sym >= 0 && sym < 256 ? (long)cp437toUnicode[sym] : (long)sym;
+    symbol = SYMHANDLING(H_IBM) && sym >= 0 && sym < 256 ? (int64_t)cp437toUnicode[sym] : (int64_t)sym;
 
     if (((special & MG_PET) && iflags.hilite_pet)
         || ((special & MG_OBJPILE) && iflags.hilite_pile)
@@ -484,7 +484,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
         special |= MG_UNDERLINE;
     }
 
-    lib_callbacks.callback_print_glyph(wid, x, y, layers.glyph, layers.bkglyph, symbol, ocolor, special, &layers);
+    lib_callbacks.callback_print_glyph(wid, x, y, layers.glyph, layers.bkglyph, (int32_t)symbol, ocolor, (uint32_t)special, &layers);
 
     if (program_state.in_bones || program_state.in_tricked)
         return;
@@ -555,7 +555,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
             if (showing_detection && !(otmp->speflags & SPEFLAGS_DETECTED))
                 continue;
 
-            unsigned long oflags = 0UL;
+            uint64_t oflags = 0UL;
             if(is_obj_drawn_in_front(otmp))
                 oflags |= OBJDATA_FLAGS_DRAWN_IN_FRONT;
             if (Hallucination)
@@ -575,7 +575,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
                 struct obj* cotmp;
                 for (cotmp = otmp->cobj; cotmp; cotmp = cotmp->nobj)
                 {
-                    unsigned long coflags = 0UL;
+                    uint64_t coflags = 0UL;
                     if (is_obj_drawn_in_front(otmp)) /* otmp to find the right object chain */
                         coflags |= OBJDATA_FLAGS_DRAWN_IN_FRONT;
                     if (Hallucination)
@@ -588,7 +588,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
                     set_obj_glyph(cotmp);
 
                     struct objclassdata cocdata = get_objclassdata(cotmp);
-                    lib_callbacks.callback_send_object_data(x, y, cotmp, 3, basewhere, &cocdata, coflags);
+                    lib_callbacks.callback_send_object_data(x, y, cotmp, 3, basewhere, &cocdata, (uint64_t)coflags);
                 }
             }
         }
@@ -599,10 +599,10 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
     struct engr* en;
     if ((layers.layer_flags & LFLAGS_L_ENGRAVING) != 0 && (en = engr_at(x, y)) != 0 && (en->engr_flags & ENGR_FLAGS_SEEN) != 0 && en->engr_txt && *en->engr_txt)
     {
-        unsigned long gflags = 0UL;
+        uint64_t gflags = 0UL;
         if (((!strcmp(en->engr_txt, Elbereth_word) || !strcmp(en->engr_txt, Gilthoniel_word)) && !Inhell) || (!strcmp(en->engr_txt, Morgoth_word) && Inhell))
             gflags |= 1;
-        lib_callbacks.callback_send_engraving_data(0, x, y, en->engr_txt, (int)en->engr_type, (unsigned long)en->engr_flags, gflags);
+        lib_callbacks.callback_send_engraving_data(0, x, y, en->engr_txt, (int)en->engr_type, (uint64_t)en->engr_flags, (uint64_t)gflags);
     }
 }
 
@@ -632,25 +632,25 @@ void lib_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char
         lib_callbacks.callback_send_object_data(0, 0, 0, 4, 0, 0, 0UL); /* Clear out uchain and uball */
         if (uchain)
         {
-            unsigned long oflags = 0UL;
+            uint64_t oflags = 0UL;
             if (Hallucination)
                 oflags |= OBJDATA_FLAGS_HALLUCINATION;
             oflags |= OBJDATA_FLAGS_UCHAIN;
             set_obj_glyph(uchain);
 
             struct objclassdata ocdata = get_objclassdata(uchain);
-            lib_callbacks.callback_send_object_data(uchain->ox, uchain->oy, uchain, 5, uchain->where, &ocdata, oflags);
+            lib_callbacks.callback_send_object_data(uchain->ox, uchain->oy, uchain, 5, uchain->where, &ocdata, (uint64_t)oflags);
         }
         if (uball)
         {
-            unsigned long oflags = 0UL;
+            uint64_t oflags = 0UL;
             if (Hallucination)
                 oflags |= OBJDATA_FLAGS_HALLUCINATION;
             oflags |= OBJDATA_FLAGS_UBALL;
             set_obj_glyph(uball);
 
             struct objclassdata ocdata = get_objclassdata(uball);
-            lib_callbacks.callback_send_object_data(uball->ox, uchain->oy, uball, 5, uball->where, &ocdata, oflags);
+            lib_callbacks.callback_send_object_data(uball->ox, uball->oy, uball, 5, uball->where, &ocdata, (uint64_t)oflags);
         }
         break;
     }
@@ -670,10 +670,8 @@ void lib_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char
     }
     case GUI_CMD_REPORT_PLAY_TIME:
     {
-        lock_thread_lock();
-        long timePassed = (long)(urealtime.finish_time - urealtime.start_timing);
-        long realtime = urealtime.realtime;
-        unlock_thread_lock();
+        int64_t timePassed = urealtime.finish_time - urealtime.start_timing;
+        int64_t realtime = urealtime.realtime;
         lib_callbacks.callback_report_play_time(timePassed, realtime);
         break;
     }
@@ -725,7 +723,7 @@ int lib_doprev_message(void)
     return 0;
 }
 
-char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char* question, const char* choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
+char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char* question, const char* choices, CHAR_P def, const char* resp_desc, const char* introline, uint64_t ynflags)
 {
     reset_found_this_turn(); /* Otherwise, after user input, the animation might play again upon flush_screen */
 
@@ -820,7 +818,7 @@ void lib_delay_output_intervals(int intervals)
 }
 
 #ifdef CHANGE_COLOR
-void lib_change_color(int param1, long param2, int param3)
+void lib_change_color(int param1, int64_t param2, int param3)
 {
     return;
 }
@@ -866,8 +864,8 @@ void lib_outrip(winid wid, int how, time_t when)
     formatkiller(kbuf, sizeof kbuf, how, FALSE);
 
     char tbuf[BUFSZ];
-    long year = yyyymmdd(when) / 10000L;
-    Sprintf(tbuf, "%4ld", year);
+    int64_t year = yyyymmdd(when) / 10000L;
+    Sprintf(tbuf, "%4lld", (long long)year);
 
     int points = (int)u.u_gamescore;
 
@@ -885,11 +883,11 @@ void lib_preference_update(const char* pref)
 
 char* lib_getmsghistory_ex(char** attrs_ptr, char** colors_ptr, BOOLEAN_P init)
 {
-    static char buf[BUFSIZ * 2] = "";
-    static char attrs[BUFSIZ * 2] = "";
-    static char colors[BUFSIZ * 2] = "";
+    static char buf[BUFSZ * 4] = "";
+    static char attrs[BUFSZ * 4] = "";
+    static char colors[BUFSZ * 4] = "";
     char utf8buf[UTF8BUFSZ * 4] = "";
-    int res = lib_callbacks.callback_getmsghistory(utf8buf, attrs, colors, (int)init);
+    int res = lib_callbacks.callback_getmsghistory(utf8buf, attrs, colors, (uchar)init);
     if (res)
     {
         copyUTF8toCP437(buf, sizeof(buf), utf8buf, sizeof(utf8buf));
@@ -913,7 +911,7 @@ void lib_putmsghistory_ex(const char* msg, const char* attrs, const char* colors
     if (msg)
         write_text2buf_utf8(buf, sizeof(buf), msg);
 
-    lib_callbacks.callback_putmsghistory(buf, attrs, colors, is_restoring);
+    lib_callbacks.callback_putmsghistory(buf, attrs, colors, (uchar)is_restoring);
 }
 
 
@@ -924,11 +922,12 @@ extern const char* status_fieldfmt[MAXBLSTATS];
 extern boolean status_activefields[MAXBLSTATS];
 extern char* status_vals[MAXBLSTATS];
 static int status_colors[MAXBLSTATS];
-static unsigned long* cond_hilites;
-static unsigned long active_conditions;
+static uint64_t* cond_hilites;
+static uint64_t active_conditions;
 static const char* cond_names[NUM_BL_CONDITIONS] = {
     "Stone", "Slime", "Strngl", "Suffoc", "FoodPois", "TermIll", "Blind",
-    "Deaf", "Stun", "Conf", "Hallu", "Lev", "Fly", "Ride", "Slow", "Paral", "Fear", "Sleep", "Cancl", "Silent", "Grab", "Rot", "Lyca"
+    "Deaf", "Stun", "Conf", "Hallu", "Lev", "Fly", "Ride", "Slow", "Paral",
+    "Fear", "Sleep", "Cancl", "Silent", "Grab", "Rot", "Lyca", "Legs"
 };
 
 void lib_status_init(int reassessment)
@@ -946,14 +945,14 @@ void lib_status_finish(void)
 
 void lib_status_enablefield(int fieldidx, const char* nm, const char* fmt, BOOLEAN_P enable)
 {
-    lib_callbacks.callback_status_enablefield(fieldidx, nm, fmt, enable);
+    lib_callbacks.callback_status_enablefield(fieldidx, nm, fmt, (uchar)enable);
     genl_status_enablefield(fieldidx, nm, fmt, enable);
 
     if (!enable)
     {
         if (fieldidx == BL_UWEP || fieldidx == BL_UWEP2 || fieldidx == BL_UQUIVER)
         {
-            unsigned long owepflags = 0UL;
+            uint64_t owepflags = 0UL;
             if (fieldidx == BL_UWEP)
                 owepflags |= OBJDATA_FLAGS_UWEP;
             else if (fieldidx == BL_UWEP2)
@@ -969,13 +968,13 @@ void lib_status_enablefield(int fieldidx, const char* nm, const char* fmt, BOOLE
 
 static short condcolors[NUM_BL_CONDITIONS] = { 0 };
 
-void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, unsigned long* colormasks)
+void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, uint64_t* colormasks)
 {
     __lib_status_update(idx, ptr, chg, percent, color, colormasks);
 
     char* txt = (char*)0;
     char utf8buf[UTF8BUFSZ] = "";
-    long condbits = 0L;
+    int64_t condbits = 0L;
     if (ptr)
     {
         if (idx != BL_CONDITION)
@@ -984,7 +983,7 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
         }
         else
         {
-            long* bits_ptr = (long*)ptr;
+            int64_t* bits_ptr = (int64_t*)ptr;
             condbits = *bits_ptr;
         }
     }
@@ -1003,16 +1002,16 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
     if (txt)
         write_text2buf_utf8(utf8buf, sizeof(utf8buf), txt);
 
-    lib_callbacks.callback_status_update(idx, txt ? utf8buf : 0, condbits, chg, percent, color, !colormasks ? NULL : condcolors);
+    lib_callbacks.callback_status_update(idx, txt ? utf8buf : 0, (int64_t)condbits, chg, percent, color, !colormasks ? NULL : condcolors);
 
     if (idx == BL_UWEP || idx == BL_UWEP2 || idx == BL_UQUIVER)
     {
         struct obj* wep = idx == BL_UQUIVER ? uquiver : idx == BL_UWEP ? (uwep ? uwep : uarmg) : (uwep2 ? uwep2 : uarmg);
-        unsigned long oflags = 0UL;
+        uint64_t oflags = 0UL;
         if (Hallucination)
             oflags |= OBJDATA_FLAGS_HALLUCINATION;
 
-        unsigned long owepflags = 0UL;
+        uint64_t owepflags = 0UL;
         boolean islauncher = wep && wep != uquiver && is_launcher(wep);
         struct obj* ammo = idx == BL_UQUIVER ? (struct obj*)0 : idx == BL_UWEP ? uquiver : uquiver;
 
@@ -1069,7 +1068,7 @@ void lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int colo
             set_obj_glyph(wep);
 
         struct objclassdata ocdata = get_objclassdata(wep);
-        lib_callbacks.callback_send_object_data(0, 0, wep, wep ? 2 : 1, wep ? wep->where : 0, &ocdata, oflags | owepflags);
+        lib_callbacks.callback_send_object_data(0, 0, wep, wep ? 2 : 1, wep ? wep->where : 0, &ocdata, (uint64_t)(oflags | owepflags));
     }
 }
 
@@ -1081,17 +1080,17 @@ void monst_to_info(struct monst* mtmp, struct monst_info* mi_ptr)
     mi_ptr->glyph = any_mon_to_glyph(mtmp, rn2_on_display_rng);
     mi_ptr->gui_glyph = maybe_get_replaced_glyph(mi_ptr->glyph, mtmp->mx, mtmp->my, data_to_replacement_info(mi_ptr->glyph, LAYER_MONSTER, (struct obj*)0, mtmp, 0UL, 0UL, 0UL, MAT_NONE, 0));
 
-    char tempbuf[BUFSIZ] = "";
+    char tempbuf[BUFSZ * 2] = "";
     if (has_umname(mtmp))
     {
-        char umnbuf[BUFSIZ];
+        char umnbuf[BUFSZ * 2];
         Strcpy(umnbuf, UMNAME(mtmp));
         umnbuf[16] = '\0'; /* Limit the length of the name */
         Strcat(tempbuf, umnbuf);
     }
     else if (has_mname(mtmp) && mtmp->u_know_mname)
     {
-        char mnbuf[BUFSIZ];
+        char mnbuf[BUFSZ * 2];
         Strcpy(mnbuf, MNAME(mtmp));
         mnbuf[16] = '\0'; /* Limit the length of the name */
         Strcat(tempbuf, mnbuf);
@@ -1273,9 +1272,9 @@ void lib_status_flush(void)
     lib_bot_updated();
 }
 
-void __lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, unsigned long* colormasks)
+void __lib_status_update(int idx, genericptr_t ptr, int chg, int percent, int color, uint64_t* colormasks)
 {
-    long *condptr = (long*)ptr;
+    int64_t *condptr = (int64_t*)ptr;
     char *text = (char*)ptr;
 
     if (idx == BL_FLUSH || idx == BL_RESET)
@@ -1320,7 +1319,7 @@ void lib_stretch_window(void)
 
 void lib_set_animation_timer_interval(unsigned int param)
 {
-    lib_callbacks.callback_set_animation_timer_interval((unsigned long)param);
+    lib_callbacks.callback_set_animation_timer_interval((uint64_t)param);
     return;
 }
 
@@ -1358,7 +1357,7 @@ void lib_play_immediate_ghsound(struct ghsound_immediate_info info)
     int sound_type = info.sound_type;
     int play_group = info.play_group;
     unsigned int dialogue_mid = info.dialogue_mid;
-    unsigned long play_flags = info.play_flags;
+    unsigned int play_flags = info.play_flags;
 
     (void)lib_callbacks.callback_play_immediate_ghsound(ghsound, eventPath, eventBank, eventVolume, soundVolume,
         parameter_names, parameter_values, parameterarraysize, sound_type, play_group, dialogue_mid, play_flags);
@@ -1461,7 +1460,7 @@ void lib_add_ambient_ghsound(struct soundsource_t* soundsource)
     int eventBank = ghsound2event[ghsound].bank_id;
     double eventVolume = (double)ghsound2event[ghsound].volume;
     double soundVolume = (double)soundsource->heard_volume;
-    unsigned long long idptr = 0;
+    uint64_t idptr = 0;
 
     if (lib_callbacks.callback_add_ambient_ghsound(ghsound, eventPath, eventBank, eventVolume, (double)soundVolume, &idptr))
     {
@@ -1476,7 +1475,7 @@ void lib_delete_ambient_ghsound(struct soundsource_t* soundsource)
     if (!soundsource)
         return;
 
-    lib_callbacks.callback_delete_ambient_ghsound((unsigned long long)soundsource->ambient_ghsound_ptr);
+    lib_callbacks.callback_delete_ambient_ghsound((uint64_t)soundsource->ambient_ghsound_ptr);
 
 }
 
@@ -1484,7 +1483,7 @@ void lib_set_ambient_ghsound_volume(struct soundsource_t* soundsource)
 {
     if (!soundsource)
         return;
-    lib_callbacks.callback_set_ambient_ghsound_volume((unsigned long long)soundsource->ambient_ghsound_ptr, (double)soundsource->heard_volume);
+    lib_callbacks.callback_set_ambient_ghsound_volume((uint64_t)soundsource->ambient_ghsound_ptr, (double)soundsource->heard_volume);
 
     return;
 }
@@ -1515,19 +1514,19 @@ lib_add_context_menu(int cmd_def_char, int cmd_cur_char, int style, int glyph, c
 }
 
 void
-lib_update_status_button(int cmd, int btn, int val, unsigned long bflags)
+lib_update_status_button(int cmd, int btn, int val, uint64_t bflags)
 {
     lib_callbacks.callback_update_status_button(cmd, btn, val, bflags);
 }
 
 void
-lib_toggle_animation_timer(int timertype, int timerid, int state, int x, int y, int layer, unsigned long tflags)
+lib_toggle_animation_timer(int timertype, int timerid, int state, int x, int y, int layer, uint64_t tflags)
 {
     lib_callbacks.callback_toggle_animation_timer(timertype, timerid, state, x, y, layer, tflags);
 }
 
 void
-lib_display_floating_text(int x, int y, const char* text, int style, int attr, int color, unsigned long tflags)
+lib_display_floating_text(int x, int y, const char* text, int style, int attr, int color, uint64_t tflags)
 {
     char utf8buf[UTF8BUFSZ] = "";
     if (text)
@@ -1536,7 +1535,7 @@ lib_display_floating_text(int x, int y, const char* text, int style, int attr, i
 }
 
 void
-lib_display_screen_text(const char* text, const char* supertext, const char* subtext, int style, int attr, int color, unsigned long tflags)
+lib_display_screen_text(const char* text, const char* supertext, const char* subtext, int style, int attr, int color, uint64_t tflags)
 {
     char utf8buf[UTF8BUFSZ] = "";
     char superutf8buf[UTF8BUFSZ] = "";
@@ -1551,7 +1550,7 @@ lib_display_screen_text(const char* text, const char* supertext, const char* sub
 }
 
 void
-lib_display_popup_text(const char* text, const char* title, int style, int attr, int color, int glyph, unsigned long tflags)
+lib_display_popup_text(const char* text, const char* title, int style, int attr, int color, int glyph, uint64_t tflags)
 {
     char utf8buf[UTF8BUFSZ] = "";
     char titleutf8buf[UTF8BUFSZ] = "";
@@ -1563,7 +1562,7 @@ lib_display_popup_text(const char* text, const char* title, int style, int attr,
 }
 
 void
-lib_display_gui_effect(int style, int subtype, int x, int y, int x2, int y2, unsigned long tflags)
+lib_display_gui_effect(int style, int subtype, int x, int y, int x2, int y2, uint64_t tflags)
 {
     lib_callbacks.callback_display_gui_effect(style, subtype, x, y, x2, y2, tflags);
 }
@@ -1647,7 +1646,7 @@ libdef_wait_synch(VOID_ARGS)
 
 void
 set_wincaps(wincap1, wincap2)
-unsigned long wincap1, wincap2;
+uint64_t wincap1, wincap2;
 {
     if(wincap1 > 0)
         lib_procs.wincap = wincap1;
@@ -1673,7 +1672,7 @@ char convert_gnhch(int ch)
         key = Cmd.move_W;
         break;
     case -5:
-        key = Cmd.spkeys[NHKF_GETDIR_SELF];
+        key = Cmd.spkeys[NHKF_RUN2];
         break;
     case -6:
         key = Cmd.move_E;
@@ -1693,6 +1692,8 @@ char convert_gnhch(int ch)
     default:
         if (ch >= -19 && ch <= -10)
             key = (char)(abs(ch) - 10 + '0');
+        else if (ch <= -100 && ch > -100 - NUM_NHKF)
+            key = Cmd.spkeys[-ch - 100];
         else
             key = (char)ch;
         break;

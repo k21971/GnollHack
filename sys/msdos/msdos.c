@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	msdos.c	$NHDT-Date: 1432512792 2015/05/25 00:13:12 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /* Copyright (c) NetHack PC Development Team 1990 */
@@ -521,14 +521,14 @@ unsigned setvalue;
     return (regs.x.dx);
 }
 
-unsigned long
+uint64_t
 sys_random_seed(VOID_ARGS)
 {
-    unsigned long ourseed = 0UL;
+    uint64_t ourseed = 0UL;
     time_t datetime = 0;
 
     (void) time(&datetime);
-    ourseed = (unsigned long) datetime;
+    ourseed = (uint64_t) datetime;
     return ourseed;
 }
 

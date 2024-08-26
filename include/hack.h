@@ -1,14 +1,9 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    hack.h    $NHDT-Date: 1549327459 2019/02/05 00:44:19 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.102 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Pasi Kallinen, 2017. */
 /* GnollHack may be freely redistributed.  See license for details. */
-
-
-#ifndef CONFIG_H
-#include "config.h"
-#endif
 
 #if defined (DEBUG) && defined(GNH_CRTDBG)
 #if defined (_DEBUG) && defined(WIN32)
@@ -23,6 +18,7 @@
 #ifndef HACK_H
 #define HACK_H
 
+#include "config.h"
 #include "lint.h"
 
 #define TELL_LETHAL_STYLE 2
@@ -217,13 +213,14 @@ enum game_end_types {
     QUIT         = 19,
     ESCAPED      = 20,
     ASCENDED     = 21,
-    NUM_GAME_END_TYPES = 22
+    SNAPSHOT     = 22,
+    NUM_GAME_END_TYPES = 23
 };
 
 /* game events log */
 struct gamelog_line {
-    long turn; /* turn when this happened */
-    long flags; /* LL_foo flags */
+    int64_t turn; /* turn when this happened */
+    int64_t flags; /* LL_foo flags */
     char* text;
     struct gamelog_line* next;
 };
@@ -235,17 +232,17 @@ typedef struct strbuf {
 } strbuf_t;
 
 #include "align.h"
+#include "context.h"
 #include "dungeon.h"
+#include "general.h"
 #include "monsym.h"
 #include "mkroom.h"
 #include "npc.h"
 #include "objclass.h"
+#include "timeout.h"
 #include "youprop.h"
 #include "wintype.h"
-#include "context.h"
 #include "decl.h"
-#include "timeout.h"
-#include "general.h"
 
 
 /* attack mode for hmon() */
@@ -453,6 +450,7 @@ extern short tile2enlargement[MAX_TILES];
 #define FEEL_COCKATRICE 0x40  /* engage cockatrice checks and react */
 #define INCLUDE_HERO 0x80     /* show hero among engulfer's inventory */
 #define OBJECT_COMPARISON 0x100     /* compare objects with currently worn ones */
+#define WORN_UNSELECTABLE 0x200     /* worn objects are not selectable */
 
 /* Flags to control query_category() */
 /* BY_NEXTHERE used by query_category() too, so skip 0x01 */
@@ -470,6 +468,7 @@ extern short tile2enlargement[MAX_TILES];
 #define BUCX_TYPES (BUC_ALLBKNOWN | BUC_UNKNOWN)
 #define UNIDENTIFIED_TYPES 0x800
 #define UNKNOWN_TYPES 0x1000
+#define WEARABLE_TYPES 0x2000
 #define ALL_TYPES_SELECTED -2
 
 /* Flags to control find_mid() */
@@ -632,14 +631,14 @@ enum bodypart_types {
 #define SET__IS_VALUE_VALID(s) ((s < SET_IN_SYS) || (s > SET_IN_WIZGAME))
 
 #define FEATURE_NOTICE_VER(major, minor, patch)                    \
-    (((unsigned long) major << 24) | ((unsigned long) minor << 16) \
-     | ((unsigned long) patch << 8) | ((unsigned long) 0))
+    (((uint64_t) major << 24) | ((uint64_t) minor << 16) \
+     | ((uint64_t) patch << 8) | ((uint64_t) 0))
 
 #define FEATURE_NOTICE_VER_MAJ (flags.suppress_alert >> 24)
 #define FEATURE_NOTICE_VER_MIN \
-    (((unsigned long) (0x0000000000FF0000L & flags.suppress_alert)) >> 16)
+    (((uint64_t) (0x0000000000FF0000L & flags.suppress_alert)) >> 16)
 #define FEATURE_NOTICE_VER_PATCH \
-    (((unsigned long) (0x000000000000FF00L & flags.suppress_alert)) >> 8)
+    (((uint64_t) (0x000000000000FF00L & flags.suppress_alert)) >> 8)
 
 #ifndef max
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -666,7 +665,8 @@ enum bodypart_types {
 #define rn1(x, y) (rn2(x) + (y))
 
 /* negative armor class is randomly weakened to prevent invulnerability */
-#define AC_VALUE(AC) ((AC) >= 0 ? (AC) : (AC) >= -21 ? -rnd(-(AC)) : (AC) >= -41 ? -rnd(21 + (-(AC) - 21) / 2) : -rnd(31 + (-(AC) - 41) / 3))
+#define AC_VALUE(AC) ((AC) >= 0 ? (AC) : (AC) >= -21 ? -rnd(-(AC)) : (AC) >= -61 ? -rnd(21 + (-(AC) - 21) / 2) : -rnd(41 + (-(AC) - 61) / 3))
+#define AC_DAMAGE_REDUCTION_MAX(AC) ((AC) >= 0 ? 0 : (AC) >= -20 ? -(AC) : (AC) >= -60 ? (20 + (-(AC) - 20) / 2) : (40 + (-(AC) - 60) / 3)) 
 
 /* Object pile definition */
 #define is_objpile(x,y) (!Hallucination && level.objects[(x)][(y)] \

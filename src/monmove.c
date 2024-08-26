@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    monmove.c    $NHDT-Date: 1557094802 2019/05/05 22:20:02 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -93,7 +93,7 @@ boolean usethe, isangry;
             /* Sidenote on "A watchman angrily waves her arms!"
              * Female being called watchman is correct (career name).
              */
-            char adjbuf[BUFSIZ] = "";
+            char adjbuf[BUFSZ * 2] = "";
             if (adverb && strcmp(adverb, "") != 0)
                 Sprintf(adjbuf, "%s ", adverb);
             
@@ -1120,7 +1120,7 @@ struct monst* mtmp;
         return;
 
     /* Trigger a boss fight if you can see the monster */
-    if ((windowprocs.wincap2 & WC2_SCREEN_TEXT) && (is_boss_monster(mtmp->data) || is_level_boss(mtmp)) && !mtmp->boss_fight_started 
+    if ((windowprocs.wincap2 & WC2_SCREEN_TEXT) && (is_boss_monster(mtmp->data) || is_level_boss(mtmp)) && !mtmp->boss_fight_started && !Hallucination
         && !DEADMONSTER(mtmp) && !is_peaceful(mtmp) && canspotmon(mtmp) && couldsee(mtmp->mx, mtmp->my) && !(mtmp->mstrategy & STRAT_WAITFORU) && !mtmp->msleeping && !is_cloned_wizard(mtmp))
     {
         mtmp->boss_fight_started = 1;
@@ -1130,6 +1130,16 @@ struct monst* mtmp;
         play_sfx_sound(SFX_BOSS_FIGHT);
         display_screen_text(Monnam(mtmp), (char*)0, (char*)0, SCREEN_TEXT_BOSS_FIGHT, ATR_NONE, NO_COLOR, 1UL);
         cliparound(u.ux, u.uy, 2);
+    }
+
+    if (MON_WEP(mtmp) && MON_WEP(mtmp)->oartifact == ART_VORPAL_BLADE && !has_vorpal_warning_been_given(mtmp) && !Hallucination && !Confusion && !Stunned
+        && !DEADMONSTER(mtmp) && !is_peaceful(mtmp) && canspotmon(mtmp) && couldsee(mtmp->mx, mtmp->my))
+    {
+        mtmp->mon_flags |= MON_FLAGS_VORPAL_WARNING_GIVEN;
+        MON_WEP(mtmp)->dknown = 1;
+        play_sfx_sound(SFX_WARNING);
+        int multicolors[3] = { CLR_MSG_WARNING, NO_COLOR, CLR_MSG_GOD };
+        pline_multi_ex(ATR_NONE, CLR_MSG_HIGHLIGHT, no_multiattrs, multicolors, "%s - %s is wielding %s.", "WARNING", Monnam(mtmp), thecxname(MON_WEP(mtmp)));
     }
 }
 
@@ -1174,7 +1184,7 @@ boolean
 should_displace(mtmp, poss, info, cnt, gx, gy)
 struct monst *mtmp;
 coord *poss; /* coord poss[9] */
-long *info;  /* long info[9] */
+int64_t *info;  /* int64_t info[9] */
 int cnt;
 xchar gx, gy;
 {
@@ -1264,8 +1274,8 @@ register int after;
     struct permonst *ptr;
     struct monst *mtoo;
     schar mmoved = 0; /* not strictly nec.: chi >= 0 will do */
-    long info[9];
-    long flag;
+    int64_t info[9];
+    int64_t flag;
     int omx = mtmp->mx, omy = mtmp->my;
 
     if (mtmp->mtrapped)
@@ -2204,7 +2214,7 @@ register struct monst *mtmp;
 {
     boolean notseen, gotu;
     register int disp, mx = mtmp->mux, my = mtmp->muy;
-    long umoney = money_cnt(invent);
+    int64_t umoney = money_cnt(invent);
 
     /*
      * do cheapest and/or most likely tests first
@@ -2294,7 +2304,7 @@ xchar x, y;
 
     /* Monsters avoid a trap if they've seen that type before */
     } else if (trap && rn2(40)
-               && (mtmp->mtrapseen & (1 << (trap->ttyp - 1))) != 0) {
+               && (mtmp->mtrapseen & ((int64_t)1 << (trap->ttyp - 1))) != 0) {
         return TRUE;
     }
 
@@ -2410,7 +2420,7 @@ struct monst* mon;
 int mode;
 xchar* mon_dx_ptr;
 xchar* mon_dy_ptr;
-long allowflags;
+int64_t allowflags;
 {
     if (!mon || !mon_dx_ptr || !mon_dy_ptr)
         return FALSE;
@@ -2685,10 +2695,10 @@ m_test_move(mon, mx, my, dx, dy, mode, allowflags)
 struct monst* mon;
 xchar mx, my, dx, dy;
 int mode;
-long allowflags;
+int64_t allowflags;
 {
     coord poss[9];
-    long info[9];
+    int64_t info[9];
     xchar test_x = mx + dx;
     xchar test_y = my + dy;
 

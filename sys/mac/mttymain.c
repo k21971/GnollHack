@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	mttymain.c	$NHDT-Date: 1554215928 2019/04/02 14:38:48 $  $NHDT-Branch: NetHack-3.6.2-beta01 $:$NHDT-Revision: 1.13 $ */
 /* Copyright (c) Jon W{tte, 1993					*/
@@ -71,7 +71,7 @@ static char _colors_inverse[CLR_MAX] = {
 #define SECONDARY_CHANNEL_LIMIT 12
 
 void
-tty_change_color(int color, long rgb, int reverse)
+tty_change_color(int color, int64_t rgb, int reverse)
 {
     long inverse, working_rgb = rgb;
     int total_power = 0, max_channel = 0;

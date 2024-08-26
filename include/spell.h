@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    spell.h    $NHDT-Date: 1432512780 2015/05/25 00:13:00 $  $NHDT-Branch: master $:$NHDT-Revision: 1.9 $ */
 /* Copyright 1986, M. Stephenson                  */
@@ -34,6 +34,7 @@ struct spell {
 #define decrnknow(spell) spl_book[spell].sp_know--
 #define spellid(spell) spl_book[spell].sp_id
 #define spellknow(spell) spl_book[spell].sp_know
+#define spell_to_glyph(spell) (spellid(spell) - FIRST_SPELL + GLYPH_SPELL_TILE_OFF)
 
 extern const char* spl_sortchoices[NUM_SPELL_SORTBY];
 extern short spl_orderindx[MAXSPELL];

@@ -13,15 +13,15 @@ using GnollHackX;
 using Android;
 using Java.IO;
 using System.IO;
-#if GNH_MAUI
-#else
-using Xamarin.Forms;
-using Xamarin.Google.Android.Play.Core.AssetPacks;
-using System.Runtime.Remoting.Contexts;
 using Xamarin.Google.Android.Play.Core.Review;
 using Xamarin.Google.Android.Play.Core.Review.Model;
 using Xamarin.Google.Android.Play.Core.Tasks;
 using Xamarin.Google.Android.Play.Core.Review.Testing;
+
+#if !GNH_MAUI
+using Xamarin.Forms;
+using Xamarin.Google.Android.Play.Core.AssetPacks;
+using System.Runtime.Remoting.Contexts;
 #endif
 using System.Threading.Tasks;
 using System.Threading;
@@ -30,6 +30,7 @@ using AndroidX.Core.App;
 using Android.Content.PM;
 using Android.Views.InputMethods;
 using Android.Provider;
+using System.Linq.Expressions;
 
 #if GNH_MAUI
 namespace GnollHackM
@@ -110,11 +111,12 @@ namespace GnollHackX.Droid
         public void CloseApplication()
         {
             RevertAnimatorDuration(true);
-            //StopForegroundService();
 #if GNH_MAUI
+            Platform.CurrentActivity.FinishAffinity();
             Platform.CurrentActivity.Finish();
             Microsoft.Maui.Controls.Application.Current.Quit();
 #else
+            MainActivity.CurrentMainActivity.FinishAffinity();
             MainActivity.CurrentMainActivity.Finish();
 #endif
         }
@@ -228,12 +230,6 @@ namespace GnollHackX.Droid
             }
         }
 
-#if GNH_MAUI
-        public async void RequestAppReview(ContentPage page)
-        {
-            await Task.Delay(50);
-        }
-#else
         IReviewManager _manager;
         TaskCompletionSource<bool> _tcs;
         TaskCompletionSource<bool> _tcs2 = null;
@@ -249,23 +245,41 @@ namespace GnollHackX.Droid
                 Log.Add("Starting App Review");
             }
 
-            _tcs?.TrySetCanceled();
-            _tcs = new TaskCompletionSource<bool>();
-            _manager = ReviewManagerFactory.Create(MainActivity.CurrentMainActivity);
-
-            var request = _manager.RequestReviewFlow();
-            var listener = new StoreReviewTaskCompleteListener(_manager, _tcs, this, false);
-            request.AddOnCompleteListener(listener);
-
-            lock (LogLock)
+            Xamarin.Google.Android.Play.Core.Tasks.Task request = null;
+            _manager = null;
+            try
             {
-                Log.Add("Awaiting");
+                _tcs?.TrySetCanceled();
+                _tcs = new TaskCompletionSource<bool>();
+                _manager = ReviewManagerFactory.Create(MainActivity.CurrentMainActivity);
+                if (_manager != null)
+                {
+                    request = _manager.RequestReviewFlow();
+                    if (request != null)
+                    {
+                        var listener = new StoreReviewTaskCompleteListener(_manager, _tcs, this, false);
+                        request.AddOnCompleteListener(listener);
+                        lock (LogLock)
+                        {
+                            Log.Add("Awaiting");
+                        }
+                        await _tcs.Task;
+                        if (_tcs2 != null)
+                            await _tcs2.Task;
+                    }
+                }
             }
-            await _tcs.Task;
-            if (_tcs2 != null)
-                await _tcs2.Task;
-            _manager.Dispose();
-            request.Dispose();
+            catch(Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+            }
+            finally
+            {
+                if(_manager != null)
+                    _manager.Dispose();
+                if(request != null)
+                    request.Dispose();
+            }
             lock (LogLock)
             {
                 Log.Add("Done");
@@ -282,10 +296,8 @@ namespace GnollHackX.Droid
                 }
                 Log.Clear();
             }
-            if (GHApp.DebugLogMessages)
-                GHApp.MaybeWriteGHLog("App Review Log: " + logs);
+            GHApp.MaybeWriteGHLog("App Review Log: " + logs);
         }
-#endif
 
         public string GetBaseUrl()
         {
@@ -388,30 +400,9 @@ namespace GnollHackX.Droid
             OnDemandPackStatusNotification?.Invoke(this, e);
         }
 
-        private void StartForegroundService()
-        {
-            var intent = new Intent(MainActivity.CurrentMainActivity, typeof(GnhSource));
-
-            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.O)
-            {
-                MainActivity.CurrentMainActivity.StartForegroundService(intent);
-            }
-            else
-            {
-                MainActivity.CurrentMainActivity.StartService(intent);
-            }
-        }
-
-        private void StopForegroundService()
-        {
-            var intent = new Intent(MainActivity.CurrentMainActivity, typeof(App));
-            MainActivity.CurrentMainActivity.StopService(intent);
-        }
-
         public void InitializePlatform()
         {
             InitOnDemandPackStatusNotificationEventHandler();
-            //StartForegroundService();
         }
 
         public void HideKeyboard()
@@ -451,88 +442,15 @@ namespace GnollHackX.Droid
                 MainActivity.ShowOsNavigationBar();
 #endif
         }
-    }
 
-    public interface INotification
-    {
-        Notification ReturnNotif();
-    }
-
-    internal class NotificationHelper : INotification
-    {
-        private static string foregroundChannelId = "9001";
-        private static Android.Content.Context context = global::Android.App.Application.Context;
-
-        public Notification ReturnNotif()
+        public void CollectGarbage()
         {
-            // Building intent
-            var intent = new Intent(context, typeof(MainActivity));
-            intent.AddFlags(ActivityFlags.SingleTop);
-            intent.PutExtra("GnollHack", "Foreground");
-
-            var pendingIntent = PendingIntent.GetActivity(context, 0, intent, PendingIntentFlags.UpdateCurrent);
-
-            var notifBuilder = new NotificationCompat.Builder(context, foregroundChannelId)
-                .SetContentTitle("GnollHack")
-                .SetContentText("GnollHack in the Foreground")
-                .SetSmallIcon(Resource.Drawable.notification_icon_background)
-                .SetOngoing(true)
-                .SetContentIntent(pendingIntent);
-
-            // Building channel if API verion is 26 or above
-            if (global::Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.O)
-            {
-                NotificationChannel notificationChannel = new NotificationChannel(foregroundChannelId, "GnollHack", NotificationImportance.High);
-                notificationChannel.Importance = NotificationImportance.High;
-                notificationChannel.EnableLights(true);
-                notificationChannel.EnableVibration(true);
-                notificationChannel.SetShowBadge(true);
-                notificationChannel.SetVibrationPattern(new long[] { 100, 200, 300, 400, 500, 400, 300, 200, 400 });
-
-                var notifManager = context.GetSystemService(Android.Content.Context.NotificationService) as NotificationManager;
-                if (notifManager != null)
-                {
-                    notifBuilder.SetChannelId(foregroundChannelId);
-                    notifManager.CreateNotificationChannel(notificationChannel);
-                }
-            }
-
-            return notifBuilder.Build();
+            var rt = Java.Lang.Runtime.GetRuntime();
+            if (rt != null)
+                rt.Gc();
         }
     }
 
-    public class GnhSource : Service
-    {
-        public override IBinder OnBind(Intent intent)
-        {
-            return null;
-        }
-
-        public const int ServiceRunningNotifID = 9000;
-
-        public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
-        {
-            Notification notif = DependencyService.Get<INotification>().ReturnNotif();
-            StartForeground(ServiceRunningNotifID, notif);
-
-            //_ = DoLongRunningOperationThings();
-
-            return StartCommandResult.Sticky;
-        }
-
-        public override void OnDestroy()
-        {
-            base.OnDestroy();
-        }
-
-        public override bool StopService(Intent name)
-        {
-            return base.StopService(name);
-        }
-    }
-
-#if GNH_MAUI
-#else
     public class StoreReviewTaskCompleteListener : Java.Lang.Object, IOnCompleteListener
     {
         IReviewManager _manager;
@@ -609,5 +527,4 @@ namespace GnollHackX.Droid
             }
         }
     }
-#endif
 }

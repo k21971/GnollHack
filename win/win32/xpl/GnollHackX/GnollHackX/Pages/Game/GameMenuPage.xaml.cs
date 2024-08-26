@@ -32,25 +32,57 @@ namespace GnollHackX.Pages.Game
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _gamePage = gamePage;
-
             if (gamePage.EnableCasualMode)
             {
                 btnSave.Text = "Save Game";
                 btnQuit.Text = "Quit Game";
             }
 
+            if (gamePage.GameEnded)
+            {
+                btnQuit.Text = "Finish Game Over";
+                btnSave.TextColor = GHColors.Gray;
+                btnSave.IsEnabled = false;
+                btnOptions.TextColor = GHColors.Gray;
+                btnOptions.IsEnabled = false;
+            }
+
             btnOptions.IsVisible = btnMessages.IsVisible = GHApp.DeveloperMode;
-            btnGC.IsVisible = btnDebug.IsVisible = btnRunTests.IsVisible =
-                GHApp.DeveloperMode && GHApp.DebugLogMessages;
+            btnGC.IsVisible = GHApp.DeveloperMode && GHApp.DebugLogMessages;
+            UpdateDarknessMode();
+        }
+
+        public GameMenuPage(GamePage gamePage, bool isLimited) : this(gamePage)
+        {
+            if(isLimited)
+            {
+                btnSave.IsVisible = false;
+                btnQuit.IsVisible = false;
+                btnSettings.IsVisible = false;
+                btnOptions.IsVisible = false;
+                btnMessages.IsVisible = false;
+                btnGC.IsVisible = false;
+                btnVersion.IsVisible = false;
+                btnTips.IsVisible = false;
+            }
+        }
+
+        public void UpdateDarknessMode()
+        {
+            lblHeader.TextColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+            bkgView.InvalidateSurface();
         }
 
         private async void btnSave_Clicked(object sender, EventArgs e)
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
             _gamePage.GenericButton_Clicked(sender, e, GHUtils.Meta('s'));
         }
 
@@ -58,15 +90,15 @@ namespace GnollHackX.Pages.Game
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
-            _gamePage.GenericButton_Clicked(sender, e, GHUtils.Meta('q'));
+            await GHApp.Navigation.PopModalAsync();
+            _gamePage.GenericButton_Clicked(sender, e, _gamePage.GameEnded ? 'q' : GHUtils.Meta('q'));
         }
 
         private async void btnBackToGame_Clicked(object sender, EventArgs e)
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private async void btnOptions_Clicked(object sender, EventArgs e)
@@ -74,8 +106,16 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.DebugWriteRestart("ProfilingStopwatch.Restart: Options");
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
             _gamePage.GenericButton_Clicked(sender, e, 'O');
+        }
+
+        private async void btnSnapshot_Clicked(object sender, EventArgs e)
+        {
+            MainLayout.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            await GHApp.Navigation.PopModalAsync();
+            _gamePage.GenericButton_Clicked(sender, e, GHUtils.Meta(28));
         }
 
         private async void btnSettings_Clicked(object sender, EventArgs e)
@@ -83,7 +123,7 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var settingsPage = new SettingsPage(this, null);
-            await App.Current.MainPage.Navigation.PushModalAsync(settingsPage);
+            await GHApp.Navigation.PushModalAsync(settingsPage);
             MainLayout.IsEnabled = true;
         }
 
@@ -93,7 +133,7 @@ namespace GnollHackX.Pages.Game
             GHApp.PlayButtonClickedSound();
             var libPage = new LibraryPage();
             libPage.ReadLibrary();
-            await App.Current.MainPage.Navigation.PushModalAsync(libPage);
+            await GHApp.Navigation.PushModalAsync(libPage);
             MainLayout.IsEnabled = true;
         }
 
@@ -106,8 +146,7 @@ namespace GnollHackX.Pages.Game
         {
             MainLayout.IsEnabled = true;
             btnOptions.IsVisible = btnMessages.IsVisible = GHApp.DeveloperMode;
-            btnGC.IsVisible = btnDebug.IsVisible = btnRunTests.IsVisible =
-                GHApp.DeveloperMode && GHApp.DebugLogMessages;
+            btnGC.IsVisible = GHApp.DeveloperMode && GHApp.DebugLogMessages;
         }
 
         private bool _backPressed = false;
@@ -117,7 +156,7 @@ namespace GnollHackX.Pages.Game
             {
                 _backPressed = true;
                 MainLayout.IsEnabled = false;
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             return false;
         }
@@ -143,29 +182,13 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = true;
         }
 
-        private async void btnDebug_Clicked(object sender, EventArgs e)
-        {
-            MainLayout.IsEnabled = false;
-            await GHApp.ListFileDescriptors(this);
-            MainLayout.IsEnabled = true;
-        }
-
-        private async void btnRunTests_Clicked(object sender, EventArgs e)
-        {
-            MainLayout.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
-            await _gamePage.RunPerformanceTests();
-            MainLayout.IsEnabled = true;
-        }
-
         private async void btnTips_Clicked(object sender, EventArgs e)
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             if(_gamePage.ShownTip == -1)
                 _gamePage.ShowGUITips(false);
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private double _currentPageWidth = 0;
@@ -187,7 +210,7 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var verPage = new VersionPage(_gamePage);
-            await App.Current.MainPage.Navigation.PushModalAsync(verPage);
+            await GHApp.Navigation.PushModalAsync(verPage);
             MainLayout.IsEnabled = true;
         }
 
@@ -241,6 +264,24 @@ namespace GnollHackX.Pages.Game
                 await DisplayAlert("Error Creating Message File", "An error occurred while creating the message file: " + ex.Message, "OK");
             }
 
+            MainLayout.IsEnabled = true;
+        }
+
+        private async void btnWiki_Clicked(object sender, EventArgs e)
+        {
+            MainLayout.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            if (GHApp.IsiOS)
+            {
+                /* Navigated event does not trigger with WebView on iOS, making navigation buttons inactivate all the time; use OpenBrowser instead (does not trigger OnSleep / OnResume on iOS) */
+                await GHApp.OpenBrowser(this, "Wiki", new Uri(GHConstants.GnollHackWikiPage));
+            }
+            else
+            {
+                /* Android seems to trigger app switching (OnSleep / OnResume) using OpenBrowser; use WebView instead */
+                var wikiPage = new WikiPage("Wiki", GHConstants.GnollHackWikiPage);
+                await GHApp.Navigation.PushModalAsync(wikiPage);
+            }
             MainLayout.IsEnabled = true;
         }
     }

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    windmain.c    $NHDT-Date: 1543465755 2018/11/29 04:29:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.101 $ */
 /* Copyright (c) Derek S. Ray, 2015. */
@@ -45,7 +45,7 @@ int NDECL(windows_nhgetch);
 void NDECL(windows_nhbell);
 int FDECL(windows_nh_poskey, (int *, int *, int *));
 void FDECL(windows_raw_print, (const char *));
-char FDECL(windows_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+char FDECL(windows_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, uint64_t));
 static void FDECL(windows_getlin_ex, (int, int, int, const char *, char *, const char*, const char*, const char*));
 extern int NDECL(windows_console_custom_nhgetch);
 void NDECL(safe_routines);
@@ -278,14 +278,7 @@ _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);*/
      * It seems you really want to play.
      */
 
-#if (defined(DUMPLOG) || defined(DUMPHTML)) && defined(DUMPLOG_DIR)
-     /* Make DUMPLOG_DIR if defined */
-    struct stat st = { 0 };
-
-    if (stat(DUMPLOG_DIR, &st) == -1) {
-        (void)mkdir(DUMPLOG_DIR);
-    }
-#endif
+    make_dumplog_dir();
 
     if (argc >= 1
         && (!strcmpi(default_window_sys, "mswin") || !strcmpi(default_window_sys, "nuklear") || !strcmpi(default_window_sys, "dll"))
@@ -445,6 +438,7 @@ attempt_restore:
         newgame();
         if (discover || CasualMode)
             You_ex(ATR_NONE, CLR_MSG_HINT, "are in %s mode.", get_game_mode_text(TRUE));
+        set_mouse_buttons();
     }
     else
     {
@@ -454,7 +448,6 @@ attempt_restore:
     }
 
     //    iflags.debug_fuzzer = TRUE;
-
     moveloop(resuming);
     //gnollhack_exit(EXIT_SUCCESS);
     /*NOTREACHED*/
@@ -848,7 +841,7 @@ const char *resp;
 const char* resp_desc;
 const char* introline;
 char def;
-unsigned long ynflags;
+uint64_t ynflags;
 {
     return '\033';
 }
@@ -1053,7 +1046,8 @@ windows_init_platform(VOID_ARGS)
 #ifdef USE_TILES
     process_tiledata(1, (const char*)0, glyph2tile, glyphtileflags);
 #endif
-
+    if(flags.right_click_command == 0 && flags.middle_click_command == 0)
+        flags.right_click_command = flags.middle_click_command = DEFCLICK_ROLE;
 }
 
 /*windmain.c*/

@@ -126,36 +126,6 @@ enum worm_tile_types
     MAX_WORM_TILES
 };
 
-struct replacement_info {
-    int signed_glyph;
-    int layer;
-    struct obj* object;
-    struct monst* monster;
-    unsigned long layer_flags;
-    unsigned long monster_flags;
-    unsigned long missile_flags;
-    unsigned char missile_material;
-    short missile_special_quality;
-};
-
-struct extended_menu_info {
-    struct obj* object;
-    struct monst* monster;
-    char heading_for_group_accelerator;
-    const char* attrs;
-    const char* colors;
-    int style; /* Generic style or subtype; used in menu data */
-    char special_mark;
-    int num_items; /* Number of items in e.g. category */
-    unsigned long menu_flags;
-};
-
-struct extended_create_window_info {
-    struct obj* object;
-    struct monst* monster;
-    unsigned long create_flags;
-};
-
 #define WINDOW_CREATE_FLAGS_NONE                0x00000000
 #define WINDOW_CREATE_FLAGS_ACTIVE              0x00000001
 #define WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS 0x00000002 /* For text window only; use menu flags for menu window */
@@ -483,6 +453,7 @@ enum screen_text_types {
     SCREEN_TEXT_SPECIAL_END,
     SCREEN_TEXT_BOSS_FIGHT,
     SCREEN_TEXT_EXTRA_LIFE_SPENT,
+    SCREEN_TEXT_SNAPSHOT,
 };
 
 enum popup_text_types {
@@ -734,13 +705,20 @@ enum gui_command_types {
     GUI_CMD_GAME_ENDED,
     GUI_CMD_ENABLE_TOURNAMENT_MODE,
     GUI_CMD_DISABLE_TOURNAMENT_MODE,
+    GUI_CMD_TOGGLE_MENU_POSITION_SAVING,
+    GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION,
+    GUI_CMD_SET_TO_BLACK,
+    GUI_CMD_FADE_FROM_BLACK_SLOWLY_NONBLOCKING,
+    GUI_CMD_REPORT_MOUSE_COMMAND,
+    GUI_CMD_TOGGLE_QUICK_ZAP_WAND,
+    GUI_CMD_TOGGLE_QUICK_CAST_SPELL,
 };
 
 enum game_status_types
 {
-    GAME_STATUS_START = 0,
-    GAME_STATUS_EVENT,
-    GAME_STATUS_ACHIEVEMENT,
+    GAME_STATUS_GENERAL_POST = 0,
+    GAME_STATUS_START,
+    GAME_STATUS_POST_IF_CLOUD_REPLAY_ON,
     GAME_STATUS_RESULT,
     GAME_STATUS_RESULT_ATTACHMENT,
 };
@@ -781,6 +759,7 @@ enum takeoff_wear_commands {
     TAKEOFF_WEAR_CMD_TAKEOFF = 0,
     TAKEOFF_WEAR_CMD_TAKEOFF_AND_WEAR,
     TAKEOFF_WEAR_CMD_EXCHANGE,
+    TAKEOFF_WEAR_CMD_WEAR,
 };
 
 enum yn_function_styles {
@@ -847,11 +826,6 @@ enum yn_function_styles {
 #define MINIMUM_DGN_LEVEL_LANDMINE      6
 #define MINIMUM_DGN_LEVEL_WEB           7
 #define MINIMUM_DGN_LEVEL_POLY_TRAP     8
-
-/*
- * type nhsym: loadable symbols go into this type
- */
-typedef long nhsym;
 
 #define DEF_HERE_WINDOW_MAX_SIZE 10
 
@@ -1001,7 +975,7 @@ enum cat_breeds {
 
 #define ARCHAEOLOGIST_PER_ARTIFACT_SCORE 30000L
 #define BARBARIAN_PER_WEAPON_SCORE 30000L
-#define CAVEMAN_PER_AMULET_OF_LIFE_SAVING_SCORE 70000L
+#define CAVEMAN_PER_AMULET_OF_LIFE_SAVING_SCORE 75000L
 #define CAVEMAN_PER_OTHER_AMULET_SCORE 15000L
 #define HEALER_PER_SPELL_LEVEL_SCORE 2000L
 #define KNIGHT_UNIQUE_MONSTER_PER_LEVEL_SCORE 200L
@@ -1013,7 +987,7 @@ enum cat_breeds {
 #define SAMURAI_PER_ITEM_SCORE 50000L
 #define SAMURAI_PER_AMMO_SCORE 1500L
 #define TOURIST_SELFIE_PER_LEVEL_SCORE 100L
-#define VALKYRIE_PER_ITEM_SCORE 60000L
+#define VALKYRIE_PER_ITEM_SCORE 75000L
 #define VALKYRIE_PER_AMMO_SCORE 1000L
 #define WIZARD_PER_SPELL_LEVEL_SCORE 1000L
 
@@ -1032,23 +1006,6 @@ enum cat_breeds {
 #define VALKYRIE_ROLE_ACHIEVEMENT_SCORE 40000L
 #define TOURIST_ROLE_ACHIEVEMENT_SCORE 50000L
 #define WIZARD_ROLE_ACHIEVEMENT_SCORE 50000L
-
-struct amulet_count_result
-{
-    long score;
-    long quantity;
-    long amulets_of_life_saving;
-    long other_amulets;
-};
-
-struct item_score_count_result
-{
-    long score;
-    long quantity;
-    long quantity_nonammo;
-    long quantity_ammo;
-};
-
 
 #endif /* GENERAL_H */
 

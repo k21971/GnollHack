@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    files.c    $NHDT-Date: 1546144856 2018/12/30 04:40:56 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.249 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -103,7 +103,7 @@ char lock[PL_NSIZ + 27]; /* long enough for username+-+name+.99 */
 #endif
 #endif
 
-#if defined(UNIX) || defined(__BEOS__)
+#if defined(UNIX) || defined(__BEOS__) || defined(GNH_MOBILE)
 #define SAVESIZE (PL_NSIZ + 13) /* save/99999player.e */
 #else
 #ifdef VMS
@@ -121,7 +121,7 @@ char lock[PL_NSIZ + 27]; /* long enough for username+-+name+.99 */
 #ifdef MICRO
 #define SAVE_EXTENSION ".sav"
 #endif
-#ifdef WIN32
+#if defined (WIN32) && !defined(GNH_MOBILE)
 #define SAVE_EXTENSION ".GnollHack-saved-game"
 #endif
 #endif
@@ -257,6 +257,7 @@ STATIC_DCL int FDECL(open_levelfile_exclusively, (const char *, int, int));
 
 STATIC_DCL void FDECL(livelog_write_string, (unsigned int, const char*));
 STATIC_DCL void FDECL(livelog_post_to_forum, (unsigned int, const char*));
+STATIC_DCL void FDECL(livelog_post_to_forum_rt, (unsigned int, struct u_realtime, const char*));
 STATIC_DCL int FDECL(copy_savefile, (const char*, const char*));
 
 #define INBUF_SIZ 4 * BUFSIZ
@@ -656,7 +657,7 @@ char errbuf[];
 /* This changes the soft limit */
 boolean
 increase_file_descriptor_limit_to_at_least(new_cur_minimum)
-unsigned long new_cur_minimum;
+uint64_t new_cur_minimum;
 {
     struct rlimit rlim;
     if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) 
@@ -665,7 +666,7 @@ unsigned long new_cur_minimum;
         {
             /* Limit the file descriptor number to lower of 32768 and current hard limit */
             rlim_t maxlimit = min((rlim_t)32768, rlim.rlim_max);
-            new_cur_minimum = min(new_cur_minimum, (unsigned long)maxlimit);
+            new_cur_minimum = min(new_cur_minimum, (uint64_t)maxlimit);
         }
         if (rlim.rlim_cur != RLIM_INFINITY && rlim.rlim_cur < (rlim_t)new_cur_minimum)
             rlim.rlim_cur = (rlim_t)new_cur_minimum;
@@ -1336,7 +1337,7 @@ boolean regularize_it;
     }
     Strcat(SAVEF, SAVE_EXTENSION);
 #else
-#if defined(WIN32)
+#if defined(WIN32) && !defined(GNH_MOBILE)
     {
         static const char okchars[] =
             "*ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-.";
@@ -1352,7 +1353,12 @@ boolean regularize_it;
         Sprintf(SAVEF, "%s%s", encodedfnamebuf, SAVE_EXTENSION);
     }
 #else  /* not VMS or MICRO or WIN32 */
-    Sprintf(SAVEF, "save/%d%s", (int) getuid(), plname);
+
+    char dir_separator = '/';
+#ifdef GNH_WIN
+    dir_separator = '\\';
+#endif
+    Sprintf(SAVEF, "save%c%d%s", dir_separator, (int)getuid(), plname);
     if (regularize_it)
         regularize(SAVEF + 5); /* avoid . or / in name */
 #endif /* WIN32 */
@@ -1723,7 +1729,7 @@ delete_running_files(VOID_ARGS)
 {
     int lev, fd;
     char errbuf[BUFSZ];
-#if defined(UNIX)
+#if defined(UNIX) || defined(GNH_MOBILE)
     Sprintf(lock, "%d%s", (int)getuid(), plname);
 #elif defined(WIN32)
     char fnamebuf[BUFSZ], encodedfnamebuf[BUFSZ];
@@ -2015,6 +2021,7 @@ int load_type; // 0 = at start normally, 1 = load after saving, corresponds to e
         {
         case 0:
             /* Welcome */
+            issue_simple_gui_command(GUI_CMD_FADE_FROM_BLACK_SLOWLY_NONBLOCKING);
             welcome(FALSE);
             check_special_room(FALSE);
             mode_message();
@@ -2196,7 +2203,47 @@ struct save_game_stats* stats_ptr;
 #endif /* 0 - WAS STORE_PLNAME_IN_FILE*/
 }
 
-#if defined(ANDROID) || defined(GNH_MOBILE)
+char*
+plname_from_running(filename, stats_ptr)
+const char* filename;
+struct save_game_stats* stats_ptr;
+{
+    int fd;
+    char* result = 0;
+    int savelev, hpid, pltmpsiz;
+    struct version_info version_data;
+    char savename[SAVESIZE];
+    struct savefile_info sfi;
+    char tmpplbuf[PL_NSIZ];
+
+    /* level 0 file contains:
+     *  pid of creating process (ignored here)
+     *  level number for current level of save file
+     *  name of save file nethack would have created
+     *  savefile info
+     *  player name
+     *  and game state
+     */
+    if ((fd = open(filename, O_RDONLY | O_BINARY, 0)) >= 0) {
+        if (read(fd, (genericptr_t)&hpid, sizeof hpid) == sizeof hpid
+            && read(fd, (genericptr_t)&savelev, sizeof(savelev)) == sizeof savelev
+            && read(fd, (genericptr_t)savename, sizeof savename) == sizeof savename
+            && read(fd, (genericptr_t)&version_data, sizeof version_data) == sizeof version_data
+            && read(fd, (genericptr_t)&sfi, sizeof sfi) == sizeof sfi
+            && read(fd, (genericptr_t)&pltmpsiz, sizeof pltmpsiz) == sizeof pltmpsiz
+            && pltmpsiz > 0 && pltmpsiz <= PL_NSIZ
+            && read(fd, (genericptr_t)&tmpplbuf, pltmpsiz) == pltmpsiz
+            && read(fd, (genericptr_t)stats_ptr, sizeof * stats_ptr) == sizeof * stats_ptr
+            ) {
+            result = dupstr(tmpplbuf);
+        }
+        close(fd);
+    }
+
+    return result;
+}
+
+#if defined(UNIX) && (defined(ANDROID) || defined(GNH_MOBILE))
 int is_error_savefile_name(savefilename)
 const char* savefilename;
 {
@@ -2275,46 +2322,6 @@ const struct dirent* entry;
     return is_imported_backup_savefile_name(entry->d_name);
 }
 
-
-char*
-plname_from_running(filename, stats_ptr)
-const char* filename;
-struct save_game_stats* stats_ptr;
-{
-    int fd;
-    char* result = 0;
-    int savelev, hpid, pltmpsiz;
-    struct version_info version_data;
-    char savename[SAVESIZE];
-    struct savefile_info sfi;
-    char tmpplbuf[PL_NSIZ];
-
-    /* level 0 file contains:
-     *  pid of creating process (ignored here)
-     *  level number for current level of save file
-     *  name of save file nethack would have created
-     *  savefile info
-     *  player name
-     *  and game state
-     */
-    if ((fd = open(filename, O_RDONLY | O_BINARY, 0)) >= 0) {
-        if (read(fd, (genericptr_t)&hpid, sizeof hpid) == sizeof hpid
-            && read(fd, (genericptr_t)&savelev, sizeof(savelev)) == sizeof savelev
-            && read(fd, (genericptr_t)savename, sizeof savename) == sizeof savename
-            && read(fd, (genericptr_t)&version_data, sizeof version_data) == sizeof version_data
-            && read(fd, (genericptr_t)&sfi, sizeof sfi) == sizeof sfi
-            && read(fd, (genericptr_t)&pltmpsiz, sizeof pltmpsiz) == sizeof pltmpsiz
-            && pltmpsiz > 0 && pltmpsiz <= PL_NSIZ
-            && read(fd, (genericptr_t)&tmpplbuf, pltmpsiz) == pltmpsiz 
-            && read(fd, (genericptr_t)stats_ptr, sizeof *stats_ptr) == sizeof *stats_ptr
-            ) {
-            result = dupstr(tmpplbuf);
-        }
-        close(fd);
-    }
-
-    return result;
-}
 #endif
 #endif /* defined(SELECTSAVED) */
 
@@ -2328,12 +2335,25 @@ get_saved_games()
 #ifdef WIN32
     {
         char *foundfile;
+        char  usedfoundfile[4096];
+        char  foundfileprefix[32];
+
         const char *fq_save;
         char fq_save_ebuf[BUFSZ];
         char fq_save_ibuf[BUFSZ];
+        char fq_lock_rbuf[BUFSZ];
+        char saved_plname[PL_NSIZ];
 
+        Strcpy(saved_plname, plname);
         Strcpy(plname, "*");
         set_savefile_name(FALSE);
+#ifdef GNH_WIN
+        Sprintf(fq_lock_rbuf, "%d*.0", getuid());
+        Strcpy(foundfileprefix, "save\\");
+#else
+        Strcpy(fq_lock_rbuf, "*-*.0");
+        Strcpy(foundfileprefix, "");
+#endif
 #if defined(ZLIB_COMP)
         Strcat(SAVEF, COMPRESS_EXTENSION);
 #endif
@@ -2348,6 +2368,7 @@ get_saved_games()
         int n = 0;
         int n2 = 0;
         int n3 = 0;
+        int n4 = 0;
         foundfile = foundfile_buffer();
         if (findfirst(fq_save)) {
             do {
@@ -2368,28 +2389,35 @@ get_saved_games()
                 } while (findnext());
             }
         }
+        if (findfirst(fq_lock_rbuf)) {
+            do {
+                ++n4;
+            } while (findnext());
+        }
 #endif
-        if (n > 0 || n2 > 0 || n3 > 0) {
-            result = (struct save_game_data*) alloc(((size_t)n + (size_t)n2 + (size_t)n3 + 1) * sizeof(struct save_game_data)); /* at most */
-            (void) memset((genericptr_t) result, 0, ((size_t)n + (size_t)n2 + (size_t)n3 + 1) * sizeof(struct save_game_data));
+        if (n > 0 || n2 > 0 || n3 > 0 || n4 > 0) 
+        {
+            result = (struct save_game_data*) alloc(((size_t)n + (size_t)n2 + (size_t)n3 + (size_t)n4 + 1) * sizeof(struct save_game_data)); /* at most */
+            (void) memset((genericptr_t) result, 0, ((size_t)n + (size_t)n2 + (size_t)n3 + (size_t)n4 + 1) * sizeof(struct save_game_data));
             if (n > 0)
             {
                 if (findfirst(fq_save)) {
                     j = n = 0;
                     do {
-                        if (is_backup_savefile_name(foundfile))
+                        Sprintf(usedfoundfile, "%s%s", foundfileprefix, foundfile);
+                        if (is_backup_savefile_name(usedfoundfile))
                             continue;
-                        if (is_imported_backup_savefile_name(foundfile))
+                        if (is_imported_backup_savefile_name(usedfoundfile))
                             continue;
                         char* r;
-                        r = plname_from_file(foundfile, &gamestats);
+                        r = plname_from_file(usedfoundfile, &gamestats);
                         if (r)
                         {
                             if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
                                 continue;
                             if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
                                 continue;
-                            result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, FALSE, FALSE);
+                            result[j++] = newsavegamedata(r, usedfoundfile, gamestats, FALSE, FALSE, FALSE);
                         }
                         ++n;
                     } while (findnext());
@@ -2400,17 +2428,18 @@ get_saved_games()
                 if (findfirst(fq_save_ebuf)) {
                     n2 = 0;
                     do {
-                        if (is_imported_backup_savefile_name(foundfile))
+                        Sprintf(usedfoundfile, "%s%s", foundfileprefix, foundfile);
+                        if (is_imported_backup_savefile_name(usedfoundfile))
                             continue;
                         char* r;
-                        r = plname_from_file(foundfile, &gamestats);
+                        r = plname_from_file(usedfoundfile, &gamestats);
                         if (r)
                         {
                             if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
                                 continue;
                             if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
                                 continue;
-                            result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, TRUE, FALSE);
+                            result[j++] = newsavegamedata(r, usedfoundfile, gamestats, FALSE, TRUE, FALSE);
                         }
                         ++n2;
                     } while (findnext());
@@ -2422,21 +2451,43 @@ get_saved_games()
                     n3 = 0;
                     do {
                         char* r;
-                        r = plname_from_file(foundfile, &gamestats);
+                        Sprintf(usedfoundfile, "%s%s", foundfileprefix, foundfile);
+                        r = plname_from_file(usedfoundfile, &gamestats);
                         if (r)
                         {
                             if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
                                 continue;
                             if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
                                 continue;
-                            boolean isimportederror = is_imported_error_savefile_name(foundfile);
-                            result[j++] = newsavegamedata(r, foundfile, gamestats, FALSE, isimportederror, TRUE);
+                            boolean isimportederror = is_imported_error_savefile_name(usedfoundfile);
+                            result[j++] = newsavegamedata(r, usedfoundfile, gamestats, FALSE, isimportederror, TRUE);
                         }
                         ++n3;
                     } while (findnext());
                 }
             }
+            if (n4 > 0)
+            {
+                if (findfirst(fq_lock_rbuf)) {
+                    n4 = 0;
+                    do {
+                        char* r;
+                        Sprintf(usedfoundfile, "%s%s", foundfileprefix, foundfile);
+                        r = plname_from_running(usedfoundfile, &gamestats);
+                        if (r)
+                        {
+                            if (TournamentMode && !(gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE))
+                                continue;
+                            if (!TournamentMode && (gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0)
+                                continue;
+                            result[j++] = newsavegamedata(r, usedfoundfile, gamestats, TRUE, FALSE, FALSE);
+                        }
+                        ++n4;
+                    } while (findnext());
+                }
+            }
         }
+        Strcpy(plname, saved_plname);
     }
 #elif defined(UNIX) && defined(QT_GRAPHICS)
     /* posixly correct version */
@@ -2485,7 +2536,7 @@ get_saved_games()
             closedir(dir);
         }
     }
-#elif defined(ANDROID) || defined(GNH_MOBILE)
+#elif defined(UNIX) && (defined(ANDROID) || defined(GNH_MOBILE))
     int myuid = getuid();
     struct dirent** namelist;
     struct dirent** namelist2;
@@ -3130,7 +3181,7 @@ int retryct;
     lockptr = -1;
 #endif
     while (--retryct && OPENFAILURE(lockptr)) {
-#if defined(WIN32) && !defined(WIN_CE)
+#if defined(WIN32) && !defined(WIN_CE) && !defined(GNH_WIN)
         lockptr = sopen(lockname, O_RDWR | O_CREAT, SH_DENYRW, S_IWRITE);
 #else
         (void) DeleteFile(lockname); /* in case dead process was here first */
@@ -3819,6 +3870,13 @@ char *origbuf;
             sysopt.debugfiles = dupstr(bufp);
         }
     } 
+    else if (src == SET_IN_SYS && match_varname(buf, "SNAPJSONFILE", 12)) {
+#if defined (DUMPLOG) || defined (DUMPHTML)
+        if (sysopt.snapjsonfile)
+            free((genericptr_t)sysopt.snapjsonfile);
+        sysopt.snapjsonfile = dupstr(bufp);
+#endif
+    }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPLOGFILE", 7))
     {
 #if defined (DUMPLOG)
@@ -3827,11 +3885,26 @@ char *origbuf;
         sysopt.dumplogfile = dupstr(bufp);
 #endif
     }
+    else if (src == SET_IN_SYS && match_varname(buf, "SNAPSHOTFILE", 8))
+    {
+#if defined (DUMPLOG)
+        if (sysopt.snapshotfile)
+            free((genericptr_t)sysopt.snapshotfile);
+        sysopt.snapshotfile = dupstr(bufp);
+#endif
+    }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTMLFILE", 12)) {
 #if defined (DUMPHTML)
         if (sysopt.dumphtmlfile)
             free((genericptr_t)sysopt.dumphtmlfile);
         sysopt.dumphtmlfile = dupstr(bufp);
+#endif
+    }
+    else if (src == SET_IN_SYS && match_varname(buf, "SNAPHTMLFILE", 12)) {
+#if defined (DUMPHTML)
+        if (sysopt.snaphtmlfile)
+            free((genericptr_t)sysopt.snaphtmlfile);
+        sysopt.snaphtmlfile = dupstr(bufp);
 #endif
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTMLFONTNAME", 16)) {
@@ -3843,7 +3916,7 @@ char *origbuf;
     }
     else if (src == SET_IN_SYS && match_varname(buf, "DUMPHTMLFONTLINK", 16)) {
 #if defined (DUMPHTML) && defined (DUMPHTML_WEBFONT_LINK)
-        if (sysopt.dumphtmlfile)
+        if (sysopt.dumphtmlfontlink)
             free((genericptr_t)sysopt.dumphtmlfontlink);
         sysopt.dumphtmlfontlink = dupstr(bufp);
 #endif
@@ -4165,7 +4238,7 @@ char *origbuf;
     } 
     else if (match_varname(buf, "SCREENMODE", 10)) 
     {
-        extern long amii_scrnmode;
+        extern int64_t amii_scrnmode;
 
         if (!stricmp(bufp, "req"))
             amii_scrnmode = 0xffffffff; /* Requester */
@@ -4566,7 +4639,7 @@ struct obj *obj;
         obj->ox = 0; /* index of main dungeon */
         obj->oy = 1; /* starting level number */
         obj->owornmask =
-            (long) (MIGR_WITH_HERO | MIGR_NOBREAK | MIGR_NOSCATTER);
+            (int64_t) (MIGR_WITH_HERO | MIGR_NOBREAK | MIGR_NOSCATTER);
     } else {
         (void) addinv(obj);
     }
@@ -5223,8 +5296,8 @@ const char *reason; /* explanation */
             int uid = getuid();
             char playmode = wizard ? 'D' : discover ? 'X' : CasualMode ? (ModernMode ? 'C' : 'R') : ModernMode ? 'M' : '-';
 
-            (void) fprintf(lfile, "%s %08ld %06ld %d %c: %s %s\n",
-                           version_string(buf), yyyymmdd(now), hhmmss(now),
+            (void) fprintf(lfile, "%s %08lld %06lld %d %c: %s %s\n",
+                           version_string(buf), (long long)yyyymmdd(now), (long long)hhmmss(now),
                            uid, playmode, type, reason);
 #endif /* !PANICLOG_FMT2 */
             (void) fclose(lfile);
@@ -5931,7 +6004,7 @@ const char* buffer;
                 if (*c1 == LLOG_SEP) *c1 = '_';
                 c1++;
             }
-            snprintf(tmpbuf, 1024, "lltype=%d%cplayer=%s%crole=%s%crace=%s%cgender=%s%calign=%s%cturns=%ld%crealtime=%ld%cstarttime=%ld%ccurtime=%ld%cmessage=%s\n",
+            snprintf(tmpbuf, 1024, "lltype=%d%cplayer=%s%crole=%s%crace=%s%cgender=%s%calign=%s%cturns=%lld%crealtime=%lld%cstarttime=%lld%ccurtime=%lld%cmessage=%s\n",
                 (ll_type & sysopt.livelog),
                 LLOG_SEP,
                 plname,
@@ -5944,12 +6017,12 @@ const char* buffer;
                 LLOG_SEP,
                 aligns[u.ualign.type == A_NONE ? 3 : 1 - u.ualign.type].filecode,
                 LLOG_SEP,
-                moves,
+                (long long)moves,
                 LLOG_SEP,
-                urealtime.realtime + (getnow() - urealtime.start_timing), LLOG_SEP,
-                (long)ubirthday,
+                (long long)(urealtime.realtime + ((int64_t)getnow() - urealtime.start_timing)), LLOG_SEP,
+                (long long)ubirthday,
                 LLOG_SEP,
-                (long)time(NULL),
+                (long long)time(NULL),
                 LLOG_SEP,
                 msgbuf);
 
@@ -5973,7 +6046,7 @@ const char* buffer UNUSED;
 
 void
 gamelog_add(glflags, gltime, str)
-long glflags, gltime;
+int64_t glflags, gltime;
 const char* str;
 {
     struct gamelog_line* tmp;
@@ -6014,6 +6087,16 @@ livelog_post_to_forum(ll_type, str)
 unsigned int ll_type;
 const char* str;
 {
+    struct u_realtime used_realtime = urealtime;
+    livelog_post_to_forum_rt(ll_type, used_realtime, str);
+}
+
+STATIC_OVL void
+livelog_post_to_forum_rt(ll_type, used_realtime, str)
+unsigned int ll_type;
+struct u_realtime used_realtime;
+const char* str;
+{
     if (!str)
         return;
 
@@ -6028,10 +6111,23 @@ const char* str;
             Sprintf(cbuf, "%.3s %.3s %.3s %.3s XL:%d", urole.filecode,
                 urace.filecode, genders[Ufemale].filecode,
                 aligns[1 - u.ualign.type].filecode, u.ulevel);
-            long currenttime = get_current_game_duration();
+            int64_t currenttime = calculate_current_game_duration(used_realtime);
             char* duration = format_duration_with_units(currenttime);
-            Sprintf(postbuf, "%s (%s) %s, on T:%ld (%s) [%s]", plname, cbuf, str, moves, duration, mbuf);
-            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_ACHIEVEMENT, (int)ll_type, postbuf);
+            Sprintf(postbuf, "%s (%s) %s, on T:%lld (%s) [%s]", plname, cbuf, str, (long long)moves, duration, mbuf);
+
+            int post_type;
+            if (ll_type & (LL_GAME_START | LL_GAME_RESTORE | LL_GAME_SAVE))
+            {
+                post_type = GAME_STATUS_POST_IF_CLOUD_REPLAY_ON;
+                if (ll_type & (LL_GAME_RESTORE | LL_GAME_SAVE))
+                {
+                    Sprintf(eos(postbuf), " [%llx]", (unsigned long long)used_realtime.finish_time);
+                }
+            }
+            else
+                post_type = GAME_STATUS_GENERAL_POST;
+
+            issue_gui_command(GUI_CMD_POST_GAME_STATUS, post_type, (int)ll_type, postbuf);
         }
     }
 }
@@ -6065,7 +6161,7 @@ int final;
             continue;
         if (!eventidx++)
             putstr(win, ATR_START_TABLE | ATR_TABLE_HEADER, " Turn  ");
-        Sprintf(buf, "%5ld: %s", llmsg->turn, llmsg->text);
+        Sprintf(buf, "%5lld: %s", (long long)llmsg->turn, llmsg->text);
         putstr(win, ATR_INDENT_AT_COLON | ATR_TABLE_ROW | (eventidx == 1 ? ATR_START_TABLE_BODY : 0) | (eventidx == eventcnt ? (ATR_END_TABLE_BODY | ATR_END_TABLE) : 0), buf);
     }
     /* since start of game is logged as a major event, 'eventcnt' should
@@ -6086,9 +6182,33 @@ VA_DECL2(unsigned int, ll_type, const char*, fmt)
     VA_START(fmt);
     VA_INIT(fmt, char*);
     vsnprintf(ll_msgbuf, 512, fmt, VA_ARGS);
-    gamelog_add((long)ll_type, moves, ll_msgbuf);
+    gamelog_add((int64_t)ll_type, moves, ll_msgbuf);
     livelog_write_string(ll_type, ll_msgbuf);
     livelog_post_to_forum(ll_type, ll_msgbuf);
+    VA_END();
+}
+
+void
+post_to_forum_printf
+VA_DECL2(unsigned int, ll_type, const char*, fmt)
+{
+    char ll_msgbuf[512];
+    VA_START(fmt);
+    VA_INIT(fmt, char*);
+    vsnprintf(ll_msgbuf, 512, fmt, VA_ARGS);
+    livelog_post_to_forum(ll_type, ll_msgbuf);
+    VA_END();
+}
+
+void
+post_to_forum_rt_printf
+VA_DECL3(unsigned int, ll_type, struct u_realtime, used_realtime, const char*, fmt)
+{
+    char ll_msgbuf[512];
+    VA_START(fmt);
+    VA_INIT(fmt, char*);
+    vsnprintf(ll_msgbuf, 512, fmt, VA_ARGS);
+    livelog_post_to_forum_rt(ll_type, used_realtime, ll_msgbuf);
     VA_END();
 }
 
@@ -6107,10 +6227,10 @@ char* buf;
     size_t slen, len = 0;
     char tmpbuf[BUFSZ];
     char verbuf[BUFSZ];
-    long uid;
+    int64_t uid;
     time_t now = getnow();
 
-    uid = (long)getuid();
+    uid = (int64_t)getuid();
 
     /*
      * Note: %t and %T assume that time_t is a 'long int' number of
@@ -6133,17 +6253,17 @@ char* buf;
                 Sprintf(tmpbuf, "%%");
                 break;
             case 't': /* game start, timestamp */
-                Sprintf(tmpbuf, "%lu", (unsigned long)ubirthday);
+                Sprintf(tmpbuf, "%llu", (unsigned long long)ubirthday);
                 break;
             case 'T': /* current time, timestamp */
-                Sprintf(tmpbuf, "%lu", (unsigned long)now);
+                Sprintf(tmpbuf, "%llu", (unsigned long long)now);
                 break;
             case 'd': /* game start, YYYYMMDDhhmmss */
-                Sprintf(tmpbuf, "%08ld%06ld",
-                    yyyymmdd(ubirthday), hhmmss(ubirthday));
+                Sprintf(tmpbuf, "%08lld%06lld",
+                    (long long)yyyymmdd(ubirthday), (long long)hhmmss(ubirthday));
                 break;
             case 'D': /* current time, YYYYMMDDhhmmss */
-                Sprintf(tmpbuf, "%08ld%06ld", yyyymmdd(now), hhmmss(now));
+                Sprintf(tmpbuf, "%08lld%06lld", (long long)yyyymmdd(now), (long long)hhmmss(now));
                 break;
             case 'v': /* version, eg. "3.6.2-0" */
                 Sprintf(tmpbuf, "%s", version_string(verbuf));
@@ -6285,10 +6405,10 @@ char* wishstring;
 
     fp = fopen_datafile(wish_tracker_file, "a+", LEVELPREFIX);
     if (fp) {
-        Sprintf(bigbuf, "%s wished for %s (%ld%s wish, on T:%ld on %08ld at %06ld hrs)\n",
+        Sprintf(bigbuf, "%s wished for %s (%ld%s wish, on T:%lld on %08lld at %06lld hrs)\n",
             plname, wishstring, u.uconduct.wishes,
             u.uconduct.wishes == 1 ? "st" : u.uconduct.wishes == 2 ? "nd" :
-            u.uconduct.wishes == 3 ? "rd" : "th", moves, yyyymmdd(now), hhmmss(now));
+            u.uconduct.wishes == 3 ? "rd" : "th", (long long)moves, (long long)yyyymmdd(now), (long long)hhmmss(now));
         fwrite(bigbuf, strlen(bigbuf), 1, fp);
         fclose(fp);
     }
@@ -6459,5 +6579,39 @@ out_error:
     errno = saved_errno;
     return -1;
 }
+
+void
+make_dumplog_dir(VOID_ARGS)
+{
+#if (defined(DUMPLOG) || defined(DUMPHTML))
+#if defined(DUMPLOG_DIR)
+    /* Make DUMPLOG_DIR if defined */
+    struct stat st = { 0 };
+
+    if (stat(DUMPLOG_DIR, &st) == -1)
+    {
+#if WIN32
+        (void)mkdir(DUMPLOG_DIR);
+#else
+        (void)mkdir(DUMPLOG_DIR, 0700);
+#endif
+    }
+#endif
+#if defined(SNAPSHOT_DIR)
+    /* Make SNAPSHOT_DIR if defined */
+    struct stat st2 = { 0 };
+
+    if (stat(SNAPSHOT_DIR, &st2) == -1)
+    {
+#if WIN32
+        (void)mkdir(SNAPSHOT_DIR);
+#else
+        (void)mkdir(SNAPSHOT_DIR, 0700);
+#endif
+    }
+#endif
+#endif
+}
+
 
 /*files.c*/

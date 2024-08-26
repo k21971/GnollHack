@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    options.c    $NHDT-Date: 1554591224 2019/04/06 22:53:44 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.363 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -47,6 +47,7 @@ enum window_option_types {
 #define PILE_LIMIT_DFLT 5
 #define HERE_WIN_SIZ_DFLT 8
 #define DEFAULT_PILE_LIMIT (iflags.wc2_herewindow ? iflags.wc2_here_window_size + 1 : PILE_LIMIT_DFLT)
+const char* mouse_cmd_names[MAX_CLICK_TYPES] = { "default", "by role", "?", "off", "look", "move", "cast", "fire", "zap" };
 
 /*
  *  NOTE:  If you add (or delete) an option, please update the short
@@ -411,6 +412,7 @@ static struct Comp_Opt {
     { "menu_select_all", "select all items in a menu", 4, SET_IN_FILE },
     { "menu_select_page", "select all items on this page of a menu", 4,
       SET_IN_FILE },
+    { "middle_click_command", "command upon clicking middle mouse button", 32, SET_IN_GAME },
     { "monsters", "the symbols to use for monsters", MAX_MONSTER_CLASSES,
       SET_IN_FILE },
     { "move_interval", "normal movement interval in milliseconds", 3, SET_IN_GAME },
@@ -462,6 +464,7 @@ static struct Comp_Opt {
     { "ramgender", "the gender of your (first) ram (e.g., ramgender:male)", 7, DISP_IN_GAME },
     { "ramname", "the name of your (first) ram (e.g., ramname:Silver)",
       PL_PSIZ, DISP_IN_GAME },
+    { "right_click_command", "command upon clicking right mouse button", 32, SET_IN_GAME },
     { "role", "your starting role (e.g., Barbarian, Valkyrie)", PL_CSIZ,
       DISP_IN_GAME },
     { "runmode", "display frequency when `running' or `travelling'",
@@ -1106,7 +1109,7 @@ boolean tp_is_nhsym;
     static NEARDATA const char oct[] = "01234567", dec[] = "0123456789",
                                hex[] = "00112233445566778899aAbBcCdDeEfF";
     const char *dp;
-    long cval, dcount;
+    int64_t cval, dcount;
     int meta;
     nhsym* tp_nhsym = (nhsym*)tp;
     char* tp_char = (char*)tp;
@@ -1362,7 +1365,7 @@ char *op;
 const char *optn;
 {
     char buf[BUFSZ];
-    unsigned long fnv = get_feature_notice_ver(op); /* version.c */
+    uint64_t fnv = get_feature_notice_ver(op); /* version.c */
 
     if (fnv == 0L)
         return 0;
@@ -1379,8 +1382,8 @@ const char *optn;
 
     flags.suppress_alert = fnv;
     if (!initial) {
-        Sprintf(buf, "%lu.%lu.%lu", FEATURE_NOTICE_VER_MAJ,
-                FEATURE_NOTICE_VER_MIN, FEATURE_NOTICE_VER_PATCH);
+        Sprintf(buf, "%llu.%llu.%llu", (unsigned long long)FEATURE_NOTICE_VER_MAJ,
+            (unsigned long long)FEATURE_NOTICE_VER_MIN, (unsigned long long)FEATURE_NOTICE_VER_PATCH);
         pline(
           "Feature change alerts disabled for GnollHack %s features and prior.",
               buf);
@@ -3107,7 +3110,7 @@ boolean tinitial, tfrom_file;
         ) {
         int color_number, color_incr;
 
-#ifndef WIN32
+#if !(defined(WIN32) && !defined(GNH_WIN))
         if (duplicate)
             complain_about_duplicate(opts, 1);
 #endif
@@ -3129,7 +3132,7 @@ boolean tinitial, tfrom_file;
             color_number = 0;
             color_incr = 1;
         }
-#ifdef WIN32
+#if defined(WIN32) && !defined(GNH_WIN)
         op = string_for_opt(opts, TRUE);
         if (!alternative_palette(op)) {
             config_error_add("Error in palette parameter '%s'", op);
@@ -3139,7 +3142,7 @@ boolean tinitial, tfrom_file;
         if ((op = string_for_opt(opts, FALSE)) != (char *) 0) {
             char *pt = op;
             int cnt, tmp, reverse;
-            long rgb;
+            int64_t rgb;
 
             while (*pt && color_number >= 0) {
                 cnt = 3;
@@ -4298,7 +4301,7 @@ boolean tinitial, tfrom_file;
         || match_optname(opts, "term_columns", 9, TRUE)
         /* different option but identical handlng */
         || (fullname = "term_rows", match_optname(opts, fullname, 8, TRUE))) {
-        long ltmp;
+        int64_t ltmp;
 
         op = string_for_opt(opts, negated);
         ltmp = atol(op);
@@ -4307,7 +4310,7 @@ boolean tinitial, tfrom_file;
             retval = FALSE;
 
         /* this just checks atol() sanity, not logical window size sanity */
-        } else if (ltmp <= 0L || ltmp >= (long) LARGEST_INT) {
+        } else if (ltmp <= 0L || ltmp >= (int64_t) LARGEST_INT) {
             config_error_add("Invalid %s: %ld", fullname, ltmp);
             retval = FALSE;
 
@@ -4884,6 +4887,65 @@ boolean tinitial, tfrom_file;
         return retval;
     }
 
+    fullname = "right_click_command";
+    fullname2 = "middle_click_command";
+    boolean is_middle = match_optname(opts, fullname2, 20, TRUE);
+    if (is_middle || match_optname(opts, fullname, 19, TRUE))
+    {
+        int itmp = 0;
+
+        op = string_for_opt(opts, negated);
+        if (negated)
+        {
+            bad_negation(fullname, TRUE);
+            itmp = 0;
+            retval = FALSE;
+        }
+        else if (op)
+        {
+            boolean found = FALSE;
+            for (i = 0; i < SIZE(mouse_cmd_names); i++) {
+                if (i >= 2 && i <= 2)
+                    continue;
+                if (!strcmp(op, mouse_cmd_names[i]))
+                {
+                    found = TRUE;
+                    itmp = i;
+                    break;
+                }
+            }
+            if(!found)
+                itmp = -1;
+        }
+
+        if (itmp < 0)
+        {
+            char valuesbuf[BUFSZ * 2] = "";
+            for (i = 0; i < SIZE(mouse_cmd_names); i++) {
+                if (i >= 2 && i <= 2)
+                    continue;
+                if (*valuesbuf)
+                {
+                    Strcat(valuesbuf, ", ");
+                    if(i == SIZE(mouse_cmd_names) - 1)
+                        Strcat(valuesbuf, "or ");
+                }
+                Strcat(valuesbuf, mouse_cmd_names[i]);
+            }
+
+            config_error_add("'%s' requires one of the following values: %s", is_middle ? fullname2 : fullname, valuesbuf);
+            retval = FALSE;
+        }
+        else
+        {
+            if(is_middle)
+                flags.middle_click_command = (uchar)itmp;
+            else
+                flags.right_click_command = (uchar)itmp;
+        }
+        return retval;
+    }
+
     fullname = "run_spot_distance";
     if (match_optname(opts, fullname, 17, TRUE))
     {
@@ -5267,6 +5329,10 @@ boolean tinitial, tfrom_file;
             {
                     need_redraw = TRUE;
                     need_issue_gui_command = TRUE;
+            }
+            else if (boolopt[i].addr == &flags.self_click_action)
+            {
+                issue_boolean_gui_command(GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION, flags.self_click_action);
             }
             else if (boolopt[i].addr == &flags.classic_statue_symbol || boolopt[i].addr == &flags.classic_colors || boolopt[i].addr == &flags.show_decorations)
             {
@@ -6547,6 +6613,35 @@ boolean setinitial, setfromfile;
             free((genericptr_t)mode_pick);
         }
         destroy_nhwindow(tmpwin);
+    } else if (!strcmp("right_click_command", optname) || !strcmp("middle_click_command", optname)) {
+        boolean is_middle = !strcmp("middle_click_command", optname);
+        menu_item *mode_pick = (menu_item *) 0;
+
+        tmpwin = create_nhwindow(NHW_MENU);
+        start_menu(tmpwin);
+        any = zeroany;
+        for (i = 0; i < SIZE(mouse_cmd_names); i++) {
+            if (i >= 1 && i <= 2)
+                continue;
+            any.a_int = i + 1;
+            add_menu(tmpwin, NO_GLYPH, &any, 'a' + i, 0, ATR_NONE, NO_COLOR,
+                mouse_cmd_names[i], MENU_UNSELECTED);
+        }
+        end_menu(tmpwin, is_middle ? "Select middle button command:" : "Select right button command:");
+        if (select_menu(tmpwin, PICK_ONE, &mode_pick) > 0) {
+            int res = mode_pick->item.a_int - 1;
+            if (is_middle)
+                flags.middle_click_command = (uchar)res;
+            else
+                flags.right_click_command = (uchar)res;
+            free((genericptr_t) mode_pick);
+            /* Notification is needed */
+            if (is_middle)
+                issue_gui_command(GUI_CMD_REPORT_MOUSE_COMMAND, (int)flags.middle_click_command, 1, (const char*)0);
+            else
+                issue_gui_command(GUI_CMD_REPORT_MOUSE_COMMAND, (int)flags.right_click_command, 0, (const char*)0);
+        }
+        destroy_nhwindow(tmpwin);
     } else if (!strcmp("menu_headings", optname)) {
         int mhattr = query_attr("How to highlight menu headings:");
 
@@ -7266,8 +7361,8 @@ char *buf;
         if (!iflags.hilite_delta)
             Strcpy(buf, "0 (off: don't highlight status fields)");
         else
-            Sprintf(buf, "%ld (on: highlight status for %ld turns)",
-                    iflags.hilite_delta, iflags.hilite_delta);
+            Sprintf(buf, "%lld (on: highlight status for %lld turns)",
+                (long long)iflags.hilite_delta, (long long)iflags.hilite_delta);
 #endif
     } 
     else if (!strcmp(optname,"statuslines"))
@@ -7313,6 +7408,12 @@ char *buf;
         Strcpy(dlbuf, flags.max_hint_difficulty < MIN_DIFFICULTY_LEVEL ? "off" : get_game_difficulty_text(flags.max_hint_difficulty));
         Sprintf(buf, "%s (%d)", dlbuf, (int)flags.max_hint_difficulty);
     }
+    else if (!strcmp(optname, "right_click_command") || !strcmp(optname, "middle_click_command"))
+    {
+        boolean is_middle = !strcmp(optname, "middle_click_command");
+        uchar cmdidx = is_middle ? flags.middle_click_command : flags.right_click_command;
+        Sprintf(buf, "%s", cmdidx >= MAX_CLICK_TYPES ? "invalid" : mouse_cmd_names[cmdidx]);
+    }
     else if (!strcmp(optname, "run_spot_distance"))
     {
         if(iflags.run_spot_distance <= 0)
@@ -7352,8 +7453,8 @@ char *buf;
         if (flags.suppress_alert == 0L)
             Strcpy(buf, none);
         else
-            Sprintf(buf, "%lu.%lu.%lu", FEATURE_NOTICE_VER_MAJ,
-                    FEATURE_NOTICE_VER_MIN, FEATURE_NOTICE_VER_PATCH);
+            Sprintf(buf, "%llu.%llu.%llu", (unsigned long long)FEATURE_NOTICE_VER_MAJ,
+                (unsigned long long)FEATURE_NOTICE_VER_MIN, (unsigned long long)FEATURE_NOTICE_VER_PATCH);
     } else if (!strcmp(optname, "symset")) {
         Sprintf(buf, "%s",
                 symset[PRIMARY].name ? symset[PRIMARY].name : "default");
@@ -8225,7 +8326,7 @@ int status;
  */
 void
 set_wc_option_mod_status(optmask, status)
-unsigned long optmask;
+uint64_t optmask;
 int status;
 {
     int k = 0;
@@ -8283,7 +8384,7 @@ const char *optnam;
 
 void
 set_wc2_option_mod_status(optmask, status)
-unsigned long optmask;
+uint64_t optmask;
 int status;
 {
     int k = 0;

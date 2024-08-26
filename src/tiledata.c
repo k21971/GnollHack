@@ -44,6 +44,11 @@ NEARDATA const struct game_cursor_definition game_cursors[MAX_CURSORS] =
     {"spell", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"pay", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"invisible", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-cursor-1", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-cursor-2", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-cursor-3", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-cursor-4", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-cursor-5", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
 };
 
 /* Hit tile */
@@ -71,6 +76,16 @@ NEARDATA const struct hit_tile_definition hit_tile_definitions[MAX_HIT_TILES] =
     {"drain-level", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"slow", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"hallucinated", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-1", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-2", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-3", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-4", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-5", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-6", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-7", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-8", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-9", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-hit-tile-10", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
 };
 
 /* General tile */
@@ -82,21 +97,27 @@ NEARDATA const struct general_tile_definition general_tile_definitions[MAX_GENER
     {"chain-down", CHAIN_DOWN_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"chain-left", CHAIN_LEFT_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
     {"chain-main", CHAIN_MAIN_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-general-tile-1", CHAIN_MAIN_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
+    {"reserved-general-tile-2", CHAIN_MAIN_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT},
 };
 
 NEARDATA struct ui_component_definition ui_tile_component_array[MAX_UI_TILES] = {
     {"general-ui",              NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 3, 16, 16, {"checkbox-unchecked", "checkbox-checked", "checkbox-count", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
-    {"status",                  NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, MAX_STATUS_MARKS, 16, 16, {"petmark", "peacemark", "detectmark", "bounty", "satiated", "hungry", "weak", "faint", "burdened",  "stressed", "strained", "overtaxed", "overloaded",  "two-weapon", "skill", "saddled", "low-hp",  "critical-hp", "spec-used", "trapped", "ustuck",  "inventory", "townguard-peaceful", "townguard-hostile", "",  "", "", "", "",  "", "", ""} },
+    {"status",                  NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, min(min(MAX_UI_TILE_16_x_16_COMPONENTS, MAX_UI_TILE_COMPONENTS), MAX_STATUS_MARKS), 16, 16, {"petmark", "peacemark", "detectmark", "bounty", "satiated", "hungry", "weak", "faint", "burdened",  "stressed", "strained", "overtaxed", "overloaded",  "two-weapon", "skill", "saddled", "low-hp",  "critical-hp", "spec-used", "trapped", "ustuck",  "inventory", "townguard-peaceful", "townguard-hostile", "",  "", "", "", "",  "", "", ""} },
+    {"status2",                 NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, min(min(MAX_UI_TILE_16_x_16_COMPONENTS, MAX_UI_TILE_COMPONENTS), max(0, MAX_STATUS_MARKS - MAX_UI_TILE_16_x_16_COMPONENTS)), 16, 16, {"", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"conditions",              NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, min(min(MAX_UI_TILE_16_x_16_COMPONENTS, MAX_UI_TILE_COMPONENTS), BL_MASK_BITS), 16, 16, {"", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
+    {"conditions2",             NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, min(min(MAX_UI_TILE_16_x_16_COMPONENTS, MAX_UI_TILE_COMPONENTS), max(0, BL_MASK_BITS - MAX_UI_TILE_16_x_16_COMPONENTS)), 16, 16, {"", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"main-tile-mark",          NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 1, 64, 96, {"whole", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"u-tile-mark",             NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 1, 64, 96, {"whole", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"item-autodraw-graphics",  NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 1, 64, 96, {"whole", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"item2-autodraw-graphics", NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 1, 64, 96, {"whole", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"item-property-marks",     NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, min(min(MAX_UI_TILE_8_x_24_COMPONENTS, MAX_UI_TILE_COMPONENTS), MAX_ITEM_PROPERTY_MARKS), 8, 24, {"poisoned", "death-magical", "flaming", "freezing",  "electrified", "exceptional",  "elite", "celestial", "primordial", "infernal", "mythic", "legendary", "corroded", "rotted", "burnt", "rusty",  "very-corroded", "very-rotted", "very-burnt", "very-rusty", "thoroughly-corroded", "thoroughly-rotted", "thoroughly-burnt", "thoroughly-rusty",  "", "", "", "",  "", "", "", "" } },
+    {"item2-property-marks",    NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, min(min(MAX_UI_TILE_8_x_24_COMPONENTS, MAX_UI_TILE_COMPONENTS), max(0, MAX_ITEM_PROPERTY_MARKS - MAX_UI_TILE_8_x_24_COMPONENTS)),  8, 24, {"", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"jar-graphics",            NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"background", "contents", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"jar-foreground",          NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"transparent", "opaque", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"jar2-graphics",           NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"background", "contents", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
     {"jar3-graphics",           NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 2, 64, 48, {"background", "contents", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
+    {"reserved-ui-tile-1",      NO_REPLACEMENT, NO_ANIMATION, NO_ENLARGEMENT, 0, 16, 16, {"", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", "",  "", "", "", ""} },
 };
 
 NEARDATA struct command_tile_definition command_tile_definitions[MAX_COMMAND_TILES] = {
@@ -117,6 +138,14 @@ NEARDATA struct command_tile_definition command_tile_definitions[MAX_COMMAND_TIL
     { "monster" },
     { "sort-spells" },
     { "reorder-spells" },
+    { "set-quick-spell" },
+    { "cast-quick-spell" },
+    { "cast-spell" },
+    { "move-spell-to-top" },
+    { "move-spell-to-bottom" },
+    { "forget-spell" },
+    { "cancel" },
+    { "ok" },
     { "no-command" },
     { "no-command" },
     { "no-command" },
@@ -161,9 +190,9 @@ init_tiledata()
     int i;
     for (i = 0; i < BL_MASK_BITS; i++)
     {
-        unsigned long bit = 1UL << i;
+        uint64_t bit = (uint64_t)1 << i;
         const char* cond_name = get_condition_name(bit);
-        ui_tile_component_array[CONDITION_MARKS].component_names[min(i, MAX_UI_TILE_COMPONENTS)] = cond_name;
+        ui_tile_component_array[CONDITION_MARKS + i / MAX_UI_TILE_16_x_16_COMPONENTS].component_names[min((i % MAX_UI_TILE_16_x_16_COMPONENTS), MAX_UI_TILE_COMPONENTS)] = cond_name;
     }
 
 }
@@ -182,7 +211,7 @@ uchar* tilemapflags;
     const char* set_name;
     int fd, i, j, k, l;
     int tile_count = 0;
-    char buf[BUFSIZ];
+    char buf[BUFSZ * 2];
     Strcpy(buf, "");
     int glyph_offset = 0;
     int roleidx, raceidx, gender, alignment, glevel;
@@ -277,7 +306,7 @@ uchar* tilemapflags;
 
                 if (spset > ACTION_TILE_NO_ACTION && spset < MAX_ACTION_TILES)
                 {
-                    unsigned long m5_action_flag = M5_ATTACK_TILE << (spset - 1);
+                    uint64_t m5_action_flag = (uint64_t)M5_ATTACK_TILE << (spset - 1);
                     if (tsd->action_tile_style[spset] == 2 && !(mons[i].mflags5 & m5_action_flag))
                         continue;
                 }
@@ -314,7 +343,7 @@ uchar* tilemapflags;
 
                 if (process_style == 0)
                 {
-                    char monnamebuf[BUFSIZ];
+                    char monnamebuf[BUFSZ * 2];
                     boolean is_human_were = (mons[i].mlet == S_HUMAN && !strncmp(mons[i].mname, "were", 4));
                     Sprintf(monnamebuf, "%s%s", is_human_were ? "human-" : "", mons[i].mname);
 
@@ -2327,12 +2356,12 @@ uchar* tilemapflags;
 
                 if (process_style == 0)
                 {
-                    char tilebuf[BUFSIZ];
+                    char tilebuf[BUFSZ * 2];
                     Strcpy(tilebuf, "");
 //                    if (enl_anim_tile_idx >= 0)
 //                        Sprintf(tilebuf, "_tile-%d", enl_anim_tile_idx);
 
-                    char enlbuf[BUFSIZ];
+                    char enlbuf[BUFSZ * 2];
                     Sprintf(enlbuf, "%s%s", enlargements[i].enlargement_name ? enlargements[i].enlargement_name : "unknown enlargement",
                         tilebuf);
 
@@ -2408,7 +2437,7 @@ uchar* tilemapflags;
             enum action_tile_types action;
             for (action = ACTION_TILE_NO_ACTION; action < MAX_ACTION_TILES; action++)
             {
-                unsigned long m5_action_flag = action == ACTION_TILE_NO_ACTION ? 0UL : M5_ATTACK_TILE << (action - 1);
+                uint64_t m5_action_flag = action == ACTION_TILE_NO_ACTION ? 0UL : M5_ATTACK_TILE << (action - 1);
                 boolean has_this_action = action == ACTION_TILE_NO_ACTION ? TRUE : (mons[i].mflags5 & m5_action_flag) != 0;
                 int repl;
                 if (!has_this_action)
@@ -2485,7 +2514,7 @@ uchar* tilemapflags;
 
             for (action = ACTION_TILE_NO_ACTION; action < MAX_ACTION_TILES; action++)
             {
-                unsigned long m5_action_flag = action == ACTION_TILE_NO_ACTION ? 0UL : M5_ATTACK_TILE << (action - 1);
+                uint64_t m5_action_flag = action == ACTION_TILE_NO_ACTION ? 0UL : M5_ATTACK_TILE << (action - 1);
                 boolean has_this_action = action == ACTION_TILE_NO_ACTION ? TRUE : (mons[i].mflags5 & m5_action_flag) != 0;
                 int repl;
                 if (!has_female_tile)

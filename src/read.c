@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    read.c    $NHDT-Date: 1546465285 2019/01/02 21:41:25 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.164 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -311,7 +311,7 @@ doread()
         pline_ex(ATR_NONE, CLR_MSG_TEXT, "\"%d0%d %ld%d1 0%d%d0\"%s",
               (((int) scroll->o_id % 89) + 10),
               ((int) scroll->o_id % 4),
-              ((((long) scroll->o_id * 499L) % 899999L) + 100000L),
+              ((((int64_t) scroll->o_id * 499L) % 899999L) + 100000L),
               ((int) scroll->o_id % 10),
               (!((int) scroll->o_id % 3)),
               (((int) scroll->o_id * 7) % 10),
@@ -1270,7 +1270,7 @@ boolean dopopup;
         }
         else
         {
-            //long mask = is_on ? (obj == uleft ? LEFT_RING : RIGHT_RING) : 0L;
+            //int64_t mask = is_on ? (obj == uleft ? LEFT_RING : RIGHT_RING) : 0L;
 
             if (s == 0)
                 play_sfx_sound(SFX_ENCHANT_ITEM_GENERAL_FAIL);
@@ -2025,7 +2025,7 @@ struct monst* targetmonst;
                     updatemaxen();
                     updatemaxhp();
                 }
-                make_stunned((HStun & TIMEOUT) + (long)rn1(10, 10), TRUE);
+                make_stunned((HStun & TIMEOUT) + (int64_t)rn1(10, 10), TRUE);
             }
         }
     }   break;
@@ -2334,6 +2334,8 @@ struct monst* targetmonst;
         if (!Conflict)
         {
             You_feel_ex(ATR_NONE, CLR_MSG_WARNING, "like a rabble-rouser.");
+            if (!u.uconduct.conflicts++)
+                livelog_printf(LL_CONDUCT, "caused conflict for the first time");
             known = TRUE;
         }
         play_sfx_sound(SFX_CONFLICT);
@@ -2944,7 +2946,7 @@ struct monst* targetmonst;
         }
         else
         {
-            Sprintf(effbuf, "%s tingle.", makeplural(body_part(FINGER)));
+            Sprintf(effbuf, "Your %s tingle.", makeplural(body_part(FINGER)));
             pline_ex1_popup(ATR_NONE, CLR_MSG_ATTENTION, effbuf, "Tingling", is_serviced_spell);
         }
 
@@ -3813,7 +3815,6 @@ do_class_genocide()
                     || ((mons[i].geno & G_GENO)
                         && !(mvitals[i].mvflags & MV_GENOCIDED))) 
                 {
-                    int prevnumgenocided = num_genocides();
                     /* This check must be first since player monsters might
                      * have MV_GENOCIDED or !G_GENO.
                      */
@@ -3830,7 +3831,7 @@ do_class_genocide()
 
                     if (!ll_done++) 
                     {
-                        if (!prevnumgenocided)
+                        if (!u.uconduct.genocides++)
                             livelog_printf(LL_CONDUCT | LL_GENOCIDE,
                                 "performed %s first genocide (monsters from class %c, %s)",
                                 uhis(), def_monsyms[class].sym, def_monsyms[class].name);
@@ -4048,7 +4049,6 @@ int how;
 
     if (how & REALLY) 
     {
-        int prevnumgenocided = num_genocides();
         play_sfx_sound(SFX_GENOCIDE);
 
         /* setting no-corpse affects wishing and random tin generation */
@@ -4056,7 +4056,7 @@ int how;
         pline("Wiped out %s%s.", which, pluralbuf);
               //(*which != 'a') ? buf : makeplural(buf));
 
-        if (!prevnumgenocided)
+        if (!u.uconduct.genocides++)
             livelog_printf(LL_CONDUCT | LL_GENOCIDE,
                 "performed %s first genocide (%s)", uhis(), pluralbuf);
         else
@@ -4355,7 +4355,7 @@ struct _create_particular_data *d;
             whichpm = rndmonst();
 
         /* 'is_FOO()' ought to be called 'always_FOO()' */
-        unsigned long genderflag = 0UL;
+        uint64_t genderflag = 0UL;
         if (d->fem != -1 && !is_male(whichpm) && !is_female(whichpm) && !is_neuter(whichpm))
         {
             if(d->fem == 0)
@@ -4695,7 +4695,7 @@ boolean confused; /* Is caster confused */
         special_effect_wait_until_end(0);
         for (obj = objchn; obj; obj = obj->nobj)
         {
-            long wornmask;
+            int64_t wornmask;
 
             /* gold isn't subject to cursing and blessing */
             if (obj->oclass == COIN_CLASS)

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    global.h    $NHDT-Date: 1557254325 2019/05/07 18:38:45 $  $NHDT-Branch: GnollHack-3.6.2 $:$NHDT-Revision: 1.71 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -156,9 +156,10 @@ typedef xchar boolean; /* 0 or 1 */
 #endif
 
 #ifdef WIN32
-#ifdef WIN_CE
+#if defined(WIN_CE)
 #include "wceconf.h"
-#else
+#endif
+#if !defined(GNH_WIN)
 #include "ntconf.h"
 #endif
 #endif
@@ -173,6 +174,10 @@ typedef xchar boolean; /* 0 or 1 */
 
 #ifdef GNH_IOS
 #include "iosconf.h"
+#endif
+
+#ifdef GNH_WIN
+#include "winconf.h"
 #endif
 
 /* Displayable name of this port; don't redefine if defined in *conf.h */
@@ -297,7 +302,7 @@ typedef xchar boolean; /* 0 or 1 */
 
 /* primitive memory leak debugging; see alloc.c */
 #ifdef MONITOR_HEAP
-extern long *FDECL(nhalloc, (size_t, const char *, int));
+extern int64_t *FDECL(nhalloc, (size_t, const char *, int));
 extern void FDECL(nhfree, (genericptr_t, const char *, int));
 extern char *FDECL(nhdupstr, (const char *, const char *, int));
 #ifndef __FILE__
@@ -316,25 +321,27 @@ extern char *FDECL(dupstr, (const char *)); /* ditto */
 extern char* FDECL(setstr, (const char*, CHAR_P)); /* ditto */
 extern char* FDECL(cpystr, (const char*, const char*)); /* ditto */
 
+#include "integer.h"
+
 /* Used for consistency checks of various data files; declare it here so
    that utility programs which include config.h but not hack.h can see it. */
 struct version_info {
-    unsigned long incarnation;   /* actual version number */
-    unsigned long feature_set;   /* bitmask of config settings */
-    unsigned long entity_count;  /* # of monsters and objects */
-    unsigned long struct_sizes1; /* size of key structs */
-    unsigned long struct_sizes2; /* size of more key structs */
+    uint64_t incarnation;   /* actual version number */
+    uint64_t feature_set;   /* bitmask of config settings */
+    uint64_t entity_count;  /* # of monsters and objects */
+    uint64_t struct_sizes1; /* size of key structs */
+    uint64_t struct_sizes2; /* size of more key structs */
     unsigned char short_size;
     unsigned char int_size;
     unsigned char long_size;
     unsigned char ptr_size;
-    unsigned long version_compatibility; /* used in cases where an older version of GnollHack tries to load a compatible but newer saved game; tells what is the oldest compatible version */
+    uint64_t version_compatibility; /* used in cases where an older version of GnollHack tries to load a compatible but newer saved game; tells what is the oldest compatible version */
 };
 
 struct savefile_info {
-    unsigned long sfi1; /* compression etc. */
-    unsigned long sfi2; /* miscellaneous */
-    unsigned long sfi3; /* thirdparty */
+    uint64_t sfi1; /* compression etc. */
+    uint64_t sfi2; /* miscellaneous */
+    uint64_t sfi3; /* thirdparty */
 };
 
 #ifdef NHSTDC
@@ -431,6 +438,10 @@ struct savefile_info {
 #define LL_DUMP       0x4000 /* none of the above but should be in dumplog */
 #define LL_DEBUG      0x8000 /* For debugging messages and other spam */
 
+#define LL_GAME_START   0x10000 /* Game start when uploading to cloud */
+#define LL_GAME_RESTORE 0x20000 /* Game restore when uploading to cloud */
+#define LL_GAME_SAVE    0x40000 /* Game save when uploading to cloud */
+
 /* #chronicle details */
 /* 'major' events for dumplog; inclusion or exclusion here may need tuning */
 #define LL_majors                                                        \
@@ -441,7 +452,7 @@ struct savefile_info {
 
 #define LL_postables                                                        \
     (LL_WISH | LL_ACHIEVE | LL_UMONST | LL_DIVINEGIFT | LL_LIFESAVE \
-     | LL_ARTIFACT | LL_GENOCIDE) /* explicitly for forum posting */
+     | LL_ARTIFACT | LL_GENOCIDE | LL_GAME_START | LL_GAME_RESTORE | LL_GAME_SAVE) /* explicitly for forum posting */
 
 
 /* Supply GnollHack_enter macro if not supplied by port */

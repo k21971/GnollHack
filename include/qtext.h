@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    qtext.h    $NHDT-Date: 1505170347 2017/09/11 22:52:27 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.18 $ */
 /* Copyright (c) Mike Stephenson 1991.                  */
@@ -14,7 +14,7 @@
 struct qtmsg {
     int msgnum;
     char delivery;
-    long offset, size, summary_size;
+    int64_t offset, size, summary_size;
 };
 
 #ifdef MAKEDEFS_C /***** MAKEDEFS *****/
@@ -29,7 +29,7 @@ struct msghdr {
 struct qthdr {
     int n_hdr;
     char id[N_HDR][LEN_HDR];
-    long offset[N_HDR];
+    int64_t offset[N_HDR];
 };
 
 /* Error message macros */

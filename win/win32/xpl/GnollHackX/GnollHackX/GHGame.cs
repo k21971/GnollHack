@@ -21,6 +21,7 @@ using System.Runtime.InteropServices.ComTypes;
 using System.IO.Compression;
 using static System.Net.Mime.MediaTypeNames;
 using System.Collections;
+using Azure;
 
 namespace GnollHackX
 {
@@ -42,7 +43,7 @@ namespace GnollHackX
         private bool _ynConfirmationResult = false;
         private bool _characternameSet = false;
         private string _characterName = "";
-        private object _characterNameLock = new object();
+        private readonly object _characterNameLock = new object();
         private bool _useLongerMessageHistory = false;
 
         private readonly GamePage _gamePage;
@@ -55,14 +56,14 @@ namespace GnollHackX
 
         private int _lastWindowHandle = 0;
         private GHWindow[] _ghWindows = new GHWindow[GHConstants.MaxGHWindows];
-        private object _ghWindowsLock = new object();
+        private readonly object _ghWindowsLock = new object();
         public GHWindow[] Windows { get { return _ghWindows; } }
         public object WindowsLock { get { return _ghWindowsLock; } }
         public int MapWindowId { get; set; }
         public int MessageWindowId { get; set; }
         public int StatusWindowId { get; set; }
         private List<GHMsgHistoryItem> _message_history = new List<GHMsgHistoryItem>(GHConstants.MaxMessageHistoryLength + 1);
-        private List<GHMsgHistoryItem> _longer_message_history = new List<GHMsgHistoryItem>(GHConstants.MaxMessageHistoryLength + 1);
+        private List<GHMsgHistoryItem> _longer_message_history = new List<GHMsgHistoryItem>(GHConstants.MaxLongerMessageHistoryLength + 1);
 
         public static ConcurrentDictionary<GHGame, ConcurrentQueue<GHRequest>> RequestDictionary { get { return _concurrentRequestDictionary; } }
         public static ConcurrentDictionary<GHGame, ConcurrentQueue<GHResponse>> ResponseDictionary { get { return _concurrentResponseDictionary; } }
@@ -92,6 +93,14 @@ namespace GnollHackX
             GHGame.ResponseDictionary.TryRemove(this, out responsequeue);
         }
 
+        private bool _gameHasEnded = false;
+        private bool _fastForwardGameOver = false;
+        private void GameOverHandling()
+        {
+            if(_gameHasEnded && GHApp.OperatingSystemKillsAppsOnBackground)
+                _fastForwardGameOver = true;
+        }
+
         private void pollResponseQueue()
         {
             /* Makes sure that whatever is happening, the game gets saved and then restored upon sleep / restore */
@@ -103,6 +112,7 @@ namespace GnollHackX
                 {
                     GHApp.SavingGame = true;
                     GHApp.GnollHackService.SaveAndRestoreSavedGame(GHApp.AppSwitchSaveStyle);
+                    GameOverHandling();
                 }
                 GHApp.GameSaved = false;
                 GHApp.SavingGame = false;
@@ -111,6 +121,7 @@ namespace GnollHackX
             {
                 _checkPointRequested = false;
                 GHApp.GnollHackService.SaveAndRestoreSavedGame(2); /* Check point and return immediately */
+                GameOverHandling();
             }
 
             if (_timeTallyRequested)
@@ -118,6 +129,8 @@ namespace GnollHackX
                 _timeTallyRequested = false;
                 GHApp.GnollHackService.TallyRealTime();
             }
+
+            GHApp.SaveDiscoveredMusic();
 
             ConcurrentQueue<GHResponse> queue;
             GHResponse response;
@@ -206,6 +219,13 @@ namespace GnollHackX
                         case GHRequestType.EndReplayFile:
                             EndReplayFile();
                             break;
+                        case GHRequestType.SetCharacterClickAction:
+                            GHApp.GnollHackService.SetCharacterClickAction(response.ResponseBoolValue);
+                            break;
+                        case GHRequestType.SetRightMouseCommand:
+                        case GHRequestType.SetMiddleMouseCommand:
+                            GHApp.GnollHackService.SetMouseCommand(response.ResponseIntValue, response.RequestType == GHRequestType.SetMiddleMouseCommand);
+                            break;
                         default:
                             break;
                     }
@@ -226,10 +246,10 @@ namespace GnollHackX
             {
                 /* In replay, the arrays are not initialized by the game, so should not fetch them, but read them from the replay file. */
                 /* Initialize now glyph2tile and other relevant arrays */
-                IntPtr gl2ti_ptr;
-                int gl2ti_size;
-                IntPtr gltifl_ptr;
-                int gltifl_size;
+                //IntPtr gl2ti_ptr;
+                //int gl2ti_size;
+                //IntPtr gltifl_ptr;
+                //int gltifl_size;
                 IntPtr ti2an_ptr;
                 int ti2an_size;
                 IntPtr ti2en_ptr;
@@ -242,21 +262,21 @@ namespace GnollHackX
                 int enoff_size;
                 IntPtr reoff_ptr;
                 int reoff_size;
-                _gamePage.GnollHackService.GetGlyphArrays(out gl2ti_ptr, out gl2ti_size, out gltifl_ptr, out gltifl_size);
+                //_gamePage.GnollHackService.GetGlyphArrays(out gl2ti_ptr, out gl2ti_size, out gltifl_ptr, out gltifl_size);
                 _gamePage.GnollHackService.GetTileArrays(out ti2an_ptr, out ti2an_size, out ti2en_ptr, out ti2en_size, out ti2ad_ptr, out ti2ad_size,
                     out anoff_ptr, out anoff_size, out enoff_ptr, out enoff_size, out reoff_ptr, out reoff_size);
                 lock (GHApp.Glyph2TileLock)
                 {
-                    if (gl2ti_ptr != IntPtr.Zero && gl2ti_size > 0)
-                    {
-                        GHApp.Glyph2Tile = new int[gl2ti_size];
-                        Marshal.Copy(gl2ti_ptr, GHApp.Glyph2Tile, 0, gl2ti_size);
-                    }
-                    if (gltifl_ptr != IntPtr.Zero && gltifl_size > 0)
-                    {
-                        GHApp.GlyphTileFlags = new byte[gltifl_size];
-                        Marshal.Copy(gltifl_ptr, GHApp.GlyphTileFlags, 0, gltifl_size);
-                    }
+                    //if (gl2ti_ptr != IntPtr.Zero && gl2ti_size > 0)
+                    //{
+                    //    GHApp.Glyph2Tile = new int[gl2ti_size];
+                    //    Marshal.Copy(gl2ti_ptr, GHApp.Glyph2Tile, 0, gl2ti_size);
+                    //}
+                    //if (gltifl_ptr != IntPtr.Zero && gltifl_size > 0)
+                    //{
+                    //    GHApp.GlyphTileFlags = new byte[gltifl_size];
+                    //    Marshal.Copy(gltifl_ptr, GHApp.GlyphTileFlags, 0, gltifl_size);
+                    //}
                     if (ti2an_ptr != IntPtr.Zero && ti2an_size > 0)
                     {
                         GHApp.Tile2Animation = new short[ti2an_size];
@@ -316,8 +336,8 @@ namespace GnollHackX
             int[] tilesperrow = null;
             lock (GHApp.Glyph2TileLock)
             {
-                gl2ti = GHApp.Glyph2Tile;
-                gltifl = GHApp.GlyphTileFlags;
+                //gl2ti = GHApp.Glyph2Tile;
+                //gltifl = GHApp.GlyphTileFlags;
                 ti2an = GHApp.Tile2Animation;
                 ti2en = GHApp.Tile2Enlargement;
                 ti2ad = GHApp.Tile2Autodraw;
@@ -436,16 +456,14 @@ namespace GnollHackX
 
             if((blocking != 0 && ismap) || ismenu || istext)
             {
-                if(PlayingReplay)
+                if((PlayingReplay && !GHApp.IsReplaySearching) || _fastForwardGameOver)
                 {
-                    if(!GHApp.IsReplaySearching)
-                    {
+                    if(!_fastForwardGameOver)
                         WaitAndCheckPauseReplay(GHConstants.ReplayDisplayWindowDelay);
-                        ConcurrentQueue<GHRequest> queue;
-                        if (GHGame.RequestDictionary.TryGetValue(this, out queue))
-                        {
-                            queue.Enqueue(new GHRequest(this, GHRequestType.HideTextWindow));
-                        }
+                    ConcurrentQueue<GHRequest> queue;
+                    if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.HideTextWindow));
                     }
                 }
                 else
@@ -495,25 +513,30 @@ namespace GnollHackX
         {
             RecordFunctionCall(RecordedFunctionID.Curs, winHandle, x, y);
 
+            GHWindow gHWindow = null;
             lock (_ghWindowsLock)
             {
-                if (_ghWindows[winHandle] != null)
-                    _ghWindows[winHandle].Curs(x, y);
+                gHWindow = _ghWindows[winHandle];
             }
+            if (gHWindow != null)
+                gHWindow.Curs(x, y);
         }
 
+        //private List<SavedPrintGlyphCall> _savedPrintGlyphCalls = new List<SavedPrintGlyphCall>();
         public void ClientCallback_PrintGlyph(int winHandle, int x, int y, int glyph, int bkglyph, int symbol, int ocolor, uint special, IntPtr layers_ptr)
         {
             LayerInfo layers = layers_ptr == IntPtr.Zero ? new LayerInfo() : (LayerInfo)Marshal.PtrToStructure(layers_ptr, typeof(LayerInfo));
             RecordFunctionCall(RecordedFunctionID.PrintGlyph, winHandle, x, y, glyph, bkglyph, symbol, ocolor, special, layers);
 
+            GHWindow gHWindow = null;
             lock (_ghWindowsLock)
             {
-                if (_ghWindows[winHandle] != null)
-                {
-                    _ghWindows[winHandle].PrintGlyph(x, y, glyph, bkglyph, symbol, ocolor, special, ref layers);
-                }
+                gHWindow = _ghWindows[winHandle];
             }
+            //_savedPrintGlyphCalls.Add(new SavedPrintGlyphCall(gHWindow, x, y, glyph, bkglyph, symbol, ocolor, special, ref layers));
+
+            if (gHWindow != null)
+                gHWindow.PrintGlyph(x, y, glyph, bkglyph, symbol, ocolor, special, ref layers);
 
             _gamePage.ClearAllObjectData(x, y);
             _gamePage.ClearEngravingData(x, y);
@@ -593,6 +616,7 @@ namespace GnollHackX
                 default:
                 case 0:
                     GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
+                    GHApp.SaveDiscoveredMusic();
                     if (GHGame.RequestDictionary.TryGetValue(this, out queue))
                     {
                         queue.Enqueue(new GHRequest(this, GHRequestType.ReturnToMainMenu));
@@ -612,6 +636,11 @@ namespace GnollHackX
                     Thread.Sleep((int)(GHConstants.ReplayStandardDelay / GHApp.ReplaySpeed));
                 return 0;
             }
+            if (_fastForwardGameOver)
+            {
+                RecordFunctionCall(RecordedFunctionID.GetChar, 0);
+                return 0;
+            }
 
             ConcurrentQueue<GHRequest> queue;
             if (GHGame.RequestDictionary.TryGetValue(this, out queue))
@@ -621,6 +650,11 @@ namespace GnollHackX
                 {
                     Thread.Sleep(GHConstants.PollingInterval);
                     pollResponseQueue();
+                    if (_fastForwardGameOver)
+                    {
+                        RecordFunctionCall(RecordedFunctionID.GetChar, 0);
+                        return 0;
+                    }
                 }
                 int res = 0;
                 if (_inputBufferLocation >= 0)
@@ -676,8 +710,13 @@ namespace GnollHackX
                     }
                     Thread.Sleep(GHConstants.PollingInterval);
                     pollResponseQueue();
+                    if (_fastForwardGameOver)
+                    {
+                        RecordFunctionCall(RecordedFunctionID.PosKey, x, y, mod, 0);
+                        return 0;
+                    }
                 }
-                int res = 27;
+                int res = GHConstants.CancelChar;
                 if (_inputBufferLocation >= 0)
                 {
                     res = _inputBuffer[0];
@@ -706,7 +745,7 @@ namespace GnollHackX
             WriteFunctionCallsAndCheckEnd();
 
             ConcurrentQueue<GHRequest> queue;
-            if (responses == null || responses == "")
+            if (string.IsNullOrEmpty(responses))
             {
                 if (GHGame.RequestDictionary.TryGetValue(this, out queue))
                 {
@@ -743,11 +782,13 @@ namespace GnollHackX
                     while (cnt < 5)
                     {
                         int val = ClientCallback_nhgetch();
+                        if (!string.IsNullOrEmpty(def) && (val == 0 || val == GHConstants.CancelChar))
+                            val = (int)def[0];
                         string desc = "";
                         if (val < 0)
                         {
                             desc = "Numpad direction " + Math.Abs(val);
-                            val = 27;
+                            val = GHConstants.CancelChar;
                         }
 
                         string res = "n";
@@ -781,8 +822,8 @@ namespace GnollHackX
             {
                 queue.Enqueue(new GHRequest(this, GHRequestType.HideYnResponses));
             }
-            RecordFunctionCall(RecordedFunctionID.YnFunction, style, attr, color, glyph, title, question, responses, def, descriptions, introline, ynflags, 27);
-            return 27;
+            RecordFunctionCall(RecordedFunctionID.YnFunction, style, attr, color, glyph, title, question, responses, def, descriptions, introline, ynflags, GHConstants.CancelChar);
+            return GHConstants.CancelChar;
         }
 
         public void ClientCallback_Cliparound(int x, int y, byte force)
@@ -791,6 +832,12 @@ namespace GnollHackX
 
             if (force == 0 && (_gamePage.MapNoClipMode || _gamePage.MapLookMode || _gamePage.ZoomMiniMode)) //|| (!_gamePage.ZoomAlternateMode && _gamePage.MapNoClipMode) || (_gamePage.ZoomAlternateMode && _gamePage.MapAlternateNoClipMode) 
                 return; /* No clip mode ignores cliparound commands */
+
+            //ConcurrentQueue<GHRequest> queue;
+            //if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+            //{
+            //    queue.Enqueue(new GHRequest(this, GHRequestType.ClipAround, x, y, force == 1));
+            //}
 
             _gamePage.SetTargetClip(x, y, force == 1);
         }
@@ -814,13 +861,22 @@ namespace GnollHackX
             {
                 List<GHMsgHistoryItem> relevantlist = _useLongerMessageHistory ? _longer_message_history : _message_history;
                 if(relevantlist.Count == 0)
-                    queue.Enqueue(new GHRequest(this, GHRequestType.PrintHistory)); /* Print null history */
+                    queue.Enqueue(new GHRequest(this, GHRequestType.PrintHistory)); /* Clear history */
                 else
                     queue.Enqueue(new GHRequest(this, GHRequestType.PrintHistory, relevantlist.ToArray()));
             }
         }
 
-        public void AddNewMessage(GHMsgHistoryItem newmsg, bool update_message_history)
+        //public void UpdateMessageHistoryItem(GHMsgHistoryItem msgHistoryItem)
+        //{
+        //    ConcurrentQueue<GHRequest> queue;
+        //    if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+        //    {
+        //        queue.Enqueue(new GHRequest(this, GHRequestType.PrintHistoryItem, msgHistoryItem));
+        //    }
+        //}
+
+        public void AddNewMessage(GHMsgHistoryItem newmsg, bool updateMessageHistory, bool isFullRefresh)
         {
             if (newmsg == null)
                 return;
@@ -829,7 +885,11 @@ namespace GnollHackX
                 _message_history[_message_history.Count - 1].IsLast = false;
             _message_history.Add(newmsg);
             if (_message_history.Count > GHConstants.MaxMessageHistoryLength)
-                _message_history.RemoveAt(0);
+            {
+                _message_history.RemoveRange(0, GHConstants.MaxMessageHistoryLength / 8);
+                if (!_useLongerMessageHistory)
+                    isFullRefresh = true;
+            }
             if (_message_history.Count > 0)
                 _message_history[_message_history.Count - 1].IsLast = true;
 
@@ -837,13 +897,25 @@ namespace GnollHackX
                 _longer_message_history[_longer_message_history.Count - 1].IsLast = false;
             _longer_message_history.Add(newmsg);
             if (_longer_message_history.Count > GHConstants.MaxLongerMessageHistoryLength)
-                _longer_message_history.RemoveAt(0);
+            {
+                _longer_message_history.RemoveRange(0, GHConstants.MaxLongerMessageHistoryLength / 4);
+                if(_useLongerMessageHistory)
+                    isFullRefresh = true;
+            }
             if (_longer_message_history.Count > 0)
                 _longer_message_history[_longer_message_history.Count - 1].IsLast = true;
 
-            if(update_message_history)
+            if(updateMessageHistory)
             {
                 UpdateMessageHistory();
+                //if (isFullRefresh)
+                //{
+                //    UpdateMessageHistory();
+                //}
+                //else
+                //{
+                //    UpdateMessageHistoryItem(newmsg);
+                //}
                 SwitchOffLongerMessageHistory(); /* Just to make sure that it does not remain on the slow down the game */
             }
         }
@@ -864,13 +936,13 @@ namespace GnollHackX
         public void RawPrintEx(string str, int attr, int color, bool is_restoring)
         {
             GHMsgHistoryItem newmsg = new GHMsgHistoryItem(str, attr, color);
-            AddNewMessage(newmsg, !is_restoring);
+            AddNewMessage(newmsg, true, false);
         }
 
         public void RawPrintEx2(string str, byte[] attrs, byte[] colors, int attr, int color, bool is_restoring)
         {
             GHMsgHistoryItem newmsg = new GHMsgHistoryItem(str, attrs, colors, attr, color);
-            AddNewMessage(newmsg, !is_restoring);
+            AddNewMessage(newmsg, true, false);
 
             //if (_message_history.Count > 0)
             //    _message_history[_message_history.Count - 1].IsLast = false;
@@ -1031,13 +1103,13 @@ namespace GnollHackX
         static public string[] cond_names_short = new string[(int)bl_conditions.NUM_BL_CONDITIONS] {
             "Stone", "Slime", "Strngl", "Suffoc", "FoodPois", "TermIll", "Blind",
             "Deaf", "Stun", "Conf", "Hallu", "Lev", "Fly", "Ride", "Slow", "Paral", 
-            "Fear", "Sleep", "Cancl", "Silent", "Grab", "Rot", "Lyca"
+            "Fear", "Sleep", "Cancl", "Silent", "Grab", "Rot", "Lyca", "Legs"
         };
 
         static public string[] cond_names_long = new string[(int)bl_conditions.NUM_BL_CONDITIONS] {
             "Petrifying", "Slimed", "Being Strangled", "Suffocating", "Food Poisoned", "Terminally Ill", "Blind",
             "Deaf", "Stunned", "Confused", "Hallucinating", "Levitating", "Flying", "Riding", "Slowed", "Paralyzed", 
-            "Frightened", "Sleeping", "Cancelled", "Silenced", "Grabbed", "Mummy Rot", "Lycanthropy"
+            "Frightened", "Sleeping", "Cancelled", "Silenced", "Grabbed", "Mummy Rot", "Lycanthropy", "Wounded Legs"
         };
 
         public void ClientCallback_StatusUpdate(int fieldidx, string text, long condbits, int cng, int percent, int color, IntPtr condcolorptr)
@@ -1306,17 +1378,28 @@ namespace GnollHackX
         public void ClientCallback_AddMenu(int winid, int glyph, long identifier, char accel, char groupaccel, int attr, int color, string text, byte presel)
         {
             ClientCallback_AddExtendedMenu(winid, glyph, identifier, accel, groupaccel, attr, color, text, presel,
-                0, 0UL, 0UL, '\0', '\0', 0UL, 0, 0, IntPtr.Zero, IntPtr.Zero);
+                0, 0UL, 0UL, '\0', '\0', 0UL, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
         }
         public void ClientCallback_AddExtendedMenu(int winid, int glyph, long identifier, char accel, char groupaccel, int attr, int color, string text, byte presel, 
-            int maxcount, ulong oid, ulong mid, char headingaccel, char special_mark, ulong menuflags, byte dataflags, int style, IntPtr otmpdata_ptr, IntPtr otypdata_ptr)
+            int maxcount, ulong oid, ulong mid, char headingaccel, char special_mark, ulong menuflags, byte dataflags, int style, 
+            IntPtr otmpdata_ptr, IntPtr otypdata_ptr, IntPtr attrs_ptr, IntPtr colors_ptr)
         {
             GHApp.DebugWriteProfilingStopwatchTimeAndStart("AddExtendedMenu");
             Obj otmpdata = otmpdata_ptr == IntPtr.Zero ? new Obj() : (Obj)Marshal.PtrToStructure(otmpdata_ptr, typeof(Obj));
             ObjClassData otypdata = otypdata_ptr == IntPtr.Zero ? new ObjClassData() : (ObjClassData)Marshal.PtrToStructure(otypdata_ptr, typeof(ObjClassData));
+            byte[] attrs = null;
+            byte[] colors = null;
+            int attrs_colors_size = text?.Length + 1 ?? 0;
+            if (attrs_ptr != IntPtr.Zero && colors_ptr != IntPtr.Zero && attrs_colors_size > 0)
+            {
+                attrs = new byte[attrs_colors_size];
+                colors = new byte[attrs_colors_size];
+                Marshal.Copy(attrs_ptr, attrs, 0, attrs_colors_size);
+                Marshal.Copy(colors_ptr, colors, 0, attrs_colors_size);
+            }
 
             RecordFunctionCall(RecordedFunctionID.AddExtendedMenu, winid, glyph, identifier, accel, groupaccel, attr, color, text, presel,
-                maxcount, oid, mid, headingaccel, special_mark, menuflags, dataflags, style, otmpdata, otypdata);
+                maxcount, oid, mid, headingaccel, special_mark, menuflags, dataflags, style, otmpdata, otypdata, attrs, colors);
 
             lock (_ghWindowsLock)
             {
@@ -1330,7 +1413,12 @@ namespace GnollHackX
                         mi.Accelerator = accel;
                     mi.GroupAccelerator = groupaccel;
                     mi.SpecialMark = special_mark;
-                    mi.Attributes = attr;
+
+                    mi.NHAttribute = attr;
+                    mi.NHColor = color;
+                    mi.NHAttributes = attrs;
+                    mi.NHColors = colors;
+
                     mi.Glyph = glyph;
                     mi.UseUpperSide = (menuflags & (ulong)MenuFlags.MENU_FLAGS_ACTIVE) != 0;
                     mi.UseColorForSuffixes = (menuflags & (ulong)MenuFlags.MENU_FLAGS_USE_COLOR_FOR_SUFFIXES) != 0;
@@ -1348,7 +1436,6 @@ namespace GnollHackX
                     mi.IsAutoClickOk = (menuflags & (ulong)MenuFlags.MENU_FLAGS_AUTO_CLICK_OK) != 0;
                     mi.Selected = (presel != 0);
                     mi.MaxCount = maxcount;
-                    mi.NHColor = color;
                     mi.Oid = oid;
                     mi.Mid = mid;
                     mi.HeadingGroupAccelerator = headingaccel;
@@ -1458,7 +1545,7 @@ namespace GnollHackX
                         else
                             continuepolling = (_ghWindows[winid].SelectedMenuItems == null);
                     }
-                    if (!continuepolling)
+                    if (!continuepolling || _fastForwardGameOver)
                         break;
 
                     Thread.Sleep(GHConstants.PollingInterval);
@@ -1479,7 +1566,7 @@ namespace GnollHackX
 
             lock (_ghWindowsLock)
             {
-                if (_ghWindows[winid] == null || _ghWindows[winid].SelectedMenuItems == null || _ghWindows[winid].WasCancelled)
+                if (_ghWindows[winid] == null || _ghWindows[winid].SelectedMenuItems == null || _ghWindows[winid].WasCancelled || _fastForwardGameOver)
                     cnt = -1;
                 else if (_ghWindows[winid].SelectedMenuItems.Count <= 0)
                     cnt = 0;
@@ -1537,9 +1624,9 @@ namespace GnollHackX
             if (used_player_name != null && used_player_name != "")
             {
                 if(GHApp.TournamentMode && !PlayingReplay)
-                    Preferences.Set("LastUsedTournamentPlayerName", used_player_name);
+                    GHApp.SaveLastUsedTournamentPlayerName(used_player_name);
                 else
-                    Preferences.Set("LastUsedPlayerName", used_player_name);
+                    GHApp.SaveLastUsedPlayerName(used_player_name);
             }
         }
 
@@ -1562,27 +1649,31 @@ namespace GnollHackX
         {
             RecordFunctionCall(RecordedFunctionID.ReportPlayTime, timePassed, currentPlayTime);
 
-            long playedalready = Preferences.Get("RealPlayTime", 0L);
+            long playedalready = GHApp.RealPlayTime;
             long totaltime = playedalready + timePassed;
-            Preferences.Set("RealPlayTime", totaltime);
+            GHApp.SaveRealPlayTime(totaltime);
             GamePlayTime = currentPlayTime;
             AddSessionPlayTime(timePassed);
             GHApp.AddAggragateSessionPlayTime(timePassed);
         }
 
+        //private List<SavedSendObjectDataCall> _savedSendObjectDataCalls = new List<SavedSendObjectDataCall>();
         public void ClientCallback_SendObjectData(int x, int y, IntPtr otmp_ptr, int cmdtype, int where, IntPtr otypdata_ptr, ulong oflags)
         {
             Obj otmp = otmp_ptr == IntPtr.Zero ? new Obj() : (Obj)Marshal.PtrToStructure(otmp_ptr, typeof(Obj));
             ObjClassData otypdata = otypdata_ptr == IntPtr.Zero ? new ObjClassData() : (ObjClassData)Marshal.PtrToStructure(otypdata_ptr, typeof(ObjClassData));
 
             RecordFunctionCall(RecordedFunctionID.SendObjectData, x, y, otmp, cmdtype, where, otypdata, oflags);
+            //_savedSendObjectDataCalls.Add(new SavedSendObjectDataCall(x, y, ref otmp, cmdtype, where, ref otypdata, oflags));
             _gamePage.AddObjectData(x, y, otmp, cmdtype, where, otypdata, oflags);
         }
 
+        //private List<SavedSendMonsterDataCall> _savedSendMonsterDataCalls = new List<SavedSendMonsterDataCall>();
         public void ClientCallback_SendMonsterData(int cmdtype, int x, int y, IntPtr monster_data_ptr, ulong oflags)
         {
             monst_info monster_data = monster_data_ptr == IntPtr.Zero ? new monst_info() : (monst_info)Marshal.PtrToStructure(monster_data_ptr, typeof(monst_info));
             RecordFunctionCall(RecordedFunctionID.SendMonsterData, cmdtype, x, y, monster_data, oflags);
+            //_savedSendMonsterDataCalls.Add(new SavedSendMonsterDataCall(cmdtype, x, y, ref monster_data, oflags));
             switch (cmdtype)
             {
                 case 0: /* Add Pet */
@@ -1591,9 +1682,11 @@ namespace GnollHackX
             }
         }
 
+        //private List<SavedSendEngravingDataCall> _savedSendEngravingDataCalls = new List<SavedSendEngravingDataCall>();
         public void ClientCallback_SendEngravingData(int cmdtype, int x, int y, string engraving_text, int etype, ulong eflags, ulong gflags)
         {
             RecordFunctionCall(RecordedFunctionID.SendEngravingData, cmdtype, x, y, engraving_text, etype, eflags, gflags);
+            //_savedSendEngravingDataCalls.Add(new SavedSendEngravingDataCall(cmdtype, x, y, engraving_text, etype, eflags, gflags));
             switch (cmdtype)
             {
                 case 0: /* Add engraving */
@@ -1882,9 +1975,11 @@ namespace GnollHackX
             _gamePage.UpdateCursor(style, force_paint, show_on_u);
         }
 
-        public int ClientCallback_PlayImmediateSound(int ghsound, string eventPath, int bankid, double eventVolume, double soundVolume, string[] parameterNames, float[] parameterValues, int arraysize, int sound_type, int play_group, uint dialogue_mid, ulong play_flags)
+        public int ClientCallback_PlayImmediateSound(int ghsound, string eventPath, int bankid, double eventVolume, double soundVolume, string[] parameterNames, float[] parameterValues, int arraysize, int sound_type, int play_group, uint dialogue_mid, uint play_flags)
         {
             RecordFunctionCall(RecordedFunctionID.PlayImmediateSound, ghsound, eventPath, bankid, eventVolume, soundVolume, parameterNames, parameterValues, arraysize, sound_type, play_group, dialogue_mid, play_flags);
+            if ((play_flags & (uint)playsound_play_flags.PLAY_FLAGS_SONG) != 0)
+                GHApp.AddDiscoveredMusic(ghsound);
 
             if (GHApp.FmodService != null && !GHApp.IsMuted)
             {
@@ -1897,6 +1992,7 @@ namespace GnollHackX
         public int ClientCallback_PlayMusic(int ghsound, string eventPath, int bankid, double eventVolume, double soundVolume)
         {
             RecordFunctionCall(RecordedFunctionID.PlayMusic, ghsound, eventPath, bankid, eventVolume, soundVolume);
+            GHApp.AddDiscoveredMusic(ghsound);
 
             if (GHApp.FmodService != null)
             {
@@ -2061,6 +2157,22 @@ namespace GnollHackX
                         Thread.Sleep(GHConstants.FadeToBlackDelay);
                     }
                     break;
+                case (int)gui_command_types.GUI_CMD_FADE_FROM_BLACK_SLOWLY_NONBLOCKING:
+                    if (PlayingReplay && GHApp.IsReplaySearching)
+                        return;
+                    if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.FadeFromBlack, GHConstants.FadeFromBlackDurationAtStart + (int)(GHConstants.FadeFromBlackAtStartExtraDelaySecs * 1000)));
+                    }
+                    break;
+                case (int)gui_command_types.GUI_CMD_SET_TO_BLACK:
+                    if (PlayingReplay && GHApp.IsReplaySearching)
+                        return;
+                    if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.SetToBlack));
+                    }
+                    break;
                 case (int)gui_command_types.GUI_CMD_COLLECT_GARBAGE:
                     if (PlayingReplay && GHApp.IsReplaySearching)
                         return;
@@ -2216,6 +2328,10 @@ namespace GnollHackX
                     if (PlayingReplay)
                         break;
 
+                    if (cmd_param == (int)game_status_types.GAME_STATUS_POST_IF_CLOUD_REPLAY_ON
+                        && (!GHApp.RecordGame || !GHApp.AutoUploadReplays))
+                        break;
+
                     if (cmd_str != null)
                         status_str = cmd_str;
 
@@ -2368,9 +2484,44 @@ namespace GnollHackX
                     //}
                     break;
                 case (int)gui_command_types.GUI_CMD_GAME_ENDED:
+                    _gameHasEnded = true;
+                    if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.GameEnded));
+                    }
                     if (PlayingReplay)
                         break;
                     GHApp.TryVerifyXlogUserName(); /* In case not verified yet; in advance of possibly posting files to the server and forums */
+                    break;
+                case (int)gui_command_types.GUI_CMD_TOGGLE_MENU_POSITION_SAVING:
+                    if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+                    {
+                        queue.Enqueue(new GHRequest(this, GHRequestType.ToggleMenuPositionSaving, cmd_param, cmd_param2));
+                    }
+                    break;
+                case (int)gui_command_types.GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION:
+                    GHApp.MirroredCharacterClickAction = cmd_param != 0;
+                    break;
+                case (int)gui_command_types.GUI_CMD_START_FLUSH:
+                    break;
+                case (int)gui_command_types.GUI_CMD_FINISH_FLUSH:
+                    //_gamePage.ProcessPrintGlyphCallList(_savedPrintGlyphCalls, _savedSendObjectDataCalls, _savedSendMonsterDataCalls, _savedSendEngravingDataCalls);
+                    //_savedPrintGlyphCalls.Clear();
+                    //_savedSendObjectDataCalls.Clear();
+                    //_savedSendMonsterDataCalls.Clear();
+                    //_savedSendEngravingDataCalls.Clear();
+                    break;
+                case (int)gui_command_types.GUI_CMD_REPORT_MOUSE_COMMAND:
+                    if (cmd_param2 != 0)
+                        GHApp.MirroredMiddleMouseCommand = cmd_param;
+                    else
+                        GHApp.MirroredRightMouseCommand = cmd_param;
+                    break;
+                case (int)gui_command_types.GUI_CMD_TOGGLE_QUICK_ZAP_WAND:
+                    _gamePage.SetQuickZapWand(cmd_param, cmd_param2, cmd_str);
+                    break;
+                case (int)gui_command_types.GUI_CMD_TOGGLE_QUICK_CAST_SPELL:
+                    _gamePage.SetQuickCastSpell(cmd_param, cmd_param2, cmd_str);
                     break;
                 default:
                     break;
@@ -2394,10 +2545,10 @@ namespace GnollHackX
             }
 
             int res = ClientCallback_nhgetch();
-            if(PlayingReplay)
+            if(PlayingReplay || _fastForwardGameOver)
             {
                 /* Only like this for replay, as normal hiding code is a bit more robust */
-                if (!GHApp.StopReplay && !GHApp.IsReplaySearching) /* No pause, since outrip page hides the controls */
+                if (!_fastForwardGameOver && !GHApp.StopReplay && !GHApp.IsReplaySearching) /* No pause, since outrip page hides the controls */
                     Thread.Sleep((int)(GHConstants.ReplayOutripDelay / GHApp.ReplaySpeed));
 
                 lock (_ghWindowsLock)
@@ -2452,7 +2603,7 @@ namespace GnollHackX
                             break;
                         }
 
-                        if (Preferences.Get("GUITipsShown", false))
+                        if (GHApp.GUITipsShown)
                             break;
 
                         ConcurrentQueue<GHRequest> queue;
@@ -2490,6 +2641,13 @@ namespace GnollHackX
                     }
                 case (int)special_view_types.SPECIAL_VIEW_PANIC:
                     {
+                        if(!PlayingReplay)
+                        {
+#if SENTRY
+                            SentrySdk.CaptureMessage("Panic: " + text);
+#endif
+                        }
+
                         ConcurrentQueue<GHRequest> queue;
                         if (GHGame.RequestDictionary.TryGetValue(this, out queue))
                         {
@@ -2538,6 +2696,9 @@ namespace GnollHackX
                             Debug.WriteLine("YN Confirmation in Replay: " + title + ": " + text);
                             break;
                         }
+                        char def = viewtype == (int)special_view_types.SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y ? 'y' : 'n'; ;
+                        if (_fastForwardGameOver)
+                            return def;
                         ConcurrentQueue<GHRequest> queue;
                         if (GHGame.RequestDictionary.TryGetValue(this, out queue))
                         {
@@ -2547,6 +2708,8 @@ namespace GnollHackX
                             {
                                 Thread.Sleep(GHConstants.PollingInterval);
                                 pollResponseQueue();
+                                if (_fastForwardGameOver)
+                                    return def;
                             }
                             return _ynConfirmationResult ? 'y' : 'n';
                         }
@@ -2733,7 +2896,7 @@ namespace GnollHackX
 
         private void ContinueToNextReplayFile()
         {
-            string plName = Preferences.Get("LastUsedPlayerName", "");
+            string plName = GHApp.LastUsedPlayerName;
             DateTime saved_timestamp = _replayTimeStamp;
             int next_replayContinuation = _replayContinuation + 1;
             RecordFunctionCallImmediately(RecordedFunctionID.ContinueToNextFile, GHApp.GHVersionNumber, _replayTimeStamp.ToBinary(), plName, next_replayContinuation);
@@ -3136,6 +3299,94 @@ namespace GnollHackX
                 }
                 while (GHApp.PauseReplay && !GHApp.IsReplaySearching);
             }
+        }
+    }
+
+    public struct SavedPrintGlyphCall
+    {
+        public GHWindow ReferenceGHWindow;
+        public int X;
+        public int Y;
+        public int Glyph;
+        public int Bkglyph;
+        public int Symbol;
+        public int Ocolor;
+        public uint Special;
+        public LayerInfo Layers;
+
+        public SavedPrintGlyphCall(GHWindow gHWindow, int x, int y, int glyph, int bkglyph, int symbol, int ocolor, uint special, ref LayerInfo layers)
+        {
+            ReferenceGHWindow = gHWindow;
+            X = x;
+            Y = y;
+            Glyph = glyph;
+            Bkglyph = bkglyph;
+            Symbol = symbol;
+            Ocolor = ocolor; 
+            Special = special; 
+            Layers = layers;
+        }
+    }
+
+    public struct SavedSendObjectDataCall
+    {
+        public int x;
+        public int y;
+        public Obj otmp;
+        public int cmdtype;
+        public int where;
+        public ObjClassData otypdata;
+        public ulong oflags;
+
+        public SavedSendObjectDataCall(int x, int y, ref Obj otmp, int cmdtype, int where, ref ObjClassData otypdata, ulong oflags)
+        {
+            this.x = x;
+            this.y = y;
+            this.cmdtype = cmdtype;
+            this.where = where;
+            this.otmp = otmp;
+            this.otypdata = otypdata;
+            this.oflags = oflags;
+        }
+    }
+
+    public struct SavedSendMonsterDataCall
+    {
+        public int cmdtype;
+        public int x;
+        public int y;
+        public monst_info monster_data;
+        public ulong oflags;
+
+        public SavedSendMonsterDataCall(int cmdtype, int x, int y, ref monst_info monster_data, ulong oflags)
+        {
+            this.cmdtype = cmdtype;
+            this.x = x;
+            this.y = y;
+            this.monster_data = monster_data;
+            this.oflags = oflags;
+        }
+    }
+
+    public struct SavedSendEngravingDataCall
+    {
+        public int cmdtype;
+        public int x;
+        public int y;
+        public string engraving_text;
+        public int etype;
+        public ulong eflags;
+        public ulong gflags;
+
+        public SavedSendEngravingDataCall(int cmdtype, int x, int y, string engraving_text, int etype, ulong eflags, ulong gflags)
+        {
+            this.cmdtype = cmdtype;
+            this.x = x;
+            this.y = y;
+            this.engraving_text = engraving_text;
+            this.etype = etype;
+            this.eflags = eflags;
+            this.gflags = gflags;
         }
     }
 }

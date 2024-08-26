@@ -7,12 +7,17 @@
 
 #include "hack.h"    /* mainly for index() which depends on BSD */
 
+#include <pthread.h>
 #include <errno.h>
 #include <sys/stat.h>
-#if defined(NO_FILE_LINKS) || defined(SUNOS4) || defined(POSIX_TYPES)
+#if defined(NO_FILE_LINKS) || defined(SUNOS4) || defined(POSIX_TYPES) || defined(O_RDONLY)
 #include <fcntl.h>
 #endif
-#include <pthread.h>
+#include <pwd.h>
+#include <sys/types.h>
+#include <dirent.h>
+extern struct passwd* FDECL(getpwuid, (uid_t));
+extern struct passwd* FDECL(getpwnam, (const char*));
 
 void
 regularize(s)    /* normalize file name - we don't like .'s, /'s, spaces */
@@ -194,4 +199,83 @@ thread_lock_unlock(VOID_ARGS)
     {
         (void)pthread_mutex_unlock(&threadlock);
     }
+}
+
+void
+gnollhack_exit(code)
+int code;
+{
+    if (exit_hack)
+        exit_hack(exit_hack_code);
+
+#if defined(EXIT_THREAD_ON_EXIT)
+    char retbuf[BUFSZ];
+    Sprintf(retbuf, "GnollHack thread exit with value %d", code);
+
+    pthread_exit(retbuf);
+#else
+    exit(code);
+#endif
+}
+
+#if defined (NOCWD_ASSUMPTIONS)
+/*
+ * Add a slash to any name not ending in /. There must
+ * be room for the /
+ */
+void
+append_slash(name)
+char* name;
+{
+    char* ptr;
+
+    if (!*name)
+        return;
+    ptr = name + (strlen(name) - 1);
+    if (*ptr != '/')
+    {
+        *++ptr = '/';
+        *++ptr = '\0';
+    }
+    return;
+}
+#endif
+
+void
+gnh_umask(VOID_ARGS)
+{
+    (void)umask(0777 & ~FCMASK);
+}
+
+uint64_t
+sys_random_seed()
+{
+    uint64_t seed = 0L;
+    uint64_t pid = (uint64_t)getpid();
+    boolean no_seed = TRUE;
+#ifdef DEV_RANDOM
+    FILE* fptr;
+
+    fptr = fopen(DEV_RANDOM, "r");
+    if (fptr) {
+        fread(&seed, sizeof(int64_t), 1, fptr);
+        has_strong_rngseed = TRUE;  /* decl.c */
+        no_seed = FALSE;
+        (void)fclose(fptr);
+    }
+    else {
+        /* leaves clue, doesn't exit */
+        paniclog("sys_random_seed", "falling back to weak seed");
+    }
+#endif
+    if (no_seed) {
+        seed = (uint64_t)getnow(); /* time((TIME_type) 0) */
+        /* Quick dirty band-aid to prevent PRNG prediction */
+        if (pid) {
+            if (!(pid & 3L))
+                pid -= 1L;
+            seed *= pid;
+        }
+    }
+    return seed;
 }

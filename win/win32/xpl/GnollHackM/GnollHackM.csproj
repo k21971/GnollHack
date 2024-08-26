@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
 		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
 		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
@@ -12,7 +12,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<InvariantGlobalization>true</InvariantGlobalization>
-		
+		<DefineConstants>$(DefineConstants);GNH_MAUI;BITFIELDS;SENTRY;BETA;USE_SPAN_FOR_SUBSTRING</DefineConstants>
+
 		<!-- Display name -->
 		<ApplicationTitle>GnollHack</ApplicationTitle>
 
@@ -21,8 +22,8 @@
 		<ApplicationIdGuid>77f64670-4eb4-432e-aa6a-b02d3d035d80</ApplicationIdGuid>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>2.10</ApplicationDisplayVersion>
+		<ApplicationVersion>210</ApplicationVersion>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
@@ -30,11 +31,19 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+		<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+		<AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+		<AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
+		<GenerateTestArtifacts>True</GenerateTestArtifacts>
+		<GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
+		<HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-	  <!--<AotAssemblies>true</AotAssemblies>
-	  <RunAOTCompilation>true</RunAOTCompilation>-->
+	  <!--<AotAssemblies>true</AotAssemblies>-->
+	  <!--<RunAOTCompilation>true</RunAOTCompilation>-->
 	  <!-- Optional -->
 	  <!--<EnableLLVM>true</EnableLLVM>-->
 	</PropertyGroup>
@@ -42,14 +51,17 @@
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
 		<ProvisioningType>manual</ProvisioningType>
 		<CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
-		<CodesignProvision>Apple Dev M Development 2023</CodesignProvision>
+		<CodesignProvision>Apple Dev M July 2024 Profile</CodesignProvision>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
 		<ProvisioningType>manual</ProvisioningType>
-		<CodesignKey>Apple Distribution: Hyvan mielen pelit ry (CUG8RS847T)</CodesignKey>
-		<CodesignProvision>Apple Dev M Distribution March 2024</CodesignProvision>
-	</PropertyGroup>
+		<!--<CodesignKey>Apple Distribution: Hyvan mielen pelit ry (CUG8RS847T)</CodesignKey>-->
+    <!--<CodesignProvision>Apple Dev M July 2024 Distribution Profile</CodesignProvision>-->
+    <CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
+    <CodesignProvision>Apple Dev M July 2024 Profile</CodesignProvision>
+    <MtouchUseLlvm>false</MtouchUseLlvm>
+  </PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
@@ -57,28 +69,37 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
-	    <UseInterpreter>false</UseInterpreter>
-		<!--<AndroidEnableProfiler>true</AndroidEnableProfiler> 
-		<RuntimeIdentifier>android-arm64</RuntimeIdentifier>
-		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>-->
+	  <UseInterpreter>false</UseInterpreter>
+    <JavaMaximumHeapSize>2G</JavaMaximumHeapSize>
+    <!--<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>-->
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+    <!--<AndroidEnableProfiler>true</AndroidEnableProfiler>--> 
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(TargetFramework.Contains('-ios'))">
 		<UseInterpreter>false</UseInterpreter>
 		<MtouchInterpreter>-all,FMODService.dll</MtouchInterpreter>
+    <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-		<_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>
+		<!--<_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>-->
+		<DebugType>full</DebugType>
+		<DebugSymbols>true</DebugSymbols>
 	</PropertyGroup>
-
 	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
-		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="0.64" />
+		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" ForegroundScale="0.6" />
 	</ItemGroup>
-	<ItemGroup Condition="'$(TargetFramework)'!='net9.0-android'">
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'">
+		<MauiIcon Include="Resources\AppIcon\appicon.png" ForegroundScale="1.0" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-ios'">
 		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="1.0" />
 	</ItemGroup>
-	
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-maccatalyst'">
+		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="1.0" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\gnollhackicon.png" Color="#000000" BaseSize="160,160" />
@@ -87,9 +108,12 @@
 		<MauiImage Include="Resources\Images\*" />
 
 		<!-- Custom Fonts -->
-		<MauiFont Include="Resources\Fonts\*" />
+		<MauiFont Include="Resources\Fonts\*" Condition="'$(TargetFramework)'=='net9.0-ios'" />
+    <MauiFont Include="Resources\Fonts\*" Condition="'$(TargetFramework)'=='net9.0-maccatalyst'" />
+    <MauiAsset Include="Resources\Fonts\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" Condition="'$(TargetFramework)'=='net9.0-android'" />
+    <MauiAsset Include="Resources\Fonts\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
 
-		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+    <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
@@ -97,6 +121,7 @@
 		<None Remove="..\GnollHackX\GnollHackX\BackgroundView.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHGame.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\UIUtils.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\CustomCanvasView.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\CustomLabel.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\DiscordWebHookAttachedFile.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\DiscordWebHookPost.cs" />
@@ -120,6 +145,7 @@
 		<None Remove="..\GnollHackX\GnollHackX\GHGUIEffect.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHMenuInfo.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHMenuItem.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\GHMouseWheelEventArgs.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHMsgHistoryItem.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHNumberPickItem.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHOutRipInfo.cs" />
@@ -133,8 +159,12 @@
 		<None Remove="..\GnollHackX\GnollHackX\GHScreenFilter.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHScreenText.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHSkiaFontPaint.cs" />
-		<None Remove="..\GnollHackX\GnollHackX\GHStatusField.cs" />
-		<None Remove="..\GnollHackX\GnollHackX\GHUtils.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\GHSnapshot.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\GHSoundTrack.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\GHStatusField.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\GHSubstring.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\GHUserData.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\GHUtils.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GHWindow.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\GlyphImageSource.cs" />
 		<None Remove="..\GnollHackX\GnollHackX.Common\GnollHackService.cs" />
@@ -143,8 +173,10 @@
 		<None Remove="..\GnollHackX\GnollHackX\IFMODService.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\ImageCarousel.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\MapData.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\NoTabStopButton.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\ObjectData.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\ObjectDataItem.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\PointableButton.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Secrets.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\SecretsDirectory.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\SecretsFile.cs" />
@@ -167,24 +199,74 @@
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\VaultPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\TopScorePage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\LibraryPage.xaml.cs" />
-		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\DisplayFilePage.xaml.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\MusicPage.xaml.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\SnapshotPage.xaml.cs" />
+    <None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\DisplayFilePage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\ReplayPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\ImportExportPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\EditorPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\MainScreen\VersionPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\Pages\Game\GameMenuPage.xaml.cs" />
+		<None Remove="..\GnollHackX\GnollHackX\Pages\Game\WikiPage.xaml.cs" />
 		<None Remove="..\GnollHackX\GnollHackX\MainPage.xaml.cs" />
+		<None Remove="Assets\Cursor\custom-cursor-32.cur" />
+		<None Remove="Assets\Cursor\custom-cursor-32in64.cur" />
+		<None Remove="Assets\Cursor\custom-cursor-64.cur" />
+		<None Remove="Assets\Cursor\info-cursor-32.cur" />
+		<None Remove="Assets\Cursor\info-cursor-64.cur" />
+		<None Remove="Assets\Fonts\Lato.otf" />
+		<None Remove="Assets\Fonts\Lato.ttf" />
 		<None Remove="Assets\gnollhack-icon-v2-512.png" />
 		<None Remove="Assets\UI\autostash.png" />
+		<None Remove="Assets\UI\background-darkmarble.png" />
 		<None Remove="Assets\UI\battery-frame.png" />
+		<None Remove="Assets\UI\catalogue.png" />
 		<None Remove="Assets\UI\fps.png" />
+		<None Remove="Assets\UI\frame-darkmode-horizontal.png" />
+		<None Remove="Assets\UI\frame-darkmode-topleft-small.png" />
+		<None Remove="Assets\UI\frame-darkmode-topleft.png" />
+		<None Remove="Assets\UI\frame-darkmode-vertical.png" />
+		<None Remove="Assets\UI\frame2-darkmode-horizontal.png" />
+		<None Remove="Assets\UI\frame2-darkmode-topleft-small.png" />
+		<None Remove="Assets\UI\frame2-darkmode-topleft.png" />
+		<None Remove="Assets\UI\frame2-darkmode-vertical.png" />
 		<None Remove="Assets\UI\frame2-horizontal.png" />
 		<None Remove="Assets\UI\frame2-topleft-small.png" />
 		<None Remove="Assets\UI\frame2-topleft.png" />
 		<None Remove="Assets\UI\frame2-vertical.png" />
+		<None Remove="Assets\UI\home.png" />
+		<None Remove="Assets\UI\library.png" />
+		<None Remove="Assets\UI\manual.png" />
+		<None Remove="Assets\UI\memory.png" />
+		<None Remove="Assets\UI\messages.png" />
+		<None Remove="Assets\UI\music.png" />
+		<None Remove="Assets\UI\page-next.png" />
+		<None Remove="Assets\UI\page-previous.png" />
 		<None Remove="Assets\UI\picktobag.png" />
+		<None Remove="Assets\UI\quickcast.png" />
+		<None Remove="Assets\UI\quickset.png" />
+		<None Remove="Assets\UI\soundtrack.png" />
+		<None Remove="Assets\UI\status-align-chaotic.png" />
+		<None Remove="Assets\UI\status-align-lawful.png" />
+		<None Remove="Assets\UI\status-align-neutral.png" />
+		<None Remove="Assets\UI\status-align-unknown.png" />
+		<None Remove="Assets\UI\status-quick-spell.png" />
+		<None Remove="Assets\UI\status-quick-wand.png" />
 		<None Remove="Assets\UI\status-quivered-weapon-style.png" />
+		<None Remove="Assets\UI\status-score.png" />
+		<None Remove="Assets\UI\status-separator.png" />
+		<None Remove="Assets\UI\status-stats-cha.png" />
+		<None Remove="Assets\UI\status-stats-con.png" />
+		<None Remove="Assets\UI\status-stats-dex.png" />
+		<None Remove="Assets\UI\status-stats-int.png" />
+		<None Remove="Assets\UI\status-stats-str.png" />
+		<None Remove="Assets\UI\status-stats-wis.png" />
+		<None Remove="Assets\UI\status-xp-points.png" />
 		<None Remove="Assets\UI\symbol-damage.png" />
+		<None Remove="Assets\UI\wiki.png" />
+		<None Remove="Assets\UI\worn.png" />
+		<None Remove="Assets\UI\zapquick.png" />
+		<None Remove="Assets\UI\zoom.png" />
 		<None Remove="Platforms\Android\Environment.txt" />
 		<None Remove="Resources\AppIcon\appicon.svg" />
 		<None Remove="Resources\AppIcon\appiconfg.svg" />
@@ -194,6 +276,7 @@
 		<Compile Include="..\GnollHackX\GnollHackX\BackgroundView.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHGame.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\UIUtils.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\CustomCanvasView.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\CustomLabel.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\DiscordWebHookAttachedFile.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\DiscordWebHookPost.cs" />
@@ -218,6 +301,7 @@
 		<Compile Include="..\GnollHackX\GnollHackX\GHNumberPickItem.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHMenuInfo.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHMenuItem.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\GHMouseWheelEventArgs.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHMsgHistoryItem.cs" />		
 		<Compile Include="..\GnollHackX\GnollHackX\GHOutRipInfo.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHPetDataItem.cs" />
@@ -230,9 +314,13 @@
 		<Compile Include="..\GnollHackX\GnollHackX\GHScreenFilter.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHScreenText.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHSkiaFontPaint.cs" />
-		<Compile Include="..\GnollHackX\GnollHackX\GHStatusField.cs" />
-		<Compile Include="..\GnollHackX\GnollHackX\GHTopScoreItem.cs" />
-		<Compile Include="..\GnollHackX\GnollHackX\GHUtils.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHSoundTrack.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHSnapshot.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHStatusField.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHSubstring.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHTopScoreItem.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHUserData.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\GHUtils.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GHWindow.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\GlyphImageSource.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX.Common\GnollHackService.cs" />
@@ -241,8 +329,10 @@
 		<Compile Include="..\GnollHackX\GnollHackX\IFMODService.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\ImageCarousel.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\MapData.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\NoTabStopButton.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\ObjectData.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\ObjectDataItem.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\PointableButton.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Secrets.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\SecretsDirectory.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\SecretsFile.cs" />
@@ -265,7 +355,9 @@
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\VaultPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\TopScorePage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\LibraryPage.xaml.cs" />
-		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\DisplayFilePage.xaml.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\MusicPage.xaml.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\SnapshotPage.xaml.cs" />
+    <Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\DisplayFilePage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\ReplayPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\ImportExportPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\MainScreen\EditorPage.xaml.cs" />
@@ -274,6 +366,7 @@
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\Game\GamePage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\Game\NamePage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\Pages\Game\OutRipPage.xaml.cs" />
+		<Compile Include="..\GnollHackX\GnollHackX\Pages\Game\WikiPage.xaml.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX\MainPage.xaml.cs" />
 	</ItemGroup>
 	
@@ -474,6 +567,7 @@
 	  <None Remove="Assets\UI\vitruvian-gnoll.png" />
 	  <None Remove="Assets\UI\wait.png" />
 	  <None Remove="Assets\UI\wear.png" />
+	  <None Remove="Assets\UI\wearmany.png" />
 	  <None Remove="Assets\UI\whatis.png" />
 	  <None Remove="Assets\UI\wield.png" />
 	  <None Remove="Assets\UI\wipe.png" />
@@ -492,38 +586,37 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
-      <EmbeddedJar Include="Platforms\Android\jars\fmod.jar" />
-	  <AndroidLibrary Include="Platforms\Android\jars\fmod.jar" />
-	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmod.so" />
-  	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmodstudio.so" />
-	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libgnollhackdroid.so" />
-	  <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libc++_shared.so" />
-      <AndroidAsset Include="Platforms\Android\gnh\credits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\license" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\logfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\nhdat" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\record" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\symbols" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\sysconf" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\perm" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\recover" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\xlogfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\gnh\xcredits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-      <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)%(Filename)banks\%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-      <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
-      <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
-      <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
-      <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
-      <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <EmbeddedJar Include="Platforms\Android\jars\fmod.jar" />
+    <AndroidLibrary Include="Platforms\Android\jars\fmod.jar" />
+    <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmod.so" />
+  	<AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmodstudio.so" />
+    <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libgnollhackdroid.so" />
+    <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libc++_shared.so" />
+    <AndroidAsset Include="Platforms\Android\gnh\license" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\logfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\nhdat" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\record" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\symbols" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\sysconf" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\perm" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\recover" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\xlogfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\gnh\xcredits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
+    <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+    <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
 	  <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
-      <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\ondemandassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
-      <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\installtimeassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
+    <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\ondemandassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
+    <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\installtimeassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
 	  <Compile Include="..\GnollHackX\GnollHackX.Android\PlatformServiceAndroid.cs" />
 	</ItemGroup>
 
@@ -546,7 +639,6 @@
 			<IsCxx>True</IsCxx>
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</NativeReference>
-		<BundleResource Include="Platforms\iOS\gnh\credits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
 		<BundleResource Include="Platforms\iOS\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
 		<BundleResource Include="Platforms\iOS\gnh\license" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
 		<BundleResource Include="Platforms\iOS\gnh\logfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
@@ -567,31 +659,101 @@
 		<Compile Include="..\GnollHackX\GnollHackX.iOS\PlatformServiceiOS.cs" />
 	</ItemGroup>
 
-	<PropertyGroup>
-		<DefineConstants>$(DefineConstants);GNH_MAUI</DefineConstants>
-	</PropertyGroup>
+	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'">
+		<MauiAsset Include="Platforms\Windows\libs\fmod.dll" LogicalName="%(RecursiveDir)%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\libs\fmodstudio.dll" LogicalName="%(RecursiveDir)%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\libs\fsbank.dll" LogicalName="%(RecursiveDir)%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\libs\gnollhackwin.dll" LogicalName="%(RecursiveDir)%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\libs\libfsbvorbis64.dll" LogicalName="%(RecursiveDir)%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\license" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\logfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\nhdat" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\perm" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\record" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\symbols" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\sysconf" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\xcredits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\gnh\xlogfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+		<MauiAsset Include="Platforms\Windows\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</MauiAsset>
+	</ItemGroup>
+	
 	<PropertyGroup Condition="'$(TargetFramework)'=='net9.0-ios'">
 		<DefineConstants>$(DefineConstants);UNITY_IPHONE</DefineConstants>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
 	  <MtouchLink>None</MtouchLink>
-	</PropertyGroup>
+    <_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>
+  </PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
 	  <MtouchLink>SdkOnly</MtouchLink>
-	</PropertyGroup>
+  </PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
 	  <PublishTrimmed>False</PublishTrimmed>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-android'">
-	  <PublishTrimmed>True</PublishTrimmed>
-      <TrimMode>partial</TrimMode>
-	</PropertyGroup>
+    <PublishTrimmed>True</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <!--<PublishTrimmed>False</PublishTrimmed>-->
+    <!--<RunAOTCompilation>False</RunAOTCompilation>-->
+  </PropertyGroup>
 
 	<ItemGroup>
 	  <EmbeddedResource Include="Assets\archristy.ttf" />
 	  <EmbeddedResource Include="Assets\button_disabled.png" />
 	  <EmbeddedResource Include="Assets\button_normal.png" />
 	  <EmbeddedResource Include="Assets\button_selected.png" />
+	  <EmbeddedResource Include="Assets\Cursor\custom-cursor-32.cur" />
+	  <EmbeddedResource Include="Assets\Cursor\custom-cursor-64.cur" />
+	  <EmbeddedResource Include="Assets\Cursor\info-cursor-32.cur" />
+	  <EmbeddedResource Include="Assets\Cursor\info-cursor-64.cur" />
 	  <EmbeddedResource Include="Assets\DejaVuSansMono-Bold.ttf" />
 	  <EmbeddedResource Include="Assets\DejaVuSansMono-BoldOblique.ttf" />
 	  <EmbeddedResource Include="Assets\DejaVuSansMono-Oblique.ttf" />
@@ -600,7 +762,9 @@
 	  <EmbeddedResource Include="Assets\diablo_h.ttf" />
 	  <EmbeddedResource Include="Assets\endr.ttf" />
 	  <EmbeddedResource Include="Assets\FMOD-Logo-192-White.png" />
-	  <EmbeddedResource Include="Assets\ghsecrets.sjson" />
+	  <MauiAsset Include="Assets\Fonts\Lato.otf" />
+    <MauiAsset Include="Assets\Fonts\Lato.ttf" />
+    <EmbeddedResource Include="Assets\ghsecrets.sjson" />
 	  <EmbeddedResource Include="Assets\ghsettings.json" />
 	  <EmbeddedResource Include="Assets\gnollhack-icon-v2-512.png" />
 	  <EmbeddedResource Include="Assets\gnollhack-logo-test-2.png" />
@@ -627,12 +791,14 @@
 	  <EmbeddedResource Include="Assets\UI\attributes.png" />
 	  <EmbeddedResource Include="Assets\UI\autopickup.png" />
 	  <EmbeddedResource Include="Assets\UI\autostash.png" />
+	  <EmbeddedResource Include="Assets\UI\background-darkmarble.png" />
 	  <EmbeddedResource Include="Assets\UI\background-loading-screen.png" />
 	  <EmbeddedResource Include="Assets\UI\background-oldpaper.png" />
 	  <EmbeddedResource Include="Assets\UI\battery-frame.png" />
 	  <EmbeddedResource Include="Assets\UI\break.png" />
 	  <EmbeddedResource Include="Assets\UI\cancel.png" />
 	  <EmbeddedResource Include="Assets\UI\cast.png" />
+	  <EmbeddedResource Include="Assets\UI\catalogue.png" />
 	  <EmbeddedResource Include="Assets\UI\chat.png" />
 	  <EmbeddedResource Include="Assets\UI\chatsteed.png" />
 	  <EmbeddedResource Include="Assets\UI\chronicle.png" />
@@ -654,10 +820,18 @@
 	  <EmbeddedResource Include="Assets\UI\fire.png" />
 	  <EmbeddedResource Include="Assets\UI\forcelock.png" />
 	  <EmbeddedResource Include="Assets\UI\fps.png" />
+	  <EmbeddedResource Include="Assets\UI\frame-darkmode-horizontal.png" />
+	  <EmbeddedResource Include="Assets\UI\frame-darkmode-topleft-small.png" />
+	  <EmbeddedResource Include="Assets\UI\frame-darkmode-topleft.png" />
+	  <EmbeddedResource Include="Assets\UI\frame-darkmode-vertical.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-horizontal.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-topleft-small.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-topleft.png" />
 	  <EmbeddedResource Include="Assets\UI\frame-vertical.png" />
+	  <EmbeddedResource Include="Assets\UI\frame2-darkmode-horizontal.png" />
+	  <EmbeddedResource Include="Assets\UI\frame2-darkmode-topleft-small.png" />
+	  <EmbeddedResource Include="Assets\UI\frame2-darkmode-topleft.png" />
+	  <EmbeddedResource Include="Assets\UI\frame2-darkmode-vertical.png" />
 	  <EmbeddedResource Include="Assets\UI\frame2-horizontal.png" />
 	  <EmbeddedResource Include="Assets\UI\frame2-topleft-small.png" />
 	  <EmbeddedResource Include="Assets\UI\frame2-topleft.png" />
@@ -666,6 +840,7 @@
 	  <EmbeddedResource Include="Assets\UI\genocided.png" />
 	  <EmbeddedResource Include="Assets\UI\handedness.png" />
 	  <EmbeddedResource Include="Assets\UI\help.png" />
+	  <EmbeddedResource Include="Assets\UI\home.png" />
 	  <EmbeddedResource Include="Assets\UI\identify.png" />
 	  <EmbeddedResource Include="Assets\UI\inventory.png" />
 	  <EmbeddedResource Include="Assets\UI\invoke.png" />
@@ -676,17 +851,22 @@
 	  <EmbeddedResource Include="Assets\UI\leftring.png" />
 	  <EmbeddedResource Include="Assets\UI\levelchange.png" />
 	  <EmbeddedResource Include="Assets\UI\levelport.png" />
+	  <EmbeddedResource Include="Assets\UI\library.png" />
 	  <EmbeddedResource Include="Assets\UI\License.txt" />
 	  <EmbeddedResource Include="Assets\UI\light.png" />
 	  <EmbeddedResource Include="Assets\UI\load.png" />
 	  <EmbeddedResource Include="Assets\UI\lookfar.png" />
 	  <EmbeddedResource Include="Assets\UI\lookhere.png" />
 	  <EmbeddedResource Include="Assets\UI\loot.png" />
+	  <EmbeddedResource Include="Assets\UI\manual.png" />
+	  <EmbeddedResource Include="Assets\UI\memory.png" />
 	  <EmbeddedResource Include="Assets\UI\menubackground.png" />
+	  <EmbeddedResource Include="Assets\UI\messages.png" />
 	  <EmbeddedResource Include="Assets\UI\missing_icon.png" />
 	  <EmbeddedResource Include="Assets\UI\mix.png" />
 	  <EmbeddedResource Include="Assets\UI\monster.png" />
 	  <EmbeddedResource Include="Assets\UI\more.png" />
+	  <EmbeddedResource Include="Assets\UI\music.png" />
 	  <EmbeddedResource Include="Assets\UI\name.png" />
 	  <EmbeddedResource Include="Assets\UI\next.png" />
 	  <EmbeddedResource Include="Assets\UI\no.png" />
@@ -696,6 +876,8 @@
 	  <EmbeddedResource Include="Assets\UI\orb_fill.png" />
 	  <EmbeddedResource Include="Assets\UI\orb_glass.png" />
 	  <EmbeddedResource Include="Assets\UI\overview.png" />
+	  <EmbeddedResource Include="Assets\UI\page-next.png" />
+	  <EmbeddedResource Include="Assets\UI\page-previous.png" />
 	  <EmbeddedResource Include="Assets\UI\pay.png" />
 	  <EmbeddedResource Include="Assets\UI\picktobag.png" />
 	  <EmbeddedResource Include="Assets\UI\pickup.png" />
@@ -704,6 +886,8 @@
 	  <EmbeddedResource Include="Assets\UI\previous.png" />
 	  <EmbeddedResource Include="Assets\UI\puton.png" />
 	  <EmbeddedResource Include="Assets\UI\quaff.png" />
+	  <EmbeddedResource Include="Assets\UI\quickcast.png" />
+	  <EmbeddedResource Include="Assets\UI\quickset.png" />
 	  <EmbeddedResource Include="Assets\UI\quiver.png" />
 	  <EmbeddedResource Include="Assets\UI\read.png" />
 	  <EmbeddedResource Include="Assets\UI\remove.png" />
@@ -721,10 +905,15 @@
 	  <EmbeddedResource Include="Assets\UI\select.png" />
 	  <EmbeddedResource Include="Assets\UI\sit.png" />
 	  <EmbeddedResource Include="Assets\UI\skill.png" />
+	  <EmbeddedResource Include="Assets\UI\soundtrack.png" />
 	  <EmbeddedResource Include="Assets\UI\spells.png" />
 	  <EmbeddedResource Include="Assets\UI\stairs-down.png" />
 	  <EmbeddedResource Include="Assets\UI\stairs-up.png" />
 	  <EmbeddedResource Include="Assets\UI\status-ac.png" />
+	  <EmbeddedResource Include="Assets\UI\status-align-chaotic.png" />
+	  <EmbeddedResource Include="Assets\UI\status-align-lawful.png" />
+	  <EmbeddedResource Include="Assets\UI\status-align-neutral.png" />
+	  <EmbeddedResource Include="Assets\UI\status-align-unknown.png" />
 	  <EmbeddedResource Include="Assets\UI\status-casual-classic-mode.png" />
 	  <EmbeddedResource Include="Assets\UI\status-casual-mode.png" />
 	  <EmbeddedResource Include="Assets\UI\status-difficulty-average.png" />
@@ -742,11 +931,22 @@
 	  <EmbeddedResource Include="Assets\UI\status-mc.png" />
 	  <EmbeddedResource Include="Assets\UI\status-modern-mode.png" />
 	  <EmbeddedResource Include="Assets\UI\status-move.png" />
+	  <EmbeddedResource Include="Assets\UI\status-quick-spell.png" />
+	  <EmbeddedResource Include="Assets\UI\status-quick-wand.png" />
 	  <EmbeddedResource Include="Assets\UI\status-quivered-weapon-style.png" />
+	  <EmbeddedResource Include="Assets\UI\status-score.png" />
+	  <EmbeddedResource Include="Assets\UI\status-separator.png" />
+	  <EmbeddedResource Include="Assets\UI\status-stats-cha.png" />
+	  <EmbeddedResource Include="Assets\UI\status-stats-con.png" />
+	  <EmbeddedResource Include="Assets\UI\status-stats-dex.png" />
+	  <EmbeddedResource Include="Assets\UI\status-stats-int.png" />
+	  <EmbeddedResource Include="Assets\UI\status-stats-str.png" />
+	  <EmbeddedResource Include="Assets\UI\status-stats-wis.png" />
 	  <EmbeddedResource Include="Assets\UI\status-turns.png" />
 	  <EmbeddedResource Include="Assets\UI\status-weapon-style.png" />
 	  <EmbeddedResource Include="Assets\UI\status-wizard-mode.png" />
 	  <EmbeddedResource Include="Assets\UI\status-xp-level.png" />
+	  <EmbeddedResource Include="Assets\UI\status-xp-points.png" />
 	  <EmbeddedResource Include="Assets\UI\stone-altmap-off.png" />
 	  <EmbeddedResource Include="Assets\UI\stone-altmap-on.png" />
 	  <EmbeddedResource Include="Assets\UI\stone-autocenter-off.png" />
@@ -795,31 +995,52 @@
 	  <EmbeddedResource Include="Assets\UI\vitruvian-gnoll.png" />
 	  <EmbeddedResource Include="Assets\UI\wait.png" />
 	  <EmbeddedResource Include="Assets\UI\wear.png" />
+	  <EmbeddedResource Include="Assets\UI\wearmany.png" />
 	  <EmbeddedResource Include="Assets\UI\whatis.png" />
 	  <EmbeddedResource Include="Assets\UI\wield.png" />
+	  <EmbeddedResource Include="Assets\UI\wiki.png" />
 	  <EmbeddedResource Include="Assets\UI\wipe.png" />
 	  <EmbeddedResource Include="Assets\UI\wish.png" />
+	  <EmbeddedResource Include="Assets\UI\worn.png" />
 	  <EmbeddedResource Include="Assets\UI\yell.png" />
 	  <EmbeddedResource Include="Assets\UI\yes.png" />
 	  <EmbeddedResource Include="Assets\UI\yestoall.png" />
 	  <EmbeddedResource Include="Assets\UI\you.png" />
 	  <EmbeddedResource Include="Assets\UI\zap.png" />
+	  <EmbeddedResource Include="Assets\UI\zapquick.png" />
+	  <EmbeddedResource Include="Assets\UI\zoom.png" />
 	  <EmbeddedResource Include="Assets\uwch.ttf" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Azure.Identity" Version="1.11.2" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0-preview.3.24126.1" />
+		<PackageReference Include="Azure.Identity" Version="1.12.0" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.13.1" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0-preview.7.24405.7" />
+		<PackageReference Include="System.Text.Json" Version="9.0.0-preview.7.24405.7" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="SkiaSharp" Version="3.0.0-preview.3.1" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.0.0-preview.3.1" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.0.0-preview.3.1" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    
+    <PackageReference Include="SkiaSharp" Version="3.0.0-preview.4.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
+    <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.0.0-preview.4.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
+    <PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.0.0-preview.4.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
+    
+    <PackageReference Include="SkiaSharp" Version="3.0.0-preview.3.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.0.0-preview.3.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.0.0-preview.3.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+		
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
-	</ItemGroup>
+    
+    <!-- Platform-specific packages -->
+    <PackageReference Include="System.Management" Version="9.0.0-preview.7.24405.7" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+    <PackageReference Include="Xamarin.Google.Android.Play.Core" Version="1.10.3.13" Condition="'$(TargetFramework)'=='net9.0-android'" />
+  </ItemGroup>
 
-	<ItemGroup>
+  <ItemGroup Condition="$(DefineConstants.Contains('SENTRY'))">
+    <PackageReference Include="Sentry.Maui" Version="4.9.0" />
+    <PackageReference Include="Sentry.Profiling" Version="4.9.0" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+  </ItemGroup>
+
+  <ItemGroup>
 	  <Compile Update="GamePage.xaml.cs">
 	    <DependentUpon>GamePage.xaml</DependentUpon>
 	  </Compile>
@@ -834,5 +1055,8 @@
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
 		<BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
 	</ItemGroup>
+
+	<Import Project="AppxIcons.targets" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+
 </Project>
  

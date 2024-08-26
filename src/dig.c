@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    dig.c    $NHDT-Date: 1547421446 2019/01/13 23:17:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.117 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -255,7 +255,7 @@ int x, y;
     } 
     else if ((IS_ROCK(levl[x][y].typ) && levl[x][y].typ != SDOOR
                 && (levl[x][y].wall_info & W_NONDIGGABLE) != 0)
-               || (ttmp && ((trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDEN) || (!Can_dig_down(&u.uz) && !levl[x][y].candig)))
+               || (ttmp && ((trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDDEN) || (!Can_dig_down(&u.uz) && !levl[x][y].candig)))
                || (IS_DOOR_OR_SDOOR(levl[x][y].typ) && !is_door_diggable_at(x, y))
               ) 
     {
@@ -849,7 +849,7 @@ int ttyp;
              */
             if (u.ustuck || wont_fall) {
                 if (newobjs)
-                    impact_drop((struct obj *) 0, x, y, 0);
+                    impact_drop((struct obj *) 0, x, y, 0, TRUE);
                 if (oldobjs != newobjs)
                     (void) pickup(1, FALSE);
                 if (shopdoor && madeby_u)
@@ -879,7 +879,7 @@ int ttyp;
             if (shopdoor && madeby_u)
                 pay_for_damage("ruin", FALSE);
             if (newobjs)
-                impact_drop((struct obj *) 0, x, y, 0);
+                impact_drop((struct obj *) 0, x, y, 0, TRUE);
             if (mtmp) {
                 /*[don't we need special sokoban handling here?]*/
                 if (is_flying(mtmp) || is_levitating(mtmp)
@@ -968,7 +968,7 @@ coord *cc;
     lev = &levl[dig_x][dig_y];
     nohole = (!Can_dig_down(&u.uz) && !lev->candig);
 
-    if ((ttmp && ((trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDEN) != 0 || nohole))
+    if ((ttmp && ((trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDDEN) != 0 || nohole))
         || (IS_ROCK(lev->typ) && lev->typ != SDOOR
             && (lev->wall_info & W_NONDIGGABLE) != 0)) {
         play_sfx_sound(SFX_GENERAL_TRIED_ACTION_BUT_IT_FAILED);
@@ -2195,11 +2195,11 @@ struct obj* origobj;
 
             if (animations[anim].action_execution_frame > 0)
             {
-                long intervals_to_execution = (long)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
+                int64_t intervals_to_execution = (int64_t)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
 #if 0
                 if (prev_anim_counter_idx > -1 && context.zap_animation_counter_on[prev_anim_counter_idx])
                 {
-                    long diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution /* - 1*/;
+                    int64_t diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution /* - 1*/;
                     if (abs((int)diff) <= 3) /* Extra check that something else is not going on */
                     {
                         context.zap_animation_counter[prev_anim_counter_idx] -= diff;
@@ -2207,7 +2207,7 @@ struct obj* origobj;
                 }
 #endif
 
-                context.zap_aggregate_intervals_to_wait_until_action = (unsigned long)intervals_to_execution;
+                context.zap_aggregate_intervals_to_wait_until_action = (uint64_t)intervals_to_execution;
             }
 
             //prev_anim_counter_idx = idx;
@@ -2602,18 +2602,18 @@ struct obj* origobj;
 
             if (animations[anim].action_execution_frame > 0)
             {
-                long intervals_to_execution = (long)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
+                int64_t intervals_to_execution = (int64_t)(animations[anim].action_execution_frame * animations[anim].intervals_between_frames);
 #if 0
                 if (prev_anim_counter_idx > -1 && context.zap_animation_counter_on[prev_anim_counter_idx])
                 {
-                    long diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution /* - 1*/;
+                    int64_t diff = context.zap_animation_counter[prev_anim_counter_idx] - intervals_to_execution /* - 1*/;
                     if (abs((int)diff) <= 3) /* Extra check that something else is not going on */
                     {
                         context.zap_animation_counter[prev_anim_counter_idx] -= diff;
                     }
                 }
 #endif
-                context.zap_aggregate_intervals_to_wait_until_action = (unsigned long)intervals_to_execution;
+                context.zap_aggregate_intervals_to_wait_until_action = (uint64_t)intervals_to_execution;
             }
 
             //prev_anim_counter_idx = idx;
@@ -3012,6 +3012,7 @@ boolean *dealloced;
     if (otmp->otyp == LEASH && otmp->leashmon != 0)
         o_unleash(otmp);
 
+    Strcpy(debug_buf_3, "bury_an_obj");
     if (otmp->lamplit && otmp->otyp != POT_OIL)
         end_burn(otmp, TRUE);
 
@@ -3052,12 +3053,12 @@ boolean *dealloced;
         ; /* should cancel timer if under_ice */
     } else if ((under_ice ? otmp->oclass == POTION_CLASS : is_rottable(otmp))
                && !obj_resists(otmp, 5, 95)) {
-        (void) start_timer((under_ice ? 0L : 250L) + (long) rnd(250),
+        (void) start_timer((under_ice ? 0L : 250L) + (int64_t) rnd(250),
                            TIMER_OBJECT, ROT_ORGANIC, obj_to_any(otmp));
 #if 0
     /* rusting of buried metal not yet implemented */
     } else if (is_rustprone(otmp)) {
-        (void) start_timer((long) rnd((otmp->otyp == HEAVY_IRON_BALL)
+        (void) start_timer((int64_t) rnd((otmp->otyp == HEAVY_IRON_BALL)
                                          ? 1500
                                          : 250),
                            TIMER_OBJECT, RUST_METAL, obj_to_any(otmp));
@@ -3073,7 +3074,7 @@ int x, y;
 {
     struct obj *otmp, *otmp2;
     struct monst *shkp;
-    long loss = 0L;
+    int64_t loss = 0L;
     boolean costly;
 
     costly = ((shkp = shop_keeper(*in_rooms(x, y, SHOPBASE)))
@@ -3165,7 +3166,7 @@ boolean verbose, buriedsearchableonly;
 void
 rot_organic(arg, timeout)
 anything *arg;
-long timeout UNUSED;
+int64_t timeout UNUSED;
 {
     struct obj *obj = arg->a_obj;
 
@@ -3194,7 +3195,7 @@ long timeout UNUSED;
 void
 rot_corpse(arg, timeout)
 anything *arg;
-long timeout;
+int64_t timeout;
 {
     xchar x = 0, y = 0;
     struct obj *obj = arg->a_obj;
@@ -3388,7 +3389,7 @@ dodig()
     }
 
 
-    char digbuf[BUFSIZ];
+    char digbuf[BUFSZ * 2];
     enum object_soundset_types oss = 0;
     if (uwep)
     {

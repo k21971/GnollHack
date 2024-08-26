@@ -9,7 +9,7 @@
 #include "callback.h"
 #include "tradstdc.h"
 
-int FDECL(GnollHackStart, (char*));
+DLLEXPORT int FDECL(GnollHackStart, (char*));
 
 #define GHRUNFLAGS_NONE                     0x00000000UL
 #define GHRUNFLAGS_SET_WINCAPS              0x00000001UL
@@ -22,16 +22,34 @@ int FDECL(GnollHackStart, (char*));
 #define GHRUNFLAGS_PLAYING_REPLAY           0x00000080UL
 #define GHRUNFLAGS_TOURNAMENT_MODE          0x00000100UL
 #define GHRUNFLAGS_GUI_DEBUG_MODE           0x00000200UL
+#define GHRUNFLAGS_CHARACTER_CLICK_ACTION   0x00000400UL
+
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_1        0x00400000UL
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_2        0x00800000UL
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_3        0x01000000UL
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_4        0x02000000UL
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_5        0x04000000UL
+
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_1       0x08000000UL
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_2       0x10000000UL
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_3       0x20000000UL
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_4       0x40000000UL
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_5       0x80000000UL
+
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_MASK     (0x07000000UL | GHRUNFLAGS_RIGHT_MOUSE_BIT_1 | GHRUNFLAGS_RIGHT_MOUSE_BIT_2)
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_MASK    0xF8000000UL
+#define GHRUNFLAGS_RIGHT_MOUSE_BIT_INDEX    22
+#define GHRUNFLAGS_MIDDLE_MOUSE_BIT_INDEX   27
 
 /* Main GnollHack routine with all the necessary callback functions */
-int RunGnollHack(
+DLLEXPORT int RunGnollHack(
     char* gnhdir,
     char* cmdlineargs,
     char* preset_player_name,
     char* recovery_name,
-    unsigned long runflags,
-    unsigned long wincap1,
-    unsigned long wincap2,
+    uint64_t runflags,
+    uint64_t wincap1,
+    uint64_t wincap2,
     InitWindowsCallback callback_init_nhwindows,
     PlayerSelectionCallback callback_player_selection,
     AskNameCallback callback_askname,

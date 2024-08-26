@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    dothrow.c    $NHDT-Date: 1556201496 2019/04/25 14:11:36 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -43,7 +43,7 @@ boolean firing;
     struct obj *otmp;
     int multishot;
     //schar skill;
-    long wep_mask;
+    int64_t wep_mask;
     //boolean weakmultishot;
 
     /* ask "in what direction?" */
@@ -126,7 +126,7 @@ boolean firing;
     {
         struct multishot_result msres = get_multishot_stats(&youmonst, obj, uwep, TRUE);     
         multishot = msres.wielder_attacks * msres.weapon_attacks;
-        if ((long) multishot > obj->quan)
+        if ((int64_t) multishot > obj->quan)
             multishot = (int) obj->quan;
         if (shotlimit > 0 && multishot > shotlimit)
             multishot = shotlimit;
@@ -739,7 +739,7 @@ genericptr_t arg;
 int x, y;
 {
     boolean res;
-    long save_EWwalking = EWwalking;
+    int64_t save_EWwalking = EWwalking;
 
     /* prevent jumping over water from being placed in that water */
     EWwalking |= I_SPECIAL;
@@ -1267,7 +1267,7 @@ boolean hitsroof;
                 u.ucreamed += blindinc;
                 if (!Blinded)
                     play_sfx_sound(SFX_ACQUIRE_BLINDNESS);
-                make_blinded(Blinded + (long) blindinc, FALSE);
+                make_blinded(Blinded + (int64_t) blindinc, FALSE);
                 if (!Blind)
                     Your1(vision_clears);
             }
@@ -1373,7 +1373,7 @@ struct obj *obj;
 void
 throwit(obj, wep_mask)
 struct obj *obj;
-long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Javelin of Returning */
+int64_t wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Javelin of Returning */
 {
     register struct monst *mon;
     register int range, urange;
@@ -1527,7 +1527,9 @@ long wep_mask; /* used to re-equip returning boomerang / aklys / Mjollnir / Jave
         mon = bhit(u.dx, u.dy, range, 0,
                    tethered_weapon ? THROWN_TETHERED_WEAPON : THROWN_WEAPON,
                    (int FDECL((*), (MONST_P, OBJ_P, MONST_P))) 0,
-                   (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, &obj, &youmonst, TRUE, FALSE);
+                   (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, 
+                   (int FDECL((*), (TRAP_P, OBJ_P, MONST_P))) 0, 
+                   &obj, &youmonst, TRUE, FALSE);
         thrownobj = obj; /* obj may be null now */
 
         /* have to do this after bhit() so u.ux & u.uy are correct */
@@ -2030,6 +2032,7 @@ uchar* hitres_ptr;
     dieroll = rnd(20);
 
     boolean is_golf_swing_with_stone = (hmode == HMON_GOLF && (obj->oclass == GEM_CLASS || objects[obj->otyp].oc_skill == -P_SLING));
+    int tohit_skill_bonus = weapon_skill_hit_bonus((struct obj*)0, P_NONE, FALSE, FALSE, 2, 0, TRUE, TRUE);
 
     if (obj->oclass == WEAPON_CLASS || is_weptool(obj) || obj->oclass == GEM_CLASS) 
     {
@@ -2042,12 +2045,15 @@ uchar* hitres_ptr;
         {
             if (!ammo_and_launcher(obj, uwep) && !is_golf_swing_with_stone)
             {
-                tmp -= 4;
-            } 
+                if (hmode == HMON_THROWN)
+                    tmp += tohit_skill_bonus;
+                else
+                    tmp -= 4;
+            }
             else if (uwep)
             {
                 tmp += weapon_to_hit_value(uwep, mon, &youmonst, 2);    //tmp += uwep->enchantment - greatest_erosion(uwep);
-                nonpolytmp += weapon_skill_hit_bonus(uwep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0, TRUE); //Players get skill bonuses
+                nonpolytmp += weapon_skill_hit_bonus(uwep, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0, TRUE, FALSE); //Players get skill bonuses
 //                if (uwep->oartifact)
 //                    tmp += spec_abon(uwep, mon);
                 /*
@@ -2075,7 +2081,7 @@ uchar* hitres_ptr;
                 tmp -= 2;
             /* we know we're dealing with a weapon or weptool handled
                by WEAPON_SKILLS once ammo objects have been excluded */
-            nonpolytmp += weapon_skill_hit_bonus(obj, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0, TRUE);
+            nonpolytmp += weapon_skill_hit_bonus(obj, is_golf_swing_with_stone ? P_THROWN_WEAPON : P_NONE, FALSE, FALSE, TRUE, 0, TRUE, TRUE);
         }
 
         /* If poly'd, give maximum of player hit chance and polymorph form hit dice, otherwise use normal player chance */
@@ -2158,6 +2164,7 @@ uchar* hitres_ptr;
     else if (otyp == HEAVY_IRON_BALL) 
     {
         exercise(A_STR, TRUE);
+        tmp += tohit_skill_bonus;
         if (tmp >= dieroll)
         {
             int was_swallowed = guaranteed_hit;
@@ -2183,10 +2190,12 @@ uchar* hitres_ptr;
             tmiss(obj, mon, TRUE);
         }
 
-    } else if (otyp == BOULDER) 
+    } 
+    else if (otyp == BOULDER) 
     {
         exercise(A_STR, TRUE);
-        if (tmp >= dieroll) 
+        tmp += tohit_skill_bonus;
+        if (tmp >= dieroll)
         {
             if (hitres_ptr)
                 *hitres_ptr = 1;
@@ -2201,10 +2210,9 @@ uchar* hitres_ptr;
         {
             tmiss(obj, mon, TRUE);
         }
-
     } 
     else if ((otyp == EGG || otyp == CREAM_PIE || otyp == BLINDING_VENOM || otyp == ACID_VENOM)
-               && (guaranteed_hit || ACURR(A_DEX) > rnd(25)))
+               && (guaranteed_hit || ACURR(A_DEX) + tohit_skill_bonus > rnd(25)))
     {
         if (hitres_ptr)
             *hitres_ptr = 1;
@@ -2214,7 +2222,7 @@ uchar* hitres_ptr;
         return 1; /* hmon used it up */
 
     } 
-    else if (obj->oclass == POTION_CLASS && (guaranteed_hit || ACURR(A_DEX) > rnd(25))) 
+    else if (obj->oclass == POTION_CLASS && (guaranteed_hit || ACURR(A_DEX) + tohit_skill_bonus > rnd(25)))
     {
         if (hitres_ptr)
             *hitres_ptr = 1;
@@ -2439,7 +2447,7 @@ xchar x, y;
     }
 }
 
-STATIC_VAR NEARDATA long lastmovetime = 0L;
+STATIC_VAR NEARDATA int64_t lastmovetime = 0L;
 STATIC_VAR NEARDATA boolean peaceful_shk = FALSE;
 
 /*
@@ -2657,7 +2665,9 @@ struct obj *obj;
         } else {
             mon = bhit(u.dx, u.dy, range, 0, THROWN_WEAPON,
                        (int FDECL((*), (MONST_P, OBJ_P, MONST_P))) 0,
-                       (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, &obj, &youmonst, TRUE, FALSE);
+                       (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, 
+                       (int FDECL((*), (TRAP_P, OBJ_P, MONST_P))) 0, 
+                       &obj, &youmonst, TRUE, FALSE);
             if (!obj)
                 return 1; /* object is gone */
             if (mon) {

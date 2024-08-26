@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mthrowu.c    $NHDT-Date: 1542765360 2018/11/21 01:56:00 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.78 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -400,7 +400,6 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
             else
             {
                 tmp += weapon_to_hit_value(mon_launcher, mtmp, (struct monst*)0, 2);
-                //tmp += weapon_skill_hit_bonus(uwep);  //Monsters do not get skill-based to-hit bonuses
 
                 //Penalty for shooting short range
                 if (archer && distmin(archer->mx, archer->my, mtmp->mx, mtmp->my) <= 1) 
@@ -962,7 +961,6 @@ struct obj *obj;         /* missile (or stack providing it) */
                         //Fitting ammo gets launcher's weapon_to_hit_value and weapon_dmg_value and str damage bonus if bow, fixed for crossbows
                         //LAUNCHER HITVAL
                         hitv += weapon_to_hit_value(MON_WEP(mon), &youmonst, mon, 2); //MON_WEP(mon)->enchantment - greatest_erosion(MON_WEP(mon));
-                        //hitv += weapon_skill_hit_bonus(MON_WEP(mon)); //Monsters do not get skill bonuses
                         //LAUNCHER DMGVAL
                         dam += weapon_total_dmg_value(MON_WEP(mon), &youmonst, mon, 2);
 
@@ -1010,7 +1008,7 @@ struct obj *obj;         /* missile (or stack providing it) */
                 char onmbuf[BUFSZ], knmbuf[BUFSZ];
 
                 Strcpy(onmbuf, xname(singleobj));
-                Strcpy(knmbuf, killer_xname(singleobj));
+                Sprintf(knmbuf, "%s thrown by %s", killer_xname(singleobj), a_monnam(mon));
                 
                 /* if damage triggered life-saving,
                    major death magic is limited to minor death magic */
@@ -1115,7 +1113,7 @@ struct obj *obj;         /* missile (or stack providing it) */
     if (blindinc) 
     {
         u.ucreamed += blindinc;
-        make_blinded(Blinded + (long) blindinc, FALSE);
+        make_blinded(Blinded + (int64_t) blindinc, FALSE);
         if (!Blind)
             Your1(vision_clears);
     }

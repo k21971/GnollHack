@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    o_init.c    $NHDT-Date: 1545383615 2018/12/21 09:13:35 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.25 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -106,19 +106,19 @@ const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     0, -1, 0, 0, 0, 0, NO_POWER, NO_POWER, 4, 3, -5,
     0UL, 0UL, 0UL, O4_DOUBLE_MYTHIC_CHANCE, O5_DOUBLE_EXCEPTIONALITY_CHANCE, 0UL },
 {"silver",      "silver",      "silvery",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "silver",        "silvery",            HI_SILVER,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.0, 0.0,
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.0, 25.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"gold",        "gold",        "golden",      PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "gold",          "golden",             HI_GOLD,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.5, 0.0,
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.5, 50.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"platinum",    "platinum",    "platinum",    PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "platinum",      "silvery",            HI_SILVER,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.5, 0.0,
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.5, 75.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
@@ -130,13 +130,13 @@ const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 2, 0,
     0UL, 0UL, 0UL, O4_VERY_RARE,O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"adamantium",  "adamantium",  "adamantium",  PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "silvery",            HI_SILVER,
-    {5, 4, 4, 4, 4, 0, 0, 0, 4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 1.0, 1.0, 2.0, 100.0,
+    {5, 4, 4, 4, 4, 0, 0, 0, 4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 1.0, 1.0, 2.5, 100.0,
     { DISINTEGRATION_RESISTANCE, DISINTEGRATION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { BISECTION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 6, 0, 0, 6, 0, NO_POWER, NO_POWER, 5, 4, 20,
     O1_INDESTRUCTIBLE | O1_DISINTEGRATION_RESISTANT, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"mithril",     "mithril",     "mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "silvery",            HI_SILVER,
-    {3, 2, 2, 2, 2, 0, 0, 0, 2}, {3, 1, 1, 1, 1 ,0 ,0 ,0 ,1}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.9, 0.5, 2.0, 100.0,
+    {3, 2, 2, 2, 2, 0, 0, 0, 2}, {3, 1, 1, 1, 1 ,0 ,0 ,0 ,1}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.9, 0.5, 2.5, 100.0,
     { BISECTION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 3, 0, 0, 3, 0, NO_POWER, NO_POWER, 4, 3, 15,
@@ -160,13 +160,13 @@ const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, 0,
     0UL, 0UL, 0UL, 0UL, 0UL, 0UL },
 {"hard crystal",    "crystal", "crystalline", PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  FALSE,       "crystal",       (char*)0,              HI_GLASS,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.2, 1.0, 1.0, 100.0,
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.2, 1.0, 2.0, 100.0,
     { REFLECTING, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 3, 0, 0, 2, 0, NO_POWER, NO_POWER, 4, 3, 5,
     0UL, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"gemstone",    "gemstone",    "gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  FALSE,       "gemstone",      (char*)0,         CLR_BRIGHT_GREEN,
-    {4, 3, 3, 3, 3, 0, 0, 0, 3}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
+    {4, 3, 3, 3, 3, 0, 0, 0, 3}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.0, 100.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 2, 2, 0, 2, 2, NO_POWER, NO_POWER, 4, 3, 10,
@@ -591,6 +591,7 @@ int o_low, o_high;
 boolean domaterial;
 {
     int i, j, num_to_shuffle;
+    uchar ucsw;
     short sw;
     uchar mat;
     int color;
@@ -610,9 +611,9 @@ boolean domaterial;
         sw = objects[j].oc_descr_idx;
         objects[j].oc_descr_idx = objects[i].oc_descr_idx;
         objects[i].oc_descr_idx = sw;
-        sw = objects[j].oc_tough;
+        ucsw = objects[j].oc_tough;
         objects[j].oc_tough = objects[i].oc_tough;
-        objects[i].oc_tough = sw;
+        objects[i].oc_tough = ucsw;
         color = objects[j].oc_color;
         objects[j].oc_color = objects[i].oc_color;
         objects[i].oc_color = color;
@@ -903,7 +904,7 @@ int fd, mode;
         bwrite(fd, (genericptr_t) objects,
                sizeof(struct objclass) * NUM_OBJECTS);
     }
-    /* as long as we use only one version of Hack we
+    /* as int64_t as we use only one version of Hack we
        need not save oc_name and oc_descr, but we must save
        oc_uname for all objects */
     for (i = 0; i < NUM_OBJECTS; i++)
@@ -1368,6 +1369,24 @@ rename_disco()
 }
 
 void
+exceptionality_checks(otmp)
+struct obj* otmp;
+{
+    if (!otmp)
+        return;
+
+    if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_CELESTIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_UNDEAD_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_CELESTIAL)
+        otmp->exceptionality = EXCEPTIONALITY_ELITE;
+    else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGEL_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
+        otmp->exceptionality = EXCEPTIONALITY_ELITE;
+    else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGEL_ITEM)) || obj_counts_as_silver(otmp)) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
+        otmp->exceptionality = EXCEPTIONALITY_ELITE;
+    
+    if (otmp->oclass == WAND_CLASS && otmp->exceptionality > EXCEPTIONALITY_ELITE)
+        otmp->exceptionality = EXCEPTIONALITY_ELITE;
+}
+
+void
 randomize_mythic_quality(obj, is_wish, prefix_ptr, suffix_ptr)
 struct obj* obj;
 uchar is_wish; /* 1 = mythic wishing, 2 = legendary wishing */
@@ -1579,7 +1598,7 @@ struct monst* mattacker UNUSED;
             if (!mythic_powers[i].name)
                 break;
 
-            unsigned long mythic_power_bit = 1UL << ((unsigned long)i);
+            uint64_t mythic_power_bit = (uint64_t)1 << ((uint64_t)i);
 
             if ((mythic_definitions[mythic_quality].mythic_powers & mythic_power_bit) && mythic_power_applies_to_obj(otmp, mythic_powers[i].power_flags))
             {
@@ -1696,14 +1715,14 @@ struct obj* obj;
     return res;
 }
 
-unsigned long
+uint64_t
 get_obj_oc_flags(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0UL;
 
-    unsigned long ocflags = objects[obj->otyp].oc_flags;
+    uint64_t ocflags = objects[obj->otyp].oc_flags;
     if (obj->material != objects[obj->otyp].oc_material)
     {
         ocflags |= material_definitions[obj->material].extra_oflags1;
@@ -1711,14 +1730,14 @@ struct obj* obj;
     return ocflags;
 }
 
-unsigned long
+uint64_t
 get_obj_oc_flags2(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0UL;
 
-    unsigned long ocflags = objects[obj->otyp].oc_flags2;
+    uint64_t ocflags = objects[obj->otyp].oc_flags2;
     if (obj->material != objects[obj->otyp].oc_material)
     {
         ocflags |= material_definitions[obj->material].extra_oflags2;
@@ -1726,14 +1745,14 @@ struct obj* obj;
     return ocflags;
 }
 
-unsigned long
+uint64_t
 get_obj_oc_flags3(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0UL;
 
-    unsigned long ocflags = objects[obj->otyp].oc_flags3;
+    uint64_t ocflags = objects[obj->otyp].oc_flags3;
     if (obj->material != objects[obj->otyp].oc_material)
     {
         ocflags |= material_definitions[obj->material].extra_oflags3;
@@ -1741,14 +1760,14 @@ struct obj* obj;
     return ocflags;
 }
 
-unsigned long
+uint64_t
 get_obj_oc_flags4(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0UL;
 
-    unsigned long ocflags = objects[obj->otyp].oc_flags4;
+    uint64_t ocflags = objects[obj->otyp].oc_flags4;
     if (obj->material != objects[obj->otyp].oc_material)
     {
         ocflags |= material_definitions[obj->material].extra_oflags4;
@@ -1756,14 +1775,14 @@ struct obj* obj;
     return ocflags;
 }
 
-unsigned long
+uint64_t
 get_obj_oc_flags5(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0UL;
 
-    unsigned long ocflags = objects[obj->otyp].oc_flags5;
+    uint64_t ocflags = objects[obj->otyp].oc_flags5;
     if (obj->material != objects[obj->otyp].oc_material)
     {
         ocflags |= material_definitions[obj->material].extra_oflags5;
@@ -1771,14 +1790,14 @@ struct obj* obj;
     return ocflags;
 }
 
-unsigned long
+uint64_t
 get_obj_oc_flags6(obj)
 struct obj* obj;
 {
     if (!obj)
         return 0UL;
 
-    unsigned long ocflags = objects[obj->otyp].oc_flags6;
+    uint64_t ocflags = objects[obj->otyp].oc_flags6;
     if (obj->material != objects[obj->otyp].oc_material)
     {
         ocflags |= material_definitions[obj->material].extra_oflags6;

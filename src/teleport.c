@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    teleport.c    $NHDT-Date: 1553885439 2019/03/29 18:50:39 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.86 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -28,7 +28,7 @@ boolean
 goodpos(x, y, mtmp, gpflags)
 int x, y;
 struct monst *mtmp;
-unsigned long gpflags;
+uint64_t gpflags;
 {
     struct permonst *mdat = (struct permonst *) 0;
     boolean ignorewater = ((gpflags & MM_IGNOREWATER) != 0);
@@ -133,7 +133,7 @@ enexto_core(cc, xx, yy, mdat, entflags)
 coord *cc;
 register xchar xx, yy;
 struct permonst *mdat;
-unsigned long entflags;
+uint64_t entflags;
 {
 #define MAX_GOOD 15
     coord good[MAX_GOOD], *good_ptr;
@@ -817,7 +817,7 @@ struct monst* mtmp;
 int
 dotelecmd()
 {
-    long save_HTele, save_ETele;
+    int64_t save_HTele, save_ETele;
     int res, added, hidden;
     boolean ignore_restrictions = FALSE;
 /* also defined in spell.c */
@@ -1202,8 +1202,8 @@ uchar tele_flags; /* 1 = teleport inside Wizard's Tower  */
             killer.format = NO_KILLER_PREFIX;
             Strcpy(killer.name, "committed suicide");
             done(DIED);
-            pline("An energized cloud of dust begins to coalesce.");
-            Your("body rematerializes%s.",
+            pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "An energized cloud of dust begins to coalesce.");
+            Your_ex(ATR_NONE, CLR_MSG_MYSTICAL, "body rematerializes%s.",
                  invent ? ", and you gather up all your possessions" : "");
             return;
         }
@@ -1297,19 +1297,19 @@ random_levtport:
                 in_mklev = FALSE;
             }
             if (newlev <= -10) {
-                You("arrive in heaven.");
+                You_ex(ATR_NONE, CLR_MSG_MYSTICAL, "arrive in heaven.");
                 play_voice_god_simple_line_by_align(u.ualign.type, GOD_LINE_THOU_ART_EARLY_BUT_WELL_ADMIT_THEE);
                 verbalize_ex(ATR_NONE, CLR_MSG_GOD, "Thou art early, but we'll admit thee.");
                 killer.format = NO_KILLER_PREFIX;
                 Strcpy(killer.name, "went to heaven prematurely");
             }
             else if (newlev == -9) {
-                You_feel("deliriously happy.");
-                pline("(In fact, you're on Cloud 9!)");
+                You_feel_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "deliriously happy.");
+                pline_ex(ATR_NONE, CLR_MSG_HALLUCINATED, "(In fact, you're on Cloud 9!)");
                 display_nhwindow(WIN_MESSAGE, FALSE);
             }
             else
-                You("are now high above the clouds...");
+                You_ex(ATR_NONE, CLR_MSG_WARNING, "are now high above the clouds...");
 
             if (killer.name[0]) {
                 ; /* arrival in heaven is pending */
@@ -1346,7 +1346,7 @@ random_levtport:
 
         /* calls done(ESCAPED) if newlevel==0 */
         if (escape_by_flying) {
-            You("%s.", escape_by_flying);
+            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s.", escape_by_flying);
             newlevel.dnum = 0;   /* specify main dungeon */
             newlevel.dlevel = 0; /* escape the dungeon */
             /* [dlevel used to be set to 1, but it doesn't make sense to

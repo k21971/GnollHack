@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2021-09-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	gnsignal.c	$NHDT-Date: 1432512805 2015/05/25 00:13:25 $  $NHDT-Branch: master $:$NHDT-Revision: 1.11 $ */
 /* Copyright (C) 1998 by Anthony Taylor <tonyt@ptialaska.net> */
@@ -175,7 +175,7 @@ ghack_handle_button_press(GtkWidget *widget, GdkEventButton *event,
 
     click->x = (int) x1 / ghack_glyph_width();
     click->y = (int) y1 / ghack_glyph_height();
-    click->mod = (event->button == 1) ? CLICK_1 : CLICK_2;
+    click->mod = (event->button == 1) ? CLICK_PRIMARY : CLICK_SECONDARY;
 
     g_clickBuffer = g_list_prepend(g_clickBuffer, click);
     /* Could use g_list_length(), but it is stupid and just

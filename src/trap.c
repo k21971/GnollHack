@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    trap.c    $NHDT-Date: 1545259936 2018/12/19 22:52:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.313 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -17,7 +17,7 @@ STATIC_DCL char *FDECL(trapnote, (struct trap *, BOOLEAN_P));
 STATIC_DCL int FDECL(steedintrap, (struct trap *, struct obj *));
 STATIC_DCL void FDECL(launch_drop_spot, (struct obj *, XCHAR_P, XCHAR_P));
 STATIC_DCL int FDECL(mkroll_launch, (struct trap *, XCHAR_P, XCHAR_P,
-                                     SHORT_P, long));
+                                     SHORT_P, int64_t));
 STATIC_DCL boolean FDECL(isclearpath, (coord *, int, SCHAR_P, SCHAR_P));
 STATIC_DCL void FDECL(dofiretrap, (struct obj *, int));
 STATIC_DCL void NDECL(domagictrap);
@@ -73,18 +73,18 @@ const struct trap_type_definition trap_type_definitions[TRAPNUM] = {
     {"teleport trap", "trap", "", MAT_ENERGY,           SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NONE},
     {"level teleport trap", "trap", "", MAT_ENERGY,     SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NONE},
     {"magic portal", "portal", "", MAT_ENERGY,          NOT_DISARMABLE_TRAP,        NOT_DISARMABLE_TRAP,        0,
-        TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NOT_DISARMABLE},
+        TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_NOT_OVERRIDDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NOT_DISARMABLE},
     {"web", "web", "", MAT_ORGANIC,                     SPECIALLY_DISARMABLE_TRAP,  SPECIALLY_DISARMABLE_TRAP,  10, TRAPDEF_FLAGS_NONE},
     {"statue", "statue", "", MAT_MINERAL,               SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS },
     {"magic trap", "trap", "", MAT_ENERGY,              COMPLEX_MAGICAL_TRAP,       COMPLEX_MAGICAL_TRAP,       40, TRAPDEF_FLAGS_NONE},
     {"anti-magic trap", "trap", "", MAT_ENERGY,         SIMPLE_MAGICAL_TRAP,        SIMPLE_MAGICAL_TRAP,        30, TRAPDEF_FLAGS_NO_TRY_ESCAPE },
     {"polymorph trap", "trap", "", MAT_ENERGY,          COMPLEX_MAGICAL_TRAP,       COMPLEX_MAGICAL_TRAP,       40, TRAPDEF_FLAGS_NONE},
     {"geometric magic portal", "portal","", MAT_ENERGY, NOT_DISARMABLE_TRAP,        NOT_DISARMABLE_TRAP,        0,
-        TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NOT_DISARMABLE},
+        TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_NOT_OVERRIDDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NOT_DISARMABLE},
     {"lever", "lever", "pull", MAT_METAL,               NOT_DISARMABLE_TRAP,        NOT_DISARMABLE_TRAP,        0,
-        TRAPDEF_FLAGS_APPLIABLE | TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_TELEOK | TRAPDEF_FLAGS_VISIBLE_AT_START | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_NOT_DISARMABLE},
+        TRAPDEF_FLAGS_APPLIABLE | TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_TELEOK | TRAPDEF_FLAGS_VISIBLE_AT_START | TRAPDEF_FLAGS_NOT_OVERRIDDEN | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_NOT_DISARMABLE},
     {"vibrating square", "vibrating square", "", MAT_MINERAL, NOT_DISARMABLE_TRAP, NOT_DISARMABLE_TRAP,         0,
-        TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_TELEOK | TRAPDEF_FLAGS_NOT_OVERRIDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS | TRAPDEF_FLAGS_NOT_DISARMABLE}
+        TRAPDEF_FLAGS_NO_TRY_ESCAPE | TRAPDEF_FLAGS_TELEOK | TRAPDEF_FLAGS_NOT_OVERRIDDEN | TRAPDEF_FLAGS_NOT_GENERATED | TRAPDEF_FLAGS_NO_STEP_CONFIRMATION | TRAPDEF_FLAGS_IGNORED_BY_MONSTERS | TRAPDEF_FLAGS_NOT_DISARMABLE}
 };
 
 /* called when you're hit by fire (dofiretrap,buzz,zapyourself,explode);
@@ -395,7 +395,7 @@ struct monst *victim;
 struct trap *
 maketrap(x, y, typ, permonstid, mkflags)
 int x, y, typ, permonstid;
-unsigned long mkflags;
+uint64_t mkflags;
 {
     static union vlaunchinfo zero_vl;
     boolean oldplace;
@@ -403,7 +403,7 @@ unsigned long mkflags;
     struct rm *lev = &levl[x][y];
 
     if ((ttmp = t_at(x, y)) != 0) {
-        if (trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDEN)
+        if (trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDDEN)
             return (struct trap *) 0;
         oldplace = TRUE;
         if (u.utrap && x == u.ux && y == u.uy
@@ -607,7 +607,7 @@ boolean td; /* td == TRUE : trap door or hole */
     if (dont_fall) {
         You1(dont_fall);
         /* hero didn't fall through, but any objects here might */
-        impact_drop((struct obj *) 0, u.ux, u.uy, 0);
+        impact_drop((struct obj *) 0, u.ux, u.uy, 0, TRUE);
         if (!td) {
             display_nhwindow(WIN_MESSAGE, FALSE);
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "opening under you closes up.");
@@ -706,6 +706,8 @@ int *fail_reason;
         /* restore a petrified monster */
         cc.x = x, cc.y = y;
         mon = montraits(statue, &cc, (cause == ANIMATE_SPELL), NON_PM, NON_PM, 0UL);
+        if (mon && has_edog(mon))
+            EDOG(mon)->hungrytime = monstermoves + 500L;
         if (mon && mon->mtame && !mon->isminion)
             wary_dog(mon, TRUE);
     }
@@ -731,7 +733,7 @@ int *fail_reason;
             boolean isfemale = !!(statue->speflags & SPEFLAGS_FEMALE);
             boolean ismale = !!(statue->speflags & SPEFLAGS_FEMALE);
 
-            unsigned long mkflags = MM_NO_MONSTER_INVENTORY;
+            uint64_t mkflags = MM_NO_MONSTER_INVENTORY;
             if (isfemale)
                 mkflags |= MM_FEMALE;
             else if (ismale)
@@ -1027,7 +1029,7 @@ struct trap *trap;
 
 void
 set_utrap(tim, typ)
-unsigned long tim;
+uint64_t tim;
 uchar typ;
 {
     u.utrap = tim;
@@ -1116,7 +1118,7 @@ unsigned short trflags;
 
     if (u.usteed)
     {
-        u.usteed->mtrapseen |= (1 << (ttype - 1));
+        u.usteed->mtrapseen |= ((int64_t)1 << (ttype - 1));
         /* suppress article in various steed messages when using its
            name (which won't occur when hallucinating) */
         if (has_mname(u.usteed) && !Hallucination)
@@ -2448,7 +2450,7 @@ int style;
                         get_level(&dest, newlev);
                         singleobj->ox = dest.dnum;
                         singleobj->oy = dest.dlevel;
-                        singleobj->owornmask = (long) MIGR_RANDOM;
+                        singleobj->owornmask = (int64_t) MIGR_RANDOM;
                     }
                     seetrap(t);
                     used_up = TRUE;
@@ -2563,7 +2565,7 @@ mkroll_launch(ttmp, x, y, otyp, ocount)
 struct trap *ttmp;
 xchar x, y;
 short otyp;
-long ocount;
+int64_t ocount;
 {
     struct obj *otmp;
     register int tmp;
@@ -2739,7 +2741,7 @@ register struct monst *mtmp;
             inescapable = TRUE;
         
         if (!inescapable && (knows_pits_and_holes(mtmp->data) || knows_traps(mtmp->data) ||
-            ((mtmp->mtrapseen & (1 << (tt - 1))) != 0  || (tt == HOLE && !mindless(mptr)))))
+            ((mtmp->mtrapseen & ((int64_t)1 << (tt - 1))) != 0  || (tt == HOLE && !mindless(mptr)))))
         {
             /* it has been in such a trap - perhaps it escapes */
             if ((is_pit(tt) && has_pitwalk(mtmp->data)) || rn2(4))
@@ -2747,7 +2749,7 @@ register struct monst *mtmp;
         }
         else 
         {
-            mtmp->mtrapseen |= (1 << (tt - 1));
+            mtmp->mtrapseen |= ((int64_t)1 << (tt - 1));
         }
 
         /* pitwalking creatures do not care about pits */
@@ -3815,7 +3817,7 @@ int x, y;
 /* stop levitating */
 int
 float_down(hmask, emask)
-long hmask, emask; /* might cancel timeout */
+int64_t hmask, emask; /* might cancel timeout */
 {
     register struct trap *trap = (struct trap *) 0;
     d_level current_dungeon_level;
@@ -4165,7 +4167,7 @@ domagictrap()
         if (!resists_blnd(&youmonst) && !Flash_resistance)
         {
             You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are momentarily blinded by a flash of light!");
-            make_blinded((long) rn1(5, 10), FALSE);
+            make_blinded((int64_t) rn1(5, 10), FALSE);
             if (!Blind)
                 Your1(vision_clears);
         } else if (!Blind) {
@@ -4299,7 +4301,7 @@ domagictrap()
         }
         case 20: { /* uncurse stuff */
             struct obj pseudo;
-            long save_conf = HConfusion;
+            int64_t save_conf = HConfusion;
 
             play_sfx_sound(SFX_UNCURSE_ITEM_SUCCESS);
             pseudo = zeroobj; /* neither cursed nor blessed,
@@ -6396,7 +6398,7 @@ boolean force;
     int boxcnt = 0;
     boolean deal_with_floor_trap = can_reach_floor(FALSE);
     boolean useplural = FALSE;
-    char the_trap[BUFSIZ], qbuf[BUFSIZ];
+    char the_trap[BUFSZ * 2], qbuf[BUFSZ * 2];
 
     for (otmp = level.objects[u.ux][u.uy]; otmp; otmp = otmp->nexthere)
         if (Is_box(otmp))
@@ -6882,7 +6884,7 @@ boolean disarm;
         case 21:
         {
             struct monst *shkp = 0;
-            long loss = 0L;
+            int64_t loss = 0L;
             boolean costly, insider;
             register xchar ox = obj->ox, oy = obj->oy;
 
@@ -7060,9 +7062,9 @@ boolean disarm;
                                                   : " and your vision blurs");
             }
             play_sfx_sound(SFX_ACQUIRE_HALLUCINATION);
-            make_stunned((HStun & TIMEOUT) + (long) rn1(7, 16), FALSE);
+            make_stunned((HStun & TIMEOUT) + (int64_t) rn1(7, 16), FALSE);
             (void) make_hallucinated(
-                (HHallucination & TIMEOUT) + (long) rn1(5, 16), FALSE, 0L);
+                (HHallucination & TIMEOUT) + (int64_t) rn1(5, 16), FALSE, 0L);
             special_effect_wait_until_end(0);
             break;
         default:
@@ -7297,7 +7299,7 @@ xchar x, y;
     exercise(A_STR, FALSE);
     if (bodypart)
         exercise(A_CON, FALSE);
-    make_stunned((HStun & TIMEOUT) + (long) dmg, TRUE);
+    make_stunned((HStun & TIMEOUT) + (int64_t) dmg, TRUE);
     special_effect_wait_until_end(0);
 }
 

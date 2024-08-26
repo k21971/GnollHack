@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    vault.c    $NHDT-Date: 1549921171 2019/02/11 21:39:31 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.62 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -325,7 +325,7 @@ invault()
         char buf[BUFSZ];
         register int x, y, gx, gy;
         xchar rx, ry;
-        long umoney;
+        int64_t umoney;
 
         /* first find the goal for the guard */
         if (!find_guard_dest((struct monst *)0, &rx, &ry))
@@ -818,7 +818,7 @@ register struct monst *grd;
     struct rm *crm;
     struct fakecorridor *fcp;
     register struct egd *egrd = EGD(grd);
-    long umoney = 0L;
+    int64_t umoney = 0L;
     boolean goldincorridor = FALSE, u_in_vault = FALSE, grd_in_vault = FALSE,
             disappear_msg_seen = FALSE, semi_dead = DEADMONSTER(grd),
             u_carry_gold = FALSE, newspot = FALSE, see_guard;
@@ -1236,7 +1236,7 @@ paygd(silently)
 boolean silently;
 {
     register struct monst *grd = findgd();
-    long umoney = money_cnt(invent);
+    int64_t umoney = money_cnt(invent);
     struct obj *coins, *nextcoins;
     int gx, gy;
     char buf[BUFSZ];
@@ -1276,10 +1276,10 @@ boolean silently;
     return;
 }
 
-long
+int64_t
 hidden_gold()
 {
-    long value = 0L;
+    int64_t value = 0L;
     struct obj *obj;
 
     for (obj = invent; obj; obj = obj->nobj)
@@ -1290,12 +1290,29 @@ hidden_gold()
     return value;
 }
 
-long
+int64_t
+magic_gold()
+{
+    int64_t value = 0L;
+    struct obj* obj;
+
+    for (obj = magic_objs; obj; obj = obj->nobj)
+    {
+        if (obj->oclass == COIN_CLASS)
+            value += obj->quan;
+        else if (Has_contents(obj))
+            value += contained_gold(obj);
+    }
+
+    return value;
+}
+
+int64_t
 contained_gem_value(obj)
 struct obj* obj;
 {
     register struct obj* otmp;
-    register long value = 0L;
+    register int64_t value = 0L;
 
     /* accumulate contained gold */
     for (otmp = obj->cobj; otmp; otmp = otmp->nobj)
@@ -1307,20 +1324,36 @@ struct obj* obj;
     return value;
 }
 
-long
+int64_t
 carried_gem_value(VOID_ARGS)
 {
-    long value = 0L;
+    int64_t value = 0L;
     struct obj* obj;
 
     for (obj = invent; obj; obj = obj->nobj)
         if (Has_contents(obj))
             value += contained_gem_value(obj);
-        else if(obj->otyp >= FIRST_GEM && obj->otyp <= LAST_GEM && (program_state.gameover || objects[obj->otyp].oc_name_known))
+        else if (obj->otyp >= FIRST_GEM && obj->otyp <= LAST_GEM && (program_state.gameover || objects[obj->otyp].oc_name_known))
             value += objects[obj->otyp].oc_cost * obj->quan;
 
     return value;
 }
+
+int64_t
+magic_gem_value(VOID_ARGS)
+{
+    int64_t value = 0L;
+    struct obj* obj;
+
+    for (obj = magic_objs; obj; obj = obj->nobj)
+        if (Has_contents(obj))
+            value += contained_gem_value(obj);
+        else if (obj->otyp >= FIRST_GEM && obj->otyp <= LAST_GEM && (program_state.gameover || objects[obj->otyp].oc_name_known))
+            value += objects[obj->otyp].oc_cost * obj->quan;
+
+    return value;
+}
+
 
 /* prevent "You hear footsteps.." when inappropriate */
 boolean

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    bones.c    $NHDT-Date: 1557092711 2019/05/05 21:45:11 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.75 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985,1993. */
@@ -10,7 +10,7 @@
 
 extern char bones[]; /* from files.c */
 #ifdef MFLOPPY
-extern long bytes_counted;
+extern int64_t bytes_counted;
 #endif
 
 STATIC_DCL boolean FDECL(no_bones_level, (d_level *));
@@ -62,6 +62,7 @@ struct obj *ochain;
 boolean restore;
 {
     struct obj *otmp, *nobj;
+    Strcpy(debug_buf_3, "resetobjs");
 
     for (otmp = ochain; otmp; otmp = nobj)
     {
@@ -87,8 +88,7 @@ boolean restore;
                restore; other fixups are done while saving */
             if (otmp->oartifact)
             {
-                if (exist_artifact(otmp->otyp, safe_oname(otmp))
-                    || is_quest_artifact(otmp)) 
+                if (exist_artifact(otmp->otyp, safe_oname(otmp)) || is_quest_artifact(otmp)) 
                 {
                     /* prevent duplicate--revert to ordinary obj */
                     /* Non-generable base item*/
@@ -131,6 +131,10 @@ boolean restore;
                             otmp->enchantment = 0;
                         }
                     }
+                    else
+                    {
+                        otmp->material = objects[otmp->otyp].oc_material; /* Base material may have been randomized (using the dead character's randomization) */
+                    }
                     otmp->oartifact = 0;
                     otmp->owt = weight(otmp);
                     if (has_oname(otmp))
@@ -139,6 +143,11 @@ boolean restore;
                 } 
                 else
                 {
+                    if (artilist[otmp->oartifact].material == MAT_NONE)
+                    {
+                        otmp->material = objects[otmp->otyp].oc_material; /* Base material may have been randomized (using the dead character's randomization) */
+                        otmp->owt = weight(otmp);
+                    }
                     artifact_exists(otmp, safe_oname(otmp), TRUE);
                 }
             }
@@ -264,7 +273,7 @@ boolean restore;
                 otmp->otyp = WAX_CANDLE;
                 otmp->age = 50L; /* assume used */
                 if (otmp->special_quality > 0)
-                    otmp->quan = (long) otmp->special_quality;
+                    otmp->quan = (int64_t) otmp->special_quality;
                 otmp->special_quality = 0;
                 otmp->material = objects[otmp->otyp].oc_material;
                 curse(otmp);
@@ -277,12 +286,14 @@ boolean restore;
             else if (otmp->otyp == SPE_BOOK_OF_THE_DEAD) 
             {
                 otmp->otyp = SPE_BLANK_PAPER;
+                otmp->material = objects[otmp->otyp].oc_material;
                 curse(otmp);
             } 
             else if (otmp->otyp == SPE_BOOK_OF_MODRON) 
             {
                 otmp->otyp = SPE_BLANK_PAPER;
                 otmp->oartifact = 0;
+                otmp->material = objects[otmp->otyp].oc_material;
                 curse(otmp);
             }
             otmp->owt = weight(otmp);
@@ -334,6 +345,7 @@ int x, y;
     while ((otmp = invent) != 0) 
     {
         Strcpy(debug_buf_2, "drop_upon_death");
+        Strcpy(debug_buf_3, "drop_upon_death");
         obj_extract_self(otmp);
         /* when turning into green slime, all gear remains held;
            other types "arise from the dead" do aren't holding

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    restore.c    $NHDT-Date: 1555201698 2019/04/14 00:28:18 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.129 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -41,6 +41,7 @@ STATIC_OVL void FDECL(restore_msghistory, (int));
 STATIC_DCL void FDECL(reset_oattached_mids, (BOOLEAN_P));
 STATIC_DCL void FDECL(rest_levl, (int, BOOLEAN_P));
 STATIC_DCL void FDECL(restore_gamelog, (int));
+STATIC_DCL void FDECL(post_restore_to_forum, (struct u_realtime));
 
 STATIC_VAR struct restore_procs {
     const char *name;
@@ -86,7 +87,7 @@ boolean restoring = FALSE;
 boolean reseting = FALSE;
 
 STATIC_VAR NEARDATA struct fruit *oldfruit;
-STATIC_VAR NEARDATA long omoves;
+STATIC_VAR NEARDATA int64_t omoves;
 
 #define Is_IceBox(o) ((o)->otyp == ICE_BOX ? TRUE : FALSE)
 
@@ -645,7 +646,7 @@ unsigned int *stuckid, *steedid;
     struct context_info *newgamecontext = (struct context_info*)malloc(sizeof(struct context_info));; /* all 0, but has some pointers */
     struct obj *otmp, *tmp_bc;
     char timebuf[15];
-    unsigned long uid;
+    uint64_t uid;
     boolean defer_perm_invent;
     Strcpy(debug_buf_2, "restgamestate");
     Strcpy(debug_buf_3, "restgamestate");
@@ -653,7 +654,7 @@ unsigned int *stuckid, *steedid;
 
     mread(fd, (genericptr_t) &uid, sizeof uid);
     if (SYSOPT_CHECK_SAVE_UID
-        && uid != (unsigned long) getuid()) { /* strange ... */
+        && uid != (uint64_t) getuid()) { /* strange ... */
         /* for wizard mode, issue a reminder; for others, treat it
            as an attempt to cheat and refuse to restore this file */
         pline("Saved game was not yours.");
@@ -666,7 +667,6 @@ unsigned int *stuckid, *steedid;
     process_tiledata(1, (const char*)0, glyph2tile, glyphtileflags);
 #endif
 
-    lock_thread_lock();
     *newgamecontext = context; /* copy statically init'd context */
     mread(fd, (genericptr_t) &context, sizeof (struct context_info));
     context.warntype.species = (context.warntype.speciesidx >= LOW_PM)
@@ -719,11 +719,10 @@ unsigned int *stuckid, *steedid;
     foo = time_from_yyyymmddhhmmss(timebuf);
 
     ReadTimebuf(ubirthday);
-    mread(fd, &urealtime.realtime, sizeof urealtime.realtime);
-    ReadTimebuf(urealtime.start_timing); /** [not used] **/
+    mread(fd, &urealtime, sizeof urealtime);
+    //ReadTimebuf(urealtime.start_timing); /** [not used] **/
     /* current time is the time to use for next urealtime.realtime update */
     urealtime.start_timing = getnow();
-    unlock_thread_lock();
 
     set_uasmon();
 #ifdef CLIPPING
@@ -773,6 +772,7 @@ unsigned int *stuckid, *steedid;
             impossible("restgamestate: lost ball & chain");
     }
 
+    magic_objs = restobjchn(fd, FALSE, FALSE);
     migrating_objs = restobjchn(fd, FALSE, FALSE);
     migrating_mons = restmonchn(fd, FALSE);
     mread(fd, (genericptr_t) mvitals, sizeof(mvitals));
@@ -830,6 +830,7 @@ unsigned int *stuckid, *steedid;
     relink_sound_sources(FALSE);
     /* inventory display is now viable */
     iflags.perm_invent = defer_perm_invent;
+
     issue_simple_gui_command(GUI_CMD_LOAD_GLYPHS);
 #ifdef WHEREIS_FILE
     touch_whereis();
@@ -992,6 +993,7 @@ register int fd;
         return 0;
     }
     restlevelstate(stuckid, steedid);
+    struct u_realtime restored_realtime = urealtime;
 #ifdef INSURANCE
     savestateinlock();
 #endif
@@ -1135,7 +1137,18 @@ register int fd;
         (void)move_tmp_backup_savefile_to_actual_backup_savefile(); /* Restore was successful, update backup savefile */
     else
         (void)delete_tmp_backup_savefile();
+
+    post_restore_to_forum(restored_realtime);
     return 1;
+}
+
+STATIC_OVL void
+post_restore_to_forum(restored_realtime)
+struct u_realtime restored_realtime;
+{
+    char dgnlvlbuf[BUFSZ * 2];
+    print_current_dgnlvl(dgnlvlbuf);
+    post_to_forum_rt_printf(LL_GAME_RESTORE, restored_realtime, "resumed %s journey %s", uhis(), dgnlvlbuf);
 }
 
 void
@@ -1219,7 +1232,7 @@ boolean ghostly;
 {
     register struct trap *trap;
     register struct monst *mtmp;
-    long elapsed;
+    int64_t elapsed;
     branch *br;
     int hpid;
     xchar dlvl;
@@ -1344,7 +1357,7 @@ boolean ghostly;
            them is different now than when the level was saved */
         restore_cham(mtmp);
         /* give hiders a chance to hide before their next move */
-        if (ghostly || elapsed > (long) rnd(10))
+        if (ghostly || elapsed > (int64_t) rnd(10))
             hide_monst(mtmp);
     }
 
@@ -1591,6 +1604,183 @@ boolean ghostly;
     }
 }
 
+void
+print_current_dgnlvl(buf)
+char* buf;
+{
+    if (!buf)
+        return;
+
+    const char* lvl_name = 0;
+    s_level* slev = Is_special(&u.uz);
+    mapseen* mptr = 0;
+    if (slev)
+        mptr = find_mapseen(&u.uz);
+
+    if (slev && mptr && mptr->flags.special_level_true_nature_known)
+        lvl_name = slev->name;
+
+    char lvlbuf[BUFSZ], dgnbuf[BUFSZ];
+    print_dgnlvl_buf(lvlbuf, dgnbuf, lvl_name, dungeons[u.uz.dnum].dname, u.uz.dlevel, (boolean*)0);
+    Sprintf(buf, "%s%s", lvlbuf, dgnbuf);
+}
+
+void
+print_dgnlvl_buf(lvlbuf, dgnbuf, lvl_name, dgn_name, dlevel, has_lvl_name_ptr)
+char* lvlbuf, * dgnbuf;
+const char* lvl_name, *dgn_name;
+int dlevel;
+boolean* has_lvl_name_ptr;
+{
+    if (!lvlbuf || !dgnbuf)
+        return;
+
+    Sprintf(dgnbuf, "%s", dgn_name && *dgn_name ? dgn_name : "Dungeon");
+    if (!strncmp(dgnbuf, "The ", 4))
+        *dgnbuf = lowc(*dgnbuf);
+
+    if(has_lvl_name_ptr)
+        *has_lvl_name_ptr = FALSE;
+    if (lvl_name && *lvl_name)
+    {
+        char namedlvlbuf[BUFSZ];
+        Strcpy(namedlvlbuf, lvl_name);
+
+        const char* lvlconjunction = "in";
+        const char* dgnconjunction = "in";
+        boolean lvl_has_level = strstr(lvl_name, "Level") != 0;
+        boolean lvl_has_plane = strstr(lvl_name, "Plane") != 0;
+        boolean lvl_has_island = strstr(lvl_name, "Island") != 0;
+        if (lvl_has_level)
+            dgnconjunction = "of";
+        if (lvl_has_level || lvl_has_plane || lvl_has_island)
+            lvlconjunction = "on";
+
+        const char* addedthe = "";
+        if (strncmpi(namedlvlbuf, "the ", 4) && lvl_has_plane)
+            addedthe = "the ";
+        if (!strncmp(namedlvlbuf, "The ", 4))
+            *namedlvlbuf = lowc(*namedlvlbuf);
+
+        Sprintf(lvlbuf, "%s %s%s %s ", lvlconjunction, addedthe, namedlvlbuf, dgnconjunction);
+        if(has_lvl_name_ptr)
+            *has_lvl_name_ptr = TRUE;
+    }
+    else
+        Sprintf(lvlbuf, "on level %d of ", dlevel);
+}
+
+void
+print_character_description(characterbuf, ulevel, rolenum, racenum, gender, aligntype, prefix)
+char* characterbuf;
+short ulevel;
+short rolenum;
+short racenum;
+boolean gender;
+aligntyp aligntype;
+const char* prefix;
+{
+    if (!characterbuf)
+        return;
+
+    if (!prefix)
+        prefix = "";
+
+    char alignbuf[BUFSZ], genderwithspacebuf[BUFSZ], racebuf[BUFSZ], rolebuf[BUFSZ], tmpbuf[BUFSZ];
+
+    strcpy_capitalized_for_title(alignbuf, aligns[1 - aligntype].adj);
+    strcpy_capitalized_for_title(racebuf, races[racenum].adj);
+    if (roles[rolenum].name.f)
+    {
+        Strcpy(genderwithspacebuf, "");
+        if (gender)
+        {
+            strcpy_capitalized_for_title(rolebuf, roles[rolenum].name.f);
+        }
+        else
+            strcpy_capitalized_for_title(rolebuf, roles[rolenum].name.m);
+    }
+    else
+    {
+        Sprintf(tmpbuf, "%s ", genders[gender].adj);
+        strcpy_capitalized_for_title(genderwithspacebuf, tmpbuf);
+        strcpy_capitalized_for_title(rolebuf, roles[rolenum].name.m);
+    }
+
+    Sprintf(characterbuf, "%sLevel %d %s %s%s %s", prefix, ulevel, alignbuf, genderwithspacebuf, racebuf, rolebuf);
+}
+
+void
+print_location_description(adventuringbuf, level_name, dgn_name, dlevel, dgn_depth, prefix)
+char* adventuringbuf;
+const char* level_name;
+const char* dgn_name;
+int dlevel;
+schar dgn_depth;
+const char* prefix;
+{
+    if (!adventuringbuf)
+        return;
+
+    if (!prefix)
+        prefix = "";
+
+    char lvlbuf[BUFSZ] = "", dgnbuf[BUFSZ] = "", totallevelbuf[BUFSZ] = "";
+    boolean has_lvl_name = FALSE;
+    print_dgnlvl_buf(lvlbuf, dgnbuf, level_name, dgn_name, dlevel, &has_lvl_name);
+
+    if (!has_lvl_name && dgn_depth != (schar)dlevel)
+        Sprintf(totallevelbuf, ", which is dungeon level %d", dgn_depth);
+    Sprintf(adventuringbuf, "%sAdventuring %s%s%s", prefix, lvlbuf, dgnbuf, totallevelbuf);
+}
+
+void
+print_mode_duration_description(playingbuf, difficulty, umoves, debug_mode, explore_mode, modern_mode, casual_mode, is_non_scoring, tournament_mode, prefix)
+char* playingbuf;
+schar difficulty;
+int64_t umoves;
+boolean debug_mode, explore_mode, modern_mode, casual_mode, is_non_scoring, tournament_mode;
+const char* prefix;
+{
+    if (!playingbuf)
+        return;
+
+    if (!prefix)
+        prefix = "";
+
+    Sprintf(playingbuf, "%sPlaying at %s difficulty in %s mode for %lld turns", prefix, get_game_difficulty_text(difficulty),
+        get_game_mode_text_core(debug_mode, explore_mode, modern_mode, casual_mode, is_non_scoring, tournament_mode, TRUE),
+        (long long)umoves);
+}
+
+void
+print_timestamp_description(savedbuf, descr, stamp, prefix)
+char* savedbuf;
+time_t stamp;
+const char* descr, * prefix;
+{
+    if (!savedbuf)
+        return;
+
+    if (!prefix)
+        prefix = "";
+
+    char timebuf[BUFSZ] = "";
+    char* timestr = ctime(&stamp);
+    if (timestr && *timestr)
+    {
+        Strncpy(timebuf, timestr, strlen(timestr) - 1);
+        timebuf[strlen(timestr) - 1] = 0;
+    }
+    else
+    {
+        Strcpy(timebuf, "unknown date");
+    }
+
+    Sprintf(savedbuf, "%s%s %s", prefix, descr, timebuf);
+}
+
+
 #ifdef SELECTSAVED
 /* put up a menu listing each character from this player's saved games;
    returns 1: use plname[], 0: new game, -1: quit */
@@ -1813,90 +2003,45 @@ struct save_game_data* saved;
             titlestr, MENU_UNSELECTED);
     #endif
 
+#if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS)
+        char prefix[8] = "    ";
+#else
+        char prefix[8] = "";
+#endif
         for (k = 0; saved[k].playername; ++k)
         {
-            char namebuf[BUFSZ], characterbuf[BUFSZ], alignbuf[BUFSZ], genderwithspacebuf[BUFSZ], racebuf[BUFSZ], rolebuf[BUFSZ], tmpbuf[BUFSZ], timebuf[BUFSZ] = "";
-            strcpy_capitalized_for_title(alignbuf, aligns[1 - saved[k].gamestats.alignment].adj);
-            strcpy_capitalized_for_title(racebuf, races[saved[k].gamestats.racenum].adj);
-            if (roles[saved[k].gamestats.rolenum].name.f)
-            {
-                Strcpy(genderwithspacebuf, "");
-                if (saved[k].gamestats.gender)
-                {
-                    strcpy_capitalized_for_title(rolebuf, roles[saved[k].gamestats.rolenum].name.f);
-                }
-                else
-                    strcpy_capitalized_for_title(rolebuf, roles[saved[k].gamestats.rolenum].name.m);
-            }
-            else
-            {
-                Sprintf(tmpbuf, "%s ", genders[saved[k].gamestats.gender].adj);
-                strcpy_capitalized_for_title(genderwithspacebuf, tmpbuf);
-                strcpy_capitalized_for_title(rolebuf, roles[saved[k].gamestats.rolenum].name.m);
-            }
-
-            char adventuringbuf[BUFSZ], lvlbuf[BUFSZ], dgnbuf[BUFSZ], totallevelbuf[BUFSZ] = "";
-            const char* dname = saved[k].gamestats.dgn_name;
-            Sprintf(dgnbuf, "%s", dname && *dname ? dname : "Dungeon");
-            if (!strncmp(dgnbuf, "The ", 4))
-                *dgnbuf = lowc(*dgnbuf);
-
-            boolean has_lvl_name = FALSE;
-            if (*saved[k].gamestats.level_name)
-            {
-                char namedlvlbuf[BUFSZ];
-                Strcpy(namedlvlbuf, saved[k].gamestats.level_name);
-
-                const char* lvlconjunction = "in";
-                const char* dgnconjunction = "in";
-                boolean lvl_has_level = strstr(saved[k].gamestats.level_name, "Level") != 0;
-                boolean lvl_has_plane = strstr(saved[k].gamestats.level_name, "Plane") != 0;
-                boolean lvl_has_island = strstr(saved[k].gamestats.level_name, "Island") != 0;
-                if (lvl_has_level)
-                    dgnconjunction = "of";
-                if (lvl_has_level || lvl_has_plane || lvl_has_island)
-                    lvlconjunction = "on";
-
-                const char* addedthe = "";
-                if (strncmpi(namedlvlbuf, "the ", 4) && lvl_has_plane)
-                    addedthe = "the ";
-                if (!strncmp(namedlvlbuf, "The ", 4))
-                    *namedlvlbuf = lowc(*namedlvlbuf);
-
-                Sprintf(lvlbuf, "%s %s%s %s ", lvlconjunction, addedthe, namedlvlbuf, dgnconjunction);
-                has_lvl_name = TRUE;
-            }
-            else
-                Sprintf(lvlbuf, "on level %d of ", saved[k].gamestats.dlevel);
-
-            if (!has_lvl_name && saved[k].gamestats.depth != (schar)saved[k].gamestats.dlevel)
-                Sprintf(totallevelbuf, ", which is dungeon level %d", saved[k].gamestats.depth);
-
+            char namebuf[BUFSZ], characterbuf[BUFSZ], adventuringbuf[BUFSZ];
             char playingbuf[BUFSZ], savedbuf[BUFSZ];
-    #if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS)
-            char prefix[8] = "    ";
-    #else
-            char prefix[8] = "";
-    #endif
+            //char adventuringbuf[BUFSZ], lvlbuf[BUFSZ], dgnbuf[BUFSZ], totallevelbuf[BUFSZ] = "";
+            //boolean has_lvl_name = FALSE;
 
             Sprintf(namebuf, "%s%s%s%s", saved[k].playername, saved[k].is_running ? " [Crashed]" : "", saved[k].is_error_save_file ? " [Saved upon Error]" : "", saved[k].is_imported_save_file ? " [Imported]" : "");
-            Sprintf(characterbuf, "%sLevel %d %s %s%s %s", prefix, saved[k].gamestats.ulevel, alignbuf, genderwithspacebuf, racebuf, rolebuf);
-            Sprintf(adventuringbuf, "%sAdventuring %s%s%s", prefix, lvlbuf, dgnbuf, totallevelbuf);
-            Sprintf(playingbuf, "%sPlaying at %s difficulty in %s mode for %ld turns", prefix, get_game_difficulty_text(saved[k].gamestats.game_difficulty),
-                get_game_mode_text_core(saved[k].gamestats.debug_mode, saved[k].gamestats.explore_mode, saved[k].gamestats.modern_mode, saved[k].gamestats.casual_mode, (boolean)((saved[k].gamestats.save_flags & SAVEFLAGS_NON_SCORING) != 0), (boolean)((saved[k].gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0), TRUE),
-                saved[k].gamestats.umoves);
-            char* timestr = ctime(&saved[k].gamestats.time_stamp);
-            if (timestr && *timestr)
-            {
-                Strncpy(timebuf, timestr, strlen(timestr) - 1);
-                timebuf[strlen(timestr) - 1] = 0;
-            }
-            else
-            {
-                Strcpy(timebuf, "unknown date");
-            }
+            print_character_description(characterbuf, saved[k].gamestats.ulevel, saved[k].gamestats.rolenum, saved[k].gamestats.racenum, saved[k].gamestats.gender, saved[k].gamestats.alignment, prefix);
+            print_location_description(adventuringbuf, saved[k].gamestats.level_name, saved[k].gamestats.dgn_name, (int)saved[k].gamestats.dlevel, saved[k].gamestats.depth, prefix);
+            print_mode_duration_description(playingbuf, saved[k].gamestats.game_difficulty, saved[k].gamestats.umoves, saved[k].gamestats.debug_mode, saved[k].gamestats.explore_mode, saved[k].gamestats.modern_mode, saved[k].gamestats.casual_mode, (boolean)((saved[k].gamestats.save_flags& SAVEFLAGS_NON_SCORING) != 0), (boolean)((saved[k].gamestats.save_flags& SAVEFLAGS_TOURNAMENT_MODE) != 0), prefix);
+            print_timestamp_description(savedbuf, "Game was saved on", (time_t)saved[k].gamestats.time_stamp, prefix);
 
-            Sprintf(savedbuf, "%sGame was saved on %s", prefix, timebuf);
+            //print_dgnlvl_buf(lvlbuf, dgnbuf, saved[k].gamestats.level_name, saved[k].gamestats.dgn_name, (int)saved[k].gamestats.dlevel, &has_lvl_name);
+            //if (!has_lvl_name && saved[k].gamestats.depth != (schar)saved[k].gamestats.dlevel)
+            //    Sprintf(totallevelbuf, ", which is dungeon level %d", saved[k].gamestats.depth);
+
+            //Sprintf(adventuringbuf, "%sAdventuring %s%s%s", prefix, lvlbuf, dgnbuf, totallevelbuf);
+            //Sprintf(playingbuf, "%sPlaying at %s difficulty in %s mode for %lld turns", prefix, get_game_difficulty_text(saved[k].gamestats.game_difficulty),
+            //    get_game_mode_text_core(saved[k].gamestats.debug_mode, saved[k].gamestats.explore_mode, saved[k].gamestats.modern_mode, saved[k].gamestats.casual_mode, (boolean)((saved[k].gamestats.save_flags & SAVEFLAGS_NON_SCORING) != 0), (boolean)((saved[k].gamestats.save_flags & SAVEFLAGS_TOURNAMENT_MODE) != 0), TRUE),
+            //    (long long)saved[k].gamestats.umoves);
+            //time_t stamp = (time_t)saved[k].gamestats.time_stamp;
+            //char* timestr = ctime(&stamp);
+            //if (timestr && *timestr)
+            //{
+            //    Strncpy(timebuf, timestr, strlen(timestr) - 1);
+            //    timebuf[strlen(timestr) - 1] = 0;
+            //}
+            //else
+            //{
+            //    Strcpy(timebuf, "unknown date");
+            //}
+
+            //Sprintf(savedbuf, "%sGame was saved on %s", prefix, timebuf);
 
             //int glyph = saved[k].gamestats.glyph;
             int gui_glyph = saved[k].gamestats.gui_glyph;
@@ -2094,7 +2239,7 @@ const char *name;
 {
     int rlen;
     struct savefile_info sfi;
-    unsigned long compatible;
+    uint64_t compatible;
     boolean verbose = name ? TRUE : FALSE, reslt = FALSE;
 
     if (!(reslt = uptodate(fd, name)))

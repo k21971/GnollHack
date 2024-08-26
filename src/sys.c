@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    sys.c    $NHDT-Date: 1547118632 2019/01/10 11:10:32 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.43 $ */
 /* Copyright (c) Kenneth Lorber, Kensington, Maryland, 2008. */
@@ -18,6 +18,8 @@
 #endif
 
 struct sysopt sysopt;
+struct startup_flags initial_flags = DUMMY; /* flags.h */
+
 
 void
 sys_early_init()
@@ -41,12 +43,17 @@ sys_early_init()
 #else
     sysopt.debugfiles = dupstr(DEBUGFILES);
 #endif
+#if defined (DUMPLOG) || defined (DUMPHTML)
+    sysopt.snapjsonfile = (char*)0;
+#endif
 #if defined (DUMPLOG)
     sysopt.dumplogfile = (char *) 0;
+    sysopt.snapshotfile = (char*)0;
     sysopt.dumplogurl = (char*)0;
 #endif
 #if defined (DUMPHTML)
     sysopt.dumphtmlfile = (char*)0;
+    sysopt.snaphtmlfile = (char*)0;
     sysopt.dumphtmlfontname = (char*)0;
     sysopt.dumphtml_css_fontface_normal = (char*)0;
     sysopt.dumphtml_css_fontface_bold = (char*)0;
@@ -127,13 +134,23 @@ sysopt_release()
     if (sysopt.debugfiles)
         free((genericptr_t) sysopt.debugfiles),
         sysopt.debugfiles = (char *) 0;
+#if defined (DUMPLOG) || defined (DUMPHTML)
+    if (sysopt.snapjsonfile)
+        free((genericptr_t)sysopt.snapjsonfile), sysopt.snapjsonfile = (char*)0;
+#endif
 #if defined (DUMPLOG)
     if (sysopt.dumplogfile)
         free((genericptr_t)sysopt.dumplogfile), sysopt.dumplogfile=(char *)0;
+    if (sysopt.snapshotfile)
+        free((genericptr_t)sysopt.snapshotfile), sysopt.snapshotfile = (char*)0;
+    if (sysopt.dumplogurl)
+        free((genericptr_t)sysopt.dumplogurl), sysopt.dumplogurl = (char*)0;
 #endif
 #if defined (DUMPHTML)
     if (sysopt.dumphtmlfile)
         free((genericptr_t)sysopt.dumphtmlfile), sysopt.dumphtmlfile = (char*)0;
+    if (sysopt.snaphtmlfile)
+        free((genericptr_t)sysopt.snaphtmlfile), sysopt.snaphtmlfile = (char*)0;
     if (sysopt.dumphtmlfontname)
         free((genericptr_t)sysopt.dumphtmlfontname), sysopt.dumphtmlfontname = (char*)0;
 #if defined (DUMPHTML_WEBFONT_LINK)
@@ -206,9 +223,7 @@ reset_global_variables(VOID_ARGS)
     memset((genericptr_t)&flags, 0, sizeof(flags)); // Just in case
     memset((genericptr_t)&youmonst, 0, sizeof(youmonst));
     memset((genericptr_t)&bhitpos, 0, sizeof(bhitpos));
-    lock_thread_lock();
     memset((genericptr_t)&urealtime, 0, sizeof(urealtime));
-    unlock_thread_lock();
     memset((genericptr_t)&hearing_array, 0, sizeof(hearing_array));
     memset((genericptr_t)&fqn_prefix, 0, sizeof(fqn_prefix));
     memset((genericptr_t)&level, 0, sizeof(level));
@@ -297,6 +312,12 @@ reset_global_variables(VOID_ARGS)
         objects[i].oc_name_idx = objects[i].oc_descr_idx = i;
     }
 
+    /* Set initial flags */
+    if (initial_flags.click_action_set)
+        flags.self_click_action = initial_flags.click_action_value;
+
+    flags.right_click_command = initial_flags.right_click_action;
+    flags.middle_click_command = initial_flags.middle_click_action;
 }
 
 void

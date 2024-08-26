@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    allmain.c    $NHDT-Date: 1555552624 2019/04/18 01:57:04 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.100 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -26,7 +26,7 @@ STATIC_DCL int NDECL(select_rwraith);
 STATIC_DCL boolean NDECL(maybe_create_rwraith);
 
 #ifdef EXTRAINFO_FN
-static long prev_dgl_extrainfo = 0;
+static int64_t prev_dgl_extrainfo = 0;
 #endif
 
 void
@@ -997,7 +997,7 @@ regenerate_hp(VOID_ARGS)
                     }
                 }
             } else { /* u.ulevel <= 9 */
-                if (!(moves % (long) ((MAXULEV + 12) / (u.ulevel + 2) + 1)))
+                if (!(moves % (int64_t) ((MAXULEV + 12) / (u.ulevel + 2) + 1)))
                     heal = 1;
             }
             if (Regeneration && !heal)
@@ -1283,7 +1283,7 @@ boolean iswizardmode, isexporemode, ismodernmode, iscasualmode;
 
 #define QUIT_DUMMY 100
 void 
-choose_game_difficulty()
+choose_game_difficulty(VOID_ARGS)
 {
     int mindifficulty = TournamentMode ? max(0, sysopt.min_difficulty) : sysopt.min_difficulty;
     int maxdifficulty = sysopt.max_difficulty;
@@ -1364,7 +1364,60 @@ choose_game_difficulty()
 #undef QUIT_DUMMY
 
 void
-newgame()
+set_mouse_buttons(VOID_ARGS)
+{
+    if (flags.right_click_command == DEFCLICK_ROLE)
+    {
+        switch (Role_switch)
+        {
+        default:
+        case PM_ARCHAEOLOGIST:
+        case PM_BARBARIAN:
+        case PM_CAVEMAN:
+        case PM_KNIGHT:
+        case PM_RANGER:
+        case PM_ROGUE:
+        case PM_SAMURAI:
+        case PM_TOURIST:
+        case PM_VALKYRIE:
+            flags.right_click_command = CLICK_FIRE;
+            break;
+        case PM_MONK:
+        case PM_HEALER:
+        case PM_PRIEST:
+        case PM_WIZARD:
+            flags.right_click_command = CLICK_CAST;
+            break;
+        }
+    }
+    if (flags.middle_click_command == DEFCLICK_ROLE)
+    {
+        switch (Role_switch)
+        {
+        default:
+        case PM_ARCHAEOLOGIST:
+        case PM_BARBARIAN:
+        case PM_CAVEMAN:
+        case PM_KNIGHT:
+        case PM_RANGER:
+        case PM_ROGUE:
+        case PM_SAMURAI:
+        case PM_TOURIST:
+        case PM_VALKYRIE:
+            flags.middle_click_command = CLICK_LOOK;
+            break;
+        case PM_MONK:
+        case PM_HEALER:
+        case PM_PRIEST:
+        case PM_WIZARD:
+            flags.middle_click_command = CLICK_ZAP;
+            break;
+        }
+    }
+}
+
+void
+newgame(VOID_ARGS)
 {
     int i;
 
@@ -1378,7 +1431,7 @@ newgame()
     context.warnlevel = 1;
     context.next_attrib_check = 600L; /* arbitrary first setting */
     context.tribute.enabled = TRUE;   /* turn on 3.6 tributes    */
-    context.tribute.tributesz = sizeof(struct tribute_info);
+    context.tribute.tributesz = (uint64_t)sizeof(struct tribute_info);
     Strcpy(context.used_names, "|");
 
     init_rm();
@@ -1446,11 +1499,9 @@ newgame()
     }
 
     /* Game is starting now */
-    lock_thread_lock();
     context.game_started = TRUE;
     urealtime.realtime = 0L;
-    urealtime.start_timing = getnow();
-    unlock_thread_lock();
+    urealtime.start_timing = (int64_t)getnow();
 
 #ifdef INSURANCE
     save_currentstate();
@@ -1471,6 +1522,10 @@ newgame()
     play_environment_ambient_sounds();
 
     /* Success! */
+    /* Fade from black */
+    issue_simple_gui_command(GUI_CMD_FADE_FROM_BLACK_SLOWLY_NONBLOCKING);
+
+    /* Welcome! */
     welcome(TRUE);
 
     /* GUI tips */
@@ -1533,13 +1588,7 @@ boolean new_game; /* false => restoring an old game */
         char postbuf[BUFSZ * 2];
         Sprintf(postbuf, "%s the%s %s %s has entered the dungeon on %s difficulty in %s mode", plname, buf, urace.adj,
             (currentgend&& urole.name.f) ? urole.name.f : urole.name.m, get_game_difficulty_text(context.game_difficulty), get_game_mode_text(FALSE));
-#if 0 //ifdef DEBUG
-        IfModeAllowsPostToForum
-        {
-            issue_gui_command(GUI_CMD_POST_GAME_STATUS, GAME_STATUS_START, 0, postbuf);
-        }
-#endif
-        livelog_printf(LL_DUMP, "%s", postbuf);
+        livelog_printf(LL_DUMP | LL_GAME_START, "%s", postbuf);
     }
 }
 

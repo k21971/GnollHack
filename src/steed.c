@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    steed.c    $NHDT-Date: 1545441042 2018/12/22 01:10:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.62 $ */
 /* Copyright (c) Kevin Hugo, 1998-1999. */
@@ -659,7 +659,7 @@ int reason; /* Player was thrown off etc. */
     coord cc, steedcc;
     const char *verb = "fall";
     boolean repair_leg_damage = (Wounded_legs != 0L);
-    unsigned long save_utrap = u.utrap;
+    uint64_t save_utrap = u.utrap;
     boolean have_spot = landing_spot(&cc, reason, 0);
 
     reset_monster_origin_coordinates(&youmonst);

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 3.6	unixmain.c	$NHDT-Date: 1432512788 2015/05/25 00:13:08 $  $NHDT-Branch: master $:$NHDT-Revision: 1.52 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -797,18 +797,18 @@ error:
 }
 #endif
 
-unsigned long
+uint64_t
 sys_random_seed()
 {
-    unsigned long seed = 0L;
-    unsigned long pid = (unsigned long) getpid();
+    uint64_t seed = 0L;
+    uint64_t pid = (uint64_t) getpid();
     boolean no_seed = TRUE;
 #ifdef DEV_RANDOM
     FILE *fptr;
 
     fptr = fopen(DEV_RANDOM, "r");
     if (fptr) {
-        fread(&seed, sizeof (long), 1, fptr);
+        fread(&seed, sizeof (int64_t), 1, fptr);
         has_strong_rngseed = TRUE;  /* decl.c */
         no_seed = FALSE;
         (void) fclose(fptr);
@@ -818,7 +818,7 @@ sys_random_seed()
     }
 #endif
     if (no_seed) {
-        seed = (unsigned long) getnow(); /* time((TIME_type) 0) */
+        seed = (uint64_t) getnow(); /* time((TIME_type) 0) */
         /* Quick dirty band-aid to prevent PRNG prediction */
         if (pid) {
             if (!(pid & 3L))

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    write.c    $NHDT-Date: 1450261366 2015/12/16 10:22:46 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.17 $ */
 /* GnollHack may be freely redistributed.  See license for details. */
@@ -96,7 +96,7 @@ struct obj *objlist;
     for (otmp = objlist; otmp; otmp = otmp->nobj) {
         if (otmp->otyp == scrolltype && otmp->dknown)
             return TRUE;
-        if (Has_contents(otmp) && otmp->cknown
+        if (Has_contained_contents(otmp) && otmp->cknown
             && label_known(scrolltype, otmp->cobj))
             return TRUE;
     }
@@ -272,7 +272,11 @@ found:
 
     /* we're really going to write now, so calculate cost
      */
-    actualcost = rn1(max(2, basecost / 2), basecost / 2);
+    if (objects[i].oc_flags6 & O6_ALWAYS_FULL_INK_COST)
+        actualcost = basecost;
+    else
+        actualcost = rn1(max(2, basecost / 2), basecost / 2);
+
     curseval = bcsign(pen) + bcsign(paper);
     exercise(A_WIS, TRUE);
     /* dry out marker */

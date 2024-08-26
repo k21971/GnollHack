@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 #if GNH_MAUI
 using GnollHackM;
 #endif
@@ -9,23 +10,26 @@ namespace GnollHackX
 {
     public interface IGnollHackService
     {
+        Task InitializeGnollHack();
+        Task InitializeSecrets(Secrets secrets);
+        Task ResetDefaultsFile();
+
         void LoadLibrary();
         void UnloadLibrary();
-        void InitializeGnollHack();
-        void InitializeSecrets(Secrets secrets);
         string GetGnollHackPath();
         void ClearFiles();
         void ClearCoreFiles();
         void ClearTopScores();
         void ClearSavedGames();
         void ClearDumplogs();
+        void ClearSnapshots();
         void ClearBones();
         void ClearAllFilesInMainDirectory();
-        void ResetDefaultsFile();
         void GetGlyphArrays(out IntPtr gl2ti, out int size1, out IntPtr gltifl, out int gltifl_size);
         void GetTileArrays(out IntPtr ti2an, out int size2, out IntPtr ti2en, out int size3, out IntPtr ti2ad, out int size4, out IntPtr anoff_ptr, out int anoff_size, out IntPtr enoff_ptr, out int enoff_size, out IntPtr reoff_ptr, out int reoff_size);
         int GetTotalTiles();
-        void SetArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl, IntPtr ptr_ti2an, int size_ti2an);
+        void SetGlyphArrays(IntPtr ptr_gl2ti, int size_gl2ti, IntPtr ptr_gltifl, int size_gltifl);
+        void SetTile2AnimationArray(IntPtr ptr_ti2an, int size_ti2an);
         int GetUnexploredGlyph();
         int GetNoGlyph();
         void GetOffs(out int a, out int e, out int r, out int gen_tile, out int hit_tile, out int ui_tile, out int spell_tile, out int skill_tile, out int command_tile, out int buff_tile, out int cursor_off);
@@ -63,6 +67,16 @@ namespace GnollHackX
         bool IncreaseFileDescriptorLimitToAtLeast(int min_cur);
         int GetFileDescriptorLimit(bool is_max_limit);
         int GetMaxManuals();
+        int GetFirstCatalogue();
+        int GetNumCatalogues();
         bool IsDebug();
+
+        bool GetCharacterClickAction();
+        void SetCharacterClickAction(bool newValue);
+        int GetMouseCommand(bool isMiddle);
+        void SetMouseCommand(int newValue, bool isMiddle);
+
+        string GetEventPathForGHSound(int ghsound);
+        float GetVolumeForGHSound(int ghsound);
     }
 }

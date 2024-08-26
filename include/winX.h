@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	winX.h	$NHDT-Date: 1457079196 2016/03/04 08:13:16 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.23 $ */
 /* Copyright (c) Dean Luick, 1992                                 */
@@ -67,8 +67,8 @@ struct tile_map_info_t {
     struct tile_glyph_info_t glyphs[ROWNO][COLNO]; /* Saved glyph numbers. */
     GC white_gc;
     GC black_gc;
-    unsigned long image_width; /* dimensions of tile image */
-    unsigned long image_height;
+    uint64_t image_width; /* dimensions of tile image */
+    uint64_t image_height;
 
     int square_width,  /* Saved tile information so      */
         square_height, /*   we can calculate the correct */
@@ -228,7 +228,7 @@ struct xwindow {
 
 
 #define NO_CLICK 0 /* No click occurred on the map window. Must */
-                   /* be different than CLICK_1 and CLICK_2.    */
+                   /* be different than CLICK_PRIMARY and CLICK_SECONDARY.    */
 
 #define DEFAULT_MESSAGE_WIDTH 60 /* width in chars of the message window */
 
@@ -439,7 +439,7 @@ E int NDECL(X11_nhgetch);
 E int FDECL(X11_nh_poskey, (int *, int *, int *));
 E void NDECL(X11_nhbell);
 E int NDECL(X11_doprev_message);
-E char FDECL(X11_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, unsigned long));
+E char FDECL(X11_yn_function_ex, (int, int, int, int, const char *, const char *, const char *, CHAR_P, const char*, const char*, uint64_t));
 E void FDECL(X11_getlin_ex, (int, int, int, const char *, char *, const char*, const char*, const char*));
 E int NDECL(X11_get_ext_cmd);
 E void FDECL(X11_number_pad, (int));
@@ -449,7 +449,7 @@ E void FDECL(X11_delay_output_intervals, (int));
 E void FDECL(X11_status_init, (int));
 E void NDECL(X11_status_finish);
 E void FDECL(X11_status_enablefield, (int, const char *, const char *, BOOLEAN_P));
-E void FDECL(X11_status_update, (int, genericptr_t, int, int, int, unsigned long *));
+E void FDECL(X11_status_update, (int, genericptr_t, int, int, int, uint64_t *));
 
 /* other defs that really should go away (they're tty specific) */
 E void NDECL(X11_start_screen);

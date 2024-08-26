@@ -35,6 +35,9 @@ namespace GnollHackX.Pages.Game
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 #if GNH_MAUI
             Loaded += ContentPage_Loaded;
 #else
@@ -44,6 +47,12 @@ namespace GnollHackX.Pages.Game
             _currentGame = gamePage.CurrentGame;
             _gamePage = gamePage;
             _replayEnteredName = replayEnteredPlayerName;
+
+            if(GHApp.DarkMode)
+            {
+                WhatNameLabel.TextColor = GHColors.White;
+                eName.TextColor = GHColors.White;
+            }
 
             if (!string.IsNullOrWhiteSpace(modeName))
             {
@@ -123,7 +132,7 @@ namespace GnollHackX.Pages.Game
             if (!_backPressed)
             {
                 _backPressed = true;
-                //await App.Current.MainPage.Navigation.PopModalAsync();
+                //await GHApp.Navigation.PopModalAsync();
             }
             await Task.FromResult(0);
             return false;
@@ -196,6 +205,19 @@ namespace GnollHackX.Pages.Game
             }
             btnOK.IsEnabled = true;
             btnCancel.IsEnabled = true;
+        }
+
+        private void eName_Completed(object sender, EventArgs e)
+        {
+            if (btnOK.IsEnabled)
+            {
+                btnOK_Clicked(sender, e);
+            }
+        }
+
+        protected override bool OnBackButtonPressed()
+        {
+            return true;
         }
     }
 }

@@ -24,15 +24,25 @@ namespace GnollHackX.Pages.MainScreen
     public partial class EditorPage : ContentPage
     {
         private string _fileName;
-
-        public EditorPage(string fileName, string header)
+        private MainPage _mainPage;
+        public EditorPage(MainPage mainPage, string fileName, string header)
         {
+            _mainPage = mainPage;
+            Disappearing += (s, e) => { _mainPage.StartCarouselViewAndEnableButtons(); };
+
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _fileName = fileName;
             HeaderLabel.Text = header;
-            Assembly assembly = GetType().GetTypeInfo().Assembly;
+            if(GHApp.DarkMode)
+            {
+                HeaderLabel.TextColor = GHColors.White;
+                TextEditor.TextColor = GHColors.White;
+            }
         }
 
         public bool ReadFile(out string errorMessage)
@@ -77,7 +87,7 @@ namespace GnollHackX.Pages.MainScreen
                     }
                     ErrorLabel.Text = "";
                     GHApp.CurrentMainPage?.InvalidateCarousel();
-                    await App.Current.MainPage.Navigation.PopModalAsync();
+                    await GHApp.Navigation.PopModalAsync();
                 }
                 else
                 {
@@ -88,7 +98,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 ErrorLabel.Text = "";
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
         }
 
@@ -103,7 +113,7 @@ namespace GnollHackX.Pages.MainScreen
                 {
                     ErrorLabel.Text = "";
                     GHApp.CurrentMainPage?.InvalidateCarousel();
-                    await App.Current.MainPage.Navigation.PopModalAsync();
+                    await GHApp.Navigation.PopModalAsync();
                 }
                 else 
                 {
@@ -114,7 +124,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 ErrorLabel.Text = "";
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
         }
 
@@ -126,9 +136,9 @@ namespace GnollHackX.Pages.MainScreen
             if(answer)
             {
                 ErrorLabel.Text = "";
-                GHApp.GnollHackService.ResetDefaultsFile();
+                await GHApp.GnollHackService.ResetDefaultsFile();
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             else
             {

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0  botl.h  $NHDT-Date: 1554591222 2019/04/06 22:53:42 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.24 $ */
 /* Copyright (c) Michael Allison, 2003                            */
@@ -31,7 +31,7 @@ Astral Plane \GXXXXNNNN:123456 HP:1234(1234) Pw:1234(1234) AC:-127
 
 struct condmap {
     const char *id;
-    unsigned long bitmask;
+    uint64_t bitmask;
 };
 
 enum statusfields {
@@ -81,6 +81,7 @@ enum bl_conditions {
     BL_COND_GRAB,
     BL_COND_ROT,
     BL_COND_LYCANTHROPY,
+    BL_COND_WOUNDED_LEGS,
     NUM_BL_CONDITIONS
 };
 
@@ -107,11 +108,12 @@ enum bl_conditions {
 #define BL_MASK_GRAB            (1UL << BL_COND_GRAB) // 0x00100000UL
 #define BL_MASK_ROT             (1UL << BL_COND_ROT) // 0x00200000UL
 #define BL_MASK_LYCANTHROPY     (1UL << BL_COND_LYCANTHROPY) // 0x00400000UL
+#define BL_MASK_WOUNDED_LEGS    (1UL << BL_COND_WOUNDED_LEGS) // 0x00800000UL
 #define BL_MASK_BITS            NUM_BL_CONDITIONS /* number of mask bits that can be set */
 /* clang-format on */
 
 struct condition_t {
-    long mask;
+    int64_t mask;
     const char* text[3]; /* 3: potential display vals, progressively shorter */
 };
 extern const struct condition_t condition_definitions[NUM_BL_CONDITIONS];

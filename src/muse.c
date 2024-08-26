@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    muse.c    $NHDT-Date: 1547025167 2019/01/09 09:12:47 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /*      Copyright (C) 1990 by Ken Arromdee                         */
@@ -2037,9 +2037,11 @@ struct monst *mtmp;
          * sight, a problem not existing with wands because wand rays
          * are not objects.  Also set dknown in mthrowu.c.
          */
-        if (cansee(mtmp->mx, mtmp->my)) {
+        if (cansee(mtmp->mx, mtmp->my)) 
+        {
             otmp->dknown = 1;
-            pline("%s hurls %s!", Monnam(mtmp), singular(otmp, doname));
+            int multicolors[2] = { NO_COLOR, CLR_MSG_HINT };
+            pline_multi_ex(ATR_NONE, CLR_MSG_WARNING, no_multiattrs, multicolors, "%s hurls %s!", Monnam(mtmp), singular(otmp, doname));
         }
         m_throw(mtmp, mtmp->mx, mtmp->my, sgn(mtmp->mux - mtmp->mx),
                 sgn(mtmp->muy - mtmp->my),
@@ -3513,7 +3515,7 @@ boolean stoning; /* True: stop petrification, False: cure stun && confusion */
     int nutrit = food || dragonfruit ? dog_nutrition(mon, obj) : 0; /* also sets meating */
 
     if (vis) {
-        long save_quan = obj->quan;
+        int64_t save_quan = obj->quan;
 
         obj->quan = 1L;
         pline("%s %s %s.", Monnam(mon),

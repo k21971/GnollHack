@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	mactopl.c	$NHDT-Date: 1432512797 2015/05/25 00:13:17 $  $NHDT-Branch: master $:$NHDT-Revision: 1.9 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -26,7 +26,7 @@ queued_resp(char *resp)
 }
 
 char
-topl_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *query, const char *resp, char def, const char* resp_desc, unsigned long ynflags)
+topl_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *query, const char *resp, char def, const char* resp_desc, uint64_t ynflags)
 {
     char buf[30];
     char c = queued_resp((char *) resp);
@@ -55,7 +55,7 @@ mac_yn_function_ex(style, attr, color, glyph title, query, resp, def, resp_desc,
 int style, attr, color, glyph;
 const char *title, *query, *resp, *resp_desc, *introline;
 char def;
-unsigned long ynflags;
+uint64_t ynflags;
 /*
  *   Generic yes/no function. 'def' is the default (returned by space or
  *   return; 'esc' returns 'q', or 'n', or the default, depending on

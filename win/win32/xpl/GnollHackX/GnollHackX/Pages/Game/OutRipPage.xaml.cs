@@ -30,6 +30,9 @@ namespace GnollHackX.Pages.Game
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _gamePage = gamePage;
             _window = window;
@@ -48,14 +51,18 @@ namespace GnollHackX.Pages.Game
         }
 
         private bool _tapHide = false;
+#if GNH_MAUI
+        private async void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+#else
         private async void TapGestureRecognizer_Tapped(object sender, EventArgs e)
+#endif
         {
             if(!_playingReplay)
             {
                 _tapHide = true;
                 OutRipGrid.IsEnabled = false;
-                await App.Current.MainPage.Navigation.PopModalAsync();
-                _gamePage.GenericButton_Clicked(sender, e, 27);
+                await GHApp.Navigation.PopModalAsync();
+                _gamePage.GenericButton_Clicked(sender, e, GHConstants.CancelChar);
             }
         }
 
@@ -80,7 +87,12 @@ namespace GnollHackX.Pages.Game
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
             if (!_playingReplay && !_tapHide)
-                _gamePage.GenericButton_Clicked(sender, e, 27);
+                _gamePage.GenericButton_Clicked(sender, e, GHConstants.CancelChar);
+        }
+
+        protected override bool OnBackButtonPressed()
+        {
+            return true;
         }
     }
 }

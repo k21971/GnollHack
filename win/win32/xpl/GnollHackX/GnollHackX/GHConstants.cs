@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -186,10 +187,19 @@ namespace GnollHackX
     }
     public enum NhGetPosMods
     {
-        None = 0,
-        Click1,
-        Click2,
-        Click3
+        Default = 0,
+        DefClickRole = 1,
+
+        ClickPrimary = 1,
+        ClickSecondary,
+        ClickTertiary,
+
+        ClickOff = 3,
+        ClickLook,
+        ClickMove,
+        ClickCast,
+        ClickFire,
+        ClickZap,
     }
 
     [Flags]
@@ -227,10 +237,23 @@ namespace GnollHackX
         PlayingReplay =         0x00000080, /* Game is a replay */
         TournamentMode =        0x00000100, /* Playing with server-like settings */
         GUIDebugMode =          0x00000200, /* GUI has been built in debug mode (not a release mode game?) */
+        CharacterClickAction =  0x00000400, /* Set character-click action to true by default */
+
+        RightMouseButtonBit1 =  0x00400000, 
+        RightMouseButtonBit2 =  0x00800000, 
+        RightMouseButtonBit3 =  0x01000000, 
+        RightMouseButtonBit4 =  0x02000000,
+        RightMouseButtonBit5 =  0x04000000,
+
+        MiddleMouseButtonBit1 = 0x08000000,
+        MiddleMouseButtonBit2 = 0x10000000, 
+        MiddleMouseButtonBit3 = 0x20000000, 
+        MiddleMouseButtonBit4 = 0x40000000, 
+        MiddleMouseButtonBit5 = 0x80000000, 
     }
 
     [Flags]
-    public enum StopSoundFlags : ulong
+    public enum StopSoundFlags : uint
     {
         None =                  0x00000000,
         Music =                 0x00000001,
@@ -249,80 +272,80 @@ namespace GnollHackX
     [Flags]
     public enum LayerFlags : ulong
     {
-         None =                     0x00000000UL,
-         LFLAGS_L_LEGAL =           0x00000001UL,
-         LFLAGS_L_ILLEGAL =         0x00000002UL,
-         LFLAGS_O_PILE =            0x00004000UL,
-         LFLAGS_O_IN_PIT =          0x00008000UL,
-         LFLAGS_O_CHAIN =           0x00010000UL,
-         LFLAGS_O_MASK =            0x0001C000UL,
-         LFLAGS_E_GEN_FADE_OUT =    0x00020000UL,
-         LFLAGS_E_BKG_FADE_IN =     0x00040000UL,
-         LFLAGS_E_BKG_FADE_OUT =    0x00080000UL,
-         LFLAGS_ZAP_LEADING_EDGE =  0x00100000UL, /* First (leading) tile in a zap */
-         LFLAGS_ZAP_TRAILING_EDGE = 0x00200000UL, /* Last (trailing) tile in a zap */
-         LFLAGS_ZAP_MASK = (0x00100000UL | 0x00200000UL),
-         LFLAGS_T_TRAPPED =         0x00400000UL,
-         LFLAGS_C_DECORATION =      0x00800000UL,
-         LFLAGS_C_CARPET =          0x01000000UL,
-         LFLAGS_SHOWING_MEMORY =    0x02000000UL, /* also implies that you cannot see the location (and hence showing memory) */
-         LFLAGS_SHOWING_DETECTION = 0x04000000UL, /* Do not darken */
-         LFLAGS_ASCENSION_RADIANCE =0x08000000UL, /* Lighten up */
-         LFLAGS_CAN_SEE =           0x10000000UL, /* cansee(x, y) is true (if not, then darken etc.) */
-         LFLAGS_UXUY =              0x20000000UL, /* x == u.ux && y == u.uy is true */
-         LFLAGS_APPEARS_UNLIT =     0x40000000UL, /* looks unlit */
-         LFLAGS_NO_WALL_END_AUTODRAW=0x80000000UL,/* NO_WALL_END_AUTODRAW(x, y) is true */
+         None =                     0x00000000U,
+         LFLAGS_L_LEGAL =           0x00000001U,
+         LFLAGS_L_ILLEGAL =         0x00000002U,
+         LFLAGS_O_PILE =            0x00004000U,
+         LFLAGS_O_IN_PIT =          0x00008000U,
+         LFLAGS_O_CHAIN =           0x00010000U,
+         LFLAGS_O_MASK =            0x0001C000U,
+         LFLAGS_E_GEN_FADE_OUT =    0x00020000U,
+         LFLAGS_E_BKG_FADE_IN =     0x00040000U,
+         LFLAGS_E_BKG_FADE_OUT =    0x00080000U,
+         LFLAGS_ZAP_LEADING_EDGE =  0x00100000U, /* First (leading) tile in a zap */
+         LFLAGS_ZAP_TRAILING_EDGE = 0x00200000U, /* Last (trailing) tile in a zap */
+         LFLAGS_ZAP_MASK = (0x00100000U | 0x00200000U),
+         LFLAGS_T_TRAPPED =         0x00400000U,
+         LFLAGS_C_DECORATION =      0x00800000U,
+         LFLAGS_C_CARPET =          0x01000000U,
+         LFLAGS_SHOWING_MEMORY =    0x02000000U, /* also implies that you cannot see the location (and hence showing memory) */
+         LFLAGS_SHOWING_DETECTION = 0x04000000U, /* Do not darken */
+         LFLAGS_ASCENSION_RADIANCE =0x08000000U, /* Lighten up */
+         LFLAGS_CAN_SEE =           0x10000000U, /* cansee(x, y) is true (if not, then darken etc.) */
+         LFLAGS_UXUY =              0x20000000U, /* x == u.ux && y == u.uy is true */
+         LFLAGS_APPEARS_UNLIT =     0x40000000U, /* looks unlit */
+         LFLAGS_NO_WALL_END_AUTODRAW=0x80000000U,/* NO_WALL_END_AUTODRAW(x, y) is true */
     }
 
     [Flags]
     public enum LayerMonsterFlags : ulong
     {
-        None =                              0x00000000UL,
-        LMFLAGS_PET =                       0x00000001UL,
-        LMFLAGS_PEACEFUL =                  0x00000002UL,
-        LMFLAGS_RIDDEN =                    0x00000004UL,
-        LMFLAGS_DETECTED =                  0x00000008UL,
-        LMFLAGS_CANSPOTMON =                0x00000010UL,
-        LMFLAGS_YOU =                       0x00000020UL,
-        LMFLAGS_BEING_HIT =                 0x00000040UL,
-        LMFLAGS_KILLED =                    0x00000080UL,
-        LMFLAGS_U_TETHERED =                0x00000100UL, /* You are tethered */
-        LMFLAGS_TETHERED =                  0x00000200UL, /* Monster is tethered */
-        LMFLAGS_DROPPING_PIERCER =          0x00000400UL,
-        LMFLAGS_WORM_TAIL =                 0x00000800UL,
-        LMFLAGS_WORM_SEEN =                 0x00001000UL,
-        LMFLAGS_WORM_HEAD =                 0x00002000UL,
-        LMFLAGS_WORM_TAILEND =              0x00004000UL,
-        LMFLAGS_INVISIBLE_TRANSPARENT =     0x00008000UL,
-        LMFLAGS_SEMI_TRANSPARENT =          0x00010000UL,
-        LMFLAGS_RADIAL_TRANSPARENCY =       0x00020000UL,
-        LMFLAGS_GLASS_TRANSPARENCY =        0x00040000UL,
-        LMFLAGS_CAN_SPOT_SELF =             0x00080000UL,
-        LMFLAGS_LONG_WORM_WITH_TAIL =       0x00100000UL,
-        LMFLAGS_LONG_WORM_TAIL =            0x00200000UL,
-        LMFLAGS_BOSS_MONSTER_FIGHT =        0x00400000UL,
-        LMFLAGS_FADES_UPON_DEATH =          0x00800000UL,
-        LMFLAGS_FLYING =                    0x01000000UL,
-        LMFLAGS_LEVITATING =                0x02000000UL,
-        LMFLAGS_BLOBBY_ANIMATION =          0x04000000UL,
-        LMFLAGS_SWIM_ANIMATION =            0x08000000UL,
-        LMFLAGS_SPECIAL_ANIMATION =         0x10000000UL,
-        LMFLAGS_HUMAN_BREATHE_ANIMATION =   0x20000000UL,
-        LMFLAGS_ANIMAL_BREATHE_ANIMATION =  0x40000000UL,
-        LMFLAGS_STONED =                    0x80000000UL,
+        None =                              0x00000000U,
+        LMFLAGS_PET =                       0x00000001U,
+        LMFLAGS_PEACEFUL =                  0x00000002U,
+        LMFLAGS_RIDDEN =                    0x00000004U,
+        LMFLAGS_DETECTED =                  0x00000008U,
+        LMFLAGS_CANSPOTMON =                0x00000010U,
+        LMFLAGS_YOU =                       0x00000020U,
+        LMFLAGS_BEING_HIT =                 0x00000040U,
+        LMFLAGS_KILLED =                    0x00000080U,
+        LMFLAGS_U_TETHERED =                0x00000100U, /* You are tethered */
+        LMFLAGS_TETHERED =                  0x00000200U, /* Monster is tethered */
+        LMFLAGS_DROPPING_PIERCER =          0x00000400U,
+        LMFLAGS_WORM_TAIL =                 0x00000800U,
+        LMFLAGS_WORM_SEEN =                 0x00001000U,
+        LMFLAGS_WORM_HEAD =                 0x00002000U,
+        LMFLAGS_WORM_TAILEND =              0x00004000U,
+        LMFLAGS_INVISIBLE_TRANSPARENT =     0x00008000U,
+        LMFLAGS_SEMI_TRANSPARENT =          0x00010000U,
+        LMFLAGS_RADIAL_TRANSPARENCY =       0x00020000U,
+        LMFLAGS_GLASS_TRANSPARENCY =        0x00040000U,
+        LMFLAGS_CAN_SPOT_SELF =             0x00080000U,
+        LMFLAGS_LONG_WORM_WITH_TAIL =       0x00100000U,
+        LMFLAGS_LONG_WORM_TAIL =            0x00200000U,
+        LMFLAGS_BOSS_MONSTER_FIGHT =        0x00400000U,
+        LMFLAGS_FADES_UPON_DEATH =          0x00800000U,
+        LMFLAGS_FLYING =                    0x01000000U,
+        LMFLAGS_LEVITATING =                0x02000000U,
+        LMFLAGS_BLOBBY_ANIMATION =          0x04000000U,
+        LMFLAGS_SWIM_ANIMATION =            0x08000000U,
+        LMFLAGS_SPECIAL_ANIMATION =         0x10000000U,
+        LMFLAGS_HUMAN_BREATHE_ANIMATION =   0x20000000U,
+        LMFLAGS_ANIMAL_BREATHE_ANIMATION =  0x40000000U,
+        LMFLAGS_STONED =                    0x80000000U,
     }
 
     [Flags]
     public enum LayerMissileFlags : ulong
     {
-        MISSILE_FLAGS_CORRODEABLE =  0x00000001UL,
-        MISSILE_FLAGS_ROTTABLE =     0x00000002UL,
-        MISSILE_FLAGS_FLAMMABLE =    0x00000004UL,
-        MISSILE_FLAGS_RUSTPRONE =    0x00000008UL,
-        MISSILE_FLAGS_ERODEPROOF =   0x00000010UL,
-        MISSILE_FLAGS_POISONABLE =   0x00000020UL,
-        MISSILE_FLAGS_TETHERED =     0x00000040UL, /* Missile is tethered */
-        MISSILE_FLAGS_LIT =          0x00000080UL,
+        MISSILE_FLAGS_CORRODEABLE =  0x00000001U,
+        MISSILE_FLAGS_ROTTABLE =     0x00000002U,
+        MISSILE_FLAGS_FLAMMABLE =    0x00000004U,
+        MISSILE_FLAGS_RUSTPRONE =    0x00000008U,
+        MISSILE_FLAGS_ERODEPROOF =   0x00000010U,
+        MISSILE_FLAGS_POISONABLE =   0x00000020U,
+        MISSILE_FLAGS_TETHERED =     0x00000040U, /* Missile is tethered */
+        MISSILE_FLAGS_LIT =          0x00000080U,
     }
 
 
@@ -397,7 +420,6 @@ namespace GnollHackX
         public int[] tile_autodraw;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = GHConstants.MaxTilesPerReplacement)]
         public ulong[] tile_flags;
-
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -564,15 +586,6 @@ namespace GnollHackX
         MAX_GHWINDOW_STYLES
     }
 
-    [Flags]
-    public enum window_create_flags : ulong
-    {
-        WINDOW_CREATE_FLAGS_NONE                    = 0x00000000UL,
-        WINDOW_CREATE_FLAGS_ACTIVE                  = 0x00000001UL,
-        WINDOW_CREATE_FLAGS_USE_SPECIAL_SYMBOLS     = 0x00000002UL, //For text window only; use menu flags for menu window
-        WINDOW_CREATE_FLAGS_ASCENDED                = 0x00000004UL
-    }
-
     /* GHMenu styles */
     public enum ghmenu_styles
     {
@@ -644,6 +657,7 @@ namespace GnollHackX
         SCREEN_TEXT_SPECIAL_END,
         SCREEN_TEXT_BOSS_FIGHT,
         SCREEN_TEXT_EXTRA_LIFE_SPENT,
+        SCREEN_TEXT_SNAPSHOT,
     }
 
     public enum game_cursor_types
@@ -659,6 +673,11 @@ namespace GnollHackX
         CURSOR_STYLE_SPELL_CURSOR,
         CURSOR_STYLE_PAY_CURSOR,
         CURSOR_STYLE_INVISIBLE,
+        CURSOR_STYLE_RESERVED_1,
+        CURSOR_STYLE_RESERVED_2,
+        CURSOR_STYLE_RESERVED_3,
+        CURSOR_STYLE_RESERVED_4,
+        CURSOR_STYLE_RESERVED_5,
         MAX_CURSORS
     }
 
@@ -686,6 +705,16 @@ namespace GnollHackX
         HIT_DRAIN_LEVEL,
         HIT_SLOW,
         HIT_HALLUCINATED,
+        HIT_RESERVED_1,
+        HIT_RESERVED_2,
+        HIT_RESERVED_3,
+        HIT_RESERVED_4,
+        HIT_RESERVED_5,
+        HIT_RESERVED_6,
+        HIT_RESERVED_7,
+        HIT_RESERVED_8,
+        HIT_RESERVED_9,
+        HIT_RESERVED_10,
         MAX_HIT_TILES
     }
 
@@ -697,21 +726,29 @@ namespace GnollHackX
         GENERAL_TILE_CHAIN_IS_DOWN,
         GENERAL_TILE_CHAIN_IS_LEFT,
         GENERAL_TILE_CHAIN_MAIN,
+        GENERAL_TILE_RESERVED_1,
+        GENERAL_TILE_RESERVED_2,
         MAX_GENERAL_TILES
     }
 
     public enum game_ui_tile_types
     {
         GENERAL_UI_ELEMENTS = 0,        /* Check box etc. */
-        STATUS_MARKS,               /* Pet mark, detection mark, ridden mark, pile mark, etc. */
-        CONDITION_MARKS,            /* One tile for each specified condition (the same as on status line) */
+        STATUS_MARKS,                   /* Pet mark, detection mark, ridden mark, pile mark, etc. */
+        STATUS2_MARKS,                  /* More status marks */
+        CONDITION_MARKS,                /* One tile for each specified condition (the same as on status line) */
+        CONDITION2_MARKS,               /* More condition marks */
         MAIN_TILE_MARK,
         U_TILE_MARK,
         ITEM_AUTODRAW_GRAPHICS,
         ITEM2_AUTODRAW_GRAPHICS,
         ITEM_PROPERTY_MARKS,
+        ITEM2_PROPERTY_MARKS,
         JAR_GRAPHICS,
         JAR_FOREGROUND,
+        JAR2_GRAPHICS,
+        JAR3_GRAPHICS,
+        RESERVED_UI_TILE_1,
         MAX_UI_TILES
     }
 
@@ -747,20 +784,21 @@ namespace GnollHackX
         BL_COND_RIDE,
         BL_COND_SLOWED,
         BL_COND_PARALYZED,
-        BL_COND_FEARFUL,
+        BL_COND_FEARFU,
         BL_COND_SLEEPING,
         BL_COND_CANCELLED,
         BL_COND_SILENCED,
         BL_COND_GRAB,
         BL_COND_ROT,
         BL_COND_LYCANTHROPY,
+        BL_COND_WOUNDED_LEGS,
         NUM_BL_CONDITIONS
     }
 
     public enum game_ui_status_mark_types
     {
         STATUS_MARK_PET = 0,
-        STATUS_MARK_PEACEFUL,
+        STATUS_MARK_PEACEFU,
         STATUS_MARK_DETECTED,
         STATUS_MARK_BOUNTY,
         STATUS_MARK_SATIATED,
@@ -839,28 +877,38 @@ namespace GnollHackX
         public IntPtr v;
         public IntPtr cobj; /* contents list for containers */
         public uint o_id;
+        public uint owt;
+        public short otyp; /* object class number */
         public sbyte ox, oy;
         public sbyte ox0, oy0;
-        public short otyp; /* object class number */
-        public uint owt;
-        public long quan; /* number of items */
+
+        public long quan;         /* number of items */
+        public long age;          /* creation date */
+        public long owornmask;
+        public ulong item_flags;  /* general purpose object flags, like speflags */
+        public ulong speflags;    /* anything else that might be going on with an item, not affected by cancellation */
 
         public short enchantment; /* Always set to zero by cancellation */
         public short charges; /* number of charges for wand or charged tool ( >= -1 ), always set to -1/0 by cancellation */
         public short special_quality; /* item-specific special quality, e.g., the amount of wetness of a towel, number of candles attached to candelabrum, not affected by cancellation */
-        public ulong speflags; /* anything else that might be going on with an item, not affected by cancellation */
+        public short oartifact; /* artifact array index */
         public sbyte oclass;    /* object class */
         public sbyte invlet;    /* designation in inventory */
-        public short oartifact; /* artifact array index */
         public byte mythic_prefix; /* magical quality for a weapon or armor giving additional powers */
         public byte mythic_suffix;  /* magical quality for a weapon or armor giving additional powers */
         public byte exceptionality; /* exceptional, elite, etc. weapon, multiplies base damage */
         public byte elemental_enchantment; /* cold, fire, lightning, or deathly */
+        public byte material; /*  specific material of this object */
 
         public sbyte recharged; /* number of times it's been recharged */
         public sbyte where;        /* where the object thinks it is */
         public sbyte timed; /* # of fuses (timers) attached to this Obj */
 
+        public int corpsenm;         /* type of corpse is mons[corpsenm] */
+        public int usecount;           /* overloaded for various things that tally */
+        public uint oeaten;        /* nutrition left in food, if partly eaten */
+
+#if BITFIELDS
         internal uint bitfields;
 
         public uint cursed 
@@ -1013,23 +1061,54 @@ namespace GnollHackX
             get { return (bitfields >> 31) & 0x00000001U; }
             set { bitfields = (bitfields & ~(0x00000001U << 31)) | ((value & 0x00000001U) << 31); }
         }
+#else
+        public byte cursed;
+        public byte blessed;
+        public byte unpaid;    /* on some bill */
+        public byte no_charge; /* if shk shouldn't charge for this */
+        public byte known;     /* exact nature & enchantment & charges known */
+        public byte dknown;    /* description = color or text known */
+        public byte bknown;    /* blessing or curse known */
+        public byte rknown;    /* rustproof or not known */
+        public byte oeroded;  /* rusted/burnt weapon/armor */
+        public byte oeroded2; /* corroded/rotted weapon/armor */
+        public byte oerodeproof; /* erodeproof weapon/armor */
+        public byte olocked;     /* object is locked */
+        public byte obroken;     /* lock has been broken */
+        public byte otrapped;    /* container is trapped */
+        public byte lamplit;   /* a light-source -- can be lit */
+        public byte makingsound;   /* a sound-source -- can be turned on to make noise */
+        public byte globby;    /* combines with like types on adjacent squares */
+        public byte greased;    /* covered with grease */
+        public byte nomerge;    /* set temporarily to prevent merging */
+        public byte was_thrown; /* thrown by hero since last picked up */
+        public byte has_special_tileset; /* thrown by hero since last picked up */
+        public byte in_use; /* for magic items before useup items */
+        public byte bypass; /* mark this as an object to be skipped by bhito() */
+        public byte cknown; /* contents of container assumed to be known */
+        public byte lknown; /* locked/unlocked status is known */
+        public byte tknown; /* trapped status of a container is known */
+        public byte nknown; /* artifact's true name is known */
+        public byte aknown; /* artifact status is known; if set, the artifact will be termed "the Artifact" instead of "item named Artifact" */
+        public byte mknown; /* mythic quality is known */
+        public byte rotknown; /* rotting status is known */
+#endif
 
-        public int corpsenm;         /* type of corpse is mons[corpsenm] */
-        public int usecount;           /* overloaded for various things that tally */
-        public uint oeaten;        /* nutrition left in food, if partly eaten */
-        public long age;               /* creation date */
-        public long owornmask;
+        public uint reserved;  /* reserved for, e.g., more bitfields */
+
+        public uint o_id_memory;  /* This is a memory object of this o_id */
+        public uint m_id_memory;  /* This is a memory object of this mimic m_id */
+
         public short cooldownleft;       /* item cooldown left before it can be used again*/
         public short repowerleft;       /* artifact cooldown left before its invoke ability can be used again*/
         public short detectioncount;    /* monsters detected for WARN_ORC and other similar properties */
-        public byte invokeon;      /* the object's / artifact's invoked ability is on */
         public short invokeleft;       /* counter for an artifact's item-specific invoke ability */
-        public uint o_id_memory;  /* This is a memory object of this o_id */
-        public uint m_id_memory;  /* This is a memory object of this mimic m_id */
+        public byte invokeon;      /* the object's / artifact's invoked ability is on */
 
         public byte special_tileset;
         public int glyph;
         public int gui_glyph;
+
         public IntPtr oextra; /* pointer to oextra struct */
     }
 
@@ -1096,7 +1175,8 @@ namespace GnollHackX
         OBJ_BURIED = 6,    /* object buried */
         OBJ_ONBILL = 7,    /* object on shk bill */
         OBJ_HEROMEMORY = 8,/* object remembered by hero */
-        NOBJ_STATES = 9
+        OBJ_MAGIC = 9,     /* object in a magic chest */
+        NOBJ_STATES = 10
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1111,7 +1191,7 @@ namespace GnollHackX
         
         public int mhp;
         public int mhpmax;
-        
+
         public ulong status_bits;
         public ulong condition_bits;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = GHConstants.NUM_BUFF_BIT_ULONGS)]
@@ -1154,11 +1234,11 @@ namespace GnollHackX
         SPEFLAGS_BEING_BROKEN                  = 0x10000000UL,
         SPEFLAGS_GIVEN_OUT_BLUE_SMOKE          = 0x20000000UL,
         SPEFLAGS_FOUND_THIS_TURN               = 0x40000000UL,
-        SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO    = 0x80000000UL
+        SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO    = 0x80000000UL,
     }
 
     [Flags]
-    public enum obj_bitfield_types : uint
+    public enum obj_bitfield_types : ulong
     {
         cursed =        0x00000001U,
         blessed =       0x00000002U,
@@ -1195,36 +1275,36 @@ namespace GnollHackX
     [Flags]
     public enum objdata_flags : ulong
     {
-        None = 0x00000000UL,
-        OBJDATA_FLAGS_DRAWN_IN_FRONT =  0x00000001UL,
-        OBJDATA_FLAGS_HALLUCINATION =   0x00000002UL,
-        OBJDATA_FLAGS_UCHAIN =          0x00000004UL,
-        OBJDATA_FLAGS_UBALL =           0x00000008UL,
-        OBJDATA_FLAGS_UWEP =            0x00000010UL,
-        OBJDATA_FLAGS_UWEP2 =           0x00000020UL,
-        OBJDATA_FLAGS_UQUIVER =         0x00000040UL,
-        OBJDATA_FLAGS_OUT_OF_AMMO1 =    0x00000080UL,
-        OBJDATA_FLAGS_WRONG_AMMO_TYPE1 =0x00000100UL,
-        OBJDATA_FLAGS_NOT_BEING_USED1 = 0x00000200UL,
-        OBJDATA_FLAGS_NOT_WEAPON1 =     0x00000400UL,
-        OBJDATA_FLAGS_OUT_OF_AMMO2 =    0x00000800UL,
-        OBJDATA_FLAGS_WRONG_AMMO_TYPE2 =0x00001000UL,
-        OBJDATA_FLAGS_NOT_BEING_USED2 = 0x00002000UL,
-        OBJDATA_FLAGS_NOT_WEAPON2 =     0x00004000UL,
-        OBJDATA_FLAGS_FOUND_THIS_TURN = 0x00008000UL,
-        OBJDATA_FLAGS_IS_AMMO =         0x00010000UL, /* is_ammo is TRUE */
-        OBJDATA_FLAGS_THROWING_WEAPON = 0x00020000UL, /* throwing_weapon is TRUE */
-        OBJDATA_FLAGS_PREV_WEP_FOUND =  0x00040000UL,
-        OBJDATA_FLAGS_PREV_UNWIELD =    0x00080000UL,
+        None = 0x00000000U,
+        OBJDATA_FLAGS_DRAWN_IN_FRONT =  0x00000001U,
+        OBJDATA_FLAGS_HALLUCINATION =   0x00000002U,
+        OBJDATA_FLAGS_UCHAIN =          0x00000004U,
+        OBJDATA_FLAGS_UBALL =           0x00000008U,
+        OBJDATA_FLAGS_UWEP =            0x00000010U,
+        OBJDATA_FLAGS_UWEP2 =           0x00000020U,
+        OBJDATA_FLAGS_UQUIVER =         0x00000040U,
+        OBJDATA_FLAGS_OUT_OF_AMMO1 =    0x00000080U,
+        OBJDATA_FLAGS_WRONG_AMMO_TYPE1 =0x00000100U,
+        OBJDATA_FLAGS_NOT_BEING_USED1 = 0x00000200U,
+        OBJDATA_FLAGS_NOT_WEAPON1 =     0x00000400U,
+        OBJDATA_FLAGS_OUT_OF_AMMO2 =    0x00000800U,
+        OBJDATA_FLAGS_WRONG_AMMO_TYPE2 =0x00001000U,
+        OBJDATA_FLAGS_NOT_BEING_USED2 = 0x00002000U,
+        OBJDATA_FLAGS_NOT_WEAPON2 =     0x00004000U,
+        OBJDATA_FLAGS_FOUND_THIS_TURN = 0x00008000U,
+        OBJDATA_FLAGS_IS_AMMO =         0x00010000U, /* is_ammo is TRUE */
+        OBJDATA_FLAGS_THROWING_WEAPON = 0x00020000U, /* throwing_weapon is TRUE */
+        OBJDATA_FLAGS_PREV_WEP_FOUND =  0x00040000U,
+        OBJDATA_FLAGS_PREV_UNWIELD =    0x00080000U,
     }
 
     [Flags]
-    public enum sound_play_flags : ulong
+    public enum sound_play_flags : uint
     {
-        None = 0x00000000UL,
-        PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING = 0x00000001UL,
-        PLAY_FLAGS_NO_PLAY_IF_ALREADY_QUEUED =  0x00000002UL,
-        PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING_OR_QUEUED = 0x00000003UL,
+        None = 0x00000000U,
+        PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING = 0x00000001U,
+        PLAY_FLAGS_NO_PLAY_IF_ALREADY_QUEUED =  0x00000002U,
+        PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING_OR_QUEUED = 0x00000003U,
     }
 
     public enum elemental_enchantment_types
@@ -1291,13 +1371,20 @@ namespace GnollHackX
         GUI_CMD_GAME_ENDED,
         GUI_CMD_ENABLE_TOURNAMENT_MODE,
         GUI_CMD_DISABLE_TOURNAMENT_MODE,
+        GUI_CMD_TOGGLE_MENU_POSITION_SAVING,
+        GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION,
+        GUI_CMD_SET_TO_BLACK,
+        GUI_CMD_FADE_FROM_BLACK_SLOWLY_NONBLOCKING,
+        GUI_CMD_REPORT_MOUSE_COMMAND,
+        GUI_CMD_TOGGLE_QUICK_ZAP_WAND,
+        GUI_CMD_TOGGLE_QUICK_CAST_SPELL,
     }
 
     public enum game_status_types
     {
-        GAME_STATUS_START = 0,
-        GAME_STATUS_EVENT,
-        GAME_STATUS_ACHIEVEMENT,
+        GAME_STATUS_GENERAL_POST = 0,
+        GAME_STATUS_START,
+        GAME_STATUS_POST_IF_CLOUD_REPLAY_ON,
         GAME_STATUS_RESULT,
         GAME_STATUS_RESULT_ATTACHMENT,
     }
@@ -1348,10 +1435,10 @@ namespace GnollHackX
     [Flags]
     public enum popup_text_flags : ulong
     {
-        POPUP_FLAGS_NONE =          0x00000000UL,
-        POPUP_FLAGS_ADD_QUOTES =    0x00000001UL,
-        POPUP_FLAGS_COLOR_TEXT =    0x00000002UL,
-        POPUP_FLAGS_UPPER_SIDE =    0x00000004UL,
+        POPUP_FLAGS_NONE =          0x00000000U,
+        POPUP_FLAGS_ADD_QUOTES =    0x00000001U,
+        POPUP_FLAGS_COLOR_TEXT =    0x00000002U,
+        POPUP_FLAGS_UPPER_SIDE =    0x00000004U,
     }
 
     public enum gui_effect_types
@@ -1424,8 +1511,6 @@ namespace GnollHackX
         GETLINE_QUESTION,
     }
 
-
-
     public enum downloaded_file_check_results
     {
         OK = 0,
@@ -1437,15 +1522,88 @@ namespace GnollHackX
         Cancelled,
     }
 
-    [Flags]
-    public enum secrets_flags : int
+    public enum sound_bank_loading_type : int
     {
-        None = 0x00
+        Master = 0,
+        Preliminary,
+        Intro,
+        Music,
+        Game,
+    }
+
+    [Flags]
+    public enum playsound_play_flags : uint
+    {
+        PLAY_FLAGS_NONE =                           0x00000000U,
+        PLAY_FLAGS_NO_PLAY_IF_ALREADY_PLAYING =     0x00000001U,
+        PLAY_FLAGS_NO_PLAY_IF_ALREADY_QUEUED =      0x00000002U,
+        PLAY_FLAGS_SONG =                           0x00000004U,
+    }
+
+    /* special key functions */
+    public enum nh_keyfunc
+    {
+        NHKF_ESC = 0,
+        NHKF_DOAGAIN,
+        NHKF_DOAGAIN2,
+
+        NHKF_REQMENU,
+
+        /* run ... clicklook need to be in a continuous block */
+        NHKF_RUN,
+        NHKF_RUN2,
+        NHKF_RUSH,
+        NHKF_FIGHT,
+        NHKF_FIGHT2,
+        NHKF_NOPICKUP,
+        NHKF_RUN_NOPICKUP,
+        NHKF_DOINV,
+        NHKF_DOSEEWORN,
+        NHKF_TRAVEL,
+        NHKF_TRAVEL_ATTACK,
+        NHKF_TRAVEL_WALK,
+        NHKF_CLICKFIRE,
+        NHKF_CLICKLOOK,
+        NHKF_CLICKCAST,
+
+        NHKF_REDRAW,
+        NHKF_REDRAW2,
+        NHKF_GETDIR_SELF,
+        NHKF_GETDIR_SELF2,
+        NHKF_GETDIR_HELP,
+        NHKF_COUNT,
+        NHKF_GETPOS_SELF,
+        NHKF_GETPOS_PICK,
+        NHKF_GETPOS_PICK_Q,  /* quick */
+        NHKF_GETPOS_PICK_O,  /* once */
+        NHKF_GETPOS_PICK_V,  /* verbose */
+        NHKF_GETPOS_SHOWVALID,
+        NHKF_GETPOS_AUTODESC,
+        NHKF_GETPOS_MON_NEXT,
+        NHKF_GETPOS_MON_PREV,
+        NHKF_GETPOS_OBJ_NEXT,
+        NHKF_GETPOS_OBJ_PREV,
+        NHKF_GETPOS_DOOR_NEXT,
+        NHKF_GETPOS_DOOR_PREV,
+        NHKF_GETPOS_UNEX_NEXT,
+        NHKF_GETPOS_UNEX_PREV,
+        NHKF_GETPOS_INTERESTING_NEXT,
+        NHKF_GETPOS_INTERESTING_PREV,
+        NHKF_GETPOS_VALID_NEXT,
+        NHKF_GETPOS_VALID_PREV,
+        NHKF_GETPOS_HELP,
+        NHKF_GETPOS_MENU,
+        NHKF_GETPOS_LIMITVIEW,
+        NHKF_GETPOS_MOVESKIP,
+
+        NUM_NHKF
     }
 
     public static class GHConstants
     {
         public const int MinimumFileDescriptorLimit = 16384;
+        public const int CancelChar = 27;
+        public const int SelfChar = 46;
         public const int InputBufferLength = 32;
         public const int BUFSZ = 256;
         public const int UTF8BUFSZ = 256 * 4;
@@ -1459,11 +1617,19 @@ namespace GnollHackX
         public const int FadeFromBlackDuration = 200;
         public const int MaxMessageHistoryLength = 256;
         public const int MaxLongerMessageHistoryLength = 16384;
+        public const float StatusBarBaseFontSize = 14f;
+        public const float StatusBarHorizontalMargin = 5.0f;
+        public const float StatusBarVerticalMargin = 5.0f;
+        public const float StatusBarRowMargin = 5.0f;
+        public const float ContextButtonBottomStartMargin = 30.0f;
+        public const float ContextButtonBaseFontSize = 8.5f;
+        public const float ContextButtonSpacing = 10.0f;
         public const float MoveDistanceThreshold = 25.0f;
-        public const long MoveOrPressTimeThreshold = 200; /* Milliseconds */
-        public const long SwipeTimeThreshold = 300; /* Milliseconds */
-        public const long FreeScrollingTime = 200; /* Milliseconds */
-        public const long ScrollRecordThreshold = 200; /* Milliseconds */
+        public const long MoveOrPressTimeThreshold = 200L; /* Milliseconds */
+        public const long DoubleClickTimeThreshold = 500L; /* Milliseconds */
+        public const long SwipeTimeThreshold = 300L; /* Milliseconds */
+        public const long FreeScrollingTime = 200L; /* Milliseconds */
+        public const long ScrollRecordThreshold = 200L; /* Milliseconds */
         public const float ScrollConstantDeceleration = 0.5f; /* pixels in % of screen height per second squared */
         public const float ScrollSpeedDeceleration = 2.0f; /* % of speed per second */
         public const float ScrollConstantDecelerationOverEdgeMultiplier = 10f; /* multiplier for ScrollSpeedDeceleration when over edge */
@@ -1495,6 +1661,7 @@ namespace GnollHackX
         public const int MaxPlayedZapAnimations = 16;
         public const int MaxNormalImmediateSoundInstances = 36;
         public const int MaxLongImmediateSoundInstances = 48;
+        public const int MaxUISoundInstances = 8;
         public const int MaxChannels = 512;
         public const int MaxBitmapCacheSize = 64;
         public const int MaxDarkenedBitmapCacheSize = 256;
@@ -1510,6 +1677,9 @@ namespace GnollHackX
         public const int MaxObjectsDrawn = 12;
         public const int OBJECT_PILE_START_HEIGHT = 2;
         public const int OBJECT_PILE_HEIGHT_DIFFERENCE = 2;
+        public const int MAX_UI_TILE_COMPONENTS = 32;
+        public const int MAX_UI_TILE_16_x_16_COMPONENTS = 24;
+        public const int MAX_UI_TILE_8_x_24_COMPONENTS = 32;
         public const float MinimumMapMiniRelativeFontSize = 0.5f;
         public const float MaximumMapMiniRelativeFontSize = 2.0f;
         public const float MinimumMapFontSize = 4.0f;
@@ -1522,6 +1692,10 @@ namespace GnollHackX
         public const int IntroGHSound = 1;
         public const string IntroEventPath = "event:/Music/Main Screen/Splash";
         public const int IntroBankId = 0;
+        public const int MusicGHSound = 2;
+        public const string MusicEventPath = "event:/Music/Start/Player Selection";
+        public const float IntroMusicVolume = 0.5f;
+        public const float BackgroundMusicVolume = 0.08f;
         public const int ButtonClickGHSound = 28;
         public const string ButtonClickEventPath = "event:/UI/Button Down";
         public const int ButtonClickBankId = 0;
@@ -1553,6 +1727,7 @@ namespace GnollHackX
         public const float BackgroundTopBorderExtraDivisor = 4.0f;
         public const bool DownloadFromWebInDebugMode = true;
         public const bool IsDefaultStatusBarClassic = false;
+        public const bool AreMenuFadeEffectsDefault = true;
         public const string GnollHackGitHubPage = "https://github.com/hyvanmielenpelit/GnollHack";
         public const string GnollHackWebPage = "https://gnollhack.com";
         public const string GnollHackWikiPage = "https://github.com/hyvanmielenpelit/GnollHack/wiki";
@@ -1565,11 +1740,10 @@ namespace GnollHackX
         public const int MaxRefreshRate = 120;
         public const int PollingFrequency = 60;
         public const int PollingInterval = 15;
-        public const bool IsGPUDefault = true;
         public const double DefaultTextWindowMaxWidth = 600.0;
         public const double WindowHideIntervals = 5.0;
-        public const uint MainCanvasAnimationTime = 250;
-        public const uint AuxiliaryCanvasAnimationTime = 240;
+        public const uint MainCanvasAnimationTime = 2500000;
+        public const uint AuxiliaryCanvasAnimationTime = 3600000;
         public const float MenuDefaultRowHeight = 30.0f;
         public const float DefaultGeneralVolume = 1.0f;
         public const float DefaultMusicVolume = 0.5f;
@@ -1583,21 +1757,27 @@ namespace GnollHackX
         public const bool DefaultHideNavigation = true;
         public const bool DefaultHideStatusBar = true;
 #if DEBUG
-        public const long StoreReviewRequestNumberOfGames = 0;
-        public const long StoreReviewRequestTotalPlayTime = 0;
+        public const long StoreReviewRequestNumberOfGames = 0L;
+        public const long StoreReviewRequestTotalPlayTime = 0L;
 #else
-        public const long StoreReviewRequestNumberOfGames = 4;
-        public const long StoreReviewRequestTotalPlayTime = 60 * 60 * 2;
+        public const long StoreReviewRequestNumberOfGames = 4L;
+        public const long StoreReviewRequestTotalPlayTime = 60L * 60L * 2L;
 #endif
         public const bool DefaultHTMLDumpLogs = true;
         public const bool DefaultUseSingleDumpLog = true;
+        public const int DefaultRightMouseCommand = (int)NhGetPosMods.DefClickRole;
+        public const int DefaultMiddleMouseCommand = (int)NhGetPosMods.DefClickRole;
+        public const int RightMouseBitIndex = 22;
+        public const int MiddleMouseBitIndex = 27;
         public const string InstallTimePackName = "installtimepack";
         public const string OnDemandPackName = "ondemandpack";
         public const string UserDataDirectory = "usrdata";
+        public const string UserDataFileName = "userdata.json";
         public const string AppLogDirectory = "log";
         public const string AppLogFileName = "ghlog.txt";
         public const string SaveDirectory = "save";
         public const string DumplogDirectory = "dumplog";
+        public const string SnapshotDirectory = "snapshot";
         public const string ReplayDirectory = "replay";
         public const string ReplayDownloadFromCloudDirectory = "replay-cloud";
         public const string ArchiveDirectory = "archive"; /* Directory for sharable archives and files; cleaned and deleted at program start */
@@ -1635,12 +1815,14 @@ namespace GnollHackX
         public const string ReplayPostFileNamePrefix = "queued_replay_post_";
         public const string ReplayPostFileNameSuffix = ".txt";
         public const double MainScreenGeneralCounterIntervalInSeconds = 2.0;
-        public const long MaxGHLogSize = 4194304;
+        public const long MaxGHLogSize = 4194304L;
         public const int LineBuilderInitialCapacity = 256;
-        public const ulong LowFreeDiskSpaceThresholdInBytes = 1024 * 1024 * 2024;
-        public const ulong VeryLowFreeDiskSpaceThresholdInBytes = 512 * 1024 * 2024;
-        public const ulong CritiallyLowFreeDiskSpaceThresholdInBytes = 64 * 1024 * 2024;
-        public const long MaxSingleReplayFileSizeInBytes = 8 * 1024 * 2024;
+        public const ulong LowFreeDiskSpaceThresholdInBytes = 1536 * 1024 * 1024UL;
+        public const ulong VeryLowFreeDiskSpaceThresholdInBytes = 1024 * 1024 * 1024UL;
+        public const ulong CritiallyLowFreeDiskSpaceThresholdInBytes = 128 * 1024 * 1024UL;
+        public const ulong DisableAuxGPUbyDefaultThresholdInBytes = 4096 * 1024 * 1024UL;
+        public const ulong UseMipMapThresholdInBytes = 5120 * 1024 * 1024UL;
+        public const long MaxSingleReplayFileSizeInBytes = 12 * 1024 * 1024L;
         public const string ReplayFileNamePrefix = "replay-";
         public const string ReplayContinuationFileNamePrefix = "rpcont-";
         public const string ReplayFileNameMiddleDivisor = "-";
@@ -1651,7 +1833,7 @@ namespace GnollHackX
         public const string ReplaySharedZipFileNamePrefix = "shared-replay-";
         public const string ReplaySharedZipFileNameSuffix = ".zip";
         public const string ReplayAllSharedZipFileNamePrefix = "shared-replays-";
-        public const string AzureBlobStorageReplayContainerName = "replays";
+        public const string AzureBlobStorageReplayContainerNamePrefix = "replays";
         public const string AzureBlobStorageDelimiter = "/";
         public const string AzureBlobStorageGeneralDirectoryName = "_Anonymous";
         public const bool GZipIsDefaultReplayCompression = true;
@@ -1666,11 +1848,28 @@ namespace GnollHackX
         public const int ReplayGetLineDelay1 = 512; /* Milliseconds */
         public const int ReplayGetLineDelay2 = 1024; /* Milliseconds */
         public const int ReplayDisplayWindowDelay = 512; /* Milliseconds */
-        //public const long GPUResourceCacheSize = 800000000L;
+        //public const GHlong GPUResourceCacheSize = 800000000L;
 #if GNH_MAUI
         public const string PortName = "GnollHackM";
+        public const UnmanagedType GHStringMarshallingType = UnmanagedType.LPUTF8Str;
+        public const float HoveringColorMultiplier = 0.24f;
+        public const float NonHoveringColorMultiplier = 0.88f;
 #else
         public const string PortName = "GnollHackX";
+        public const UnmanagedType GHStringMarshallingType = UnmanagedType.LPStr;
+        public const float HoveringColorMultiplier = 0.24f;
+        public const double NonHoveringColorMultiplier = 0.88;
+#endif
+#if WINDOWS
+        public const bool DefaultCharacterClickAction = true;
+        public const bool DefaultSimpleCmdLayout = false;
+        public const int FadeFromBlackDurationAtStart = 700;
+        public const double FadeFromBlackAtStartExtraDelaySecs = 0.25;
+#else
+        public const bool DefaultCharacterClickAction = false;
+        public const bool DefaultSimpleCmdLayout = true;
+        public const int FadeFromBlackDurationAtStart = 700;
+        public const double FadeFromBlackAtStartExtraDelaySecs = 0.15;
 #endif
     }
 
@@ -1892,5 +2091,11 @@ namespace GnollHackX
         FileDoesNotExist = 4,
         InvalidVersion = 5,
         Restarting = 6,
+    }
+
+    public enum GameCursorType
+    {
+        Normal = 0,
+        Info = 1
     }
 }

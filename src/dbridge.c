@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    dbridge.c    $NHDT-Date: 1503355815 2017/08/21 22:50:15 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.39 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet              */
@@ -30,7 +30,7 @@ STATIC_DCL const char *FDECL(e_nam, (struct entity *));
 STATIC_DCL const char *FDECL(E_phrase, (struct entity *, const char *));
 STATIC_DCL boolean FDECL(e_survives_at, (struct entity *, int, int));
 STATIC_DCL void FDECL(e_died, (struct entity *, int, int));
-STATIC_OVL void FDECL(e_damage, (struct entity*, int, int, unsigned long, const char*, int));
+STATIC_OVL void FDECL(e_damage, (struct entity*, int, int, uint64_t, const char*, int));
 STATIC_DCL boolean FDECL(automiss, (struct entity *));
 STATIC_DCL boolean FDECL(e_missed, (struct entity *, BOOLEAN_P));
 STATIC_DCL boolean FDECL(e_jumps, (struct entity *));
@@ -500,7 +500,7 @@ STATIC_OVL void
 e_damage(etmp, basedmg, adtyp, ad_flags, knam, k_format)
 struct entity* etmp;
 int basedmg, adtyp;
-unsigned long ad_flags;
+uint64_t ad_flags;
 const char* knam;
 int k_format;
 {

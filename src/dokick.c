@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    dokick.c    $NHDT-Date: 1551920353 2019/03/07 00:59:13 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.131 $ */
 /* Copyright (c) Izchak Miller, Mike Stephenson, Steve Linhart, 1989. */
@@ -25,7 +25,7 @@ STATIC_DCL boolean FDECL(maybe_kick_monster, (struct monst *,
 STATIC_DCL void FDECL(kick_monster, (struct monst *, XCHAR_P, XCHAR_P));
 STATIC_DCL int FDECL(really_kick_object, (XCHAR_P, XCHAR_P, BOOLEAN_P));
 STATIC_DCL char *FDECL(kickstr, (char *, const char *));
-STATIC_DCL void FDECL(otransit_msg, (struct obj *, BOOLEAN_P, long));
+STATIC_DCL void FDECL(otransit_msg, (struct obj *, BOOLEAN_P, int64_t));
 STATIC_DCL void FDECL(drop_to, (coord *, SCHAR_P));
 
 STATIC_VAR const char kick_passes_thru[] = "kick passes harmlessly through";
@@ -99,7 +99,7 @@ boolean clumsy;
     if (uarmf)
         dmg += weapon_dmg_value(uarmf, mon, &youmonst, 0);
     
-    dmg += weapon_skill_dmg_bonus(uarmf, P_MARTIAL_ARTS, FALSE, FALSE, TRUE, 0, TRUE);
+    dmg += weapon_skill_dmg_bonus(uarmf, P_MARTIAL_ARTS, FALSE, FALSE, TRUE, 0, TRUE, FALSE);
 
     /* excessive wt affects dex, so it affects dmg */
     if (clumsy)
@@ -113,7 +113,7 @@ boolean clumsy;
     if (is_shade(mon->data) && !shade_glare(uarmf))
         dmg = 0;
 
-    long silverhit = 0;
+    int64_t silverhit = 0;
     specialdmg = special_dmgval(&youmonst, mon, W_ARMF, &silverhit);
     dmg += specialdmg;
 
@@ -373,7 +373,7 @@ xchar x, y;
             u_wait_until_action();
 
             kickdieroll = rnd(20);
-            specialdmg = special_dmgval(&youmonst, mon, W_ARMF, (long *) 0);
+            specialdmg = special_dmgval(&youmonst, mon, W_ARMF, (int64_t *) 0);
             if (is_shade(mon->data) && !shade_glare(uarmf) && !specialdmg) {
                 /* doesn't matter whether it would have hit or missed,
                    and shades have no passive counterattack */
@@ -412,7 +412,7 @@ xchar x, y;
         play_monster_simple_weapon_sound(&youmonst, BAREFOOTED_ATTACK_NUMBER, uarmf, OBJECT_SOUND_TYPE_SWING_MELEE);
         u_wait_until_action();
 
-        char strikebuf[BUFSIZ] = "";
+        char strikebuf[BUFSZ * 2] = "";
         Sprintf(strikebuf, "You attack");
 
         if (strikeindex > 0)
@@ -527,7 +527,7 @@ uchar* hitres_ptr;
         if (hitres_ptr)
             *hitres_ptr = 1;
 
-        long umoney, value = gold->quan * objects[gold->otyp].oc_cost;
+        int64_t umoney, value = gold->quan * objects[gold->otyp].oc_cost;
 
         mtmp->msleeping = 0;
         finish_meating(mtmp);
@@ -541,7 +541,7 @@ uchar* hitres_ptr;
         gold = (struct obj *) 0; /* obj has been freed */
         if (mtmp->isshk)
         {
-            long robbed = ESHK(mtmp)->robbed;
+            int64_t robbed = ESHK(mtmp)->robbed;
 
             if (robbed) 
             {
@@ -628,7 +628,7 @@ uchar* hitres_ptr;
         } 
         else if (is_mercenary(mtmp->data))
         {
-            long goldreqd = 0L;
+            int64_t goldreqd = 0L;
 
             if (rn2(3)) {
                 if (mtmp->data == &mons[PM_SOLDIER])
@@ -676,7 +676,7 @@ xchar x, y; /* coordinates where object was before the impact, not after */
 {
     struct monst *shkp;
     struct obj *otmp, *otmp2;
-    long loss = 0L;
+    int64_t loss = 0L;
     boolean costly, insider, frominv;
 
     /* only consider normal containers */
@@ -846,7 +846,7 @@ boolean is_golf_swing;
         calculate the range for that 1 rather than for the whole stack */
     if (kickedobj->quan > 1L && !isgold)
     {
-        long save_quan = kickedobj->quan;
+        int64_t save_quan = kickedobj->quan;
 
         kickedobj->quan = 1L;
         k_owt = weight(kickedobj);
@@ -1046,7 +1046,9 @@ boolean is_golf_swing;
     newsym(x, y);
     mon = bhit(u.dx, u.dy, range, 0, is_golf_swing ? GOLF_SWING : KICKED_WEAPON,
                (int FDECL((*), (MONST_P, OBJ_P, MONST_P))) 0,
-               (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, &kickedobj, &youmonst, TRUE, FALSE);
+               (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, 
+               (int FDECL((*), (TRAP_P, OBJ_P, MONST_P))) 0, 
+               &kickedobj, &youmonst, TRUE, FALSE);
     if (!kickedobj)
         return 1; /* object broken */
 
@@ -1204,7 +1206,7 @@ dokick() {
     else if (Wounded_legs) 
     {
         /* note: jump() has similar code */
-        long wl = (EWounded_legs & BOTH_SIDES);
+        int64_t wl = (EWounded_legs & BOTH_SIDES);
         const char *bp = body_part(LEG);
 
         if (wl == BOTH_SIDES)
@@ -1528,7 +1530,7 @@ dokick() {
             if ((Luck < 0 || maploc->flags) && !rn2(3)) 
             {
                 create_basic_floor_location(x, y, maploc->floortyp ? maploc->floortyp : ROOM, maploc->floorsubtyp ? maploc->floorsubtyp : 0, 0, FALSE);
-                (void) mkgold((long) rnd(200), x, y);
+                (void) mkgold((int64_t) rnd(200), x, y);
                 play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_LOCATION, xy_to_any(x, y), NATTK, (struct obj*)0, 5.0, HMON_MELEE);
                 if (Blind)
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "CRASH!  You destroy it.");
@@ -1540,7 +1542,7 @@ dokick() {
                 update_u_action_revert(ACTION_TILE_NO_ACTION);
                 return 1;
             } else if (Luck > 0 && !rn2(3) && !maploc->looted) {
-                (void) mkgold((long) rn1(201, 300), x, y);
+                (void) mkgold((int64_t) rn1(201, 300), x, y);
                 i = Luck + 1;
                 if (i > 6)
                     i = 6;
@@ -1666,8 +1668,8 @@ dokick() {
             {
                 if (maploc->special_quality > 0)
                 {
-                    long nfruit = (long)min(maploc->special_quality, max(0, d(tree_subtype_definitions[maploc->subtyp].fruit_drop_d, tree_subtype_definitions[maploc->subtyp].fruit_drop_n) + tree_subtype_definitions[maploc->subtyp].fruit_drop_p));
-                    long nfall;
+                    int64_t nfruit = (int64_t)min(maploc->special_quality, max(0, d(tree_subtype_definitions[maploc->subtyp].fruit_drop_d, tree_subtype_definitions[maploc->subtyp].fruit_drop_n) + tree_subtype_definitions[maploc->subtyp].fruit_drop_p));
+                    int64_t nfall;
                     if (nfruit > 0)
                     {
                         maploc->special_quality -= (short)nfruit;
@@ -2020,15 +2022,16 @@ schar loc;
 
 /* player or missile impacts location, causing objects to fall down */
 void
-impact_drop(missile, x, y, dlev)
+impact_drop(missile, x, y, dlev, dropall)
 struct obj *missile; /* caused impact, won't drop itself */
 xchar x, y;          /* location affected */
 xchar dlev;          /* if !0 send to dlev near player */
+boolean dropall;
 {
     schar toloc;
     register struct obj *obj, *obj2;
     register struct monst *shkp;
-    long oct, dct, price, debit, robbed;
+    int64_t oct, dct, price, debit, robbed;
     boolean angry, costly, isrock;
     coord cc;
 
@@ -2078,7 +2081,7 @@ xchar dlev;          /* if !0 send to dlev near player */
             continue;
         /* boulders can fall too, but rarely & never due to rocks */
         if ((isrock && obj->otyp == BOULDER)
-            || rn2(obj->otyp == BOULDER ? 30 : 3))
+            || (!dropall && rn2(obj->otyp == BOULDER ? 30 : 3)))
             continue;
         Strcpy(debug_buf_2, "impact_drop");
         obj_extract_self(obj);
@@ -2099,7 +2102,7 @@ xchar dlev;          /* if !0 send to dlev near player */
         add_to_migration(obj);
         obj->ox = cc.x;
         obj->oy = cc.y;
-        obj->owornmask = (long) toloc;
+        obj->owornmask = (int64_t) toloc | (toloc == MIGR_WITH_HERO ? MIGR_NOSCATTER : 0);
 
         /* number of fallen objects */
         dct += obj->quan;
@@ -2111,6 +2114,9 @@ xchar dlev;          /* if !0 send to dlev near player */
         if (missile)
             pline("From the impact, %sother %s.",
                   dct == oct ? "the " : dct == 1L ? "an" : "", what);
+        else if (dropall)
+            pline("%sther %s.",
+                dct == oct ? "The o" : dct == 1L ? "Ano" : "O", what);
         else if (oct == dct)
             pline("%s adjacent %s %s.", dct == 1L ? "The" : "All the", what,
                   gate_str);
@@ -2150,7 +2156,7 @@ xchar dlev;          /* if !0 send to dlev near player */
             return;
         }
         if (ESHK(shkp)->debit > debit) {
-            long amt = (ESHK(shkp)->debit - debit);
+            int64_t amt = (ESHK(shkp)->debit - debit);
             You("owe %s %ld %s for goods lost.", Monnam(shkp), amt,
                 currency(amt));
         }
@@ -2173,7 +2179,7 @@ boolean shop_floor_obj;
     struct obj *obj;
     struct trap *t;
     boolean nodrop, unpaid, container, impact = FALSE;
-    long n = 0L;
+    int64_t n = 0L;
 
     if (!otmp)
         return FALSE;
@@ -2203,7 +2209,7 @@ boolean shop_floor_obj;
     if (otmp->otyp == BOULDER && ((t = t_at(x, y)) != 0)
         && is_hole(t->ttyp)) {
         if (impact)
-            impact_drop(otmp, x, y, 0);
+            impact_drop(otmp, x, y, 0, FALSE);
         return FALSE; /* let caller finish the drop */
     }
 
@@ -2212,7 +2218,7 @@ boolean shop_floor_obj;
 
     if (nodrop) {
         if (impact)
-            impact_drop(otmp, x, y, 0);
+            impact_drop(otmp, x, y, 0, FALSE);
         return FALSE;
     }
 
@@ -2267,7 +2273,7 @@ boolean shop_floor_obj;
     add_to_migration(otmp);
     otmp->ox = cc.x;
     otmp->oy = cc.y;
-    otmp->owornmask = (long) toloc;
+    otmp->owornmask = (int64_t) toloc;
     /* boulder from rolling boulder trap, no longer part of the trap */
     if (otmp->otyp == BOULDER)
         otmp->otrapped = 0;
@@ -2282,7 +2288,7 @@ boolean shop_floor_obj;
          * fall down a trap door--thereby getting two shopkeepers
          * angry at the hero in one shot.
          */
-        impact_drop(otmp, x, y, 0);
+        impact_drop(otmp, x, y, 0, FALSE);
         newsym(x, y);
     }
     return TRUE;
@@ -2307,7 +2313,7 @@ boolean near_hero;
             continue;
 
         nobreak = (where & MIGR_NOBREAK) != 0;
-        noscatter = (where & MIGR_WITH_HERO) != 0;
+        noscatter = (where & MIGR_NOSCATTER) != 0;
         where &= ~(MIGR_NOBREAK | MIGR_NOSCATTER);
 
         if (!near_hero ^ (where == MIGR_WITH_HERO))
@@ -2368,7 +2374,7 @@ void
 deliver_obj_to_mon(mtmp, cnt, deliverflags)
 int cnt;
 struct monst *mtmp;
-unsigned long deliverflags;
+uint64_t deliverflags;
 {
     struct obj *otmp, *otmp2;
     int where, maxobj = 1;
@@ -2420,7 +2426,7 @@ STATIC_OVL void
 otransit_msg(otmp, nodrop, num)
 register struct obj *otmp;
 register boolean nodrop;
-long num;
+int64_t num;
 {
     char *optr = 0, obuf[BUFSZ], xbuf[BUFSZ];
 

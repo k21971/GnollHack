@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-05-22 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mkmaze.c    $NHDT-Date: 1555022325 2019/04/11 22:38:45 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.68 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -29,7 +29,7 @@ STATIC_DCL void NDECL(setup_waterlevel);
 STATIC_DCL void NDECL(unsetup_waterlevel);
 STATIC_DCL void FDECL(check_ransacked, (char *));
 STATIC_DCL void FDECL(migr_booty_item, (int, const char *));
-STATIC_DCL void FDECL(migrate_orc, (struct monst *, unsigned long));
+STATIC_DCL void FDECL(migrate_orc, (struct monst *, uint64_t));
 STATIC_DCL void NDECL(stolen_booty);
 
 /* adjust a coordinate one step in the specified direction */
@@ -354,7 +354,7 @@ d_level *lev;
                It might still fail if there's a dungeon feature here. */
             struct trap *t = t_at(x, y);
 
-            if (t && !(trap_type_definitions[t->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDEN))
+            if (t && !(trap_type_definitions[t->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDDEN))
                 deltrap(t);
             if (bad_location(x, y, nlx, nly, nhx, nhy))
                 return FALSE;
@@ -630,7 +630,7 @@ fixup_special()
         /* stock the main vault */
         for (x = croom->lx; x <= croom->hx; x++)
             for (y = croom->ly; y <= croom->hy; y++) {
-                (void) mkgold((long) rn1(120, 240), x, y);
+                (void) mkgold((int64_t) rn1(120, 240), x, y);
                 if (!rn2(3) && !is_pool(x, y))
                     (void) maketrap(x, y, rn2(3) ? LANDMINE : SPIKED_PIT, NON_PM, MKTRAP_NO_FLAGS);
             }
@@ -670,7 +670,7 @@ STATIC_VAR const char *orcfruit[] = { "paddle cactus", "dwarven root" };
 void
 migrate_orc(mtmp, mflags)
 struct monst *mtmp;
-unsigned long mflags;
+uint64_t mflags;
 {
     int nlev, max_depth, cur_depth;
     d_level dest;
@@ -739,7 +739,7 @@ const char *gang;
 {
     struct obj *otmp;
 
-    otmp = mksobj_migr_to_species(otyp, (unsigned long) M2_ORC, FALSE, FALSE);
+    otmp = mksobj_migr_to_species(otyp, (uint64_t) M2_ORC, FALSE, FALSE);
     if (otmp && gang) {
         new_uoname(otmp, strlen(gang) + 1); /* removes old name if present */
         Strcpy(UONAME(otmp), gang);
@@ -747,7 +747,7 @@ const char *gang;
             if (otyp == SLIME_MOLD)
                 otmp->special_quality = fruitadd((char *) orcfruit[rn2(SIZE(orcfruit))],
                                      (struct fruit *) 0);
-            otmp->quan += (long) rn2(3);
+            otmp->quan += (int64_t) rn2(3);
             otmp->owt = weight(otmp);
         }
     }
@@ -757,7 +757,7 @@ void
 stolen_booty(VOID_ARGS)
 {
     char *gang, gang_name[BUFSZ];
-    char lootlabel[BUFSIZ] = "";
+    char lootlabel[BUFSZ * 2] = "";
     struct monst *mtmp;
     int cnt, i, otyp;
 

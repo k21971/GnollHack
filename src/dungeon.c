@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    dungeon.c    $NHDT-Date: 1554341477 2019/04/04 01:31:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.92 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -481,7 +481,7 @@ branch *new_branch;
 boolean extract_first;
 {
     branch *curr, *prev;
-    long new_val, curr_val, prev_val;
+    int64_t new_val, curr_val, prev_val;
 
     if (extract_first) {
         for (prev = 0, curr = branches; curr; prev = curr, curr = curr->next)
@@ -503,9 +503,9 @@ boolean extract_first;
 
 /* Convert the branch into a unique number so we can sort them. */
 #define branch_val(bp)                                                     \
-    ((((long) (bp)->end1.dnum * (MAXLEVEL + 1) + (long) (bp)->end1.dlevel) \
+    ((((int64_t) (bp)->end1.dnum * (MAXLEVEL + 1) + (int64_t) (bp)->end1.dlevel) \
       * (MAXDUNGEON + 1) * (MAXLEVEL + 1))                                 \
-     + ((long) (bp)->end2.dnum * (MAXLEVEL + 1) + (long) (bp)->end2.dlevel))
+     + ((int64_t) (bp)->end2.dnum * (MAXLEVEL + 1) + (int64_t) (bp)->end2.dlevel))
 
     /*
      * Insert the new branch into the correct place in the branch list.
@@ -2246,7 +2246,7 @@ donamelevel()
        empty string after mungspaces() above) */
     if (*nbuf && strcmp(nbuf, " ")) {
         mptr->custom = dupstr(nbuf);
-        mptr->custom_lth = strlen(mptr->custom);
+        mptr->custom_lth = (uint64_t)strlen(mptr->custom);
     }
     return 0;
 }
@@ -2403,11 +2403,11 @@ void
 overview_stats(win, statsfmt, total_count, total_size)
 winid win;
 const char *statsfmt;
-long* total_count;
+int64_t* total_count;
 size_t* total_size;
 {
     char buf[BUFSZ], hdrbuf[QBUFSZ];
-    long ocount, bcount, acount;
+    int64_t ocount, bcount, acount;
     size_t osize, bsize, asize;
     struct cemetery *ce;
     mapseen *mptr = find_mapseen(&u.uz);
@@ -2423,7 +2423,7 @@ size_t* total_size;
         }
         if (mptr->custom_lth) {
             ++acount;
-            asize += (mptr->custom_lth + 1);
+            asize += (size_t)(mptr->custom_lth + 1);
         }
     }
 
@@ -2566,8 +2566,8 @@ recalc_mapseen()
     mapseen *mptr;
     struct monst *mtmp = (struct monst*)0;
     struct cemetery *bp, **bonesaddr;
-    unsigned i, ridx;
-    int x, y, ltyp, count, atmp;
+    unsigned i, ridx, count;
+    int x, y, ltyp, atmp;
 
     /* Should not happen in general, but possible if in the process
      * of being booted from the quest.  The mapseen object gets
@@ -2943,7 +2943,7 @@ int reason; /* how hero died; used when disclosing end-of-game level */
     if (In_endgame(&u.uz))
         traverse_mapseenchn(TRUE, win, why, reason, &lastdun);
     /* if game is over or we're not in the endgame yet, show the dungeon */
-    if (why > 0 || !In_endgame(&u.uz))
+    if (why > 0 || !In_endgame(&u.uz) || reason == SNAPSHOT)
         traverse_mapseenchn(FALSE, win, why, reason, &lastdun);
     display_nhwindow(win, TRUE);
     destroy_nhwindow(win);
@@ -3172,7 +3172,7 @@ boolean printdun;
 
     if (printdun) 
     {
-        char dbuf[BUFSIZ];
+        char dbuf[BUFSZ * 2];
         if (dungeons[dnum].dunlev_ureached == dungeons[dnum].entry_lev
             /* suppress the negative numbers in the endgame */
             || In_endgame(&mptr->lev))
@@ -3191,7 +3191,7 @@ boolean printdun;
             putstr(win, ATR_SUBTITLE | ATR_ALIGN_CENTER, dbuf);
 #else
         Sprintf(buf, "%s: %s", dungeons[dnum].dname, dbuf);
-        putstr(win, (!final ? ATR_INVERSE : 0) | ATR_TITLE, buf);
+        putstr(win, (!final && !iflags.in_dumplog ? ATR_INVERSE : 0) | ATR_TITLE, buf);
 #endif
     }
 
@@ -3202,7 +3202,7 @@ boolean printdun;
     else
         Sprintf(buf, "%sLevel %d:", TAB, i);
 
-    putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, NO_COLOR, 1);
+    putstr_ex(win, buf, (!final && !iflags.in_dumplog ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, NO_COLOR, 1);
 
     /* wizmode prints out proto dungeon names for clarity */
     if (wizard) {
@@ -3211,7 +3211,7 @@ boolean printdun;
         if ((slev = Is_special(&mptr->lev)) != 0 && !mptr->flags.special_level_true_nature_known)
         {
             Sprintf(buf, " [%s]", slev->name);
-            putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_MSG_GOD, 1);
+            putstr_ex(win, buf, (!final && !iflags.in_dumplog ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_MSG_GOD, 1);
         }
     }
 
@@ -3219,7 +3219,7 @@ boolean printdun;
     if (mptr->custom)
     {
         Sprintf(buf, " \"%s\"", mptr->custom);
-        putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_MSG_HINT, 1);
+        putstr_ex(win, buf, (!final && !iflags.in_dumplog ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_MSG_HINT, 1);
     }
     if (on_level(&u.uz, &mptr->lev))
     {
@@ -3228,10 +3228,10 @@ boolean printdun;
             : (final == 1 && how == ESCAPED) ? "left from"
             : "were");
 
-        putstr_ex(win, buf, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_RED, 1);
+        putstr_ex(win, buf, (!final && !iflags.in_dumplog ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, CLR_RED, 1);
     }
-    putstr(win, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, "");
-    //putstr(win, (!final ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, buf);
+    putstr(win, (!final && !iflags.in_dumplog ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, "");
+    //putstr(win, (!final && !iflags.in_dumplog ? ATR_BOLD : 0) | ATR_SUBHEADING | ATR_INDENT_AT_COLON, buf);
 
     if (mptr->flags.forgot)
         return;

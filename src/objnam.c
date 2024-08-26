@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    objnam.c    $NHDT-Date: 1551138256 2019/02/25 23:44:16 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.235 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -479,7 +479,9 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     const char *un = ocl->oc_uname;
     boolean pluralize = (obj->quan != 1L) && !(cxn_flags & CXN_SINGULAR);
     boolean known, dknown, bknown, nknown, aknown, mknown, tknown;
+    char anamebuf[OBUFSZ] = "";
     boolean makeThelower = FALSE;
+    boolean hasnamed = FALSE;
 
     buf = nextobuf() + PREFIXBUFSZ; /* leave room for "17 -3 " */
 
@@ -615,8 +617,14 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         }
     }
 
-    if (obj->oclass == ARMOR_CLASS && (is_boots(obj) || is_gloves(obj) || is_bracers(obj)))
-        Strcat(buf, "pair of ");
+    if (obj->oclass == ARMOR_CLASS)
+    {
+        if (is_boots(obj) || is_gloves(obj) || is_bracers(obj))
+            Strcat(buf, "pair of ");
+        else if (is_dragon_scales(obj)) {
+            Strcat(buf, "set of ");
+        }
+    }
     else if (obj->oclass == MISCELLANEOUS_CLASS && (
         objects[obj->otyp].oc_subtyp == MISC_EARRINGS
         || objects[obj->otyp].oc_subtyp == MISC_EYEGLASSES
@@ -637,6 +645,9 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             Strcat(buf, " ");
         }
     }
+
+    if (dknown && obj->oclass == POTION_CLASS && obj->odiluted)
+        Strcat(buf, "diluted ");
 
     if (dknown && (obj->mythic_prefix || obj->mythic_suffix))
     {
@@ -682,10 +693,18 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                )
            )
         {
-            Strcat(actualn_fullbuf, material_definitions[obj->material].object_prefix);
-            Strcat(actualn_fullbuf, " ");
-            Strcat(dn_fullbuf, material_definitions[obj->material].object_prefix);
-            Strcat(dn_fullbuf, " ");
+            if (obj->oclass == RING_CLASS || obj->oclass == WAND_CLASS || obj->oclass == POTION_CLASS || obj->oclass == SCROLL_CLASS)
+            {
+                Strcat(buf, material_definitions[obj->material].object_prefix);
+                Strcat(buf, " ");
+            }
+            else
+            {
+                Strcat(actualn_fullbuf, material_definitions[obj->material].object_prefix);
+                Strcat(actualn_fullbuf, " ");
+                Strcat(dn_fullbuf, material_definitions[obj->material].object_prefix);
+                Strcat(dn_fullbuf, " ");
+            }
         }
     }
 
@@ -766,8 +785,8 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     }
     case ARMOR_CLASS:
         /* depends on order of the dragon scales objects -- Special case, ignores the modifiers above */
-        if (typ >= GRAY_DRAGON_SCALES && typ <= YELLOW_DRAGON_SCALES) {
-            Sprintf(eos(buf), "set of %s", actualn_fullbuf);
+        if (is_dragon_scales(obj)) {
+            Strcat(buf, actualn_fullbuf);
             break;
         }
 
@@ -884,7 +903,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         if (typ == STATUE && omndx != NON_PM) 
         {
             char anbuf[10];
-            char monbuf[BUFSIZ] = "";
+            char monbuf[BUFSZ * 2] = "";
             struct monst* mtmp = get_mtraits(obj, FALSE);
             if (mtmp)
             {
@@ -924,8 +943,6 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                 (obj->owt > ocl->oc_weight) ? "very " : "");
         break;
     case POTION_CLASS:
-        if (dknown && obj->odiluted)
-            Strcpy(buf, "diluted ");
         if (nn || un || !dknown) {
             Strcat(buf, "potion");
             if (!dknown)
@@ -947,7 +964,7 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         }
         break;
     case SCROLL_CLASS:
-        Strcpy(buf, "scroll");
+        Strcat(buf, "scroll");
         if (!dknown)
             break;
         if (nn) {
@@ -977,13 +994,13 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     case SPBOOK_CLASS:
         if (objects[typ].oc_subtyp == BOOKTYPE_NOVEL || objects[typ].oc_subtyp == BOOKTYPE_MANUAL) { /* 3.6 tribute */
             if (!dknown)
-                Strcpy(buf, "book");
+                Strcat(buf, "book");
             else if (nn)
-                Strcpy(buf, actualn_fullbuf);
+                Strcat(buf, actualn_fullbuf);
             else if (un)
-                Sprintf(buf, "%s called %s", book_type_names[objects[typ].oc_subtyp], un);
+                Sprintf(eos(buf), "%s called %s", book_type_names[objects[typ].oc_subtyp], un);
             else
-                Sprintf(buf, "%s book", dn_fullbuf);
+                Sprintf(eos(buf), "%s book", dn_fullbuf);
             break;
             /* end of tribute */
         } else if (!dknown) {
@@ -993,19 +1010,19 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
                 Sprintf(buf, "%s of ", book_type_names[objects[typ].oc_subtyp]);
             Strcat(buf, actualn_fullbuf);
         } else if (un) {
-            Sprintf(buf, "%s called %s", book_type_names[objects[typ].oc_subtyp], un);
+            Sprintf(eos(buf), "%s called %s", book_type_names[objects[typ].oc_subtyp], un);
         } else
-            Sprintf(buf, "%s %s", dn_fullbuf, book_type_names[objects[typ].oc_subtyp]);
+            Sprintf(eos(buf), "%s %s", dn_fullbuf, book_type_names[objects[typ].oc_subtyp]);
         break;
     case RING_CLASS:
         if (!dknown)
             Strcpy(buf, "ring");
         else if (nn)
-            Sprintf(buf, "ring of %s", actualn_fullbuf);
+            Sprintf(eos(buf), "ring of %s", actualn_fullbuf);
         else if (un)
-            Sprintf(buf, "ring called %s", un);
+            Sprintf(eos(buf), "ring called %s", un);
         else
-            Sprintf(buf, "%s ring", dn_fullbuf);
+            Sprintf(eos(buf), "%s ring", dn_fullbuf);
         break;
     default:
         Sprintf(buf, "glorkum %d %d %d %d", obj->oclass, typ, obj->enchantment, obj->charges);
@@ -1024,12 +1041,13 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
         Sprintf(eos(buf), " with text \"%s\"", tshirt_text(obj, tmpbuf));
     }
 
-    char anamebuf[OBUFSZ] = "";
-    if (has_oname(obj) && nknown && dknown) {
+    if (has_oname(obj) && nknown && dknown) 
+    {
         if(obj->oclass == SPBOOK_CLASS)
             Strcat(buf, " entitled ");
         else
             Strcat(buf, " named ");
+        hasnamed = TRUE;
         makeThelower = TRUE;
     nameit:
         Strcpy(anamebuf, ONAME(obj));
@@ -1037,11 +1055,15 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
             *anamebuf = lowc(*anamebuf);
         Strcat(buf, anamebuf);
     }
-    else if (has_uoname(obj))
+
+    if (has_uoname(obj))
     {
+        if(hasnamed)
+            Strcat(buf, " and");
         Strcat(buf, " labeled ");
         Strcat(buf, UONAME(obj));
     }
+
     if (!strncmpi(buf, "the ", 4))
         buf += 4;
 
@@ -1326,7 +1348,7 @@ char** attrs_ptr, ** colors_ptr;
 
     if (obj->quan != 1L) {
         if (dknown || !vague_quan)
-            Sprintf(prefix, "%ld ", obj->quan);
+            Sprintf(prefix, "%lld ", (long long)obj->quan);
         else
             Strcpy(prefix, "some ");
     } else if (obj->otyp == CORPSE) {
@@ -1355,7 +1377,7 @@ char** attrs_ptr, ** colors_ptr;
              ? (obj->charges == 0 && !known)
              /* not bag of tricks: empty if container which has no contents */
              : ((Is_container(obj) || obj->otyp == STATUE)
-                && !Has_contents(obj)))))
+                && !Has_contained_contents(obj)))))
         Strcat(prefix, "empty ");
 
     if (bknown && obj->oclass != COIN_CLASS
@@ -1439,13 +1461,13 @@ char** attrs_ptr, ** colors_ptr;
     }
 
 
-    if (cknown && Has_contents(obj)) {
+    if (cknown && Has_contained_contents(obj)) {
         /* we count the number of separate stacks, which corresponds
            to the number of inventory slots needed to be able to take
            everything out if no merges occur */
-        long itemcount = count_contents(obj, FALSE, FALSE, TRUE);
+        int64_t itemcount = count_contained_contents(obj, FALSE, FALSE, TRUE);
 
-        Sprintf(eos(bp), " containing %ld item%s", itemcount,
+        Sprintf(eos(bp), " containing %lld item%s", (long long)itemcount,
                 plur(itemcount));
     }
 
@@ -1460,7 +1482,7 @@ char** attrs_ptr, ** colors_ptr;
             Sprintf(eos(bp), " (%d:%d)", (int)obj->recharged, (int)obj->charges);
     }
 
-    long burnleft = 0;
+    int64_t burnleft = 0;
     boolean burnleftset = FALSE;
     char burnbuf[BUFSZ] = "";
 
@@ -1644,7 +1666,7 @@ weapon_here:
             && is_obj_light_source(obj) && object_stats_known(obj)
             && (obj->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0)
         {
-            long maxburn = obj_light_maximum_burn_time(obj);
+            int64_t maxburn = obj_light_maximum_burn_time(obj);
             if (maxburn >= 0 && !obj_burns_infinitely(obj))
             {
                 burnleft = obj_light_burn_time_left(obj);
@@ -1666,14 +1688,14 @@ weapon_here:
                     Strcat(prefix, "lit ");
 
                 if (burnleftset)
-                    Sprintf(burnbuf, " (%ld turn%s left)", burnleft, plur(burnleft));
+                    Sprintf(burnbuf, " (%lld turn%s left)", (long long)burnleft, plur(burnleft));
                 Sprintf(eos(bp), " with %s candle%s%s%s", tmpbuf, plur(obj->special_quality),
                     " attached", burnbuf);
             }
             else
             {
                 if (burnleftset)
-                    Sprintf(burnbuf, ", %ld turn%s left", burnleft, plur(burnleft));
+                    Sprintf(burnbuf, ", %lld turn%s left", (long long)burnleft, plur(burnleft));
                 Sprintf(eos(bp), " (%s candle%s%s%s)", tmpbuf, plur(obj->special_quality),
                     !obj->lamplit ? " attached" : ", lit", burnbuf);
             }
@@ -1694,19 +1716,19 @@ weapon_here:
                 {
                     Strcat(prefix, "lit ");
                     if (burnleftset)
-                        Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+                        Sprintf(eos(bp), " (%lld turn%s left)", (long long)burnleft, plur(burnleft));
                 }
                 else
                 {
                     if (burnleftset)
-                        Sprintf(burnbuf, ", %ld turn%s left", burnleft, plur(burnleft));
+                        Sprintf(burnbuf, ", %lld turn%s left", (long long)burnleft, plur(burnleft));
                     Sprintf(eos(bp), " (lit%s)", burnbuf);
                 }
             }
             else
             {
                 if (burnleftset)
-                    Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+                    Sprintf(eos(bp), " (%lld turn%s left)", (long long)burnleft, plur(burnleft));
             }
             break;
         }
@@ -1723,19 +1745,19 @@ weapon_here:
                 {
                     Strcat(prefix, "lit ");
                     if (burnleftset)
-                        Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+                        Sprintf(eos(bp), " (%lld turn%s left)", (long long)burnleft, plur(burnleft));
                 }
                 else
                 {
                     if (burnleftset)
-                        Sprintf(burnbuf, ", %ld turn%s left", burnleft, plur(burnleft));
+                        Sprintf(burnbuf, ", %lld turn%s left", (long long)burnleft, plur(burnleft));
                     Sprintf(eos(bp), " (lit%s)", burnbuf);
                 }
             }
             else
             {
                 if (burnleftset)
-                    Sprintf(eos(bp), " (%ld turn%s left)", burnleft, plur(burnleft));
+                    Sprintf(eos(bp), " (%lld turn%s left)", (long long)burnleft, plur(burnleft));
             }
         }
         break;
@@ -1760,7 +1782,7 @@ weapon_here:
         
         if (is_obj_rotting_corpse(obj) && obj->rotknown)
         {
-            long rotted = get_rotted_status(obj);
+            int64_t rotted = get_rotted_status(obj);
             if (obj->orotten || rotted > 3L)
                 Strcat(prefix, rotted > 5L ? "tainted " : "rotten ");
             else
@@ -1905,19 +1927,19 @@ weapon_here:
     if (iflags.suppress_price || restoring || saving) {
         ; /* don't attempt to obtain any stop pricing, even if 'with_price' */
     } else if (is_unpaid(obj)) { /* in inventory or in container in invent */
-        long quotedprice = unpaid_cost(obj, TRUE);
+        int64_t quotedprice = unpaid_cost(obj, TRUE);
 
-        Sprintf(eos(bp), " (%s, %ld %s)",
+        Sprintf(eos(bp), " (%s, %lld %s)",
                 obj->unpaid ? "unpaid" : "contents",
-                quotedprice, currency(quotedprice));
+                (long long)quotedprice, currency(quotedprice));
     } else if (with_price) { /* on floor or in container on floor */
         int nochrg = 0;
-        long price = get_cost_of_shop_item(obj, &nochrg);
+        int64_t price = get_cost_of_shop_item(obj, &nochrg);
 
         if (price > 0L)
-            Sprintf(eos(bp), " (%s, %ld %s)",
+            Sprintf(eos(bp), " (%s, %lld %s)",
                     nochrg ? "contents" : "for sale",
-                    price, currency(price));
+                    (long long)price, currency(price));
         else if (nochrg > 0)
             Strcat(bp, " (no charge)");
     }
@@ -2220,7 +2242,7 @@ struct obj *otmp;
         return TRUE;
     if ((otmp->mythic_prefix || otmp->mythic_suffix) && !otmp->mknown)
         return TRUE;
-    if (is_obj_rotting_corpse(otmp) && otmp->rotknown)
+    if (is_obj_rotting_corpse(otmp) && !otmp->rotknown)
         return TRUE;
     /* otmp->rknown is the only item of interest if we reach here */
     /*
@@ -2228,14 +2250,10 @@ struct obj *otmp;
      *  rings to become shockproof, this checking will need to be revised.
      *  `rknown' ID only matters if xname() will provide the info about it.
      */
-    if (otmp->rknown
-        || (otmp->oclass != ARMOR_CLASS && otmp->oclass != WEAPON_CLASS
-            && !is_weptool(otmp)            /* (redundant) */
-            && otmp->oclass != BALL_CLASS)) /* (useless) */
+    if (otmp->rknown || is_obj_identified_when_damageable(otmp))
         return FALSE;
     else /* lack of `rknown' only matters for vulnerable objects */
-        return (boolean) (is_rustprone(otmp) || is_corrodeable(otmp)
-                          || is_flammable(otmp));
+        return (boolean)is_damageable(otmp); // (is_rustprone(otmp) || is_corrodeable(otmp) || is_flammable(otmp));
 }
 
 boolean
@@ -2380,11 +2398,11 @@ struct obj* obj;
 
 char*
 prepend_quan(quan, name)
-long quan;
+int64_t quan;
 const char* name; /* Should be already in plural */
 {
     char* buf = nextobuf(); /* no prefix size addition needed here */
-    Sprintf(buf, "%ld %s", quan, name);
+    Sprintf(buf, "%lld %s", (long long)quan, name);
     return buf;
 }
 
@@ -2595,7 +2613,7 @@ singular(otmp, func)
 register struct obj *otmp;
 char *FDECL((*func), (OBJ_P));
 {
-    long savequan;
+    int64_t savequan;
     char *nam;
 
     /* using xname for corpses does not give the monster type */
@@ -2770,7 +2788,7 @@ const char *verb;
     char *bp = cxname(otmp);
 
     if (otmp->quan != 1L) {
-        Sprintf(prefix, "%ld ", otmp->quan);
+        Sprintf(prefix, "%lld ", (long long)otmp->quan);
         bp = strprepend(bp, prefix);
     }
     if (verb) {
@@ -3255,9 +3273,9 @@ char *str;
         {
           " of ",     " labeled ", " called ", " entitled ",
           " named ",  " above", /* lurkers above */
-          " versus ", " from ",    " in ",
-          " on ",     " a la ",    " with", /* " with "? */
-          " de ",     " d'",       " du ", " against ",
+          " versus ", " from ",    " in ",     " to ", /* altars to Tyr */
+          " on ",     " a la ",    " with ",
+          " de ",     " d'",       " du ",     " against ",
           "-in-",     "-at-",      0
         }, /* list of first characters for all compounds[] entries */
         compound_start[] = " -";
@@ -3812,6 +3830,7 @@ STATIC_VAR const struct alt_spellings {
     { "iron ball", HEAVY_IRON_BALL },
     { "lantern", BRASS_LANTERN },
     { "mattock", DWARVISH_MATTOCK },
+    { "maul", TWO_HANDED_CLUB },
     { "longbow", LONG_BOW },
     { "composite longbow", COMPOSITE_LONG_BOW },
     { "elven longbow", ELVEN_LONG_BOW },
@@ -4504,7 +4523,7 @@ boolean* removed_from_game_ptr;
             && !strstri(bp, "sword ") && !strstri(bp, "dagger ") && !strstri(bp, "arrow ") && !strstri(bp, "arrows ")
             && !strstri(bp, "axe ") && !strstri(bp, "bolt ") && !strstri(bp, "quarrel ") && !strstri(bp, "sling-bullet ")
             && !strstri(bp, "bolts ") && !strstri(bp, "quarrels ") && !strstri(bp, "sling-bullets ")
-            && !strstri(bp, "mace ") && !strstri(bp, "flail ") && !strstri(bp, "hammer ") && !strstri(bp, "morning star ") && !strstri(bp, "mattock ")
+            && !strstri(bp, "mace ") && !strstri(bp, "flail ") && !strstri(bp, "hammer ") && !strstri(bp, "morning star ") && !strstri(bp, "mattock ") && !strstri(bp, "maul ")
             && !strstri(bp, "staff ") && !strstri(bp, "bow ") && !strstri(bp, "crossbow ")
             && !strstri(bp, "robe ") && !strstri(bp, "cloak ") && !strstri(bp, "gloves ")
             && !strstri(bp, "gauntlets ") && !strstri(bp, "belt ") && !strstri(bp, "girdle ")
@@ -4538,6 +4557,7 @@ boolean* removed_from_game_ptr;
         && strncmpi(bp, "wand of orcus", 13) /* not the "Orcus" monster! */
         && strncmpi(bp, "triple-headed flail of yeenaghu", 31) /* not the "Yeenaghu" monster! */
         && strncmpi(bp, "mattock of the titans", 21) /* not the "Titan" monster! */
+        && strncmpi(bp, "maul of the titans", 18) /* not the "Titan" monster! */
         && strncmpi(bp, "ninja-to", 8)     /* not the "ninja" rank */
         && strncmpi(bp, "master key", 10)  /* not the "master" rank */
         && strncmpi(bp, "death cap", 9)  /* not the "death" monster */
@@ -4645,7 +4665,7 @@ boolean* removed_from_game_ptr;
         else if (cnt < 1)
             cnt = 1;
         otmp = mksobj(GOLD_PIECE, FALSE, FALSE, 2);
-        otmp->quan = (long) cnt;
+        otmp->quan = (int64_t) cnt;
         otmp->owt = weight(otmp);
         context.botl = 1;
         return otmp;
@@ -5263,14 +5283,14 @@ retry:
     /*
      * Create the object, then fine-tune it.
      */
-    unsigned long mkflags = 0UL;
+    uint64_t mkflags = 0UL;
     if (open && typ > 0 && Is_otyp_container_with_lid(typ))
         mkflags |= MKOBJ_FLAGS_OPEN_COFFIN;
 
     otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, MKOBJ_TYPE_WISHING, (struct monst*)0, MAT_NONE, 0L, 0L, mkflags) : mkobj(oclass, FALSE, MKOBJ_TYPE_WISHING);
     typ = otmp->otyp, oclass = otmp->oclass; /* what we actually got */
 
-    if (islit && (is_lamp(otmp) || is_candle(otmp) || is_torch(otmp) || is_obj_candelabrum(otmp) || typ == POT_OIL))
+    if (islit && !otmp->lamplit && (is_lamp(otmp) || is_candle(otmp) || is_torch(otmp) || is_obj_candelabrum(otmp) || typ == POT_OIL))
     {
         place_object(otmp, u.ux, u.uy); /* make it viable light source */
         begin_burn(otmp, FALSE);
@@ -5283,7 +5303,7 @@ retry:
         && (wiz_wishing || cnt < rnd(6) || (cnt <= 7 && is_candle(otmp))
             || (cnt <= 20 && ((oclass == WEAPON_CLASS && is_ammo(otmp))
                               || is_rock(otmp) || is_missile(otmp)))))
-        otmp->quan = (long) cnt;
+        otmp->quan = (int64_t) cnt;
 
     if (oclass == GEM_CLASS && !wiz_wishing)
         otmp->quan = 1;
@@ -5522,7 +5542,7 @@ retry:
         {
             if(wiz_wishing)
                 otmp->exceptionality = (uchar)exceptionality;
-            else
+            else if (!is_normally_non_exceptional(otmp))
             {
                 boolean halfchance = !!(objects[otmp->otyp].oc_flags5 & O5_HALF_EXCEPTIONALITY_CHANCE);
                 boolean doublechance = !!(objects[otmp->otyp].oc_flags5 & O5_DOUBLE_EXCEPTIONALITY_CHANCE);
@@ -5545,13 +5565,7 @@ retry:
                         otmp->exceptionality = (uchar)((!rn2(halfchance ? 40 : doublechance ? 10 : 20) && Luck >= 0) ? exceptionality : EXCEPTIONALITY_NORMAL);
                 }
             }
-
-            if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_CELESTIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_UNDEAD_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_CELESTIAL)
-                otmp->exceptionality = EXCEPTIONALITY_ELITE;
-            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_PRIMORDIAL) || (objects[otmp->otyp].oc_flags2 & (O2_DEMON_ITEM | O2_ANGEL_ITEM))) && otmp->exceptionality == EXCEPTIONALITY_PRIMORDIAL)
-                otmp->exceptionality = EXCEPTIONALITY_ELITE;
-            else if (((objects[otmp->otyp].oc_flags5 & O5_CANNOT_BE_INFERNAL) || (objects[otmp->otyp].oc_flags2 & (O2_ANGEL_ITEM)) || otmp->material == MAT_SILVER) && otmp->exceptionality == EXCEPTIONALITY_INFERNAL)
-                otmp->exceptionality = EXCEPTIONALITY_ELITE;
+            exceptionality_checks(otmp);
         }
     }
 
@@ -6175,18 +6189,24 @@ boolean use_symbols;
     (void)itemdescription_core(obj, obj->otyp, &obj_stats);
 
     struct obj* launcher = uwep && is_launcher(uwep) ? uwep : uswapwep && is_launcher(uswapwep) ? uswapwep : 0;
-    struct obj* cwep = is_ammo(obj) ? (uquiver && launcher && ammo_and_launcher(uquiver, launcher) && ammo_and_launcher(obj, launcher) ? uquiver : 0) :
+    struct obj* cwep = is_boots(obj) && is_weapon(obj) ? uarmf : is_gloves(obj) && is_weapon(obj) ? uarmg :
+        is_ammo(obj) ? (uquiver && launcher && ammo_and_launcher(uquiver, launcher) && ammo_and_launcher(obj, launcher) ? uquiver : 0) :
         is_thrown_weapon_only(obj) ? (uquiver && is_thrown_weapon_only(uquiver) ? uquiver : 0) :
         (is_wieldable_weapon(obj) && uwep && is_launcher(obj) == is_launcher(uwep)) ? uwep :
         (is_wieldable_weapon(obj) && uswapwep && is_launcher(obj) == is_launcher(uswapwep)) ? uswapwep : 0;
 
+    struct obj* cwep2 = u.twoweap && uwep2 && is_wieldable_weapon(uwep2) && is_wieldable_weapon(obj) && !is_boots(obj) && !is_gloves(obj) && !is_ammo(obj) && !is_thrown_weapon_only(obj) ? uwep2 : 0;
+
     int dmgpos = -1;
+    int dmg2pos = -1;
     int acpos = -1;
     int mcpos = -1;
     size_t dmglen = 0;
+    size_t dmg2len = 0;
     size_t aclen = 0;
     size_t mclen = 0;
     char dmgcolor = NO_COLOR;
+    char dmg2color = NO_COLOR;
     char accolor = NO_COLOR;
     char mccolor = NO_COLOR;
 
@@ -6194,9 +6214,12 @@ boolean use_symbols;
     if (obj_stats.weapon_stats_printed)
     {
         double dmgdiff = obj_stats.avg_damage;
+        double dmgdiff2 = obj_stats.avg_damage;
         boolean isdmgdiff = FALSE;
-        boolean skip_weapon_print = FALSE;
-        if (cwep && cwep != obj && uwep2 != obj && uswapwep2 != obj)
+        boolean isdmgdiff2 = FALSE;
+        boolean skip_weapon_print1 = FALSE;
+        boolean skip_weapon_print2 = FALSE;
+        if (cwep && cwep != obj && uwep != obj && uwep2 != obj && uswapwep2 != obj)
         {
             struct item_description_stats cwep_stats = { 0 };
             (void)itemdescription_core(cwep, cwep->otyp, &cwep_stats);
@@ -6207,9 +6230,22 @@ boolean use_symbols;
             }
         }
         else
-            skip_weapon_print = TRUE;
+            skip_weapon_print1 = TRUE;
 
-        if (!skip_weapon_print)
+        if (cwep2 && cwep2 != obj && uwep != obj && uwep2 != obj && uswapwep != obj && !bimanual(obj) && !is_ammo(obj) && !is_launcher(obj) && !is_thrown_weapon_only(obj) && !is_boots(obj) && !is_gloves(obj))
+        {
+            struct item_description_stats cwep2_stats = { 0 };
+            (void)itemdescription_core(cwep2, cwep2->otyp, &cwep2_stats);
+            if (cwep2_stats.stats_set && cwep2_stats.weapon_stats_printed)
+            {
+                isdmgdiff2 = TRUE;
+                dmgdiff2 = obj_stats.avg_damage - cwep2_stats.avg_damage;
+            }
+        }
+        else
+            skip_weapon_print2 = TRUE;
+
+        if (!skip_weapon_print1 || !skip_weapon_print2)
         {
             if (*buf)
             {
@@ -6236,12 +6272,31 @@ boolean use_symbols;
                     putstr_ex(datawin, tmpbuf, attr, color, 1);
             }
             dmgpos = (int)strlen(buf);
-            Sprintf(tmpbuf, "%s%.1f", isdmgdiff && dmgdiff >= 0 ? "+" : "", dmgdiff);
+            if (skip_weapon_print1)
+                Strcpy(tmpbuf, "-");
+            else
+                Sprintf(tmpbuf, "%s%.1f", isdmgdiff && dmgdiff >= 0 ? "+" : "", dmgdiff);
             dmglen = strlen(tmpbuf);
-            dmgcolor = dmgdiff > 0 ? CLR_BRIGHT_GREEN : dmgdiff < 0 ? CLR_RED : CLR_GRAY;
+            dmgcolor = skip_weapon_print1 ? CLR_GRAY : dmgdiff > 0 ? CLR_BRIGHT_GREEN : dmgdiff < 0 ? CLR_RED : CLR_GRAY;
             Strcat(buf, tmpbuf);
             if (do_putstr)
                 putstr_ex(datawin, tmpbuf, attr, dmgcolor, 1);
+
+            if (!skip_weapon_print2)
+            {
+                Strcat(buf, "/");
+                if (do_putstr)
+                    putstr_ex(datawin, "/", attr, color, 1);
+
+                dmg2pos = dmgpos + (int)dmglen + 1;
+                Sprintf(tmpbuf, "%s%.1f", isdmgdiff2 && dmgdiff2 >= 0 ? "+" : "", dmgdiff2);
+                dmg2len = strlen(tmpbuf);
+                dmg2color = dmgdiff2 > 0 ? CLR_BRIGHT_GREEN : dmgdiff2 < 0 ? CLR_RED : CLR_GRAY;
+                Strcat(buf, tmpbuf);
+                if (do_putstr)
+                    putstr_ex(datawin, tmpbuf, attr, dmg2color, 1);
+            }
+
             if (!do_special_symbols)
             {
                 Strcpy(tmpbuf, " damage");
@@ -6388,6 +6443,14 @@ boolean use_symbols;
             {
                 attrs[i] = ATR_NONE;
                 colors[i] = dmgcolor;
+            }
+        }
+        if (dmg2pos >= 0)
+        {
+            for (i = orig_objbuf_len + (size_t)dmg2pos; i < orig_objbuf_len + (size_t)dmg2pos + dmg2len; i++)
+            {
+                attrs[i] = ATR_NONE;
+                colors[i] = dmg2color;
             }
         }
         if (acpos >= 0)

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    apply.c    $NHDT-Date: 1553363415 2019/03/23 17:50:15 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.272 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -388,7 +388,9 @@ struct obj *obj;
         {
             if ((mtmp = bhit(u.dx, u.dy, COLNO, 0, FLASHED_LIGHT,
                 (int FDECL((*), (MONST_P, OBJ_P, MONST_P))) 0,
-                (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, &obj, &youmonst, TRUE, FALSE)) != 0)
+                (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, 
+                (int FDECL((*), (TRAP_P, OBJ_P, MONST_P))) 0, 
+                &obj, &youmonst, TRUE, FALSE)) != 0)
             {
                 obj->ox = u.ux, obj->oy = u.uy;
                     (void)flash_hits_mon(mtmp, obj);
@@ -420,7 +422,7 @@ struct obj *obj;
     } 
     else if (obj->cursed) 
     {
-        long old;
+        int64_t old;
 
         switch (rn2(3)) 
         {
@@ -441,7 +443,7 @@ struct obj *obj;
                 u.ucreamed += rn1(10, 3);
                 pline("Yecch!  Your %s %s gunk on it!", body_part(FACE),
                       (old ? "has more" : "now has"));
-                make_blinded(Blinded + (long) u.ucreamed - old, TRUE);
+                make_blinded(Blinded + (int64_t) u.ucreamed - old, TRUE);
             } 
             else
             {
@@ -1223,7 +1225,7 @@ register xchar x, y;
                 if (um_dist(mtmp->mx, mtmp->my, 5)
                     || deduct_monster_hp(mtmp, rnd(2)) <= 0) 
                 {
-                    long save_pacifism = u.uconduct.killer;
+                    int64_t save_pacifism = u.uconduct.killer;
 
                     Your("leash chokes %s to death!", mon_nam(mtmp));
                     /* hero might not have intended to kill pet, but
@@ -1392,7 +1394,9 @@ struct obj *obj;
     }
     mtmp = bhit(u.dx, u.dy, COLNO, 0, INVIS_BEAM,
                 (int FDECL((*), (MONST_P, OBJ_P, MONST_P))) 0,
-                (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, &obj, &youmonst, TRUE, FALSE);
+                (int FDECL((*), (OBJ_P, OBJ_P, MONST_P))) 0, 
+                (int FDECL((*), (TRAP_P, OBJ_P, MONST_P))) 0, 
+                &obj, &youmonst, TRUE, FALSE);
     if (!mtmp || !haseyes(mtmp->data) || notonhead)
         return 1;
 
@@ -1559,7 +1563,7 @@ struct obj* obj;
     play_simple_player_sound(MONSTER_SOUND_TYPE_CAST);
     You_ex(ATR_NONE, CLR_MSG_HINT, "raise %s high.", yname(obj));
     exercise(A_WIS, TRUE);
-    (void)bhit(u.dx, u.dy, obj->blessed ? 4 : 3, 0, ZAPPED_WAND, uthitm, uthito,
+    (void)bhit(u.dx, u.dy, obj->blessed ? 4 : 3, 0, ZAPPED_WAND, uthitm, uthito, uthitt,
         &obj, &youmonst, TRUE, FALSE);
 
     return 1;
@@ -1748,6 +1752,14 @@ struct monst* origmonst;
     return res;
 }
 
+int
+uthitt(t, otmp, origmonst)
+struct trap* t UNUSED;
+struct obj* otmp UNUSED;
+struct monst* origmonst UNUSED;
+{
+    return 0;
+}
 
 STATIC_OVL void
 use_bell(optr)
@@ -1930,6 +1942,7 @@ register struct obj *obj;
     {
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY2);
         You("snuff the %s.", s);
+        Strcpy(debug_buf_3, "use_candelabrum");
         end_burn(obj, TRUE);
         return;
     }
@@ -2109,7 +2122,7 @@ struct obj **optr;
     ans = 'n';
     if (candelabrum_cnt > 0 && floor_cnt > 0)
     {
-        char attachbuf[BUFSIZ] = "";
+        char attachbuf[BUFSZ * 2] = "";
         Sprintf(attachbuf, "There is %s on the floor. Attach the candles to %s?", floor_cnt > 1 ? "candelabra" : "a candelabrum", floor_cnt > 1 ? "one of them" : "it");
         ans = yn_query(attachbuf);
     }
@@ -2201,7 +2214,7 @@ struct obj **optr;
         return 1;
     }
 
-    long max_candles = (long)objects[otmp->otyp].oc_special_quality;
+    int64_t max_candles = (int64_t)objects[otmp->otyp].oc_special_quality;
     if (otmp->special_quality >= max_candles)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
@@ -2209,9 +2222,9 @@ struct obj **optr;
         return 1;
     }
 
-    if ((long) otmp->special_quality + obj->quan > max_candles)
+    if ((int64_t) otmp->special_quality + obj->quan > max_candles)
     {
-        obj = splitobj(obj, max_candles - (long) otmp->special_quality);
+        obj = splitobj(obj, max_candles - (int64_t) otmp->special_quality);
         /* avoid a grammatical error if obj->quan gets
             reduced to 1 candle from more than one */
         s = (obj->quan != 1) ? "candles" : "candle";
@@ -2255,6 +2268,7 @@ struct obj **optr;
     if (otmp->lamplit)
         obj_merge_light_sources(otmp, otmp);
 
+    Strcpy(debug_buf_3, "use_candle");
     /* candles are no longer a separate light source */
     if (obj->lamplit)
         end_burn(obj, TRUE);
@@ -2284,9 +2298,10 @@ struct obj *otmp;
 
         (void) get_obj_location(otmp, &x, &y, 0);
         if (otmp->where == OBJ_MINVENT ? cansee(x, y) : !Blind)
-            pline("%s%scandle%s flame%s extinguished.", Shk_Your(buf, otmp),
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s%scandle%s flame%s extinguished.", Shk_Your(buf, otmp),
                   (candle ? "" : "candelabrum's "), (many ? "s'" : "'s"),
                   (many ? "s are" : " is"));
+        Strcpy(debug_buf_3, "snuff_candle");
         end_burn(otmp, TRUE);
         return TRUE;
     }
@@ -2366,8 +2381,9 @@ struct obj* otmp;
 
         (void)get_obj_location(otmp, &x, &y, 0);
         if (otmp->where == OBJ_MINVENT ? cansee(x, y) : !Blind)
-            pline("%storch%s flame%s extinguished.", Shk_Your(buf, otmp),
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%storch%s flame%s extinguished.", Shk_Your(buf, otmp),
                 (many ? "es'" : "'s"), (many ? "s are" : " is"));
+        Strcpy(debug_buf_3, "snuff_torch");
         end_burn(otmp, TRUE);
         return TRUE;
     }
@@ -2389,7 +2405,8 @@ struct obj *obj;
         {
             (void) get_obj_location(obj, &x, &y, 0);
             if (obj->where == OBJ_MINVENT ? cansee(x, y) : !Blind)
-                pline("%s %s out!", Yname2(obj), otense(obj, "go"));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s out!", Yname2(obj), otense(obj, "go"));
+            Strcpy(debug_buf_3, "snuff_lit");
             end_burn(obj, TRUE);
             return TRUE;
         }
@@ -2471,12 +2488,13 @@ struct obj *obj;
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY2);
         if (is_lamp(obj))
         {
-            pline("%slamp is now off.", Shk_Your(buf, obj));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%slamp is now off.", Shk_Your(buf, obj));
         }
         else
         {
-            You("snuff out %s.", yname(obj));
+            You_ex(ATR_NONE, CLR_MSG_ATTENTION, "snuff out %s.", yname(obj));
         }
+        Strcpy(debug_buf_3, "use_lamp");
         end_burn(obj, TRUE);
         return;
     }
@@ -2513,14 +2531,14 @@ struct obj *obj;
         if (is_lamp(obj))
         {
             check_unpaid(obj);
-            pline("%slamp is now on.", Shk_Your(buf, obj));
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%slamp is now on.", Shk_Your(buf, obj));
         } 
         else 
         { /* candle(s) */
-            pline("%s flame%s %s%s", s_suffix(Yname2(obj)), plur(obj->quan),
+            pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s flame%s %s%s", s_suffix(Yname2(obj)), plur(obj->quan),
                   otense(obj, "burn"), Blind ? "." : " brightly!");
             if (is_unpaid_shop_item(obj, u.ux, u.uy)
-                && (obj->age == 30L * (long) objects[obj->otyp].oc_cost || obj->otyp == MAGIC_CANDLE)) 
+                && (obj->age == 30L * (int64_t) objects[obj->otyp].oc_cost || obj->otyp == MAGIC_CANDLE)) 
             {
                 const char *ithem = (obj->quan > 1L) ? "them" : "it";
 
@@ -2630,7 +2648,8 @@ struct obj **optr;
     if (obj->lamplit) 
     {        
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY2);
-        You("snuff the lit potion.");
+        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "snuff the lit potion.");
+        Strcpy(debug_buf_3, "light_cocktail");
         end_burn(obj, TRUE);
         /*
          * Free & add to re-merge potion.  This will average the
@@ -2654,7 +2673,7 @@ struct obj **optr;
         obj = splitobj(obj, 1L);
 
     play_simple_object_sound(obj, OBJECT_SOUND_TYPE_APPLY);
-    You("light %spotion.%s", shk_your(buf, obj),
+    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "light %spotion.%s", shk_your(buf, obj),
         Blind ? "" : "  It gives off a dim light.");
 
     if (is_unpaid_shop_item(obj, u.ux, u.uy)) {
@@ -3019,7 +3038,7 @@ int magic; /* 0=Physical, otherwise skill level */
     }
     else if (!magic && Wounded_legs) 
     {
-        long wl = (Wounded_legs & BOTH_SIDES);
+        int64_t wl = (Wounded_legs & BOTH_SIDES);
         const char *bp = body_part(LEG);
 
         if (wl == BOTH_SIDES)
@@ -3065,7 +3084,7 @@ int magic; /* 0=Physical, otherwise skill level */
             {
             case TT_BEARTRAP:
             {
-                long side = rn2(3) ? LEFT_SIDE : RIGHT_SIDE;
+                int64_t side = rn2(3) ? LEFT_SIDE : RIGHT_SIDE;
 
                 play_player_ouch_sound(MONSTER_OUCH_SOUND_OUCH);
                 You("rip yourself free of the bear trap!  Ouch!");
@@ -3236,6 +3255,7 @@ struct obj *obj;
         can->blessed = obj->blessed;
         can->owt = weight(can);
         can->known = 1;
+        can->speflags |= is_female_corpse_or_statue(corpse) ? SPEFLAGS_FEMALE : 0UL;
         /* Mark tinned tins. No spinach allowed... */
         set_tin_variety(can, HOMEMADE_TIN);
         if (carried(corpse)) 
@@ -3285,14 +3305,14 @@ struct obj *obj;
 
     if (obj->cursed)
     {
-        long lcount = (long) rn1(90, 10);
+        int64_t lcount = (int64_t) rn1(90, 10);
 
         switch (rn2(13) / 2) { /* case 6 is half as likely as the others */
         case 0:
             if(!Sick)
                 play_sfx_sound(SFX_CATCH_TERMINAL_ILLNESS);
             make_sick((Sick & TIMEOUT) ? (Sick & TIMEOUT) / 3L + 1L
-                                       : (long) rn1(ACURR(A_CON), 20),
+                                       : (int64_t) rn1(ACURR(A_CON), 20),
                       xname(obj), TRUE, HINT_KILLED_ILLNESS_FROM_CURSED_UNICORN_HORN);
             break;
         case 1:
@@ -3351,7 +3371,7 @@ struct obj *obj;
         prop_trouble(FOOD_POISONED);
     if (MummyRot)
         prop_trouble(MUMMY_ROT);
-    if (TimedTrouble(Blinded) > (long) u.ucreamed
+    if (TimedTrouble(Blinded) > (int64_t) u.ucreamed
         && !(u.uswallow
              && attacktype_fordmg(u.ustuck->data, AT_ENGL, AD_BLND)))
         prop_trouble(BLINDED);
@@ -3442,7 +3462,7 @@ struct obj *obj;
             break;
         case prop2trbl(BLINDED):
             play_sfx_sound(SFX_CURE_AILMENT);
-            make_blinded((long) u.ucreamed, TRUE);
+            make_blinded((int64_t) u.ucreamed, TRUE);
             did_prop++;
             break;
         case prop2trbl(HALLUC):
@@ -3512,7 +3532,7 @@ struct obj *obj;
 void
 fig_transform(arg, timeout)
 anything *arg;
-long timeout;
+int64_t timeout;
 {
     struct obj *figurine = arg->a_obj;
     struct monst *mtmp;
@@ -3532,7 +3552,7 @@ long timeout;
         okay_spot = enexto(&cc, cc.x, cc.y, &mons[figurine->corpsenm]);
     if (!okay_spot || !figurine_location_checks(figurine, &cc, TRUE)) {
         /* reset the timer to try again later */
-        (void) start_timer((long) rnd(5000), TIMER_OBJECT, FIG_TRANSFORM,
+        (void) start_timer((int64_t) rnd(5000), TIMER_OBJECT, FIG_TRANSFORM,
                            obj_to_any(figurine));
         return;
     }
@@ -4126,7 +4146,7 @@ struct obj* obj;
                 freeinv(otmp);
                 obj_clear_found(otmp);
                 place_object(otmp, u.ux, u.uy);
-                char tbuf[BUFSIZ];
+                char tbuf[BUFSZ * 2];
                 Strcpy(tbuf, Tobjnam(otmp, "vanish"));
                 boolean stillexists = rloco(otmp);
                 play_sfx_sound(SFX_TELEPORT);
@@ -5225,7 +5245,7 @@ struct obj *obj;
     if (can_blnd((struct monst *) 0, &youmonst, AT_WEAP, obj)) {
         int blindinc = rnd(25);
         u.ucreamed += blindinc;
-        make_blinded((Blinded& TIMEOUT) + (long) blindinc, FALSE);
+        make_blinded((Blinded& TIMEOUT) + (int64_t) blindinc, FALSE);
         if (!Blind || (Blind && wasblind))
             pline("There's %ssticky goop all over your %s.",
                   wascreamed ? "more " : "", body_part(FACE));
@@ -5851,7 +5871,7 @@ doapply()
         case BLINDFOLD:
             if (obj == ublindf)
             {
-                if (!cursed(obj))
+                if (!cursed(obj, FALSE))
                     Blindf_off(obj);
             }
             else if (!ublindf)
@@ -5877,25 +5897,6 @@ doapply()
         case GRAPPLING_HOOK:
             res = use_grapple(obj);
             break;
-#if 0
-        case LARGE_BOX:
-        case CHEST:
-        case ICE_BOX:
-        case BOOKSHELF:
-        case SACK:
-        case BACKPACK:
-        case LEATHER_BAG:
-        case ORIENTAL_SILK_SACK:
-        case EXPENSIVE_HANDBAG:
-        case GOLDEN_CHEST:
-        case BAG_OF_HOLDING:
-        case BAG_OF_WIZARDRY:
-        case BAG_OF_TREASURE_HAULING:
-        case BAG_OF_THE_GLUTTON:
-        case OILSKIN_SACK:
-            res = use_container(&obj, 1, FALSE);
-            break;
-#endif
         case BAG_OF_TRICKS:
             (void)bagotricks(obj, FALSE, (int*)0);
             break;

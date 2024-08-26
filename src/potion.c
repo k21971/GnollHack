@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    potion.c    $NHDT-Date: 1549074254 2019/02/02 02:24:14 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.160 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -12,15 +12,15 @@ boolean notonhead = FALSE;
 STATIC_VAR NEARDATA int nothing, unkn;
 STATIC_VAR NEARDATA const char beverages[] = { POTION_CLASS, TOOL_CLASS, 0 };
 
-STATIC_DCL long FDECL(itimeout, (long));
+STATIC_DCL int64_t FDECL(itimeout, (int64_t));
 STATIC_DCL void NDECL(ghost_from_bottle);
 STATIC_DCL short FDECL(mixtype, (struct obj *, struct obj *));
 STATIC_DCL short FDECL(mixtype_core, (struct obj*, struct obj*));
 
 /* force `val' to be within valid range for intrinsic timeout value */
-STATIC_OVL long
+STATIC_OVL int64_t
 itimeout(val)
-long val;
+int64_t val;
 {
     if (val >= TIMEOUT)
         val = TIMEOUT;
@@ -31,18 +31,18 @@ long val;
 }
 
 /* increment `old' by `incr' and force result to be valid intrinsic timeout */
-long
+int64_t
 itimeout_incr(old, incr)
-long old;
+int64_t old;
 int incr;
 {
-    return itimeout((old & TIMEOUT) + (long) incr);
+    return itimeout((old & TIMEOUT) + (int64_t) incr);
 }
 
 /* set the timeout field of intrinsic `which' */
 void
 set_itimeout(which, val)
-long *which, val;
+int64_t *which, val;
 {
     *which &= ~TIMEOUT;
     *which |= itimeout(val);
@@ -51,7 +51,7 @@ long *which, val;
 /* increment the timeout field of intrinsic `which' */
 void
 incr_itimeout(which, incr)
-long *which;
+int64_t *which;
 int incr;
 {
     set_itimeout(which, itimeout_incr(*which, incr));
@@ -59,10 +59,10 @@ int incr;
 
 void
 make_confused(xtime, talk)
-long xtime;
+int64_t xtime;
 boolean talk;
 {
-    long old = HConfusion;
+    int64_t old = HConfusion;
 
     if (Unaware)
         talk = FALSE;
@@ -84,10 +84,10 @@ boolean talk;
 
 void
 make_stunned(xtime, talk)
-long xtime;
+int64_t xtime;
 boolean talk;
 {
-    long old = HStun;
+    int64_t old = HStun;
 
     if (Unaware)
         talk = FALSE;
@@ -127,13 +127,13 @@ boolean talk;
    the other at a time.  They should become separate intrinsics.... */
 void
 make_sick(xtime, cause, talk, killerhintidx)
-long xtime;
+int64_t xtime;
 const char *cause; /* sickness cause */
 boolean talk;
 int killerhintidx;
 {
     struct kinfo *kptr;
-    long old = Sick;
+    int64_t old = Sick;
 
 #if 0   /* tell player even if hero is unconscious */
     if (Unaware)
@@ -202,13 +202,13 @@ int killerhintidx;
    the other at a time.  They should become separate intrinsics.... */
 void
 make_food_poisoned(xtime, cause, talk, killerhintidx)
-long xtime;
+int64_t xtime;
 const char* cause; /* sickness cause */
 boolean talk;
 int killerhintidx;
 {
     struct kinfo* kptr;
-    long old = FoodPoisoned;
+    int64_t old = FoodPoisoned;
 
 #if 0   /* tell player even if hero is unconscious */
     if (Unaware)
@@ -276,13 +276,13 @@ int killerhintidx;
 
 void
 make_mummy_rotted(xtime, cause, talk, killerhintidx)
-long xtime;
+int64_t xtime;
 const char* cause; /* sickness cause */
 boolean talk;
 int killerhintidx;
 {
     struct kinfo* kptr;
-    long old = MummyRot;
+    int64_t old = MummyRot;
 
 #if 0   /* tell player even if hero is unconscious */
     if (Unaware)
@@ -354,13 +354,13 @@ int killerhintidx;
 
 void
 make_slimed(xtime, msg, killedby, killername, killerhintidx)
-long xtime;
+int64_t xtime;
 const char *msg;
 int killedby;
 const char* killername;
 int killerhintidx;
 {
-    long old = Slimed;
+    int64_t old = Slimed;
     struct kinfo* kptr;
 
 #if 0   /* tell player even if hero is unconscious */
@@ -392,12 +392,12 @@ int killerhintidx;
 /* start or stop petrification */
 void
 make_stoned(xtime, msg, killedby, killername, killhintidx)
-long xtime;
+int64_t xtime;
 const char *msg;
 int killedby, killhintidx;
 const char *killername;
 {
-    long old = Stoned;
+    int64_t old = Stoned;
     struct kinfo* kptr;
 
 #if 0   /* tell player even if hero is unconscious */
@@ -428,10 +428,10 @@ const char *killername;
 
 void
 make_vomiting(xtime, talk)
-long xtime;
+int64_t xtime;
 boolean talk;
 {
-    long old = Vomiting;
+    int64_t old = Vomiting;
 
     if (Unaware)
         talk = FALSE;
@@ -449,10 +449,10 @@ STATIC_VAR const char eyemsg[] = "%s momentarily %s.";
 
 void
 make_blinded(xtime, talk)
-long xtime;
+int64_t xtime;
 boolean talk;
 {
-    long old = Blinded;
+    int64_t old = Blinded;
     boolean u_could_see, can_see_now;
     const char *eyes;
 
@@ -591,11 +591,11 @@ toggle_blindness()
 
 boolean
 make_hallucinated(xtime, talk, mask)
-long xtime; /* nonzero if this is an attempt to turn on hallucination */
+int64_t xtime; /* nonzero if this is an attempt to turn on hallucination */
 boolean talk;
-long mask; /* nonzero if resistance status should change by mask */
+int64_t mask; /* nonzero if resistance status should change by mask */
 {
-    long old = HHallucination;
+    int64_t old = HHallucination;
     boolean changed = 0;
     const char *message, *verb;
 
@@ -665,10 +665,10 @@ long mask; /* nonzero if resistance status should change by mask */
 
 void
 make_deaf(xtime, talk)
-long xtime;
+int64_t xtime;
 boolean talk;
 {
-    long old = HDeaf;
+    int64_t old = HDeaf;
 
     if (Unaware)
         talk = FALSE;
@@ -1377,7 +1377,7 @@ struct obj *otmp;
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Ulch!  This potion was contaminated!");
         if (otmp->blessed)
         {
-            pline("(But in fact it was mildly stale %s.)", fruitname(TRUE));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "(But in fact it was mildly stale %s.)", fruitname(TRUE));
             if (!Role_if(PM_HEALER) && !Sick_resistance)
             {
                 losehp(adjust_damage(1, (struct monst*)0, &youmonst, AD_DISE, ADFLAGS_NONE), "mildly contaminated potion", KILLED_BY_AN);
@@ -1385,7 +1385,7 @@ struct obj *otmp;
         }
         else 
         {
-            pline("(But in fact it was biologically contaminated %s.)",  fruitname(TRUE));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "(But in fact it was biologically contaminated %s.)",  fruitname(TRUE));
 
             if (Sick_resistance || Role_if(PM_HEALER))
             {
@@ -1403,7 +1403,7 @@ struct obj *otmp;
                 if (!FoodPoisoned)
                     play_sfx_sound(SFX_CATCH_FOOD_POISONING);
                 
-                make_food_poisoned(FoodPoisoned ? FoodPoisoned / 3L + 1L : (long)rn1(ACURR(max(2, A_CON)), 20),
+                make_food_poisoned(FoodPoisoned ? FoodPoisoned / 3L + 1L : (int64_t)rn1(ACURR(max(2, A_CON)), 20),
                     contaminant, TRUE, HINT_KILLED_POTION_OF_SICKNESS);
 
                 exercise(A_CON, FALSE);
@@ -2264,8 +2264,7 @@ int how;
         tx = u.ux, ty = u.uy;
         distance = 0;
         play_simple_object_sound_at_location(obj, tx, ty, OBJECT_SOUND_TYPE_BREAK);
-        pline_The("%s crashes on your %s and breaks into shards.", botlnam,
-                  body_part(HEAD));
+        pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s crashes on your %s and breaks into shards.", botlnam, body_part(HEAD));
         losehp(adjust_damage(rnd(2), (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE),
                (how == POTHIT_OTHER_THROW) ? "propelled potion" /* scatter */
                                            : "thrown potion",
@@ -2310,8 +2309,7 @@ int how;
                 Strcpy(buf, mnam);
             }
             play_simple_object_sound_at_location(obj, tx, ty, OBJECT_SOUND_TYPE_BREAK);
-            pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s crashes on %s and breaks into shards.", botlnam,
-                      buf);
+            pline_The_ex(ATR_NONE, is_tame(mon) ? CLR_MSG_WARNING : CLR_MSG_ATTENTION, "%s crashes on %s and breaks into shards.", botlnam, buf);
         }
         if (rn2(5) && mon->mhp > 1 && !hit_saddle)
             mon->mhp--;
@@ -3847,10 +3845,10 @@ dodip()
                 else
                     amt = rnd(amt - (7 - 1)) + (7 - 1); /* 1..(N-6) + 6 */
 
-                if ((long)amt < obj->quan)
+                if ((int64_t)amt < obj->quan)
                 {
-                    obj = splitobj(obj, (long)amt);
-                    Sprintf(qbuf, "%ld of the", obj->quan);
+                    obj = splitobj(obj, (int64_t)amt);
+                    Sprintf(qbuf, "%lld of the", (long long)obj->quan);
                 }
             }
             /* [N of] the {obj(s)} mix(es) with [one of] {the potion}... */
@@ -3862,7 +3860,7 @@ dodip()
 
             if (useupliquidonly)
             {
-                if (obj->quan > (long)potion->charges)
+                if (obj->quan > (int64_t)potion->charges)
                     potion->charges = 0;
                 else
                     potion->charges -= (short)obj->quan;

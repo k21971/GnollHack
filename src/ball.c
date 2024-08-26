@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2022-08-14 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    ball.c    $NHDT-Date: 1557088406 2019/05/05 20:33:26 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.36 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -778,7 +778,7 @@ xchar x, y;
     if (x != u.ux || y != u.uy) {
         STATIC_VAR const char *pullmsg = "The ball pulls you out of the %s!";
         struct trap *t;
-        long side;
+        int64_t side;
 
         if (u.utrap
             && u.utraptype != TT_INFLOOR && u.utraptype != TT_BURIEDBALL) {

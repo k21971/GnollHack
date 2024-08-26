@@ -32,6 +32,13 @@ namespace GnollHackX.Pages.MainScreen
 		{
 			InitializeComponent ();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            if (GHApp.DarkMode)
+            {
+                lblHeader.TextColor = GHColors.White;
+            }
         }
 
         private async void btnExportSavedGames_Clicked(object sender, EventArgs e)
@@ -380,7 +387,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             ImportExportGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private bool _backPressed = false;
@@ -390,7 +397,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 _backPressed = true;
                 ImportExportGrid.IsEnabled = false;
-                await App.Current.MainPage.Navigation.PopModalAsync();
+                await GHApp.Navigation.PopModalAsync();
             }
             return false;
         }
@@ -546,6 +553,20 @@ namespace GnollHackX.Pages.MainScreen
                 GHApp.GnollHackService.ClearDumplogs();
                 btnDeleteDumplogs.Text = "Done";
                 btnDeleteDumplogs.TextColor = GHColors.Red;
+            }
+            ImportExportGrid.IsEnabled = true;
+        }
+
+        private async void btnDeleteSnapshots_Clicked(object sender, EventArgs e)
+        {
+            ImportExportGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            bool answer = await DisplayAlert("Delete Snapshots?", "Are you sure to delete all snapshots?", "Yes", "No");
+            if (answer)
+            {
+                GHApp.GnollHackService.ClearSnapshots();
+                btnDeleteSnapshots.Text = "Done";
+                btnDeleteSnapshots.TextColor = GHColors.Red;
             }
             ImportExportGrid.IsEnabled = true;
         }

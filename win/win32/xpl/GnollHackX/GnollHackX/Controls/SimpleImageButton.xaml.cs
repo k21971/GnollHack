@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using GnollHackX;
 
 #if GNH_MAUI
 namespace GnollHackM
@@ -17,6 +18,7 @@ namespace GnollHackX.Controls
     public partial class SimpleImageButton : ContentView
     {
         public static readonly BindableProperty ImgSourcePathProperty = BindableProperty.Create(nameof(ImgSourcePath), typeof(string), typeof(SimpleImageButton), string.Empty);
+        public static readonly BindableProperty ImgHighFilterQualityProperty = BindableProperty.Create(nameof(ImgHighFilterQuality), typeof(bool), typeof(LabeledImageButton), false);
         public static readonly BindableProperty GridWidthProperty = BindableProperty.Create(nameof(GridWidth), typeof(double), typeof(SimpleImageButton), 45.0);
         public static readonly BindableProperty GridHeightProperty = BindableProperty.Create(nameof(GridHeight), typeof(double), typeof(SimpleImageButton), 45.0);
 
@@ -24,7 +26,59 @@ namespace GnollHackX.Controls
         {
             InitializeComponent();
             ViewButton.Clicked += ViewButton_Clicked;
+#if WINDOWS
+            ViewButton.HandlerChanged += (s, e) =>
+            {
+                if (ViewButton.Handler?.PlatformView is Microsoft.UI.Xaml.Controls.Button)
+                {
+                    var platformView = ViewButton.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.Button;
+                    if (platformView != null)
+                    {
+                        platformView.PointerEntered += PlatformView_PointerEntered;
+                        platformView.PointerExited += PlatformView_PointerExited;
+                        platformView.PointerCanceled += PlatformView_PointerExited;
+                        platformView.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush();
+                    }
+                }
+            };
+            ViewButton.HandlerChanging += (s, e) =>
+            {
+                if (e.OldHandler != null && e.NewHandler == null)
+                {
+                    if (e.OldHandler?.PlatformView is Microsoft.UI.Xaml.Controls.Button)
+                    {
+                        var platformView = e.OldHandler?.PlatformView as Microsoft.UI.Xaml.Controls.Button;
+                        if (platformView != null)
+                        {
+                            platformView.PointerEntered -= PlatformView_PointerEntered;
+                            platformView.PointerExited -= PlatformView_PointerExited;
+                            platformView.PointerCanceled -= PlatformView_PointerExited;
+                        }
+                    }
+                }
+            };
+#endif
         }
+
+#if WINDOWS
+        private void PlatformView_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            e.Handled = true;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                ViewImage.IsHighlighted = true;
+            });
+        }
+
+        private void PlatformView_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            e.Handled = true;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                ViewImage.IsHighlighted = false;
+            });
+        }
+#endif
 
         public event EventHandler<EventArgs> BtnClicked;
 
@@ -43,18 +97,22 @@ namespace GnollHackX.Controls
             get => (double)GetValue(SimpleImageButton.GridHeightProperty);
             set => SetValue(SimpleImageButton.GridHeightProperty, value);
         }
-
-        public int LandscapeButtonsInRow { get; set; } = 16;
-        public int PortraitButtonsInRow { get; set; } = 8;
-
-        public void SetSideSize(double canvaswidth, double canvasheight)
+        public bool ImgHighFilterQuality
         {
-            double imgsidewidth = 0;
-            if (canvaswidth > canvasheight)
-                imgsidewidth = Math.Min(75.0, Math.Max(35.0, canvaswidth / Math.Max(1, LandscapeButtonsInRow)));
-            else
-                imgsidewidth = Math.Min(75.0, Math.Max(35.0, canvaswidth / Math.Max(1, PortraitButtonsInRow)));
+            get => (bool)GetValue(LabeledImageButton.ImgHighFilterQualityProperty);
+            set => SetValue(LabeledImageButton.ImgHighFilterQualityProperty, value);
+        }
 
+        public int LandscapeButtonsInRow { get; set; } = 0;
+        public int PortraitButtonsInRow { get; set; } = 0;
+
+        public void SetSideSize(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale)
+        {
+            //int bigRowNoOfButtons = LandscapeButtonsInRow > 0 ? LandscapeButtonsInRow : UIUtils.LandscapeButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
+            //bool tooWide = 35.0 * bigRowNoOfButtons + (bigRowNoOfButtons - 1) * 6 > canvaswidth;
+            //int noOfButtons = canvaswidth > canvasheight && !tooWide ? bigRowNoOfButtons : PortraitButtonsInRow > 0 ? PortraitButtonsInRow : UIUtils.PortraitButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
+            //double imgsidewidth = Math.Min(75.0, Math.Max(35.0, (canvaswidth - (noOfButtons - 1) * 6) / Math.Max(1, noOfButtons)));
+            double imgsidewidth = UIUtils.CalculateButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale, LandscapeButtonsInRow, PortraitButtonsInRow, true);
             GridWidth = imgsidewidth;
             GridHeight = imgsidewidth;
         }

@@ -54,10 +54,16 @@ namespace GnollHackX
     }
     public class CustomLabel : SKCanvasView
     {
+#pragma warning disable 67
+        public event EventHandler<GHMouseWheelEventArgs> MouseWheel;
+#pragma warning restore 67
+
         public CustomLabel() : base()
         {
             PaintSurface += Base_PaintSurface;
             Touch += Base_Touch;
+            MouseWheel += Base_MouseWheel;
+            //SizeChanged += Base_SizeChanged;
         }
 
         public static readonly BindableProperty TextProperty = BindableProperty.Create(
@@ -208,7 +214,7 @@ namespace GnollHackX
         {
             using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
-                float scale = GHApp.DisplayScale;
+                float scale = GHApp.DisplayDensity;
                 textPaint.TextSize = (float)FontSize * scale;
                 textPaint.Typeface = GetFontTypeface();
                 lock (_textRowLock)
@@ -384,7 +390,7 @@ namespace GnollHackX
             List<float> rowWidths = new List<float>();
             using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
             {
-                float scale = GHApp.DisplayScale;
+                float scale = GHApp.DisplayDensity;
                 textPaint.TextSize = (float)FontSize * scale;
                 textPaint.Typeface = GetFontTypeface();
                 if (OutlineWidth > 0)
@@ -393,8 +399,9 @@ namespace GnollHackX
                     textPaint.StrokeWidth = (float)OutlineWidth * scale;
                 }
                 string[] textRows = SplitTextWithConstraint(Text, widthConstraint, textPaint);
-                foreach (string textRow in textRows)
+                for (int i = 0, n = textRows.Length; i < n; i++)
                 {
+                    string textRow = textRows[i];
                     totalheight += textPaint.FontSpacing;
                     string[] textParts;
                     if (UseSpecialSymbols)
@@ -407,8 +414,9 @@ namespace GnollHackX
                     }
                     int cnt = 0;
                     float totalwidth = 0;
-                    foreach (string textPart in textParts)
+                    for (int j = 0, m = textParts.Length; j < m; j++)
                     {
+                        string textPart = textParts[j];
                         SKImage symbolbitmap;
                         SKRect source_rect = new SKRect();
                         if (UseSpecialSymbols && (symbolbitmap = GHApp.GetSpecialSymbol(textPart, out source_rect)) != null)
@@ -434,7 +442,7 @@ namespace GnollHackX
             }
         }
 
-        private SizeRequest CalculateLabelSize(double widthConstraint, double heightConstraint)
+        private Size CalculateLabelSize(double widthConstraint, double heightConstraint)
         {
             double usedMaximumValue = 1000000.0;
             double adjWidthConstraint = double.IsInfinity(widthConstraint) ?
@@ -450,7 +458,7 @@ namespace GnollHackX
             }
             else
             {
-                float scale = GHApp.DisplayScale;
+                float scale = GHApp.DisplayDensity;
                 float scaledwidthconstraint = scale * (float)(WidthRequest > 0 ? Math.Min(adjWidthConstraint, WidthRequest) : adjWidthConstraint);
 
                 TextAreaSize textAreaSize = CalculateTextAreaSize(scaledwidthconstraint);
@@ -464,7 +472,7 @@ namespace GnollHackX
                 else
                     hr = (double)(textAreaSize.Height / scale); // Math.Min(adjHeightConstraint, (double)(textAreaSize.Height / scale));
             }
-            return new SizeRequest(new Size(wr, hr));
+            return new Size(wr, hr);
         }
 
         Dictionary<string, CustomLabelFonts> _fontDictionary = new Dictionary<string, CustomLabelFonts>
@@ -537,7 +545,7 @@ namespace GnollHackX
             SKCanvas canvas = surface.Canvas;
             float canvaswidth = this.CanvasSize.Width;
             float canvasheight = this.CanvasSize.Height;
-            float scale = GHApp.DisplayScale;
+            float scale = GHApp.DisplayDensity;
             float scale2 = this.Width == 0 ? 1.0f : canvaswidth / (float)this.Width;
 
             canvas.Clear();
@@ -552,6 +560,9 @@ namespace GnollHackX
 
                 using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
                 {
+#if !GNH_MAUI
+                    SKFilterQuality oldFilterQuality = textPaint.Paint.FilterQuality;
+#endif
                     float x = 0, y = 0;
                     textPaint.Typeface = GetFontTypeface();
                     textPaint.TextSize = (float)FontSize * scale;
@@ -624,8 +635,9 @@ namespace GnollHackX
                             }
 
                             int cnt = 0;
-                            foreach (string textPart in textParts)
+                            for (int j = 0, m = textParts.Length; j < m; j++)
                             {
+                                string textPart = textParts[j];
                                 SKImage symbolbitmap;
                                 SKRect source_rect = new SKRect();
                                 if (UseSpecialSymbols && (symbolbitmap = GHApp.GetSpecialSymbol(textPart, out source_rect)) != null)
@@ -637,7 +649,16 @@ namespace GnollHackX
                                     float bmpx = x;
                                     float bmpy = y + textPaint.FontMetrics.Ascent;
                                     SKRect bmptargetrect = new SKRect(bmpx, bmpy, bmpx + bmpwidth, bmpy + bmpheight);
-                                    canvas.DrawImage(symbolbitmap, source_rect, bmptargetrect, textPaint.Paint); 
+#if !GNH_MAUI
+                                    textPaint.Paint.FilterQuality = SKFilterQuality.High;
+#endif
+                                    canvas.DrawImage(symbolbitmap, source_rect, bmptargetrect,
+#if GNH_MAUI
+                                        new SKSamplingOptions(SKFilterMode.Linear));
+#else
+                                        textPaint.Paint);
+                                    textPaint.Paint.FilterQuality = oldFilterQuality;
+#endif
                                     x += bmpwidth + bmpmargin;
                                 }
                                 else
@@ -683,7 +704,7 @@ namespace GnollHackX
 
         public double MeasureWidth(string str)
         {
-            float scale = GHApp.DisplayScale;
+            float scale = GHApp.DisplayDensity;
             if (scale == 0)
                 return 0;
             float skwidth = 0;
@@ -1079,17 +1100,16 @@ namespace GnollHackX
                 }
             }
         }
-        protected override SizeRequest OnMeasure(double widthConstraint, double heightConstraint)
-        {
-            return CalculateLabelSize(widthConstraint, heightConstraint);
-        }
 
 #if GNH_MAUI
         public Size CustomMeasureSize(double widthConstraint, double heightConstraint)
         {
-            SizeRequest sizeRequest = CalculateLabelSize(widthConstraint, heightConstraint);
-            Size size = new Size(sizeRequest.Request.Width, sizeRequest.Request.Height);
-            return size;
+            return CalculateLabelSize(widthConstraint, heightConstraint);
+        }
+#else
+        protected override SizeRequest OnMeasure(double widthConstraint, double heightConstraint)
+        {
+            return new SizeRequest(CalculateLabelSize(widthConstraint, heightConstraint));
         }
 #endif
 
@@ -1106,6 +1126,74 @@ namespace GnollHackX
                 UpdateScrollable(IsScrollable, true);
             }
         }
+
+        private void Base_MouseWheel(object sender, GHMouseWheelEventArgs e)
+        {
+            if (IsScrollable && e.MouseWheelDelta != 0)
+            {
+                lock (_textScrollLock)
+                {
+                    float bottomScrollLimit =  Math.Min(0, CanvasSize.Height - TextHeight);
+                    _textScrollOffset += (CanvasSize.Height * e.MouseWheelDelta) / (10 * 120);
+                    if (_textScrollOffset > 0)
+                    {
+                        _textScrollOffset = 0;
+                        _textScrollSpeed = 0;
+                        TextScrollSpeedOn = false;
+                    }
+                    else if (_textScrollOffset < bottomScrollLimit)
+                    {
+                        _textScrollOffset = bottomScrollLimit;
+                        _textScrollSpeed = 0;
+                        TextScrollSpeedOn = false;
+                    }
+                }
+                InvalidateSurface();
+            }
+        }
+
+        //private void Base_SizeChanged(object sender, EventArgs e)
+        //{
+        //    if(_currentWidth > 0 && _currentHeight > 0)
+        //        InvalidateSurface();
+        //}
+
+#if GNH_MAUI
+        protected override void OnHandlerChanged()
+        {
+            base.OnHandlerChanged();
+#if WINDOWS
+            SkiaSharp.Views.Windows.SKXamlCanvas view = Handler?.PlatformView as SkiaSharp.Views.Windows.SKXamlCanvas;
+            if(view != null)
+                view.PointerWheelChanged += View_PointerWheelChanged;
+#endif
+        }
+
+        protected override void OnHandlerChanging(HandlerChangingEventArgs args)
+        {
+            base.OnHandlerChanging(args);
+#if WINDOWS
+            SkiaSharp.Views.Windows.SKXamlCanvas view = args.OldHandler?.PlatformView as SkiaSharp.Views.Windows.SKXamlCanvas;
+            if (view != null && args.NewHandler == null)
+                view.PointerWheelChanged -= View_PointerWheelChanged;
+#endif
+        }
+
+#if WINDOWS
+        private void View_PointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.UIElement)
+            {
+                var delta = e.GetCurrentPoint((Microsoft.UI.Xaml.UIElement)sender).Properties.MouseWheelDelta;
+                if (delta != 0)
+                {
+                    MouseWheel?.Invoke(sender, new GHMouseWheelEventArgs(delta));
+                }
+            }
+        }
+
+#endif
+#endif
     }
 
 #if GNH_MAUI

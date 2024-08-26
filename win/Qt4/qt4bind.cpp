@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 // Copyright (c) Warwick Allison, 1999.
 // Qt4 conversion copyright (c) Ray Chason, 2012-2014.
@@ -522,7 +522,7 @@ int NetHackQtBind::qt_doprev_message()
     return 0;
 }
 
-char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question_, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, unsigned long ynflags)
+char NetHackQtBind::qt_yn_function_ex(int style, int attr, int color, int glyph, const char* title, const char *question_, const char *choices, CHAR_P def, const char* resp_desc, const char* introline, uint64_t ynflags)
 {
     QString question(QString::fromLatin1(question_));
     QString message;

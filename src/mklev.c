@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mklev.c    $NHDT-Date: 1550800390 2019/02/22 01:53:10 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.59 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -273,13 +273,14 @@ int floortyp, floorsubtyp, mtype, tileset;
                     levl[lowx][lowy - 1].decoration_typ = DECORATION_COBWEB_CORNER; // 0 + (DOODAD_COBWEB_CORNER_SMALL_DECORATED + rn2(DOODAD_COBWEB_CORNER_LARGE - DOODAD_COBWEB_CORNER_SMALL_DECORATED + 1)) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
                     levl[lowx][lowy - 1].decoration_subtyp = decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes > 1 ? rn2(decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes) : 0;
                     levl[lowx][lowy - 1].decoration_dir = 0;
+                    levl[lowx][lowy - 1].decoration_flags = 0;
                 }
                 if (IS_WALL(levl[hix][lowy - 1].typ) && !rn2(5 + webmod))
                 {
                     levl[hix][lowy - 1].decoration_typ = DECORATION_COBWEB_CORNER; // 1 + (DOODAD_COBWEB_CORNER_SMALL_DECORATED + rn2(DOODAD_COBWEB_CORNER_LARGE - DOODAD_COBWEB_CORNER_SMALL_DECORATED + 1)) * NUM_DOODAD_MIRRORINGS + GLYPH_MIRRORABLE_DOODAD_OFF;
                     levl[hix][lowy - 1].decoration_subtyp = decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes > 1 ? rn2(decoration_type_definitions[DECORATION_COBWEB_CORNER].num_subtypes) : 0;
-                    levl[hix][lowy - 1].decoration_dir = 1;
-                    levl[hix][lowy - 1].decoration_flags = 0;
+                    levl[hix][lowy - 1].decoration_dir = 0;
+                    levl[hix][lowy - 1].decoration_flags = DECORATION_FLAGS_HORIZONTAL_MIRRORING;
                 }
 
                 if (lowx + 1 < hix && !rn2(7 + webmod))
@@ -289,8 +290,8 @@ int floortyp, floorsubtyp, mtype, tileset;
                     {
                         levl[lowx + roll + 1][lowy - 1].decoration_typ = DECORATION_COBWEB;
                         levl[lowx + roll + 1][lowy - 1].decoration_subtyp = 0;
-                        levl[lowx + roll + 1][lowy - 1].decoration_dir = rn2(2);
-                        levl[lowx + roll + 1][lowy - 1].decoration_flags = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_dir = 0;
+                        levl[lowx + roll + 1][lowy - 1].decoration_flags = !rn2(2) ? DECORATION_FLAGS_HORIZONTAL_MIRRORING : 0;
                     }
                 }
 
@@ -972,7 +973,8 @@ int trap_type;
                             m_dowear(mon, TRUE, FALSE);
                             struct obj* box = mksobj_at(LARGE_BOX, xx, yy + dy, FALSE, FALSE);
                             struct obj* pie = mksobj(CREAM_PIE, FALSE, FALSE, FALSE);
-                            add_to_container(box, pie);
+                            if(box && pie)
+                                add_to_container(box, pie);
                         }
                     }
                     else if (u_depth >= 9 && u_depth <= 14 && !context.made_orc_and_a_pie2 && !rn2(5))
@@ -1002,14 +1004,23 @@ int trap_type;
                             m_dowear(mon, TRUE, FALSE);
                             mongets(mon, CREAM_PIE);
                             struct obj* box = mksobj_at(LARGE_BOX, xx, yy + dy, FALSE, FALSE);
-                            struct obj* pie = mksobj(CREAM_PIE, FALSE, FALSE, FALSE);
-                            pie->quan = 4 + rnd(8);
-                            pie->owt = weight(pie);
-                            add_to_container(box, pie);
-                            struct obj* pot = mksobj(POT_GAIN_ABILITY, FALSE, FALSE, FALSE);
-                            bless(pot);
-                            add_to_container(box, pot);
-                            box->owt = weight(box);
+                            if (box)
+                            {
+                                struct obj* pie = mksobj(CREAM_PIE, FALSE, FALSE, FALSE);
+                                if (pie)
+                                {
+                                    pie->quan = 4 + rnd(8);
+                                    pie->owt = weight(pie);
+                                    add_to_container(box, pie);
+                                }
+                                struct obj* pot = mksobj(POT_GAIN_ABILITY, FALSE, FALSE, FALSE);
+                                if (pot)
+                                {
+                                    bless(pot);
+                                    add_to_container(box, pot);
+                                }
+                                box->owt = weight(box);
+                            }
                         }
                     }
                     else
@@ -1339,7 +1350,7 @@ makelevel()
             && nroom >= room_threshold && shopok)  // rn2(u_depth) < 3))
             res = make_room(SHOPBASE);
 
-        if (!res && u_depth > 1 && u_depth < depth(&medusa_level) && !(context.npc_made & (1UL << NPC_ELVEN_BARD))
+        if (!res && u_depth > 1 && u_depth < depth(&medusa_level) && !(context.npc_made & ((uint64_t)1 << NPC_ELVEN_BARD))
             && (context.game_difficulty == MIN_DIFFICULTY_LEVEL 
                 || (context.game_difficulty < 0 && !rn2(max(2, 2 * (context.game_difficulty - MIN_DIFFICULTY_LEVEL) + 1)))
                 || (context.game_difficulty >= 0 && !rn2(100 * context.game_difficulty + 20))))
@@ -1520,7 +1531,7 @@ makelevel()
             //make_engr_at(x, y, Gilthoniel_word, 0L, ENGRAVE, ENGR_FLAGS_NONE);
 
             /* Stash has now some random contents */
-            struct obj* stash = mksobj_at(CHEST, x, y, FALSE, FALSE);
+            struct obj* stash = mksobj_at(MAGIC_CHEST, x, y, FALSE, FALSE);
             if (stash)
             {
                 stash->olocked = FALSE;
@@ -1542,29 +1553,29 @@ makelevel()
                     if (otmp)
                     {
                         otmp->bknown = 1;
-                        (void)add_to_container(stash, otmp);
+                        (void)add_to_magic_chest(otmp);
                     }
                 }
 
                 if (context.game_difficulty < 0)
                 {
-                    long bits = 0L, bits2 = 0L;
+                    int64_t bits = 0L, bits2 = 0L;
                     otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, MKOBJ_TYPE_NORMAL, (struct monst*)0, MAT_NONE, !rn2(4) ? MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_II : MANUAL_GUIDE_TO_ESSENTIAL_RESISTANCES_VOL_I, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
                     if (otmp)
                     {
                         otmp->bknown = 1;
-                        (void)add_to_container(stash, otmp);
+                        (void)add_to_magic_chest(otmp);
                         if(otmp->manualidx < 32)
-                            bits |= 1L << otmp->special_quality;
+                            bits |= (int64_t)1 << otmp->special_quality;
                         else if (otmp->manualidx < 64)
-                            bits2 |= 1L << (otmp->special_quality - 32);
+                            bits2 |= (int64_t)1 << (otmp->special_quality - 32);
                     }
 
                     otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, MKOBJ_TYPE_NORMAL, (struct monst*)0, MAT_NONE, bits, bits2, MKOBJ_FLAGS_PARAM_IS_EXCLUDED_INDEX_BITS);
                     if (otmp)
                     {
                         otmp->bknown = 1;
-                        (void)add_to_container(stash, otmp);
+                        (void)add_to_magic_chest(otmp);
                     }
                 }
             }
@@ -2430,7 +2441,7 @@ mkmodronportal(subtyp, tm, portal_tm, portal_flags)
 int subtyp;
 coord* tm;
 coord* portal_tm;
-unsigned long portal_flags;
+uint64_t portal_flags;
 {
     struct trap* t;
 
@@ -2711,7 +2722,7 @@ struct mkroom *croom;
            replicate mkgold()'s level-based formula for the amount */
         struct obj *gold = mksobj(GOLD_PIECE, TRUE, FALSE, FALSE);
 
-        gold->quan = (long) (rnd(20) + level_difficulty() * rnd(5));
+        gold->quan = (int64_t) (rnd(20) + level_difficulty() * rnd(5));
         gold->owt = weight(gold);
         gold->ox = m.x, gold->oy = m.y;
         add_to_buried(gold);

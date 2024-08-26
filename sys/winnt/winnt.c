@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    winnt.c    $NHDT-Date: 1524321419 2018/04/21 14:36:59 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.30 $ */
 /* Copyright (c) GnollHack PC Development Team 1993, 1994 */
@@ -75,7 +75,7 @@ switchar()
 }
 
 
-long
+int64_t
 freediskspace(path)
 char *path;
 {
@@ -91,7 +91,7 @@ char *path;
     tmppath[3] = '\0';
     GetDiskFreeSpace(tmppath, &SectorsPerCluster, &BytesPerSector,
                      &FreeClusters, &TotalClusters);
-    return (long) (SectorsPerCluster * BytesPerSector * FreeClusters);
+    return (int64_t) (SectorsPerCluster * BytesPerSector * FreeClusters);
 }
 
 /*
@@ -121,12 +121,12 @@ foundfile_buffer()
     return &ffd.cFileName[0];
 }
 
-long
+int64_t
 filesize(file)
 const char *file;
 {
     if (findfirst(file)) {
-        return ((long) ffd.nFileSizeLow);
+        return ((int64_t) ffd.nFileSizeLow);
     } else
         return -1L;
 }
@@ -215,6 +215,7 @@ return &szFullPath[0];
 }
 #endif
 
+#ifndef GNH_WIN
 /* fatal error */
 /*VARARGS1*/
 void error
@@ -239,6 +240,7 @@ VA_DECL(const char *, s)
     VA_END();
     gnollhack_exit(EXIT_FAILURE);
 }
+#endif
 
 void
 Delay(int ms)
@@ -515,7 +517,7 @@ int code;
      * GUILaunched is defined and set in nttty.c.
      */
     if (exit_hack)
-        exit_hack(code);
+        exit_hack(exit_hack_code);
 
     if (!GUILaunched) {
         windowprocs = *get_safe_procs(1);
@@ -709,10 +711,10 @@ char *name;
 #define STATUS_UNSUCCESSFUL 0xC0000001
 #endif
 
-unsigned long
+uint64_t
 sys_random_seed(VOID_ARGS)
 {
-    unsigned long ourseed = 0UL;
+    uint64_t ourseed = 0UL;
     BCRYPT_ALG_HANDLE hRa = (BCRYPT_ALG_HANDLE) 0;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     boolean Plan_B = TRUE;
@@ -739,7 +741,7 @@ sys_random_seed(VOID_ARGS)
             emsg = "Other failure than algorithm not avail";
         paniclog("sys_random_seed", emsg); /* leaves clue, doesn't exit */
         (void) time(&datetime);
-        ourseed = (unsigned long) datetime;
+        ourseed = (uint64_t) datetime;
     }
     return ourseed;
 }

@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-07-16 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0	wc_chainin.c	$NHDT-Date: 1433806610 2015/06/08 23:36:50 $  $NHDT-Branch: master $:$NHDT-Revision: 1.7 $ */
 /* Copyright (c) Kenneth Lorber, 2012				  */
@@ -376,7 +376,7 @@ chainin_yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_
 int style, attr, color, glyph;
 const char *title, * query, * resp, *resp_desc, *introline;
 char def;
-unsigned long ynflags;
+uint64_t ynflags;
 {
     int rv;
 
@@ -435,7 +435,7 @@ int intervals;
 void
 chainin_change_color(color, value, reverse)
 int color;
-long value;
+int64_t value;
 int reverse;
 {
     (*cibase->nprocs->win_change_color)(cibase->ndata, color, value, reverse);
@@ -552,7 +552,7 @@ void
 chainin_status_update(idx, ptr, chg, percent, color, colormasks)
 int idx, chg, percent, color;
 genericptr_t ptr;
-unsigned long *colormasks;
+uint64_t *colormasks;
 {
     (*cibase->nprocs->win_status_update)(cibase->ndata, idx, ptr, chg,
                                          percent, color, colormasks);

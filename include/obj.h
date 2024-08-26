@@ -1,15 +1,15 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    obj.h    $NHDT-Date: 1508827590 2017/10/24 06:46:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.60 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2006. */
 /* GnollHack may be freely redistributed.  See license for details. */
 
-#include "general.h"
-#include "objclass.h"
-
 #ifndef OBJ_H
 #define OBJ_H
+
+#include "general.h"
+#include "objclass.h"
 
 /* #define obj obj_nh */ /* uncomment for SCO UNIX, which has a conflicting
                           * typedef for "obj" in <sys/types.h> */
@@ -29,7 +29,7 @@ struct oextra {
     char* uoname;          /* ptr to name of object */
     struct monst *omonst; /* ptr to attached monst struct */
     unsigned *omid;       /* ptr to m_id */
-    long *olong;          /* ptr to misc long (temporary gold object) */
+    int64_t *olong;          /* ptr to misc int64_t (temporary gold object) */
     char *omailcmd;       /* response_cmd for mail deliver */
 };
 
@@ -42,38 +42,16 @@ struct obj {
 
     struct obj *cobj; /* contents list for containers */
     unsigned o_id;
+    unsigned owt;
+    short otyp; /* object class number */
     xchar ox, oy;
     xchar ox0, oy0;
-    short otyp; /* object class number */
-    unsigned owt;
-    long quan; /* number of items */
 
-    short enchantment; /* Always set to zero by cancellation
-                  quality of weapon, weptool, armor or ring (+ or -);
-                  OBSOLETE (moved to charges): number of charges for wand or charged tool ( >= -1 );
-                  OBSOLETE (moved to special_quality): number of candles attached to candelabrum;
-                  OBSOLETE (moved to special_quality and speflags): marks your eggs, tin variety and spinach tins;
-                  OBSOLETE (moved to special_quality and speflags): Schroedinger's Box (1) or royal coffers for a court (2);
-                  OBSOLETE (moved to special_quality): tells which fruit a fruit is;
-                  OBSOLETE (moved to special_quality): special for uball and amulet;
-                  OBSOLETE (moved to special_quality): scroll of mail (normal==0, bones or wishing==1, written==2);
-                  OBSOLETE (moved to speflags): historic and gender for statues */
-    short charges; /* number of charges for wand or charged tool ( >= -1 ), always set to -1/0 by cancellation */
-    short special_quality; /* item-specific special quality, e.g., the amount of wetness of a towel, number of candles attached to candelabrum, not affected by cancellation */
-
-#define SPEQUAL_STATUE_HISTORIC                1
-#define SPEQUAL_RULING_RING_INSCRIPTION_READ   1
-#define SPEQUAL_MAIL_FROM_BONES_OR_WISHING     1
-#define SPEQUAL_MAIL_FROM_MAGIC_MARKER         2
-#define SPEQUAL_MAGIC_LAMP_CONTAINS_DJINN      1
-#define SPEQUAL_TIN_CONTAINS_SPINACH           1
-#define SPEQUAL_MAGIC_CANDLE_PARTLY_USED       1
-#define SPEQUAL_MAGIC_CANDLE_UNUSED            2
-#define SPEQUAL_LIGHT_SOURCE_FUNCTIONAL        1
-#define SPEQUAL_UBALL_SPECIAL                  1
-#define SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP    1
-
-    unsigned long speflags; /* anything else that might be going on with an item, not affected by cancellation */
+    int64_t quan; /* number of items */
+    int64_t age;               /* creation date */
+    int64_t owornmask;
+    uint64_t item_flags;  /* general purpose object flags, like speflags */
+    uint64_t speflags;    /* anything else that might be going on with an item, not affected by cancellation */
 
 #define SPEFLAGS_YOURS                         0x00000001UL
 #define SPEFLAGS_FEMALE                        0x00000002UL
@@ -108,9 +86,34 @@ struct obj {
 #define SPEFLAGS_FOUND_THIS_TURN               0x40000000UL
 #define SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO    0x80000000UL
 
+    short enchantment; /* Always set to zero by cancellation
+                  quality of weapon, weptool, armor or ring (+ or -);
+                  OBSOLETE (moved to charges): number of charges for wand or charged tool ( >= -1 );
+                  OBSOLETE (moved to special_quality): number of candles attached to candelabrum;
+                  OBSOLETE (moved to special_quality and speflags): marks your eggs, tin variety and spinach tins;
+                  OBSOLETE (moved to special_quality and speflags): Schroedinger's Box (1) or royal coffers for a court (2);
+                  OBSOLETE (moved to special_quality): tells which fruit a fruit is;
+                  OBSOLETE (moved to special_quality): special for uball and amulet;
+                  OBSOLETE (moved to special_quality): scroll of mail (normal==0, bones or wishing==1, written==2);
+                  OBSOLETE (moved to speflags): historic and gender for statues */
+    short charges; /* number of charges for wand or charged tool ( >= -1 ), always set to -1/0 by cancellation */
+    short special_quality; /* item-specific special quality, e.g., the amount of wetness of a towel, number of candles attached to candelabrum, not affected by cancellation */
+
+#define SPEQUAL_STATUE_HISTORIC                1
+#define SPEQUAL_RULING_RING_INSCRIPTION_READ   1
+#define SPEQUAL_MAIL_FROM_BONES_OR_WISHING     1
+#define SPEQUAL_MAIL_FROM_MAGIC_MARKER         2
+#define SPEQUAL_MAGIC_LAMP_CONTAINS_DJINN      1
+#define SPEQUAL_TIN_CONTAINS_SPINACH           1
+#define SPEQUAL_MAGIC_CANDLE_PARTLY_USED       1
+#define SPEQUAL_MAGIC_CANDLE_UNUSED            2
+#define SPEQUAL_LIGHT_SOURCE_FUNCTIONAL        1
+#define SPEQUAL_UBALL_SPECIAL                  1
+#define SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP    1
+
+    short oartifact; /* artifact array index */
     char oclass;    /* object class */
     char invlet;    /* designation in inventory */
-    short oartifact; /* artifact array index */
     uchar mythic_prefix; /* magical quality for a weapon or armor giving additional powers */
     uchar mythic_suffix;  /* magical quality for a weapon or armor giving additional powers */
     uchar exceptionality; /* exceptional, elite, etc. weapon, multiplies base damage */
@@ -129,8 +132,20 @@ struct obj {
 #define OBJ_BURIED 6    /* object buried */
 #define OBJ_ONBILL 7    /* object on shk bill */
 #define OBJ_HEROMEMORY 8  /* object remembered by hero */
-#define NOBJ_STATES 9
+#define OBJ_MAGIC 9     /* object is in a magic chest */
+#define NOBJ_STATES 10
     xchar timed; /* # of fuses (timers) attached to this obj */
+
+    int corpsenm;         /* type of corpse is mons[corpsenm] */
+#define leashmon corpsenm /* gets m_id of attached pet */
+#define appearanceidx corpsenm /* index for alternative appearance */
+#define novelidx special_quality /* 3.6 tribute - the index of the novel title */
+#define manualidx special_quality /* the index of the manual title */
+#define keyotyp corpsenm  /* otyp of the key capable of locking / unlocking the chest (0 = SKELETON_KEY). Special_quality additionally defines the type of the key (its matching special_quality) */
+    int usecount;           /* overloaded for various things that tally */
+#define spestudied usecount /* # of times a spellbook has been studied */
+#define ring_text_appeared usecount /* the round the text of Ruling Ring of Yendor appeared */
+    unsigned oeaten;        /* nutrition left in food, if partly eaten */
 
     Bitfield(cursed, 1);
     Bitfield(blessed, 1);
@@ -175,29 +190,21 @@ struct obj {
     Bitfield(mknown, 1); /* mythic quality is known */
     Bitfield(rotknown, 1); /* rotting status is known */
 
-    int corpsenm;         /* type of corpse is mons[corpsenm] */
-#define leashmon corpsenm /* gets m_id of attached pet */
-#define appearanceidx corpsenm /* index for alternative appearance */
-#define novelidx special_quality /* 3.6 tribute - the index of the novel title */
-#define manualidx special_quality /* the index of the manual title */
-#define keyotyp corpsenm  /* otyp of the key capable of locking / unlocking the chest (0 = SKELETON_KEY). Special_quality additionally defines the type of the key (its matching special_quality) */
-    int usecount;           /* overloaded for various things that tally */
-#define spestudied usecount /* # of times a spellbook has been studied */
-#define ring_text_appeared usecount /* the round the text of Ruling Ring of Yendor appeared */
-    unsigned oeaten;        /* nutrition left in food, if partly eaten */
-    long age;               /* creation date */
-    long owornmask;
+    unsigned reserved;  /* reserved for, e.g., more bitfields */
+
+    unsigned o_id_memory;  /* This is a memory object of this o_id */
+    unsigned m_id_memory;  /* This is a memory object of this mimic m_id */
+
     short cooldownleft;       /* item cooldown left before it can be used again*/
     short repowerleft;       /* artifact cooldown left before its invoke ability can be used again*/
     short detectioncount;    /* monsters detected for WARN_ORC and other similar properties */
-    boolean invokeon;      /* the object's / artifact's invoked ability is on */
     short invokeleft;      /* the counter for artifact's invoke ability remaining on */
-    unsigned o_id_memory;  /* This is a memory object of this o_id */
-    unsigned m_id_memory;  /* This is a memory object of this mimic m_id */
+    boolean invokeon;      /* the object's / artifact's invoked ability is on */
 
     uchar special_tileset;
     int glyph;
     int gui_glyph;
+
     struct oextra *oextra; /* pointer to oextra struct */
 };
 
@@ -354,6 +361,8 @@ enum elemental_enchantments {
 #define is_otyp_throwing_weapon(otyp) (is_otyp_nonmelee_throwing_weapon(otyp) || (objects[otyp].oc_flags & O1_MELEE_AND_THROWN_WEAPON))
 #define throwing_weapon(o) is_otyp_throwing_weapon((o)->otyp)
 #define nonmelee_throwing_weapon(o) is_otyp_nonmelee_throwing_weapon((o)->otyp)
+#define is_obj_identified_when_damageable(o) \
+    ((o)->oclass != ARMOR_CLASS && (o)->oclass != WEAPON_CLASS  && !is_weptool(o) && (o)->oclass != BALL_CLASS)
 
 #define is_otyp_armor(otyp) (objects[otyp].oc_class == ARMOR_CLASS)
 #define is_armor(o) ((o)->oclass == ARMOR_CLASS)
@@ -414,6 +423,9 @@ enum elemental_enchantments {
 #define can_have_exceptionality(o)     ((is_weapon(o) || is_otyp_specially_exceptional((o)->otyp)) && !is_otyp_non_exceptional((o)->otyp))
 #define is_otyp_nonexceptionality_armor(otyp) (is_otyp_armor(otyp) && !can_otyp_have_exceptionality(otyp))
 #define nonexceptionality_armor(o)     (is_armor(o) && !can_have_exceptionality(o))
+#define is_otyp_normally_non_exceptional(otyp)     \
+    ((objects[(otyp)].oc_flags6 & O6_NORMALLY_NON_EXCEPTIONAL) != 0)
+#define is_normally_non_exceptional(o) is_otyp_normally_non_exceptional((o)->otyp) 
 
 #define otyp_allows_specially_dipping_into(otyp) ((objects[(otyp)].oc_flags4 & O4_ALLOWS_DIPPING_INTO) != 0)
 #define otyp_allows_object_to_be_dipped_into_it(otyp) (objects[(otyp)].oc_class == POTION_CLASS || otyp_allows_specially_dipping_into(otyp))
@@ -430,30 +442,6 @@ enum elemental_enchantments {
 
 #define is_obj_generated_blessed(o)                                            \
     ((objects[(o)->otyp].oc_flags2 & O2_GENERATED_BLESSED) != 0)
-
-#define oresist_disintegration(o)                                       \
-    ((get_obj_oc_flags(o) & O1_DISINTEGRATION_RESISTANT) != 0 || is_obj_indestructible(o) \
-     || ((o)->otyp == CORPSE && pm_resists_disint(&mons[(o)->corpsenm])) \
-     || obj_resists(o, 2, 50) \
-     || is_quest_artifact(o) )
-
-#define oresist_fire(o)                                       \
-    ((get_obj_oc_flags(o) & O1_FIRE_RESISTANT) != 0 || is_obj_indestructible(o) \
-     || ((o)->otyp == CORPSE && pm_resists_fire(&mons[(o)->corpsenm])) \
-     || obj_resists(o, 0, 0) \
-     || is_quest_artifact(o) )
-
-#define oresist_cold(o)                                       \
-    ((get_obj_oc_flags(o) & O1_COLD_RESISTANT) != 0 || is_obj_indestructible(o) \
-     || ((o)->otyp == CORPSE && pm_resists_cold(&mons[(o)->corpsenm])) \
-     || obj_resists(o, 0, 0) \
-     || is_quest_artifact(o) )
-
-#define oresist_elec(o)                                       \
-    ((get_obj_oc_flags(o) & O1_LIGHTNING_RESISTANT) != 0 || is_obj_indestructible(o) \
-     || ((o)->otyp == CORPSE && pm_resists_elec(&mons[(o)->corpsenm])) \
-     || obj_resists(o, 0, 0) \
-     || is_quest_artifact(o) )
 
 /* Armor */
 #define is_otyp_shield(otyp)          \
@@ -520,9 +508,11 @@ enum elemental_enchantments {
 /* Containers */
 #define carried(o) ((o)->where == OBJ_INVENT)
 #define mcarried(o) ((o)->where == OBJ_MINVENT)
-#define Has_contents(o)                                \
-    (/* (Is_container(o) || (o)->otyp == STATUE) && */ \
-     (o)->cobj != (struct obj *) 0)
+#define Is_magic_chest(o) ((objects[(o)->otyp].oc_flags6 & O6_MAGIC_CHEST) != 0)
+#define contained_object_chain(o) (Is_magic_chest(o) && (o)->where != OBJ_CONTAINED ? magic_objs : (o)->cobj)
+#define contained_object_chain_ptr(o) (Is_magic_chest(o) && (o)->where != OBJ_CONTAINED ? &magic_objs : &((o)->cobj))
+#define Has_contained_contents(o) (contained_object_chain(o) != (struct obj *) 0)
+#define Has_contents(o) ((o)->cobj != (struct obj *) 0)
 #define Is_otyp_container(otyp) ((objects[(otyp)].oc_flags2 & O2_CONTAINER) != 0)
 #define Is_container(o) Is_otyp_container((o)->otyp)
 #define Has_otyp_lid(otyp) ((objects[(otyp)].oc_flags4 & O4_CONTAINER_HAS_LID) != 0)
@@ -624,6 +614,10 @@ enum elemental_enchantments {
     (objects[otyp].oc_class == TOOL_CLASS \
      && objects[otyp].oc_subtyp == TOOLTYPE_SAW)
 #define is_saw(o) is_otyp_saw((o)->otyp) 
+#define is_otyp_chest(otyp) \
+    (objects[otyp].oc_class == TOOL_CLASS \
+     && objects[otyp].oc_subtyp == TOOLTYPE_CHEST)
+#define is_chest(o) is_otyp_chest((o)->otyp) 
 
 #define MAX_OIL_IN_FLASK 400 /* maximum amount of oil in a potion of oil */
 
@@ -823,11 +817,14 @@ enum exceptionality_types {
     EXCEPTIONALITY_NORMAL = 0,
     EXCEPTIONALITY_EXCEPTIONAL,
     EXCEPTIONALITY_ELITE,
+    /* Planar exceptionalities */
     EXCEPTIONALITY_CELESTIAL,
     EXCEPTIONALITY_PRIMORDIAL,
     EXCEPTIONALITY_INFERNAL,
     MAX_EXCEPTIONALITY_TYPES
 };
+
+#define EXCEPTIONALITY_PLANAR_BY_ORIGINAL_ALIGNMENT MAX_EXCEPTIONALITY_TYPES
 
 
 /* Mythic */
@@ -837,9 +834,9 @@ struct mythic_definition {
     const char* description;
     short probability;
     double price_multiplier;
-    long price_addition;
-    unsigned long mythic_powers;
-    unsigned long mythic_flags;
+    int64_t price_addition;
+    uint64_t mythic_powers;
+    uint64_t mythic_flags;
 };
 
 #define MYTHIC_FLAG_NONE                        0x00000000UL
@@ -932,11 +929,11 @@ struct mythic_power_definition {
     const char* name;
     const char* description;
     uchar power_type;
-    long parameter1;                /* E.g., damage multiplier */
+    int64_t parameter1;                /* E.g., damage multiplier */
     double parameter2;              /* E.g., damage multiplier */
     char parameter3;                /* E.g., monster or item class */
-    unsigned long parameter4;       /* E.g., M2_ flag */
-    unsigned long power_flags;
+    uint64_t parameter4;       /* E.g., M2_ flag */
+    uint64_t power_flags;
 };
 
 enum mythic_power_types {
@@ -955,7 +952,6 @@ enum mythic_power_types {
 #define MYTHIC_POWER_FLAG_ALSO_SHAPESHIFTERS    0x00000020 /* Works also against shapeshifted monsters of the type */
 #define MYTHIC_POWER_FLAG_NO_THROWN_OR_AMMO     0x00000040 /* No thrown weapons or ammo for this power */
 #define MYTHIC_POWER_FLAG_THROWN_WEAPONS_ONLY   0x00000080 /* Works only for thrown weapons */
-
 
 enum mythic_prefix_power_types {
     MYTHIC_PREFIX_POWER_INDEX_LEVEL_DRAIN = 0,
@@ -1134,6 +1130,9 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 #define has_obj_mythic_spell_casting(o)         has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_SPELL_CASTING)
 #define has_obj_mythic_great_accuracy(o)        has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_ACCURACY)
 #define has_obj_mythic_great_damage(o)          has_obj_mythic_prefix_power(o, MYTHIC_PREFIX_POWER_INDEX_GREAT_DAMAGE)
+#define has_obj_mythic_fire_resistance(o)       has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_FIRE_RESISTANCE)
+#define has_obj_mythic_cold_resistance(o)       has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_COLD_RESISTANCE)
+#define has_obj_mythic_shock_resistance(o)      has_obj_mythic_suffix_power(o, MYTHIC_SUFFIX_POWER_INDEX_SHOCK_RESISTANCE)
 
 #define obj_counts_as_silver(o) ((o)->material == MAT_SILVER || has_obj_mythic_silver_damage(o))
 
@@ -1149,7 +1148,7 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 #define candlelabrum_maximum_burn_time(o) candlelabrum_starting_burn_time(o)
 #define torch_starting_burn_time(o) (500)
 #define torch_maximum_burn_time(o) torch_starting_burn_time(o)
-#define lamp_starting_burn_time(o) ((long)rn1(500, 1000))
+#define lamp_starting_burn_time(o) ((int64_t)rn1(500, 1000))
 #define lamp_maximum_burn_time(o) MAX_OIL_IN_LAMP
 #define potion_starting_burn_time(o) MAX_OIL_IN_FLASK
 #define potion_maximum_burn_time(o) potion_starting_burn_time(o)
@@ -1158,6 +1157,33 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 #define is_light_source_empty(o) \
         (((o)->oclass == TOOL_CLASS && (objects[(o)->otyp].oc_subtyp == TOOLTYPE_LANTERN || objects[(o)->otyp].oc_subtyp == TOOLTYPE_LAMP) && (o)->otyp != MAGIC_LAMP && (o)->age == 0L && !((o)->lamplit) && ((o)->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0) \
         || ((o)->otyp == MAGIC_LAMP && (o)->special_quality == 0 && ((o)->speflags & SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO) != 0))
+
+#define oresist_disintegration(o)                                       \
+    ((get_obj_oc_flags(o) & O1_DISINTEGRATION_RESISTANT) != 0 || is_obj_indestructible(o) \
+     || ((o)->otyp == CORPSE && pm_resists_disint(&mons[(o)->corpsenm])) \
+     || obj_resists(o, 2, 50) \
+     || is_quest_artifact(o) )
+
+#define oresist_fire(o)                                       \
+    ((get_obj_oc_flags(o) & O1_FIRE_RESISTANT) != 0 || is_obj_indestructible(o) \
+     || has_obj_mythic_fire_resistance(o) \
+     || ((o)->otyp == CORPSE && pm_resists_fire(&mons[(o)->corpsenm])) \
+     || obj_resists(o, 0, 0) \
+     || is_quest_artifact(o) )
+
+#define oresist_cold(o)                                       \
+    ((get_obj_oc_flags(o) & O1_COLD_RESISTANT) != 0 || is_obj_indestructible(o) \
+     || has_obj_mythic_cold_resistance(o) \
+     || ((o)->otyp == CORPSE && pm_resists_cold(&mons[(o)->corpsenm])) \
+     || obj_resists(o, 0, 0) \
+     || is_quest_artifact(o) )
+
+#define oresist_elec(o)                                       \
+    ((get_obj_oc_flags(o) & O1_LIGHTNING_RESISTANT) != 0 || is_obj_indestructible(o) \
+     || has_obj_mythic_shock_resistance(o) \
+     || ((o)->otyp == CORPSE && pm_resists_elec(&mons[(o)->corpsenm])) \
+     || obj_resists(o, 0, 0) \
+     || is_quest_artifact(o) )
 
 /* Manuals */
 enum manual_types

@@ -28,10 +28,11 @@ namespace GnollHackX.Controls
         {
             InitializeComponent();
             customCanvasView.InvalidateSurface();
+            TextColor = TextColor;
             customButton.Pressed += (object sender, EventArgs args) =>
             {
                 _isPressed = true;
-                if(UseVaryingTextColors)
+                if (UseVaryingTextColors)
                     customButton.TextColor = !IsEnabled ? DisabledTextColor : _isPressed ? SelectedTextColor : NormalTextColor;
                 customCanvasView.InvalidateSurface();
             };
@@ -53,8 +54,60 @@ namespace GnollHackX.Controls
             {
                 customCanvasView.InvalidateSurface();
             };
+#if WINDOWS
+            customCanvasView.HandlerChanged += (object sender, EventArgs args) =>
+            {
+                if(customCanvasView.Handler?.PlatformView is SkiaSharp.Views.Windows.SKXamlCanvas)
+                {
+                    var canvas = customCanvasView.Handler?.PlatformView as SkiaSharp.Views.Windows.SKXamlCanvas;
+                    canvas.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush();
+                    canvas.PointerEntered += Canvas_PointerEntered;
+                    canvas.PointerExited += Canvas_PointerExited;
+                    canvas.PointerCanceled += Canvas_PointerExited;
+                }
+            };
+            customButton.HandlerChanged += (object sender, EventArgs args) =>
+            {
+                if (customButton.Handler?.PlatformView is Microsoft.UI.Xaml.Controls.Button)
+                {
+                    var button = customButton.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.Button;
+                    button.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush();
+                    button.PointerEntered += Canvas_PointerEntered;
+                    button.PointerExited += Canvas_PointerExited;
+                    button.PointerCanceled += Canvas_PointerExited;
+                }
+            };
+#endif
         }
 
+
+#if WINDOWS
+        private bool _isHoveringEnabled = true;
+        private bool _isHovering = false;
+        private void Canvas_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            e.Handled = true;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _isHovering = true;
+                customCanvasView.InvalidateSurface();
+                TextColor = TextColor;
+            });
+        }
+        private void Canvas_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            e.Handled = true;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _isHovering = false;
+                customCanvasView.InvalidateSurface();
+                TextColor = TextColor;
+            });
+        }
+#else
+        private bool _isHoveringEnabled = false;
+        private bool _isHovering = false;
+#endif
         private bool _isPressed = false;
 
         public event EventHandler Clicked;
@@ -63,8 +116,19 @@ namespace GnollHackX.Controls
         public static readonly BindableProperty NormalTextColorProperty = BindableProperty.Create(nameof(NormalTextColorProperty), typeof(Color), typeof(CustomImageButton), GHColors.White);
         public static readonly BindableProperty SelectedTextColorProperty = BindableProperty.Create(nameof(SelectedTextColorProperty), typeof(Color), typeof(CustomImageButton), GHColors.White);
         public static readonly BindableProperty DisabledTextColorProperty = BindableProperty.Create(nameof(DisabledTextColorProperty), typeof(Color), typeof(CustomImageButton), GHColors.Gray);
+        public static readonly BindableProperty TextColorProperty = BindableProperty.Create(nameof(TextColorProperty), typeof(Color), typeof(CustomImageButton), GHColors.White, propertyChanged: OnTextColorChanged);
         public static readonly BindableProperty UseVaryingTextColorsProperty = BindableProperty.Create(nameof(UseVaryingTextColorsProperty), typeof(bool), typeof(CustomImageButton), false);
         public static readonly BindableProperty UseVaryingBackgroundImagesProperty = BindableProperty.Create(nameof(UseVaryingBackgroundImages), typeof(bool), typeof(CustomImageButton), true);
+
+        private static void OnTextColorChanged(BindableObject bindable, object oldValue, object newValue)
+        {
+            CustomImageButton cib = bindable as CustomImageButton;
+            if (cib != null && newValue is Color)
+            {
+                Color newColor = (Color)newValue;
+                cib.customButton.TextColor = cib._isHoveringEnabled && (!cib._isHovering || !cib.IsEnabled) ? UIUtils.NonHoveringColorAdjustment(newColor, true) : UIUtils.HoveringColorAdjustment(newColor, true);
+            }
+        }
 
         public double ButtonRelativeWidth
         {
@@ -73,8 +137,12 @@ namespace GnollHackX.Controls
         }
         public Color TextColor
         {
-            get { return (Color)customButton.GetValue(Button.TextColorProperty); }
-            set { customButton.SetValue(Button.TextColorProperty, value); }
+            get { return (Color)GetValue(TextColorProperty); }
+            set 
+            { 
+                SetValue(TextColorProperty, value);
+                customButton.TextColor = _isHoveringEnabled && (!_isHovering || !IsEnabled) ? UIUtils.NonHoveringColorAdjustment(value, true) : UIUtils.HoveringColorAdjustment(value, true);
+            }
         }
         public Color NormalTextColor
         {
@@ -120,12 +188,12 @@ namespace GnollHackX.Controls
         public new bool IsEnabled
         {
             get { return (bool)GetValue(CustomImageButton.IsEnabledProperty); }
-            set { SetValue(CustomImageButton.IsEnabledProperty, value); customGrid.IsEnabled = value; if (UseVaryingTextColors) { customButton.TextColor = !value ? DisabledTextColor : _isPressed ? SelectedTextColor : NormalTextColor; } customCanvasView.InvalidateSurface(); }
+            set { SetValue(CustomImageButton.IsEnabledProperty, value); customGrid.IsEnabled = value; if (UseVaryingTextColors) { TextColor = !value ? DisabledTextColor : _isPressed ? SelectedTextColor : NormalTextColor; } customCanvasView.InvalidateSurface(); }
         }
         public bool UseVaryingTextColors
         {
             get { return (bool)GetValue(CustomImageButton.UseVaryingTextColorsProperty); }
-            set { SetValue(CustomImageButton.UseVaryingTextColorsProperty, value); customButton.TextColor = value ? (!IsEnabled ? DisabledTextColor : _isPressed ? SelectedTextColor : NormalTextColor) : NormalTextColor; }
+            set { SetValue(CustomImageButton.UseVaryingTextColorsProperty, value); if (value) { TextColor = !IsEnabled ? DisabledTextColor : _isPressed ? SelectedTextColor : NormalTextColor; } }
         }
         public bool UseVaryingBackgroundImages
         {
@@ -146,19 +214,27 @@ namespace GnollHackX.Controls
             SKCanvas canvas = surface.Canvas;
             float canvaswidth = customCanvasView.CanvasSize.Width;
             float canvasheight = customCanvasView.CanvasSize.Height;
+#if WINDOWS
+            SKImage targetBitmap = !UseVaryingBackgroundImages ? GHApp.ButtonNormalBitmap : _isPressed && IsEnabled ? GHApp.ButtonSelectedBitmap : _isHovering && IsEnabled ? GHApp.ButtonNormalBitmap : GHApp.ButtonDisabledBitmap;
+#else
             SKImage targetBitmap = !UseVaryingBackgroundImages ? GHApp.ButtonNormalBitmap : !IsEnabled ? GHApp.ButtonDisabledBitmap : _isPressed ? GHApp.ButtonSelectedBitmap : GHApp.ButtonNormalBitmap;
+#endif
             if (targetBitmap == null)
                 return;
             canvas.Clear();
             SKRect sourcerect = new SKRect(0, 0, targetBitmap.Width, targetBitmap.Height);
             SKRect targetrect = new SKRect(0, 0, canvaswidth, canvasheight);
-            canvas.DrawImage(targetBitmap, sourcerect, targetrect);
+            using (SKPaint paint = new SKPaint() )
+            {
+#if !GNH_MAUI
+                paint.FilterQuality = SKFilterQuality.High;
+#endif
+                canvas.DrawImage(targetBitmap, sourcerect, targetrect,
+#if GNH_MAUI
+                    new SKSamplingOptions(SKFilterMode.Linear),
+#endif
+                    paint);
+            }
         }
-
-        public void Redraw()
-        {
-            customCanvasView.InvalidateSurface();
-        }
-
     }
 }

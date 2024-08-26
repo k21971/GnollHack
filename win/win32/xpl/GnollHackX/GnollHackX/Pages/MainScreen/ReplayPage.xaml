@@ -6,8 +6,8 @@
              BackgroundColor="Black"
              x:Class="GnollHackX.Pages.MainScreen.ReplayPage">
     <ContentPage.Content>
-        <Grid>
-            <gnh:BackgroundView x:Name="bkgView" BackgroundStyle="StretchedBitmap" BackgroundBitmap="OldPaper" BorderStyle="Simple" HorizontalOptions="Fill" VerticalOptions="Fill"/>
+        <Grid x:Name="RootGrid">
+            <gnh:BackgroundView x:Name="bkgView" BackgroundStyle="Automatic" BackgroundBitmap="AutoMenuBackground" BorderStyle="Simple" HorizontalOptions="Fill" VerticalOptions="Fill"/>
             <Grid x:Name="MainGrid" WidthRequest  ="900" RowSpacing="6" HorizontalOptions="Center" VerticalOptions="Fill" >
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -19,9 +19,9 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Label x:Name="HeaderLabel" Grid.Row="0" Text="Select Recorded Game" HorizontalOptions="Center" VerticalOptions="Start" HorizontalTextAlignment="Center" FontSize="Large" TextColor="Black" FontFamily="Immortal"/>
+                <Label Grid.Row="0" x:Name="HeaderLabel" Text="Select Recorded Game" HorizontalOptions="Center" VerticalOptions="Start" HorizontalTextAlignment="Center" FontSize="22" TextColor="Black" FontFamily="Immortal"/>
                 <Label Grid.Row="1" x:Name="RecordingsLabel" Text="0 replays available" HorizontalOptions="Center" VerticalOptions="Start" HorizontalTextAlignment="Center" FontSize="16" TextColor="Black" FontFamily="Immortal"/>
-                <CollectionView x:Name="ReplayCollectionView" Grid.Row="2" HorizontalOptions="Fill" VerticalOptions="Start" SelectionMode="Single"  BackgroundColor="Transparent" SelectionChanged="MainListView_SelectionChanged" >
+                <CollectionView Grid.Row="2" x:Name="ReplayCollectionView" HorizontalOptions="Fill" VerticalOptions="Start" SelectionMode="Single"  BackgroundColor="Transparent" SelectionChanged="MainListView_SelectionChanged" >
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="gnh:GHRecordedGameFile">
                             <Grid ColumnSpacing="6" HorizontalOptions="Fill" VerticalOptions="Fill" Margin="0,8">
@@ -51,6 +51,7 @@
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>
+                <Label Grid.Row="2" x:Name="EmptyLabel" IsVisible="False" Text="No replays found" HorizontalOptions="Center" VerticalOptions="Start" HorizontalTextAlignment="Center" FontSize="18" TextColor="Black" FontFamily="Immortal"/>
                 <Grid x:Name="BottomLayout" Grid.Row="3" HorizontalOptions="Fill" VerticalOptions="End">
                     <StackLayout x:Name="OuterButtonMainStack" Spacing="6" Orientation="Vertical"  HorizontalOptions="Center">
                         <StackLayout x:Name="ServerStack" Grid.Row="3" Spacing="6" Orientation="Horizontal" HorizontalOptions="Center" VerticalOptions="Center">
@@ -111,7 +112,7 @@
                     <Frame x:Name="UploadDownloadFrame" BackgroundColor="#99000000" BorderColor="Black" CornerRadius="10" HorizontalOptions="Center" VerticalOptions="Center">
                         <StackLayout Spacing="6">
                             <Label Text="Uploading..." x:Name="UploadDownloadTitleLabel" FontFamily="Immortal" FontSize="20" TextColor="White" VerticalTextAlignment="Center" HorizontalOptions="Center"  />
-                            <Label Text="replay.gnhrec.gz" x:Name="UploadDownloadFileLabel" FontFamily="Lato-Regular" FontSize="16" TextColor="White" VerticalTextAlignment="Start" HorizontalOptions="Center"  />
+                            <Label Text="replay.gnhrec.gz" x:Name="UploadDownloadFileLabel" FontFamily="LatoRegular" FontSize="16" TextColor="White" VerticalTextAlignment="Start" HorizontalOptions="Center"  />
                             <Label Text="Please wait..." x:Name="UploadDownloadStatusLabel" FontFamily="Underwood" FontSize="16" TextColor="White" VerticalTextAlignment="Start" HorizontalOptions="Center"  />
                             <controls:CustomImageButton Text="Cancel" x:Name="UploadDownloadCancelButton" Clicked="UploadDownloadCancelButton_Clicked" Margin="0,10,0,0" FontFamily="Diablo" FontSize="16" TextColor="White" BackgroundColor="Transparent" WidthRequest="180" HeightRequest="50" HorizontalOptions="Center" VerticalOptions="Center" />
                         </StackLayout>

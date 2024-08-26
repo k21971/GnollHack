@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mondata.h    $NHDT-Date: 1550524558 2019/02/18 21:15:58 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.37 $ */
 /* Copyright (c) 1989 Mike Threepoint                  */
@@ -41,6 +41,7 @@
 #define nohands(ptr) (((ptr)->mflags1 & M1_NOHANDS) != 0L) /* also covers no limbs because of the bit in M1_NOLIMBS  */
 #define notake(ptr) (((ptr)->mflags1 & M1_NOTAKE) != 0L)
 #define can_operate_objects(ptr) (!(nohands(ptr) || verysmall(ptr)) || is_telekinetic_operator(ptr))
+#define is_armed(ptr) attacktype(ptr, AT_WEAP)
 
 #define has_head(ptr) ((ptr)->heads > 0)
 #define has_neck(ptr) (((ptr)->mflags1 & M1_NONECK) == 0L && has_head(ptr))
@@ -236,6 +237,7 @@
 #define is_cloned_wizard(m) (((m)->mon_flags & MON_FLAGS_CLONED_WIZ) != 0L)
 #define is_level_boss(m) (((m)->mon_flags & MON_FLAGS_LEVEL_BOSS) != 0L)
 #define uses_level_boss_hostility(m) (((m)->mon_flags & MON_FLAGS_BOSS_HOSTILITY) != 0L)
+#define has_vorpal_warning_been_given(m) (((m)->mon_flags & MON_FLAGS_VORPAL_WARNING_GIVEN) != 0L)
 
 /* Resistances and properties */
 #define has_innate(ptr, bit) \
@@ -881,8 +883,6 @@
 #define has_sickening_corpse(ptr) (((ptr)->mconveys & MC_SICKENING_CORPSE) != 0L)
 #define has_mummy_rotted_corpse(ptr) (((ptr)->mconveys & MC_MUMMY_ROTTED_CORPSE) != 0L)
 
-#define is_armed(ptr) attacktype(ptr, AT_WEAP)
-
 
 #define is_mplayer(ptr) \
     (((ptr) >= &mons[PM_ARCHAEOLOGIST]) && ((ptr) <= &mons[PM_WIZARD]))
@@ -963,7 +963,7 @@
 #define can_wear_rings(ptr) (!nohands(ptr))
 #define can_wear_shield(ptr) (!nohands(ptr))
 #define can_wear_blindfold(ptr) (haseyes(ptr) && has_head(ptr))
-#define can_wield_weapons(ptr) (!nohands(ptr))
+#define can_wield_weapons(ptr) is_armed(ptr)
 #define can_wear_objects(ptr) (can_operate_objects(ptr) && !(is_animal(ptr) && !able_to_wear_objects(ptr)))
 #define can_wear_saddle(ptr) is_steed(ptr)
 

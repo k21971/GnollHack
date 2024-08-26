@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    sys.h    $NHDT-Date: 1449296291 2015/12/05 06:18:11 $  $NHDT-Branch: NetHack-3.6.0 $:$NHDT-Revision: 1.27 $ */
 /* Copyright (c) Kenneth Lorber, Kensington, Maryland, 2008. */
@@ -17,14 +17,19 @@ struct sysopt {
     char *shellers;   /* like wizards, for ! command (-DSHELL); also ^Z */
     char *genericusers; /* usernames that prompt for user name */
     char *debugfiles; /* files to show debugplines in. '*' is all. */
+#if defined (DUMPLOG) || defined (DUMPHTML)
+    char* snapjsonfile; /* where the snapshot json file is saved */
+#endif
 #if defined (DUMPLOG)
     char *dumplogfile; /* where the dump file is saved */
-    char* dumplogurl;  /* url path for the above */
+    char *snapshotfile; /* where the snapshot file is saved */
+    char *dumplogurl;  /* url path for the above */
 #endif
-#ifdef DUMPHTML
+#if defined (DUMPHTML)
     char* dumphtmlfile; /* where the html dump is saved */
+    char* snaphtmlfile; /* where the html snapshot is saved */
     char* dumphtmlfontname; /* font name for html dump */
-#ifdef DUMPHTML_WEBFONT_LINK
+#if defined(DUMPHTML_WEBFONT_LINK)
     char* dumphtmlfontlink; /* css web link for the font */
 #endif
     char* dumphtml_css_fontface_normal; /* css @fontface definition for normal font */

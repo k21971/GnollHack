@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    mcastu.c    $NHDT-Date: 1436753517 2015/07/13 02:11:57 $  $NHDT-Branch: master $:$NHDT-Revision: 1.44 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -705,7 +705,7 @@ int spellnum;
                 stun_duration = (stun_duration + 1) / 2;
             if (!Stunned)
                 play_sfx_sound(SFX_ACQUIRE_STUN);
-            make_stunned((HStun & TIMEOUT) + (long)stun_duration, FALSE);
+            make_stunned((HStun & TIMEOUT) + (int64_t)stun_duration, FALSE);
         }
         damage = 0;
         break;
@@ -849,7 +849,7 @@ int spellnum;
             damage = adjust_damage(d(8, 6), mtmp, &youmonst, AD_ELEC, ADFLAGS_SPELL_DAMAGE);
         destroy_item(WAND_CLASS, AD_ELEC);
         destroy_item(RING_CLASS, AD_ELEC);
-        (void) flashburn((long) rnd(100));
+        (void) flashburn((int64_t) rnd(100));
         item_destruction_hint(AD_ELEC, FALSE);
         break;
     }

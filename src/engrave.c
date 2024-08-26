@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    engrave.c    $NHDT-Date: 1456304550 2016/02/24 09:02:30 $  $NHDT-Branch: GnollHack-3.6.0 $:$NHDT-Revision: 1.61 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
@@ -418,7 +418,7 @@ void
 make_engr_at(x, y, s, e_time, e_type, e_flags)
 int x, y;
 const char *s;
-long e_time;
+int64_t e_time;
 xchar e_type;
 unsigned short e_flags;
 {
@@ -441,7 +441,7 @@ unsigned short e_flags;
     ep->engr_time = e_time;
     ep->engr_type = e_type > 0 ? e_type : rnd(ENGR_BLOOD);
     ep->engr_flags = e_flags | (!in_mklev && u.ux > 0 && x == u.ux && y == u.uy ? ENGR_FLAGS_SEEN : 0);
-    ep->engr_lth = smem;
+    ep->engr_lth = (uint64_t)smem;
 }
 
 /* delete any engraving at location <x,y> */
@@ -1328,14 +1328,18 @@ doengrave()
     newsym(u.ux, u.uy);
 
     if (!strcmp(buf, Elbereth_word))
+    {
         u.uevent.elbereth_known = 1;
+        if (!u.uconduct.elbereths++)
+            livelog_printf(LL_CONDUCT, "engraved Elbereth for the first time");
+    }
 
     if (post_engr_text[0])
         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s", post_engr_text);
     if (doblind && !resists_blnd(&youmonst) && !Flash_resistance) {
         play_sfx_sound(SFX_BLINDING_FLASH);
         You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are blinded by the flash!");
-        make_blinded((long) rnd(50), FALSE);
+        make_blinded((int64_t) rnd(50), FALSE);
         if (!Blind)
             Your1(vision_clears);
     }
@@ -1365,7 +1369,7 @@ int fd, mode;
         ep2 = ep->nxt_engr;
         if (ep->engr_lth && ep->engr_txt[0] && perform_bwrite(mode)) {
             bwrite(fd, (genericptr_t) &ep->engr_lth, sizeof ep->engr_lth);
-            bwrite(fd, (genericptr_t) ep, sizeof (struct engr) + ep->engr_lth);
+            bwrite(fd, (genericptr_t) ep, sizeof (struct engr) + (size_t)ep->engr_lth);
         }
         if (release_data(mode))
             dealloc_engr(ep);
@@ -1418,7 +1422,7 @@ void
 engr_stats(hdrfmt, hdrbuf, count, size)
 const char *hdrfmt;
 char *hdrbuf;
-long* count;
+int64_t* count;
 size_t* size;
 {
     struct engr *ep;
@@ -1428,7 +1432,7 @@ size_t* size;
     *size = 0;
     for (ep = head_engr; ep; ep = ep->nxt_engr) {
         ++*count;
-        *size += sizeof *ep + ep->engr_lth;
+        *size += sizeof *ep + (size_t)ep->engr_lth;
     }
 }
 

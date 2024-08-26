@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-01 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    polyself.c    $NHDT-Date: 1556497911 2019/04/29 00:31:51 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.132 $ */
 /*      Copyright (C) 1987, 1988, 1989 by Ken Arromdee */
@@ -53,7 +53,7 @@ set_uasmon(VOID_ARGS)
         u.uprops[i].intrinsic &= ~FROM_FORM;
     }
 
-    unsigned long bit = 1UL;
+    uint64_t bit = 1UL;
     for (i = 1; i <= 32; i++)
     {
         int prop = 0;
@@ -686,6 +686,7 @@ made_change:
     new_light = emitted_light_range(youmonst.data);
     if (old_light != new_light)
     {
+        Strcpy(debug_buf_4, "polyself");
         if (old_light)
             del_light_source(LS_MONSTER, monst_to_any(&youmonst));
         if (new_light == 1)
@@ -791,7 +792,7 @@ int mntmp;
     u.umonnum = mntmp;
     set_uasmon();
 
-    /* New stats for monster, to last only as long as polymorphed.
+    /* New stats for monster, to last only as int64_t as polymorphed.
      * Currently only strength gets changed.
      */
     //if (strongmonst(&mons[mntmp]))
@@ -873,7 +874,7 @@ int mntmp;
     updatemaxhp();
 
     if (u.ulevel < mlvl) {
-        /* Low level characters can't become high level monsters for long */
+        /* Low level characters can't become high level monsters for int64_t */
 #ifdef DUMB
         /* DRS/NS 2.2.6 messes up -- Peter Kendell */
         int mtd = u.mtimedone, ulv = u.ulevel;
@@ -1513,6 +1514,7 @@ rehumanize(VOID_ARGS)
         }
     }
 
+    Strcpy(debug_buf_4, "rehumanize");
     if (emitted_light_range(youmonst.data))
         del_light_source(LS_MONSTER, monst_to_any(&youmonst));
     if (mon_ambient_sound(youmonst.data))
@@ -1760,7 +1762,7 @@ dospinweb(VOID_ARGS)
     }
     exercise(A_DEX, TRUE);
     if (ttmp) {
-        if(trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDEN)
+        if(trap_type_definitions[ttmp->ttyp].tdflags & TRAPDEF_FLAGS_NOT_OVERRIDDEN)
         {
             Your("webbing vanishes!");
             return 0;

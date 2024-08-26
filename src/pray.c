@@ -1,4 +1,4 @@
-/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2023-08-07 */
+/* GnollHack File Change Notice: This file has been changed from the original. Date of last change: 2024-08-11 */
 
 /* GnollHack 4.0    pray.c    $NHDT-Date: 1549074257 2019/02/02 02:24:17 $  $NHDT-Branch: GnollHack-3.6.2-beta01 $:$NHDT-Revision: 1.110 $ */
 /* Copyright (c) Benson I. Margulies, Mike Stephenson, Steve Linhart, 1989. */
@@ -501,7 +501,7 @@ int trouble;
                Without something like this, fix_all_troubles can get
                stuck in an infinite loop trying to fix STUCK_IN_WALL
                and repeatedly failing. */
-            set_itimeout(&HPasses_walls, (long) (d(4, 4) + 4)); /* 8..20 */
+            set_itimeout(&HPasses_walls, (int64_t) (d(4, 4) + 4)); /* 8..20 */
             refresh_u_tile_gui_info(TRUE);
             /* how else could you move between packed rocks or among
                lattice forming "solid" rock? */
@@ -1395,19 +1395,19 @@ gcrownu()
                         artiname(ART_HOLY_GRAIL));
                 }
             }
-            else if (obj && in_hand)
+            else if (obj && in_hand && !Role_if(PM_VALKYRIE))
             {
                 Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s shines white for a while!", xname(obj));
                 obj->enchantment = max(1, obj->enchantment + rnd(3));
                 obj->dknown = obj->aknown = obj->nknown = TRUE;
             }
-            else if (obj2 && in_hand2)
+            else if (obj2 && in_hand2 && !Role_if(PM_VALKYRIE))
             {
                 Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s shines white for a while!", xname(obj2));
                 obj2->enchantment = max(1, obj2->enchantment + rnd(3));
                 obj2->dknown = obj2->aknown = obj2->nknown = TRUE;
             }
-            else if (!katana_already_exists)
+            else if (!katana_already_exists && !Role_if(PM_VALKYRIE))
             {
                 class_gift = KATANA;
                 obj = mksobj(KATANA, FALSE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE);
@@ -1425,7 +1425,7 @@ gcrownu()
                         artiname(ART_KATANA_OF_MASAMUNE));
                 }
             }
-            else if (obj && objects[obj->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj) < 2000L && !obj->oartifact)
+            else if (obj && objects[obj->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj) < 2000L && !obj->oartifact && !Role_if(PM_VALKYRIE))
             {
                 if (!Blind)
                     Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "sword shines brightly for a moment.");
@@ -1442,7 +1442,7 @@ gcrownu()
                 }
             }
             /* acquire Excalibur's skill regardless of weapon or gift */
-            else if (obj2 && objects[obj2->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj2) < 2000L && !obj2->oartifact)
+            else if (obj2 && objects[obj2->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj2) < 2000L && !obj2->oartifact && !Role_if(PM_VALKYRIE))
             {
                 if (!Blind)
                     Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "sword shines brightly for a moment.");
@@ -1460,14 +1460,19 @@ gcrownu()
             }
             else
             {
-                obj = mksobj(SWORD_OF_HOLY_VENGEANCE, FALSE, FALSE, FALSE);
-                obj->enchantment = 1 + rnd(3);
-                at_your_feet("A sword");
-                dropyf(obj);
-                u.ugifts++;
-                obj->aknown = obj->nknown = TRUE;
-                livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
-                    "was bestowed with %s", an(actualoname(obj)));
+                obj = mksobj(LONG_SWORD, FALSE, FALSE, FALSE);
+                if (obj)
+                {
+                    obj->exceptionality = EXCEPTIONALITY_CELESTIAL;
+                    randomize_mythic_quality(obj, 2, &obj->mythic_prefix, &obj->mythic_suffix);
+                    obj->enchantment = 1 + rnd(3);
+                    at_your_feet("A sword");
+                    dropyf(obj);
+                    u.ugifts++;
+                    obj->aknown = obj->nknown = TRUE;
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                        "was bestowed with %s", an(actualoname(obj)));
+                }
             }
 
             /* acquire Excalibur's skill regardless of weapon or gift */
@@ -1507,19 +1512,19 @@ gcrownu()
                         artiname(ART_HOLY_GRAIL));
                 }
             }
-            else if (obj && in_hand)
+            else if (obj && in_hand && !Role_if(PM_VALKYRIE))
             {
                 Your("%s goes snicker-snack!", xname(obj));
                 obj->enchantment = max(1, obj->enchantment + rnd(3));
                 obj->dknown = obj->aknown = obj->nknown = TRUE;
             } 
-            else if (obj2 && in_hand2)
+            else if (obj2 && in_hand2 && !Role_if(PM_VALKYRIE))
             {
                 Your("%s goes snicker-snack!", xname(obj2));
                 obj2->enchantment = max(1, obj2->enchantment + rnd(3));
                 obj2->dknown = obj2->aknown = obj2->nknown = TRUE;
             }
-            else if (!already_exists)
+            else if (!already_exists && !Role_if(PM_VALKYRIE))
             {
                 obj = mksobj(LONG_SWORD, FALSE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE);
                 obj = oname(obj, artiname(ART_VORPAL_BLADE));
@@ -1535,6 +1540,23 @@ gcrownu()
                         artiname(ART_VORPAL_BLADE));
                 }
             }
+            else
+            {
+                obj = mksobj(LONG_SWORD, FALSE, FALSE, FALSE);
+                if (obj)
+                {
+                    obj->exceptionality = EXCEPTIONALITY_PRIMORDIAL;
+                    randomize_mythic_quality(obj, 2, &obj->mythic_prefix, &obj->mythic_suffix);
+                    obj->enchantment = 1 + rnd(3);
+                    at_your_feet("A sword");
+                    dropyf(obj);
+                    u.ugifts++;
+                    obj->aknown = obj->nknown = TRUE;
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                        "was bestowed with %s", an(actualoname(obj)));
+                }
+            }
+
             /* acquire Vorpal Blade's skill regardless of weapon or gift */
             unrestrict_weapon_skill(P_SWORD);
             if ((obj && obj->oartifact == ART_VORPAL_BLADE) || (obj2 && obj2->oartifact == ART_VORPAL_BLADE))
@@ -1561,19 +1583,19 @@ gcrownu()
             {
                 ; /* already got bonus above */
             }
-            else if (obj && in_hand) 
+            else if (obj && in_hand && !Role_if(PM_VALKYRIE))
             {
                 Your("%s hums ominously!", swordbuf);
                 obj->enchantment = max(1, obj->enchantment + rnd(3));
                 obj->dknown = obj->aknown = obj->nknown = TRUE;
             }
-            else if (obj2 && in_hand2)
+            else if (obj2 && in_hand2 && !Role_if(PM_VALKYRIE))
             {
                 Your("%s hums ominously!", swordbuf);
                 obj2->enchantment = max(1, obj2->enchantment + rnd(3));
                 obj2->dknown = obj2->aknown = obj2->nknown = TRUE;
             }
-            else if (!already_exists)
+            else if (!already_exists && !Role_if(PM_VALKYRIE))
             {
                 obj = mksobj(chaotic_crowning_gift_baseitem, FALSE, FALSE, MKOBJ_TYPE_ARTIFACT_BASE);
                 obj = oname(obj, artiname(chaotic_crowning_gift_oartifact));
@@ -1587,6 +1609,22 @@ gcrownu()
                     livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
                         "was bestowed with %s",
                         artiname(chaotic_crowning_gift_oartifact));
+                }
+            }
+            else
+            {
+                obj = mksobj(LONG_SWORD, FALSE, FALSE, FALSE);
+                if (obj)
+                {
+                    obj->exceptionality = EXCEPTIONALITY_INFERNAL;
+                    randomize_mythic_quality(obj, 2, &obj->mythic_prefix, &obj->mythic_suffix);
+                    obj->enchantment = 1 + rnd(3);
+                    at_your_feet("A sword");
+                    dropyf(obj);
+                    u.ugifts++;
+                    obj->aknown = obj->nknown = TRUE;
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
+                        "was bestowed with %s", an(actualoname(obj)));
                 }
             }
             /* Acquire two-weapon combat for dual-wielding Stormbringer and Mournblade  */
@@ -2069,7 +2107,7 @@ water_prayer(bless_water)
 boolean bless_water;
 {
     register struct obj *otmp;
-    register long changed = 0;
+    register int64_t changed = 0;
     boolean other = FALSE, bc_known = !(Blind || Hallucination);
 
     for (otmp = level.objects[u.ux][u.uy]; otmp; otmp = otmp->nexthere) 
@@ -2109,7 +2147,7 @@ symbol_prayer(bless_stuff)
 boolean bless_stuff;
 {
     register struct obj* otmp;
-    register long changed = 0;
+    register int64_t changed = 0;
     boolean other = FALSE, bc_known = !(Blind || Hallucination);
     char buf[BUFSZ];
     Strcpy(buf, "");
@@ -2318,7 +2356,7 @@ dosacrifice()
         /* you're handling this corpse, even if it was killed upon the altar
          */
         feel_cockatrice(otmp, TRUE);
-        if (rider_corpse_revival(otmp, FALSE))
+        if (rider_corpse_revival(otmp, FALSE, (boolean*)0))
             return 1;
 
         if (otmp->corpsenm == PM_ACID_BLOB
@@ -3670,7 +3708,7 @@ int dx, dy;
 {
     register struct obj *otmp;
     int nx, ny;
-    long count = 0L;
+    int64_t count = 0L;
 
     for (otmp = level.objects[u.ux + dx][u.uy + dy]; otmp;
          otmp = otmp->nexthere) {

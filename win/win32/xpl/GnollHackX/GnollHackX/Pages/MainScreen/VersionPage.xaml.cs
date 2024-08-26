@@ -31,8 +31,27 @@ namespace GnollHackX.Pages.MainScreen
         {
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
+            UIUtils.AdjustRootLayout(RootGrid);
+            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _gamePage = gamePage;
+
+            if (GHApp.DarkMode)
+            {
+                HeaderLabel.TextColor = GHColors.White;
+                LongTitleLabel.TextColor = GHColors.White;
+                LongLabel.TextColor = GHColors.White;
+                foreach (View child in VersionInfoGrid.Children)
+                {
+                    if (child != null && child is Label)
+                    {
+                        Label label = (Label)child;
+                        label.TextColor = GHColors.White;
+                    }
+                }
+            }
+
 
             string compatstr = GHApp.GHVersionCompatibilityString;
             string manufacturer = DeviceInfo.Manufacturer;
@@ -46,7 +65,7 @@ namespace GnollHackX.Pages.MainScreen
             ulong TotalDiskSpaceInBytes = GHApp.PlatformService.GetDeviceTotalDiskSpaceInBytes();
             ulong TotalDiskSpaceInGB = ((TotalDiskSpaceInBytes / 1024) / 1024) / 1024;
 
-            long TotalPlayTime = Preferences.Get("RealPlayTime", 0L);
+            long TotalPlayTime = GHApp.RealPlayTime;
             long TotalPlayHours = TotalPlayTime / 3600;
             long TotalPlayMinutes = (TotalPlayTime % 3600) / 60;
             long TotalPlaySeconds = TotalPlayTime - TotalPlayHours * 3600 - TotalPlayMinutes * 60;
@@ -160,20 +179,101 @@ namespace GnollHackX.Pages.MainScreen
                 GPUCacheUsageRowDefinition.Height = 0;
             }
 
+#if WINDOWS
+            string winRTAssemblyVersion = GetAssemblyInformationalVersion(typeof(WinRT.AgileReference));
+            WinRTLabel.Text = !string.IsNullOrEmpty(winRTAssemblyVersion) ? winRTAssemblyVersion : "?";
+
+            string winUIAssemblyVersion = GetAssemblyInformationalVersion(typeof(Microsoft.UI.Xaml.Application));
+            WinUILabel.Text = !string.IsNullOrEmpty(winUIAssemblyVersion) ? winUIAssemblyVersion : "?";
+
+            string winSDKAssemblyVersion = GetAssemblyInformationalVersion(typeof(Windows.UI.Color));
+            WinSDKLabel.Text = !string.IsNullOrEmpty(winSDKAssemblyVersion) ? winSDKAssemblyVersion : "?";
+
+            string winAppSDKAssemblyVersion = typeof(Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap)?.Assembly?.GetName()?.Version?.ToString();
+            WinAppSDKLabel.Text = !string.IsNullOrEmpty(winAppSDKAssemblyVersion) ? winAppSDKAssemblyVersion : "?";
+
+            if (GHApp.DeviceGPUs.Count > 1)
+            {
+                string activeGPU = GHApp.GetActiveGPU();
+                ActiveGPULabel.Text = activeGPU + " (" + GHApp.DeviceGPUs.Count + " GPUs)";
+            }
+            else
+            {
+                ActiveGPULabel.Text = "";
+                ActiveGPULabel.IsVisible = false;
+                ActiveGPUTitleLabel.IsVisible = false;
+                VersionInfoGrid.Children.Remove(ActiveGPULabel);
+                VersionInfoGrid.Children.Remove(ActiveGPUTitleLabel);
+                ActiveGPURowDefinition.Height = 0;
+            }
+#else
+            WinRTLabel.Text = "";
+            WinRTLabel.IsVisible = false;
+            WinRTTitleLabel.IsVisible = false;
+            VersionInfoGrid.Children.Remove(WinRTLabel);
+            VersionInfoGrid.Children.Remove(WinRTTitleLabel);
+            WinRTRowDefinition.Height = 0;
+
+            WinUILabel.Text = "";
+            WinUILabel.IsVisible = false;
+            WinUITitleLabel.IsVisible = false;
+            VersionInfoGrid.Children.Remove(WinUILabel);
+            VersionInfoGrid.Children.Remove(WinUITitleLabel);
+            WinUIRowDefinition.Height = 0;
+
+            WinSDKLabel.Text = "";
+            WinSDKLabel.IsVisible = false;
+            WinSDKTitleLabel.IsVisible = false;
+            VersionInfoGrid.Children.Remove(WinSDKLabel);
+            VersionInfoGrid.Children.Remove(WinSDKTitleLabel);
+            WinSDKRowDefinition.Height = 0;
+
+            WinAppSDKLabel.Text = "";
+            WinAppSDKLabel.IsVisible = false;
+            WinAppSDKTitleLabel.IsVisible = false;
+            VersionInfoGrid.Children.Remove(WinAppSDKLabel);
+            VersionInfoGrid.Children.Remove(WinAppSDKTitleLabel);
+            WinAppSDKRowDefinition.Height = 0;
+
+            ActiveGPULabel.Text = "";
+            ActiveGPULabel.IsVisible = false;
+            ActiveGPUTitleLabel.IsVisible = false;
+            VersionInfoGrid.Children.Remove(ActiveGPULabel);
+            VersionInfoGrid.Children.Remove(ActiveGPUTitleLabel);
+            ActiveGPURowDefinition.Height = 0;
+#endif
+
+#if GNH_MAUI
+            Version ver = AppInfo.Current.Version;
+            string portVersion = (ver?.Major.ToString() ?? "?") + "." + (ver?.Minor.ToString() ?? "?");
+            PortVersionLabel.Text = portVersion; // GetAssemblyInformationalVersion(Assembly.GetEntryAssembly()); //This can also be AppInfo.Current.VersionString, but it is longer and the build number
+#if WINDOWS
+            PortBuildLabel.Text = AppInfo.Current.Version.Build.ToString();
+#else
+            PortBuildLabel.Text = AppInfo.Current.BuildString;
+#endif
+#else
+            PortVersionLabel.Text = VersionTracking.CurrentVersion;
+            PortBuildLabel.Text = VersionTracking.CurrentBuild;
+#endif
             PortVersionTitleLabel.Text = GHApp.RuntimePlatform + " Port Version:";
             PortBuildTitleLabel.Text = GHApp.RuntimePlatform + " Port Build:";
             PortConfigurationTitleLabel.Text ="Port Configuration:";
+#if BETA
+            PortVersionLabel.Text += " (Beta)";
+#endif
 
             GnollHackVersionLabel.Text = GHApp.GHVersionString;
             GnollHackConfigurationLabel.Text = GHApp.GHDebug ? "Debug" : "Release";
-            PortVersionLabel.Text = VersionTracking.CurrentVersion;
-            PortBuildLabel.Text = VersionTracking.CurrentBuild;
             PortConfigurationLabel.Text =
 #if DEBUG
                 "Debug";
 #else
                 "Release";
 #endif
+
+            PackagingModelLabel.Text = GHApp.IsPackaged ? "Packaged" : "Unpackaged";
+
             GnollHackCompatibilityLabel.Text = compatstr == "" ? "" : "From " + compatstr;
             FMODVersionLabel.Text = GHApp.FMODVersionString;
             SkiaVersionLabel.Text = GHApp.SkiaVersionString + " (# " + GHApp.SkiaSharpVersionString + ")";
@@ -193,7 +293,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await App.Current.MainPage.Navigation.PopModalAsync();
+            await GHApp.Navigation.PopModalAsync();
         }
 
         private double _currentPageWidth = 0;
@@ -235,5 +335,37 @@ namespace GnollHackX.Pages.MainScreen
             }
         }
 
+#if WINDOWS
+        private string GetAssemblyInformationalVersion(Type type)
+        {
+            return GetAssemblyInformationalVersion(type?.Assembly);
+        }
+
+        private string GetAssemblyInformationalVersion(Assembly assembly)
+        {
+            if (assembly == null)
+            {
+                return null;
+            }
+
+            return TrimVersion(assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+        }
+
+        private string TrimVersion(string version)
+        {
+            if (string.IsNullOrEmpty(version))
+            {
+                return version;
+            }
+
+            var plusIndex = version.IndexOf('+');
+            if (plusIndex > 0)
+            {
+                return version.Substring(0, plusIndex);
+            }
+
+            return version;
+        }
+#endif
     }
 }
