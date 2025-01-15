@@ -18,9 +18,9 @@ COMPRESSBIN="/bin/gzip"
 NH_GIT="/home/build/GnollHack"
 NH_BRANCH="master"
 # HACKDIR from include/config.h; aka nethack subdir inside chroot
-NHSUBDIR="gnollhack-4.2.0.16"
+NHSUBDIR="gnollhack-4.2.0.20"
 # VAR_PLAYGROUND from include/unixconf.h
-NH_VAR_PLAYGROUND="/gnollhack-4.2.0.16"
+NH_VAR_PLAYGROUND="/gnollhack-4.2.0.20"
 # END OF CONFIG
 ##############################################################################
 
@@ -45,8 +45,8 @@ set -e
 umask 022
 
 echo "Creating inprogress and extrainfo directories"
-mkdir -p "$NAO_CHROOT/dgldir/inprogress-gnoll42016"
-chown "$USRGRP" "$NAO_CHROOT/dgldir/inprogress-gnoll42016"
+mkdir -p "$NAO_CHROOT/dgldir/inprogress-gnoll42020"
+chown "$USRGRP" "$NAO_CHROOT/dgldir/inprogress-gnoll42020"
 mkdir -p "$NAO_CHROOT/dgldir/extrainfo-gnoll"
 chown "$USRGRP" "$NAO_CHROOT/dgldir/extrainfo-gnoll"
 
