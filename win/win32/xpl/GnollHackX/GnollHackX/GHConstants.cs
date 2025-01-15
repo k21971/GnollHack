@@ -238,6 +238,7 @@ namespace GnollHackX
         TournamentMode =        0x00000100, /* Playing with server-like settings */
         GUIDebugMode =          0x00000200, /* GUI has been built in debug mode (not a release mode game?) */
         CharacterClickAction =  0x00000400, /* Set character-click action to true by default */
+        NoPet =                 0x00000800, /* Same as pettype:none in options file */
 
         RightMouseButtonBit1 =  0x00400000, 
         RightMouseButtonBit2 =  0x00800000, 
@@ -1617,13 +1618,22 @@ namespace GnollHackX
         public const int FadeFromBlackDuration = 200;
         public const int MaxMessageHistoryLength = 256;
         public const int MaxLongerMessageHistoryLength = 16384;
-        public const float StatusBarBaseFontSize = 14f;
+        public const float WindowBaseFontSize = 16f;
+        public const float WindowMessageFontSize = 12f;
+        public const float WindowMenuFontSize = 16f;
+        public const float WindowStatusBarFontSize = 12f;
+        public const float WindowMessageFontSizeMaxMultiplier = 1.40f;
+        public const float StatusBarBaseFontSize = 13.5f;
+        public const float StatusBarFontSizeMaxMultiplier = 1.55f;
         public const float StatusBarHorizontalMargin = 5.0f;
         public const float StatusBarVerticalMargin = 5.0f;
         public const float StatusBarRowMargin = 5.0f;
+        public const float StatusBarShieldFontSize = StatusBarBaseFontSize * 32f / 42f;
+        public const float StatusBarDifFontSize = StatusBarBaseFontSize * 24f / 42f;
+        public const float SkillButtonBaseFontSize = 9.5f;
         public const float ContextButtonBottomStartMargin = 30.0f;
+        public const double ContextButtonSpacing = 10.0;
         public const float ContextButtonBaseFontSize = 8.5f;
-        public const float ContextButtonSpacing = 10.0f;
         public const float MoveDistanceThreshold = 25.0f;
         public const long MoveOrPressTimeThreshold = 200L; /* Milliseconds */
         public const long DoubleClickTimeThreshold = 500L; /* Milliseconds */
@@ -1849,6 +1859,7 @@ namespace GnollHackX
         public const int ReplayGetLineDelay2 = 1024; /* Milliseconds */
         public const int ReplayDisplayWindowDelay = 512; /* Milliseconds */
         //public const GHlong GPUResourceCacheSize = 800000000L;
+
 #if GNH_MAUI
         public const string PortName = "GnollHackM";
         public const UnmanagedType GHStringMarshallingType = UnmanagedType.LPUTF8Str;
@@ -2097,5 +2108,48 @@ namespace GnollHackX
     {
         Normal = 0,
         Info = 1
+    }
+
+    public enum GHSpecialKey
+    {
+        None = 0,
+        Left,
+        Right,
+        Up,
+        Down,
+        UpLeft,
+        UpRight,
+        DownLeft,
+        DownRight,
+        Escape,
+        Enter,
+        Space,
+        Add,
+        Subtract,
+        Multiply,
+        Divide,
+        Decimal,
+        Number0,
+        Number1,
+        Number2,
+        Number3,
+        Number4,
+        Number5,
+        Number6,
+        Number7,
+        Number8,
+        Number9,
+        NumberPad0,
+        NumberPad1,
+        NumberPad2,
+        NumberPad3,
+        NumberPad4,
+        NumberPad5,
+        NumberPad6,
+        NumberPad7,
+        NumberPad8,
+        NumberPad9,
+        A,
+        Z = A + 25,
     }
 }

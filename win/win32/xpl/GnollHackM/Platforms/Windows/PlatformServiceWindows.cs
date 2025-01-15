@@ -113,7 +113,11 @@ namespace GnollHackM
         {
             RevertAnimatorDuration(true);
             GHApp.SaveWindowPosition();
-            GHApp.WindowsApp?.Exit();
+            if (GHApp.WindowsApp != null)
+            {
+                GHApp.WindowsApp?.Exit();
+                GHApp.WindowsApp = null;
+            }
             Application.Current?.Quit();
             Environment.Exit(0);
         }
@@ -327,6 +331,11 @@ namespace GnollHackM
         {
 
         }
+        public bool GetKeyboardConnected()
+        {
+            return true;
+        }
+
     }
 
     public class MemoryStatus

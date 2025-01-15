@@ -380,6 +380,10 @@ encodeconduct()
         e |= 1L << 15;
     if (!u.umortality)
         e |= 1L << 16;
+    if (!u.uconduct.pets)
+        e |= 1L << 17;
+    if (!u.uroleplay.numbones)
+        e |= 1L << 18;
 
     return e;
 }
@@ -685,9 +689,13 @@ encode_extended_conducts()
     add_achieveX(buf, "genocideless", !u.uconduct.genocides);
     add_achieveX(buf, "elberethless", !u.uconduct.elbereths);
     add_achieveX(buf, "conflictless", !u.uconduct.conflicts);
+    add_achieveX(buf, "petless", !u.uconduct.conflicts);
+    add_achieveX(buf, "conflictless", !u.uconduct.conflicts);
+    add_achieveX(buf, "petless", !u.uconduct.pets);
     add_achieveX(buf, "never_died", !u.umortality);
     add_achieveX(buf, "blind", u.uroleplay.blind);
     add_achieveX(buf, "nudist", u.uroleplay.nudist);
+    add_achieveX(buf, "boneless", !u.uroleplay.numbones);
 
     return buf;
 }

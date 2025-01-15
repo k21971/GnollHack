@@ -5912,6 +5912,27 @@ int final;
         you_have_X(buf);
     }
 
+    if (!u.uconduct.pets) {
+        you_have_never("had a pet or ally");
+    }
+    else 
+    {
+        Sprintf(buf, "had %lld pet%s or %s", (long long)u.uconduct.pets,
+            plur(u.uconduct.pets), u.uconduct.pets == 1 ? "ally" : "allies");
+        you_have_X(buf);
+    }
+
+    if (final)
+    {
+        if (!u.uroleplay.numbones) {
+            you_have_never("found a bones level");
+        }
+        else {
+            Sprintf(buf, "found %lld bones level%s", (long long)u.uroleplay.numbones, plur(u.uroleplay.numbones));
+            you_have_X(buf);
+        }
+    }
+
     putstr(dumpwin, ATR_NONE, "");
     putstr(en_win, ATR_TITLE, "Role score:");
     if (!final && !iflags.in_dumplog)
@@ -5929,11 +5950,23 @@ int final;
     {
         struct item_score_count_result artifacts = count_artifacts(invent);
         struct item_score_count_result artifacts2 = count_artifacts(magic_objs);
-        int64_t score_percentage = ((artifacts.score + artifacts2.score + (int64_t)u.uachieve.role_achievement * ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
+        struct item_score_count_result statues = count_historic_statues(invent);
+        struct item_score_count_result statues2 = count_historic_statues(magic_objs);
+        struct item_score_count_result artobjects = count_valuable_art_objects(invent);
+        struct item_score_count_result artobjects2 = count_valuable_art_objects(magic_objs);
+        int64_t score_percentage = ((artifacts.score + artifacts2.score + statues.score + statues2.score + (artobjects.score + artobjects2.score) * ARCHAEOLOGIST_ART_OBJECT_SCORE_MULTIPLIER + (int64_t)u.uachieve.role_achievement * ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
         Sprintf(goalbuf, "%lld %sartifact%s with you", (long long)artifacts.quantity, program_state.gameover ? "" : "known ", plur(artifacts.quantity));
         you_have(goalbuf, "");
         Sprintf(goalbuf, "%lld %sartifact%s in your %s", (long long)artifacts2.quantity, program_state.gameover ? "" : "known ", plur(artifacts2.quantity), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld historic statue%s with you", (long long)statues.quantity, plur(statues.quantity));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld historic statue%s in your %s", (long long)statues2.quantity, plur(statues2.quantity), chest_name);
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld %s worth of art objects with you", (long long)artobjects.score, currency(artobjects.score));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld %s worth of art objects in your %s", (long long)artobjects2.score, currency(artobjects2.score), chest_name);
         you_have(goalbuf, "");
         Sprintf(goalbuf, "gained %lld%% of your maximum role score", (long long)score_percentage);
         you_have(goalbuf, "");
@@ -5995,8 +6028,10 @@ int final;
     }
     else if (Role_if(PM_ROGUE))
     {
-        int64_t valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value();
-        int64_t valuableworth2 =  magic_gold() + magic_gem_value();
+        struct item_score_count_result cnt = count_valuable_art_objects(invent);
+        struct item_score_count_result cnt2 = count_valuable_art_objects(magic_objs);
+        int64_t valuableworth = money_cnt(invent) + hidden_gold() + carried_gem_value() + cnt.score;
+        int64_t valuableworth2 =  magic_gold() + magic_gem_value() + cnt2.score;
         int64_t score_percentage = ((valuableworth + valuableworth2 + (int64_t)u.uachieve.role_achievement * ROGUE_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
         score_percentage = min(100, score_percentage);
         Sprintf(goalbuf, "%lld %s worth of %svaluables with you", (long long)valuableworth, currency(valuableworth), program_state.gameover ? "" : "known ");

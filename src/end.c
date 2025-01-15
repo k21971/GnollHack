@@ -1373,6 +1373,52 @@ struct obj* list;
 }
 
 struct item_score_count_result
+count_historic_statues(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == STATUE && otmp->special_quality == SPEQUAL_STATUE_HISTORIC)
+        {
+            cnt.quantity += otmp->quan;
+            cnt.score += ARCHAEOLOGIST_PER_HISTORIC_STATUE_SCORE * otmp->quan;
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_historic_statues(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_valuable_art_objects(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->oclass == ART_CLASS)
+        {
+            cnt.quantity += otmp->quan;
+            cnt.score += get_object_base_value(otmp) * otmp->quan;
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_valuable_art_objects(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
 count_powerful_melee_weapon_score(list)
 struct obj* list;
 {
@@ -3512,9 +3558,11 @@ get_conduct_score_upon_ascension(VOID_ARGS)
         + 15 * (u.uconduct.genocides == 0)
         + 10 * (u.uconduct.elbereths == 0)
         + 15 * (u.uconduct.conflicts == 0)
+        + 2 * (u.uconduct.pets == 0)
         + 10 * (u.umortality == 0)
         + 80 * (u.uroleplay.blind)
         + 60 * (u.uroleplay.nudist)
+        + 2 * (u.uroleplay.numbones == 0)
         - 20 * (u.ualign.type != u.ualignbase[A_ORIGINAL])
         - 20 * (u.ualignbase[A_CURRENT] != u.ualignbase[A_ORIGINAL])
         );
@@ -3566,7 +3614,11 @@ get_current_game_score(VOID_ARGS)
     {
         struct item_score_count_result cnt = count_artifacts(invent);
         struct item_score_count_result cnt2 = count_artifacts(magic_objs);
-        Role_Specific_Score = cnt.score + cnt2.score;
+        struct item_score_count_result cnt3 = count_historic_statues(invent);
+        struct item_score_count_result cnt4 = count_historic_statues(magic_objs);
+        struct item_score_count_result cnt5 = count_valuable_art_objects(invent);
+        struct item_score_count_result cnt6 = count_valuable_art_objects(magic_objs);
+        Role_Specific_Score = cnt.score + cnt2.score + cnt3.score + cnt4.score + (cnt5.score + cnt6.score) * ARCHAEOLOGIST_ART_OBJECT_SCORE_MULTIPLIER;
         Role_Achievement_Score = ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
@@ -3654,6 +3706,9 @@ get_current_game_score(VOID_ARGS)
         lootvalue += money_cnt(invent);
         lootvalue += hidden_gold() + magic_gold(); /* accumulate gold from containers */
         lootvalue += carried_gem_value() + magic_gem_value();
+        struct item_score_count_result cnt = count_valuable_art_objects(invent);
+        struct item_score_count_result cnt2 = count_valuable_art_objects(magic_objs);
+        lootvalue += cnt.score + cnt2.score;
         Role_Specific_Score = lootvalue;
         Role_Achievement_Score = ROGUE_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;

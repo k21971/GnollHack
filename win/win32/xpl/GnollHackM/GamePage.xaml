@@ -83,7 +83,7 @@
                     </FlexLayout>-->
                     <StackLayout Grid.Row="1" x:Name="MessageNumberGrid" Padding="0,2" Spacing="6"
                         HorizontalOptions="Start" VerticalOptions="End">
-                        <Button x:Name="ToggleMessageNumberButton" Text="" Clicked="ToggleMessageNumberButton_Clicked" HeightRequest="80" WidthRequest="80" BackgroundColor="Transparent" />
+                        <gnh:NoTabStopButton x:Name="ToggleMessageNumberButton" Text="" Clicked="ToggleMessageNumberButton_Clicked" HeightRequest="80" WidthRequest="80" BackgroundColor="Transparent" />
                     </StackLayout>
                     <Grid Grid.Row="2" x:Name="ButtonRowGrid" HorizontalOptions="Fill" VerticalOptions="End" BackgroundColor="#66000000">
                         <controls:LabeledImageButton x:Name="lRowAbilitiesButton" IsVisible="False" LblText="Stats" BtnLetter="A" ImgSourcePath="resource://GnollHackM.Assets.UI.home.png" BtnClicked="GHButton_Clicked" Margin="0,2" HorizontalOptions="Start" VerticalOptions="End" />
@@ -187,13 +187,13 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <controls:CustomImageButton Grid.Column="0" HorizontalOptions="End" WidthRequest="135" HeightRequest="60" UseVaryingTextColors="True" Text="OK" x:Name="MenuOKButton" Clicked="MenuOKButton_Clicked" FontFamily="Diablo" FontSize="20" TextColor="White" BackgroundColor="Transparent" />
-                        <controls:CustomImageButton Grid.Column="1" HorizontalOptions="Start" WidthRequest="135"  HeightRequest="60" UseVaryingTextColors="True" Text="Cancel" x:Name="MenuCancelButton" Clicked="MenuCancelButton_Clicked" FontFamily="Diablo" FontSize="20" TextColor="White" BackgroundColor="Transparent" />
+                        <controls:CustomImageButton Grid.Column="0" HorizontalOptions="End" WidthRequest="135" HeightRequest="60" UseVaryingTextColors="True" Text="OK" x:Name="MenuOKButton" Clicked="MenuOKButton_Clicked" FontFamily="Diablo" FontSize="19" TextColor="White" BackgroundColor="Transparent" />
+                        <controls:CustomImageButton Grid.Column="1" HorizontalOptions="Start" WidthRequest="135"  HeightRequest="60" UseVaryingTextColors="True" Text="Cancel" x:Name="MenuCancelButton" Clicked="MenuCancelButton_Clicked" FontFamily="Diablo" FontSize="19" TextColor="White" BackgroundColor="Transparent" />
                     </Grid>
                 </StackLayout>
-                <Grid x:Name="MenuCountBackgroundGrid" HorizontalOptions="Fill" VerticalOptions="Fill" 
+                <Grid x:Name="MenuCountGrid" HorizontalOptions="Fill" VerticalOptions="Fill" 
                          BackgroundColor="#66000000" IsVisible="False">
-                    <Grid x:Name="MenuCountForegroundGrid" MaximumWidthRequest="360" HorizontalOptions="Center" VerticalOptions="Center">
+                    <Grid x:Name="MenuCountWidthGrid" MaximumWidthRequest="360" HorizontalOptions="Center" VerticalOptions="Center">
                         <Border x:Name="MenuCountFrame" BackgroundColor="#66000000" Stroke="Black" Padding="12,12" StrokeThickness="1" StrokeShape="RoundRectangle 10,10,10,10" HorizontalOptions="Fill" VerticalOptions="Center">
                             <StackLayout Spacing="6" x:Name="MenuCountLayout" HorizontalOptions="Fill" VerticalOptions="Center">
                                 <Label x:Name="MenuCountCaption" Text="Select Count" FontFamily="Immortal" FontSize="20" HorizontalOptions="CenterAndExpand" TextColor="White" />
@@ -223,7 +223,7 @@
                                     PlaceholderColor="Gray" Placeholder="Count" 
                                     Keyboard="Numeric" 
                                     WidthRequest="180"
-                                    Completed="MenuEntry_Completed"
+                                    Completed="MenuCountEntry_Completed"
                                     />
                                 <Grid x:Name="MenuCountButtonGrid" ColumnSpacing="6" HorizontalOptions="Center" VerticalOptions="CenterAndExpand" WidthRequest="360">
                                     <Grid.RowDefinitions>

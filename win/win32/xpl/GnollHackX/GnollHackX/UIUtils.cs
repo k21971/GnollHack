@@ -1281,17 +1281,89 @@ namespace GnollHackX
             bool tooWide = customScale * 40.0 * bigRowNoOfButtons + (bigRowNoOfButtons - 1) * 6 > canvasViewWidth;
             int minNoOfContextButtonRows = 2;
             int noOfCommandRows = usingSimpleCmdLayout ? 1 : isLandscape && !tooWide ? 1 : 2;
-            float statusBarRowSizeRelativeToButtonWidth = 2 * (GHConstants.StatusBarBaseFontSize / 50.0f * inverseCanvasScale);
+            //float statusBarRowSizeRelativeToButtonWidth = 2 * (GHConstants.StatusBarBaseFontSize / 50.0f * inverseCanvasScale);
             float minNoOfLabeledButtonRows = minNoOfContextButtonRows + noOfCommandRows;
             int noOfVerticalSmallerButtons = usingSimpleCmdLayout ? (isLandscape ? 3 : 4) : (isLandscape ? 3 : 5);
             float labeledButtonFontSizeRelativeToButtonSize = GHConstants.ContextButtonBaseFontSize / 50f;
-            float noOfButtonWidthsNeededForHeight = minNoOfLabeledButtonRows * (1.0f + labeledButtonFontSizeRelativeToButtonSize)
-                + statusBarRowSizeRelativeToButtonWidth
+            double noOfButtonWidthsNeededForHeight = minNoOfLabeledButtonRows * (1.0f + labeledButtonFontSizeRelativeToButtonSize)
+                //+ statusBarRowSizeRelativeToButtonWidth
                 + noOfVerticalSmallerButtons * 75f / 80f;
-            float verticalMargins = (noOfVerticalSmallerButtons - 1) * 6 + (noOfCommandRows - 1) * 6 + (minNoOfContextButtonRows - 1) * GHConstants.ContextButtonSpacing + (GHConstants.StatusBarVerticalMargin * 2 + GHConstants.StatusBarRowMargin + GHConstants.ContextButtonBottomStartMargin) / inverseCanvasScale;
-            double verticalSpaceAvailable = canvasViewHeight - verticalMargins - 1.0;
+            double statusBarSize = CalculateStatusBarSkiaHeight(inverseCanvasScale, customScale, canvasViewWidth, canvasViewHeight) / inverseCanvasScale;
+            double verticalMargins =
+                /* Upper UI buttons */  (noOfVerticalSmallerButtons - 1) * 6 + 2 * 6 /* Bottom and top margins just in case */
+                /* Bottom UI buttons */ + (noOfCommandRows - 1) * 6 + 2 * 6 /* Bottom and top margins just in case */
+                /* Context button margins */ + (minNoOfContextButtonRows - 1) * GHConstants.ContextButtonSpacing
+                /* Bottom margin for context buttons */ + (GHConstants.ContextButtonBottomStartMargin) / inverseCanvasScale;
+            double verticalSpaceAvailable = canvasViewHeight - verticalMargins - statusBarSize - 1.0;
             double tmpsideheight = Math.Min(customScale * (isSmaller ? 75.0 : 80.0), Math.Max(customScale * (isSmaller ? 35.0 : 40.0), verticalSpaceAvailable / Math.Max(1, noOfButtonWidthsNeededForHeight)));
             return tmpsideheight;
+        }
+
+        private static float _cachedStatusBarHeight = -1;
+        private static float _cachedTextScale = -1;
+        
+        public static float CalculateStatusBarSkiaHeight(float textScale)
+        {
+            if(_cachedStatusBarHeight > 0 && _cachedTextScale == textScale)
+                return _cachedStatusBarHeight;
+
+            float statusbarheight;
+            using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint())
+            {
+                textPaint.Typeface = GHApp.LatoRegular;
+                textPaint.TextSize = GHConstants.StatusBarBaseFontSize * textScale;
+                float rowheight = textPaint.FontSpacing;
+                statusbarheight = rowheight * 2 + GHConstants.StatusBarVerticalMargin * 2 + GHConstants.StatusBarRowMargin;
+            }
+            _cachedStatusBarHeight = statusbarheight;
+            _cachedTextScale = textScale;
+            return statusbarheight;
+        }
+
+        public static float CalculateStatusBarSkiaHeight(double canvasViewWidth, double canvasViewHeight)
+        {
+            return CalculateStatusBarSkiaHeight(CalculateTextScale() * CalculateStatusBarFontSizeMultiplier(canvasViewWidth, canvasViewHeight));
+        }
+
+        public static float CalculateStatusBarSkiaHeight(float inverseCanvasScale, float customScale, double canvasViewWidth, double canvasViewHeight)
+        {
+            return CalculateStatusBarSkiaHeight(CalculateTextScale(inverseCanvasScale, customScale) * CalculateStatusBarFontSizeMultiplier(canvasViewWidth, canvasViewHeight));
+        }
+
+        public static float CalculateTextScale(float inverseCanvasScale, float customScale)
+        {
+            return inverseCanvasScale * customScale;
+        }
+        public static float CalculateTextScale()
+        {
+            return GHApp.TotalScreenScale;
+        }
+        public static float CalculateStatusBarFontSizeMultiplier(double canvasViewWidth, double canvasViewHeight)
+        {
+            double relevantScale = canvasViewWidth / 360;
+            return Math.Max(1.0f, Math.Min(GHConstants.StatusBarFontSizeMaxMultiplier, (float)relevantScale));
+        }
+        public static float CalculateMessageFontSizeMultiplier(double buttonWidth, double buttonHeight, float skiaStatusBarHeight, float messageFontSize, float skiaCanvasWidth, float skiaCanvasHeight, double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, float inverseCanvasScale, float customScale)
+        {
+            bool isLandscape = canvasViewWidth > canvasViewHeight;
+            double relevantScale = canvasViewWidth / 480;
+            if (relevantScale < 1.0f)
+                return 1.0f;
+            if (inverseCanvasScale == 0.0f)
+                inverseCanvasScale = 1.0f;
+            int bigRowNoOfButtons = isLandscape ? LandscapeButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout) : PortraitButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
+            bool tooWide = customScale * 40.0 * bigRowNoOfButtons + (bigRowNoOfButtons - 1) * 6 > canvasViewWidth;
+            int noOfCommandRows = usingSimpleCmdLayout ? 1 : isLandscape && !tooWide ? 1 : 2;
+            float orbHeight = (float)buttonWidth * inverseCanvasScale + 5;
+            float skillButtonHeight = (float)buttonHeight * inverseCanvasScale;
+            float commandRowHeight = (float)buttonHeight * inverseCanvasScale;
+            float freeSpace = skiaCanvasHeight - skiaStatusBarHeight - 2 * orbHeight - skillButtonHeight - noOfCommandRows * commandRowHeight + (noOfCommandRows - 1) * 6 * inverseCanvasScale;
+            int requiredNumberOfTextRows = 9;
+            float freeSpacePerTextRow = freeSpace / requiredNumberOfTextRows;
+            float fontHeight = messageFontSize * inverseCanvasScale;
+            float possibleScaling = freeSpacePerTextRow / fontHeight;
+
+            return Math.Max(1.0f, Math.Min(possibleScaling, Math.Min(GHConstants.WindowMessageFontSizeMaxMultiplier, (float)relevantScale)));
         }
     }
 

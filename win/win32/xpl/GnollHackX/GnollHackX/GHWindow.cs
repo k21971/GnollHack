@@ -182,10 +182,8 @@ namespace GnollHackX
         }
         public float Left { get; set; }
         public float Top { get; set; }
-        public float Right { get { return Left + _pixelWidth; } }
-        public float Bottom { get { return Top + _pixelHeight; } }
-        public float Width { get { return _pixelHeight; } }
-        public float Height { get { return _pixelHeight; } }
+        public float UnscaledWidth { get { return _pixelHeight; } }
+        public float UnscaledHeight { get { return _pixelHeight; } }
 
         private float _pixelWidth = 0;
         private float _pixelHeight = 0;
@@ -221,21 +219,20 @@ namespace GnollHackX
         {
             Typeface = GHApp.LatoRegular;
             TextColor = SKColors.White;
-            TextSize = 14.0f;
+            TextSize = GHConstants.WindowBaseFontSize;
             BackgroundColor = SKColors.Transparent;
             switch (_winType)
             {
                 case GHWinType.None:
                     break;
                 case GHWinType.Message:
-                    TextSize = TextSize * 32.0f / 42f;
+                    TextSize = GHConstants.WindowMessageFontSize;
                     Typeface = GHApp.DejaVuSansMonoTypeface;
                     StrokeWidth = TextSize / 4.0f;
                     AutoPlacement = true;
                     break;
                 case GHWinType.Status:
-                    //BackgroundColor = TransparentBlack;
-                    TextSize = TextSize * 30.0f / 42.0f;
+                    TextSize = GHConstants.WindowStatusBarFontSize;
                     Typeface = GHApp.LatoRegular;
                     StrokeWidth = TextSize / 4.0f;
                     HasShadow = true;
@@ -243,21 +240,21 @@ namespace GnollHackX
                     Top = 0;
                     break;
                 case GHWinType.Map:
-                    TextSize = TextSize * 30.0f / 42.0f;
+                    TextSize = GHConstants.WindowStatusBarFontSize;
                     Typeface = GHApp.LatoRegular;
                     Left = 0;
                     Top = 120;
                     break;
                 case GHWinType.Menu:
+                    TextSize = GHConstants.WindowMenuFontSize;
                     Typeface = GHApp.UnderwoodTypeface;
-                    TextSize = TextSize * 42.0f / 42.0f;
                     Left = 0;
                     Top = 150;
                     CenterHorizontally = true;
                     break;
                 case GHWinType.Text:
-                    Typeface = GHApp.EndorTypeface;
-                    TextSize = TextSize * 42.0f / 42.0f;
+                    TextSize = GHConstants.WindowMenuFontSize;
+                    Typeface = GHApp.UnderwoodTypeface;
                     Left = 0;
                     Top = 150;
                     CenterHorizontally = true;
@@ -265,7 +262,7 @@ namespace GnollHackX
                 case GHWinType.Base:
                     break;
                 case GHWinType.Here:
-                    TextSize = TextSize * 32.0f / 42.0f;
+                    TextSize = GHConstants.WindowMessageFontSize;
                     Typeface = GHApp.DejaVuSansMonoTypeface;
                     StrokeWidth = TextSize / 4.0f;
                     AutoPlacement = true;
@@ -383,7 +380,7 @@ namespace GnollHackX
                 using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint()
                 {
                     Typeface = Typeface,
-                    TextSize = TextSize * _gamePage.GetTextScale()
+                    TextSize = TextSize * UIUtils.CalculateTextScale()
                 })
                 {
                     if (CursY >= PutStrs.Count)
@@ -498,7 +495,7 @@ namespace GnollHackX
                     using (GHSkiaFontPaint textPaint = new GHSkiaFontPaint()
                     {
                         Typeface = Typeface,
-                        TextSize = TextSize * _gamePage.GetTextScale()
+                        TextSize = TextSize * UIUtils.CalculateTextScale()
                     })
                     {
                         if (CursY >= PutStrs.Count)
@@ -589,6 +586,11 @@ namespace GnollHackX
                     }
                 }
             }
+        }
+
+        public SKRect GetWindowRect(float textScalingFactor)
+        {
+            return new SKRect(Left, Top, Left + UnscaledWidth * textScalingFactor, Top + UnscaledHeight * textScalingFactor);
         }
 
         public double TextWindowMaximumWidth

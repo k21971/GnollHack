@@ -4,6 +4,15 @@ using SkiaSharp.Views.Maui.Controls.Hosting;
 using System.Runtime.Intrinsics.Arm;
 using GnollHackX;
 
+#if ANDROID
+using AndroidX.Activity;
+using Android.App;
+using AndroidX.Fragment.App;
+using Microsoft.Maui.Platform;
+using Android.OS;
+using Android.Views;
+#endif
+
 #if IOS
 using GnollHackM.Platforms.iOS;
 #endif
@@ -19,6 +28,8 @@ using Sentry.Maui;
 using Sentry.Profiling;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
+using Windows.Graphics;
+using SkiaSharp;
 #endif
 #endif
 
@@ -34,6 +45,9 @@ public static class MauiProgram
             .UseSkiaSharp()
             .ConfigureMauiHandlers((handlers) => {
                 handlers.AddHandler(typeof(CustomLabel), typeof(AutoSizeSKCanvasViewHandler));
+#if ANDROID
+                handlers.AddHandler(typeof(Button), typeof(NoFocusButtonHandler));
+#endif
 #if IOS
                 handlers.AddHandler(typeof(Shell), typeof(CustomShellRenderer));
                 handlers.AddHandler<Border, NotAnimatedBorderHandler>();
@@ -135,7 +149,10 @@ public static class MauiProgram
                         window.Closed += (s, e) =>
                         {
                             if (GHApp.WindowsApp != null)
+                            {
                                 GHApp.WindowsApp.Exit();
+                                GHApp.WindowsApp = null;
+                            }
                             else
                                 Environment.Exit(0);
                         };
@@ -169,27 +186,44 @@ public static class MauiProgram
                         }
                         else
                         {
+                            bool onSomeMonitor = false;
                             int sizeX = Preferences.Get("WindowedSizeX", 0);
                             int sizeY = Preferences.Get("WindowedSizeY", 0);
                             int sizeWidth = Preferences.Get("WindowedSizeWidth", 0);
                             int sizeHeight = Preferences.Get("WindowedSizeHeight", 0);
+                            float sizeDisplayDensity = Preferences.Get("WindowedSizeDisplayDensity", 1.0f);
+                            var monitors = GHMonitor.All;
+                            if (monitors?.Count >= 1)
+                            {
+                                SKRect r1 = new SKRect(sizeX, sizeY, sizeX + sizeWidth, sizeY + sizeHeight);
+                                foreach (var monitor in monitors)
+                                {
+                                    SKRect r2 = new SKRect(monitor.WorkingArea.X, monitor.WorkingArea.Y, monitor.WorkingArea.X + monitor.WorkingArea.Width, monitor.WorkingArea.Y + monitor.WorkingArea.Height);
+                                    if (r1.IntersectsWith(r2))
+                                    {
+                                        onSomeMonitor = true;
+                                        break;
+                                    }
+                                }
+                            }
 
                             Microsoft.UI.Windowing.DisplayArea displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(id, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
-                            if (sizeWidth > 0 && sizeHeight > 0)
+                            if (sizeWidth > 0 && sizeHeight > 0 && onSomeMonitor)
                             {
-                                if (displayArea != null && displayArea.WorkArea.Width > 0 && displayArea.WorkArea.Height > 0)
-                                {
-                                    if (sizeX + sizeWidth > displayArea.WorkArea.X + displayArea.WorkArea.Width * 1.1 + 32)
-                                        sizeX = sizeWidth = 0;
-                                    else if (sizeX < displayArea.WorkArea.X - 16)
-                                        sizeX = sizeWidth = 0;
+                                //if (displayArea != null && displayArea.WorkArea.Width > 0 && displayArea.WorkArea.Height > 0)
+                                //{
+                                //    if (sizeX + sizeWidth > displayArea.WorkArea.X + displayArea.WorkArea.Width * 1.1 + 32)
+                                //        sizeX = sizeWidth = 0;
+                                //    else if (sizeX < displayArea.WorkArea.X - 16)
+                                //        sizeX = sizeWidth = 0;
 
-                                    if (sizeY + sizeHeight > displayArea.WorkArea.Y + displayArea.WorkArea.Height * 1.1 + 32)
-                                        sizeY = sizeHeight = 0;
-                                    else if (sizeY < displayArea.WorkArea.Y - 16)
-                                        sizeY = sizeHeight = 0;
-                                }
-                                appWindow.MoveAndResize(new Windows.Graphics.RectInt32(sizeX, sizeY, sizeWidth, sizeHeight));
+                                //    if (sizeY + sizeHeight > displayArea.WorkArea.Y + displayArea.WorkArea.Height * 1.1 + 32)
+                                //        sizeY = sizeHeight = 0;
+                                //    else if (sizeY < displayArea.WorkArea.Y - 16)
+                                //        sizeY = sizeHeight = 0;
+                                //}
+                                float scale = GHApp.DisplayDensity / (sizeDisplayDensity <= 0 ? 1.0f : sizeDisplayDensity);
+                                appWindow.MoveAndResize(new Windows.Graphics.RectInt32(sizeX, sizeY, (int)(sizeWidth * scale), (int)(sizeHeight * scale)));
                             }
                             else if (displayArea != null && displayArea.WorkArea.Width > 0 && displayArea.WorkArea.Height > 0)
                             {
@@ -207,13 +241,57 @@ public static class MauiProgram
                                     Preferences.Set("WindowedSizeY", sender.Position.Y);
                                     Preferences.Set("WindowedSizeWidth", sender.Size.Width);
                                     Preferences.Set("WindowedSizeHeight", sender.Size.Height);
+                                    Preferences.Set("WindowedSizeDisplayDensity", GHApp.DisplayDensity);
                                 }
                             };
                         }
                     });
                 });
             })
-#endif            
+#endif
+            .ConfigureLifecycleEvents(static lifecycleBuilder =>
+            {
+            #if ANDROID
+                lifecycleBuilder.AddAndroid(androidLifecycleBuilder =>
+                {
+                    androidLifecycleBuilder.OnCreate((activity, savedInstance) =>
+                    {
+                        if (activity is ComponentActivity componentActivity)
+                        {
+                            componentActivity.GetFragmentManager()?.RegisterFragmentLifecycleCallbacks(new MyFragmentLifecycleCallbacks((fragmentManager, fragment) =>
+                            {
+                                // Modals in MAUI in NET9 use DialogFragment
+                                if (fragment is AndroidX.Fragment.App.DialogFragment dialogFragment)
+                                {
+                                    var window = dialogFragment.Dialog?.Window;
+                                    if(window != null)
+                                    {
+                                        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+                                        {
+#pragma warning disable CA1416 // Supported on: 'android' 30.0 and later
+                                            window!.SetDecorFitsSystemWindows(false);
+                                            window!.InsetsController?.Hide(WindowInsets.Type.SystemBars());
+                                            if (window!.InsetsController != null)
+                                                window!.InsetsController.SystemBarsBehavior = (int)WindowInsetsControllerBehavior.ShowTransientBarsBySwipe;
+#pragma warning restore CA1416 // Supported on: 'android' 30.0 and later
+                                        }
+                                        else
+                                        {
+#pragma warning disable CS0618 // Type or member is obsolete
+                                            SystemUiFlags systemUiVisibility = (SystemUiFlags)window!.DecorView.SystemUiVisibility;
+                                            systemUiVisibility |= SystemUiFlags.HideNavigation;
+                                            systemUiVisibility |= SystemUiFlags.Immersive;
+                                            window!.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+#pragma warning restore CS0618 // Type or member is obsolete
+                                        }
+                                    }
+                                }
+                            }), false);
+                        }
+                    });
+                });
+            #endif
+            })
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -231,10 +309,22 @@ public static class MauiProgram
                 fonts.AddFont("shxi.ttf", "Xizor");
                 fonts.AddFont("uwch.ttf", "Underwood");
             });
-
 #if DEBUG
 		builder.Logging.AddDebug();
 #endif
         return builder.Build();
 	}
+
 }
+
+#if ANDROID
+public class MyFragmentLifecycleCallbacks(Action<AndroidX.Fragment.App.FragmentManager, AndroidX.Fragment.App.Fragment> onFragmentStarted) : AndroidX.Fragment.App.FragmentManager.FragmentLifecycleCallbacks
+{
+    public override void OnFragmentStarted(AndroidX.Fragment.App.FragmentManager fm, AndroidX.Fragment.App.Fragment f)
+    {
+        onFragmentStarted?.Invoke(fm, f);
+        base.OnFragmentStarted(fm, f);
+    }
+}
+#endif
+

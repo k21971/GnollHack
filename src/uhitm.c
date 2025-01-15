@@ -633,7 +633,7 @@ int dieroll;
     if (override_confirmation) 
     {
         if (flags.verbose && weapon)
-            Your("bloodthirsty %s attacks!", is_blade(weapon) ? "blade" : is_weapon(weapon) ? weapon_type_names[objects[weapon->otyp].oc_subtyp] : "weapon");
+            Your("bloodthirsty %s attacks!", is_blade(weapon) ? "blade" : weapon->oclass == WEAPON_CLASS ? weapon_type_names[objects[weapon->otyp].oc_subtyp] : "weapon");
     }
 
     if (!*mhit)
@@ -1485,7 +1485,7 @@ boolean* obj_destroyed;
                 obfree(o, (struct obj*) 0); \
             else                             \
                 useupall(o);                 \
-                o = (struct obj*) 0;            \
+            o = (struct obj*) 0;            \
     } while (0) /* now gone */
                 case EGG: 
                 {

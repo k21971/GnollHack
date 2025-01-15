@@ -4,6 +4,7 @@ using GnollHackM;
 #if WINDOWS
 using GnollHackM.Platforms.Windows;
 using System.Management;
+using Windows.Graphics;
 #endif
 #else
 using Xamarin.Essentials;
@@ -36,6 +37,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure;
 using System.Text.RegularExpressions;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 
 namespace GnollHackX
 {
@@ -102,7 +105,7 @@ namespace GnollHackX
     public static class GHApp
     {
 #if WINDOWS
-        public static Microsoft.UI.Xaml.Application WindowsApp = null;
+        public static MauiWinUIApplication WindowsApp = null;
         public static Microsoft.UI.Xaml.Window WindowsXamlWindow = null;
         public static Microsoft.UI.Input.InputCursor WindowsCursor = null;
         public static Microsoft.UI.Input.InputCursor WindowsInfoCursor = null;
@@ -162,6 +165,7 @@ namespace GnollHackX
             XlogPassword = Preferences.Get("XlogPassword", "");
             XlogReleaseAccount = Preferences.Get("XlogReleaseAccount", false);
             AllowBones = Preferences.Get("AllowBones", true);
+            AllowPet = Preferences.Get("AllowPet", true);
             BonesAllowedUsers = Preferences.Get("BonesAllowedUsers", "");
             EmptyWishIsNothing = Preferences.Get("EmptyWishIsNothing", true);
             RecommendedSettingsChecked = Preferences.Get("RecommendedSettingsChecked", false);
@@ -224,6 +228,30 @@ namespace GnollHackX
             }
         }
 
+        public static bool IsKeyboardConnected
+        {
+            get
+            {
+                return PlatformService == null ? false : PlatformService.GetKeyboardConnected();
+            }
+        }
+
+        public static bool PressOkOnEntryCompleted
+        {
+            get
+            {
+                return !IsKeyboardConnected; /* Keyboard handling does not fire */
+            }
+        }
+
+        public static bool AutoFocusOnEntry
+        {
+            get
+            {
+                return IsKeyboardConnected; /* Does not bring up the soft keyboard, so can focus immediately */
+            }
+        }
+
         public static void InitializeGC()
         {
             //try
@@ -267,6 +295,7 @@ namespace GnollHackX
                     Preferences.Set("WindowedSizeY", appWindow.Position.Y);
                     Preferences.Set("WindowedSizeWidth", appWindow.Size.Width);
                     Preferences.Set("WindowedSizeHeight", appWindow.Size.Height);
+                    Preferences.Set("WindowedSizeDisplayDensity", DisplayDensity);
                 }
             }
 #endif
@@ -3066,9 +3095,11 @@ namespace GnollHackX
         private static bool _bonesUserListIsBlack;
         public static bool BonesUserListIsBlack { get { lock (_bonesUserListIsBlackLock) { return _bonesUserListIsBlack; } } set { lock (_bonesUserListIsBlackLock) { _bonesUserListIsBlack = value; } } }
 
-        private static readonly object _allowBonesLock = new object();
+        private static readonly object _allowInGameLock = new object();
         private static bool _allowBones;
-        public static bool AllowBones { get { bool t = TournamentMode; lock (_allowBonesLock) { return _allowBones || t; } } set { lock (_allowBonesLock) { _allowBones = value; } } }
+        private static bool _allowPet;
+        public static bool AllowBones { get { bool t = TournamentMode; lock (_allowInGameLock) { return _allowBones || t; } } set { lock (_allowInGameLock) { _allowBones = value; } } }
+        public static bool AllowPet { get { lock (_allowInGameLock) { return _allowPet; } } set { lock (_allowInGameLock) { _allowPet = value; } } }
 
         private static readonly object _behaviorLock = new object();
         private static bool _emptyWishIsNothing;
@@ -5586,13 +5617,13 @@ namespace GnollHackX
                                                                 byte[] attrs_bytes = attrs_size > 0 ? br.ReadBytes(attrs_size) : null;
                                                                 fixed (byte* attrs_byte_ptr = attrs_bytes)
                                                                 {
-                                                                    IntPtr attrs_ptr = attrs_bytes == null ? IntPtr.Zero : (IntPtr)otypdata_byte_ptr;
+                                                                    IntPtr attrs_ptr = attrs_bytes == null ? IntPtr.Zero : (IntPtr)attrs_byte_ptr;
 
                                                                     int colors_size = br.ReadInt32();
                                                                     byte[] colors_bytes = colors_size > 0 ? br.ReadBytes(colors_size) : null;
                                                                     fixed (byte* colors_byte_ptr = colors_bytes)
                                                                     {
-                                                                        IntPtr colors_ptr = colors_bytes == null ? IntPtr.Zero : (IntPtr)otypdata_byte_ptr;
+                                                                        IntPtr colors_ptr = colors_bytes == null ? IntPtr.Zero : (IntPtr)colors_byte_ptr;
                                                                         game.ClientCallback_AddExtendedMenu(winid, glyph, identifier, accel, groupaccel, attr, color, text, presel,
                                                                             maxcount, oid, mid, headingaccel, special_mark, menuflags, dataflags, style, otmpdata_ptr, otypdata_ptr, attrs_ptr, colors_ptr);
                                                                     }
@@ -6364,6 +6395,7 @@ namespace GnollHackX
             if(pluspos >= 0)
             {
                 res = fullverid.Substring(0, pluspos);
+#if !WINDOWS
                 int lastdashpos = fullverid.LastIndexOf("-");
                 int lastdotpos = fullverid.LastIndexOf(".");
                 if (lastdotpos > lastdashpos && lastdashpos > 0 && lastdashpos < fullverid.Length - 1)
@@ -6372,6 +6404,7 @@ namespace GnollHackX
                     if(previewLen > 1) //More than just the dash
                         res += fullverid.Substring(lastdashpos, previewLen);
                 }
+#endif
             }
             else
             {
@@ -6821,6 +6854,15 @@ namespace GnollHackX
                 }
             }
         }
+
+        public static void SendKeyPress(int key, bool isCtrl, bool isMeta)
+        {
+            CurrentGamePage?.HandleKeyPress(key, isCtrl, isMeta);
+        }
+        public static void SendSpecialKeyPress(GHSpecialKey spkey, bool isCtrl, bool isMeta, bool isShift)
+        {
+            CurrentGamePage?.HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+        }
     }
 
     public class DeviceGPU
@@ -6896,4 +6938,106 @@ namespace GnollHackX
             return DisplayName;
         }
     }
+
+#if WINDOWS
+    public sealed class GHMonitor
+    {
+        private GHMonitor(IntPtr handle)
+        {
+            Handle = handle;
+            var mi = new MONITORINFOEX();
+            mi.cbSize = Marshal.SizeOf(mi);
+            if (!GetMonitorInfo(handle, ref mi))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+
+            DeviceName = mi.szDevice.ToString();
+            Bounds = new RectInt32(mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top);
+            WorkingArea = new RectInt32(mi.rcWork.left, mi.rcWork.top, mi.rcWork.right - mi.rcWork.left, mi.rcWork.bottom - mi.rcWork.top);
+            IsPrimary = mi.dwFlags.HasFlag(MONITORINFOF.MONITORINFOF_PRIMARY);
+        }
+
+        public IntPtr Handle { get; }
+        public bool IsPrimary { get; }
+        public RectInt32 WorkingArea { get; }
+        public RectInt32 Bounds { get; }
+        public string DeviceName { get; }
+
+        public static List<GHMonitor> All
+        {
+            get
+            {
+                var all = new List<GHMonitor>();
+                EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (m, h, rc, p) =>
+                {
+                    all.Add(new GHMonitor(m));
+                    return true;
+                }, IntPtr.Zero);
+                return all;
+            }
+        }
+
+        public override string ToString() => DeviceName;
+        public static IntPtr GetNearestFromWindow(IntPtr hwnd) => MonitorFromWindow(hwnd, MFW.MONITOR_DEFAULTTONEAREST);
+        public static IntPtr GetDesktopMonitorHandle() => GetNearestFromWindow(GetDesktopWindow());
+        public static IntPtr GetShellMonitorHandle() => GetNearestFromWindow(GetShellWindow());
+        public static GHMonitor FromWindow(IntPtr hwnd, MFW flags = MFW.MONITOR_DEFAULTTONULL)
+        {
+            var h = MonitorFromWindow(hwnd, flags);
+            return h != IntPtr.Zero ? new GHMonitor(h) : null;
+        }
+
+        [Flags]
+        public enum MFW
+        {
+            MONITOR_DEFAULTTONULL = 0x00000000,
+            MONITOR_DEFAULTTOPRIMARY = 0x00000001,
+            MONITOR_DEFAULTTONEAREST = 0x00000002,
+        }
+
+        [Flags]
+        public enum MONITORINFOF
+        {
+            MONITORINFOF_NONE = 0x00000000,
+            MONITORINFOF_PRIMARY = 0x00000001,
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct MONITORINFOEX
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public MONITORINFOF dwFlags;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string szDevice;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
+        }
+
+        private delegate bool MonitorEnumProc(IntPtr monitor, IntPtr hdc, IntPtr lprcMonitor, IntPtr lParam);
+
+        [DllImport("user32")]
+        private static extern IntPtr GetDesktopWindow();
+
+        [DllImport("user32")]
+        private static extern IntPtr GetShellWindow();
+
+        [DllImport("user32")]
+        private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+        [DllImport("user32")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, MFW flags);
+
+        [DllImport("user32", CharSet = CharSet.Unicode)]
+        private static extern bool GetMonitorInfo(IntPtr hmonitor, ref MONITORINFOEX info);
+    }
+#endif
 }

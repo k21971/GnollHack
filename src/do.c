@@ -25,11 +25,29 @@ STATIC_DCL void NDECL(final_level);
 STATIC_DCL void FDECL(print_corpse_properties, (winid, int));
 STATIC_DCL void FDECL(revive_handle_magic_chest, (xchar*, struct obj**, int*, struct monst**));
 /* STATIC_DCL boolean FDECL(badspot, (XCHAR_P,XCHAR_P)); */
+STATIC_PTR int FDECL(CFDECLSPEC item_wiki_cmp, (const genericptr, const genericptr));
 
 extern int n_dgns; /* number of dungeons, from dungeon.c */
 
 STATIC_VAR NEARDATA const char drop_types[] = { ALLOW_COUNT, COIN_CLASS,
                                             ALL_CLASSES, 0 };
+
+STATIC_OVL int CFDECLSPEC
+item_wiki_cmp(p, q)
+const genericptr p;
+const genericptr q;
+{
+    if (!p || !q)
+        return 0;
+
+    short idx1 = *(short*)p;
+    short idx2 = *(short*)q;
+
+    const char* name1 = OBJ_NAME(objects[idx1]);
+    const char* name2 = OBJ_NAME(objects[idx2]);
+
+    return strcmpi(name1, name2);
+}
 
 /* 'd' command: drop one inventory item */
 int
@@ -1234,7 +1252,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
     }
 
     boolean weapon_stats_shown = FALSE;
-    if (!uses_spell_flags && desc_known &&(is_otyp_weapon(otyp) || ((is_otyp_gloves(otyp) || is_otyp_boots(otyp) || objects[otyp].oc_class == GEM_CLASS))))
+    if (!uses_spell_flags && desc_known && (is_otyp_weapon(otyp) || is_otyp_pick(otyp) || is_otyp_saw(otyp) || ((is_otyp_gloves(otyp) || is_otyp_boots(otyp) || objects[otyp].oc_class == GEM_CLASS))))
     {
         weapon_stats_shown = TRUE;
         boolean maindiceprinted = FALSE;
@@ -1250,7 +1268,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-            if (obj ? is_appliable_weapon(obj) : is_otyp_appliable_weapon(otyp))
+            if (obj ? is_appliable_weapon(obj) || is_pick(obj) || is_saw(obj) : is_otyp_appliable_weapon(otyp) || is_otyp_pick(otyp) || is_otyp_saw(otyp))
             {
                 /* Single or two-handed */
                 if (obj ? is_appliable_pole_type_weapon(obj) : is_otyp_appliable_pole_type_weapon(otyp))
@@ -1742,7 +1760,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             wep_avg_dmg += dmg_bonus;
             wep_multipliable_avg_dmg += dmg_bonus;
         }
-        else
+        else if (obj)
         {
             /* Otherwise get full melee strength damage bonus */
             double str_bonus = strength_damage_bonus_core(ACURR(A_STR), TRUE);
@@ -2639,6 +2657,21 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         if (nonmythic)
         {
             Sprintf(buf, "Mythic status:          %s", "Cannot be mythic");
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        }
+    }
+
+    /* Historic status for statues */
+    if (obj && otyp == STATUE && obj->dknown)
+    {
+        if (obj->special_quality == SPEQUAL_STATUE_HISTORIC)
+        {
+            Sprintf(buf, "Historic statue:        %s", "Yes");
+            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        }
+        else
+        {
+            Sprintf(buf, "Historic statue:        %s", "No");
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
     }
@@ -4306,6 +4339,87 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 }
             }
         }
+    }
+    else if (!obj)
+    {
+        int spellcnt = 0;
+        short* spellbook_indices = (short*)alloc(MAXSPELL * sizeof(short));
+        memset(spellbook_indices, 0, MAXSPELL * sizeof(short));
+
+        for (i = FIRST_SPELL; i < FIRST_SPELL + MAXSPELL; i++)
+        {
+            if (is_otyp_component_for_spellbook(i, otyp, (uint64_t*)0, (int*)0) > 0)
+            {
+                spellbook_indices[spellcnt] = (short)i;
+                spellcnt++;
+            }
+        }
+        if (spellcnt > 0)
+        {
+            qsort(spellbook_indices, spellcnt, sizeof(short), item_wiki_cmp);
+
+            Sprintf(buf, "Component for the following spell%s:", plur(spellcnt));
+            putstr(datawin, ATR_HEADING, buf);
+            int compcnt = 0;
+            const char* splname = 0;
+            char sbuf[BUFSZ];
+            char fbuf[BUFSZ];
+            int splres;
+            for (i = 0; i < spellcnt; i++)
+            {
+                uint64_t mcflags = 0;
+                int mccorpsenm = -1;
+                splres = is_otyp_component_for_spellbook((int)spellbook_indices[i], otyp, &mcflags, &mccorpsenm);
+                if (splres > 0)
+                {
+                    compcnt++;
+                    splname = OBJ_NAME(objects[spellbook_indices[i]]);
+                    Strcpy(sbuf, splname);
+                    *sbuf = highc(*sbuf);
+                    Strcpy(fbuf, "");
+                    if (mccorpsenm >= 0 && mccorpsenm < NUM_MONSTERS)
+                    {
+                        if (*fbuf)
+                            Strcat(fbuf, ", ");
+                        Strcat(fbuf, mons[mccorpsenm].mname);
+                    }
+                    if (mcflags & MATCOMP_NOT_SPENT)
+                    {
+                        if (*fbuf)
+                            Strcat(fbuf, ", ");
+                        Strcat(fbuf, "catalyst");
+                    }
+                    if (mcflags & MATCOMP_NOT_CURSED)
+                    {
+                        if(*fbuf)
+                            Strcat(fbuf, ", ");
+                        Strcat(fbuf, "not cursed");
+                    }
+                    if (mcflags & MATCOMP_BLESSED_REQUIRED)
+                    {
+                        if (*fbuf)
+                            Strcat(fbuf, ", ");
+                        Strcat(fbuf, "blessed");
+                    }
+                    if (mcflags & MATCOMP_CURSED_REQUIRED)
+                    {
+                        if (*fbuf)
+                            Strcat(fbuf, ", ");
+                        Strcat(fbuf, "cursed");
+                    }
+                    if (mcflags & MATCOMP_DEATH_ENCHANTMENT_REQUIRED)
+                    {
+                        if (*fbuf)
+                            Strcat(fbuf, ", ");
+                        Strcat(fbuf, "death-enchanted");
+                    }
+                    Sprintf(buf, " %2d - [[%s]]%s%s%s", compcnt, sbuf, *fbuf ? " (" : "", fbuf, *fbuf ? ")" : "");
+                    putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+                }
+            }
+        }
+
+        free(spellbook_indices);
     }
 
     /* Notable */
@@ -8675,7 +8789,6 @@ int otyp;
 
     if (objects[otyp].oc_class == WEAPON_CLASS)
     {
-
         return weapon_type_names[objects[otyp].oc_subtyp];
     }
     else if (objects[otyp].oc_class == ARMOR_CLASS)
@@ -9124,7 +9237,6 @@ STATIC_DCL void FDECL(write_putstr_ex, (winid, const char*, int, int, int));
 STATIC_DCL void FDECL(write_putstr_ex2, (winid, const char*, const char*, const char*, int, int, int));
 STATIC_PTR int FDECL(CFDECLSPEC spell_wiki_cmp, (const genericptr, const genericptr));
 STATIC_PTR int FDECL(CFDECLSPEC monster_wiki_cmp, (const genericptr, const genericptr));
-STATIC_PTR int FDECL(CFDECLSPEC item_wiki_cmp, (const genericptr, const genericptr));
 
 STATIC_VAR int write_fd = -1;
 
@@ -9647,23 +9759,6 @@ write_monsters()
     pline("Done!");
 }
 
-
-STATIC_OVL int CFDECLSPEC
-item_wiki_cmp(p, q)
-const genericptr p;
-const genericptr q;
-{
-    if (!p || !q)
-        return 0;
-
-    short idx1 = *(short*)p;
-    short idx2 = *(short*)q;
-
-    const char* name1 = OBJ_NAME(objects[idx1]);
-    const char* name2 = OBJ_NAME(objects[idx2]);
-
-    return strcmpi(name1, name2);
-}
 
 void
 write_items()

@@ -1137,6 +1137,8 @@ E struct item_score_count_result FDECL(count_powerful_Japanese_item_score, (stru
 E struct item_score_count_result FDECL(count_powerful_valkyrie_item_score, (struct obj*));
 E struct amulet_count_result FDECL(count_amulets, (struct obj*));
 E struct item_score_count_result FDECL(count_artifacts, (struct obj*));
+E struct item_score_count_result FDECL(count_historic_statues, (struct obj*));
+E struct item_score_count_result FDECL(count_valuable_art_objects, (struct obj*));
 E void NDECL(recalculate_knight_slaying_score);
 
 /* ### engrave.c ### */
@@ -3617,6 +3619,7 @@ E double FDECL(get_spell_mana_cost, (int));
 E double FDECL(get_spellbook_adjusted_mana_cost, (int));
 E void FDECL(deduct_mana_cost, (double));
 E uchar FDECL(is_obj_component_for, (int, struct obj*));
+E uchar FDECL(is_otyp_component_for_spellbook, (int, int, uint64_t*, int*));
 #if defined (DUMPLOG) || defined (DUMPHTML)
 E void NDECL(dump_spells);
 #endif
