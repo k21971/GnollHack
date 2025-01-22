@@ -614,6 +614,18 @@ LibGetCharacterClickAction(VOID_ARGS)
 }
 
 DLLEXPORT void
+LibSetDiceAsRanges(int new_value)
+{
+    iflags.show_dice_as_ranges = new_value != 0;
+}
+
+DLLEXPORT int
+LibGetDiceAsRanges(VOID_ARGS)
+{
+    return (int)iflags.show_dice_as_ranges;
+}
+
+DLLEXPORT void
 LibSetMouseCommand(int new_value, int is_middle)
 {
     if (is_middle)
@@ -712,6 +724,7 @@ DLLEXPORT int RunGnollHack(
     char* preset_player_name,
     char* last_used_player_name,
     uint64_t runflags,
+    uint64_t foundmanuals,
     uint64_t wincap1,
     uint64_t wincap2,
     InitWindowsCallback callback_init_nhwindows,
@@ -891,6 +904,7 @@ DLLEXPORT int RunGnollHack(
 
     initial_flags.right_click_action = (uchar)((runflags & GHRUNFLAGS_RIGHT_MOUSE_BIT_MASK) >> GHRUNFLAGS_RIGHT_MOUSE_BIT_INDEX);
     initial_flags.middle_click_action = (uchar)((runflags & GHRUNFLAGS_MIDDLE_MOUSE_BIT_MASK) >> GHRUNFLAGS_MIDDLE_MOUSE_BIT_INDEX);
+    initial_flags.found_manuals = foundmanuals;
 
     if (runflags & GHRUNFLAGS_NO_PET)
     {

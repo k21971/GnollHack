@@ -45,7 +45,7 @@ struct flag {
     boolean ignintr;         /* ignore interrupts */
     boolean ins_chkpt;       /* checkpoint as appropriate; INSURANCE */
     boolean invlet_constant; /* let objects keep their inventory symbol */
-    boolean knapsack_prompt; /* automatic prompt for putting items in a bag / dropping them when knapsack is full */
+    boolean knapsack_prompt; /* automatic prompt for putting items in a bag / dropping them when inventory is full */
     boolean legacy;          /* print game entry "story" */
     boolean lit_corridor;    /* show a dark corr as lit if it is in sight */
     boolean nap;             /* `timed_delay' option for display effects */
@@ -248,7 +248,7 @@ struct flag {
 
     uchar right_click_command;
     uchar middle_click_command;
-    uchar reserved_uchar1;
+    boolean stash_on_autopickup;
     uchar reserved_uchar2;
     uchar reserved_uchar3;
     uchar reserved_uchar4;
@@ -582,6 +582,8 @@ struct instance_flags {
     boolean obsolete;  /* obsolete options can point at this, it isn't used */
 
     struct monst* spell_target_monster;
+    uint64_t found_manuals;
+    boolean show_dice_as_ranges;
 };
 
 /*
@@ -777,6 +779,7 @@ struct startup_flags {
     boolean click_action_value;
     uchar right_click_action;
     uchar middle_click_action;
+    uint64_t found_manuals;
 };
 
 extern NEARDATA struct startup_flags initial_flags;

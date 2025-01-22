@@ -186,7 +186,7 @@ static struct Bool_Opt {
     { "implicit_uncursed", "omit \"uncursed\" from inventory", &iflags.implicit_uncursed, TRUE, SET_IN_GAME },
     { "inventory_obj_cmd", "display a command menu upon selecting an object in inventory", &flags.inventory_obj_cmd, TRUE, SET_IN_GAME},
     { "inventory_weights_last", "display object weights in parentheses after object name", &flags.inventory_weights_last, FALSE, SET_IN_GAME},
-    { "knapsack_prompt", "prompt for an action when knapsack is full", &flags.knapsack_prompt, TRUE, SET_IN_GAME},
+    { "knapsack_prompt", "prompt for an action when inventory is full", &flags.knapsack_prompt, TRUE, SET_IN_GAME},
     { "large_font", "obsolete: use large font", &iflags.obsolete, FALSE, SET_IN_FILE}, /* OBSOLETE */
     { "legacy", "show introductory message", &flags.legacy, TRUE, DISP_IN_GAME },
     { "lit_corridor", "show dark corridors as lit if in sight", &flags.lit_corridor, FALSE, SET_IN_GAME },
@@ -263,6 +263,13 @@ static struct Bool_Opt {
     { "show_buff_timer", "show buff timer on tiles", &flags.show_buff_timer, FALSE, SET_IN_GAME},
     { "show_comparison_stats", "show comparison statistics for items when picking them up", &iflags.show_comparison_stats, TRUE, SET_IN_GAME },
     { "show_decorations", "show decorations via colors in ASCII mode", &flags.show_decorations, TRUE, SET_IN_GAME },
+    { "show_dice_as_ranges", "show dice as ranges (e.g., 2-12 instead of 2d6)", &iflags.show_dice_as_ranges,
+#ifdef GNH_MOBILE
+        TRUE,
+#else
+        FALSE,
+#endif
+        SET_IN_GAME },
     { "show_grid", "show grid between tiles", &flags.show_grid, FALSE, SET_IN_GAME},
     { "show_tile_mon_hp_bar", "show monster hit points on tiles", &flags.show_tile_mon_hp_bar, FALSE, SET_IN_GAME},
     { "show_tile_pet_hp_bar", "show pet hit points on tiles", &flags.show_tile_pet_hp_bar, FALSE, SET_IN_GAME },
@@ -277,6 +284,7 @@ static struct Bool_Opt {
     { "spell_table_format", "show spells in a table format rather than a list", &iflags.spell_table_format, TRUE, SET_IN_GAME },
     { "splash_screen", "show splash screen", &iflags.wc_splash_screen, TRUE, DISP_IN_GAME}, /*WC*/
     { "standout", "use standout for --more--", &flags.standout, FALSE, SET_IN_GAME },
+    { "stash_on_autopickup", "stash items into a container on autopickup (but no thrown if pick_thrown is on)", &flags.stash_on_autopickup, FALSE, SET_IN_GAME },
     { "status_updates", "allow the status lines to update", &iflags.status_updates, TRUE, DISP_IN_GAME },
     { "swap_rhand_only", "swap right hand weapon only rather than objects in both hands", &flags.swap_rhand_only, FALSE, SET_IN_GAME},
     { "takeoff_uses_all", "takeoff command uses takeoffall command rather than normal implementation", &iflags.takeoff_uses_all, TRUE, SET_IN_GAME},
@@ -5338,6 +5346,10 @@ boolean tinitial, tfrom_file;
             else if (boolopt[i].addr == &flags.self_click_action)
             {
                 issue_boolean_gui_command(GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION, flags.self_click_action);
+            }
+            else if (boolopt[i].addr == &iflags.show_dice_as_ranges)
+            {
+                issue_boolean_gui_command(GUI_CMD_TOGGLE_DICE_AS_RANGES, iflags.show_dice_as_ranges);
             }
             else if (boolopt[i].addr == &flags.classic_statue_symbol || boolopt[i].addr == &flags.classic_colors || boolopt[i].addr == &flags.show_decorations)
             {

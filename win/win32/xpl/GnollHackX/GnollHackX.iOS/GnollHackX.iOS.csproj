@@ -53,8 +53,6 @@
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
     <MtouchLink>None</MtouchLink>
     <MtouchInterpreter>-all</MtouchInterpreter>
-    <MtouchExtraArgs>
-    </MtouchExtraArgs>
     <MtouchSdkVersion>
     </MtouchSdkVersion>
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
@@ -71,8 +69,6 @@
     <CodesignKey>Apple Distribution: Hyvan mielen pelit ry (CUG8RS847T)</CodesignKey>
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
     <MtouchInterpreter>-all</MtouchInterpreter>
-    <MtouchExtraArgs>
-    </MtouchExtraArgs>
     <MtouchLink>SdkOnly</MtouchLink>
     <MtouchNoSymbolStrip>false</MtouchNoSymbolStrip>
     <MtouchFastDev>false</MtouchFastDev>
@@ -188,17 +184,8 @@
     <PackageReference Include="SkiaSharp.Views.Forms">
       <Version>2.88.8</Version>
     </PackageReference>
-    <PackageReference Include="Xamarin.Firebase.iOS.Analytics">
-      <Version>6.9.0</Version>
-    </PackageReference>
-    <PackageReference Include="Xamarin.Firebase.iOS.Auth">
-      <Version>6.9.2</Version>
-    </PackageReference>
-    <PackageReference Include="Xamarin.Firebase.iOS.Core">
-      <Version>6.10.4</Version>
-    </PackageReference>
-    <PackageReference Include="Xamarin.Firebase.iOS.Installations">
-      <Version>1.7.0</Version>
+    <PackageReference Include="Xamarin.Build.Download">
+      <Version>0.11.4</Version>
     </PackageReference>
     <PackageReference Include="Xamarin.Forms" Version="5.0.0.2662" />
     <PackageReference Include="Xamarin.Essentials" Version="1.8.1" />

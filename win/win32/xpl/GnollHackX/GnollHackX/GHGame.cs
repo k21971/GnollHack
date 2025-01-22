@@ -45,6 +45,7 @@ namespace GnollHackX
         private string _characterName = "";
         private readonly object _characterNameLock = new object();
         private bool _useLongerMessageHistory = false;
+        private bool _useHideMessageHistory = false;
 
         private readonly GamePage _gamePage;
         public GamePage ActiveGamePage { get { return _gamePage; } }
@@ -64,6 +65,7 @@ namespace GnollHackX
         public int StatusWindowId { get; set; }
         private List<GHMsgHistoryItem> _message_history = new List<GHMsgHistoryItem>(GHConstants.MaxMessageHistoryLength + 1);
         private List<GHMsgHistoryItem> _longer_message_history = new List<GHMsgHistoryItem>(GHConstants.MaxLongerMessageHistoryLength + 1);
+        private List<GHMsgHistoryItem> _empty_message_history = new List<GHMsgHistoryItem>(1);
 
         public static ConcurrentDictionary<GHGame, ConcurrentQueue<GHRequest>> RequestDictionary { get { return _concurrentRequestDictionary; } }
         public static ConcurrentDictionary<GHGame, ConcurrentQueue<GHResponse>> ResponseDictionary { get { return _concurrentResponseDictionary; } }
@@ -216,11 +218,21 @@ namespace GnollHackX
                                 UpdateMessageHistory();
                             }
                             break;
+                        case GHRequestType.UseHideMessageHistory:
+                            if (_useHideMessageHistory != response.ResponseBoolValue)
+                            {
+                                _useHideMessageHistory = response.ResponseBoolValue;
+                                UpdateMessageHistory();
+                            }
+                            break;
                         case GHRequestType.EndReplayFile:
                             EndReplayFile();
                             break;
                         case GHRequestType.SetCharacterClickAction:
                             GHApp.GnollHackService.SetCharacterClickAction(response.ResponseBoolValue);
+                            break;
+                        case GHRequestType.SetDiceAsRanges:
+                            GHApp.GnollHackService.SetDiceAsRanges(response.ResponseBoolValue);
                             break;
                         case GHRequestType.SetRightMouseCommand:
                         case GHRequestType.SetMiddleMouseCommand:
@@ -859,7 +871,7 @@ namespace GnollHackX
             ConcurrentQueue<GHRequest> queue;
             if (GHGame.RequestDictionary.TryGetValue(this, out queue))
             {
-                List<GHMsgHistoryItem> relevantlist = _useLongerMessageHistory ? _longer_message_history : _message_history;
+                List<GHMsgHistoryItem> relevantlist = _useHideMessageHistory ? _empty_message_history : _useLongerMessageHistory ? _longer_message_history : _message_history;
                 if(relevantlist.Count == 0)
                     queue.Enqueue(new GHRequest(this, GHRequestType.PrintHistory)); /* Clear history */
                 else
@@ -916,11 +928,11 @@ namespace GnollHackX
                 //{
                 //    UpdateMessageHistoryItem(newmsg);
                 //}
-                SwitchOffLongerMessageHistory(); /* Just to make sure that it does not remain on the slow down the game */
+                SwitchOffLongerAndHideMessageHistory(); /* Just to make sure that it does not remain on the slow down the game */
             }
         }
 
-        public void SwitchOffLongerMessageHistory()
+        public void SwitchOffLongerAndHideMessageHistory()
         {
             if (_useLongerMessageHistory && _longer_message_history.Count > GHConstants.MaxMessageHistoryLength)
             {
@@ -929,6 +941,15 @@ namespace GnollHackX
                 {
                     /* _useLongerMessageHistory will be turned off by the response to this request */
                     queue.Enqueue(new GHRequest(this, GHRequestType.UseLongerMessageHistory, false));
+                }
+            }
+            if (_useHideMessageHistory)
+            {
+                ConcurrentQueue<GHRequest> queue;
+                if (GHGame.RequestDictionary.TryGetValue(this, out queue))
+                {
+                    /* _useHideMessageHistory will be turned off by the response to this request */
+                    queue.Enqueue(new GHRequest(this, GHRequestType.UseHideMessageHistory, false));
                 }
             }
         }
@@ -2501,6 +2522,9 @@ namespace GnollHackX
                     break;
                 case (int)gui_command_types.GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION:
                     GHApp.MirroredCharacterClickAction = cmd_param != 0;
+                    break;
+                case (int)gui_command_types.GUI_CMD_TOGGLE_DICE_AS_RANGES:
+                    GHApp.MirroredDiceAsRanges = cmd_param != 0;
                     break;
                 case (int)gui_command_types.GUI_CMD_START_FLUSH:
                     break;

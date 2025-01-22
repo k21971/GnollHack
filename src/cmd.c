@@ -1508,9 +1508,9 @@ int abilitynum;
                 struct attack* mattk = attacktype_fordmg(u.usteed->data, AT_BREA, AD_ANY);
                 int typ = get_ray_adtyp(mattk->adtyp);
                 if (typ == AD_SLEE)
-                    Sprintf(cooldownbuf, "%dd%d+%d", MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT);
+                    printdice(cooldownbuf, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT);
                 else
-                    Sprintf(cooldownbuf, "%dd%d+%d", MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT);
+                    printdice(cooldownbuf, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT);
                 const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
                     "%s (&cool; %s after use)" : "%s (%s round cooldown after use)";
                 Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command the steed to use breath weapon", cooldownbuf);
@@ -6186,6 +6186,8 @@ struct ext_func_tab extcmdlist[] = {
     { M('i'), "invoke", "invoke an object's special powers", 
         doinvoke, IFBURIED | AUTOCOMPLETE | INCMDMENU | SINGLE_OBJ_CMD_SPECIFIC, 0, 
         getobj_invoke_types, "invoke" },
+    { 'B', "itemsin", "put items into a container", doputitemsin, SINGLE_OBJ_CMD_SPECIFIC, 0, 0, "put items in", "put items in" },
+    { 'b', "itemsout", "take items out of a container", dotakeitemsout, SINGLE_OBJ_CMD_SPECIFIC, 0, 0, "take items out of", "take items out" },
     { M('j'), "jump", "jump to another location", dojump, AUTOCOMPLETE | INCMDMENU },
     { C('d'), "kick", "kick something", dokick, AUTOCOMPLETE | INCMDMENU },
     { M('k'), "killed", "list killed monsters", dokilledmonsters, IFBURIED },
@@ -6197,6 +6199,8 @@ struct ext_func_tab extcmdlist[] = {
     { ':', "look", "look at what is here", dolook, IFBURIED },
     { 'L', "lookat", "show what type of thing a symbol corresponds to", dowhatis, IFBURIED | GENERALCMD },
     { M('l'), "loot", "loot a box on the floor", doloot, AUTOCOMPLETE },
+    { 'Y', "lootin", "put items into a container on the floor", dolootin},
+    { 'y', "lootout", "take items out of a container on the floor", dolootout },
     { '\0', "managespell", "manage spells", dospellmanage, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
     { M(8), "favorite", "mark an item as favorite",
         dofavorite, SINGLE_OBJ_CMD_GENERAL | ALLOW_RETURN_TO_INVENTORY, 0,
@@ -10308,6 +10312,8 @@ enum create_context_menu_types menu_type;
                 add_context_menu(';', cmd_from_func(doput2bag), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick & Stash", cxname(otmp), 0, NO_COLOR);
             boolean eat_added = FALSE;
             boolean loot_added = FALSE;
+            boolean loot_out_added = FALSE;
+            boolean loot_in_added = FALSE;
             for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
             {
                 if (!eat_added && is_edible(otmp_here))
@@ -10316,10 +10322,33 @@ enum create_context_menu_types menu_type;
                     eat_added = TRUE;
                 }
 
-                if (!loot_added && Is_container(otmp_here))
+                if (Is_container(otmp_here))
                 {
-                    add_context_menu('l', cmd_from_func(doloot), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Loot", cxname(otmp_here), 0, NO_COLOR);
-                    loot_added = TRUE;
+                    if (!loot_added)
+                    {
+                        add_context_menu('l', cmd_from_func(doloot), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Loot", cxname(otmp_here), 0, NO_COLOR);
+                        loot_added = TRUE;
+                    }
+
+                    boolean is_known_improper = (objects[otmp_here->otyp].oc_name_known && !Is_proper_container(otmp_here));
+                    if (!loot_out_added && !is_known_improper)
+                    {
+                        boolean isknownempty = FALSE;
+                        if (otmp_here->cknown && (otmp_here->otyp == BAG_OF_TRICKS ? (otmp_here->charges == 0) : !Has_contained_contents(otmp_here)))
+                            isknownempty = TRUE;
+
+                        if (!isknownempty)
+                        {
+                            add_context_menu('b', cmd_from_func(dolootout), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Take out", cxname(otmp_here), 0, NO_COLOR);
+                            loot_out_added = TRUE;
+                        }
+                    }
+
+                    if (!loot_in_added && invent && !is_known_improper)
+                    {
+                        add_context_menu('B', cmd_from_func(dolootin), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Put in", cxname(otmp_here), 0, NO_COLOR);
+                        loot_in_added = TRUE;
+                    }
                 }
             }
         }

@@ -43,6 +43,7 @@ STATIC_DCL boolean FDECL(is_valid_jump_pos, (int, int, int, BOOLEAN_P));
 STATIC_DCL int FDECL(get_invalid_jump_position, (int, int));
 STATIC_DCL int FDECL(get_invalid_polearm_position, (int, int));
 STATIC_DCL boolean FDECL(find_poleable_mon, (coord *, int, int));
+STATIC_DCL int FDECL(doapply_core, (int));
 
 #ifdef AMIGA
 void FDECL(amii_speaker, (struct obj *, char *, int));
@@ -932,7 +933,7 @@ xchar x, y, n;
 }
 
 int
-number_leashed()
+number_leashed(VOID_ARGS)
 {
     int i = 0;
     struct obj *obj;
@@ -981,7 +982,7 @@ boolean feedback;
 
 /* player is about to die (for bones) */
 void
-unleash_all()
+unleash_all(VOID_ARGS)
 {
     register struct obj *otmp;
     register struct monst *mtmp;
@@ -1156,7 +1157,7 @@ struct monst *mtmp;
 }
 
 boolean
-next_to_u()
+next_to_u(VOID_ARGS)
 {
     register struct monst *mtmp;
     register struct obj *otmp;
@@ -1280,7 +1281,7 @@ register xchar x, y;
 }
 
 const char *
-beautiful()
+beautiful(VOID_ARGS)
 {
     return ((ACURR(A_CHA) > 14)
                ? ((poly_gender() == 1)
@@ -2709,7 +2710,7 @@ struct obj **optr;
 STATIC_VAR NEARDATA const char cuddly[] = { TOOL_CLASS, GEM_CLASS, 0 };
 
 int
-dorub()
+dorub(VOID_ARGS)
 {
     struct obj *obj = getobj(cuddly, "rub", 0, "");
 
@@ -2773,7 +2774,7 @@ dorub()
 }
 
 int
-dojump()
+dojump(VOID_ARGS)
 {
     /* Physical jump */
     return jump(0);
@@ -4492,9 +4493,9 @@ struct obj *otmp;
     return;
 }
 
-STATIC_PTR
+STATIC_OVL
 int
-set_trap()
+set_trap(VOID_ARGS)
 {
     struct obj *otmp = trapinfo.tobj;
     struct trap *ttmp;
@@ -5761,9 +5762,9 @@ char* class_list;
     }
 }
 
-
+/* the C('b') command */
 int
-dobreak()
+dobreak(VOID_ARGS)
 {
     int res = 1;
     char class_list[MAX_OBJECT_CLASSES + 2];
@@ -5814,7 +5815,28 @@ dobreak()
 
 /* the 'a' command */
 int
-doapply()
+doapply(VOID_ARGS)
+{
+    return doapply_core(0);
+}
+
+/* the 'b' command */
+int
+dotakeitemsout(VOID_ARGS)
+{
+    return doapply_core(1);
+}
+
+/* the 'B' command */
+int
+doputitemsin(VOID_ARGS)
+{
+    return doapply_core(2);
+}
+
+STATIC_OVL int
+doapply_core(applymode)
+int applymode; /* 0 = normal, 1 = take out items, 2 = put in items */
 {
     struct obj *obj;
     register int res = 1;
@@ -5823,21 +5845,32 @@ doapply()
     if (check_capacity((char *) 0))
         return 0;
 
-    int fres = 0;
-    if ((fres = floorapply()) > -1) /* -1 = nothing to floor apply or selected not to do it */
+    if (!applymode)
     {
-        return fres;
+        int fres = 0;
+        if ((fres = floorapply()) > -1) /* -1 = nothing to floor apply or selected not to do it */
+        {
+            return fres;
+        }
     }
 
     setapplyclasses(class_list); /* tools[] */
-    obj = getobj(class_list, "use or apply", 0, "");
+    const char* getobjverb = applymode == 1 ? "take items out of" : applymode == 2 ? "put items in" : "use or apply";
+    obj = getobj(class_list, getobjverb, 0, "");
     if (!obj)
         return 0;
+
+    if (applymode && !Is_container(obj))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot %s %s.", getobjverb, thecxname(obj));
+        return 0;
+    }
 
     if (obj->cooldownleft > 0)
     {
         play_sfx_sound(SFX_NOT_READY_YET);
-        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot apply %s before its cooldown has expired.", the(cxname(obj)));
+        You_ex(ATR_NONE, CLR_MSG_ATTENTION, "cannot apply %s before its cooldown has expired.", thecxname(obj));
         return 0;
     }
 
@@ -5853,7 +5886,7 @@ doapply()
     if (Is_proper_container(obj))
     {
         /* Regular containers */
-        res = use_container(&obj, 1, FALSE);
+        res = use_container(&obj, 1, FALSE, applymode);
     }
     else if (is_key(obj))
     {
@@ -6681,7 +6714,7 @@ thump:
 
 /* -1 to continue to inventory, 0 = did not take a turn, 1 = take a turn */
 int
-floorapply()
+floorapply(VOID_ARGS)
 {
     register struct trap* ttmp = t_at(u.ux, u.uy);
     char qbuf[QBUFSZ];
