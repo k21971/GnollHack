@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Globalization;
+
 
 #if GNH_MAUI
 using GnollHackX;
@@ -32,8 +35,8 @@ namespace GnollHackX.Pages.MainScreen
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _gamePage = gamePage;
 
@@ -243,36 +246,26 @@ namespace GnollHackX.Pages.MainScreen
             ActiveGPURowDefinition.Height = 0;
 #endif
 
+            PortVersionLabel.Text = GHApp.GetPortVersionString();
+            PortBuildLabel.Text = GHApp.GetPortBuildString();
 #if GNH_MAUI
-            Version ver = AppInfo.Current.Version;
-            string portVersion = (ver?.Major.ToString() ?? "?") + "." + (ver?.Minor.ToString() ?? "?");
-            PortVersionLabel.Text = portVersion; // GetAssemblyInformationalVersion(Assembly.GetEntryAssembly()); //This can also be AppInfo.Current.VersionString, but it is longer and the build number
-#if WINDOWS
-            PortBuildLabel.Text = AppInfo.Current.Version.Build.ToString();
+            UIFrameworkVersionLabel.Text = ".NET MAUI " + GHApp.UIFrameworkVersionString;
 #else
-            PortBuildLabel.Text = AppInfo.Current.BuildString;
-#endif
-#else
-            PortVersionLabel.Text = VersionTracking.CurrentVersion;
-            PortBuildLabel.Text = VersionTracking.CurrentBuild;
+            UIFrameworkVersionLabel.Text = "XF " + GHApp.UIFrameworkVersionString;
 #endif
             PortVersionTitleLabel.Text = GHApp.RuntimePlatform + " Port Version:";
             PortBuildTitleLabel.Text = GHApp.RuntimePlatform + " Port Build:";
             PortConfigurationTitleLabel.Text ="Port Configuration:";
-#if BETA
-            PortVersionLabel.Text += " (Beta)";
-#endif
+            if (GHApp.IsBeta && (!GHApp.IsSteam || GHApp.IsPlaytest))
+                PortVersionLabel.Text += " (Beta)";
+            if (GHApp.IsPlaytest)
+                PortBuildLabel.Text += " (Playtest)";
 
             GnollHackVersionLabel.Text = GHApp.GHVersionString;
             GnollHackConfigurationLabel.Text = GHApp.GHDebug ? "Debug" : "Release";
-            PortConfigurationLabel.Text =
-#if DEBUG
-                "Debug";
-#else
-                "Release";
-#endif
-
+            PortConfigurationLabel.Text = GHApp.IsDebug ? "Debug" : "Release";
             PackagingModelLabel.Text = GHApp.IsPackaged ? "Packaged" : "Unpackaged";
+            CultureLabel.Text = CultureInfo.CurrentCulture?.EnglishName; // + " / " + CultureInfo.InstalledUICulture.EnglishName + " / " + CultureInfo.CurrentUICulture.EnglishName;
 
             GnollHackCompatibilityLabel.Text = compatstr == "" ? "" : "From " + compatstr;
             FMODVersionLabel.Text = GHApp.FMODVersionString;
@@ -293,7 +286,8 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
         }
 
         private double _currentPageWidth = 0;

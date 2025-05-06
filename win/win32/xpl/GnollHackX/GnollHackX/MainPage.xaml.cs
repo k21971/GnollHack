@@ -29,6 +29,7 @@ using Newtonsoft.Json.Linq;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using GnollHackM.Platforms.Windows;
 #endif
 
@@ -74,7 +75,7 @@ namespace GnollHackX
             InitializeComponent();
             GHApp.CurrentMainPage = this;
             On<iOS>().SetUseSafeArea(true);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
 #if WINDOWS
             classicModeGrid.HeightRequest = 40;
             casualModeGrid.HeightRequest = 40;
@@ -82,6 +83,32 @@ namespace GnollHackX
             tournamentModeGrid.HeightRequest = 40;
 #endif
 #if GNH_MAUI
+#if WINDOWS
+            classicModeSwitch.HandlerChanged += (s, e) =>
+            {
+                var pv = classicModeSwitch.Handler?.PlatformView as ToggleSwitch;
+                if (pv != null)
+                {
+                    pv.IsTabStop = false;
+                }
+            };
+            casualModeSwitch.HandlerChanged += (s, e) =>
+            {
+                var pv = casualModeSwitch.Handler?.PlatformView as ToggleSwitch;
+                if (pv != null)
+                {
+                    pv.IsTabStop = false;
+                }
+            };
+            wizardModeSwitch.HandlerChanged += (s, e) =>
+            {
+                var pv = wizardModeSwitch.Handler?.PlatformView as ToggleSwitch;
+                if (pv != null)
+                {
+                    pv.IsTabStop = false;
+                }
+            };
+#endif
             Shell.SetNavBarIsVisible(this, false);
             _generalTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
             _generalTimer.Interval = TimeSpan.FromSeconds(GHConstants.MainScreenGeneralCounterIntervalInSeconds);
@@ -93,6 +120,9 @@ namespace GnollHackX
                 GHApp.DisplayDensity = DeviceDisplay.Current.MainDisplayInfo.Density <= 0.0 ? 1.0f : (float)DeviceDisplay.Current.MainDisplayInfo.Density;
                 GHApp.LoadCustomCursor();
                 UIUtils.ChangeElementCursor(RootGrid, GameCursorType.Normal);
+                UIUtils.ChangeElementCursor(classicModeLabel, GameCursorType.Info);
+                UIUtils.ChangeElementCursor(casualModeLabel, GameCursorType.Info);
+                UIUtils.ChangeElementCursor(wizardModeLabel, GameCursorType.Info);
             };
 #endif
         }
@@ -146,83 +176,94 @@ namespace GnollHackX
 
         private async Task GeneralTimerTasksAsync()
         {
-            bool hasinternet = GHApp.HasInternetAccess;
-            if (!CheckAndSetGeneralTimerWorkOnTasks)
+            bool workingOnTasks = false;
+            try
             {
-                bool dopostbones = GHApp.PostingBonesFiles && GHApp.AllowBones;
-                bool dopostreplays = GHApp.AutoUploadReplays;
-                string directory = Path.Combine(GHApp.GHPath, GHConstants.ForumPostQueueDirectory);
-                string directory2 = Path.Combine(GHApp.GHPath, GHConstants.XlogPostQueueDirectory);
-                string directory3 = Path.Combine(GHApp.GHPath, GHConstants.BonesPostQueueDirectory);
-                string directory4 = Path.Combine(GHApp.GHPath, GHConstants.ReplayPostQueueDirectory);
-                bool has_files = Directory.Exists(directory) && Directory.GetFiles(directory)?.Length > 0;
-                bool has_files2 = Directory.Exists(directory2) && Directory.GetFiles(directory2)?.Length > 0;
-                bool has_files3 = Directory.Exists(directory3) && Directory.GetFiles(directory3)?.Length > 0;
-                bool has_files4 = Directory.Exists(directory4) && Directory.GetFiles(directory4)?.Length > 0;
-                bool missingcredentials = string.IsNullOrEmpty(GHApp.XlogUserName);
-                bool incorrectcredentials = GHApp.XlogCredentialsIncorrect;
-                bool missingorincorrectcredentials = missingcredentials || incorrectcredentials;
-                bool postingqueueempty = _postingQueue.Count == 0;
-
-                PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
-                UpdateGeneralTimerTasksLabel(false);
-
-                if (postingqueueempty
-                    && (GHApp.XlogUserNameVerified || missingorincorrectcredentials || (!GHApp.PostingXlogEntries && !dopostbones && !dopostreplays))
-                    && (!has_files || !GHApp.PostingGameStatus)
-                    && (!has_files2 || !GHApp.PostingXlogEntries || missingorincorrectcredentials)
-                    && (!has_files3 || !dopostbones || GameStarted || missingorincorrectcredentials)
-                    && (!has_files4 || !dopostreplays || incorrectcredentials)
-                    )
+                bool hasinternet = GHApp.HasInternetAccess;
+                if (!CheckAndSetGeneralTimerWorkOnTasks)
                 {
-                    StopGeneralTimer = true;
-                }
-                else
-                {
-                    if (_postingQueue.Count > 0)
-                    {
-                        ProcessPostingQueue(); //Saves now posts first to disk in the case app is switched off very quickly before sending is finished
-                        has_files = Directory.Exists(directory) && Directory.GetFiles(directory)?.Length > 0;
-                        has_files2 = Directory.Exists(directory2) && Directory.GetFiles(directory2)?.Length > 0;
-                        has_files3 = Directory.Exists(directory3) && Directory.GetFiles(directory3)?.Length > 0;
-                        has_files4 = Directory.Exists(directory4) && Directory.GetFiles(directory4)?.Length > 0;
-                    }
-
-                    if (hasinternet && !GHApp.XlogUserNameVerified && (GHApp.PostingXlogEntries || dopostbones || dopostreplays) && !missingorincorrectcredentials)
-                        await GHApp.TryVerifyXlogUserNameAsync();
+                    workingOnTasks = true;
+                    bool dopostbones = GHApp.PostingBonesFiles && GHApp.AllowBones;
+                    bool dopostreplays = GHApp.AutoUploadReplays;
+                    string directory = Path.Combine(GHApp.GHPath, GHConstants.ForumPostQueueDirectory);
+                    string directory2 = Path.Combine(GHApp.GHPath, GHConstants.XlogPostQueueDirectory);
+                    string directory3 = Path.Combine(GHApp.GHPath, GHConstants.BonesPostQueueDirectory);
+                    string directory4 = Path.Combine(GHApp.GHPath, GHConstants.ReplayPostQueueDirectory);
+                    bool has_files = Directory.Exists(directory) && Directory.GetFiles(directory)?.Length > 0;
+                    bool has_files2 = Directory.Exists(directory2) && Directory.GetFiles(directory2)?.Length > 0;
+                    bool has_files3 = Directory.Exists(directory3) && Directory.GetFiles(directory3)?.Length > 0;
+                    bool has_files4 = Directory.Exists(directory4) && Directory.GetFiles(directory4)?.Length > 0;
+                    bool missingcredentials = string.IsNullOrEmpty(GHApp.XlogUserName);
+                    bool incorrectcredentials = GHApp.XlogCredentialsIncorrect;
+                    bool missingorincorrectcredentials = missingcredentials || incorrectcredentials;
+                    bool postingqueueempty = _postingQueue.Count == 0;
 
                     PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
                     UpdateGeneralTimerTasksLabel(false);
 
-                    if (hasinternet && has_files && GHApp.PostingGameStatus)
+                    if (postingqueueempty
+                        && (GHApp.XlogUserNameVerified || missingorincorrectcredentials || (!GHApp.PostingXlogEntries && !dopostbones && !dopostreplays))
+                        && (!has_files || !GHApp.PostingGameStatus)
+                        && (!has_files2 || !GHApp.PostingXlogEntries || missingorincorrectcredentials)
+                        && (!has_files3 || !dopostbones || GameStarted || missingorincorrectcredentials)
+                        && (!has_files4 || !dopostreplays || incorrectcredentials)
+                        )
                     {
-                        await ProcessSavedPosts(0, directory, GHConstants.ForumPostFileNamePrefix);
-                        PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
-                        UpdateGeneralTimerTasksLabel(false);
+                        StopGeneralTimer = true;
                     }
+                    else
+                    {
+                        if (_postingQueue.Count > 0)
+                        {
+                            ProcessPostingQueue(); //Saves now posts first to disk in the case app is switched off very quickly before sending is finished
+                            has_files = Directory.Exists(directory) && Directory.GetFiles(directory)?.Length > 0;
+                            has_files2 = Directory.Exists(directory2) && Directory.GetFiles(directory2)?.Length > 0;
+                            has_files3 = Directory.Exists(directory3) && Directory.GetFiles(directory3)?.Length > 0;
+                            has_files4 = Directory.Exists(directory4) && Directory.GetFiles(directory4)?.Length > 0;
+                        }
 
-                    if (hasinternet && has_files2 && GHApp.PostingXlogEntries && !missingorincorrectcredentials)
-                    {
-                        await ProcessSavedPosts(1, directory2, GHConstants.XlogPostFileNamePrefix);
-                        PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
-                        UpdateGeneralTimerTasksLabel(false);
-                    }
+                        if (hasinternet && !GHApp.XlogUserNameVerified && (GHApp.PostingXlogEntries || dopostbones || dopostreplays) && !missingorincorrectcredentials)
+                            await GHApp.TryVerifyXlogUserNameAsync();
 
-                    if (hasinternet && has_files3 && dopostbones && !GameStarted && !missingorincorrectcredentials) // Do not fetch bones files while the game is on
-                    {
-                        await ProcessSavedPosts(2, directory3, GHConstants.BonesPostFileNamePrefix);
                         PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
                         UpdateGeneralTimerTasksLabel(false);
-                    }
 
-                    if (hasinternet && has_files4 && dopostreplays && !incorrectcredentials)
-                    {
-                        await ProcessSavedPosts(3, directory4, GHConstants.ReplayPostFileNamePrefix);
-                        PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
-                        UpdateGeneralTimerTasksLabel(false);
+                        if (hasinternet && has_files && GHApp.PostingGameStatus)
+                        {
+                            await ProcessSavedPosts(0, directory, GHConstants.ForumPostFileNamePrefix);
+                            PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
+                            UpdateGeneralTimerTasksLabel(false);
+                        }
+
+                        if (hasinternet && has_files2 && GHApp.PostingXlogEntries && !missingorincorrectcredentials)
+                        {
+                            await ProcessSavedPosts(1, directory2, GHConstants.XlogPostFileNamePrefix);
+                            PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
+                            UpdateGeneralTimerTasksLabel(false);
+                        }
+
+                        if (hasinternet && has_files3 && dopostbones && !GameStarted && !missingorincorrectcredentials) // Do not fetch bones files while the game is on
+                        {
+                            await ProcessSavedPosts(2, directory3, GHConstants.BonesPostFileNamePrefix);
+                            PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
+                            UpdateGeneralTimerTasksLabel(false);
+                        }
+
+                        if (hasinternet && has_files4 && dopostreplays && !incorrectcredentials)
+                        {
+                            await ProcessSavedPosts(3, directory4, GHConstants.ReplayPostFileNamePrefix);
+                            PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
+                            UpdateGeneralTimerTasksLabel(false);
+                        }
                     }
+                    GeneralTimerWorkOnTasks = false;
                 }
-                GeneralTimerWorkOnTasks = false;
+            }
+            catch (Exception ex)
+            {
+                GHApp.MaybeWriteGHLog("Exception (GeneralTimerTasks): " + ex.Message);
+                if(workingOnTasks)
+                    GeneralTimerWorkOnTasks = false;
             }
         }
 
@@ -437,23 +478,31 @@ namespace GnollHackX
                     case 1:
                         if (post.status_type == (int)game_status_types.GAME_STATUS_RESULT_ATTACHMENT)
                         {
-                            switch (post.status_datatype)
+                            lock (_attachmentLock)
                             {
-                                case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_GENERIC:
-                                    _xlogPostAttachments.Add(new GHPostAttachment(post.status_string, "application/zip", "game data", false, post.status_type, false));
-                                    break;
-                                case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT:
-                                    _xlogPostAttachments.Add(new GHPostAttachment(post.status_string, "text/plain", "dumplog", false, post.status_type, false));
-                                    break;
-                                case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_HTML:
-                                    _xlogPostAttachments.Add(new GHPostAttachment(post.status_string, "text/html", "HTML dumplog", false, post.status_type, false));
-                                    break;
+                                switch (post.status_datatype)
+                                {
+                                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_GENERIC:
+                                        _xlogPostAttachments.Add(new GHPostAttachment(post.status_string, "application/zip", "game data", false, post.status_type, false));
+                                        break;
+                                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT:
+                                        _xlogPostAttachments.Add(new GHPostAttachment(post.status_string, "text/plain", "dumplog", false, post.status_type, false));
+                                        break;
+                                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_HTML:
+                                        _xlogPostAttachments.Add(new GHPostAttachment(post.status_string, "text/html", "HTML dumplog", false, post.status_type, false));
+                                        break;
+                                }
                             }
                         }
                         else
                         {
-                            GHApp.SaveXLogEntryToDisk(post.status_type, post.status_datatype, post.status_string, _xlogPostAttachments);
-                            _xlogPostAttachments.Clear();
+                            List<GHPostAttachment> forumPosts = new List<GHPostAttachment>();
+                            lock (_attachmentLock)
+                            {
+                                forumPosts.AddRange(_xlogPostAttachments);
+                                _xlogPostAttachments.Clear();
+                            }
+                            GHApp.SaveXLogEntryToDisk(post.status_type, post.status_datatype, post.status_string, forumPosts);
                         }
                         break;
                     case 0:
@@ -466,10 +515,15 @@ namespace GnollHackX
                         }
                         else
                         {
+                            List <GHPostAttachment> forumPosts = new List < GHPostAttachment >();
+                            lock (_attachmentLock)
+                            {
+                                forumPosts.AddRange(_forumPostAttachments);
+                                _forumPostAttachments.Clear();
+                            }
                             GHApp.SaveForumPostToDisk(post.is_game_status, post.status_type, post.status_datatype,
                                 post.is_game_status ? GHApp.AddForumPostInfo(post.status_string) : GHApp.AddDiagnosticInfo(GHApp.AddForumPostInfo(post.status_string), post.status_type),
-                                _forumPostAttachments, post.forcesend);
-                            _forumPostAttachments.Clear();
+                                forumPosts, post.forcesend);
                         }
                         break;
                 }
@@ -481,29 +535,35 @@ namespace GnollHackX
         {
             if (is_game_status && status_string != null && status_string != "" && status_type == (int)game_status_types.GAME_STATUS_RESULT_ATTACHMENT)
             {
-                switch (status_datatype)
+                lock (_attachmentLock)
                 {
-                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_GENERIC:
-                        _forumPostAttachments.Add(new GHPostAttachment(status_string, "application/zip", "game data", !is_game_status, status_type, false));
-                        break;
-                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT:
-                        _forumPostAttachments.Add(new GHPostAttachment(status_string, "text/plain", "dumplog", !is_game_status, status_type, false));
-                        break;
-                    case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_HTML:
-                        _forumPostAttachments.Add(new GHPostAttachment(status_string, "text/html", "HTML dumplog", !is_game_status, status_type, false));
-                        break;
+                    switch (status_datatype)
+                    {
+                        case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_GENERIC:
+                            _forumPostAttachments.Add(new GHPostAttachment(status_string, "application/zip", "game data", !is_game_status, status_type, false));
+                            break;
+                        case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_TEXT:
+                            _forumPostAttachments.Add(new GHPostAttachment(status_string, "text/plain", "dumplog", !is_game_status, status_type, false));
+                            break;
+                        case (int)game_status_data_types.GAME_STATUS_ATTACHMENT_DUMPLOG_HTML:
+                            _forumPostAttachments.Add(new GHPostAttachment(status_string, "text/html", "HTML dumplog", !is_game_status, status_type, false));
+                            break;
+                    }
                 }
             }
             else if (!is_game_status && status_string != null && status_string != "" && status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_ATTACHMENT)
             {
-                switch (status_datatype)
+                lock (_attachmentLock)
                 {
-                    case (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_GENERIC:
-                        _forumPostAttachments.Add(new GHPostAttachment(status_string, "application/zip", "diagnostic data", !is_game_status, status_type, false));
-                        break;
-                    case (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST:
-                        _forumPostAttachments.Add(new GHPostAttachment(status_string, "text/plain", "file descriptor list", !is_game_status, status_type, true));
-                        break;
+                    switch (status_datatype)
+                    {
+                        case (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_GENERIC:
+                            _forumPostAttachments.Add(new GHPostAttachment(status_string, "application/zip", "diagnostic data", !is_game_status, status_type, false));
+                            break;
+                        case (int)diagnostic_data_attachment_types.DIAGNOSTIC_DATA_ATTACHMENT_FILE_DESCRIPTOR_LIST:
+                            _forumPostAttachments.Add(new GHPostAttachment(status_string, "text/plain", "file descriptor list", !is_game_status, status_type, true));
+                            break;
+                    }
                 }
             }
             else if (!is_game_status && status_string != null && status_string != "" && status_type == (int)diagnostic_data_types.DIAGNOSTIC_DATA_CREATE_ATTACHMENT_FROM_TEXT)
@@ -540,10 +600,14 @@ namespace GnollHackX
                 {
                     Debug.WriteLine(e.Message);
                 }
-                _forumPostAttachments.Add(new GHPostAttachment(temp_string, "text/plain", "diagnostic data", !is_game_status, status_type, true));
+                lock (_attachmentLock)
+                {
+                    _forumPostAttachments.Add(new GHPostAttachment(temp_string, "text/plain", "diagnostic data", !is_game_status, status_type, true));
+                }
             }
         }
 
+        private readonly object _attachmentLock = new object();
         private List<GHPostAttachment> _forumPostAttachments = new List<GHPostAttachment>();
         private List<GHPostAttachment> _xlogPostAttachments = new List<GHPostAttachment>();
 
@@ -644,7 +708,7 @@ namespace GnollHackX
                     bool removeanimationson = GHApp.PlatformService.IsRemoveAnimationsOn();
                     if (removeanimationson)
                     {
-                        await DisplayAlert("Invalid Animator Duration Scale",
+                        await GHApp.DisplayMessageBox(this, "Invalid Animator Duration Scale",
                             "GnollHack has detected invalid animator settings. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting must be set to Off. If your device does not have this setting, please manually adjust the value of \"Animator duration scale\" to 1x under Settings -> Developer Options -> Animator duration scale. ", "OK");
                         await CloseApp();
                     }
@@ -655,10 +719,10 @@ namespace GnollHackX
                         if (scalecurrent == 0.0f)
                         {
                             if (scalesetting == 0.0f)
-                                await DisplayAlert("Invalid Animator Duration Scale",
+                                await GHApp.DisplayMessageBox(this, "Invalid Animator Duration Scale",
                                     "GnollHack failed to automatically adjust Animator Duration Scale and it remains set to Off. Please manually adjust the value to 1x under Settings -> Developer Options -> Animator duration scale. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting needs to be disabled, too.", "OK");
                             else
-                                await DisplayAlert("Invalid Animator Duration Scale",
+                                await GHApp.DisplayMessageBox(this, "Invalid Animator Duration Scale",
                                     "GnollHack failed to automatically adjust Animator Duration Scale and it has become turned Off. Please check that the value is 1x under Settings -> Developer Options -> Animator duration scale. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting needs to be disabled, too.", "OK");
                             await CloseApp();
                         }
@@ -695,7 +759,14 @@ namespace GnollHackX
                 }
                 if (GHApp.InformAboutGPU)
                 {
-                    await DisplayAlertOrGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add App > Microsoft Store App > Options.", "OK", GHColors.Orange);
+                    if (GHApp.IsSteam)
+                    {
+                        await DisplayAlertOrGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add Desktop App > the .exe file under C:\\Program Files (x86)\\Steam\\steamapps\\common\\GnollHack.", "OK", GHColors.Orange);
+                    }
+                    else
+                    {
+                        await DisplayAlertOrGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add App > Microsoft Store App > Options.", "OK", GHColors.Orange);
+                    }
                     GHApp.HasInformedAboutGPU = true;
                     previousInformationShown = true;
                 }
@@ -846,6 +917,7 @@ namespace GnollHackX
             string skiaverstr = "?";
             string skiasharpverstr = "?";
             string frameworkverstr = "?";
+            string frameworkUIverstr = "?";
             string runtimeverstr = "?";
             ulong vernum = 0UL;
             ulong vercompat = 0UL;
@@ -864,6 +936,28 @@ namespace GnollHackX
                 if (pidx > 0)
                 {
                     frameworkverstr = frameworkverstr.Substring(0, pidx);
+                }
+                //string pverstr_detailed = (Attribute.GetCustomAttribute(typeof(Button).Assembly, typeof(AssemblyFileVersionAttribute), false) as AssemblyFileVersionAttribute)?.Version;
+                string pverstr = "";
+#if GNH_MAUI
+                pverstr = (Attribute.GetCustomAttribute(typeof(Microsoft.Maui.Controls.Button).Assembly, typeof(AssemblyInformationalVersionAttribute), false) as AssemblyInformationalVersionAttribute)?.InformationalVersion;
+#else
+                pverstr = (Attribute.GetCustomAttribute(typeof(Xamarin.Forms.Button).Assembly, typeof(AssemblyInformationalVersionAttribute), false) as AssemblyInformationalVersionAttribute)?.InformationalVersion;
+#endif
+                if (!string.IsNullOrWhiteSpace(pverstr))
+                {
+                    int plusIdx = pverstr.IndexOf("+");
+                    if (plusIdx > 0)
+                    {
+                        pverstr = pverstr.Substring(0, plusIdx);
+                    }
+                    int minusIdx = pverstr.IndexOf("-");
+                    if (minusIdx > 0)
+                    {
+                        pverstr = pverstr.Substring(0, minusIdx);
+                    }
+
+                    frameworkUIverstr = pverstr;
                 }
                 runtimeverstr = Environment.Version.ToString() ?? "?";
                 pidx = runtimeverstr.IndexOf(" (");
@@ -901,6 +995,7 @@ namespace GnollHackX
             GHApp.SkiaVersionString = skiaverstr;
             GHApp.SkiaSharpVersionString = skiasharpverstr;
             GHApp.FrameworkVersionString = frameworkverstr;
+            GHApp.UIFrameworkVersionString = frameworkUIverstr;
             GHApp.RuntimeVersionString = runtimeverstr;
 
             //VersionLabel.Text = verid;
@@ -1088,7 +1183,21 @@ namespace GnollHackX
                 else if (GHApp.IsiOS)
                     PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates by toggling off App Updates under App Store section in the Settings app, and manually apply updates when you have no saved games.";
                 else if (GHApp.IsWindows)
-                    PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates by toggling off App Updates under Profile > Settings in the Microsoft Store app, and manually apply updates when you have no saved games.";
+                {
+                    if(GHApp.IsPackaged)
+                        PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates by toggling off App Updates under Profile > Settings in the Microsoft Store app, and manually apply updates when you have no saved games.";
+                    else
+                    {
+                        if(GHApp.IsSteam)
+                        {
+                            PopupLabel.Text = "Some updates of GnollHack may be incompatible with your saved games. In such a case, you can revert to an old version of the game by going to the Betas tab under GnollHack Properties and activating a compatible version therein.";
+                        }
+                        else
+                        {
+                            PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you do not use an automatic update of GnollHack, and manually apply updates only when you have no saved games.";
+                        }
+                    }
+                }
                 else
                     PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates in your device settings and manually apply updates when you have no saved games.";
                 PopupGrid.IsVisible = true;
@@ -1134,6 +1243,7 @@ namespace GnollHackX
             carouselView.Stop();
             GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0U);
             await Task.Delay(200);
+            GHApp.BeforeExitApp();
             GHApp.PlatformService.CloseApplication();
 
 #if !GNH_MAUI
@@ -1188,16 +1298,16 @@ namespace GnollHackX
             GHApp.PlayButtonClickedSound();
             string fulltargetpath = Path.Combine(GHApp.GHPath, "defaults.gnh");
             var editorPage = new EditorPage(this, fulltargetpath, "Default Options File");
-            string errormsg = "";
-            if (!editorPage.ReadFile(out errormsg))
+            try
             {
-                await DisplayAlertOrGrid("Reading Options File Failed", "GnollHack failed to read the options file: " + errormsg, "OK", GHColors.Red);
-                UpperButtonGrid.IsEnabled = true;
-            }
-            else
-            {
+                editorPage.ReadFile();
                 carouselView.Stop();
                 await GHApp.Navigation.PushModalAsync(editorPage);
+            }
+            catch (Exception ex)
+            {
+                editorPage.ClearTextEditor();
+                await DisplayAlertOrGrid("Reading Options File Failed", "GnollHack failed to read the options file: " + ex.Message, "OK", GHColors.Red);
             }
             UpperButtonGrid.IsEnabled = true;
         }
@@ -1367,6 +1477,18 @@ namespace GnollHackX
             }
             StopGeneralTimer = false;
             StartGeneralTimer();
+            DoKeyboardFocus();
+        }
+
+        public void DoKeyboardFocus()
+        {
+#if WINDOWS
+            Microsoft.UI.Xaml.Controls.Button fbtn = KeyboardFocusButton.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.Button;
+            if (fbtn != null)
+            {
+                fbtn.Focus(FocusState.Programmatic);
+            }
+#endif
         }
 
         private async void PendingTasksOkButton_Clicked(object sender, EventArgs e)
@@ -1439,9 +1561,104 @@ namespace GnollHackX
         private async Task DisplayAlertOrGrid(string title, string message, string buttonText, Color titleColor)
         {
             if (AlertGrid.IsVisible)
-                await DisplayAlert(title, message, buttonText);
+                await GHApp.DisplayMessageBox(this, title, message, buttonText);
             else
                 DisplayAlertGrid(title, message, buttonText, titleColor);
+        }
+
+        public bool HandleMainPageSpecialKeyPress(GHSpecialKey key, bool isCtrl, bool isMeta, bool isShift)
+        {
+            bool handled = false;
+            if (key == GHSpecialKey.Escape || key == GHSpecialKey.Enter || key == GHSpecialKey.Space)
+            {
+                if (AlertGrid.IsVisible && AlertOkButton.IsEnabled)
+                {
+                    AlertOkButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                }
+                else if (PopupGrid.IsVisible && ((PopupOkButton.IsVisible && PopupOkButton.IsEnabled) || (PopupButtonGrid.IsVisible && PopupOkButton2.IsVisible && PopupOkButton2.IsEnabled)))
+                {
+                    PopupOkButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                }
+                else if (PendingTasksGrid.IsVisible && key == GHSpecialKey.Escape && PendingTasksCancelButton.IsVisible && PendingTasksCancelButton.IsEnabled)
+                {
+                    PendingTasksCancelButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                }
+                else if (PendingTasksGrid.IsVisible && (key == GHSpecialKey.Enter || key == GHSpecialKey.Space) && PendingTasksOkButton.IsVisible && PendingTasksOkButton.IsEnabled)
+                {
+                    PendingTasksOkButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                }
+            }
+            return handled;
+        }
+
+        public bool HandleMainPageKeyPress(int key, bool isCtrl, bool isMeta)
+        {
+            bool handled = false;
+            if (AlertGrid.IsVisible || PopupGrid.IsVisible || PendingTasksGrid.IsVisible)
+                return false;
+
+            switch (key)
+            {
+                case (int)'p':
+                    if(StartLocalGameButton.IsEnabled && StartLocalGrid.IsEnabled && StartLocalGameButton.IsVisible && StartLocalGrid.IsVisible && UpperButtonGrid.IsVisible)
+                        StartLocalGameButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                case (int)'s':
+                    if (SettingsButton.IsEnabled && SettingsButton.IsVisible && UpperButtonGrid.IsVisible)
+                        SettingsButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                case (int)'o':
+                    if (OptionsButton.IsEnabled && OptionsButton.IsVisible && UpperButtonGrid.IsVisible)
+                        OptionsButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                case (int)'r':
+                    if (ResetButton.IsEnabled && ResetButton.IsVisible && UpperButtonGrid.IsVisible)
+                        ResetButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                case (int)'a':
+                    if (AboutButton.IsEnabled && AboutButton.IsVisible && UpperButtonGrid.IsVisible)
+                        CreditsButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                case (int)'v':
+                    if (VaultButton.IsEnabled && VaultButton.IsVisible && UpperButtonGrid.IsVisible)
+                        VaultButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                case (int)'w': //Wizard mode
+                    if (wizardModeSwitch.IsEnabled && wizardModeGrid.IsVisible && StartButtonLayout.IsVisible)
+                        wizardModeSwitch.IsToggled = !wizardModeSwitch.IsToggled;
+                    handled = true;
+                    break;
+                case (int)'c': //Classic mode
+                    if (classicModeSwitch.IsEnabled && classicModeGrid.IsVisible && StartButtonLayout.IsVisible)
+                        classicModeSwitch.IsToggled = !classicModeSwitch.IsToggled;
+                    handled = true;
+                    break;
+                case (int)'C': //Casual mode
+                    if (casualModeSwitch.IsEnabled && casualModeGrid.IsVisible && StartButtonLayout.IsVisible)
+                        casualModeSwitch.IsToggled = !casualModeSwitch.IsToggled;
+                    handled = true;
+                    break;
+                case (int)'e':
+                case (int)'x':
+                case (int)'q':
+                    if(ExitButton.IsEnabled && ExitButton.IsVisible && StartButtonLayout.IsVisible)
+                        ExitAppButton_Clicked(this, EventArgs.Empty);
+                    handled = true;
+                    break;
+                default:
+                    break;
+            }
+            return handled;
         }
     }
 

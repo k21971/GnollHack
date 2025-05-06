@@ -308,6 +308,10 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetCharacterClickAction(int new_value);
         [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetGetPositionArrows();
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetGetPositionArrows(int new_value);
+        [DllImport(PlatformConstants.dll)]
         public static extern int LibGetDiceAsRanges();
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetDiceAsRanges(int new_value);
@@ -502,7 +506,7 @@ namespace GnollHackX.Unknown
 #elif WINDOWS
                 string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
                 using Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath);
-                using (StreamReader sr = new StreamReader(fullsourcepath))
+                using (StreamReader sr = new StreamReader(fileStream))
 #else
                 string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
                 using (StreamReader sr = new StreamReader(fullsourcepath))
@@ -609,23 +613,23 @@ namespace GnollHackX.Unknown
                 foreach (string txtfile in _txtfileslist)
                 {
 #if __IOS__
-                string extension = Path.GetExtension(txtfile);
-                if (extension != null && extension.Length > 0)
-                    extension = extension.Substring(1); /* Remove . from the start */
-                string fname = Path.GetFileNameWithoutExtension(txtfile);
-                string fullsourcepath = NSBundle.MainBundle.PathForResource(fname, extension, assetsourcedir);
-                using (StreamReader sr = new StreamReader(fullsourcepath))
+                    string extension = Path.GetExtension(txtfile);
+                    if (extension != null && extension.Length > 0)
+                        extension = extension.Substring(1); /* Remove . from the start */
+                    string fname = Path.GetFileNameWithoutExtension(txtfile);
+                    string fullsourcepath = NSBundle.MainBundle.PathForResource(fname, extension, assetsourcedir);
+                    using (StreamReader sr = new StreamReader(fullsourcepath))
 #elif __ANDROID__
                     string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
                     using Stream assetsStream = assets.Open(fullsourcepath);
                     using (StreamReader sr = new StreamReader(assetsStream))
 #elif WINDOWS
-                string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
-                using Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath);
-                using (StreamReader sr = new StreamReader(fileStream))
+                    string fullsourcepath = Path.Combine(assetsourcedir, txtfile);
+                    using Stream fileStream = await FileSystem.Current.OpenAppPackageFileAsync(fullsourcepath);
+                    using (StreamReader sr = new StreamReader(fileStream))
 #else
-                string fullsourcepath = Path.Combine(filesdir, assetsourcedir, txtfile);
-                using (StreamReader sr = new StreamReader(fullsourcepath))
+                    string fullsourcepath = Path.Combine(filesdir, assetsourcedir, txtfile);
+                    using (StreamReader sr = new StreamReader(fullsourcepath))
 #endif
                     {
                         content = sr.ReadToEnd();
@@ -1123,6 +1127,15 @@ namespace GnollHackX.Unknown
             LibSetCharacterClickAction(newValue ? 1 : 0);
         }
 
+        public bool GetGetPositionArrows()
+        {
+            return LibGetGetPositionArrows() != 0;
+        }
+        public void SetGetPositionArrows(bool newValue)
+        {
+            LibSetGetPositionArrows(newValue ? 1 : 0);
+        }
+
         public bool GetDiceAsRanges()
         {
             return LibGetDiceAsRanges() != 0;
@@ -1161,6 +1174,9 @@ namespace GnollHackX.Unknown
             string filesdir = GetGnollHackPath();
             bool allowbones = GHApp.AllowBones;
             bool allowpet = GHApp.AllowPet;
+            bool getposarrows = GHApp.GetPositionArrows;
+            bool characterclickaction = GHApp.MirroredCharacterClickAction;
+            bool diceasranges = GHApp.MirroredDiceAsRanges;
             ulong rightmouse = (ulong)GHApp.MirroredRightMouseCommand << GHConstants.RightMouseBitIndex;
             ulong middlemouse = (ulong)GHApp.MirroredMiddleMouseCommand << GHConstants.MiddleMouseBitIndex;
             ulong runflags = (ulong)(ghGame.WizardMode ? RunGnollHackFlags.WizardMode : 0) |
@@ -1170,9 +1186,13 @@ namespace GnollHackX.Unknown
                 (ulong)(allowbones ? 0 : RunGnollHackFlags.DisableBones) |
                 (ulong)(allowpet ? 0 : RunGnollHackFlags.NoPet) |
                 (ulong)(GHApp.TournamentMode ? RunGnollHackFlags.TournamentMode : 0) |
+                (ulong)(RunGnollHackFlags.SaveFileTrackingSupported) |
+                (ulong)(GHApp.IsSaveFileTrackingNeeded ? RunGnollHackFlags.SaveFileTrackingNeeded : 0) |
+                (ulong)(GHApp.SaveFileTracking ? RunGnollHackFlags.SaveFileTrackingOn : 0) |
                 (ulong)(GHApp.IsDebug ? RunGnollHackFlags.GUIDebugMode : 0) |
-                (ulong)(GHApp.MirroredCharacterClickAction ? RunGnollHackFlags.CharacterClickAction : 0) | /* Use the default; GHApp.CharacterClickAction may contain the option value from the last game */
-                (ulong)(GHApp.MirroredDiceAsRanges ? RunGnollHackFlags.DiceAsRanges : 0) | /* Use the default; GHApp.DiceAsRanges may contain the option value from the last game */
+                (ulong)(getposarrows ? RunGnollHackFlags.GetPositionArrows : 0) | /* Set the iflag to right value */
+                (ulong)(characterclickaction ? RunGnollHackFlags.CharacterClickAction : 0) | /* Use the default; GHApp.CharacterClickAction may contain the option value from the last game */
+                (ulong)(diceasranges ? RunGnollHackFlags.DiceAsRanges : 0) | /* Use the default; GHApp.DiceAsRanges may contain the option value from the last game */
                 rightmouse | middlemouse | (ulong)ghGame.StartFlags;
             ulong foundManuals = GHApp.FoundManuals;
             string lastusedplname = GHApp.TournamentMode && !ghGame.PlayingReplay ? GHApp.LastUsedTournamentPlayerName : GHApp.LastUsedPlayerName;

@@ -251,7 +251,13 @@ static struct Bool_Opt {
       DISP_IN_GAME },
 #endif
     { "safe_pet", "prevent you from hitting pets", &flags.safe_dog, TRUE, SET_IN_GAME },
-    { "sanity_check", "perform data sanity checks", &iflags.sanity_check, FALSE, SET_IN_WIZGAME },
+    { "sanity_check", "perform data sanity checks", &iflags.sanity_check, 
+#ifdef DEBUG
+        TRUE,  /* Set to false in set_playmode if not in wizard mode */
+#else
+        FALSE,
+#endif
+        SET_IN_WIZGAME },
     { "search_box_traps", "search command searches boxes for traps first", &flags.search_box_traps, TRUE, SET_IN_GAME },
     { "selectsaved", "select a saved game at program start", &iflags.wc2_selectsaved, TRUE, DISP_IN_GAME}, /*WC*/
     { "self_click_action", "clicking the player character executes an action", &flags.self_click_action, TRUE, SET_IN_GAME},
@@ -971,6 +977,43 @@ init_options()
     flags.force_hint = (CasualMode || ModernMode);
     flags.max_hint_difficulty = DEFAULT_MAX_HINT_DIFFICULTY;
     iflags.run_spot_distance = DEFAULT_RUN_SPOT_DISTANCE;
+
+    if (initial_flags.click_action_set)
+        flags.self_click_action = initial_flags.click_action_value;
+
+    if (initial_flags.dice_as_ranges_set)
+        iflags.show_dice_as_ranges = initial_flags.dice_as_ranges_value;
+
+    if (initial_flags.getpos_arrows_set)
+        iflags.getpos_arrows = initial_flags.getpos_arrows_value;
+
+    if (initial_flags.save_file_tracking_supported_set)
+        iflags.save_file_tracking_supported = initial_flags.save_file_tracking_supported_value;
+
+    if (initial_flags.save_file_tracking_needed_set)
+        iflags.save_file_tracking_needed = initial_flags.save_file_tracking_needed_value;
+
+    if (initial_flags.save_file_tracking_on_set)
+        iflags.save_file_tracking_on = initial_flags.save_file_tracking_on_value;
+
+#if defined(DGAMELAUNCH) // Unix server
+    iflags.save_file_secure = TRUE;
+#endif
+
+    flags.save_file_tracking_migrated = TRUE; /* Always set by this new version for migration (old version has it at 0) */
+    flags.save_file_tracking_value = iflags.save_file_secure ? SAVEFILETRACK_VALID : SAVEFILETRACK_INVALID;
+    if (iflags.save_file_tracking_supported)
+    {
+        if (iflags.save_file_tracking_needed)
+        {
+            if (iflags.save_file_tracking_on)
+                flags.save_file_tracking_value = SAVEFILETRACK_VALID;
+        }
+        else
+        {
+            flags.save_file_tracking_value = SAVEFILETRACK_VALID;
+        }
+    }
 
     /* since this is done before init_objects(), do partial init here */
     objects[SLIME_MOLD].oc_name_idx = SLIME_MOLD;
@@ -8598,6 +8641,10 @@ set_playmode()
     }
     /* don't need to do anything special for explore mode or normal play */
 #endif
+
+    /* Turn off sanity_check if not in wizard mode */
+    if (!wizard)
+        iflags.sanity_check = FALSE;
 }
 
 #endif /* OPTION_LISTS_ONLY */

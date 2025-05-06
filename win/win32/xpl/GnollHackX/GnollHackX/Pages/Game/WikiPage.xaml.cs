@@ -33,8 +33,8 @@ namespace GnollHackX.Pages.Game
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
             UrlWebViewSource Source = new UrlWebViewSource
             {
                 Url = wikiUrl,
@@ -122,7 +122,8 @@ namespace GnollHackX.Pages.Game
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
         }
 
         private void BackButton_Clicked(object sender, EventArgs e)

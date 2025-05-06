@@ -36,11 +36,15 @@ namespace GnollHackX.Pages.MainScreen
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
             if (GHApp.DarkMode)
             {
                 lblHeader.TextColor = GHColors.White;
+            }
+            if (GHApp.IsSteam)
+            {
+                btnSponsor.IsVisible = false;
             }
         }
 
@@ -53,7 +57,7 @@ namespace GnollHackX.Pages.MainScreen
             string errormsg = "";
             if (!displFilePage.ReadFile(out errormsg))
             {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the xcredits file.", "OK");
+                await GHApp.DisplayMessageBox(this, "Error Opening File", "GnollHack cannot open the xcredits file.", "OK");
             }
             else
             {
@@ -71,7 +75,7 @@ namespace GnollHackX.Pages.MainScreen
         //    string errormsg = "";
         //    if (!displFilePage.ReadFile(out errormsg))
         //    {
-        //        await DisplayAlert("Error Opening File", "GnollHack cannot open the credits file.", "OK");
+        //        await GHApp.DisplayMessageBox(this, "Error Opening File", "GnollHack cannot open the credits file.", "OK");
         //    }
         //    else
         //    {
@@ -89,7 +93,7 @@ namespace GnollHackX.Pages.MainScreen
             string errormsg = "";
             if (!displFilePage.ReadFile(out errormsg))
             {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the license file.", "OK");
+                await GHApp.DisplayMessageBox(this, "Error Opening File", "GnollHack cannot open the license file.", "OK");
             }
             else
             {
@@ -142,7 +146,14 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
+        }
+
+        public void ClosePage()
+        {
+            if(AboutGrid.IsEnabled)
+                Button_Clicked(this, EventArgs.Empty);
         }
 
         private bool _backPressed = false;
@@ -153,7 +164,8 @@ namespace GnollHackX.Pages.MainScreen
                 _backPressed = true;
                 AboutGrid.IsEnabled = false;
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await GHApp.Navigation.PopModalAsync();
+                var page = await GHApp.Navigation.PopModalAsync();
+                GHApp.DisconnectIViewHandlers(page);
             }
             return false;
         }
@@ -172,7 +184,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            bool answer = await DisplayAlert("Send Crash Report?", "This will create a zip archive of the files in your game directory and ask it to be shared further.", "Yes", "No");
+            bool answer = await GHApp.DisplayMessageBox(this, "Send Crash Report?", "This will create a zip archive of the files in your game directory and ask it to be shared further.", "Yes", "No");
             if (answer)
             {
                 await GHApp.CreateCrashReport(this);
@@ -189,11 +201,11 @@ namespace GnollHackX.Pages.MainScreen
             string errormsg;
             if (!System.IO.File.Exists(fulltargetpath))
             {
-                await DisplayAlert("No Panic Log", "Panic Log does not exist.", "OK");
+                await GHApp.DisplayMessageBox(this, "No Panic Log", "Panic Log does not exist.", "OK");
             }
             else if (!displFilePage.ReadFile(out errormsg))
             {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the paniclog file: " + errormsg, "OK");
+                await GHApp.DisplayMessageBox(this, "Error Opening File", "GnollHack cannot open the paniclog file: " + errormsg, "OK");
             }
             else
             {
@@ -212,11 +224,11 @@ namespace GnollHackX.Pages.MainScreen
             
             if (!System.IO.File.Exists(fulltargetpath))
             {
-                await DisplayAlert("No App Log", "App Log does not exist.", "OK");
+                await GHApp.DisplayMessageBox(this, "No App Log", "App Log does not exist.", "OK");
             }
             else if (!displFilePage.ReadFile(out errormsg))
             {
-                await DisplayAlert("Error Opening File", "GnollHack cannot open the App Log file: " + errormsg, "OK");
+                await GHApp.DisplayMessageBox(this, "Error Opening File", "GnollHack cannot open the App Log file: " + errormsg, "OK");
             }
             else
             {

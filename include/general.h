@@ -351,32 +351,6 @@ enum ghmenu_styles
 };
 
 
-/* Special view */
-enum special_view_types
-{
-    SPECIAL_VIEW_NONE = 0,
-    SPECIAL_VIEW_CHAT_MESSAGE,
-    SPECIAL_VIEW_SHOW_SPECIAL_EFFECT,
-    SPECIAL_VIEW_GUI_TIPS,
-    SPECIAL_VIEW_CRASH_DETECTED,
-    SPECIAL_VIEW_PANIC,
-    SPECIAL_VIEW_DEBUGLOG,
-    SPECIAL_VIEW_MESSAGE,
-    SPECIAL_VIEW_SELFIE,
-    SPECIAL_VIEW_HELP_DIR,
-    SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_N,
-    SPECIAL_VIEW_GUI_YN_CONFIRMATION_DEFAULT_Y,
-    MAX_SPECIAL_VIEW_TYPES
-};
-
-struct special_view_info {
-    enum special_view_types viewtype;
-    const char* text;
-    const char* title;
-    int attr;
-    int color;
-};
-
 /* Fountain types */
 enum fountain_subtypes
 {
@@ -713,6 +687,17 @@ enum gui_command_types {
     GUI_CMD_TOGGLE_QUICK_ZAP_WAND,
     GUI_CMD_TOGGLE_QUICK_CAST_SPELL,
     GUI_CMD_TOGGLE_DICE_AS_RANGES,
+    GUI_CMD_ZOOM_NORMAL,
+    GUI_CMD_ZOOM_IN,
+    GUI_CMD_ZOOM_OUT,
+    GUI_CMD_ZOOM_MINI,
+    GUI_CMD_ZOOM_HALF,
+    GUI_CMD_ZOOM_TO_SCALE,
+    GUI_CMD_SAVE_ZOOM,
+    GUI_CMD_RESTORE_ZOOM,
+    GUI_CMD_TOGGLE_GETPOS_ARROWS,
+    GUI_CMD_DELETE_TRACKING_FILE,
+    GUI_CMD_KEYBOARD_FOCUS,
 };
 
 enum game_status_types

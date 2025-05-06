@@ -29,11 +29,12 @@ namespace GnollHackX.Pages.MainScreen
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
             if (GHApp.DarkMode)
             {
                 lblHeader.TextColor = GHColors.White;
+                lblSubtitle.TextColor = GHColors.White;
                 EmptyLabel.TextColor = GHColors.White;
             }
         }
@@ -168,7 +169,7 @@ namespace GnollHackX.Pages.MainScreen
                         if (dispfilepage.ReadFile(out errormsg))
                             await GHApp.Navigation.PushModalAsync(dispfilepage);
                         else
-                            await DisplayAlert("Error Reading Snapshot", "Error reading snapshot at " + usedFilePath + ": " + errormsg, "OK");
+                            await GHApp.DisplayMessageBox(this, "Error Reading Snapshot", "Error reading snapshot at " + usedFilePath + ": " + errormsg, "OK");
                     }
                 }
             }
@@ -179,7 +180,8 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
         }
 
         private double _currentPageWidth = 0;
@@ -204,7 +206,8 @@ namespace GnollHackX.Pages.MainScreen
             if (!_backPressed)
             {
                 _backPressed = true;
-                await GHApp.Navigation.PopModalAsync();
+                var page = await GHApp.Navigation.PopModalAsync();
+                GHApp.DisconnectIViewHandlers(page);
             }
             return false;
         }

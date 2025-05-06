@@ -321,13 +321,16 @@ enum elemental_enchantments {
     (objects[(otyp)].oc_class == WEAPON_CLASS && objects[(otyp)].oc_subtyp == WEP_SPEAR)
 #define is_otyp_lance(otyp) \
     (objects[(otyp)].oc_class == WEAPON_CLASS && objects[(otyp)].oc_subtyp == WEP_LANCE)
+#define is_otyp_trident(otyp) \
+    (objects[(otyp)].oc_class == WEAPON_CLASS && objects[(otyp)].oc_subtyp == WEP_TRIDENT)
 #define is_pole(o) is_otyp_pole((o)->otyp)
 #define is_spear(o) is_otyp_spear((o)->otyp)
 #define is_lance(o) is_otyp_lance((o)->otyp)
+#define is_trident(o) is_otyp_trident((o)->otyp)
 #define is_otyp_appliable_pole_type_weapon(otyp)   \
-    (is_otyp_pole(otyp) || is_otyp_spear(otyp) || is_otyp_lance(otyp))
+    (is_otyp_pole(otyp) || is_otyp_spear(otyp) || is_otyp_lance(otyp) || is_otyp_trident(otyp))
 #define is_appliable_pole_type_weapon(o)   \
-    (is_pole(o) || is_spear(o) || is_lance(o))
+    (is_pole(o) || is_spear(o) || is_lance(o) || is_trident(o))
 #define is_otyp_appliable_weapon(otyp) \
     (objects[otyp].oc_class == WEAPON_CLASS && (is_otyp_pick(otyp) || is_otyp_axe(otyp) || is_otyp_appliable_pole_type_weapon(otyp) || is_otyp_whip(otyp) || is_otyp_appliable(otyp)))
 #define is_appliable_weapon(o) \
@@ -394,7 +397,7 @@ enum elemental_enchantments {
     ((objects[(o)->otyp].oc_flags4 & O4_TETHERED_WEAPON) != 0 && ((wmask) & W_WIELDED_WEAPON) != 0)
 
 #define is_unweapon(o) (((o)->oclass == WEAPON_CLASS) \
-    ? is_launcher(o) || is_ammo(o) || is_missile(o) || (is_appliable_pole_type_weapon(o) && !is_spear(o) && !u.usteed) \
+    ? is_launcher(o) || is_ammo(o) || is_missile(o) || (is_appliable_pole_type_weapon(o) && !is_spear(o) && !is_trident(o) && !u.usteed) \
     : !is_wieldable_weapon(o) && !is_wet_towel(o))
 
 #define uslinging() (uwep && objects[uwep->otyp].oc_skill == P_SLING)
@@ -781,6 +784,7 @@ enum elemental_enchantments {
     ((o)->oclass == COIN_CLASS || (o)->oclass == GEM_CLASS \
     || (o)->oclass == RING_CLASS || (o)->oclass == AMULET_CLASS \
     || (o)->oclass == MISCELLANEOUS_CLASS \
+    || (o)->oclass == ART_CLASS \
     || (o)->material == MAT_SILVER \
     || (o)->material == MAT_GOLD \
     || (o)->material == MAT_PLATINUM \
@@ -1188,6 +1192,11 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
      || ((o)->otyp == CORPSE && pm_resists_elec(&mons[(o)->corpsenm])) \
      || obj_resists(o, 0, 0) \
      || is_quest_artifact(o) )
+
+#define obj_destroyed_in_lava_effects(o) \
+    ((melts_in_lava(o) || o->oclass == POTION_CLASS) \
+        && !o->oerodeproof \
+        && !oresist_fire(o))
 
 /* Manuals */
 enum manual_types

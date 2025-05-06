@@ -12,6 +12,11 @@ namespace GnollHackM
     {
         public event EventHandler<AssetPackStatusEventArgs> OnDemandPackStatusNotification;
 
+        public Task<Stream> GetPlatformAssetsStreamAsync(string directory, string fileName)
+        {
+            throw new NotImplementedException();
+        }
+
         public void CloseApplication()
         {
             throw new NotImplementedException();
@@ -78,6 +83,11 @@ namespace GnollHackM
         }
 
         public string GetVersionString()
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsRunningOnDesktop()
         {
             throw new NotImplementedException();
         }

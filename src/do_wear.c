@@ -2805,11 +2805,11 @@ find_ac()
 
     if (Magical_stoneskin)
         uac -= MAGICAL_STONESKIN_AC_BONUS;
-    else if (Magical_barkskin)
+    if (Magical_barkskin)
         uac -= MAGICAL_BARKSKIN_AC_BONUS;
-    else if (Magical_shielding)
+    if (Magical_shielding)
         uac -= MAGICAL_SHIELDING_AC_BONUS;
-    else if (Magical_protection)
+    if (Magical_protection)
         uac -= MAGICAL_PROTECTION_AC_BONUS;
     
     /* Divine protection */
@@ -3865,7 +3865,7 @@ int retry;
     n = query_objlist("What do you want to take off?", &invent,
                       (SIGNAL_NOMENU | USE_INVLET | INVORDER_SORT),
                       &pick_list, PICK_ANY,
-                      all_worn_categories ? is_worn : is_worn_by_type, 0);
+                      all_worn_categories ? is_worn : is_worn_by_type, SHOWWEIGHTS_NONE);
     if (n > 0) {
         for (i = 0; i < n; i++)
             (void) select_off(pick_list[i].item.a_obj);
@@ -3919,7 +3919,7 @@ int retry;
     n = query_objlist("What do you want to wear?", &invent,
         (SIGNAL_NOMENU | USE_INVLET | INVORDER_SORT | WORN_UNSELECTABLE),
         &pick_list, PICK_ANY,
-        all_wearable_categories ? is_wearable : is_wearable_by_type, 0);
+        all_wearable_categories ? is_wearable : is_wearable_by_type, SHOWWEIGHTS_NONE);
     if (n > 0) {
         for (i = 0; i < n; i++)
             (void)select_on(pick_list[i].item.a_obj);
@@ -4033,7 +4033,7 @@ register struct obj *atmp;
         (void) Boots_off();
         useup(otmp);
     }
-    else if (DESTROY_ARM(uarms) && is_shield(otmp)) {
+    else if (uarms && is_shield(uarms) && DESTROY_ARM(uarms)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);

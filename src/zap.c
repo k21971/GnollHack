@@ -1032,7 +1032,7 @@ struct monst* origmonst;
                the current zap and shouldn't be affected if hit again */
             ;
         } 
-        else if (resists_magic(mtmp))
+        else if (resists_magic(mtmp) || resists_polymorph(mtmp))
         {
             /* magic missile resistance protects from polymorph traps, so make
                it guard against involuntary polymorph attacks too... */
@@ -1117,7 +1117,7 @@ struct monst* origmonst;
         res = 1;
         if (disguised_mimic)
             seemimic(mtmp);
-        if (mtmp->cham && !mtmp->mprops[UNCHANGING])
+        if (mtmp->cham && !has_unchanging(mtmp))
             revert_mon_polymorph(mtmp, FALSE, TRUE, TRUE);
         if (!has_cancellation_resistance(mtmp))
         {
@@ -1135,7 +1135,7 @@ struct monst* origmonst;
         res = 1;
         if (disguised_mimic)
             seemimic(mtmp);
-        if (mtmp->cham && !mtmp->mprops[UNCHANGING])
+        if (mtmp->cham && !has_unchanging(mtmp))
             revert_mon_polymorph(mtmp, FALSE, TRUE, TRUE);
         /* Unaffected by cancellation resistance */
         play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
@@ -1941,6 +1941,13 @@ struct permonst* ptr;
     {
         abilcnt++;
         Sprintf(buf, " %2d - %s", abilcnt, "Resists magic");
+        putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+    }
+
+    if (mtmp ? resists_polymorph(mtmp) : pm_resists_polymorph(ptr))
+    {
+        abilcnt++;
+        Sprintf(buf, " %2d - %s", abilcnt, "Resists polymorph");
         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
     }
 
@@ -3399,12 +3406,13 @@ boolean update_inv;
             obj->special_quality = 0;
             break;
         case SPBOOK_CLASS:
-            if (objects[otyp].oc_multigen_type == BOOKTYPE_SPELLBOOK
+            if (objects[otyp].oc_subtyp == BOOKTYPE_SPELLBOOK && otyp != SPE_BOOK_OF_THE_DEAD && objects[otyp].oc_magic
                 && !objects[otyp].oc_unique && !(objects[otyp].oc_flags & O1_INDESTRUCTIBLE) && obj->oartifact == 0)
             {
                 costly_alteration(obj, COST_CANCEL);
                 obj->otyp = SPE_BLANK_PAPER;
                 obj->material = objects[obj->otyp].oc_material;
+                obj->owt = weight(obj);
             }
             break;
         case POTION_CLASS:
@@ -3968,6 +3976,7 @@ int id;
         {
             otmp->otyp = rnd_class(SPE_DIG, SPE_BLANK_PAPER);
             otmp->material = objects[otmp->otyp].oc_material;
+            otmp->owt = weight(otmp);
         }
         /* reduce spellbook abuse; non-blank books degrade */
         if (otmp->otyp != SPE_BLANK_PAPER) 
@@ -3976,6 +3985,8 @@ int id;
             if (otmp->spestudied > MAX_SPELL_STUDY) 
             {
                 otmp->otyp = SPE_BLANK_PAPER;
+                otmp->material = objects[otmp->otyp].oc_material;
+                otmp->owt = weight(otmp);
                 /* writing a new book over it will yield an unstudied
                    one; re-polymorphing this one as-is may or may not
                    get something non-blank */
@@ -6331,7 +6342,7 @@ struct obj* obj;
 
                 if (ans == 'm')
                 {
-                    prinv("Marked empty:", obj, 0L);
+                    prinvc("Marked empty:", obj, 0L);
                     update_inventory();
                 }
             }
@@ -6727,7 +6738,7 @@ boolean ordinary;
     case WAN_POLYMORPH:
     case SPE_POLYMORPH:
         damage = 0;
-        if (!Unchanging) {
+        if (!Unchanging && !Polymorph_resistance) {
             learn_it = TRUE;
             polyself(0);
         }
@@ -9316,7 +9327,7 @@ const char *fltxt;
             if (origmonst == &youmonst)
                 Sprintf(hisbuf, "%s own", uhis());
             else
-                Sprintf(hisbuf, "%s's", an(mon_monster_name(origmonst)));
+                Sprintf(hisbuf, "%s's", mon_monster_name(origmonst));
 
             if (origobj)
             {
@@ -12112,9 +12123,10 @@ int otyp;
                 : "Oops!  %s to the floor!");
 
         /* The(aobjnam()) is safe since otmp is unidentified -dlc */
-        (void)hold_another_object(otmp, oops_msg,
-            The(aobjnam(otmp, verb)),
-            (const char*)0);
+        otmp = hold_another_object(otmp, oops_msg, The(aobjnam(otmp, verb)), (const char*)0);
+
+        if (otmp)
+            otmp->nomerge = 0;
     }
 }
 

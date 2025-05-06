@@ -75,8 +75,8 @@ E void FDECL(play_special_effect_at, (enum special_effect_types, int, int, int, 
 E void FDECL(special_effect_wait_until_action, (int));
 E void FDECL(special_effect_wait_until_end, (int));
 E int FDECL(get_u_move_speed, (BOOLEAN_P));
-E void reduce_counters(int);
-E void reduce_counters_intervals(int);
+E void FDECL(reduce_counters, (int));
+E void FDECL(reduce_counters_intervals, (int));
 E void NDECL(stop_animations);
 E boolean FDECL(glyph_is_specific_cmap_or_its_variation, (int, int));
 E boolean FDECL(no_wall_end_autodraw, (int, int));
@@ -309,7 +309,7 @@ E char* NDECL(botl_realtime);
 E int64_t NDECL(get_current_game_duration);
 E int64_t FDECL(calculate_current_game_duration, (struct u_realtime));
 E size_t FDECL(print_conditions, (char*));
-E void FDECL(compose_partystatline, (char*, char*, char*, char*, char*));
+E void FDECL(compose_partystatline, (char*, char*, char*, char*, char*, size_t));
 E char* FDECL(format_duration_with_units, (int64_t));
 
 
@@ -687,6 +687,7 @@ E void FDECL(full_location_transform, (XCHAR_P, XCHAR_P, int, int, int, UNSIGNED
 E void FDECL(full_initial_location_transform, (XCHAR_P, XCHAR_P, int, UNSIGNED_SHORT_P, SCHAR_P, SCHAR_P, UCHAR_P, SCHAR_P, SCHAR_P, SCHAR_P, UCHAR_P, int, int, BOOLEAN_P, BOOLEAN_P, SHORT_P, SHORT_P, BOOLEAN_P));
 E void FDECL(create_simple_location, (XCHAR_P, XCHAR_P, int, int, int, UNSIGNED_SHORT_P, int, int, int, int, BOOLEAN_P));
 E void FDECL(create_simple_initial_location, (XCHAR_P, XCHAR_P, int, UNSIGNED_SHORT_P, int, int, BOOLEAN_P));
+E void FDECL(create_simple_location_with_carpet, (XCHAR_P, XCHAR_P, int, int, int, UNSIGNED_SHORT_P, SCHAR_P, SCHAR_P, UCHAR_P, int, int, int, int, BOOLEAN_P));
 E void FDECL(create_location_with_current_floor, (XCHAR_P, XCHAR_P, int, int, int, UNSIGNED_SHORT_P, int, BOOLEAN_P));
 E void FDECL(create_initial_location_with_current_floor, (XCHAR_P, XCHAR_P, int, UNSIGNED_SHORT_P, int, BOOLEAN_P));
 E void FDECL(create_current_floor_location, (XCHAR_P, XCHAR_P, UNSIGNED_SHORT_P, int, BOOLEAN_P));
@@ -1099,8 +1100,8 @@ E void FDECL(done_in_by, (struct monst *, int));
 E void VDECL(panic, (const char *, ...)) PRINTF_F(1, 2) NORETURN;
 #if !defined(MAKEDEFS_C) && !defined(LEV_LEX_C)
 E void FDECL(done, (int));
-E void FDECL(container_contents, (struct obj *, BOOLEAN_P,
-                                  BOOLEAN_P, BOOLEAN_P, int));
+E void FDECL(container_contents, (struct obj *, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, int));
+E void FDECL(magic_chest_contents, (BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, int));
 #ifdef VMS
 E void FDECL(nh_terminate, (int));
 E void FDECL(nh_bail, (int, const char*, BOOLEAN_P));
@@ -1576,6 +1577,7 @@ E int FDECL(count_objects_in_class, (struct obj*, CHAR_P, boolean(*)(OBJ_P), BOO
 E int FDECL(identify_pack, (int, BOOLEAN_P));
 E void NDECL(learn_unseen_invent);
 E void FDECL(prinv, (const char *, struct obj *, int64_t));
+E void FDECL(prinvc, (const char*, struct obj*, int64_t));
 E void FDECL(prinv_ex, (const char*, struct obj*, int64_t, int, int, int, int, BOOLEAN_P, BOOLEAN_P));
 E char *FDECL(xprname,
               (struct obj *, const char *, CHAR_P, BOOLEAN_P, int64_t, int64_t));
@@ -2180,6 +2182,7 @@ E void NDECL(reset_mon);
 
 E void FDECL(set_mon_data, (struct monst *, struct permonst *, UNSIGNED_SHORT_P));
 E struct attack *FDECL(attacktype_fordmg, (struct permonst *, int, int));
+E int FDECL(does_passive_impact_obj, (struct permonst*, struct obj*));
 E boolean FDECL(attacktype, (struct permonst *, int));
 E boolean FDECL(noattacks, (struct permonst *));
 E boolean FDECL(poly_when_stoned, (struct permonst *));
@@ -2753,6 +2756,7 @@ E boolean NDECL(can_floor_stash_objs);
 E void NDECL(set_current_container_to_dummyobj);
 E void NDECL(set_current_container_to_null);
 E void NDECL(reset_pickup);
+E boolean FDECL(loadstone_weight_shown_correctly, (int));
 
 /* ### pline.c ### */
 
@@ -3258,13 +3262,14 @@ E void FDECL(savecemetery, (int, int, struct cemetery **));
 E void FDECL(savefruitchn, (int, int));
 E void NDECL(reset_fruitchn);
 E void FDECL(store_plname_in_file, (int));
-E void FDECL(store_save_game_stats_in_file, (int));
+E void FDECL(store_save_game_stats_in_file, (int, int64_t));
 E void NDECL(free_dungeons);
 E void NDECL(free_dynamic_data_A);
 E void NDECL(free_dynamic_data_B);
 E void NDECL(free_dynamic_data_C);
 E void NDECL(freedynamicdata);
 E void FDECL(store_savefileinfo, (int));
+E void FDECL(track_new_save_file, (const char*, int64_t));
 
 /* ### shk.c ### */
 
@@ -3903,9 +3908,9 @@ E void FDECL(display_being_hit, (struct monst*, int, int, enum hit_tile_types, i
 E void FDECL(display_u_being_hit, (enum hit_tile_types, int, uint64_t));
 E void FDECL(display_m_being_hit, (struct monst*, enum hit_tile_types, int, uint64_t, BOOLEAN_P));
 E void NDECL(u_wait_until_action);
-E void NDECL(m_wait_until_action);
+E void FDECL(m_wait_until_action, (struct monst*, enum action_tile_types));
 E void NDECL(u_wait_until_end);
-E void NDECL(m_wait_until_end);
+E void FDECL(m_wait_until_end, (struct monst*, enum action_tile_types));
 E void FDECL(remove_monster_and_nearby_waitforu, (struct monst*));
 E boolean FDECL(m_slips_free, (struct monst*, struct attack*));
 

@@ -1,18 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-    <TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
-		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
-		<OutputType>Exe</OutputType>
+  <!-- BASE PROPERTIES -->
+  <PropertyGroup>
+    <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks>
+    <!-- Uncomment to also build the MacCatalyst app. -->
+    <!-- <TargetFrameworks>$(TargetFrameworks);net9.0-maccatalyst</TargetFrameworks> -->
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
+    <!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
+    <!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
+    <OutputType>Exe</OutputType>
 		<RootNamespace>GnollHackM</RootNamespace>
 		<UseMaui>true</UseMaui>
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!--<InvariantGlobalization>true</InvariantGlobalization>-->
-		<DefineConstants>$(DefineConstants);GNH_MAUI;BITFIELDS;SENTRY;BETA;USE_SPAN_FOR_SUBSTRING</DefineConstants>
+		<DefineConstants>$(DefineConstants);GNH_MAUI;BITFIELDS;SENTRY;USE_SPAN_FOR_SUBSTRING</DefineConstants>
 
 		<!-- Display name -->
 		<ApplicationTitle>GnollHack</ApplicationTitle>
@@ -22,8 +25,8 @@
 		<ApplicationIdGuid>77f64670-4eb4-432e-aa6a-b02d3d035d80</ApplicationIdGuid>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>2.14</ApplicationDisplayVersion>
-		<ApplicationVersion>214</ApplicationVersion>
+		<ApplicationDisplayVersion>2.36</ApplicationDisplayVersion>
+		<ApplicationVersion>252</ApplicationVersion>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">14.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
@@ -34,82 +37,104 @@
 		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
 		<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
 		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-		<AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+		<AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
 		<AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
 		<GenerateTestArtifacts>True</GenerateTestArtifacts>
-		<GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
 		<HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
 	</PropertyGroup>
 
-	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+  
+  <!-- CONFIGURATION SPECIFIC PROPERTIES -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <!--<UseInterpreter>false</UseInterpreter>-->
+    <_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
 	  <!--<AotAssemblies>true</AotAssemblies>-->
 	  <!--<RunAOTCompilation>true</RunAOTCompilation>-->
 	  <!-- Optional -->
 	  <!--<EnableLLVM>true</EnableLLVM>-->
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
-		<ProvisioningType>manual</ProvisioningType>
-		<CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
-		<CodesignProvision>Apple Dev M July 2024 Profile</CodesignProvision>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
-		<ProvisioningType>manual</ProvisioningType>
-		<!--<CodesignKey>Apple Distribution: Hyvan mielen pelit ry (CUG8RS847T)</CodesignKey>-->
-    <!--<CodesignProvision>Apple Dev M July 2024 Distribution Profile</CodesignProvision>-->
-    <CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
-    <CodesignProvision>Apple Dev M July 2024 Profile</CodesignProvision>
-    <MtouchUseLlvm>false</MtouchUseLlvm>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>None</DebugType>
   </PropertyGroup>
 
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
-		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
+  
+  <!-- FRAMEWORK SPECIFIC PROPERTIES -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
 	  <UseInterpreter>false</UseInterpreter>
     <JavaMaximumHeapSize>2G</JavaMaximumHeapSize>
     <!--<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>-->
-    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
-    <!--<AndroidEnableProfiler>true</AndroidEnableProfiler>--> 
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+    <!--<AndroidEnableProfiler>true</AndroidEnableProfiler>-->
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(TargetFramework.Contains('-ios'))">
 		<UseInterpreter>false</UseInterpreter>
-		<MtouchInterpreter>-all,FMODService.dll</MtouchInterpreter>
+		<MtouchInterpreter>-all</MtouchInterpreter>
     <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
 	</PropertyGroup>
 
-  <ItemGroup Condition=" '$(IncludeWindowsSDKRefFrameworkReferences)' == 'True'">
+  <!--<ItemGroup Condition=" '$(IncludeWindowsSDKRefFrameworkReferences)' == 'True'">
     <FrameworkReference Include="Microsoft.Windows.SDK.NET.Ref" IsImplicitlyDefined="true" Pack="false" PrivateAssets="All" />
-  </ItemGroup>
+  </ItemGroup>-->
   
   <PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
-    <WindowsSdkPackageVersion>10.0.19041.38</WindowsSdkPackageVersion>
-    <WindowsPackageType>MSIX</WindowsPackageType>
+    <!--<WindowsSdkPackageVersion>10.0.19041.38</WindowsSdkPackageVersion>-->
+    <UseInterpreter>false</UseInterpreter>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <!--<WindowsAppSDKSelfContained Condition="'$(WindowsPackageType)'=='None'">true</WindowsAppSDKSelfContained>
+    <SelfContained Condition="'$(WindowsPackageType)'=='None'">true</SelfContained>-->
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-		<_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>
-		<DebugSymbols>true</DebugSymbols>
-	</PropertyGroup>
-	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
-		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" ForegroundScale="0.6" />
-	</ItemGroup>
-	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'">
-		<MauiIcon Include="Resources\AppIcon\appicon.png" ForegroundScale="1.0" />
-	</ItemGroup>
-	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-ios'">
-		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="1.0" />
-	</ItemGroup>
-	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-maccatalyst'">
-		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFCCCC" ForegroundScale="1.0" />
-	</ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
+    <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" ForegroundScale="0.6" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'">
+    <MauiIcon Include="Resources\AppIcon\appicon.png" ForegroundScale="1.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='net9.0-ios'">
+    <MauiIcon Include="Resources\AppIcon\iOS\appicon.png" ForegroundFile="Resources\AppIcon\iOS\appiconios.png" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='net9.0-maccatalyst'">
+    <MauiIcon Include="Resources\AppIcon\iOS\appicon.png" ForegroundFile="Resources\AppIcon\iOS\appiconios.png" />
+  </ItemGroup>
 
-	<ItemGroup>
-		<!-- Splash Screen -->
+  <!-- CONFIGURATION + FRAMEWORK SPECIFIC PROPERTIES -->
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
+    <ProvisioningType>manual</ProvisioningType>
+    <CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>
+    <CodesignProvision>Apple Dev X July 2024 Profile</CodesignProvision>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
+    <ProvisioningType>manual</ProvisioningType>
+    <CodesignKey>Apple Distribution: Hyvan mielen pelit ry (CUG8RS847T)</CodesignKey>
+    <CodesignProvision>Apple Dev X July 2024 Distribution Profile</CodesignProvision>
+    <!--<CodesignKey>Apple Development: Janne Gustafsson (3JF32923Y3)</CodesignKey>-->
+    <!--<CodesignProvision>Apple Dev M July 2024 Profile</CodesignProvision>-->
+    <!--<MtouchUseLlvm>false</MtouchUseLlvm>-->
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-android'">
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-android'">
+    <EnableLLVM>true</EnableLLVM>
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+  </PropertyGroup>
+
+  <!-- GENERAL PROPERTIES -->
+  <ItemGroup>
+    <!-- MauiIcon has been set above on a platform-specific manner -->
+    
+    <!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\gnollhackicon.png" Color="#000000" BaseSize="160,160" />
 
 		<!-- Images -->
@@ -118,6 +143,7 @@
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" Condition="'$(TargetFramework)'=='net9.0-ios'" />
     <MauiFont Include="Resources\Fonts\*" Condition="'$(TargetFramework)'=='net9.0-maccatalyst'" />
+    <!-- Note: MauiFont has been unreliable on Android and Windows; workaround is to copy the files using MauiAsset to the right location instead -->
     <MauiAsset Include="Resources\Fonts\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" Condition="'$(TargetFramework)'=='net9.0-android'" />
     <MauiAsset Include="Resources\Fonts\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
 
@@ -222,8 +248,8 @@
 		<None Remove="Assets\Cursor\custom-cursor-64.cur" />
 		<None Remove="Assets\Cursor\info-cursor-32.cur" />
 		<None Remove="Assets\Cursor\info-cursor-64.cur" />
-		<None Remove="Assets\Fonts\Lato.otf" />
-		<None Remove="Assets\Fonts\Lato.ttf" />
+		<!--<None Remove="Assets\Fonts\Lato.otf" />-->
+		<!--<None Remove="Assets\Fonts\Lato.ttf" />-->
 		<None Remove="Assets\gnollhack-icon-v2-512.png" />
 		<None Remove="Assets\UI\autostash.png" />
 		<None Remove="Assets\UI\background-darkmarble.png" />
@@ -278,6 +304,12 @@
 		<None Remove="Assets\UI\zapquick.png" />
 		<None Remove="Assets\UI\zoom.png" />
 		<None Remove="Platforms\Android\Environment.txt" />
+		<None Remove="Platforms\Android\libs\x86_64\libc++_shared.so" />
+		<None Remove="Platforms\Android\libs\x86_64\libfmod.so" />
+		<None Remove="Platforms\Android\libs\x86_64\libfmodstudio.so" />
+		<None Remove="Platforms\Android\libs\x86_64\libgnollhackdroid.so" />
+		<None Remove="Platforms\Android\tileset\gnollhack_64x96_transparent_32bits-2.ghpng" />
+		<None Remove="Platforms\Android\tileset\gnollhack_64x96_transparent_32bits.ghpng" />
 		<None Remove="Resources\AppIcon\appicon.svg" />
 		<None Remove="Resources\AppIcon\appiconfg.svg" />
 	</ItemGroup>
@@ -396,8 +428,6 @@
 	  <None Remove="Assets\ghsecrets.sjson" />
 	  <None Remove="Assets\ghsettings.json" />
 	  <None Remove="Assets\gnollhack-logo-test-2.png" />
-	  <None Remove="Assets\gnollhack_64x96_transparent_32bits-2.png" />
-	  <None Remove="Assets\gnollhack_64x96_transparent_32bits.png" />
 	  <None Remove="Assets\Immortal-Regular.ttf" />
 	  <None Remove="Assets\Lato-Bold.ttf" />
 	  <None Remove="Assets\Lato-Regular.ttf" />
@@ -596,6 +626,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)'=='net9.0-android'">
+    <!-- Both EmbeddedJar and AndroidLibrary seem to be required for things to work; this results in some warnings, though -->
     <EmbeddedJar Include="Platforms\Android\jars\fmod.jar" />
     <AndroidLibrary Include="Platforms\Android\jars\fmod.jar" />
     <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libfmod.so" />
@@ -613,11 +644,15 @@
     <AndroidAsset Include="Platforms\Android\gnh\xlogfile" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
     <AndroidAsset Include="Platforms\Android\gnh\defaults.gnh" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
     <AndroidAsset Include="Platforms\Android\gnh\xcredits" LogicalName="%(RecursiveDir)gnh\%(Filename)%(Extension)" />
-    <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-    <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-    <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-    <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
-    <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
+
+    <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Intro.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+    <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+    <AndroidAsset Include="Platforms\Android\tileset\gnollhack_64x96_transparent_32bits.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+    <AndroidAsset Include="Platforms\Android\tileset\gnollhack_64x96_transparent_32bits-2.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk'" />
+
     <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" Condition=" '$(AndroidPackageFormat)' == 'apk' " />
     <AndroidAsset Include="Platforms\Android\banks\Master.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
     <AndroidAsset Include="Platforms\Android\banks\Auxiliary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
@@ -625,6 +660,8 @@
     <AndroidAsset Include="Platforms\Android\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
     <AndroidAsset Include="Platforms\Android\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
 	  <AndroidAsset Include="Platforms\Android\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <AndroidAsset Include="Platforms\Android\tileset\gnollhack_64x96_transparent_32bits.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
+    <AndroidAsset Include="Platforms\Android\tileset\gnollhack_64x96_transparent_32bits-2.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)" AssetPack="installtimeassetpack" DeliveryType="InstallTime" Condition=" '$(AndroidPackageFormat)' != 'apk'" />
     <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\ondemandassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
     <!--<AndroidAppBundleModules Include="Platforms\Android\assetpacks\installtimeassetpack.zip" Condition=" '$(AndroidPackageFormat)' != 'apk' " />-->
 	  <Compile Include="..\GnollHackX\GnollHackX.Android\PlatformServiceAndroid.cs" />
@@ -666,7 +703,9 @@
 		<BundleResource Include="Platforms\iOS\banks\Master.strings.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
 		<BundleResource Include="Platforms\iOS\banks\Music.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
 		<BundleResource Include="Platforms\iOS\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)" />
-		<Compile Include="..\GnollHackX\GnollHackX.iOS\PlatformServiceiOS.cs" />
+    <BundleResource Include="Platforms\iOS\tileset\gnollhack_64x96_transparent_32bits.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)" />
+    <BundleResource Include="Platforms\iOS\tileset\gnollhack_64x96_transparent_32bits-2.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)" />
+    <Compile Include="..\GnollHackX\GnollHackX.iOS\PlatformServiceiOS.cs" />
 		<Compile Include="..\GnollHackX\GnollHackX.iOS\GHUIApplication.cs" />
 	</ItemGroup>
 
@@ -734,14 +773,19 @@
 		<MauiAsset Include="Platforms\Windows\banks\Preliminary.bank" LogicalName="%(RecursiveDir)banks\%(Filename)%(Extension)">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</MauiAsset>
-	</ItemGroup>
+    <MauiAsset Include="Platforms\Windows\tileset\gnollhack_64x96_transparent_32bits.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </MauiAsset>
+    <MauiAsset Include="Platforms\Windows\tileset\gnollhack_64x96_transparent_32bits-2.ghpng" LogicalName="%(RecursiveDir)tileset\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </MauiAsset>
+  </ItemGroup>
 	
 	<PropertyGroup Condition="'$(TargetFramework)'=='net9.0-ios'">
 		<DefineConstants>$(DefineConstants);UNITY_IPHONE</DefineConstants>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Debug|net9.0-ios'">
 	  <MtouchLink>None</MtouchLink>
-    <_MauiForceXamlCForDebug>true</_MauiForceXamlCForDebug>
   </PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)'=='Release|net9.0-ios'">
 	  <MtouchLink>SdkOnly</MtouchLink>
@@ -755,6 +799,18 @@
     <!--<PublishTrimmed>False</PublishTrimmed>-->
     <!--<RunAOTCompilation>False</RunAOTCompilation>-->
   </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
+	  <Debugger>Xamarin</Debugger>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
+	  <Debugger>Xamarin</Debugger>
+	</PropertyGroup>
+	<ItemGroup>
+	  <AndroidNativeLibrary Include="Platforms\Android\libs\x86_64\libc++_shared.so" />
+	  <AndroidNativeLibrary Include="Platforms\Android\libs\x86_64\libfmod.so" />
+	  <AndroidNativeLibrary Include="Platforms\Android\libs\x86_64\libfmodstudio.so" />
+	  <AndroidNativeLibrary Include="Platforms\Android\libs\x86_64\libgnollhackdroid.so" />
+	</ItemGroup>
 
 	<ItemGroup>
 	  <EmbeddedResource Include="Assets\archristy.ttf" />
@@ -775,14 +831,12 @@
 	  <EmbeddedResource Include="Assets\FMOD-Logo-192-White.png" />
 	  <EmbeddedResource Include="Assets\UI\lootin.png" />
 	  <EmbeddedResource Include="Assets\UI\lootout.png" />
-	  <MauiAsset Include="Assets\Fonts\Lato.otf" />
-    <MauiAsset Include="Assets\Fonts\Lato.ttf" />
+	  <!--<MauiAsset Include="Assets\Fonts\Lato.otf" />-->
+    <!--<MauiAsset Include="Assets\Fonts\Lato.ttf" />-->
     <EmbeddedResource Include="Assets\ghsecrets.sjson" />
 	  <EmbeddedResource Include="Assets\ghsettings.json" />
 	  <EmbeddedResource Include="Assets\gnollhack-icon-v2-512.png" />
 	  <EmbeddedResource Include="Assets\gnollhack-logo-test-2.png" />
-	  <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits-2.png" />
-	  <EmbeddedResource Include="Assets\gnollhack_64x96_transparent_32bits.png" />
 	  <EmbeddedResource Include="Assets\Immortal-Regular.ttf" />
 	  <EmbeddedResource Include="Assets\Lato-Bold.ttf" />
 	  <EmbeddedResource Include="Assets\Lato-Regular.ttf" />
@@ -1028,29 +1082,44 @@
 	<ItemGroup>
 		<PackageReference Include="Azure.Identity" Version="1.12.0" />
 		<PackageReference Include="Azure.Storage.Blobs" Version="12.13.1" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
-		<PackageReference Include="System.Text.Json" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.3" />
+		<PackageReference Include="System.Text.Json" Version="9.0.3" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    
-    <PackageReference Include="SkiaSharp" Version="3.116.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
+
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+    <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.119.0" />
+    <PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.119.0" />
+
+    <!--<PackageReference Include="SkiaSharp" Version="3.116.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
     <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.116.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
     <PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.116.1" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0'" />
     
     <PackageReference Include="SkiaSharp" Version="3.116.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
 		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.116.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
-		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.116.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="3.116.1" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />-->
 		
-    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
-    
-    <!-- Platform-specific packages -->
-    <PackageReference Include="System.Management" Version="9.0.0" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
-    <PackageReference Include="Xamarin.Google.Android.Play.Core" Version="1.10.3.14" Condition="'$(TargetFramework)'=='net9.0-android'" />
+    <!--<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />-->
+
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.50" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0' or '$(WindowsPackageType)'!='MSIX'" />
+    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.50" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0' or '$(WindowsPackageType)'!='MSIX'" />
+
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.50" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0' and '$(WindowsPackageType)'=='MSIX'" />
+    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.50" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0' and '$(WindowsPackageType)'=='MSIX'" />
+
+    <!--<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.40" />
+    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.40" />
+
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="[1.6.241114003]" Condition="'$(TargetFramework)'!='net9.0-windows10.0.19041.0' or '$(WindowsPackageType)'!='MSIX'" />-->
+
+		<!-- Platform-specific packages -->
+    <PackageReference Include="System.Management" Version="9.0.3" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+    <PackageReference Include="Xamarin.Google.Android.Play.Core" Version="1.10.3.17" Condition="'$(TargetFramework)'=='net9.0-android'" />
   </ItemGroup>
 
   <ItemGroup Condition="$(DefineConstants.Contains('SENTRY'))">
-    <PackageReference Include="Sentry.Maui" Version="4.12.0" />
-    <PackageReference Include="Sentry.Profiling" Version="4.12.0" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+    <PackageReference Include="Sentry.Maui" Version="5.6.0" />
+    <PackageReference Include="Sentry.Profiling" Version="5.6.0" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
   </ItemGroup>
 
   <ItemGroup>
@@ -1069,7 +1138,6 @@
 		<BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
 	</ItemGroup>
 
-	<Import Project="AppxIcons.targets" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />
+	<!--<Import Project="AppxIcons.targets" Condition="'$(TargetFramework)'=='net9.0-windows10.0.19041.0'" />-->
 
 </Project>
- 

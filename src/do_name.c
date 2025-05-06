@@ -602,8 +602,8 @@ int cx, cy;
 {
     coord cc;
     nhsym sym = 0;
-    char tmpbuf[BUFSZ];
-    char descbuf[BUFSZ];
+    char tmpbuf[BUFSZ * 2];
+    char descbuf[BUFSZ * 5];
     const char *firstmatch = "unknown";
 
     cc.x = cx;
@@ -637,8 +637,8 @@ int gloc;
     anything any;
     int i, pick_cnt;
     menu_item *picks = (menu_item *) 0;
-    char descbuf[BUFSZ];
-    char tmpbuf[BUFSZ];
+    char descbuf[BUFSZ * 5];
+    char tmpbuf[BUFSZ * 2];
 
     gather_locs(&garr, &gcount, gloc);
 
@@ -657,7 +657,7 @@ int gloc;
 
     /* gather_locs returns array[0] == you. skip it. */
     for (i = 1; i < gcount; i++) {
-        char fullbuf[BUFSZ];
+        char fullbuf[BUFSZ * 5];
         coord tmpcc;
         const char *firstmatch = "unknown";
         nhsym sym = 0;
@@ -733,6 +733,7 @@ enum game_cursor_types cursor_style;
     coord *garr[NUM_GLOCS] = DUMMY;
     int gcount[NUM_GLOCS] = DUMMY;
     int gidx[NUM_GLOCS] = DUMMY;
+    boolean getpos_arrows_at_start = iflags.getpos_arrows;
 
     flags.show_cursor_on_u = TRUE;
     flags.force_paint_at_cursor = TRUE;
@@ -773,7 +774,7 @@ enum game_cursor_types cursor_style;
 #endif
     curs(WIN_MAP, cx, cy);
     flush_screen(0);
-    if(cursor_style != CURSOR_STYLE_TELEPORT_CURSOR)
+    if (getpos_arrows_at_start || cursor_style == CURSOR_STYLE_LOOK_CURSOR || cursor_style == CURSOR_STYLE_TRAVEL_CURSOR) // (cursor_style != CURSOR_STYLE_TELEPORT_CURSOR)
         issue_simple_gui_command(GUI_CMD_SAVE_AND_DISABLE_TRAVEL_MODE);
 #if defined(MAC) || defined(ANDROID)
     lock_mouse_cursor(TRUE);
@@ -1143,7 +1144,7 @@ enum game_cursor_types cursor_style;
     flags.force_paint_at_cursor = TRUE;
     flags.active_cursor_style = CURSOR_STYLE_GENERIC_CURSOR;
     update_cursor(flags.active_cursor_style, flags.force_paint_at_cursor, flags.show_cursor_on_u);
-    if (cursor_style != CURSOR_STYLE_TELEPORT_CURSOR)
+    if (getpos_arrows_at_start || cursor_style == CURSOR_STYLE_LOOK_CURSOR || cursor_style == CURSOR_STYLE_TRAVEL_CURSOR) // (cursor_style != CURSOR_STYLE_TELEPORT_CURSOR)
         issue_simple_gui_command(GUI_CMD_RESTORE_TRAVEL_MODE);
     create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
     clear_valid_pos_flags();
@@ -1547,7 +1548,7 @@ const char *name;
     size_t lth;
     char buf[PL_PSIZ];
 
-    lth = *name ? (strlen(name) + 1) : 0;
+    lth = name && *name ? (strlen(name) + 1) : 0;
     if (lth > PL_PSIZ) {
         lth = PL_PSIZ;
         name = strncpy(buf, name, PL_PSIZ - 1);
@@ -4017,7 +4018,7 @@ uint64_t excludedtitles, excludedtitles2; /* Requires a 64-bit long to work for 
 
     if (titleidx)  /* Randomized or non-randomized if titleidx != 0 */
     {
-        if (*titleidx == -1)
+        if (*titleidx < 0)
             *titleidx = j; /* Randomized, set titleidx to the randomized index */
         else if (*titleidx >= 0 && *titleidx < arraysize)
             j = *titleidx;  /* Set to value determined by titleidx */
@@ -4030,6 +4031,8 @@ noveltitle(novidx, excludedtitles, excludedtitles2)
 short* novidx;
 uint64_t excludedtitles, excludedtitles2;
 {
+    if (novidx && *novidx == -1)
+        return (const char*)0; /* Blank */
     return gettitle(novidx, sir_Terry_novels, SIZE(sir_Terry_novels), SIZE(sir_Terry_novels), excludedtitles, excludedtitles2);
 }
 
@@ -4054,9 +4057,11 @@ STATIC_VAR const char* const manual_names[MAX_MANUAL_TYPES] = {
 
 const char*
 manualtitle(mnlidx, excludedtitles, excludedtitles2)
-short* mnlidx;
+short* mnlidx; /* >= 0 from array, -1 = blank, -2 = random */
 uint64_t excludedtitles, excludedtitles2;
 {
+    if (mnlidx && *mnlidx == -1)
+        return (const char*)0; /* Blank */
     return gettitle(mnlidx, manual_names, SIZE(manual_names), NUM_RANDOM_MANUALS, excludedtitles, excludedtitles2);
 }
 
@@ -4386,7 +4391,12 @@ struct obj* obj;
 
     short mnlidx = obj->manualidx;
 
-    if (mnlidx < 0)
+    if (mnlidx == -1)
+    {
+        pline1("This manual is all blank.");
+        return;
+    }
+    if (mnlidx < -1)
     {
         pline("%s unintelligibly scribbled.", Tobjnam(obj, "be"));
         return;
@@ -4787,7 +4797,6 @@ const char *lookname;
 short* idx;
 {
     short k;
-
     /* Take American or U.K. spelling of this one */
     if (!strcmpi(The(lookname), "The Color of Magic"))
         lookname = sir_Terry_novels[0];
@@ -4813,7 +4822,6 @@ const char* lookname;
 short* idx;
 {
     short k;
-
     for (k = 0; k < SIZE(manual_names); ++k) {
         if (!strcmpi(lookname, manual_names[k])
             || !strcmpi(The(lookname), manual_names[k])) {

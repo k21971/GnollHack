@@ -941,12 +941,12 @@ time_t when; /* date+time at end of game */
     }
     if (iflags.wc2_statuslines > 3)
     {
-        char partybuf[BUFSZ * 2];
-        char partybuf2[BUFSZ * 2];
-        char partybuf3[BUFSZ * 2];
-        char partybuf4[BUFSZ * 2];
-        char partybuf5[BUFSZ * 2];
-        compose_partystatline(partybuf, partybuf2, partybuf3, partybuf4, partybuf5);
+        char partybuf[BUFSZ * 3];
+        char partybuf2[BUFSZ * 3];
+        char partybuf3[BUFSZ * 3];
+        char partybuf4[BUFSZ * 3];
+        char partybuf5[BUFSZ * 3];
+        compose_partystatline(partybuf, partybuf2, partybuf3, partybuf4, partybuf5, BUFSZ * 3);
         char* partylines[5] = { partybuf, partybuf2, partybuf3, partybuf4, partybuf5 };
         int i;
         for (i = 0; i < iflags.wc2_statuslines - 3 && i < 5; i++)
@@ -962,9 +962,10 @@ time_t when; /* date+time at end of game */
     dump_plines();
     putstr(NHW_DUMPTXT, 0, "");
     putstr(0, ATR_HEADING, "Inventory:");
-    (void) display_inventory((char *) 0, TRUE, 0);
-    container_contents(invent, how != SNAPSHOT, TRUE, FALSE, 0);
-    enlightenment(how == SNAPSHOT ? BASICENLIGHTENMENT : (BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
+    (void) display_inventory((char *) 0, TRUE, SHOWWEIGHTS_NONE);
+    container_contents(invent, how != SNAPSHOT, TRUE, FALSE, SHOWWEIGHTS_NONE);
+    magic_chest_contents(how != SNAPSHOT, TRUE, FALSE, SHOWWEIGHTS_NONE);
+    enlightenment(how == SNAPSHOT ? BASICENLIGHTENMENT | GAMEENLIGHTENMENT : (BASICENLIGHTENMENT | MAGICENLIGHTENMENT | GAMEENLIGHTENMENT),
                   how == SNAPSHOT ? ENL_GAMEINPROGRESS : (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
     putstr(NHW_DUMPTXT, 0, "");
     dump_skills();
@@ -1090,8 +1091,9 @@ boolean taken;
         
         if (c == 'y') {
             /* caller has already ID'd everything */
-            (void) display_inventory((char *) 0, FALSE, 0);
-            container_contents(invent, TRUE, TRUE, FALSE, 0);
+            (void) display_inventory((char *) 0, FALSE, SHOWWEIGHTS_NONE);
+            container_contents(invent, TRUE, TRUE, FALSE, SHOWWEIGHTS_NONE);
+            magic_chest_contents(TRUE, TRUE, FALSE, SHOWWEIGHTS_NONE);
         }
         if (c == 'q')
             done_stopprint++;
@@ -1103,7 +1105,7 @@ boolean taken;
                               defquery, ynq2descs)
                 : defquery;
         if (c == 'y')
-            enlightenment((BASICENLIGHTENMENT | MAGICENLIGHTENMENT),
+            enlightenment((BASICENLIGHTENMENT | MAGICENLIGHTENMENT | GAMEENLIGHTENMENT),
                           (how >= PANICKED) ? ENL_GAMEOVERALIVE
                                             : ENL_GAMEOVERDEAD);
         if (c == 'q')
@@ -2527,16 +2529,7 @@ int show_weights;
     boolean cat, dumping = iflags.in_dumplog;
     int count = 0;
     int totalweight = 0;
-    boolean loadstonecorrectly = FALSE;
-
-    if (show_weights == 1) // Inventory
-        loadstonecorrectly = TRUE;
-    else if (show_weights == 2) 
-    { // Pick up
-        loadstonecorrectly = (boolean)objects[LOADSTONE].oc_name_known;
-    }
-    else if (show_weights == 3) // Drop
-        loadstonecorrectly = TRUE;
+    boolean loadstonecorrectly = loadstone_weight_shown_correctly(show_weights);
 
     for (box = list; box; box = box->nobj) 
     {
@@ -2604,7 +2597,7 @@ int show_weights;
                         else
                             totalweight += obj->owt;
     
-                        Sprintf(&buf[2], "%2d - %s", count, show_weights > 0 ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly) : doname_with_price_and_weight_first(obj, loadstonecorrectly)) : doname_with_price(obj));
+                        Sprintf(&buf[2], "%2d - %s", count, show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly) : doname_with_price_and_weight_first(obj, loadstonecorrectly)) : doname_with_price(obj));
                         //Strcpy(&buf[2], doname_with_price_and_weight_first(obj));
                         putstr(tmpwin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                     }
@@ -2640,6 +2633,87 @@ int show_weights;
             break;
     }
 }
+
+void
+magic_chest_contents(identified, all_containers, reportempty, show_weights)
+boolean identified, all_containers, reportempty;
+int show_weights;
+{
+    register struct obj* obj;
+    char buf[BUFSZ];
+    boolean dumping = iflags.in_dumplog;
+    int count = 0;
+    int totalweight = 0;
+    boolean loadstonecorrectly = loadstone_weight_shown_correctly(show_weights);
+    const char* chest_name = objects[MAGIC_CHEST].oc_name_known || identified ? OBJ_NAME(objects[MAGIC_CHEST]) : OBJ_DESCR(objects[MAGIC_CHEST]);
+
+    if (magic_objs)
+    {
+        winid tmpwin = create_nhwindow(NHW_MENU);
+        Loot* sortedcobj, * srtc;
+        unsigned sortflags;
+
+        count = 0;
+
+        Sprintf(buf, "Contents of your %s:", chest_name);
+        putstr(tmpwin, ATR_TITLE, buf);
+        if (!dumping)
+            putstr(tmpwin, ATR_HALF_SIZE, " ");
+        buf[0] = buf[1] = ' '; /* two leading spaces */
+        if (magic_objs)
+        {
+            sortflags = (((flags.sortloot == 'l'
+                || flags.sortloot == 'f')
+                ? SORTLOOT_LOOT : 0)
+                | (flags.sortpack ? SORTLOOT_PACK : 0));
+            sortedcobj = sortloot(&magic_objs, sortflags, FALSE,
+                (boolean FDECL((*), (OBJ_P))) 0);
+            totalweight = 0;
+            for (srtc = sortedcobj; ((obj = srtc->obj) != 0); ++srtc)
+            {
+                if (identified)
+                {
+                    discover_object(obj->otyp, TRUE, FALSE);
+                    obj->known = obj->bknown = obj->dknown
+                        = obj->rknown = obj->nknown = obj->aknown = obj->mknown = 1;
+                    if (Is_container(obj) || obj->otyp == STATUE)
+                        obj->cknown = obj->lknown = obj->tknown = 1;
+                }
+                count++;
+
+                /* total sum here */
+                if (obj->otyp == LOADSTONE && !loadstonecorrectly)
+                    totalweight += objects[LUCKSTONE].oc_weight;
+                else
+                    totalweight += obj->owt;
+
+                Sprintf(&buf[2], "%2d - %s", count, show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly) : doname_with_price_and_weight_first(obj, loadstonecorrectly)) : doname_with_price(obj));
+                //Strcpy(&buf[2], doname_with_price_and_weight_first(obj));
+                putstr(tmpwin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
+            }
+            if (flags.show_weight_summary)
+            {
+                if (flags.inventory_weights_last)
+                    putstr(tmpwin, ATR_HALF_SIZE, " ");
+                add_weight_summary_putstr(tmpwin, totalweight, show_weights);
+            }
+
+            unsortloot(&sortedcobj);
+        }
+        if (dumping)
+            putstr(0, ATR_HALF_SIZE, " ");
+        display_nhwindow(tmpwin, TRUE);
+        destroy_nhwindow(tmpwin);
+        if (all_containers)
+            container_contents(magic_objs, identified, TRUE, reportempty, show_weights);
+    }
+    else if (reportempty)
+    {
+        pline("Your %s is empty.", chest_name);
+        display_nhwindow(WIN_MESSAGE, FALSE);
+    }
+}
+
 
 /* should be called with either EXIT_SUCCESS or EXIT_FAILURE */
 /* called between displaying gamewindows and before newgame / restore, after getlock doclearlocks must be set to TRUE */
@@ -3086,7 +3160,7 @@ int final;
         {
             char dbuf[BUFSZ];
             Sprintf(dbuf, "print_selfies: selfiescore of %lld does not match context.role_score of %lld.", (long long)selfiescore, (long long)context.role_score);
-            issue_debuglog(DEBUGLOG_GENERAL, dbuf);
+            issue_debuglog(0, dbuf);
             context.role_score = selfiescore;
         }
         int64_t score_percentage = ((selfiescore + (int64_t)u.uachieve.role_achievement * TOURIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
@@ -3186,7 +3260,7 @@ int final;
         {
             char dbuf[BUFSZ];
             Sprintf(dbuf, "print_knight_slayings: killscore of %lld does not match context.role_score of %lld.", (long long)killscore, (long long)context.role_score);
-            issue_debuglog(DEBUGLOG_GENERAL, dbuf);
+            issue_debuglog(0, dbuf);
             context.role_score = killscore;
         }
         int64_t score_percentage = ((killscore + (int64_t)u.uachieve.role_achievement * KNIGHT_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
@@ -3769,8 +3843,8 @@ get_current_game_score(VOID_ARGS)
     double Turn_Count_Multiplier = sqrt(50000.0) / sqrt((double)max(1L, moves));
     double Ascension_Multiplier = u.uachieve.ascended ? min(16.0, max(2.0, 4.0 * Turn_Count_Multiplier)) : 1.0;
     double Difficulty_Multiplier = pow(10.0, 0.5 * (double)context.game_difficulty);
-    double mortexp = (double)(u.utruemortality > 6 ? 7 : u.utruemortality + 1);
-    double mortmult = (double)(u.utruemortality > 6 ? u.utruemortality - 5 : 1);
+    double mortexp = (double)(u.utruemortality > 2 ? 3 : u.utruemortality + 1);
+    double mortmult = (double)(u.utruemortality > 2 ? u.utruemortality - 1 : 1);
     double Modern_Multiplier = ModernMode ? 1.0 / (pow(3, mortexp) * mortmult) : 1.0;
 
     utotal = (int64_t)(round((double)Base_Score * Ascension_Multiplier * Difficulty_Multiplier * Modern_Multiplier));

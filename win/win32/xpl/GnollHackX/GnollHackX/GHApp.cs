@@ -11,6 +11,7 @@ using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.PlatformConfiguration;
 using GnollHackX.Pages.Game;
+using GnollHackX.Pages.MainScreen;
 #endif
 using Newtonsoft.Json;
 using System;
@@ -55,6 +56,7 @@ namespace GnollHackX
     public struct SendResult
     {
         public bool IsSuccess;
+        public bool IsException;
         public bool HasHttpStatusCode;
         public HttpStatusCode StatusCode;
         public string Message;
@@ -109,6 +111,10 @@ namespace GnollHackX
         public static Microsoft.UI.Xaml.Window WindowsXamlWindow = null;
         public static Microsoft.UI.Input.InputCursor WindowsCursor = null;
         public static Microsoft.UI.Input.InputCursor WindowsInfoCursor = null;
+
+        private static readonly object _windowFocusedLock = new object();
+        private static bool _windowFocused = false;
+        public static bool WindowFocused { get { lock (_windowFocusedLock) { return _windowFocused; } } set { lock (_windowFocusedLock) { _windowFocused = value; } } }
 #endif
         private static Assembly _assembly = null;
 
@@ -121,8 +127,11 @@ namespace GnollHackX
             PlatformService.InitializePlatform();
             GHPath = GnollHackService.GetGnollHackPath();
             InitializeBattery();
+            ProcessCommandLineArguments();
+            ProcessEnvironment();
 
-            TotalMemory = GHApp.PlatformService.GetDeviceMemoryInBytes();
+            TotalMemory = PlatformService.GetDeviceMemoryInBytes();
+            PlatformScreenScale = PlatformService.GetPlatformScreenScale();
 
             InitBaseTypefaces();
             InitBaseCachedBitmaps();
@@ -173,12 +182,14 @@ namespace GnollHackX
             AutoUploadReplays = Preferences.Get("AutoUploadReplays", false);
             UseGZipForReplays = Preferences.Get("UseGZipForReplays", GHConstants.GZipIsDefaultReplayCompression);
             OkOnDoubleClick = Preferences.Get("OkOnDoubleClick", IsDesktop);
+            GetPositionArrows = Preferences.Get("GetPositionArrows", false);
             LastUsedPlayerName = Preferences.Get("LastUsedPlayerName", "");
             LastUsedTournamentPlayerName = Preferences.Get("LastUsedTournamentPlayerName", "");
             GUITipsShown = Preferences.Get("GUITipsShown", false);
             RealPlayTime = Preferences.Get("RealPlayTime", 0L);
             DrawWallEnds = Preferences.Get("DrawWallEnds", GHConstants.DefaultDrawWallEnds);
             CustomScreenScale = Preferences.Get("CustomScreenScale", 0.0f); /* Note that preferences have a default of zero but the property return 1.0f */
+            SaveFileTracking = Preferences.Get("SaveFileTracking", IsDesktop && !string.IsNullOrEmpty(XlogUserName) && !string.IsNullOrEmpty(XlogPassword));
 
             SetAvailableGPUCacheLimits(TotalMemory);
             PrimaryGPUCacheLimit = Preferences.Get("PrimaryGPUCacheLimit", -2L);
@@ -207,6 +218,14 @@ namespace GnollHackX
 
             BackButtonPressed += EmptyBackButtonPressed;
             DeviceDisplay.MainDisplayInfoChanged += DeviceDisplay_MainDisplayInfoChanged;
+        }
+
+
+        public static void BeforeExitApp()
+        {
+            Connectivity.ConnectivityChanged -= Connectivity_ConnectivityChanged;
+            Battery.BatteryInfoChanged -= Battery_BatteryInfoChanged;
+            DeviceDisplay.MainDisplayInfoChanged -= DeviceDisplay_MainDisplayInfoChanged;
         }
 
         private static void DeviceDisplay_MainDisplayInfoChanged(object sender, DisplayInfoChangedEventArgs e)
@@ -240,7 +259,7 @@ namespace GnollHackX
         {
             get
             {
-                return !IsKeyboardConnected; /* Keyboard handling does not fire */
+                return !IsKeyboardConnected || IsWindows; /* Keyboard handling does not fire */
             }
         }
 
@@ -249,6 +268,72 @@ namespace GnollHackX
             get
             {
                 return IsKeyboardConnected; /* Does not bring up the soft keyboard, so can focus immediately */
+            }
+        }
+
+        public static bool IsSteam { get; set; }
+        public static bool IsPlaytest { get; set; }
+
+        private static void ProcessEnvironment()
+        {
+            IsPlaytest = false;
+            IsSteam = false;
+#if WINDOWS
+            try
+            {
+                string packstr = AppInfo.PackageName;
+                if (!string.IsNullOrEmpty(packstr))
+                {
+                    if (packstr.EndsWith(".Playtest"))
+                    {
+                        IsPlaytest = true;
+                        IsSteam = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+
+            try
+            {
+                string packstr = AppInfo.PackageName;
+                if (!string.IsNullOrEmpty(packstr))
+                {
+                    if (packstr.EndsWith(".Steam") || packstr.Contains(".Steam."))
+                    {
+                        IsSteam = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+#endif
+        }
+
+        private static void ProcessCommandLineArguments()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            if (args != null && args.Length > 0)
+            {
+                int cnt = args.Length;
+                for(int i = 0; i < cnt; i++)
+                {
+                    if (args[i] != null && args[i].ToLower() == "-store")
+                    {
+                        if (i + 1 < cnt)
+                        {
+                            if (args[i + 1] != null && args[i + 1].ToLower() == "steam")
+                            {
+                                IsSteam = true;
+                                i++;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -281,37 +366,79 @@ namespace GnollHackX
             }
         }
 
+        public static string GetPortVersionString()
+        {
+            string str;
+#if GNH_MAUI
+            Version ver = AppInfo.Current.Version;
+            str = (ver?.Major.ToString() ?? "?") + "." + (ver?.Minor.ToString() ?? "?");
+#else
+            str = VersionTracking.CurrentVersion;
+#endif
+            return str != null ? str : "?";
+        }
+
+        public static string GetPortBuildString()
+        {
+            string str;
+#if GNH_MAUI
+#if WINDOWS
+            str = AppInfo.Current.Version.Build.ToString();
+#else
+            str = AppInfo.Current.BuildString;
+#endif
+#else
+            str = VersionTracking.CurrentBuild;
+#endif
+            return str != null ? str : "?";
+        }
+
         public static void SaveWindowPosition()
         {
 #if WINDOWS
             if(WindowsXamlWindow != null && WindowedMode)
             {
-                var handle = WinRT.Interop.WindowNative.GetWindowHandle(WindowsXamlWindow);
-                var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
-                var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(id);
-                if(appWindow != null)
+                //var handle = WinRT.Interop.WindowNative.GetWindowHandle(WindowsXamlWindow);
+                //var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
+                //var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(id);
+                var appWindow = WindowsXamlWindow.AppWindow;
+                bool isMaximized = false;
+                var presenter = appWindow?.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                if (presenter != null)
                 {
-                    Preferences.Set("WindowedSizeX", appWindow.Position.X);
-                    Preferences.Set("WindowedSizeY", appWindow.Position.Y);
-                    Preferences.Set("WindowedSizeWidth", appWindow.Size.Width);
-                    Preferences.Set("WindowedSizeHeight", appWindow.Size.Height);
+                    if (presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                    {
+                        isMaximized = true;
+                    }
+                }
+
+                if (appWindow != null)
+                {
                     Preferences.Set("WindowedSizeDisplayDensity", DisplayDensity);
+                    Preferences.Set("WindowedSizeIsMaximized", isMaximized);
+                    if(!isMaximized)
+                    {
+                        Preferences.Set("WindowedSizeX", appWindow.Position.X);
+                        Preferences.Set("WindowedSizeY", appWindow.Position.Y);
+                        Preferences.Set("WindowedSizeWidth", appWindow.Size.Width);
+                        Preferences.Set("WindowedSizeHeight", appWindow.Size.Height);
+                    }
                 }
             }
 #endif
         }
-
 
         public static void SetMirroredOptionsToDefaults()
         {
             MirroredCharacterClickAction = Preferences.Get("CharacterClickAction", GHConstants.DefaultCharacterClickAction);
             MirroredRightMouseCommand = Preferences.Get("RightMouseCommand", GHConstants.DefaultRightMouseCommand);
             MirroredMiddleMouseCommand = Preferences.Get("MiddleMouseCommand", GHConstants.DefaultMiddleMouseCommand);
+            MirroredDiceAsRanges = Preferences.Get("DiceAsRanges", GHConstants.DefaultDiceAsRanges);
         }
 
-        public static void MaybeFixRects(ref SKRect source, ref SKRect dest, float targetscale, bool usingGL)
+        public static void MaybeFixRects(ref SKRect source, ref SKRect dest, float targetscale, bool usingGL, bool fixRects)
         {
-            if (usingGL && FixRects)
+            if ((usingGL || IsWindows) && fixRects)
             {
                 //if (targetscale <= 0)
                 //    targetscale = 1.0f;
@@ -552,17 +679,12 @@ namespace GnollHackX
             }
         }
 
-        public static bool IsDebug
-        {
-            get
-            {
+        public static readonly bool IsDebug = 
 #if DEBUG
-                return true;
+            true;
 #else
-                return false;
+            false;
 #endif
-            }
-        }
 
         private static readonly object _useGPULock = new object();
         private static bool _useMipMap = false;
@@ -758,7 +880,7 @@ namespace GnollHackX
             get
             {
 #if WINDOWS
-                return UseGPU && !HasInformedAboutGPU && DeviceGPUs.Count > 1 && GetActiveGPU() != "Dedicated";
+                return UseGPU && !HasInformedAboutGPU && DeviceGPUs.Count > 1 && (IsPackaged ? GetActiveGPU() != "Dedicated" : GetActiveGPU() == "Integrated");
 #else
                 return false;
 #endif
@@ -770,7 +892,7 @@ namespace GnollHackX
             get
             {
 #if GNH_MAUI
-                return IsPackaged;
+                return IsPackaged && !IsWindows;
 #else
                 return !HasUnstableGPU();
 #endif
@@ -843,6 +965,14 @@ namespace GnollHackX
             get
             {
                 return IsDesktop || IsUseAuxGPUDefault;
+            }
+        }
+
+        public static bool IsMenuHighlightedKeysDefault
+        {
+            get
+            {
+                return IsDesktop;
             }
         }
 
@@ -1024,6 +1154,12 @@ namespace GnollHackX
             get { return !IsDesktop; }
         }
 
+        public static void DoKeyboardFocus()
+        {
+            if (CurrentMainPage != null)
+                CurrentMainPage.DoKeyboardFocus();
+        }
+
         public static void OnStart()
         {
             if (PlatformService != null)
@@ -1033,6 +1169,8 @@ namespace GnollHackX
             AltDown = false;
             ShiftDown = false;
             SleepMuteMode = false;
+
+            DoKeyboardFocus();
 
             if (IsAutoSaveUponSwitchingAppsOn)
             {
@@ -1111,7 +1249,10 @@ namespace GnollHackX
             if (WindowsXamlWindow?.AppWindow?.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
             {
                 if (WindowedMode)
-                    presenter.Restore();
+                {
+                    if (presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
+                        presenter.Restore();
+                }
                 else
                     presenter.Maximize();
             }
@@ -1171,70 +1312,19 @@ namespace GnollHackX
             set { lock (_darkModeLock) { _darkMode = value; } UpdateTheme(value); }
         }
 
-        public static void UpdateTheme(bool isDarkTheme)
+        private static void UpdateTheme(bool isDarkTheme)
         {
 #if GNH_MAUI
             Microsoft.Maui.Controls.Application.Current.UserAppTheme = isDarkTheme ? AppTheme.Dark : AppTheme.Light;
 #endif
 #if WINDOWS
-            SetPageTheme(CurrentMainPage, isDarkTheme);
+            UIUtils.SetPageTheme(CurrentMainPage, isDarkTheme);
             if (CurrentMainPage != null && CurrentMainPage.Navigation.ModalStack.Count > 0)
             {
                 foreach (Page page in CurrentMainPage.Navigation.ModalStack)
                 {
-                    SetPageTheme(page, isDarkTheme);
+                    UIUtils.SetPageTheme(page, isDarkTheme);
                 }
-            }
-#endif
-        }
-
-        public static void SetPageTheme(Page page, bool isDarkTheme)
-        {
-#if WINDOWS
-            if(page != null)
-            {
-                var handler = page.Handler;
-                if (handler != null && handler.PlatformView is Microsoft.UI.Xaml.FrameworkElement)
-                    ((Microsoft.UI.Xaml.FrameworkElement)handler.PlatformView).RequestedTheme = isDarkTheme ? Microsoft.UI.Xaml.ElementTheme.Dark : Microsoft.UI.Xaml.ElementTheme.Light;
-            }
-#endif
-        }
-        public static void SetPageThemeOnHandler(Page page, bool isDarkTheme)
-        {
-#if WINDOWS
-            if (page != null)
-            {
-                page.HandlerChanged += (sender, e) =>
-                {
-                    if (sender != null && sender is Page)
-                    {
-                        SetPageTheme((Page)sender, isDarkTheme);
-                        if (!(page is MainPage))
-                        {
-                            Microsoft.UI.Xaml.Controls.Panel p = page?.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.Panel;
-                            if (p != null)
-                            {
-                                p.Transitions = new Microsoft.UI.Xaml.Media.Animation.TransitionCollection()
-                                {
-                                    new Microsoft.UI.Xaml.Media.Animation.EntranceThemeTransition()
-                                };
-                            }
-                        }
-                    }
-                };
-            }
-#endif
-        }
-
-        public static void SetViewCursorOnHandler(View layout, GameCursorType cursorType)
-        {
-#if WINDOWS
-            if (layout != null)
-            {
-                layout.HandlerChanged += (sender, e) =>
-                {
-                    UIUtils.ChangeElementCursor(layout, cursorType);
-                };
             }
 #endif
         }
@@ -1411,6 +1501,7 @@ namespace GnollHackX
         public static string SkiaSharpVersionString { get; set; }
         public static string FMODVersionString { get; set; }
         public static string FrameworkVersionString { get; set; }
+        public static string UIFrameworkVersionString { get; set; }
         public static string RuntimeVersionString { get; set; }
 
         public static string GHPath { get; private set; } = ".";
@@ -1424,6 +1515,13 @@ namespace GnollHackX
         public static IFmodService FmodService { get { return _fmodService; } }
         private static IPlatformService _platformService = null;
         public static IPlatformService PlatformService { get { return _platformService; } }
+
+        public static readonly bool IsBeta =
+#if BETA
+            true;
+#else
+            false;
+#endif
 
 #if GNH_MAUI
         public static float _displayRefreshRate = Math.Max(60.0f, DeviceDisplay.Current.MainDisplayInfo.RefreshRate);
@@ -1454,6 +1552,17 @@ namespace GnollHackX
         public static readonly bool IsPackaged = true;
 #endif
 
+        public static bool IsMobileRunningOnDesktop
+        {
+            get
+            {
+                if (_platformService == null)
+                    return true;
+                else
+                    return _platformService.IsRunningOnDesktop();
+            }
+        }
+
         private static readonly object _displayDataLock = new object();
         public static float DisplayDensity
         {
@@ -1473,9 +1582,16 @@ namespace GnollHackX
             set { lock (_displayDataLock) { _customScreenScale = value <= 0.0f ? 1.0f : value; } }
         }
 
+        private static float _platformScreenScale = 1.0f;
+        public static float PlatformScreenScale
+        {
+            get { lock (_displayDataLock) { return _platformScreenScale; } }
+            set { lock (_displayDataLock) { _platformScreenScale = value <= 0.0f ? 1.0f : value; } }
+        }
+
         public static float TotalScreenScale
         {
-            get { lock (_displayDataLock) { return _displayDensity * _customScreenScale; } }
+            get { lock (_displayDataLock) { return _displayDensity * _platformScreenScale * _customScreenScale; } }
         }
 
         public static GHPlatform PlatformId
@@ -1658,10 +1774,64 @@ namespace GnollHackX
             return res;
         }
 
+        private async static Task<SKImage> LoadTilesetFromPlatformAssetsAsync(string tilesetName)
+        {
+            SKImage res = null;
+            try
+            {
+                using (Stream stream = await GHApp.PlatformService.GetPlatformAssetsStreamAsync(GHConstants.AssetsTilesetDirectory, tilesetName))
+                {
+                    SKBitmap bmp = SKBitmap.Decode(stream);
+                    bmp.SetImmutable();
+                    res = SKImage.FromBitmap(bmp);
+                }
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog("LoadTilesetFromPlatformAssetsAsync (" + tilesetName + "): " + ex.Message);
+            }
+            return res;
+        }
+
+        //private static SKImage LoadTilesetFromPlatformAssets(string tilesetName)
+        //{
+        //    SKImage res = null;
+        //    try
+        //    {
+        //        byte[] data = PlatformService.GetPlatformAssetsTilesetBytes(GHConstants.AssetsTilesetDirectory, tilesetName);
+        //        WriteGHLog("data: " + (data != null ? "not null" : "null"));
+        //        WriteGHLog("data length: " + data.Length);
+        //        using (MemoryStream ms = new MemoryStream(data))
+        //        {
+        //            WriteGHLog("ms length: " + ms.Length);
+        //            SKBitmap bmp = SKBitmap.Decode(ms);
+        //            WriteGHLog("bmp: " + (bmp != null ? "not null" : "null"));
+        //            bmp.SetImmutable();
+        //            res = SKImage.FromBitmap(bmp);
+        //            WriteGHLog("res: " + (res != null ? "not null" : "null"));
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        MaybeWriteGHLog("LoadTilesetFromPlatformAssets (" + tilesetName + "): " + ex.Message);
+        //    }
+        //    return res;
+        //}
+
         public static SKImage LoadEmbeddedAssetsBitmap(string bitmapName)
         {
             return LoadEmbeddedResourceBitmap(AppResourceName + ".Assets." + bitmapName);
         }
+
+        public async static Task<SKImage> LoadTilesetAsync(string bitmapName)
+        {
+            return await LoadTilesetFromPlatformAssetsAsync(bitmapName);
+        }
+
+        //public static SKImage LoadTileset(string bitmapName)
+        //{
+        //    return LoadTilesetFromPlatformAssets(bitmapName);
+        //}
 
         public static void InitBaseButtonBitmaps()
         {
@@ -2261,31 +2431,35 @@ namespace GnollHackX
                 bmpPaint.Color = SKColors.White.WithAlpha(204);
 
                 var redbitmap = new SKBitmap(_orbFillBitmap.Width, _orbFillBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
-                var redcanvas = new SKCanvas(redbitmap);
-                redcanvas.Clear(SKColors.Transparent);
-                bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
-                    {
-                    -1.0f, 0,     0,    0, 255f,
-                    0,     1.0f,  0,    0, 0,
-                    0,     0,     1.0f, 0, 0,
-                    0,     0,     0,    1, 0
-                    });
-                redcanvas.DrawImage(_orbFillBitmap, 0, 0, bmpPaint);
+                using (var redcanvas = new SKCanvas(redbitmap))
+                {
+                    redcanvas.Clear(SKColors.Transparent);
+                    bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                        {
+                            -1.0f, 0,     0,    0, 255f,
+                            0,     1.0f,  0,    0, 0,
+                            0,     0,     1.0f, 0, 0,
+                            0,     0,     0,    1, 0
+                        });
+                    redcanvas.DrawImage(_orbFillBitmap, 0, 0, bmpPaint);
+                }
                 redbitmap.SetImmutable();
                 _orbFillBitmapRed = SKImage.FromBitmap(redbitmap);
 
                 var bluebitmap = new SKBitmap(_orbFillBitmap.Width, _orbFillBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
-                var bluecanvas = new SKCanvas(bluebitmap);
-                bluecanvas.Clear(SKColors.Transparent);
-                bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
-                    {
-                    1.0f,  0,      0,    0,   0,
-                    0,     1.0f,   0,    0,   0,
-                    0,     0,     -1.0f, 0,   255f,
-                    0,     0,     0,     1,   0
-                    });
+                using (var bluecanvas = new SKCanvas(bluebitmap))
+                {
+                    bluecanvas.Clear(SKColors.Transparent);
+                    bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                        {
+                            1.0f,  0,      0,    0,   0,
+                            0,     1.0f,   0,    0,   0,
+                            0,     0,     -1.0f, 0,   255f,
+                            0,     0,     0,     1,   0
+                        });
 
-                bluecanvas.DrawImage(_orbFillBitmap, 0, 0, bmpPaint);
+                    bluecanvas.DrawImage(_orbFillBitmap, 0, 0, bmpPaint);
+                }
                 bluebitmap.SetImmutable();
                 _orbFillBitmapBlue = SKImage.FromBitmap(bluebitmap);
             }
@@ -2300,16 +2474,18 @@ namespace GnollHackX
             {
                 bmpPaint.Color = SKColors.White;
                 var redbitmap = new SKBitmap(_batteryFrameBitmap.Width, _batteryFrameBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
-                var redcanvas = new SKCanvas(redbitmap);
-                redcanvas.Clear(SKColors.Transparent);
-                bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
-                    {
-                    1.0f,  0,     0,    0, 0,
-                    0,     0.0f,  0,    0, 0,
-                    0,     0,     0.0f, 0, 0,
-                    0,     0,     0,    1, 0
-                    });
-                redcanvas.DrawImage(_batteryFrameBitmap, 0, 0, bmpPaint);
+                using (var redcanvas = new SKCanvas(redbitmap))
+                {
+                    redcanvas.Clear(SKColors.Transparent);
+                    bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                        {
+                            1.0f,  0,     0,    0, 0,
+                            0,     0.0f,  0,    0, 0,
+                            0,     0,     0.0f, 0, 0,
+                            0,     0,     0,    1, 0
+                        });
+                    redcanvas.DrawImage(_batteryFrameBitmap, 0, 0, bmpPaint);
+                }
                 redbitmap.SetImmutable();
                 _batteryRedFrameBitmap = SKImage.FromBitmap(redbitmap);
             }
@@ -2622,9 +2798,9 @@ namespace GnollHackX
                 {
                     output += proc.StandardOutput.ReadLine() + "\n";
                 }
-                await page.DisplayAlert("File Descriptors", "GnollHack will now attempt to send critical diagnostic data." + (output != "" ? "The information is as follows:\n\n" + output : ""), "OK");
+                await DisplayMessageBox(page, "File Descriptors", "GnollHack will now attempt to send critical diagnostic data." + (output != "" ? "The information is as follows:\n\n" + output : ""), "OK");
 #else
-                await page.DisplayAlert("Unsupported Function", "ListFileDescriptors is unsupported.", "OK");
+                await DisplayMessageBox(page, "Unsupported Function", "ListFileDescriptors is unsupported.", "OK");
 #endif
             }
         }
@@ -3163,10 +3339,12 @@ namespace GnollHackX
         private static bool _characterClickAction;
         private static bool _diceAsRanges;
         private static bool _okOnDoubleClick;
+        private static bool _getPositionArrows;
         private static int _rightMouseCommand;
         private static int _middleMouseCommand;
         public static bool EmptyWishIsNothing { get { lock (_behaviorLock) { return _emptyWishIsNothing; } } set { lock (_behaviorLock) { _emptyWishIsNothing = value; } } }
         public static bool OkOnDoubleClick { get { lock (_behaviorLock) { return _okOnDoubleClick; } } set { lock (_behaviorLock) { _okOnDoubleClick = value; } } }
+        public static bool GetPositionArrows { get { lock (_behaviorLock) { return _getPositionArrows; } } set { lock (_behaviorLock) { _getPositionArrows = value; } } }
         public static bool MirroredCharacterClickAction { get { lock (_behaviorLock) { return _characterClickAction; } } set { lock (_behaviorLock) { _characterClickAction = value; } } }
         public static bool MirroredDiceAsRanges { get { lock (_behaviorLock) { return _diceAsRanges; } } set { lock (_behaviorLock) { _diceAsRanges = value; } } }
         public static int MirroredRightMouseCommand { get { lock (_behaviorLock) { return _rightMouseCommand; } } set { lock (_behaviorLock) { _rightMouseCommand = value; } } }
@@ -3311,6 +3489,11 @@ namespace GnollHackX
         private static string _bonesAllowedUsers = "";
         public static string BonesAllowedUsers { get { lock (_bonesAllowedUsersLock) { return _bonesAllowedUsers; } } set { lock (_bonesAllowedUsersLock) { _bonesAllowedUsers = value; } } }
 
+        private static readonly object _saveFileTrackingLock = new object();
+        private static bool _saveFileTracking = false;
+        public static bool SaveFileTracking { get { bool t = TournamentMode; lock (_saveFileTrackingLock) { return _saveFileTracking || t; } } set { lock (_saveFileTrackingLock) { _saveFileTracking = value; } } }
+        public static bool IsSaveFileTrackingNeeded { get { return IsDesktop || IsMobileRunningOnDesktop; } }
+
         private static readonly object _xlogCreditialLock = new object();
         private static string _xlogUserName = "";
         private static string _xlogPassword = "";
@@ -3325,23 +3508,20 @@ namespace GnollHackX
             }
         }
 
-        private static readonly object _xlogReleaseAccountLock = new object();
         private static bool _xlogReleaseAccount;
-        public static bool XlogReleaseAccount { get { lock (_xlogReleaseAccountLock) { return _xlogReleaseAccount; } } set { lock (_xlogReleaseAccountLock) { _xlogReleaseAccount = value; } } }
+        public static bool XlogReleaseAccount { get { lock (_xlogCreditialLock) { return _xlogReleaseAccount; } } set { lock (_xlogCreditialLock) { _xlogReleaseAccount = value; } } }
 
         private static string _verifiedUserName;
         private static string _verifiedPassword;
         private static bool _xlogUserNameVerified;
-        private static readonly object _xlogUserNameVerifiedLock = new object();
-        public static bool XlogUserNameVerified { get { lock (_xlogUserNameVerifiedLock) { return _xlogUserNameVerified; } } }
+        public static bool XlogUserNameVerified { get { lock (_xlogCreditialLock) { return _xlogUserNameVerified; } } }
 
-        private static readonly object _xlogCredentialsIncorrectLock = new object();
         private static bool _xlogCredentialsIncorrect;
-        public static bool XlogCredentialsIncorrect { get { lock (_xlogCredentialsIncorrectLock) { return _xlogCredentialsIncorrect; } } set { lock (_xlogCredentialsIncorrectLock) { _xlogCredentialsIncorrect = value; } } }
+        public static bool XlogCredentialsIncorrect { get { lock (_xlogCreditialLock) { return _xlogCredentialsIncorrect; } } set { lock (_xlogCreditialLock) { _xlogCredentialsIncorrect = value; } } }
 
         public static void SetXlogUserNameVerified(bool isverified, string username, string password)
         {
-            lock(_xlogUserNameVerifiedLock)
+            lock(_xlogCreditialLock)
             {
                 _xlogUserNameVerified = isverified;
                 _verifiedUserName = username;
@@ -3351,7 +3531,7 @@ namespace GnollHackX
 
         public static bool AreCredentialsVerified(string username, string password)
         {
-            lock (_xlogUserNameVerifiedLock)
+            lock (_xlogCreditialLock)
             {
                 return _xlogUserNameVerified && _verifiedUserName != null && _verifiedPassword != null && username == _verifiedUserName && password == _verifiedPassword;
             }
@@ -3378,7 +3558,7 @@ namespace GnollHackX
             {
                 if(_verifiedUserName != null && _verifiedPassword != null && username == _verifiedUserName && password == _verifiedPassword)
                 {
-                    lock (_xlogUserNameVerifiedLock)
+                    lock (_xlogCreditialLock)
                     {
                         _xlogUserNameVerified = true;
                     }
@@ -3569,7 +3749,7 @@ namespace GnollHackX
         {
             if (!File.Exists(filename))
             {
-                await page.DisplayAlert("File Sharing Failure", "GnollHack cannot find file \'" + filename + "\'", "OK");
+                await DisplayMessageBox(page, "File Sharing Failure", "GnollHack cannot find file \'" + filename + "\'", "OK");
                 return false;
             }
             await Share.RequestAsync(new ShareFileRequest
@@ -3591,13 +3771,13 @@ namespace GnollHackX
             {
                 // Prompt the user to turn on in settings
                 // On iOS once a permission has been denied it may not be requested again from the application
-                await page.DisplayAlert("Permission Needed", "GnollHack needs the file write permission to create a zip file. Please turn it on in Settings.", "OK");
+                await DisplayMessageBox(page, "Permission Needed", "GnollHack needs the file write permission to create a zip file. Please turn it on in Settings.", "OK");
                 return status;
             }
 
             if (Permissions.ShouldShowRationale<Permissions.StorageWrite>())
             {
-                await page.DisplayAlert("Permission Needed", "GnollHack needs the file write permission to create a zip file.", "OK");
+                await DisplayMessageBox(page, "Permission Needed", "GnollHack needs the file write permission to create a zip file.", "OK");
             }
 
             status = await Permissions.RequestAsync<Permissions.StorageWrite>();
@@ -3615,13 +3795,13 @@ namespace GnollHackX
             {
                 // Prompt the user to turn on in settings
                 // On iOS once a permission has been denied it may not be requested again from the application
-                await page.DisplayAlert("Permission Needed", "GnollHack needs the file read permission to work with a zip file. Please turn it on in Settings.", "OK");
+                await DisplayMessageBox(page, "Permission Needed", "GnollHack needs the file read permission to work with a zip file. Please turn it on in Settings.", "OK");
                 return status;
             }
 
             if (Permissions.ShouldShowRationale<Permissions.StorageRead>())
             {
-                await page.DisplayAlert("Permission Needed", "GnollHack needs the file read permission to work with a zip file.", "OK");
+                await DisplayMessageBox(page, "Permission Needed", "GnollHack needs the file read permission to work with a zip file.", "OK");
             }
 
             status = await Permissions.RequestAsync<Permissions.StorageRead>();
@@ -3640,7 +3820,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await page.DisplayAlert("Archive Creation Failure", "GnollHack failed to create a crash report archive: " + ex.Message, "OK");
+                await DisplayMessageBox(page, "Archive Creation Failure", "GnollHack failed to create a crash report archive: " + ex.Message, "OK");
                 return false;
             }
             try
@@ -3652,7 +3832,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await page.DisplayAlert("Share File Failure", "GnollHack failed to share a crash report archive: " + ex.Message, "OK");
+                await DisplayMessageBox(page, "Share File Failure", "GnollHack failed to share a crash report archive: " + ex.Message, "OK");
                 return false;
             }
         }
@@ -3700,8 +3880,10 @@ namespace GnollHackX
                                     + "\tplatform=" + DeviceInfo.Platform.ToString()?.ToLower()
                                     + "\tplatformversion=" + DeviceInfo.VersionString?.ToLower()
                                     + "\tport=" + GHConstants.PortName?.ToLower()
-                                    + "\tportversion=" + VersionTracking.CurrentVersion?.ToLower()
-                                    + "\tportbuild=" + VersionTracking.CurrentBuild?.ToLower()
+                                    + "\tportversion=" + GetPortVersionString()?.ToLower()
+                                    + "\tportbuild=" + GetPortBuildString()?.ToLower()
+                                    + "\tportseclvl=" + GetPortSecurityLevel()
+                                    + "\tstore=" + GetStoreString()
                                     + Environment.NewLine;
                         }
 
@@ -3770,6 +3952,7 @@ namespace GnollHackX
                             {
                                 Debug.WriteLine("Exception occurred while sending XLog entry: " + ex.Message);
                                 res.IsSuccess = false;
+                                res.IsException = true;
                                 res.Message = ex.Message;
                             }
 
@@ -3777,7 +3960,7 @@ namespace GnollHackX
                             if (res.IsSuccess)
                             {
                                 SetXlogUserNameVerified(true, username, password);
-                                WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication successful" : "XLog entry successfully sent") + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
+                                MaybeWriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication successful" : "XLog entry successfully sent") + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
                             }
                             else
                             {
@@ -3790,7 +3973,7 @@ namespace GnollHackX
 
                             if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
                             {
-                                WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: "+ res.Message);
+                                MaybeWriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: "+ res.Message);
                                 SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
                             }                            
                         }
@@ -3815,6 +3998,8 @@ namespace GnollHackX
             catch (Exception e)
             {
                 Debug.WriteLine(e.Message);
+                res.IsSuccess = false;
+                res.IsException = true;
                 res.Message = e.Message;
             }
             if (xlogattachments != null)
@@ -3839,6 +4024,363 @@ namespace GnollHackX
                 xlogattachments.Clear();
             }
             return res;
+        }
+
+        public static async Task<SendResult> SendSaveFileTrackingSaveRequest(Page displayPage, long timeStamp, string fileName, long fileLength, string sha256hash)
+        {
+            SendResult res;
+            bool tryAgain;
+            do
+            {
+                tryAgain = false;
+                res = new SendResult();
+                try
+                {
+                    string postaddress = XlogPostAddress?.Replace("/xlogfile", "/api/savefiletracking/create");
+                    Debug.WriteLine("Save File Tracking address: " + postaddress);
+                    if (postaddress != null && postaddress.Length > 8 && postaddress.Substring(0, 8) == "https://" && Uri.IsWellFormedUriString(postaddress, UriKind.Absolute))
+                    {
+                        using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
+                        {
+                            MultipartFormDataContent multicontent = new MultipartFormDataContent("-------------------boundary");
+
+                            string username = XlogUserName;
+                            string password = XlogPassword;
+                            StringContent content1 = new StringContent(username, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv1 = new ContentDispositionHeaderValue("form-data");
+                            cdhv1.Name = "UserName";
+                            content1.Headers.ContentDisposition = cdhv1;
+                            multicontent.Add(content1);
+                            Debug.WriteLine("UserName: " + username);
+
+                            StringContent content3 = new StringContent(password, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv3 = new ContentDispositionHeaderValue("form-data");
+                            cdhv3.Name = "Password";
+                            content3.Headers.ContentDisposition = cdhv3;
+                            multicontent.Add(content3);
+                            Debug.WriteLine("Password: " + password);
+
+                            StringContent content4 = new StringContent(XlogAntiForgeryToken, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv4 = new ContentDispositionHeaderValue("form-data");
+                            cdhv4.Name = "AntiForgeryToken";
+                            content4.Headers.ContentDisposition = cdhv4;
+                            multicontent.Add(content4);
+                            Debug.WriteLine("AntiForgeryToken: " + XlogAntiForgeryToken);
+
+                            StringContent content2 = new StringContent(timeStamp.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
+                            cdhv2.Name = "TimeStamp";
+                            content2.Headers.ContentDisposition = cdhv2;
+                            multicontent.Add(content2);
+                            Debug.WriteLine("TimeStamp: " + timeStamp);
+
+                            StringContent content5 = new StringContent(fileLength.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv5 = new ContentDispositionHeaderValue("form-data");
+                            cdhv5.Name = "FileLength";
+                            content5.Headers.ContentDisposition = cdhv5;
+                            multicontent.Add(content5);
+                            Debug.WriteLine("FileLength: " + fileLength);
+
+                            StringContent content6 = new StringContent(sha256hash, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv6 = new ContentDispositionHeaderValue("form-data");
+                            cdhv6.Name = "Sha256";
+                            content6.Headers.ContentDisposition = cdhv6;
+                            multicontent.Add(content6);
+                            Debug.WriteLine("Sha256: " + sha256hash);
+
+                            using (var cts = new CancellationTokenSource())
+                            {
+                                cts.CancelAfter(10000);
+                                string responseContent = "";
+
+                                try
+                                {
+                                    using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
+                                    {
+                                        responseContent = await response.Content.ReadAsStringAsync();
+                                        Debug.WriteLine("Save file tracking on save, entry response content:");
+                                        Debug.WriteLine(responseContent);
+                                        res.Message = responseContent;
+                                        res.IsSuccess = response.IsSuccessStatusCode;
+                                        res.HasHttpStatusCode = true;
+                                        res.StatusCode = response.StatusCode;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    tryAgain = await DisplayMessageBox(displayPage, "Save File Tracking Exception", "Exception occurred while sending save file tracking information to the server after saving the game: " + ex.Message + "\n\nTry again?", "Yes", "No");
+                                    res.IsSuccess = false;
+                                    res.IsException = true;
+                                    res.Message = ex.Message;
+                                }
+
+                                XlogCredentialsIncorrect = false;
+                                if (res.IsSuccess)
+                                {
+                                    SetXlogUserNameVerified(true, username, password);
+                                    MaybeWriteGHLog("Save file tracking on save successfully sent");
+                                    bool writeAgain = false;
+                                    do
+                                    {
+                                        try
+                                        {
+                                            File.WriteAllText(fileName + GHConstants.SaveFileTrackingSuffix, res.Message);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.WriteLine(ex.Message);
+                                            writeAgain = await DisplayMessageBox(displayPage, "Tracking File Write Exception", "Could not write the tracking file \'" + fileName + GHConstants.SaveFileTrackingSuffix + "\'. Please check that you have enough disk space available. Exception: " + ex.Message + "\n\nTry again?", "Yes", "No");
+                                            res.IsSuccess = false;
+                                            res.IsException = true;
+                                            res.Message = ex.Message;
+                                        }
+                                    } while (writeAgain);
+                                }
+                                else
+                                {
+                                    if (res.HasHttpStatusCode && res.StatusCode == HttpStatusCode.NotFound)
+                                        tryAgain = await DisplayMessageBox(displayPage, "Save File Tracking Server Unavailable", "Save file tracking server is not available for recording save file information.\n\nTry again?", "Yes", "No");
+                                    else
+                                    {
+                                        if (XlogUserNameVerified && res.HasHttpStatusCode && (res.StatusCode == HttpStatusCode.Forbidden /* 403 */)) // || res.StatusCode == HttpStatusCode.Locked /* 423 */
+                                            SetXlogUserNameVerified(false, null, null);
+                                        if (res.HasHttpStatusCode && res.StatusCode == HttpStatusCode.Forbidden)
+                                            XlogCredentialsIncorrect = true;
+
+                                        if (!XlogCredentialsIncorrect && XlogUserNameVerified)
+                                        {
+                                            if (res.HasHttpStatusCode && res.StatusCode == HttpStatusCode.Conflict)
+                                                await DisplayMessageBox(displayPage, "Save File Recorded Before", "Information of this save file has already been recorded on the server before and cannot be recorded more than once. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
+                                            else
+                                                tryAgain = await DisplayMessageBox(displayPage, "Save File Tracking Error", "Sending save file tracking information to the server failed. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message + "\n\nTry again?", "Yes", "No");
+                                        }
+                                        else if (XlogCredentialsIncorrect)
+                                            await DisplayMessageBox(displayPage, "Save File Tracking Credentials Error", "Sending save file tracking information to the server failed, likely due to incorrect credentials. Please check your user name and password. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
+                                        else
+                                            await DisplayMessageBox(displayPage, "Save File Tracking Error", "Sending save file tracking information to the server failed. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
+                                    }
+                                }
+
+                                //if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
+                                //{
+                                //    WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                //    SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
+                                //}
+                            }
+                            content1.Dispose();
+                            content2.Dispose();
+                            content3.Dispose();
+                            content4.Dispose();
+                            content5.Dispose();
+                            content6.Dispose();
+                            multicontent.Dispose();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                    await DisplayMessageBox(displayPage, "Save File Tracking Exception", "Exception occurred while sending save file tracking information to the server after saving the game: " + ex.Message, "OK");
+                    res.IsSuccess = false;
+                    res.IsException = true;
+                    res.Message = ex.Message;
+                }
+            } while (tryAgain);
+            return res;
+        }
+
+        public static async Task<SendResult> SendSaveFileTrackingLoadRequest(Page displayPage, long timeStamp, string fileName, long fileLength, string sha256hash)
+        {
+            SendResult res;
+            bool tryAgain;
+            do
+            {
+                tryAgain = false;
+                res = new SendResult();
+                try
+                {
+                    string postaddress = XlogPostAddress?.Replace("/xlogfile", "/api/savefiletracking/use");
+                    Debug.WriteLine("Save File Tracking address: " + postaddress);
+                    if (postaddress != null && postaddress.Length > 8 && postaddress.Substring(0, 8) == "https://" && Uri.IsWellFormedUriString(postaddress, UriKind.Absolute))
+                    {
+                        using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromDays(1) })
+                        {
+                            MultipartFormDataContent multicontent = new MultipartFormDataContent("-------------------boundary");
+
+                            string encryptedId = "";
+                            encryptedId = File.ReadAllText(fileName + GHConstants.SaveFileTrackingSuffix);
+                            StringContent content0 = new StringContent(encryptedId, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv0 = new ContentDispositionHeaderValue("form-data");
+                            cdhv0.Name = "EncryptedId";
+                            content0.Headers.ContentDisposition = cdhv0;
+                            multicontent.Add(content0);
+                            Debug.WriteLine("EncryptedId: " + encryptedId);
+
+                            string username = XlogUserName;
+                            string password = XlogPassword;
+                            StringContent content1 = new StringContent(username, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv1 = new ContentDispositionHeaderValue("form-data");
+                            cdhv1.Name = "UserName";
+                            content1.Headers.ContentDisposition = cdhv1;
+                            multicontent.Add(content1);
+                            Debug.WriteLine("UserName: " + username);
+
+                            StringContent content3 = new StringContent(password, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv3 = new ContentDispositionHeaderValue("form-data");
+                            cdhv3.Name = "Password";
+                            content3.Headers.ContentDisposition = cdhv3;
+                            multicontent.Add(content3);
+                            Debug.WriteLine("Password: " + password);
+
+                            StringContent content4 = new StringContent(XlogAntiForgeryToken, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv4 = new ContentDispositionHeaderValue("form-data");
+                            cdhv4.Name = "AntiForgeryToken";
+                            content4.Headers.ContentDisposition = cdhv4;
+                            multicontent.Add(content4);
+                            Debug.WriteLine("AntiForgeryToken: " + XlogAntiForgeryToken);
+
+                            StringContent content2 = new StringContent(timeStamp.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv2 = new ContentDispositionHeaderValue("form-data");
+                            cdhv2.Name = "TimeStamp";
+                            content2.Headers.ContentDisposition = cdhv2;
+                            multicontent.Add(content2);
+                            Debug.WriteLine("TimeStamp: " + timeStamp);
+
+                            StringContent content5 = new StringContent(fileLength.ToString(), Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv5 = new ContentDispositionHeaderValue("form-data");
+                            cdhv5.Name = "FileLength";
+                            content5.Headers.ContentDisposition = cdhv5;
+                            multicontent.Add(content5);
+                            Debug.WriteLine("FileLength: " + fileLength);
+
+                            StringContent content6 = new StringContent(sha256hash, Encoding.UTF8, "text/plain");
+                            ContentDispositionHeaderValue cdhv6 = new ContentDispositionHeaderValue("form-data");
+                            cdhv6.Name = "Sha256";
+                            content6.Headers.ContentDisposition = cdhv6;
+                            multicontent.Add(content6);
+                            Debug.WriteLine("Sha256: " + sha256hash);
+
+                            using (var cts = new CancellationTokenSource())
+                            {
+                                cts.CancelAfter(10000);
+                                string responseContent = "";
+
+                                try
+                                {
+                                    using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
+                                    {
+                                        responseContent = await response.Content.ReadAsStringAsync();
+                                        Debug.WriteLine("Save file tracking on save, entry response content:");
+                                        Debug.WriteLine(responseContent);
+                                        res.Message = responseContent;
+                                        res.IsSuccess = response.IsSuccessStatusCode;
+                                        res.HasHttpStatusCode = true;
+                                        res.StatusCode = response.StatusCode;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    tryAgain = await DisplayMessageBox(displayPage, "Save File Tracking Exception", "Exception occurred while sending a save file tracking request upon loading a saved game: " + ex.Message + "\n\nTry again?", "Yes", "No");
+                                    res.IsSuccess = false;
+                                    res.IsException = true;
+                                    res.Message = ex.Message;
+                                }
+
+                                XlogCredentialsIncorrect = false;
+                                if (res.IsSuccess)
+                                {
+                                    SetXlogUserNameVerified(true, username, password);
+                                    MaybeWriteGHLog("Save file tracking on load successful");
+                                }
+                                else
+                                {
+                                    if (res.HasHttpStatusCode && res.StatusCode == HttpStatusCode.NotFound)
+                                        tryAgain = await DisplayMessageBox(displayPage, "Save File Tracking Server Unavailable", "Save file tracking server is not available for verifying the save file.\n\nTry again?", "Yes", "No");
+                                    else
+                                    {
+                                        if (XlogUserNameVerified && res.HasHttpStatusCode && (res.StatusCode == HttpStatusCode.Forbidden /* 403 */)) // || res.StatusCode == HttpStatusCode.Locked /* 423 */
+                                            SetXlogUserNameVerified(false, null, null);
+                                        if (res.HasHttpStatusCode && res.StatusCode == HttpStatusCode.Forbidden)
+                                            XlogCredentialsIncorrect = true;
+
+                                        if (!XlogCredentialsIncorrect && XlogUserNameVerified)
+                                        {
+                                            if (res.HasHttpStatusCode && res.StatusCode == HttpStatusCode.Conflict)
+                                                await DisplayMessageBox(displayPage, "Save File Loaded Before", "This save file has already been loaded before and cannot be loaded more than once. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
+                                            else
+                                                tryAgain = await DisplayMessageBox(displayPage, "Save File Tracking Error", "Save file tracking verification failed upon loading a saved game. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message + "\n\nTry again?", "Yes", "No");
+                                        }
+                                        else if (XlogCredentialsIncorrect)
+                                            await DisplayMessageBox(displayPage, "Credentials Error", "Sending a save file tracking verification request to the server upon loading a saved game failed, likely due to incorrect credentials provided to the server. Please check your user name and password. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
+                                        else
+                                            await DisplayMessageBox(displayPage, "Save File Tracking Error", "Save file tracking verification failed upon loading a saved game. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
+                                    }
+                                }
+
+                                //if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
+                                //{
+                                //    WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                //    SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
+                                //}
+                            }
+                            content1.Dispose();
+                            content2.Dispose();
+                            content3.Dispose();
+                            content4.Dispose();
+                            content5.Dispose();
+                            content6.Dispose();
+                            multicontent.Dispose();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                    await DisplayMessageBox(displayPage, "Save File Tracking Exception", "Exception occurred while sending a save file tracking verification request upon loading a saved game: " + ex.Message, "OK");
+                    res.IsSuccess = false;
+                    res.IsException = true;
+                    res.Message = ex.Message;
+                }
+            } while (tryAgain);
+            return res;
+        }
+
+        public static int GetPortSecurityLevel()
+        {
+            if (IsiOS || IsAndroid)
+            {
+                return 10;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+
+        public static string GetStoreString()
+        {
+            if (IsAndroid)
+                return "google";
+            else if (IsiOS)
+                return "apple";
+            else if (IsWindows)
+            {
+                if (IsPackaged)
+                    return "microsoft";
+                else
+                {
+                    if (IsSteam)
+                    {
+                        if (IsPlaytest)
+                            return "steam-playtest";
+                        else
+                            return "steam";
+                    }
+                    else
+                        return "none";
+                }
+            }
+            return "unknown";
         }
 
         public static void SaveXLogEntryToDisk(int status_type, int status_datatype, string xlogentry_string, List<GHPostAttachment> xlogattachments)
@@ -3866,12 +4408,12 @@ namespace GnollHackX
                         string json = JsonConvert.SerializeObject(fp);
                         Debug.WriteLine(json);
                         sw.Write(json);
-                        WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication request" : "XLog entry send request") + " written to the queue on disk: " + targetfilepath);
+                        MaybeWriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication request" : "XLog entry send request") + " written to the queue on disk: " + targetfilepath);
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteGHLog("Writing the " + (string.IsNullOrEmpty(xlogentry_string) ? "server authentication request" : "XLog entry send request") + " to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                    MaybeWriteGHLog("Writing the " + (string.IsNullOrEmpty(xlogentry_string) ? "server authentication request" : "XLog entry send request") + " to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
                 }
             }
         }
@@ -3964,12 +4506,12 @@ namespace GnollHackX
 
                             if(res.IsSuccess)
                             {
-                                WriteGHLog("Forum post successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
+                                MaybeWriteGHLog("Forum post successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
                             }
 
                             if (!res.IsSuccess && !is_from_queue)
                             {
-                                WriteGHLog("Forum post send request redirected to the queue on disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                MaybeWriteGHLog("Forum post send request redirected to the queue on disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
                                 SaveForumPostToDisk(is_game_status, status_type, status_datatype, message, forumpostattachments, forcesend);
                             }
                         }
@@ -4045,12 +4587,12 @@ namespace GnollHackX
                         GHPost fp = new GHPost(0, is_game_status, status_type, status_datatype, message, forumpostattachments != null ? forumpostattachments : new List<GHPostAttachment>(), forcesend);
                         string json = JsonConvert.SerializeObject(fp);
                         sw.Write(json);
-                        WriteGHLog("Forum post send request written to the queue on disk: " + targetfilepath);
+                        MaybeWriteGHLog("Forum post send request written to the queue on disk: " + targetfilepath);
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteGHLog("Writing the forum post send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                    MaybeWriteGHLog("Writing the forum post send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
                 }
             }
         }
@@ -4137,19 +4679,19 @@ namespace GnollHackX
                         multicontent.Add(contentE3);
                         Debug.WriteLine("Port: " + GHConstants.PortName);
 
-                        StringContent contentE4 = new StringContent(VersionTracking.CurrentVersion, Encoding.UTF8, "text/plain");
+                        StringContent contentE4 = new StringContent(GetPortVersionString(), Encoding.UTF8, "text/plain");
                         ContentDispositionHeaderValue cdhve4 = new ContentDispositionHeaderValue("form-data");
                         cdhve4.Name = "PortVersion";
                         contentE4.Headers.ContentDisposition = cdhve4;
                         multicontent.Add(contentE4);
-                        Debug.WriteLine("PortVersion: " + VersionTracking.CurrentVersion);
+                        Debug.WriteLine("PortVersion: " + GetPortVersionString());
 
-                        StringContent contentE5 = new StringContent(VersionTracking.CurrentBuild, Encoding.UTF8, "text/plain");
+                        StringContent contentE5 = new StringContent(GetPortBuildString(), Encoding.UTF8, "text/plain");
                         ContentDispositionHeaderValue cdhve5 = new ContentDispositionHeaderValue("form-data");
                         cdhve5.Name = "PortBuild";
                         contentE5.Headers.ContentDisposition = cdhve5;
                         multicontent.Add(contentE5);
-                        Debug.WriteLine("PortBuild: " + VersionTracking.CurrentBuild);
+                        Debug.WriteLine("PortBuild: " + GetPortBuildString());
 
                         StringContent contentE6 = new StringContent(GHApp.GHVersionNumber.ToString(), Encoding.UTF8, "text/plain");
                         ContentDispositionHeaderValue cdhve6 = new ContentDispositionHeaderValue("form-data");
@@ -4200,18 +4742,18 @@ namespace GnollHackX
                                     res.StatusCode = response.StatusCode;
                                     if(res.IsSuccess)
                                     {
-                                        WriteGHLog("Bones file successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + "): " + full_filepath);
+                                        MaybeWriteGHLog("Bones file successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + "): " + full_filepath);
                                         if (res.StatusCode == HttpStatusCode.OK)
                                         {
                                             // Delete sent file first on OK status code
                                             try
                                             {
                                                 File.Delete(full_filepath);
-                                                WriteGHLog("Deleted the sent bones file: " + full_filepath);
+                                                MaybeWriteGHLog("Deleted the sent bones file: " + full_filepath);
                                             }
                                             catch (Exception ex)
                                             {
-                                                WriteGHLog("Deleting the sent bones file from client failed: " + ex.Message);
+                                                MaybeWriteGHLog("Deleting the sent bones file from client failed: " + ex.Message);
                                             }
                                         }
                                         else
@@ -4222,7 +4764,7 @@ namespace GnollHackX
                                         //We may or may not have received another bones file in return
                                         if (bytearray != null && bytearray.Length > 0)
                                         {
-                                            WriteGHLog("Bones file received from the server. Writing the bones file to disk.");
+                                            MaybeWriteGHLog("Bones file received from the server. Writing the bones file to disk.");
                                             didReceiveBonesFile = true;
                                             Debug.WriteLine("Response Headers: " + response.Headers.ToString());
                                             if (response.Headers.TryGetValues("X-GH-OriginalFileName", out IEnumerable<string> origFileNames))
@@ -4256,27 +4798,27 @@ namespace GnollHackX
                                                                 }
                                                                 catch (Exception ex)
                                                                 {
-                                                                    WriteGHLog("Writing the received bones file " + savepath + " to disk failed: " + ex.Message);
+                                                                    MaybeWriteGHLog("Writing the received bones file " + savepath + " to disk failed: " + ex.Message);
                                                                 }
                                                             }
                                                             else
-                                                                WriteGHLog("Bones file already exists: " + savepath + ". Ignoring the received bones file.");
+                                                                MaybeWriteGHLog("Bones file already exists: " + savepath + ". Ignoring the received bones file.");
                                                         }
                                                         else
-                                                            WriteGHLog("Bones file name is null or empty.");
+                                                            MaybeWriteGHLog("Bones file name is null or empty.");
                                                     }
                                                     else
-                                                        WriteGHLog("Bones original file name list is empty in the server response.");
+                                                        MaybeWriteGHLog("Bones original file name list is empty in the server response.");
                                                 }
                                                 else
-                                                    WriteGHLog("Bones original file name list is null in the server response.");
+                                                    MaybeWriteGHLog("Bones original file name list is null in the server response.");
                                             }
                                             else
-                                                WriteGHLog("Bones original file name header could not be found in the server response.");
+                                                MaybeWriteGHLog("Bones original file name header could not be found in the server response.");
                                         }
                                         else
                                         {
-                                            WriteGHLog("No bones file received from the server: Bones byte array was null or empty.");
+                                            MaybeWriteGHLog("No bones file received from the server: Bones byte array was null or empty.");
                                             string str = "";
                                             try
                                             {
@@ -4284,14 +4826,14 @@ namespace GnollHackX
                                             }
                                             catch (Exception ex)
                                             {
-                                                WriteGHLog("Reading bones response content failed: " + ex.Message);
+                                                MaybeWriteGHLog("Reading bones response content failed: " + ex.Message);
                                             }
-                                            WriteGHLog("Bones response content: " + str);
+                                            MaybeWriteGHLog("Bones response content: " + str);
                                         }
                                     }
                                     else
                                     {
-                                        Debug.WriteLine("Sending the bones file " + full_filepath + " failed. No bones file received in exchange. (" + (int)res.StatusCode + ")");
+                                        MaybeWriteGHLog("Sending the bones file " + full_filepath + " failed. No bones file received in exchange. (" + (int)res.StatusCode + ")");
                                         string str = "";
                                         try
                                         {
@@ -4299,7 +4841,7 @@ namespace GnollHackX
                                         }
                                         catch (Exception ex) 
                                         {
-                                            Debug.WriteLine("Reading bones response content failed: " + ex.Message);
+                                            MaybeWriteGHLog("Reading bones response content failed: " + ex.Message);
                                         }
                                         Debug.WriteLine("Bones response content: " + str);
                                     }
@@ -4316,7 +4858,7 @@ namespace GnollHackX
                             if (res.IsSuccess)
                             {
                                 SetXlogUserNameVerified(true, username, password);
-                                WriteGHLog("Bones file exchange successfully completed. (" + (int)res.StatusCode + ")");
+                                MaybeWriteGHLog("Bones file exchange successfully completed. (" + (int)res.StatusCode + ")");
                             }
                             else
                             {
@@ -4329,7 +4871,7 @@ namespace GnollHackX
 
                             if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(bones_filename))
                             {
-                                WriteGHLog("Bones file send request redirected to the queue on disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
+                                MaybeWriteGHLog("Bones file send request redirected to the queue on disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
                                 SaveBonesPostToDisk(status_type, status_datatype, bones_filename);
                             }
                         }
@@ -4433,19 +4975,19 @@ namespace GnollHackX
                             multicontent.Add(contentE3);
                             Debug.WriteLine("Port: " + GHConstants.PortName);
 
-                            StringContent contentE4 = new StringContent(VersionTracking.CurrentVersion, Encoding.UTF8, "text/plain");
+                            StringContent contentE4 = new StringContent(GetPortVersionString(), Encoding.UTF8, "text/plain");
                             ContentDispositionHeaderValue cdhve4 = new ContentDispositionHeaderValue("form-data");
                             cdhve4.Name = "PortVersion";
                             contentE4.Headers.ContentDisposition = cdhve4;
                             multicontent.Add(contentE4);
-                            Debug.WriteLine("PortVersion: " + VersionTracking.CurrentVersion);
+                            Debug.WriteLine("PortVersion: " + GetPortVersionString());
 
-                            StringContent contentE5 = new StringContent(VersionTracking.CurrentBuild, Encoding.UTF8, "text/plain");
+                            StringContent contentE5 = new StringContent(GetPortBuildString(), Encoding.UTF8, "text/plain");
                             ContentDispositionHeaderValue cdhve5 = new ContentDispositionHeaderValue("form-data");
                             cdhve5.Name = "PortBuild";
                             contentE5.Headers.ContentDisposition = cdhve5;
                             multicontent.Add(contentE5);
-                            Debug.WriteLine("PortBuild: " + VersionTracking.CurrentBuild);
+                            Debug.WriteLine("PortBuild: " + GetPortBuildString());
 
                             StringContent contentE6 = new StringContent(GHApp.GHVersionNumber.ToString(), Encoding.UTF8, "text/plain");
                             ContentDispositionHeaderValue cdhve6 = new ContentDispositionHeaderValue("form-data");
@@ -4470,7 +5012,7 @@ namespace GnollHackX
                                     {
                                         if(response.IsSuccessStatusCode)
                                         {
-                                            WriteGHLog("Bones receipt confirmation of server bones file " + receivedBonesServerFilePath + " sent successfully (" + (int)response.StatusCode + ").");
+                                            MaybeWriteGHLog("Bones receipt confirmation of server bones file " + receivedBonesServerFilePath + " sent successfully (" + (int)response.StatusCode + ").");
                                         }
                                         else
                                         {
@@ -4545,11 +5087,11 @@ namespace GnollHackX
                         Debug.WriteLine(json);
                         sw.Write(json);
                     }
-                    WriteGHLog("Bones file send request written to the queue on disk: " + targetfilepath);
+                    MaybeWriteGHLog("Bones file send request written to the queue on disk: " + targetfilepath);
                 }
                 catch (Exception ex)
                 {
-                    WriteGHLog("Writing the bones file send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                    MaybeWriteGHLog("Writing the bones file send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
                 }
             }
         }
@@ -4620,7 +5162,7 @@ namespace GnollHackX
                             }
                             catch (Exception ex)
                             {
-                                WriteGHLog(ex.Message);
+                                MaybeWriteGHLog(ex.Message);
                             }
                         }
 
@@ -4665,11 +5207,11 @@ namespace GnollHackX
                         Debug.WriteLine(json);
                         sw.Write(json);
                     }
-                    WriteGHLog("Replay file send request written to the queue on disk: " + targetfilepath);
+                    MaybeWriteGHLog("Replay file send request written to the queue on disk: " + targetfilepath);
                 }
                 catch (Exception ex)
                 {
-                    WriteGHLog("Writing the replay file send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
+                    MaybeWriteGHLog("Writing the replay file send request to the queue on disk using path " + targetfilepath + " failed: " + ex.Message);
                 }
             }
         }
@@ -4684,12 +5226,7 @@ namespace GnollHackX
             if (PostingXlogEntries && !string.IsNullOrWhiteSpace(username) && XlogUserNameVerified)
                 message = message + (isCustomXlogServerLink ? " {" : " [") + username + (isCustomXlogServerLink ? "}" : "]");
 
-#if GNH_MAUI
-            Version ver = AppInfo.Current.Version;
-            string portver = (ver?.Major.ToString() ?? "?") + "." + (ver?.Minor.ToString() ?? "?");
-#else
-            string portver = VersionTracking.CurrentVersion;
-#endif
+            string portver = GetPortVersionString();
             DevicePlatform platform = DeviceInfo.Platform;
             string platstr = platform.ToString();
             if (platstr == null)
@@ -4700,6 +5237,11 @@ namespace GnollHackX
             else
                 platid = "";
 
+            if (IsPlaytest)
+                platid += "t";
+            else if (IsSteam)
+                platid += "s";
+
             message = message + " [" + portver + platid + "]";
             return message;
         }
@@ -4709,12 +5251,16 @@ namespace GnollHackX
             if (info_str == null)
                 info_str = "";
 
-            string ver = GHApp.GHVersionString + " / " + VersionTracking.CurrentVersion + " / " + VersionTracking.CurrentBuild;
+            string ver = GHApp.GHVersionString + " / " + GetPortVersionString() + " / " + GetPortBuildString();
             string manufacturer = DeviceInfo.Manufacturer;
             if (manufacturer.Length > 0)
                 manufacturer = manufacturer.Substring(0, 1).ToUpper() + manufacturer.Substring(1);
             string device_model = manufacturer + " " + DeviceInfo.Model;
             string platform_with_version = DeviceInfo.Platform + " " + DeviceInfo.VersionString;
+            if (IsPlaytest)
+                platform_with_version += " Playtest";
+            else if (IsSteam)
+                platform_with_version += " Steam";
 
             ulong TotalMemInBytes = TotalMemory;
             ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
@@ -4794,7 +5340,7 @@ namespace GnollHackX
                         var now = DateTime.UtcNow;
                         File.AppendAllText(logfullpath, now.ToString("yyyy-MM-dd HH:mm:ss") + ": "
                             + loggedtext
-                            + " [" + VersionTracking.CurrentVersion + "]"
+                            + " [" + GetPortVersionString() + "]"
                             + Environment.NewLine);
                     }
                 }
@@ -5057,12 +5603,8 @@ namespace GnollHackX
                     ReplayTurn = 0;
                     GoToTurn = GoToTurn; /* Reset original replay turn */
                     ReplayRestarted = true;
-                    ConcurrentQueue<GHRequest> queue;
-                    if (GHGame.RequestDictionary.TryGetValue(game, out queue))
-                    {
-                        queue.Enqueue(new GHRequest(game, GHRequestType.CloseAllDialogs));
-                        queue.Enqueue(new GHRequest(game, GHRequestType.RestartReplay));
-                    }
+                    game?.RequestQueue.Enqueue(new GHRequest(game, GHRequestType.CloseAllDialogs));
+                    game?.RequestQueue.Enqueue(new GHRequest(game, GHRequestType.RestartReplay));
                     return PlayReplayResult.Restarting;
                 }
 
@@ -6102,7 +6644,8 @@ namespace GnollHackX
                                                     string title = br.ReadInt32() == 0 ? null : br.ReadString();
                                                     int attr = br.ReadInt32();
                                                     int color = br.ReadInt32();
-                                                    game.ClientCallback_OpenSpecialView(viewtype, text, title, attr, color);
+                                                    //long time_stamp = br.ReadInt64();
+                                                    game.ClientCallback_OpenSpecialView(viewtype, text, title, attr, color, 0);
                                                 }
                                                 break;
                                             case (int)RecordedFunctionID.ExitHack:
@@ -6426,7 +6969,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await page.DisplayAlert("Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
+                await DisplayMessageBox(page, "Cannot Open Web Page", "GnollHack cannot open the webpage at " + uri.OriginalString + ". Error: " + ex.Message, "OK");
             }
         }
 
@@ -6443,6 +6986,17 @@ namespace GnollHackX
             return topPage == page;
         }
 
+        public static Page PageFromTopOfModalNavigationStack()
+        {
+            int cnt = Navigation.ModalStack.Count;
+            if (cnt == 0)
+                return null;
+            Page topPage = Navigation?.ModalStack[cnt - 1];
+            if (topPage == null)
+                return null;
+            return topPage;
+        }
+
         public static string ParseSkiaSharpVersionString(string fullverid)
         {
             if (fullverid == null)
@@ -6455,13 +7009,17 @@ namespace GnollHackX
             {
                 res = fullverid.Substring(0, pluspos);
 #if !WINDOWS
-                int lastdashpos = fullverid.LastIndexOf("-");
-                int lastdotpos = fullverid.LastIndexOf(".");
-                if (lastdotpos > lastdashpos && lastdashpos > 0 && lastdashpos < fullverid.Length - 1)
+                int previewpos = fullverid.IndexOf("preview", StringComparison.InvariantCultureIgnoreCase);
+                if (previewpos >= 0)
                 {
-                    int previewLen = lastdotpos - lastdashpos;
-                    if(previewLen > 1) //More than just the dash
-                        res += fullverid.Substring(lastdashpos, previewLen);
+                    int lastdashpos = fullverid.LastIndexOf("-");
+                    int lastdotpos = fullverid.LastIndexOf(".");
+                    if (lastdotpos > lastdashpos && lastdashpos > 0 && lastdashpos < fullverid.Length - 1)
+                    {
+                        int previewLen = lastdotpos - lastdashpos;
+                        if (previewLen > 1) //More than just the dash
+                            res += fullverid.Substring(lastdashpos, previewLen);
+                    }
                 }
 #endif
             }
@@ -6649,14 +7207,17 @@ namespace GnollHackX
             string res = "";
             try
             {
+                string ghFilePath = Process.GetCurrentProcess()?.MainModule?.FileName;
+                if (ghFilePath == null)
+                    ghFilePath = "";
 #if WINDOWS10_0_19041_0_OR_GREATER
                 OperatingSystem osVer = System.Environment.OSVersion;
                 int build = osVer?.Version?.Build ?? 0;
 #pragma warning disable CA1416
-                var t2 = build >= 19041 ? Windows.ApplicationModel.AppInfo.Current.AppUserModelId : Windows.ApplicationModel.Package.Current.Id.FamilyName + "!App";
+                var t2 = !IsPackaged ? ghFilePath : build >= 19041 ? Windows.ApplicationModel.AppInfo.Current.AppUserModelId : Windows.ApplicationModel.Package.Current.Id.FamilyName + "!App";
 #pragma warning restore CA1416
 #else
-                var t2 = Windows.ApplicationModel.Package.Current.Id.FamilyName + "!App";
+                var t2 = !IsPackaged ? ghFilePath : Windows.ApplicationModel.Package.Current.Id.FamilyName + "!App";
 #endif
                 var gpuPref = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences");
                 if (gpuPref != null)
@@ -6664,38 +7225,39 @@ namespace GnollHackX
                     var gnollHackGpuPref = gpuPref.GetValue(t2)?.ToString();
                     if (!string.IsNullOrEmpty(gnollHackGpuPref))
                     {
-                        var gnollHackGpuPrefSplit = gnollHackGpuPref.Trim(';').Split('=', StringSplitOptions.RemoveEmptyEntries);
-                        if (gnollHackGpuPrefSplit.Length == 2)
+                        string[] gnollHackGpuPrefSplitLarge = gnollHackGpuPref.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                        foreach(string ghSplitStr in gnollHackGpuPrefSplitLarge)
                         {
-                            int gnollHackGpuPrefInt = 0;
-                            bool ok = int.TryParse(gnollHackGpuPrefSplit[1], out gnollHackGpuPrefInt);
-                            if (ok)
+                            var gnollHackGpuPrefSplit = ghSplitStr.Split('=', StringSplitOptions.RemoveEmptyEntries);
+                            if(gnollHackGpuPrefSplit.Length == 2 && gnollHackGpuPrefSplit[0] == "GpuPreference")
                             {
-                                if (gnollHackGpuPrefInt == 0)
+                                int gnollHackGpuPrefInt = 0;
+                                bool ok = int.TryParse(gnollHackGpuPrefSplit[1], out gnollHackGpuPrefInt);
+                                if (ok)
                                 {
-                                    res = "Auto";
-                                }
-                                else if (gnollHackGpuPrefInt == 1)
-                                {
-                                    res = "Integrated";
-                                }
-                                else if (gnollHackGpuPrefInt == 2)
-                                {
-                                    res = "Dedicated";
+                                    if (gnollHackGpuPrefInt == 0)
+                                    {
+                                        res = "Auto";
+                                    }
+                                    else if (gnollHackGpuPrefInt == 1)
+                                    {
+                                        res = "Integrated";
+                                    }
+                                    else if (gnollHackGpuPrefInt == 2)
+                                    {
+                                        res = "Dedicated";
+                                    }
+                                    else
+                                    {
+                                        res = "Unknown";
+                                    }
                                 }
                                 else
                                 {
-                                    res = "Unknown";
+                                    res = "Not parsed";
                                 }
+                                break;
                             }
-                            else
-                            {
-                                res = "Not parsed";
-                            }
-                        }
-                        else
-                        {
-                            res = "Error";
                         }
                     }
                     else
@@ -6914,14 +7476,140 @@ namespace GnollHackX
             }
         }
 
-        public static void SendKeyPress(int key, bool isCtrl, bool isMeta)
+        //private static long _lockCount = 0;
+        //private static long _lock5tickCount = 0;
+        //private static long _lock10tickCount = 0;
+        //private static long _lock50tickCount = 0;
+        //private static long _lock100tickCount = 0;
+        //private static long _lock500tickCount = 0;
+        //private static TimeSpan _lockTotalElapsed = new TimeSpan(0);
+
+        //public static void AddLockBlockData(TimeSpan elapsed)
+        //{
+        //    _lockCount++;
+        //    _lockTotalElapsed += elapsed;
+        //    if (elapsed.Ticks >= 500)
+        //        _lock500tickCount++;
+        //    else if (elapsed.Ticks >= 100)
+        //        _lock100tickCount++;
+        //    else if (elapsed.Ticks >= 50)
+        //        _lock50tickCount++;
+        //    else if (elapsed.Ticks >= 10)
+        //        _lock10tickCount++;
+        //    else if (elapsed.Ticks >= 5)
+        //        _lock5tickCount++;
+        //}
+
+        //public static void ReportLockDataResults()
+        //{
+        //    if (_lockCount == 0)
+        //        MaybeWriteGHLog("LockData: #:" + _lockCount);
+        //    else
+        //        MaybeWriteGHLog("LockData: #:" + _lockCount + ", Avg.Ticks:" + _lockTotalElapsed.Ticks / _lockCount 
+        //            + ", 500+:"+ _lock500tickCount
+        //            + ", 100+:" + _lock100tickCount
+        //            + ", 50+:" + _lock50tickCount
+        //            + ", 10+:" + _lock10tickCount
+        //            + ", 5+:" + _lock5tickCount
+        //            );
+        //}
+
+
+        public static bool SendKeyPress(int key, bool isCtrl, bool isMeta)
         {
-            CurrentGamePage?.HandleKeyPress(key, isCtrl, isMeta);
+            Page topPage = PageFromTopOfModalNavigationStack();
+            if (topPage == null)
+                return CurrentMainPage?.HandleMainPageKeyPress(key, isCtrl, isMeta) ?? false;
+            else if (topPage is GamePage)
+                return ((GamePage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            else
+                return false;
         }
-        public static void SendSpecialKeyPress(GHSpecialKey spkey, bool isCtrl, bool isMeta, bool isShift)
+        public static bool SendSpecialKeyPress(GHSpecialKey spkey, bool isCtrl, bool isMeta, bool isShift)
         {
-            CurrentGamePage?.HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            Page topPage = PageFromTopOfModalNavigationStack();
+            if(topPage == null)
+                return CurrentMainPage?.HandleMainPageSpecialKeyPress(spkey, isCtrl, isMeta, isShift) ?? false;
+            else if (topPage is GamePage)
+                return ((GamePage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            else if (topPage is OutRipPage)
+            {
+                if (spkey == GHSpecialKey.Escape || spkey == GHSpecialKey.Enter || spkey == GHSpecialKey.Space)
+                {
+                    ((OutRipPage)topPage).CloseOutrip();
+                    return true;
+                }
+            }
+            else if (spkey == GHSpecialKey.Escape)
+            {
+                if (topPage is GameMenuPage)
+                {
+                    ((GameMenuPage)topPage).ClosePage();
+                    return true;
+                }
+                else if (topPage is AboutPage)
+                {
+                    ((AboutPage)topPage).ClosePage();
+                    return true;
+                }
+                else if (topPage is ResetPage)
+                {
+                    ((ResetPage)topPage).ClosePage();
+                    return true;
+                }
+                else if (topPage is VaultPage)
+                {
+                    ((VaultPage)topPage).ClosePage();
+                    return true;
+                }
+                else if (topPage is EditorPage)
+                {
+                    ((EditorPage)topPage).ClosePage();
+                    return true;
+                }
+                else if (topPage is NamePage)
+                {
+                    ((NamePage)topPage).PressCancel();
+                    return true;
+                }
+            }
+
+            return false;
         }
+
+        private static readonly object _keyboardHookLock = new object();
+        private static bool _isKeyboardHookEnabled = true;
+        public static bool IsKeyboardHookEnabled { get { lock (_keyboardHookLock) { return _isKeyboardHookEnabled; } } set { lock (_keyboardHookLock) { _isKeyboardHookEnabled = value; } } }
+
+        public static async Task DisplayMessageBox(Page page, string title, string message, string cancel)
+        {
+            IsKeyboardHookEnabled = false;
+            await page.DisplayAlert(title, message, cancel);
+            IsKeyboardHookEnabled = true;
+        }
+
+        public static async Task<bool> DisplayMessageBox(Page page, string title, string message, string accept, string cancel)
+        {
+            IsKeyboardHookEnabled = false;
+            bool res = await page.DisplayAlert(title, message, accept, cancel);
+            IsKeyboardHookEnabled = true;
+            return res;
+        }
+
+#if GNH_MAUI
+        /* Note: var page = await GHApp.Navigation.PopModalAsync(); GHApp.DisconnectIViewHandlers(page); is preferred to await GHApp.Navigation.PopModalAsync(); GHApp.DisconnectIViewHandlers(this); since this ensures that the program does not crash if the wrong page is accidentally popped  */
+        public static void DisconnectIViewHandlers(IView view)
+        {
+#if !WINDOWS
+            view?.DisconnectHandlers();
+#endif
+        }
+#else
+        public static void DisconnectIViewHandlers(Page view)
+        {
+            // Nothing
+        }
+#endif
     }
 
     public class DeviceGPU

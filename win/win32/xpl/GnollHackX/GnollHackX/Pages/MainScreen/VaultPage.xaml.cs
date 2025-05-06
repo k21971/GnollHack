@@ -37,8 +37,8 @@ namespace GnollHackX.Pages.MainScreen
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
             if (GHApp.DarkMode)
             {
                 lblHeader.TextColor = GHColors.White;
@@ -143,7 +143,14 @@ namespace GnollHackX.Pages.MainScreen
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
+        }
+
+        public void ClosePage()
+        {
+            if(CloseButton.IsEnabled)
+                Button_Clicked(this, EventArgs.Empty);
         }
 
         private bool _backPressed = false;
@@ -153,7 +160,8 @@ namespace GnollHackX.Pages.MainScreen
             {
                 _backPressed = true;
                 GHApp.CurrentMainPage?.InvalidateCarousel();
-                await GHApp.Navigation.PopModalAsync();
+                var page = await GHApp.Navigation.PopModalAsync();
+                GHApp.DisconnectIViewHandlers(page);
             }
             return false;
         }
@@ -236,7 +244,7 @@ namespace GnollHackX.Pages.MainScreen
                 string errormsg = "";
                 if (!topScorePage.ReadFile(out errormsg))
                 {
-                    await DisplayAlert("Reading Top Scores Failed", "GnollHack failed to read the top scores file: " + errormsg, "OK");
+                    await GHApp.DisplayMessageBox(this, "Reading Top Scores Failed", "GnollHack failed to read the top scores file: " + errormsg, "OK");
                     VaultLayout.IsEnabled = true;
                 }
                 else

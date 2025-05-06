@@ -3820,7 +3820,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             if (ocflags6 & O6_THROWING_REQUIRES_STR_18_00)
             {
                 powercnt++;
-                Sprintf(buf, " %2d - Throwing requires strength of 18/00 or higher", powercnt);
+                Sprintf(buf, " %2d - Throwing requires strength of 18/** or higher", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
 
@@ -6385,7 +6385,7 @@ dodropmany()
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist("What would you like to drop?", &invent,
-        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY, allow_all, 3);
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY, allow_all, SHOWWEIGHTS_DROP);
 
     if (n > 0 && pick_list)
     {
@@ -6558,7 +6558,7 @@ int retry;
         /* should coordinate with perm invent, maybe not show worn items */
         n = query_objlist("What would you like to drop?", &invent,
                           (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
-                          all_categories ? allow_all : allow_category, 3);
+                          all_categories ? allow_all : allow_category, SHOWWEIGHTS_DROP);
         if (n > 0 && pick_list)
         {
             /*
@@ -6729,7 +6729,7 @@ int retry;
         /* should coordinate with perm invent, maybe not show worn items */
         n = query_objlist("What would you like to put in bag?", &invent,
             (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
-            all_categories ? allow_all : allow_category, 3);
+            all_categories ? allow_all : allow_category, SHOWWEIGHTS_DROP);
         if (n > 0 && pick_list)
         {
             /*
@@ -8759,6 +8759,19 @@ boolean donewsym;
 }
 
 void
+create_simple_location_with_carpet(x, y, type, subtype, vartype, location_flags, carpet_typ, carpet_piece, carpet_flags, floor_doodad, floortype, floorsubtype, floorvartype, donewsym)
+xchar x, y;
+int type, subtype, vartype, floor_doodad, floortype, floorsubtype, floorvartype;
+unsigned short location_flags;
+schar carpet_typ, carpet_piece;
+uchar carpet_flags;
+boolean donewsym;
+{
+    full_location_transform(x, y, type, subtype, vartype, location_flags, carpet_typ, carpet_piece, carpet_flags, 0, 0, 0, 0, floor_doodad, floortype, floorsubtype, floorvartype, FALSE, FALSE, 0, 0, donewsym);
+    initialize_location(&levl[x][y]);
+}
+
+void
 create_simple_initial_location(x, y, type, location_flags, floor_doodad, floortype, donewsym)
 xchar x, y;
 int type, floor_doodad, floortype;
@@ -8777,7 +8790,7 @@ unsigned short location_flags;
 boolean donewsym;
 {
     boolean isfloor = IS_FLOOR(levl[x][y].typ);
-    create_simple_location(x, y, type, subtype, vartype, location_flags, floor_doodad, isfloor ? levl[x][y].typ : levl[x][y].floortyp, isfloor ? levl[x][y].subtyp : levl[x][y].floorsubtyp, isfloor ? levl[x][y].vartyp : levl[x][y].floorvartyp, donewsym);
+    create_simple_location_with_carpet(x, y, type, subtype, vartype, location_flags, levl[x][y].carpet_typ, levl[x][y].carpet_piece, levl[x][y].carpet_flags, floor_doodad, isfloor ? levl[x][y].typ : levl[x][y].floortyp, isfloor ? levl[x][y].subtyp : levl[x][y].floorsubtyp, isfloor ? levl[x][y].vartyp : levl[x][y].floorvartyp, donewsym);
 }
 
 void
@@ -8803,21 +8816,29 @@ boolean donewsym;
         return; /* Do nothing, floor already */
 
     int type, subtype, vartype;
+    schar carpet_typ, carpet_piece;
+    uchar carpet_flags;
     if (!levl[x][y].floortyp)
     {
         /* Backup */
         type = location_type_definitions[levl[x][y].typ].initial_floor_type;
         subtype = get_initial_location_subtype(type);
         vartype = get_initial_location_vartype(type, subtype);
+        carpet_typ = 0;
+        carpet_piece = 0;
+        carpet_flags = 0;
     }
     else
     {
         type = levl[x][y].floortyp;
         subtype = levl[x][y].floorsubtyp;
         vartype = levl[x][y].floorvartyp;
+        carpet_typ = levl[x][y].carpet_typ;
+        carpet_piece = levl[x][y].carpet_piece;
+        carpet_flags = levl[x][y].carpet_flags;
     }
 
-    create_simple_location(x, y, type, subtype, vartype, location_flags, floor_doodad, 0, 0, 0, donewsym);
+    create_simple_location_with_carpet(x, y, type, subtype, vartype, location_flags, carpet_typ, carpet_piece, carpet_flags, floor_doodad, 0, 0, 0, donewsym);
 }
 
 void
@@ -9526,7 +9547,7 @@ const genericptr q;
 }
 
 void
-write_spells()
+write_spells(VOID_ARGS)
 {
     pline("Starting writing spells...");
 
@@ -9698,7 +9719,7 @@ const genericptr q;
 
 
 void
-write_monsters()
+write_monsters(VOID_ARGS)
 {
     pline("Starting writing monsters...");
 
@@ -9897,7 +9918,7 @@ write_monsters()
 
 
 void
-write_items()
+write_items(VOID_ARGS)
 {
     pline("Starting writing items...");
 

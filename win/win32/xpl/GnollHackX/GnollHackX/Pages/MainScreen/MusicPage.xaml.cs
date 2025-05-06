@@ -28,11 +28,12 @@ namespace GnollHackX.Pages.MainScreen
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
             if (GHApp.DarkMode)
             {
                 lblHeader.TextColor = GHColors.White;
+                lblSubtitle.TextColor = GHColors.White;
                 EmptyLabel.TextColor = GHColors.White;
             }
             AddDiscoveredSoundTracks();
@@ -90,7 +91,7 @@ namespace GnollHackX.Pages.MainScreen
                 int sec = length % 60;
                 bool hasSongwriter = !string.IsNullOrWhiteSpace(track.Songwriter);
                 bool hasDuration = length > 0;
-                string durationString = hasDuration ? min + ":" + sec : "";
+                string durationString = hasDuration ? min + ":" + string.Format("{0:D2}", sec) : "";
                 RowImageButton rib = new RowImageButton();
                 rib.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.soundtrack.png";
                 rib.ImgHighFilterQuality = true;
@@ -160,9 +161,10 @@ namespace GnollHackX.Pages.MainScreen
             CloseButton.IsEnabled = false;
             GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
             GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
             GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Music);
+            GHApp.DisconnectIViewHandlers(page);
         }
 
 
@@ -189,9 +191,10 @@ namespace GnollHackX.Pages.MainScreen
             {
                 _backPressed = true;
                 GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
-                await GHApp.Navigation.PopModalAsync();
+                var page = await GHApp.Navigation.PopModalAsync();
                 GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
                 GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Music);
+                GHApp.DisconnectIViewHandlers(page);
             }
             return false;
         }

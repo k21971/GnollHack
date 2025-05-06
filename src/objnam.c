@@ -649,6 +649,9 @@ unsigned cxn_flags; /* bitmask of CXN_xxx values */
     if (dknown && obj->oclass == POTION_CLASS && obj->odiluted)
         Strcat(buf, "diluted ");
 
+    if (dknown && (obj->otyp == SPE_NOVEL || obj->otyp == SPE_MANUAL) && obj->special_quality == -1)
+        Strcat(buf, "blank ");
+
     if (dknown && (obj->mythic_prefix || obj->mythic_suffix))
     {
         if (!mknown)
@@ -4655,6 +4658,14 @@ boolean* removed_from_game_ptr;
         typ = SPE_BLANK_PAPER;
         goto typfnd;
     }
+    if (unlabeled && !BSTRCMPI(bp, p - 6, "manual")) {
+        typ = SPE_MANUAL;
+        goto typfnd;
+    }
+    if (unlabeled && !BSTRCMPI(bp, p - 5, "novel")) {
+        typ = SPE_NOVEL;
+        goto typfnd;
+    }
     /* specific food rather than color of gem/potion/spellbook[/scales] */
     if (!BSTRCMPI(bp, p - 6, "orange") && mntmp == NON_PM) {
         typ = ORANGE;
@@ -5039,7 +5050,7 @@ retry:
             int floorsubtype = IS_FLOOR(lev->typ) ? lev->subtyp : get_initial_location_subtype(ROOM);
             int floorvartype = IS_FLOOR(lev->typ) ? lev->vartyp : get_initial_location_vartype(ROOM, floorsubtype);
 
-            full_location_transform(x, y, FOUNTAIN, lsubtype, lvartype, lflags, 0, 0, 0, 0, 0, 0, 0, 0, floortype, floorsubtype, floorvartype, FALSE, lhorizontal, 0, 0, FALSE);
+            full_location_transform(x, y, FOUNTAIN, lsubtype, lvartype, lflags, lev->carpet_typ, lev->carpet_piece, lev->carpet_flags, 0, 0, 0, 0, 0, floortype, floorsubtype, floorvartype, FALSE, lhorizontal, 0, 0, FALSE);
 
             int ftyp = lev->subtyp; // (lev->fountainmask & FOUNTAIN_TYPE_MASK);
             pline("A %s.", ftyp == FOUNTAIN_MAGIC && lev->blessedftn ? "enchanted fountain" : fountain_type_text(ftyp));
@@ -5048,20 +5059,20 @@ retry:
         }
         if (!BSTRCMPI(bp, p - 6, "throne")) 
         {
-            create_simple_location(x, y, THRONE, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
+            create_simple_location_with_carpet(x, y, THRONE, 0, 0, 0, levl[x][y].carpet_typ, levl[x][y].carpet_piece, levl[x][y].carpet_flags, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
             pline("A throne.");
             newsym(x, y);
             return (struct obj *) &zeroobj;
         }
         if (!BSTRCMPI(bp, p - 5, "anvil"))
         {
-            create_simple_location(x, y, ANVIL, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
+            create_simple_location_with_carpet(x, y, ANVIL, 0, 0, 0, levl[x][y].carpet_typ, levl[x][y].carpet_piece, levl[x][y].carpet_flags, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
             pline("An anvil.");
             newsym(x, y);
             return (struct obj*)&zeroobj;
         }
         if (!BSTRCMPI(bp, p - 4, "sink")) {
-            create_simple_location(x, y, SINK, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
+            create_simple_location_with_carpet(x, y, SINK, 0, 0, 0, levl[x][y].carpet_typ, levl[x][y].carpet_piece, levl[x][y].carpet_flags, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
             pline("A sink.");
             newsym(x, y);
             return (struct obj *) &zeroobj;
@@ -5100,7 +5111,7 @@ retry:
             else /* -1 - A_CHAOTIC, 0 - A_NEUTRAL, 1 - A_LAWFUL */
                 al = (!rn2(6)) ? A_NONE : rn2((int) A_LAWFUL + 2) - 1;
 
-            create_simple_location(x, y, ALTAR, 0, 0, Align2amask(al), 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
+            create_simple_location_with_carpet(x, y, ALTAR, 0, 0, Align2amask(al), levl[x][y].carpet_typ, levl[x][y].carpet_piece, levl[x][y].carpet_flags, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
             pline("%s altar.", An(align_str(al)));
             newsym(x, y);
             return (struct obj *) &zeroobj;
@@ -5116,7 +5127,7 @@ retry:
         }
 
         if (!BSTRCMPI(bp, p - 7, "brazier")) {
-            create_simple_location(x, y, BRAZIER, 0, 0, 0, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
+            create_simple_location_with_carpet(x, y, BRAZIER, 0, 0, 0, levl[x][y].carpet_typ, levl[x][y].carpet_piece, levl[x][y].carpet_flags, 0, IS_FLOOR(levl[x][y].typ) ? levl[x][y].typ : levl[x][y].floortyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, IS_FLOOR(levl[x][y].typ) ? levl[x][y].subtyp : levl[x][y].floorsubtyp, FALSE);
             pline("%s.", IS_BRAZIER(lev->typ) ? "A brazier"
                 : "Can't place a brazier here");
             newsym(x, y);
@@ -5299,6 +5310,12 @@ retry:
 
     otmp = typ ? mksobj_with_flags(typ, TRUE, FALSE, MKOBJ_TYPE_WISHING, (struct monst*)0, MAT_NONE, 0L, 0L, mkflags) : mkobj(oclass, FALSE, MKOBJ_TYPE_WISHING);
     typ = otmp->otyp, oclass = otmp->oclass; /* what we actually got */
+
+    if (unlabeled && (typ == SPE_MANUAL || typ == SPE_NOVEL))
+    {
+        otmp->special_quality = -1;
+        otmp = oname(otmp, (const char*)0);
+    }
 
     if (islit && !otmp->lamplit && (is_lamp(otmp) || is_candle(otmp) || is_torch(otmp) || is_obj_candelabrum(otmp) || typ == POT_OIL))
     {
@@ -5693,7 +5710,7 @@ retry:
             name = aname;
 
         /* 3.6 tribute - fix up novel */
-        if (objects[otmp->otyp].oc_class == SPBOOK_CLASS && objects[otmp->otyp].oc_subtyp == BOOKTYPE_NOVEL) {
+        if (objects[otmp->otyp].oc_class == SPBOOK_CLASS && objects[otmp->otyp].oc_subtyp == BOOKTYPE_NOVEL && otmp->novelidx >= 0) {
             const char *novelname;
 
             novelname = lookup_novel(name, &otmp->novelidx);
@@ -5702,7 +5719,7 @@ retry:
 
             otmp = oname(otmp, name);
         }
-        else if (objects[otmp->otyp].oc_class == SPBOOK_CLASS && objects[otmp->otyp].oc_subtyp == BOOKTYPE_MANUAL) {
+        else if (objects[otmp->otyp].oc_class == SPBOOK_CLASS && objects[otmp->otyp].oc_subtyp == BOOKTYPE_MANUAL && otmp->manualidx >= 0) {
             const char* manualname;
 
             manualname = lookup_manual(name, &otmp->manualidx);

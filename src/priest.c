@@ -1732,7 +1732,7 @@ void
 mstatusline(mtmp)
 struct monst *mtmp;
 {
-    char buf[BUFSZ];
+    char buf[BUFSZ * 5];
     print_mstatusline(buf, mtmp, ARTICLE_THE, FALSE);
     pline("Status of %s", buf);
 }
@@ -1792,9 +1792,9 @@ boolean showheads;
     {
         if (wizard && flags.wiz_mstatusline)
         {
-            Sprintf(eos(info), " (%d", is_tame(mtmp));
-            if (!mtmp->isminion)
-                Sprintf(eos(info), "; hungry %lld; apport %d",
+            Sprintf(eos(info), " (tameness %d", mtmp->mtame);
+            if (has_edog(mtmp))
+                Sprintf(eos(info), "; hungry on turn %lld; apport %d",
                     (long long)EDOG(mtmp)->hungrytime, EDOG(mtmp)->apport);
             Strcat(info, ")");
         }
@@ -1885,7 +1885,7 @@ boolean showheads;
 void
 ustatusline()
 {
-    char info[BUFSZ];
+    char info[BUFSZ * 2];
 
     info[0] = '\0';
 

@@ -1192,7 +1192,7 @@ boolean* obj_destroyed;
                 /* or strike with a missile in your hand... */
                 || (!thrown && (is_missile(obj) || is_ammo(obj)))
                 /* or use a pole at short range and not mounted... */
-                || (!thrown && !u.usteed && is_appliable_pole_type_weapon(obj) && !is_spear(obj))
+                || (!thrown && !u.usteed && is_appliable_pole_type_weapon(obj) && !is_spear(obj) && !is_trident(obj))
                 /* or throw a missile without the proper bow... */
                 || (is_ammo(obj) && !is_golf_swing_with_stone && (thrown != HMON_THROWN
                     || !ammo_and_launcher(obj, uwep)))) 
@@ -1777,11 +1777,17 @@ boolean* obj_destroyed;
 
         if (thrown == HMON_MELEE && obj && uwep && obj == uwep && two_handed_bonus_applies(obj))
             use_skill(P_TWO_HANDED_WEAPON, 1);
+
+        if (thrown == HMON_THROWN && wtype != P_THROWN_WEAPON && ordinary_thrown)
+            use_skill(P_THROWN_WEAPON, 1);
     }
     else if (ordinary_thrown) //Thrown weapon skill bonus to thrown objects
     {
         damage += adjust_damage(weapon_skill_dmg_bonus((struct obj*)0, P_NONE, FALSE, FALSE, 2, 0, TRUE, TRUE),
             &youmonst, mon, wep ? objects[wep->otyp].oc_damagetype : AD_PHYS, ADFLAGS_NONE);
+
+        if (thrown == HMON_THROWN && wtype != P_THROWN_WEAPON && damage > 0)
+            use_skill(P_THROWN_WEAPON, 1);
     }
 
     if (ispoisoned && !isdisintegrated) 
@@ -4327,7 +4333,7 @@ boolean wep_was_destroyed;
     {
         update_m_action(mon, ptr->mattk[i].action_tile ? ptr->mattk[i].action_tile : ACTION_TILE_PASSIVE_DEFENSE);
         play_monster_simple_weapon_sound(mon, i, (struct obj*)0, OBJECT_SOUND_TYPE_SWING_MELEE);
-        m_wait_until_action();
+        m_wait_until_action(mon, ptr->mattk[i].action_tile ? ptr->mattk[i].action_tile : ACTION_TILE_PASSIVE_DEFENSE);
     }
 
     /*  These affect you even if they just died.
@@ -5378,7 +5384,7 @@ enum action_tile_types action;
     if(mtmp == &youmonst)
         u_wait_until_action();
     else if(action == ACTION_TILE_DEATH ? canspotmon(mtmp) : canseemon(mtmp))
-        m_wait_until_action();
+        m_wait_until_action((struct monst*)0, action); // Visibility check is above
 }
 
 void
@@ -5392,7 +5398,7 @@ enum action_tile_types action;
     if (mtmp == &youmonst)
         u_wait_until_action();
     else if (action == ACTION_TILE_DEATH ? canspotmon(mtmp) : canseemon(mtmp))
-        m_wait_until_action();
+        m_wait_until_action((struct monst*)0, action); // Visibility check is above
 }
 
 
@@ -5499,11 +5505,14 @@ u_wait_until_action()
 }
 
 void
-m_wait_until_action()
+m_wait_until_action(mon, action)
+struct monst* mon;
+enum action_tile_types action;
 {
     if (context.m_intervals_to_wait_until_action > 0UL)
     {
-        delay_output_intervals((int)context.m_intervals_to_wait_until_action);
+        if (!mon || mon == &youmonst || (action == ACTION_TILE_DEATH ? canspotmon(mon) : canseemon(mon)))
+            delay_output_intervals((int)context.m_intervals_to_wait_until_action);
         context.m_intervals_to_wait_until_action = 0UL;
     }
 }
@@ -5519,15 +5528,17 @@ u_wait_until_end()
 }
 
 void
-m_wait_until_end()
+m_wait_until_end(mon, action)
+struct monst* mon;
+enum action_tile_types action;
 {
     if (context.m_intervals_to_wait_until_end > 0UL)
     {
-        delay_output_intervals((int)context.m_intervals_to_wait_until_end);
+        if (!mon || mon == &youmonst || (action == ACTION_TILE_DEATH ? canspotmon(mon) : canseemon(mon)))
+            delay_output_intervals((int)context.m_intervals_to_wait_until_end);
         context.m_intervals_to_wait_until_end = 0UL;
     }
 }
-
 
 void
 display_being_hit(mon, x, y, hit_symbol_shown, damage_shown, extra_mflags)
@@ -5545,7 +5556,7 @@ uint64_t extra_mflags;
     if(mon == &youmonst)
         u_wait_until_action();
     else
-        m_wait_until_action();
+        m_wait_until_action((struct monst*)0, ACTION_TILE_NO_ACTION); // Visibility check has been before
     flush_screen(1);
     adjusted_delay_output();
     adjusted_delay_output();

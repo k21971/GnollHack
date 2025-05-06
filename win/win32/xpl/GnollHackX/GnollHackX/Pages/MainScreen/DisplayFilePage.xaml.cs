@@ -51,8 +51,8 @@ namespace GnollHackX.Pages.MainScreen
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _fileName = fileName;
             _fixedWidth = fixedWidth;
@@ -74,7 +74,8 @@ namespace GnollHackX.Pages.MainScreen
         {
             CloseButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
         }
 
         public bool ReadFile(out string errorMessage)
@@ -205,7 +206,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Share File Failure", "GnollHack failed to share " + HeaderLabel.Text + ": " + ex.Message, "OK");
+                await GHApp.DisplayMessageBox(this, "Share File Failure", "GnollHack failed to share " + HeaderLabel.Text + ": " + ex.Message, "OK");
             }
             ShareButton.IsEnabled = true;
         }

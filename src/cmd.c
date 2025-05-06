@@ -226,6 +226,7 @@ STATIC_DCL boolean FDECL(cause_known, (int));
 STATIC_DCL char *FDECL(attrval, (int, int, char *));
 STATIC_DCL void FDECL(background_enlightenment, (int, int));
 STATIC_DCL void FDECL(basics_enlightenment, (int, int));
+STATIC_DCL void FDECL(game_enlightenment, (int, int));
 STATIC_DCL void FDECL(characteristics_enlightenment, (int, int));
 STATIC_DCL void FDECL(one_characteristic, (int, int, int));
 STATIC_DCL void FDECL(status_enlightenment, (int, int));
@@ -1664,7 +1665,7 @@ wiz_identify(VOID_ARGS)
            display_pickinv() and xname() see override_ID as nonzero */
         if (!iflags.override_ID)
             iflags.override_ID = C('I');
-        (void) display_inventory((char *) 0, FALSE, 0);
+        (void) display_inventory((char *) 0, FALSE, SHOWWEIGHTS_NONE);
         iflags.override_ID = 0;
         update_inventory();
     } else
@@ -3273,7 +3274,7 @@ char resultbuf[]; /* should be at least [7] to hold "18/100\0" */
 
 void
 enlightenment(mode, final)
-int mode;  /* BASICENLIGHTENMENT | MAGICENLIGHTENMENT (| both) */
+int mode;  /* BASICENLIGHTENMENT | MAGICENLIGHTENMENT | GAMEENLIGHTENMENT  */
 int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
 {
     char buf[BUFSZ], tmpbuf[BUFSZ];
@@ -3322,6 +3323,11 @@ int final; /* ENL_GAMEINPROGRESS:0, ENL_GAMEOVERALIVE, ENL_GAMEOVERDEAD */
     if (mode & MAGICENLIGHTENMENT) {
         /* intrinsics and other traditional enlightenment feedback */
         attributes_enlightenment(mode, final);
+    }
+
+    if (mode & GAMEENLIGHTENMENT) {
+        /* game status */
+        game_enlightenment(mode, final);
     }
 
     if (!en_via_menu) {
@@ -3542,6 +3548,9 @@ int final;
         }
         you_have(buf, "");
     }
+
+    Sprintf(buf, "%lld", (long long)get_current_game_score());
+    enl_msg("Your game score ", "is ", "was ", buf, "");
 }
 
 /* hit points, energy points, armor class -- essential information which
@@ -3634,6 +3643,17 @@ int final;
     else
         Strcpy(buf, "off");
     enl_msg("Autopickup ", "is ", "was ", buf, "");
+}
+
+STATIC_OVL void
+game_enlightenment(mode, final)
+int mode UNUSED;
+int final;
+{
+    char buf[BUFSZ];
+
+    enlght_out(" ", ATR_HALF_SIZE); /* separator after background */
+    enlght_out("Game:", ATR_SUBHEADING);
 
     const char* game_dif_text = get_game_difficulty_text(context.game_difficulty);
     Strcpy(buf, game_dif_text);
@@ -3650,12 +3670,39 @@ int final;
     Sprintf(modebuf, " mode (%s)", get_game_mode_description());
     enl_msg("You ", "are playing in ", "were playing in ", get_game_mode_text(TRUE), modebuf);
 
-    Sprintf(buf, "%lld", (long long)get_current_game_score());
-    enl_msg("Your game score ", "is ", "was ", buf, "");
-
     print_realtime(modebuf, get_current_game_duration());
     Sprintf(buf, "%s", modebuf);
     enl_msg("You ", "have been playing the game for ", "had been playing the game for ", buf, "");
+
+    if (iflags.save_file_secure)
+    {
+        enl_msg("You ", "are ", "were ", "playing the game on a secure server", "");
+    }
+    else
+    {
+        if (!iflags.save_file_tracking_supported)
+            enl_msg("Save file tracking ", "is ", "was ", "not supported on your platform", "");
+        else
+        {
+            if (wizard || discover || CasualMode)
+            {
+                enl_msg("Your game mode ", "is ", "was ", "not eligible for save file tracking", "");
+            }
+            else
+            {
+                if (!iflags.save_file_tracking_needed)
+                {
+                    enl_msg("Save file tracking ", "is ", "was ", "supported but not needed on your platform", "");
+                }
+                else
+                {
+                    enl_msg("Save file tracking ", "is ", "was ", "supported and needed on your platform", "");
+                    enl_msg("Save file tracking ", "is ", "was ", iflags.save_file_tracking_on ? "on" : "off", "");
+                }
+                enl_msg("Your save file ", "has been ", "had been ", flags.save_file_tracking_value ? "successfully " : "unsuccessfully ", "tracked");
+            }
+        }
+    }
 }
 
 /* characteristics: expanded version of bottom line strength, dexterity, &c */
@@ -4471,6 +4518,8 @@ int final;
         you_are("stun resistant", from_what(STUN_RESISTANCE));
     if (Slime_resistance)
         you_are("sliming resistant", from_what(SLIME_RESISTANCE));
+    if (Polymorph_resistance)
+        you_are("polymorph resistant", from_what(POLYMORPH_RESISTANCE));
     if (Bisection_resistance)
         you_cannot("be bisected", from_what(BISECTION_RESISTANCE));
     if (Halluc_resistance)
@@ -4825,8 +4874,7 @@ int final;
         you_are("receiving double spell damage", from_what(DOUBLE_SPELL_DAMAGE));
     /* polymorph and other shape change */
     if (Protection_from_shape_changers)
-        you_are("protected from shape changers",
-                from_what(PROT_FROM_SHAPE_CHANGERS));
+        you_are("protected from shape changers", from_what(PROT_FROM_SHAPE_CHANGERS));
     if (Unchanging) {
         const char *what = 0;
 
@@ -5207,7 +5255,7 @@ doviewpetstatistics(struct monst* mon)
 STATIC_PTR int
 doattributes(VOID_ARGS)
 {
-    int mode = BASICENLIGHTENMENT;
+    int mode = BASICENLIGHTENMENT | GAMEENLIGHTENMENT;
 
     /* show more--as if final disclosure--for wizard and explore modes */
     if ((wizard && yn_query("Enforce magic enlightenment?") == 'y') || discover)
@@ -6149,7 +6197,7 @@ struct ext_func_tab extcmdlist[] = {
     { C('c'), "call", "call (name) something", docallcmd, IFBURIED | AUTOCOMPLETE, 0, getobj_callable, "call" },
     { 'Z', "cast", "cast a spell", docast, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
     { M(26), "castquick", "cast the quick spell", docastquick, AUTOCOMPLETE | IFBURIED | INSPELLMENU },
-    { 'C', "chat", "talk to someone", dotalk, IFBURIED | AUTOCOMPLETE },
+    { 'C', "chat", "talk to or interact with someone", dotalk, IFBURIED | AUTOCOMPLETE },
     { M(10), "chatsteed", "talk to steed", dotalksteed, IFBURIED },
     { M(11), "chatnearby", "talk to someone nearby", dotalknearby, IFBURIED },
     { M(13), "chronicle", "show journal of major events", do_gamelog, IFBURIED | AUTOCOMPLETE | GENERALCMD },
@@ -6336,13 +6384,13 @@ struct ext_func_tab extcmdlist[] = {
     { '}', "you", "describe your character", docharacterstatistics, IFBURIED | AUTOCOMPLETE },
     { 'z', "zap", "zap a wand", dozap, SINGLE_OBJ_CMD_SPECIFIC, 0, getobj_zap_syms, "zap" },
     { M(27), "zapquick", "zap the quick wand", dozapquick, 0, 0, getobj_zap_syms, "zap" },
-#if defined (USE_TILES) && !defined(GNH_MOBILE)
+#if defined (USE_TILES)
     { M('.'), "zoomnormal", "revert to normal zoom level", dozoomnormal, IFBURIED | AUTOCOMPLETE },
     { M('+'), "zoomin", "zoom map out", dozoomin, IFBURIED | AUTOCOMPLETE },
     { M('-'), "zoomout", "zoom map in", dozoomout, IFBURIED | AUTOCOMPLETE },
     { M(','), "zoommini", "zoom map to fit to screen", dozoommini, IFBURIED | AUTOCOMPLETE },
-    { C(','), "zoomhalf", "zoom map out to 50% of normal", dozoomhalf, IFBURIED | AUTOCOMPLETE },
-#endif
+    { M('/'), "zoomhalf", "zoom map out to 50% of normal", dozoomhalf, IFBURIED | AUTOCOMPLETE },
+#endif //USE_TILES
 #ifdef GNH_MOBILE
     { '{', "viewpet", "view currently active pet", doviewpet, IFBURIED },
 #endif
@@ -6507,13 +6555,13 @@ commands_init(VOID_ARGS)
     (void) bind_key(M('N'), "name");
     (void) bind_key('u',    "untrap"); /* if number_pad is on */
 
-#ifdef USE_TILES
-    (void) bind_key(C('0'), "zoommini");
-    (void) bind_key(C('1'), "zoomnormal");
-    (void) bind_key(C('.'), "zoomnormal");
-    (void) bind_key(C('+'), "zoomin");
-    (void) bind_key(C('-'), "zoomout");
-#endif
+//#ifdef USE_TILES
+//    (void) bind_key(C('0'), "zoommini");
+//    (void) bind_key(C('1'), "zoomnormal");
+//    (void) bind_key(C('.'), "zoomnormal");
+//    (void) bind_key(C('+'), "zoomin");
+//    (void) bind_key(C('-'), "zoomout");
+//#endif
 
     /* alt keys: */
     (void) bind_key(M('O'), "overview");
@@ -7668,7 +7716,9 @@ register char *cmd;
     if (program_state.done_hup)
         end_of_input();
 #endif
-    if (firsttime) {
+    if (firsttime) 
+    {
+        //issue_simple_gui_command(GUI_CMD_KEYBOARD_FOCUS);
         context.nopick = 0;
         cmd = parse();
     }
@@ -9841,57 +9891,40 @@ dosh_core(VOID_ARGS)
 int
 dozoomnormal(VOID_ARGS)
 {
-    flags.screen_scale_adjustment = flags.preferred_screen_scale <= 0 ? 0.0 
-        : max(MIN_SCREEN_SCALE_ADJUSTMENT, min(MAX_SCREEN_SCALE_ADJUSTMENT, (((double)flags.preferred_screen_scale) / 100.0 - 1.0) ));
-
+    issue_simple_gui_command(GUI_CMD_ZOOM_NORMAL);
     stretch_window();
-
     return 0;
 }
 
 int
 dozoomin(VOID_ARGS)
 {
-    double scale_level = round(flags.screen_scale_adjustment / KEYBOARD_SCREEN_SCALE_ADJUSTMENT_STEP);
-    flags.screen_scale_adjustment = (scale_level + 1) * KEYBOARD_SCREEN_SCALE_ADJUSTMENT_STEP;
-    if(flags.screen_scale_adjustment > MAX_SCREEN_SCALE_ADJUSTMENT)
-        flags.screen_scale_adjustment = MAX_SCREEN_SCALE_ADJUSTMENT;
-    
+    issue_simple_gui_command(GUI_CMD_ZOOM_IN);
     stretch_window();
-
     return 0;
 }
 
 int
 dozoomout(VOID_ARGS)
 {
-    double scale_level = round(flags.screen_scale_adjustment / KEYBOARD_SCREEN_SCALE_ADJUSTMENT_STEP);
-    flags.screen_scale_adjustment = (scale_level - 1) * KEYBOARD_SCREEN_SCALE_ADJUSTMENT_STEP;
-    if (flags.screen_scale_adjustment < MIN_SCREEN_SCALE_ADJUSTMENT)
-        flags.screen_scale_adjustment = MIN_SCREEN_SCALE_ADJUSTMENT;
-
+    issue_simple_gui_command(GUI_CMD_ZOOM_OUT);
     stretch_window();
-
     return 0;
 }
 
 int
 dozoommini(VOID_ARGS)
 {
-    flags.screen_scale_adjustment = -1.0; /* In fact fit-to-screen */
-
+    issue_simple_gui_command(GUI_CMD_ZOOM_MINI);
     stretch_window();
-
     return 0;
 }
 
 int
 dozoomhalf(VOID_ARGS)
 {
-    flags.screen_scale_adjustment = -0.5;
-
+    issue_simple_gui_command(GUI_CMD_ZOOM_HALF);
     stretch_window();
-
     return 0;
 }
 
@@ -9899,7 +9932,7 @@ void
 zoomtoscale(scale)
 double scale;
 {
-    flags.screen_scale_adjustment = scale;
+    issue_gui_command(GUI_CMD_ZOOM_TO_SCALE, (int)(scale * 10000), 0, (char*)0);
     stretch_window();
 }
 

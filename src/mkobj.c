@@ -17,6 +17,7 @@ STATIC_DCL void FDECL(container_weight, (struct obj *));
 STATIC_DCL void FDECL(save_mtraits, (struct obj *, struct monst *));
 STATIC_DCL void FDECL(objlist_sanity, (struct obj *, int, const char *));
 STATIC_DCL void FDECL(mon_obj_sanity, (struct monst *, const char *));
+STATIC_DCL void FDECL(insane_obj_bits, (struct obj*, struct monst*));
 STATIC_DCL const char *FDECL(where_name, (struct obj *));
 STATIC_DCL void FDECL(insane_object, (struct obj *, const char *,
                                       const char *, struct monst *));
@@ -2257,18 +2258,25 @@ uint64_t mkflags;
         if(mkflags & MKOBJ_FLAGS_PARAM_IS_TITLE)
             otmp->novelidx = (short)param;
         else
-            otmp->novelidx = -1; /* "none of the above"; will be changed */
-        otmp = oname(otmp, noveltitle(&otmp->novelidx, excludedtitles, excludedtitles2));
-        otmp->nknown = TRUE;
+            otmp->novelidx = -2; /* "none of the above"; will be changed */
+
+        if (otmp->novelidx != -1) /* Not blank */
+        {
+            otmp = oname(otmp, noveltitle(&otmp->novelidx, excludedtitles, excludedtitles2));
+            otmp->nknown = TRUE;
+        }
         break;
     case SPE_MANUAL:
         if (mkflags & MKOBJ_FLAGS_PARAM_IS_TITLE)
             otmp->manualidx = (short)param;
         else
-            otmp->manualidx = -1; /* "none of the above"; will be changed */
+            otmp->manualidx = -2; /* "none of the above"; will be changed */
 
-        otmp = oname(otmp, manualtitle(&otmp->manualidx, excludedtitles, excludedtitles2));
-        otmp->nknown = TRUE;
+        if (otmp->manualidx != -1) /* Not blank */
+        {
+            otmp = oname(otmp, manualtitle(&otmp->manualidx, excludedtitles, excludedtitles2));
+            otmp->nknown = TRUE;
+        }
         otmp->cursed = otmp->blessed = 0; /* Never blessed or cursed */
         break;
     }
@@ -4433,7 +4441,7 @@ STATIC_VAR const char NEARDATA /* pline formats for insane_object() */
 
 /* Check all object lists for consistency. */
 void
-obj_sanity_check()
+obj_sanity_check(VOID_ARGS)
 {
     int x, y;
     struct obj *obj;
@@ -4543,6 +4551,10 @@ const char *mesg;
                 break;
             }
         }
+        /* temporary flags that might have been set but which should
+           be clear by the time this sanity check is taking place */
+        if (obj->in_use || obj->bypass || obj->nomerge)
+            insane_obj_bits(obj, (struct monst*)0);
     }
 }
 
@@ -4570,7 +4582,31 @@ const char *mesg;
             if (obj->ocarry != mon)
                 insane_object(obj, mfmt2, mesg, mon);
             check_contained(obj, mesg);
+            if (obj->in_use || obj->bypass || obj->nomerge)
+                insane_obj_bits(obj, mon);
         }
+    }
+}
+
+STATIC_OVL void
+insane_obj_bits(obj, mon)
+struct obj* obj;
+struct monst* mon;
+{
+    unsigned o_in_use, o_bypass, o_nomerge;
+
+    o_in_use = obj->in_use;
+    o_bypass = obj->bypass;
+    o_nomerge = obj->nomerge && !(obj->speflags & (SPEFLAGS_MINES_PRIZE | SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2));
+
+    if (o_in_use || o_bypass || o_nomerge) {
+        char infobuf[QBUFSZ];
+
+        Sprintf(infobuf, "flagged%s%s%s",
+            o_in_use ? " in_use" : "",
+            o_bypass ? " bypass" : "",
+            o_nomerge ? " nomerge" : "");
+        insane_object(obj, ofmt0, infobuf, mon);
     }
 }
 

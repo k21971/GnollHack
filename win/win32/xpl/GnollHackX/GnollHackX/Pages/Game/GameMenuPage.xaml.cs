@@ -33,14 +33,18 @@ namespace GnollHackX.Pages.Game
             InitializeComponent();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.AdjustRootLayout(RootGrid);
-            GHApp.SetPageThemeOnHandler(this, GHApp.DarkMode);
-            GHApp.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
+            UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            UIUtils.SetViewCursorOnHandler(RootGrid, GameCursorType.Normal);
 
             _gamePage = gamePage;
             if (gamePage.EnableCasualMode)
             {
                 btnSave.Text = "Save Game";
                 btnQuit.Text = "Quit Game";
+            }
+            else if (!gamePage.EnableWizardMode)
+            {
+                btnQuit.Text = "Delete Character";
             }
 
             if (gamePage.GameEnded)
@@ -82,23 +86,35 @@ namespace GnollHackX.Pages.Game
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
             _gamePage.GenericButton_Clicked(sender, e, GHUtils.Meta('s'));
+            GHApp.DisconnectIViewHandlers(page);
+            GHApp.DoKeyboardFocus();
         }
 
         private async void btnQuit_Clicked(object sender, EventArgs e)
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
             _gamePage.GenericButton_Clicked(sender, e, _gamePage.GameEnded ? 'q' : GHUtils.Meta('q'));
+            GHApp.DisconnectIViewHandlers(page);
+            GHApp.DoKeyboardFocus();
+        }
+
+        public void ClosePage()
+        {
+            if(MainLayout.IsEnabled)
+                btnBackToGame_Clicked(this, EventArgs.Empty);
         }
 
         private async void btnBackToGame_Clicked(object sender, EventArgs e)
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
+            GHApp.DoKeyboardFocus();
         }
 
         private async void btnOptions_Clicked(object sender, EventArgs e)
@@ -106,16 +122,20 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.DebugWriteRestart("ProfilingStopwatch.Restart: Options");
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
             _gamePage.GenericButton_Clicked(sender, e, 'O');
+            GHApp.DisconnectIViewHandlers(page);
+            GHApp.DoKeyboardFocus();
         }
 
         private async void btnSnapshot_Clicked(object sender, EventArgs e)
         {
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
             _gamePage.GenericButton_Clicked(sender, e, GHUtils.Meta(28));
+            GHApp.DisconnectIViewHandlers(page);
+            GHApp.DoKeyboardFocus();
         }
 
         private async void btnSettings_Clicked(object sender, EventArgs e)
@@ -156,7 +176,9 @@ namespace GnollHackX.Pages.Game
             {
                 _backPressed = true;
                 MainLayout.IsEnabled = false;
-                await GHApp.Navigation.PopModalAsync();
+                var page = await GHApp.Navigation.PopModalAsync();
+                GHApp.DisconnectIViewHandlers(page);
+                GHApp.DoKeyboardFocus();
             }
             return false;
         }
@@ -188,7 +210,9 @@ namespace GnollHackX.Pages.Game
             GHApp.PlayButtonClickedSound();
             if(_gamePage.ShownTip == -1)
                 _gamePage.ShowGUITips(false);
-            await GHApp.Navigation.PopModalAsync();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
+            GHApp.DoKeyboardFocus();
         }
 
         private double _currentPageWidth = 0;
@@ -255,13 +279,13 @@ namespace GnollHackX.Pages.Game
                 }
                 else
                 {
-                    await DisplayAlert("Message File Not Found", "GnollHack could not find " + filepath + ".", "OK");
+                    await GHApp.DisplayMessageBox(this, "Message File Not Found", "GnollHack could not find " + filepath + ".", "OK");
                 }
             }
             catch (Exception ex) 
             {
                 Debug.WriteLine(ex.Message);
-                await DisplayAlert("Error Creating Message File", "An error occurred while creating the message file: " + ex.Message, "OK");
+                await GHApp.DisplayMessageBox(this, "Error Creating Message File", "An error occurred while creating the message file: " + ex.Message, "OK");
             }
 
             MainLayout.IsEnabled = true;
