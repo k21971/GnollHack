@@ -77,6 +77,8 @@ NEARDATA boolean ransacked = 0;
 NEARDATA uint64_t n_game_recoveries = 0;
 
 const char *occtxt = DUMMY;
+int occattr = ATR_NONE;
+int occclr = NO_COLOR;
 enum object_soundset_types occsoundset = OBJECT_SOUNDSET_NONE; /* defined when occupation != NULL */
 enum object_occupation_types occtyp = OCCUPATION_NONE; /* defined when occupation != NULL */
 
@@ -203,6 +205,9 @@ NEARDATA struct obj
     *current_wand = 0,  /* wand currently zapped/applied */
     *thrownobj = 0,     /* object in flight due to throwing */
     *kickedobj = 0;     /* object in flight due to kicking */
+    
+NEARDATA struct obj* trackedobj = (struct obj*)0;
+NEARDATA boolean trackedobj_gone = FALSE;
 
 NEARDATA const struct zap_type_definition zap_type_definitions[MAX_ZAP_TYPES] = {
     {"magic", HI_ZAP, MAGIC_MISSILE_RAY_ANIMATION},
@@ -364,6 +369,10 @@ NEARDATA const char getobj_favorites[] = {
     FOOD_CLASS,   REAGENT_CLASS,  TOOL_CLASS,   GEM_CLASS,   ART_CLASS,
     ROCK_CLASS,      BALL_CLASS,   CHAIN_CLASS,  SPBOOK_CLASS, 0
 };
+
+NEARDATA const char getobj_enchant_weapon_objects[] = { ALL_CLASSES, WEAPON_CLASS, TOOL_CLASS, 0 };
+NEARDATA const char getobj_enchant_armor_objects[] = { ALL_CLASSES, ARMOR_CLASS, 0 };
+NEARDATA const char getobj_enchant_accessory_objects[] = { ALL_CLASSES, RING_CLASS, MISCELLANEOUS_CLASS, 0 };
 
 /* originally from dog.c */
 NEARDATA char dogname[PL_PSIZ] = DUMMY;
@@ -583,6 +592,11 @@ NEARDATA char debug_buf_1[BUFSZ * 2] = "";
 NEARDATA char debug_buf_2[BUFSZ * 2] = "";
 NEARDATA char debug_buf_3[BUFSZ * 2] = "";
 NEARDATA char debug_buf_4[BUFSZ * 2] = "";
+
+NEARDATA char priority_debug_buf_1[BUFSZ * 2] = "";
+NEARDATA char priority_debug_buf_2[BUFSZ * 2] = "";
+NEARDATA char priority_debug_buf_3[BUFSZ * 2] = "";
+NEARDATA char priority_debug_buf_4[BUFSZ * 2] = "";
 
 /* dummy routine used to force linkage */
 void

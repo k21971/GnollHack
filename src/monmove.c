@@ -29,21 +29,20 @@ mb_trapped(mtmp)
 struct monst *mtmp;
 {
     boolean spef_on = FALSE;
-    if (flags.verbose)
+    if (cansee(mtmp->mx, mtmp->my) && !Unaware)
     {
-        if (cansee(mtmp->mx, mtmp->my) && !Unaware)
-        {
-            play_special_effect_at(SPECIAL_EFFECT_SMALL_FIERY_EXPLOSION, 0, mtmp->mx, mtmp->my, FALSE);
-            play_sfx_sound_at_location_with_minimum_volume(SFX_EXPLOSION_FIERY, mtmp->mx, mtmp->my, 0.15);
-            special_effect_wait_until_action(0);
-            spef_on = TRUE;
-            pline("KABOOM!!  You see a door explode.");
-        }
-        else if (!Deaf)
-        {
-            play_sfx_sound_at_location_with_minimum_volume(SFX_EXPLOSION_FIERY, mtmp->mx, mtmp->my, 0.15);
-            You_hear("a distant explosion.");
-        }
+        play_special_effect_at(SPECIAL_EFFECT_SMALL_FIERY_EXPLOSION, 0, mtmp->mx, mtmp->my, FALSE);
+        play_sfx_sound_at_location_with_minimum_volume(SFX_EXPLOSION_FIERY, mtmp->mx, mtmp->my, 0.15);
+        special_effect_wait_until_action(0);
+        spef_on = TRUE;
+        if (flags.verbose)
+            pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, "KABOOM!!  You see a door explode.");
+    }
+    else if (!Deaf)
+    {
+        play_sfx_sound_at_location_with_minimum_volume(SFX_EXPLOSION_FIERY, mtmp->mx, mtmp->my, 0.15);
+        if (flags.verbose)
+            You_hear_ex1(ATR_NONE, CLR_MSG_ATTENTION, "a distant explosion.");
     }
     wake_nearto(mtmp->mx, mtmp->my, 7 * 7);
     increase_mon_property(mtmp, STUNNED, 5 + rnd(10));
@@ -75,7 +74,7 @@ boolean for_unlocking; /* true => credit card ok, false => not ok */
 {
     if (for_unlocking && m_carrying(mon, CREDIT_CARD))
         return TRUE;
-    return m_carrying(mon, SKELETON_KEY) || m_carrying(mon, LOCK_PICK);
+    return m_carrying(mon, SKELETON_KEY) || m_carrying(mon, MASTER_KEY) || m_carrying(mon, LOCK_PICK);
 }
 
 void
@@ -310,7 +309,15 @@ register struct monst *mtmp;
         && canspotmon(mtmp) && couldsee(x2, y2)
         && mon_can_move(mtmp)
         && !onscary(u.ux, u.uy, mtmp))
+    {
+        if (!Hallucination && !is_peaceful(mtmp))
+        {
+            int multicolors[2] = { CLR_MSG_WARNING, NO_COLOR };
+            int d2 = distu(mtmp->mx, mtmp->my);
+            You_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, multicolors, "spot %s%s.", a_monnam(mtmp), d2 <= 2 ? " next to you" : d2 <= RUN_SPOT_NEARBY_DISTANCE * RUN_SPOT_NEARBY_DISTANCE ? " nearby" : " at a distance");
+        }
         stop_occupation();
+    }
 
     return rd;
 }
@@ -1076,12 +1083,19 @@ register struct monst *mtmp;
     /*  Now, attack the player if possible - one attack set per monst
      */
 
-    if (!is_peaceful(mtmp) || is_crazed(mtmp) || (Conflict && !check_ability_resistance_success(mtmp, A_WIS, 0)))
+    boolean foundyou = (mtmp->mux == u.ux && mtmp->muy == u.uy);
+    boolean found_or_wildmiss_ok = (foundyou || m_cannotsenseu(mtmp) || Displaced || Underwater);
+    if (found_or_wildmiss_ok && (!is_peaceful(mtmp) || is_crazed(mtmp) || (Conflict && !check_ability_resistance_success(mtmp, A_WIS, 0))))
     {
-        if (inrange && !noattacks(mdat)
-            && (Upolyd ? u.mh : u.uhp) > 0 && !scared && tmp != 3)
+        if (inrange && !noattacks(mdat) && (Upolyd ? u.mh : u.uhp) > 0 && !scared && tmp != 3)
+        {
+            Sprintf(debug_buf_4, "mattacku mon, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d",
+                (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy,
+                is_peaceful(mtmp) != 0, is_tame(mtmp) != 0, is_blinded(mtmp) != 0, is_crazed(mtmp) != 0, is_confused(mtmp) != 0,
+                Conflict != 0, Displaced != 0);
             if (mattacku(mtmp))
                 return 1; /* monster died (e.g. exploded) */
+        }
 
         if (mtmp->wormno)
             wormhitu(mtmp);
@@ -1128,7 +1142,9 @@ struct monst* mtmp;
         flush_screen(1);
         cliparound(mtmp->mx, mtmp->my, 2);
         play_sfx_sound(SFX_BOSS_FIGHT);
-        display_screen_text(Monnam(mtmp), (char*)0, (char*)0, SCREEN_TEXT_BOSS_FIGHT, ATR_NONE, NO_COLOR, 1UL);
+        char nametitlebuf[BUFSZ];
+        strcpy_capitalized_for_title(nametitlebuf, Monnam(mtmp));
+        display_screen_text(nametitlebuf, (char*)0, (char*)0, SCREEN_TEXT_BOSS_FIGHT, ATR_NONE, NO_COLOR, 1UL);
         cliparound(u.ux, u.uy, 2);
     }
 
@@ -1260,6 +1276,9 @@ m_move(mtmp, after)
 register struct monst *mtmp;
 register int after;
 {
+    if (!mtmp)
+        return 3;
+
     register int appr;
     xchar gx, gy, nix, niy, chcnt;
     int chi; /* could be schar except for stupid Sun-2 compiler */
@@ -1412,7 +1431,7 @@ register int after;
     }
 
     /* teleport if that lies in our nature */
-    if (ptr == &mons[PM_TENGU] && !rn2(5) && !is_cancelled(mtmp)
+    if (has_teleportation(mtmp) && has_teleport_control(mtmp) && !rn2(5) && !is_cancelled(mtmp)
         && !tele_restrict(mtmp)) 
     {
         if (mtmp->mhp < 7 || is_peaceful(mtmp) || rn2(2))
@@ -1562,8 +1581,8 @@ register int after;
                     if (((likegold && otmp->oclass == COIN_CLASS)
                          || (likeobjs && (index(practical, otmp->oclass))
                              && (otmp->otyp != CORPSE
-                                 || (ptr->mlet == S_NYMPH
-                                     && !is_rider(&mons[otmp->corpsenm]))))
+                                 || (ptr->mlet == S_NYMPH /* Nymph picks up corpses... */
+                                     && (otmp->corpsenm < LOW_PM || !is_rider(&mons[otmp->corpsenm]))))) /* ...but not rider corpses */
                          || (likemagic && index(magical, otmp->oclass))
                          || (uses_items && searches_for_item(mtmp, otmp))
                          || (likerock && otmp->otyp == BOULDER)
@@ -1572,8 +1591,7 @@ register int after;
                          || (conceals && !cansee(otmp->ox, otmp->oy))
                          || (slurps_items(ptr)
                              && !index(indigestion, otmp->oclass)
-                             && !(otmp->otyp == CORPSE
-                                  && touch_petrifies(&mons[otmp->corpsenm]))))
+                             && !(otmp->otyp == CORPSE && otmp->corpsenm >= LOW_PM && touch_petrifies(&mons[otmp->corpsenm]))))
                         && touch_artifact(otmp, mtmp) 
                         && mon_wants_to_pick_up_obj(mtmp, otmp)
                         )
@@ -2232,17 +2250,22 @@ register struct monst *mtmp;
     notseen = m_cannotsenseu(mtmp);
 
     /* add cases as required.  eg. Displacement ... */
-    if (notseen || Underwater) {
+    if (notseen || Underwater) 
+    {
         /* Xorns can smell quantities of valuable metal
             like that in solid gold coins, treat as seen */
         if ((mtmp->data == &mons[PM_XORN]) && umoney && !Underwater)
             disp = 0;
         else
             disp = 1;
-    } else if (Displaced) {
+    } 
+    else if (Displaced) 
+    {
         disp = couldsee(mx, my) ? 2 : 1;
-    } else
+    } 
+    else
         disp = 0;
+
     if (!disp)
         goto found_you;
 
@@ -2250,22 +2273,27 @@ register struct monst *mtmp;
        are too powerful */
     gotu = notseen ? !rn2(3) : Displaced ? !rn2(4) : FALSE;
 
-    if (!gotu) {
+    if (!gotu) 
+    {
         register int try_cnt = 0;
 
-        do {
+        do 
+        {
             if (++try_cnt > 200)
                 goto found_you; /* punt */
             mx = u.ux - disp + rn2(2 * disp + 1);
             my = u.uy - disp + rn2(2 * disp + 1);
-        } while (!isok(mx, my)
+        }
+        while (!isok(mx, my)
                  || (disp != 2 && mx == mtmp->mx && my == mtmp->my)
                  || ((mx != u.ux || my != u.uy) && !passes_walls(mtmp->data)
                      && !(accessible(mx, my)
                           || (closed_door(mx, my)
                               && (can_ooze(mtmp) || can_fog(mtmp)))))
                  || !couldsee(mx, my));
-    } else {
+    }
+    else 
+    {
  found_you:
         mx = u.ux;
         my = u.uy;
@@ -2340,7 +2368,7 @@ struct monst *mtmp;
             && !(typ >= DAGGER && typ <= CRYSKNIFE) && typ != SLING
             && !is_cloak(obj) && typ != FEDORA && !is_gloves(obj)
             && typ != LEATHER_JACKET && typ != CREDIT_CARD && !is_shirt(obj)
-            && !(typ == CORPSE && verysmall(&mons[obj->corpsenm]))
+            && !(typ == CORPSE && obj->corpsenm >= LOW_PM && verysmall(&mons[obj->corpsenm]))
             && typ != FORTUNE_COOKIE && typ != CANDY_BAR && typ != PANCAKE
             && typ != ELVEN_WAYBREAD && typ != LUMP_OF_ROYAL_JELLY
             && obj->oclass != AMULET_CLASS && obj->oclass != MISCELLANEOUS_CLASS && obj->oclass != RING_CLASS
@@ -2350,7 +2378,7 @@ struct monst *mtmp;
             && !is_candle_or_torch(obj) && typ != OILSKIN_SACK && typ != LEASH
             && typ != STETHOSCOPE && typ != BLINDFOLD && typ != TOWEL
             && typ != TIN_WHISTLE && typ != MAGIC_WHISTLE
-            && typ != MAGIC_MARKER && typ != TIN_OPENER && typ != SKELETON_KEY
+            && typ != MAGIC_MARKER && typ != TIN_OPENER && typ != SKELETON_KEY && typ != MASTER_KEY
             && typ != LOCK_PICK)
             return TRUE;
         if (Is_container(obj) && obj->cobj)

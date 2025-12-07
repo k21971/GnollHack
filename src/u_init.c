@@ -1451,7 +1451,7 @@ add_school_specific_spellbooks(VOID_ARGS)
             int i;
             for (i = 0; i < cnt; i++)
             {
-                struct obj* obj = mkobj_with_flags(SPBOOK_CLASS, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_NORMAL_SPELLBOOK);
+                struct obj* obj = mkobj_with_flags(SPBOOK_CLASS, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_NORMAL_SPELLBOOK);
                 int otyp = obj->otyp;
 
                 while (otyp == SPE_BLANK_PAPER
@@ -1480,7 +1480,7 @@ add_school_specific_spellbooks(VOID_ARGS)
                         ))
                 {
                     dealloc_obj(obj);
-                    obj = mkobj_with_flags(SPBOOK_CLASS, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_NORMAL_SPELLBOOK);
+                    obj = mkobj_with_flags(SPBOOK_CLASS, TRUE, FALSE, FALSE, (struct monst*)0, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_NORMAL_SPELLBOOK);
                     otyp = obj->otyp;
                 }
 
@@ -1488,6 +1488,7 @@ add_school_specific_spellbooks(VOID_ARGS)
                 if (OBJ_DESCR(objects[otyp]))
                     knows_object(otyp);
                 initialspell(obj);
+                Sprintf(priority_debug_buf_2, "add_school_specific_spellbooks: %d", obj->otyp);
                 useup(obj);
             }
         }
@@ -2065,6 +2066,7 @@ register const struct trobj * trop;
             if (obj->oclass == SPBOOK_CLASS && obj->otyp != SPE_BLANK_PAPER)
             {
                 initialspell(obj);
+                Sprintf(priority_debug_buf_2, "ini_inv: %d", obj->otyp);
                 useup(obj);
             }
             quan--; /* make a similar object */

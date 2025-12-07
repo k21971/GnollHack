@@ -338,6 +338,7 @@ int ef_flags;
             costly_alteration(otmp, cost_type);
 
         setnotworn(otmp);
+        Sprintf(priority_debug_buf_3, "erode_obj: %d", otmp->otyp);
         delobj(otmp);
         return ER_DESTROYED;
     } 
@@ -749,7 +750,7 @@ int *fail_reason;
     if (!mon) 
     {
         if (fail_reason)
-            *fail_reason = unique_corpstat(&mons[statue->corpsenm])
+            *fail_reason = statue->corpsenm >= LOW_PM && unique_corpstat(&mons[statue->corpsenm])
                                ? AS_MON_IS_UNIQUE
                                : AS_NO_MON;
         return (struct monst *) 0;
@@ -883,6 +884,7 @@ int *fail_reason;
     if (statue->owornmask)
         remove_worn_item(statue, TRUE);
     /* statue no longer exists */
+    Sprintf(priority_debug_buf_3, "animate_statue: %d", statue->otyp);
     delobj(statue);
 
     /* avoid hiding under nothing */
@@ -1147,8 +1149,13 @@ unsigned short trflags;
         else if (thitu(8, weapon_total_dmg_value(otmp, &youmonst, (struct monst*)0, 1), &otmp, (const char*)0, (struct monst*)0, (char*)0))
         {
             if (otmp)
-                obfree(otmp, (struct obj *) 0);
-        } else {
+            {
+                Sprintf(priority_debug_buf_4, "dotrap: %d", otmp->otyp);
+                obfree(otmp, (struct obj*)0);
+            }
+        } 
+        else 
+        {
             place_object(otmp, u.ux, u.uy);
             if (!Blind)
                 otmp->dknown = 1;
@@ -1187,6 +1194,7 @@ unsigned short trflags;
                              /* if damage triggered life-saving,
                                 poison is limited to attrib loss */
                              0, TRUE, 2);
+                Sprintf(priority_debug_buf_4, "dotrap2: %d", otmp->otyp);
                 obfree(otmp, (struct obj *) 0);
             }
         } 
@@ -3490,6 +3498,8 @@ register struct monst *mtmp;
             {
                 multi = -1;
                 nomovemsg = "The explosion awakens you!";
+                nomovemsg_attr = ATR_NONE;
+                nomovemsg_color = NO_COLOR;
             }
             if (spef_on)
             {
@@ -3689,7 +3699,7 @@ const char *arg;
         if (!uarmg && !Stone_resistance)
             uwepgone();
     }
-    if (uarms && uarms->otyp == CORPSE
+    if (uarms && uarms->otyp == CORPSE && uarms->corpsenm >= LOW_PM
         && touch_petrifies(&mons[uarms->corpsenm]) && !Stone_resistance) {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s touch the %s corpse.", arg, corpse_monster_name(uarms));
         Sprintf(kbuf, "%s corpse", an(corpse_monster_name(uarms)));
@@ -3709,7 +3719,7 @@ boolean byplayer;
 {
     struct obj *mwep = MON_WEP(mon);
 
-    if (mwep && mwep->otyp == CORPSE && touch_petrifies(&mons[mwep->corpsenm])
+    if (mwep && mwep->otyp == CORPSE && mwep->corpsenm >= LOW_PM && touch_petrifies(&mons[mwep->corpsenm])
         && !resists_ston(mon)) {
         if (cansee(mon->mx, mon->my)) {
             pline("%s%s touches %s.", arg ? arg : "",
@@ -4344,7 +4354,8 @@ xchar x, y;
     if (catch_lit(obj))
         return FALSE;
 
-    if (Is_container(obj))
+    Sprintf(priority_debug_buf_2, "fire_damage: %d", obj->otyp);
+    if (Is_container(obj) && !oresist_fire(obj))
     {
         switch (obj->otyp) 
         {
@@ -4384,6 +4395,7 @@ xchar x, y;
             }
         }
         setnotworn(obj);
+        Sprintf(priority_debug_buf_3, "fire_damage: %d", obj->otyp);
         delobj(obj);
         return TRUE;
     } 
@@ -4415,6 +4427,7 @@ xchar x, y;
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s.", Yname2(obj),
                   destroy_strings[dindx][(obj->quan > 1L)]);
         setnotworn(obj);
+        Sprintf(priority_debug_buf_3, "fire_damage2: %d", obj->otyp);
         delobj(obj);
         return TRUE;
     } 
@@ -4429,6 +4442,7 @@ xchar x, y;
             pline("%s %s.", Yname2(obj),
                   destroy_strings[dindx][(obj->quan > 1L)]);
         setnotworn(obj);
+        Sprintf(priority_debug_buf_3, "fire_damage3: %d", obj->otyp);
         delobj(obj);
         return TRUE;
     }
@@ -4502,9 +4516,14 @@ xchar x, y;
         }
         if (carried(obj)) { /* shouldn't happen */
             remove_worn_item(obj, TRUE);
+            Sprintf(priority_debug_buf_3, "lava_damage: %d", obj->otyp);
             useupall(obj);
-        } else
+        }
+        else
+        {
+            Sprintf(priority_debug_buf_3, "lava_damage2: %d", obj->otyp);
             delobj(obj);
+        }
         return TRUE;
     }
     return fire_damage(obj, TRUE, x, y);
@@ -4726,6 +4745,7 @@ boolean force;
                     acid_ctx.unk_boom++;
             }
             setnotworn(obj);
+            Sprintf(priority_debug_buf_3, "water_damage: %d, %u", obj->otyp, obj->o_id);
             delobj(obj);
             if (update)
                 update_inventory();
@@ -4961,7 +4981,7 @@ drown()
        while still asleep; we can't do that the same way that waking
        due to combat is handled; note unmul() clears u.usleep */
     if (u.usleep)
-        unmul("Suddenly you wake up!");
+        unmul_ex(ATR_NONE, CLR_MSG_ATTENTION, "Suddenly you wake up!");
     /* being doused will revive from fainting */
     if (is_fainted())
         reset_faint();
@@ -6910,6 +6930,12 @@ boolean disarm;
             if (costly)
                 loss += stolen_value(obj, ox, oy, is_peaceful(shkp) != 0,
                                      TRUE);
+            struct obj* curr;
+            while ((curr = obj->cobj) != 0) {
+                obj_extract_self(curr);
+                dropy(curr);
+                (void)scatter(curr->ox, curr->oy, 3, VIS_EFFECTS | MAY_HIT | MAY_DESTROY | MAY_FRACTURE, curr);
+            }
             delete_contents(obj);
             /* unpunish() in advance if either ball or chain (or both)
                is going to be destroyed */
@@ -6918,13 +6944,15 @@ boolean disarm;
                                  && uball->ox == u.ux && uball->oy == u.uy)))
                 unpunish();
 
+            Strcpy(priority_debug_buf_3, "chest_trap");
             for (otmp = level.objects[u.ux][u.uy]; otmp; otmp = otmp2)
             {
                 otmp2 = otmp->nexthere;
                 if (costly)
-                    loss += stolen_value(otmp, otmp->ox, otmp->oy,
-                                         is_peaceful(shkp) != 0, TRUE);
+                    loss += stolen_value(otmp, otmp->ox, otmp->oy, is_peaceful(shkp) != 0, TRUE);
+                //context.suppress_container_deletion_warning = 1;
                 delobj(otmp);
+                //context.suppress_container_deletion_warning = 0;
             }
             wake_nearby();
             losehp(adjust_damage(d(6, 6), (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE), buf, KILLED_BY_AN);
@@ -7039,6 +7067,7 @@ boolean disarm;
                 exercise(A_DEX, FALSE);
 #endif
                 nomovemsg = You_can_move_again;
+                nomovemsg_attr = ATR_NONE;
                 nomovemsg_color = CLR_MSG_SUCCESS;
             }
             else
@@ -7391,7 +7420,10 @@ boolean nocorpse;
         stackobj(obj);
     }
     else if (obj)
+    {
+        Sprintf(priority_debug_buf_4, "thitm: %d", obj->otyp);
         obfree(obj, (struct obj*)0);
+    }
 
     return trapkilled;
 }
@@ -7444,26 +7476,29 @@ lava_effects()
          * make the player sink into the lava. Assumption: water walking only
          * comes from boots.
          */
-        if (uarmf && melts_in_lava(uarmf) && !uarmf->oerodeproof)
+        if (uarmf && melts_in_lava(uarmf) && !uarmf->oerodeproof && !oresist_fire(uarmf))
         {
             obj = uarmf;
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s into flame!", Yobjnam2(obj, "burst"));
             iflags.in_lava_effects++; /* (see above) */
             (void)Boots_off();
+            Sprintf(priority_debug_buf_2, "lava_effects: %d", obj->otyp);
+            Sprintf(priority_debug_buf_3, "lava_effects: %d", obj->otyp);
+            Sprintf(priority_debug_buf_4, "lava_effects: %d", obj->otyp);
             useup(obj);
             iflags.in_lava_effects--;
         }
 
         if (Walks_on_water)
         {
-            pline_The("%s here burns you!", hliquid("lava"));
+            pline_The_ex(ATR_NONE, CLR_MSG_WARNING, "%s here burns you!", hliquid("lava"));
             losehp(damage, lava_killer, KILLED_BY); /* lava damage */
             goto burn_stuff; /* Clears off in_use */
         }
         else
-            You("fall into the %s!", hliquid("lava"));
+            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "fall into the %s!", hliquid("lava"));
 
-        usurvive = Lifesaved || discover || wizard;
+        usurvive = Lifesaved || discover || wizard || ModernMode || CasualMode;
 
         /* prevent remove_worn_item() -> Boots_off(WATER_WALKING_BOOTS) ->
            spoteffects() -> lava_effects() recursion which would
@@ -7488,16 +7523,24 @@ lava_effects()
             }
             else if (obj->oartifact == ART_RULING_RING_OF_YENDOR)
             {
-                read_the_ruling_ring(obj);
+                if (usurvive)
+                    read_the_ruling_ring(obj);
             }
             else if (obj->in_use)
             {
                 if (obj->owornmask) 
-                {
-                    if (usurvive)
-                        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s into flame!", Yobjnam2(obj, "burst"));
                     remove_worn_item(obj, TRUE);
+                if (usurvive)
+                {
+                    if (obj->oclass == FOOD_CLASS || obj->oclass == REAGENT_CLASS)
+                        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s burnt to ashes!", Yobjnam2(obj, "are"));
+                    else if (is_fragile(obj)) /* Glass */
+                        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s!", Yobjnam2(obj, "melt"));
+                    else
+                        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s into flame!", Yobjnam2(obj, "burst"));
                 }
+                Sprintf(priority_debug_buf_3, "lava_effects2: %d", obj->otyp);
+                Sprintf(priority_debug_buf_4, "lava_effects2: %d", obj->otyp);
                 useupall(obj);
             }
         }

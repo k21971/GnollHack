@@ -57,24 +57,81 @@ public partial class App : Application
     protected override Window CreateWindow(IActivationState activationState)
     {
         Window window = new Window(new AppShell());
+        window.Activated += WindowActivated;
+        window.Deactivated += WindowDeactivated;
+        window.Destroying += WindowDestroying;
+        window.Stopped += Window_Stopped;
+        window.Resumed += Window_Resumed;
+        window.Created += Window_Created;
         return window;  
     }
 
-    protected override void OnStart()
+    private static void Window_Created(object sender, EventArgs e)
     {
-        base.OnStart();
+        GHApp.MaybeWriteGHLog("MAUI Window has been created.", true, "Window Information");
         GHApp.OnStart();
     }
 
-    protected override void OnSleep()
+    private static void Window_Resumed(object sender, EventArgs e)
     {
-        base.OnSleep();
+        GHApp.MaybeWriteGHLog("MAUI Window has been resumed.", true, "Window Information");
+        GHApp.OnResume();
+    }
+
+    private static void Window_Stopped(object sender, EventArgs e)
+    {
+        GHApp.MaybeWriteGHLog("MAUI Window has been stopped / entered background.", true, "Window Information");
         GHApp.OnSleep();
     }
 
-    protected override void OnResume()
+    private static void WindowActivated(object sender, EventArgs e)
     {
-        base.OnResume();
-        GHApp.OnResume();
+        GHApp.MaybeWriteGHLog("MAUI Window has been activated / focused.", true, "Window Information");
+        GHApp.OnFocus();
     }
+    private static void WindowDeactivated(object sender, EventArgs e)
+    {
+        GHApp.MaybeWriteGHLog("MAUI Window has been deactivated / unfocused.", true, "Window Information");
+        GHApp.OnUnfocus();
+    }
+    private static void WindowDestroying(object sender, EventArgs e)
+    {
+        GHApp.MaybeWriteGHLog("MAUI Window's native window is being destroyed.", true, "Window Information");
+        //Window window = sender as Window;
+        //if (window != null)
+        //{
+        //    window.Activated -= WindowActivated;
+        //    window.Deactivated -= WindowDeactivated;
+        //    window.Destroying -= WindowDestroying;
+        //    window.Stopped -= Window_Stopped;
+        //    window.Resumed -= Window_Resumed;
+        //    window.Created -= Window_Created;
+        //}
+    }
+
+    //protected override void OnStart()
+    //{
+    //    base.OnStart();
+    //    GHApp.OnStart();
+    //}
+
+    //protected override void OnSleep()
+    //{
+    //    base.OnSleep();
+    //    GHApp.OnSleep();
+    //}
+
+    //protected override void OnResume()
+    //{
+    //    base.OnResume();
+    //    GHApp.OnResume();
+    //}
+
+    protected override void CleanUp()
+    {
+        GHApp.RevertScreenResolution();
+        base.CleanUp();
+    }
+
+
 }

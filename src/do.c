@@ -24,7 +24,6 @@ STATIC_DCL int NDECL(currentlevel_rewrite);
 STATIC_DCL void NDECL(final_level);
 STATIC_DCL void FDECL(print_corpse_properties, (winid, int));
 STATIC_DCL void FDECL(revive_handle_magic_chest, (xchar*, struct obj**, int*, struct monst**));
-STATIC_DCL void FDECL(convert_dice_to_ranges, (char*));
 /* STATIC_DCL boolean FDECL(badspot, (XCHAR_P,XCHAR_P)); */
 STATIC_PTR int FDECL(CFDECLSPEC item_wiki_cmp, (const genericptr, const genericptr));
 
@@ -67,7 +66,7 @@ dodrop(VOID_ARGS)
     return result;
 }
 
-/* the M('y') command - Character statistics */
+/* the '}' command - Character statistics */
 int
 docharacterstatistics(VOID_ARGS)
 {
@@ -274,14 +273,11 @@ docharacterstatistics(VOID_ARGS)
         int64_t temporary_intrinsic = u.uprops[i].intrinsic & TIMEOUT;
         int64_t extrinsic = u.uprops[i].extrinsic;
         boolean is_recurring = property_definitions[i].recurring;
-        boolean o_stats_known = FALSE;
         if (extrinsic)
         {
-            obj = what_gives(i);
-            if (obj)
-                o_stats_known = object_stats_known(obj);
+            obj = what_gives(i, TRUE);
         }
-        if (innate_intrinsic || o_stats_known || (temporary_intrinsic && !is_recurring))
+        if (innate_intrinsic || obj || (temporary_intrinsic && !is_recurring))
         {
             intrinsic_count++;
 
@@ -319,7 +315,7 @@ docharacterstatistics(VOID_ARGS)
 
                 Sprintf(eos(dbuf3), "polymorphed form");
             }
-            else if (o_stats_known)
+            else if (obj)
             {
                 if (strcmp(dbuf3, ""))
                     Sprintf(eos(dbuf3), ", ");
@@ -1219,6 +1215,9 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                         break;
                     case EDIBLEFX_CURE_PETRIFICATION:
                         Strcpy(buf2, "Cures petrification");
+                        break;
+                    case EDIBLEFX_CURE_TELEPORTITIS:
+                        Strcpy(buf2, "Cures teleportitis");
                         break;
                     default:
                         break;
@@ -4440,7 +4439,8 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
 
     /* Note if used as a component for a spell */
-    if (obj && objects[otyp].oc_name_known)
+    if (obj && objects[otyp].oc_name_known && !objects[otyp].oc_unique && !obj->owornmask && !obj->oartifact
+        && !is_obj_unremovable_from_the_game(obj) && !is_obj_indestructible(obj))
     {
         int spellcnt = 0;
         for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++)
@@ -4474,10 +4474,10 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
     else if (!obj)
     {
         int spellcnt = 0;
-        short* spellbook_indices = (short*)alloc(MAXSPELL * sizeof(short));
+        short* spellbook_indices = (short*)alloc((SPE_BLANK_PAPER - FIRST_SPELL) * sizeof(short));
         memset(spellbook_indices, 0, MAXSPELL * sizeof(short));
 
-        for (i = FIRST_SPELL; i < FIRST_SPELL + MAXSPELL; i++)
+        for (i = FIRST_SPELL; i < SPE_BLANK_PAPER; i++)
         {
             if (is_otyp_component_for_spellbook(i, otyp, (uint64_t*)0, (int*)0) > 0)
             {
@@ -4584,8 +4584,9 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         putstr(datawin, ATR_HEADING, buf);
 
         size_t desclen = strlen(OBJ_ITEM_DESC(otyp));
-        char* descbuf = (char*)alloc(desclen + 10);
+        char* descbuf = (char*)alloc(desclen + BUFSZ);
         Strcpy(descbuf, OBJ_ITEM_DESC(otyp));
+        convert_dice_to_ranges(descbuf);
         char* bp = descbuf;
         char* ebp;
         while (bp && *bp)
@@ -4664,7 +4665,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     if ((is_thrown_weapon_only(obj) || is_ammo(obj)) && !(obj == uwep || obj == uwep2 || obj == uswapwep || obj == uswapwep2))
                     {
                         roll_to_hit = -1 + Luck + u_ranged_strdex_to_hit_bonus() + find_mac(&youmonst) + u.ubasehitinc + u.uhitinc
-                            + maybe_polyd(youmonst.data->mlevel, u.ulevel);
+                            + maybe_polyd((int)youmonst.data->mlevel, u.ulevel);
 
                         roll_to_hit += omon_adj(&youmonst, obj, FALSE);
 
@@ -4848,8 +4849,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             stats_ptr->mc_bonus = totalmcbonus;
         }
 
-        if ((stats_known && (is_armor(obj) || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED)))
-            || totalacbonus != 0 || totalmcbonus != 0 || (has_obj_mythic_defense(obj) && obj->mknown))
+        if (is_armor(obj) || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || (has_obj_mythic_defense(obj) && obj->mknown))
         {
             armor_stats_printed = TRUE;
             int powercnt = 0;
@@ -4903,7 +4903,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     }
                 }
             }
-            if (u.twoweap && uwep2 && is_wieldable_weapon(uwep2) && !bimanual(obj) && !is_ammo(obj) && !is_launcher(obj) && !is_thrown_weapon_only(obj) && !is_boots(obj) && !is_gloves(obj) && obj != uwep2 && obj != uwep)
+            if (u.twoweap && uwep2 && is_wieldable_weapon(uwep2) && is_wieldable_weapon(obj) && !bimanual(obj) && !is_ammo(obj) && !is_launcher(obj) && !is_thrown_weapon_only(obj) && !is_boots(obj) && !is_gloves(obj) && obj != uwep2 && obj != uwep)
             {
                 struct obj* cwep2 = uwep2;
                 struct item_description_stats cwep2_stats = { 0 };
@@ -5178,9 +5178,9 @@ struct permonst* ptr;
     int relevant_level = !mon || is_you ? ptr->mlevel : mon->m_lev;
 
     Strcpy(buf2, "");
-    if (relevant_level != ptr->mlevel)
+    if (relevant_level != (int)ptr->mlevel)
     {
-        Sprintf(buf2, " (base %d)", ptr->mlevel);
+        Sprintf(buf2, " (base %d)", (int)ptr->mlevel);
     }
 
     Sprintf(buf, "Hit dice:               %d%s", relevant_level, buf2);    
@@ -5252,7 +5252,7 @@ struct permonst* ptr;
 
     if (mon && !is_neuter(ptr))
     {
-        Sprintf(buf, "Gender:                 %s", mon->female ? "Female" : "Male");
+        Sprintf(buf, "Gender:                 %s", (is_you ? flags.female : mon->female) ? "Female" : "Male");
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -5496,6 +5496,9 @@ boolean pushing;
         }
 
         /* boulder is now gone */
+        Sprintf(priority_debug_buf_2, "boulder_hits_pool: %d", otmp->otyp);
+        Sprintf(priority_debug_buf_3, "boulder_hits_pool: %d", otmp->otyp);
+        Sprintf(priority_debug_buf_4, "boulder_hits_pool: %d", otmp->otyp);
         if (pushing)
             delobj(otmp);
         else
@@ -5643,8 +5646,11 @@ const char *verb;
          */
         if ((t = t_at(x, y)) != 0)
             deltrap(t);
-        if(obj)
+        if (obj)
+        {
+            Sprintf(priority_debug_buf_2, "flooreffects: %d", obj->otyp);
             useupf(obj, 1L);
+        }
         bury_objs(x, y);
         newsym(x, y);
         return TRUE;
@@ -5929,6 +5935,7 @@ register struct obj *obj;
                           otense(otmp, "vanish"));
                     ideed = TRUE;
                 }
+                Sprintf(priority_debug_buf_3, "dosinkring: %d", otmp->otyp);
                 delobj(otmp);
             }
         }
@@ -6027,8 +6034,14 @@ register struct obj *obj;
         obj->ox = u.ux;
         obj->oy = u.uy;
         add_to_buried(obj);
-    } else
+    }
+    else
+    {
+        Sprintf(priority_debug_buf_2, "dosinkring: %d", obj->otyp);
+        Strcpy(priority_debug_buf_3, "dosinkring");
+        Strcpy(priority_debug_buf_4, "dosinkring");
         useup(obj);
+    }
 }
 
 /* some common tests when trying to drop or throw items */
@@ -6263,7 +6276,7 @@ boolean with_impact;
         { /* mon doesn't pick up ball */
             if (obj->otyp == CORPSE)
             {
-                could_petrify = touch_petrifies(&mons[obj->corpsenm]);
+                could_petrify = obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]);
                 could_poly = polyfodder(obj);
                 could_slime = (obj->corpsenm == PM_GREEN_SLIME);
                 could_grow = (obj->corpsenm == PM_WRAITH || obj->corpsenm == PM_SPECTRE || obj->corpsenm == PM_KING_WRAITH);
@@ -6273,7 +6286,7 @@ boolean with_impact;
             if (is_unpaid(obj))
                 (void) stolen_value(obj, u.ux, u.uy, TRUE, FALSE);
 
-            (void) mpickobj(u.ustuck, obj);
+            int was_obj_freed = mpickobj(u.ustuck, obj);
 
             if (is_animal(u.ustuck->data)) 
             {
@@ -6281,7 +6294,11 @@ boolean with_impact;
                 {
                     (void) newcham(u.ustuck, could_poly ? (struct permonst *) 0 : &mons[PM_GREEN_SLIME], 0,
                                    FALSE, could_slime);
-                    delobj(obj); /* corpse is digested */
+                    if (!was_obj_freed)
+                    {
+                        Sprintf(priority_debug_buf_3, "dropz1: %d", obj->otyp);
+                        delobj(obj); /* corpse is digested */
+                    }
                 }
                 else if (could_petrify) 
                 {
@@ -6289,18 +6306,29 @@ boolean with_impact;
                     (void)set_mon_property_verbosely(u.ustuck, STONED, max(1, min(existing_stoning - 1, 5)));
                     //minstapetrify(u.ustuck, TRUE);
                     /* Don't leave a cockatrice corpse in a statue */
-                    if (!u.uswallow)
+                    if (!u.uswallow && !was_obj_freed)
+                    {
+                        Sprintf(priority_debug_buf_3, "dropz2: %d", obj->otyp);
                         delobj(obj);
+                    }
                 } 
                 else if (could_grow)
                 {
                     (void) grow_up(u.ustuck, (struct monst *) 0);
-                    delobj(obj); /* corpse is digested */
+                    if (!was_obj_freed)
+                    {
+                        Sprintf(priority_debug_buf_3, "dropz3: %d", obj->otyp);
+                        delobj(obj); /* corpse is digested */
+                    }
                 } 
                 else if (could_heal)
                 {
                     u.ustuck->mhp = u.ustuck->mhpmax;
-                    delobj(obj); /* corpse is digested */
+                    if (!was_obj_freed)
+                    {
+                        Sprintf(priority_debug_buf_3, "dropz4: %d", obj->otyp);
+                        delobj(obj); /* corpse is digested */
+                    }
                 }
             }
         }
@@ -7067,6 +7095,7 @@ save_currentstate()
         fd = currentlevel_rewrite();
         if (fd < 0)
             return;
+        Sprintf(priority_debug_buf_4, "save_currentstate (fd=%d)", fd);
         bufon(fd);
         savelev(fd, ledger_no(&u.uz), WRITE_SAVE);
         bclose(fd);
@@ -7266,7 +7295,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     u.ustuck = 0; /* idem */
     u.uinwater = 0;
     u.uundetected = 0; /* not hidden, even if means are available */
-    keepdogs(context.reviving, TRUE);
+    move_monsters_to_mydogs(context.reviving, TRUE);
     removealtarsummons();
     if (u.uswallow) /* idem */
         u.uswldtim = u.uswallow = 0;
@@ -7289,6 +7318,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     if (!cant_go_back) 
     {
         update_mlstmv(); /* current monsters are becoming inactive */
+        Sprintf(priority_debug_buf_4, "goto_level (fd=%d)", fd);
         bufon(fd);       /* use buffered output */
     }
 
@@ -7518,12 +7548,12 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     if (Punished)
         placebc();
     obj_delivery(FALSE);
-    losedogs();
+    arrival_from_mydogs_and_migrating_mons();
     kill_genocided_monsters(); /* for those wiped out while in limbo */
     /*
      * Expire all timers that have gone off while away.  Must be
      * after migrating monsters and objects are delivered
-     * (losedogs and obj_delivery).
+     * (arrival_from_mydogs_and_migrating_mons and obj_delivery).
      */
     run_timers();
 
@@ -8360,13 +8390,18 @@ anything *arg;
 int64_t timeout UNUSED;
 {
     struct obj *body = arg->a_obj;
-    struct permonst *mptr = &mons[body->corpsenm];
+    struct permonst *mptr = body->corpsenm >= LOW_PM ? &mons[body->corpsenm] : 0;
     struct monst *mtmp;
     xchar x, y;
 
+    if (!mptr)
+        return;
+
+    int body_where = body->where;
+
     /* corpse will revive somewhere else if there is a monster in the way;
        Riders get a chance to try to bump the obstacle out of their way */
-    if ((mptr->mflags3 & M3_DISPLACES) != 0 && body->where == OBJ_FLOOR
+    if ((mptr->mflags3 & M3_DISPLACES) != 0 && body_where == OBJ_FLOOR
         && get_obj_location(body, &x, &y, 0) && (mtmp = m_at(x, y)) != 0) {
         boolean notice_it = canseemon(mtmp); /* before rloc() */
         char *monname = Monnam(mtmp);
@@ -8382,16 +8417,25 @@ int64_t timeout UNUSED;
     }
 
     /* if we succeed, the corpse is gone */
-    if (!revive_corpse(body)) {
+    if (!revive_corpse(body)) 
+    {
         int64_t when;
         int action;
 
-        if (is_rider_or_tarrasque(mptr) && rn2(99)) { /* Rider usually tries again */
+        if (is_rider_or_tarrasque(mptr) && (body_where == OBJ_MAGIC || rn2(99)))  /* Rider usually tries again; and always if in magic chest */
+        {
             action = REVIVE_MON;
-            for (when = 3L; when < 67L; when++)
-                if (!rn2(3))
-                    break;
-        } else { /* rot this corpse away */
+            if (body_where == OBJ_MAGIC) /* While in a magic chest that cannot be located, try to revive every 9 turns in the case player changed levels, recovered the magic chest, or the like */
+                when = 9L;
+            else
+            {
+                for (when = 3L; when < 67L; when++)
+                    if (!rn2(3))
+                        break;
+            }
+        } 
+        else 
+        { /* rot this corpse away */
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless hassled.", is_rider_or_tarrasque(mptr) ? "much " : "");
             action = ROT_CORPSE;
             when = 250L - (monstermoves - body->age);
@@ -8453,7 +8497,7 @@ dowipe()
 
         static NEARDATA char buf[39];
         Sprintf(buf, "wiping off your %s", body_part(FACE));
-        set_occupation(wipeoff, buf, used_oss, OCCUPATION_WIPING_OFF, OCCUPATION_SOUND_TYPE_START, 0);
+        set_occupation(wipeoff, buf, ATR_NONE, CLR_MSG_ATTENTION, used_oss, OCCUPATION_WIPING_OFF, OCCUPATION_SOUND_TYPE_START, 0);
         /* Not totally correct; what if they change back after now
          * but before they're finished wiping?
          */
@@ -9220,7 +9264,7 @@ check_mobbed_hint(VOID_ARGS)
                 continue;
 
             mtmp = m_at(x, y);
-            if (mtmp && !is_peaceful(mtmp) && !is_tame(mtmp) && canspotmon(mtmp))
+            if (mtmp && !DEADMONSTER(mtmp) && !is_peaceful(mtmp) && !is_tame(mtmp) && canspotmon(mtmp))
             {
                 cnt++;
             }

@@ -353,17 +353,19 @@ namespace GnollHackX
                 int autodraw = GHApp.Tile2Autodraw[ntile];
                 int anim_frame_idx = 0, main_tile_idx = 0;
                 sbyte mapAnimated = 0;
-                long counter_value = 0;
                 int tile_animation_idx = GHApp.GnollHackService.GetTileAnimationIndexFromGlyph(abs_glyph);
-                if (refPage == null)
+                
+                long counter_value;
+                GHGame ghGame = GHApp.CurrentGHGame;
+                if (ghGame == null)
                 {
                     counter_value = 0;
                 }
                 else
                 {
-                    lock (refPage.AnimationTimerLock)
+                    //lock (refPage.AnimationTimerLock)
                     {
-                        counter_value = refPage.AnimationTimers.general_animation_counter;
+                        counter_value = Interlocked.CompareExchange(ref ghGame.AnimationTimers.general_animation_counter, 0L, 0L);;
                     }
                 }
                 ntile = GHApp.GnollHackService.GetAnimatedTile(ntile, tile_animation_idx, (int)animation_play_types.ANIMATION_PLAY_TYPE_ALWAYS, counter_value, out anim_frame_idx, out main_tile_idx, out mapAnimated, ref autodraw);
@@ -384,7 +386,11 @@ namespace GnollHackX
                     else if (isHighlighted)
                         paint.ColorFilter = UIUtils.HighlightColorFilter;
 
-                    paint.Color = paint.Color.WithAlpha((byte)(0xFF * Math.Min(1.0f, Math.Max(0.0f, Opacity))));
+                    float opaqueness = 1.0f;
+                    if (ObjData != null && ObjData.OtypData.semitransparent != 0)
+                        opaqueness = 0.5f;
+
+                    paint.Color = paint.Color.WithAlpha((byte)(0xFF * Math.Min(1.0f, Math.Max(0.0f, opaqueness * Opacity))));
 
                     if (enlargement_idx == 0)
                     {

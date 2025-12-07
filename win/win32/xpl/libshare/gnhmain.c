@@ -44,7 +44,7 @@ char** argv;
 {
     FILE* fp;
     uchar resuming = FALSE; /* assume new game */
-    int exit_hack_code_at_start = exit_hack_code; /* if 1, then the game is restarting after saving; sys_early_init will set to zero */
+    int exit_hack_code_at_start = exit_hack_code; /* if 1, then the game is restarting after saving, 2 if restarting after the game window got destroyed by the OS; sys_early_init will set to zero */
 
     sys_early_init();
     lib_init_platform();
@@ -66,7 +66,7 @@ char** argv;
 
     /* Now initialize windows */
     choose_windows(DEFAULT_WINDOW_SYS);
-    maybe_issue_simple_gui_command(!exit_hack_code_at_start, GUI_CMD_LOAD_GLYPHS);
+    maybe_issue_simple_gui_command(exit_hack_code_at_start != 1, GUI_CMD_LOAD_GLYPHS);
     init_nhwindows(&argc, argv);
     maybe_issue_simple_gui_command(!exit_hack_code_at_start, GUI_CMD_SET_TO_BLACK);
     process_options_file();
@@ -131,11 +131,11 @@ char** argv;
     }
     else
     {
-        resuming = exit_hack_code_at_start == 1 ? 2 : TRUE;
+        resuming = exit_hack_code_at_start > 0 ? 2 : TRUE;
     }
     notify_gui_pregame();
     moveloop(resuming);
-    gnollhack_exit(EXIT_SUCCESS);
+    nh_terminate(EXIT_SUCCESS);
     return (0);
 }
 
@@ -146,6 +146,8 @@ notify_gui_pregame(VOID_ARGS)
     issue_simple_gui_command(CasualMode ? GUI_CMD_ENABLE_CASUAL_MODE : GUI_CMD_DISABLE_CASUAL_MODE); /* Notification may be needed if loaded a casual mode saved game */
     issue_simple_gui_command(TournamentMode ? GUI_CMD_ENABLE_TOURNAMENT_MODE : GUI_CMD_DISABLE_TOURNAMENT_MODE); /* Notification may be needed if loaded a tournament mode saved game */
     issue_boolean_gui_command(GUI_CMD_TOGGLE_CHARACTER_CLICK_ACTION, flags.self_click_action); /* Notification is needed */
+    issue_boolean_gui_command(GUI_CMD_TOGGLE_AUTODIG, flags.autodig); /* Notification is needed */
+    issue_boolean_gui_command(GUI_CMD_TOGGLE_IGNORE_STOPPING, flags.ignore_stopping); /* Notification is needed */
     issue_boolean_gui_command(GUI_CMD_TOGGLE_DICE_AS_RANGES, iflags.show_dice_as_ranges); /* Since this is an iflag, notification is really not needed but good to make sure that things align and for debug purposes */
     issue_boolean_gui_command(GUI_CMD_TOGGLE_GETPOS_ARROWS, iflags.getpos_arrows); /* Since this is an iflag, notification is really not needed but good to make sure that things align and for debug purposes */
     issue_gui_command(GUI_CMD_REPORT_MOUSE_COMMAND, (int)flags.right_click_command, 0, (const char*)0); /* Notification is needed */

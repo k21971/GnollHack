@@ -9,6 +9,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace GnollHackX
 {
@@ -32,7 +33,7 @@ namespace GnollHackX
         Worn
     }
 
-    public class GHPadding
+    public sealed class GHPadding
     {
         public GHPadding(float left, float top, float right, float bottom)
         {
@@ -47,14 +48,13 @@ namespace GnollHackX
         public float Bottom { get; set; }
     }
 
-    public class GHWindow
+    public sealed class GHWindow
     {
         private GHWinType _winType = 0;
         private ghwindow_styles _winStyle = 0;
         private int _glyph;
         private ObjectDataItem _objdata = null;
         public ObjectDataItem ObjData { get { return _objdata; } set { _objdata = value; } }
-        private GamePage _gamePage;
         private GHGame _currentGame;
         private int _winId;
         private bool _useUpperSide;
@@ -200,16 +200,18 @@ namespace GnollHackX
         public GHMenuInfo MenuInfo { get; set; }
 
         private List<GHMenuItem> _selectedMenuItems = null;
-        private object _selectedMenuItemsLock = new object();
+        //private readonly object _selectedMenuItemsLock = new object();
         public List<GHMenuItem> SelectedMenuItems
         {
-            get { lock (_selectedMenuItemsLock) { return _selectedMenuItems; } }
-            set { lock (_selectedMenuItemsLock) { _selectedMenuItems = value; } }
+            //get { lock (_selectedMenuItemsLock) { return _selectedMenuItems; } }
+            //set { lock (_selectedMenuItemsLock) { _selectedMenuItems = value; } }
+            get { return Interlocked.CompareExchange(ref _selectedMenuItems, null, null); }
+            set { Interlocked.Exchange(ref _selectedMenuItems, value); }
         }
 
         public bool WasCancelled { get; set; } = false;
 
-        public GHWindow(GHWinType winType, ghwindow_styles winStyle, int glyph, bool useUpperSide, bool useSpecialSymbols, bool ascension, ObjectDataItem objdata, GamePage gamePage, int winid)
+        public GHWindow(GHWinType winType, ghwindow_styles winStyle, int glyph, bool useUpperSide, bool useSpecialSymbols, bool ascension, ObjectDataItem objdata, int winid)
         {
             _winType = winType;
             _winStyle = winStyle;
@@ -218,8 +220,7 @@ namespace GnollHackX
             _useSpecialSymbols = useSpecialSymbols;
             _ascension = ascension;
             _objdata = objdata;
-            _gamePage = gamePage;
-            _currentGame = gamePage.CurrentGame;
+            _currentGame = GHApp.CurrentGHGame;
             _winId = winid;
         }
 
@@ -304,7 +305,7 @@ namespace GnollHackX
         public WeakReference<GHWindow> ClonedFrom = null;
         public GHWindow Clone()
         {
-            GHWindow clone = new GHWindow(_winType, _winStyle, _glyph, _useUpperSide, _useSpecialSymbols, _ascension, _objdata, _gamePage, _winId);
+            GHWindow clone = new GHWindow(_winType, _winStyle, _glyph, _useUpperSide, _useSpecialSymbols, _ascension, _objdata, _winId);
             List<GHPutStrItem> clonestrs = new List<GHPutStrItem>();
             foreach (GHPutStrItem item in PutStrs)
             {
@@ -420,14 +421,14 @@ namespace GnollHackX
                     {
                         for (int i = 0; i < CursY - PutStrs.Count + 1; i++)
                         {
-                            PutStrs.Add(new GHPutStrItem(_gamePage, this, ""));
+                            PutStrs.Add(new GHPutStrItem(this, ""));
                         }
                     }
 
                     if (CursY >= 0)
                     {
                         if (PutStrs[CursY] == null)
-                            PutStrs[CursY] = new GHPutStrItem(_gamePage, this, "");
+                            PutStrs[CursY] = new GHPutStrItem(this, "");
                         else if (PutStrs[CursY].Text == null)
                             PutStrs[CursY].Text = "";
 
@@ -538,14 +539,14 @@ namespace GnollHackX
                         {
                             for (int i = 0; i < CursY - PutStrs.Count + 1; i++)
                             {
-                                PutStrs.Add(new GHPutStrItem(_gamePage, this, ""));
+                                PutStrs.Add(new GHPutStrItem(this, ""));
                             }
                         }
 
                         if (CursY >= 0)
                         {
                             if (PutStrs[CursY] == null)
-                                PutStrs[CursY] = new GHPutStrItem(_gamePage, this, "");
+                                PutStrs[CursY] = new GHPutStrItem(this, "");
                             else if (PutStrs[CursY].Text == null)
                                 PutStrs[CursY].Text = "";
 

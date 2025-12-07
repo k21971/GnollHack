@@ -13,11 +13,16 @@ using Microsoft.Maui.Platform;
 using Android.OS;
 using Android.Views;
 using Android.Content;
+using static Android.Provider.CalendarContract;
+using Microsoft.Maui.Controls.PlatformConfiguration;
+using AndroidX.Core.App;
+using Android.Content.PM;
 
 #endif
 
 #if IOS
 using GnollHackM.Platforms.iOS;
+using UIKit;
 #endif
 
 #if WINDOWS
@@ -34,6 +39,8 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using System.Text;
+using System.Reflection.Emit;
+using System.Reflection.Metadata;
 #endif
 #endif
 
@@ -79,6 +86,7 @@ public static class MauiProgram
                   options.ProfilesSampleRate = 1.0;
 
                   // Other Sentry options can be set here.
+                  options.CaptureFailedRequests = false;
             })
 #endif
 #if SENTRY && WINDOWS
@@ -112,6 +120,9 @@ public static class MauiProgram
                     // prefer profiling to start asynchronously
                     TimeSpan.FromMilliseconds(500)
                 ));
+
+                // Other Sentry options can be set here.
+                options.CaptureFailedRequests = false;
             })
 #endif
 
@@ -121,48 +132,48 @@ public static class MauiProgram
                 // Make sure to add "using Microsoft.Maui.LifecycleEvents;" in the top of the file 
                 events.AddWindows(windowsLifecycleBuilder =>
                 {
-                    windowsLifecycleBuilder.OnPlatformMessage((window, e) => 
-                    {
-                        switch(e.MessageId)
-                        {
-                            case 0x0112: /* WM_SYSCOMMAND */
-                                {
-                                    switch (e.WParam)
-                                    {
-                                        case 0xF100:
-                                            //System.Diagnostics.Debug.WriteLine("MenuKey Pressed!");
-                                            return;
-                                        case 0xF020:
-                                            //System.Diagnostics.Debug.WriteLine("Minimizing!");
-                                            break;
-                                        case 0xF120:
-                                            //System.Diagnostics.Debug.WriteLine("Restoring!");
-                                            GHApp.DoKeyboardFocus();
-                                            break;
-                                    }
+                    //windowsLifecycleBuilder.OnPlatformMessage((window, e) => 
+                    //{
+                    //    switch(e.MessageId)
+                    //    {
+                    //        case 0x0112: /* WM_SYSCOMMAND */
+                    //            {
+                    //                switch (e.WParam)
+                    //                {
+                    //                    case 0xF100:
+                    //                        //GHApp.MaybeWriteLowLevelGHLog("MenuKey Pressed!");
+                    //                        return;
+                    //                    case 0xF020:
+                    //                        //GHApp.MaybeWriteLowLevelGHLog("Minimizing!");
+                    //                        break;
+                    //                    case 0xF120:
+                    //                        //GHApp.MaybeWriteLowLevelGHLog("Restoring!");
+                    //                        GHApp.DoKeyboardFocus();
+                    //                        break;
+                    //                }
 
-                                }
-                                break;
-                            case 0x0005: /* WM_SIZE */
-                                {
-                                    switch (e.WParam)
-                                    {
-                                        case 0:
-                                            //System.Diagnostics.Debug.WriteLine("SIZE_RESTORED!");
-                                            GHApp.DoKeyboardFocus();
-                                            break;
-                                        case 1:
-                                            //System.Diagnostics.Debug.WriteLine("SIZE_MINIMIZED!");
-                                            break;
-                                        case 2:
-                                            //System.Diagnostics.Debug.WriteLine("SIZE_MAXIMIZED!");
-                                            GHApp.DoKeyboardFocus();
-                                            break;
-                                    }
-                                }
-                                break;
-                        }
-                    });
+                    //            }
+                    //            break;
+                    //        case 0x0005: /* WM_SIZE */
+                    //            {
+                    //                switch (e.WParam)
+                    //                {
+                    //                    case 0:
+                    //                        //GHApp.MaybeWriteLowLevelGHLog("SIZE_RESTORED!");
+                    //                        GHApp.DoKeyboardFocus();
+                    //                        break;
+                    //                    case 1:
+                    //                        //GHApp.MaybeWriteLowLevelGHLog("SIZE_MINIMIZED!");
+                    //                        break;
+                    //                    case 2:
+                    //                        //GHApp.MaybeWriteLowLevelGHLog("SIZE_MAXIMIZED!");
+                    //                        GHApp.DoKeyboardFocus();
+                    //                        break;
+                    //                }
+                    //            }
+                    //            break;
+                    //    }
+                    //});
                     windowsLifecycleBuilder.OnWindowCreated(window =>
                     {
                         GHApp.WindowsXamlWindow = window;
@@ -187,12 +198,15 @@ public static class MauiProgram
                             if(GHApp.CurrentGamePage != null)
                             {
                                 e.Cancel = true;
-                                GHApp.CurrentGamePage?.GenericButton_Clicked(s, new EventArgs(), GHUtils.Meta('s'));
+                                GHApp.CurrentGamePage?.GenericButton_Clicked(s, EventArgs.Empty, GHUtils.Meta('s'));
                             }
                             else
                             {
                                 GHApp.SaveWindowPosition();
-                                GHApp.FmodService?.StopAllSounds((uint)StopSoundFlags.All, 0U);
+                                //GHApp.FmodService?.StopAllGameSounds((uint)StopSoundFlags.All, 0U);
+                                GHGame curGame = GHApp.CurrentGHGame;
+                                curGame?.ResponseQueue.Enqueue(new GHResponse(curGame, GHRequestType.StopAllGameSounds));
+                                GHApp.FmodService?.StopAllUISounds();
                             }
                         };
 
@@ -271,14 +285,21 @@ public static class MauiProgram
                                             isMaximized = true;
                                         }
                                     }
-                                    Preferences.Set("WindowedSizeDisplayDensity", GHApp.DisplayDensity);
-                                    Preferences.Set("WindowedSizeIsMaximized", isMaximized);
-                                    if (!isMaximized)
+                                    try
                                     {
-                                        Preferences.Set("WindowedSizeX", sender.Position.X);
-                                        Preferences.Set("WindowedSizeY", sender.Position.Y);
-                                        Preferences.Set("WindowedSizeWidth", sender.Size.Width);
-                                        Preferences.Set("WindowedSizeHeight", sender.Size.Height);
+                                        Preferences.Set("WindowedSizeDisplayDensity", GHApp.DisplayDensity);
+                                        Preferences.Set("WindowedSizeIsMaximized", isMaximized);
+                                        if (!isMaximized)
+                                        {
+                                            Preferences.Set("WindowedSizeX", sender.Position.X);
+                                            Preferences.Set("WindowedSizeY", sender.Position.Y);
+                                            Preferences.Set("WindowedSizeWidth", sender.Size.Width);
+                                            Preferences.Set("WindowedSizeHeight", sender.Size.Height);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        GHApp.MaybeWriteLowLevelGHLog(ex.Message);
                                     }
                                 }
                             };
@@ -295,13 +316,15 @@ public static class MauiProgram
                         {
                             // Focused
                             GHApp.WindowFocused = true;
-                            Debug.WriteLine("Window is focused.");
+                            GHApp.UnfocusedMuteMode = false;
+                            GHApp.MaybeWriteLowLevelGHLog("Window is focused.");
                         }
                         else
                         {
                             // Not focused
                             GHApp.WindowFocused = false;
-                            Debug.WriteLine("Window is not focused.");
+                            GHApp.UnfocusedMuteMode = true;
+                            GHApp.MaybeWriteLowLevelGHLog("Window is not focused.");
                         }
                     });
                 });
@@ -309,12 +332,12 @@ public static class MauiProgram
 #endif
             .ConfigureLifecycleEvents(static lifecycleBuilder =>
             {
-            #if ANDROID
+#if ANDROID
                 lifecycleBuilder.AddAndroid(androidLifecycleBuilder =>
                 {
                     androidLifecycleBuilder.OnCreate((activity, savedInstance) =>
                     {
-                        if (activity is ComponentActivity componentActivity)
+                        if (activity is AndroidX.Activity.ComponentActivity componentActivity)
                         {
                             componentActivity.GetFragmentManager()?.RegisterFragmentLifecycleCallbacks(new MyFragmentLifecycleCallbacks((fragmentManager, fragment) =>
                             {
@@ -357,8 +380,58 @@ public static class MauiProgram
                             }), false);
                         }
                     });
+                    //androidLifecycleBuilder.OnPause((activity) =>
+                    //{
+                    //    _ = Task.Run(async () => await GHApp.SaveGameOnSleepAsync());
+                    //});
+                    //androidLifecycleBuilder.OnStop((activity) =>
+                    //{
+                    //    var intent = new Intent(Android.App.Application.Context, typeof(SaveGameService));
+                    //    Android.App.Application.Context.StartService(intent);
+                    //});
+                    androidLifecycleBuilder.OnPause((activity) =>
+                    {
+                        try
+                        {
+                            GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 1");
+                            if (activity.IsFinishing || !activity.HasWindowFocus)
+                            {
+                                GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 2");
+                                var intent = new Intent(Android.App.Application.Context, typeof(SaveGameService));
+                                AndroidX.Core.Content.ContextCompat.StartForegroundService(Android.App.Application.Context, intent);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            GHApp.MaybeWriteGHLog(ex.Message);
+                        }
+                    });
                 });
-            #endif
+#endif
+#if IOS
+            lifecycleBuilder.AddiOS(ios =>
+            {
+                ios.OnResignActivation((app) =>
+                {
+                    GHApp.BackgroundTaskId = UIApplication.SharedApplication.BeginBackgroundTask("SaveGameTask", () =>
+                    {
+                        GHApp.EndBackgroundTask();
+                    });
+
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await GHApp.SaveGameOnSleepAsync();
+                        }
+                        finally
+                        {
+                            GHApp.EndBackgroundTask();
+                        }
+                    });
+                });
+            });
+#endif
             })
             .ConfigureFonts(fonts =>
             {
@@ -387,8 +460,8 @@ public static class MauiProgram
     public static void AndroidDialogKeyPress(object sender, DialogKeyEventArgs e)
     {
         e.Handled = false;
-        if (e.Event.Action == KeyEventActions.Up)
-            e.Handled = PlatformService.HandleOnKeyUp(e.KeyCode, e.Event);
+        if (e.Event.Action == KeyEventActions.Down)
+            e.Handled = PlatformService.HandleOnKeyDown(e.KeyCode, e.Event);
     }
 #endif
 }
@@ -448,57 +521,101 @@ public class KeyboardHook
 
     private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
-            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+        //if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+        //    return CallNextHookEx(_hookID, nCode, wParam, lParam);
 
         //No game on to send key strokes to
         //if (GHApp.CurrentGHGame == null)
         //    return CallNextHookEx(_hookID, nCode, wParam, lParam);
 
-        Debug.WriteLine("HookCallback: " + nCode + ", " + wParam + ", " + lParam);
+        GHApp.MaybeWriteLowLevelGHLog("HookCallback: " + nCode + ", " + wParam + ", " + lParam);
         if (nCode >= 0)
         {
             if (wParam == (IntPtr)WM_KEYUP)
             {
-                Debug.WriteLine("HookCallback: WM_KEYUP");
+                GHApp.MaybeWriteLowLevelGHLog("HookCallback: WM_KEYUP");
                 int vkCode = Marshal.ReadInt32(lParam);
                 if (vkCode == 0x10 || vkCode == 0xA0 || vkCode == 0xA1)
                 {
                     GHApp.ShiftDown = false;
-                    Debug.WriteLine("HookCallback: Shift Up");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Shift Up");
                 }
                 else if (vkCode == 0x11 || vkCode == 0xA2 || vkCode == 0xA3)
                 {
                     GHApp.CtrlDown = false;
-                    Debug.WriteLine("HookCallback: Control Up");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Control Up");
                 }
                 else if (vkCode == 0x12 || vkCode == 0xA4 || vkCode == 0xA5)
                 {
                     GHApp.AltDown = false;
-                    Debug.WriteLine("HookCallback: Alt Up");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Alt Up");
                 }
+                else if (vkCode == 0x5B || vkCode == 0x5C)
+                {
+                    GHApp.WindowsKeyDown = false;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Windows Key Up");
+                    if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    if (GHApp.DisableWindowsKey)
+                        return 1;
+                    else
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                //else if (vkCode == 0x73)
+                //{
+                //    GHApp.MaybeWriteLowLevelGHLog("HookCallback: F4 Up");
+                //}
             }
             else if (wParam == (IntPtr)WM_KEYDOWN)
             {
-                Debug.WriteLine("HookCallback: WM_KEYDOWN");
+                GHApp.MaybeWriteLowLevelGHLog("HookCallback: WM_KEYDOWN");
                 int vkCode = Marshal.ReadInt32(lParam);
                 if (vkCode == 0x10 || vkCode == 0xA0 || vkCode == 0xA1)
                 {
                     GHApp.ShiftDown = true;
-                    Debug.WriteLine("HookCallback: Shift Down");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Shift Down");
                 }
                 else if (vkCode == 0x11 || vkCode == 0xA2 || vkCode == 0xA3)
                 {
                     GHApp.CtrlDown = true;
-                    Debug.WriteLine("HookCallback: Control Down");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Control Down");
                 }
                 else if (vkCode == 0x12 || vkCode == 0xA4 || vkCode == 0xA5)
                 {
                     GHApp.AltDown = true;
-                    Debug.WriteLine("HookCallback: Alt Down");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Alt Down");
+                }
+                //else if (vkCode == 0x73)
+                //{
+                //    GHApp.MaybeWriteLowLevelGHLog("HookCallback: F4 Down");
+                //}
+                else if (vkCode == 0x5B || vkCode == 0x5C)
+                {
+                    GHApp.WindowsKeyDown = true;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Windows Key Down");
+                    if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    if (GHApp.DisableWindowsKey)
+                        return 1;
+                    else
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
                 }
                 else
                 {
+                    if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                    {
+                        GHApp.MaybeWriteLowLevelGHLog("HookCallback: !GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled");
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    }
+
+                    if (!GHApp.DisableWindowsKey && GHApp.WindowsKeyDown)
+                    {
+                        GHApp.MaybeWriteLowLevelGHLog("HookCallback: !GHApp.DisableWindowsKey && GHApp.WindowsKeyDown");
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    }
+
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Send Keypress: " + vkCode);
+
                     // Translate virtual key to actual character
                     switch (vkCode)
                     {
@@ -562,6 +679,18 @@ public class KeyboardHook
                             if (GHApp.SendSpecialKeyPress(GHSpecialKey.Decimal, GHApp.CtrlDown, GHApp.AltDown, GHApp.ShiftDown))
                                 return 1;
                             break;
+                        case 0x09:
+                            if (GHApp.SendSpecialKeyPress(GHSpecialKey.Tab, GHApp.CtrlDown, GHApp.AltDown, GHApp.ShiftDown))
+                                return 1;
+                            break;
+                        case 0x70:
+                            if (GHApp.SendSpecialKeyPress(GHSpecialKey.F1, GHApp.CtrlDown, GHApp.AltDown, GHApp.ShiftDown))
+                                return 1;
+                            break;
+                        case 0x79:
+                            if (GHApp.SendSpecialKeyPress(GHSpecialKey.F10, GHApp.CtrlDown, GHApp.AltDown, GHApp.ShiftDown))
+                                return 1;
+                            break;
                         //case 0x60:
                         //case 0x61:
                         //case 0x62:
@@ -576,11 +705,12 @@ public class KeyboardHook
                         //        return 1;
                         //    break;
                         default:
-                            string character = VkCodeToUnicode((uint)vkCode);
+                            string character = VkCodeToUnicode(Convert.ToUInt32(vkCode));
                             if (!string.IsNullOrEmpty(character) && character.Length > 0)
                             {
                                 int key = character[0];
                                 bool handled = GHApp.SendKeyPress(key, GHApp.CtrlDown, GHApp.AltDown);
+                                GHApp.MaybeWriteLowLevelGHLog("HookCallback: Send Keypress Default: '" + character + "', Handled: " + handled);
                                 if (handled)
                                     return 1;
                                 else
@@ -592,35 +722,115 @@ public class KeyboardHook
             }
             else if (wParam == (IntPtr)WM_SYSKEYUP)
             {
-                Debug.WriteLine("HookCallback: WM_SYSKEYUP");
-                bool handled = false;
-                bool isShiftDown = GHApp.ShiftDown;
-                bool isCtrlDown = GHApp.CtrlDown;
-
+                GHApp.MaybeWriteLowLevelGHLog("HookCallback: WM_SYSKEYUP");
                 GHApp.AltDown = false;
+                GHApp.CtrlDown = false;
+                GHApp.WindowsKeyDown = false;
                 int vkCode = Marshal.ReadInt32(lParam);
                 if (vkCode == 0x10 || vkCode == 0xA0 || vkCode == 0xA1)
                 {
                     GHApp.ShiftDown = false;
-                    Debug.WriteLine("HookCallback: Syskey Shift Up");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey Shift Up");
                     return CallNextHookEx(_hookID, nCode, wParam, lParam);
                 }
                 else if (vkCode == 0x11 || vkCode == 0xA2 || vkCode == 0xA3)
                 {
                     GHApp.CtrlDown = false;
-                    Debug.WriteLine("HookCallback: Syskey Control Up");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey Control Up");
                     return CallNextHookEx(_hookID, nCode, wParam, lParam);
                 }
+                else if (vkCode == 0x5B || vkCode == 0x5C)
+                {
+                    GHApp.WindowsKeyDown = false;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Sys Windows Key Up");
+                    if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    if (GHApp.DisableWindowsKey)
+                        return 1;
+                    else
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                //else if (vkCode == 0x73)
+                //{
+                //    GHApp.MaybeWriteLowLevelGHLog("HookCallback: F4 Syskey Up");
+                //}
+                else if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
                 else if (vkCode == 0x09)
                 {
-                    Debug.WriteLine("HookCallback: Tab Up");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Tab Up");
                     return CallNextHookEx(_hookID, nCode, wParam, lParam);
                 }
-                else if (isCtrlDown) /* AltGr, also includes $ on Finnish keyboard */
+                else if (GHApp.CtrlDown)
                 {
-                    Debug.WriteLine("HookCallback: Syskey with Ctrl (AltGr)");
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey Up with Ctrl (AltGr)");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (!GHApp.DisableWindowsKey && GHApp.WindowsKeyDown)
+                {
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else
+                    return 1;
+            }
+            else if (wParam == (IntPtr)WM_SYSKEYDOWN)
+            {
+                int vkCode = Marshal.ReadInt32(lParam);
+                GHApp.MaybeWriteLowLevelGHLog("HookCallback: WM_SYSKEYDOWN, vkCode=" + vkCode);
+                if (vkCode == 0x10 || vkCode == 0xA0 || vkCode == 0xA1)
+                {
+                    GHApp.ShiftDown = true;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey Shift Down");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (vkCode == 0x11 || vkCode == 0xA2 || vkCode == 0xA3)
+                {
+                    GHApp.CtrlDown = true;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey Control Down");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (vkCode == 0x12 || vkCode == 0xA4 || vkCode == 0xA5)
+                {
+                    GHApp.AltDown = true;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey Alt Down");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (vkCode == 0x5B || vkCode == 0x5C)
+                {
+                    GHApp.WindowsKeyDown = true;
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Sys Windows Key Down");
+                    if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    if (GHApp.DisableWindowsKey)
+                        return 1;
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (!GHApp.WindowFocused || !GHApp.IsKeyboardHookEnabled)
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                else if (vkCode == 0x09)
+                {
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Tab Syskey Down");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (vkCode == 0x73)
+                {
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: F4 Syskey Down");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+                else if (!GHApp.DisableWindowsKey && GHApp.WindowsKeyDown)
+                {
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: SyskeyDown, but WindowsKey is down");
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+
+                bool handled = false;
+                bool isShiftDown = GHApp.ShiftDown;
+                bool isCtrlDown = GHApp.CtrlDown;
+                if (isCtrlDown) /* AltGr, also includes $ on Finnish keyboard */
+                {
+                    GHApp.MaybeWriteLowLevelGHLog("HookCallback: Syskey with Ctrl (AltGr)");
                     // Translate virtual key to actual character
-                    string character = VkCodeToUnicode((uint)vkCode);
+                    string character = VkCodeToUnicode(Convert.ToUInt32(vkCode));
                     if (!string.IsNullOrEmpty(character) && character.Length > 0)
                     {
                         int key = character[0];
@@ -640,6 +850,18 @@ public class KeyboardHook
                 {
                     switch (vkCode)
                     {
+                        case 0x25:
+                            spkey = GHSpecialKey.Left;
+                            break;
+                        case 0x26:
+                            spkey = GHSpecialKey.Up;
+                            break;
+                        case 0x27:
+                            spkey = GHSpecialKey.Right;
+                            break;
+                        case 0x28:
+                            spkey = GHSpecialKey.Down;
+                            break;
                         case 0xBB:
                             spkey = GHSpecialKey.Plus;
                             break;
@@ -659,36 +881,6 @@ public class KeyboardHook
                     return 1;
                 else
                     return CallNextHookEx(_hookID, nCode, wParam, lParam);
-            }
-            else if (wParam == (IntPtr)WM_SYSKEYDOWN)
-            {
-                int vkCode = Marshal.ReadInt32(lParam);
-                Debug.WriteLine("HookCallback: WM_SYSKEYDOWN, vkCode=" + vkCode);
-                if (vkCode == 0x10 || vkCode == 0xA0 || vkCode == 0xA1)
-                {
-                    GHApp.ShiftDown = true;
-                    Debug.WriteLine("HookCallback: Syskey Shift Down");
-                }
-                else if (vkCode == 0x11 || vkCode == 0xA2 || vkCode == 0xA3)
-                {
-                    GHApp.CtrlDown = true;
-                    Debug.WriteLine("HookCallback: Syskey Control Down");
-                }
-                else if (vkCode == 0x12 || vkCode == 0xA4 || vkCode == 0xA5)
-                {
-                    GHApp.AltDown = true;
-                    Debug.WriteLine("HookCallback: Syskey Alt Down");
-                }
-                else if (vkCode == 0x09)
-                {
-                    Debug.WriteLine("HookCallback: Tab Down");
-                }
-                else if (GHApp.CtrlDown)
-                {
-                    Debug.WriteLine("HookCallback: Syskey Down with Ctrl (AltGr)");
-                }
-                else
-                    return 1;
             }
         }
         return CallNextHookEx(_hookID, nCode, wParam, lParam);
@@ -742,3 +934,94 @@ public class KeyboardHook
 }
 #endif
 
+#if ANDROID
+[Service(ForegroundServiceType = ForegroundService.TypeDataSync)]
+public class SaveGameService : Service
+{
+    public override IBinder OnBind(Intent intent)
+    {
+        return null;
+    }
+
+    const string CHANNEL_ID = "save_game_channel";
+
+    public override void OnCreate()
+    {
+        base.OnCreate();
+
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+        {
+            try
+            {
+                var channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Game Save Progress",
+                    NotificationImportance.Low)
+                {
+                    Description = "Used while saving your game data."
+                };
+
+                var manager = (NotificationManager)GetSystemService(NotificationService);
+                manager.CreateNotificationChannel(channel);
+            }
+            catch (Exception ex)
+            {
+                GHApp.MaybeWriteGHLog(ex.Message);
+            }
+        }
+    }
+
+
+    private static int _isSaving = 0;
+    public static bool IsSaving { get { return Interlocked.CompareExchange(ref _isSaving, 0, 0) != 0; } set { Interlocked.Exchange(ref _isSaving, value ? 1 : 0); } }
+
+    public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
+    {
+        try
+        {
+            GHApp.MaybeWriteGHLog("SaveGameService: OnStartCommand!");
+
+            // Create a foreground service notification (required on Android 8+)
+            var notification = new Notification.Builder(this, CHANNEL_ID)
+                .SetContentTitle("Saving Game")
+                .SetContentText("Please wait while your progress is saved.")
+                .SetSmallIcon(Android.Resource.Drawable.IcMenuSave)
+                .SetOngoing(true)
+                .Build();
+
+            StartForeground(1, notification);
+
+            if (IsSaving)
+            {
+                StopForeground(StopForegroundFlags.Remove);
+                StopSelf();
+                return StartCommandResult.NotSticky;
+            }
+
+            IsSaving = true;
+
+            // Do your save operation
+            Task.Run(async () =>
+            {
+                try
+                {
+                    GHApp.MaybeWriteGHLog("SaveGameService: SavingGame!");
+                    await GHApp.SaveGameOnSleepAsync();
+                }
+                finally
+                {
+                    IsSaving = false;
+                    StopForeground(StopForegroundFlags.Remove);
+                    StopSelf();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            GHApp.MaybeWriteGHLog(ex.Message);
+        }
+
+        return StartCommandResult.NotSticky;
+    }
+}
+#endif

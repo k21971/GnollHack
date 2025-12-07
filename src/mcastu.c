@@ -219,9 +219,9 @@ boolean foundyou;
     
     //Assumes that attack type is AT_MAGC when this function is called
     if(mattk->mlevel > 0)
-        ml = mattk->mlevel;
+        ml = (int)mattk->mlevel;
     else
-        ml = mtmp->m_lev;
+        ml = (int)mtmp->m_lev;
 
     /* Three cases:
      * -- monster is attacking you.  Search for a useful spell.
@@ -335,10 +335,12 @@ boolean foundyou;
         return (0);
     }
 
-    nomul(0);
+    if (!is_peaceful(mtmp) && (!nodirspell || canspotmon(mtmp)))
+        nomul(0);
+
     /*Spellnum + 1 is used as spell level 1...ml; chance of fail is 50% for ml and 0% for ml /2,
       interpolated linearly*/
-    int    failchance = 0;
+    int failchance = 0;
     int sl = spellnum + 1;
     if (sl > ml / 2 && ml > 0) { // fail only if spell level is high enough
         failchance = (50 * (sl - ml / 2)) / (ml - ml / 2);
@@ -639,17 +641,27 @@ int spellnum;
         damage = 0;
         break;
     case MGC_DESTRY_ARMR:
-        if (Antimagic_or_resistance) {
+        if (Antimagic_or_resistance) 
+        {
             play_sfx_sound(SFX_GENERAL_RESISTS);
             u_shieldeff();
             pline_ex(ATR_NONE, CLR_MSG_SPELL, "A field of force surrounds you!");
         }
-        else if (uarmc && uarmc->otyp == CLOAK_OF_INTEGRITY) {
+        else if (Protection_from_armor_destruction) 
+        {
             play_sfx_sound(SFX_GENERAL_RESISTS);
             u_shieldeff();
-            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "Your cloak neutralizes the destructive energies of the spell!");
-            makeknown(uarmc->otyp);
-        } else if (!destroy_arm(some_armor(&youmonst))) {
+            struct obj* protitem = what_gives(PROTECTION_FROM_ARMOR_DESTRUCTION, FALSE);
+            if (protitem)
+            {
+                pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s the destructive energies of the spell!", Yobjnam2(protitem, "neutralize"));
+                makeknown(protitem->otyp);
+            }
+            else
+                pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, "A mysterious force neutralizes the destructive energies of the spell!");
+        }
+        else if (!destroy_arm(some_armor(&youmonst))) 
+        {
             play_sfx_sound(SFX_HANDS_ITCH);
             Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "skin itches.");
         }
@@ -997,6 +1009,8 @@ int spellnum;
             refresh_u_tile_gui_info(TRUE);
         }
         nomovemsg = 0;
+        nomovemsg_attr = ATR_NONE;
+        nomovemsg_color = NO_COLOR;
         damage = 0;
         break;
     case CLC_CONFUSE_YOU:

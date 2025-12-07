@@ -38,7 +38,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class ReplayPage : ContentPage
+    public partial class ReplayPage : ContentPage, ICloseablePage
     {
         MainPage _mainPage = null;
         string _subDirectoryLocal = null;
@@ -71,19 +71,24 @@ namespace GnollHackX.Pages.MainScreen
             SelectButton.IsEnabled = false;
             FolderPicker.SelectedIndex = 0;
 
-            UpdateRecordings();
+            Appearing += ReplayPage_Appearing;
         }
 
-        private void UpdateRecordings()
+        private async void ReplayPage_Appearing(object sender, EventArgs e)
         {
-            UpdateLocalOrServerRecordings(IsCloud);
+            await UpdateRecordings();
         }
 
-        private void UpdateLocalOrServerRecordings(bool isServer)
+        private async Task UpdateRecordings()
+        {
+            await UpdateLocalOrServerRecordings(IsCloud);
+        }
+
+        private async Task UpdateLocalOrServerRecordings(bool isServer)
         {
             if (isServer)
             {
-                UpdateServerRecordings();
+                await UpdateServerRecordings();
             }
             else
             {
@@ -767,14 +772,14 @@ namespace GnollHackX.Pages.MainScreen
                     _subDirectoryDownload = string.IsNullOrWhiteSpace(rgf.FilePath) ? null : rgf.FileName + rgf.Extension;
                 else if (IsLocal)
                     _subDirectoryLocal = string.IsNullOrWhiteSpace(rgf.FilePath) ? null : rgf.FileName + rgf.Extension;
-                UpdateRecordings();
+                await UpdateRecordings();
                 return;
             }
 
             if (IsCloud)
             {
                 /* Download */
-                DownloadButton_Clicked(sender, e);
+                await DoDownload();
                 return;
             }
 
@@ -791,9 +796,8 @@ namespace GnollHackX.Pages.MainScreen
                 if(GHApp.ValidateReplayFile(filePath, out outstr))
                 {
                     var gamePage = new GamePage(_mainPage);
-                    GHApp.CurrentGamePage = gamePage;
                     await GHApp.Navigation.PushModalAsync(gamePage);
-                    gamePage.StartReplay(filePath, -1);
+                    await gamePage.StartReplay(filePath, -1);
                 }
                 else
                 {
@@ -804,7 +808,7 @@ namespace GnollHackX.Pages.MainScreen
                         try
                         {
                             GHApp.DeleteReplay(filePath);
-                            UpdateRecordings();
+                            await UpdateRecordings();
                         }
                         catch (Exception ex)
                         {
@@ -818,12 +822,37 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        private async Task ClosePageAsync(bool playClickedSound)
+        {
             CloseButton.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
+            _backPressed = true;
+            if (playClickedSound)
+                GHApp.PlayButtonClickedSound();
             var page = await GHApp.Navigation.PopModalAsync();
             GHApp.DisconnectIViewHandlers(page);
         }
 
+        private bool _backPressed = false;
+        private async Task<bool> BackButtonPressed(object sender, EventArgs e)
+        {
+            if (!_backPressed)
+            {
+                await ClosePageAsync(false);
+            }
+            return false;
+        }
+
+        private void ContentPage_Appearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed += BackButtonPressed;
+        }
+        private void ContentPage_Disappearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed -= BackButtonPressed;
+        }
         private double _currentPageWidth = 0;
         private double _currentPageHeight = 0;
         protected override void OnSizeAllocated(double width, double height)
@@ -1095,7 +1124,7 @@ namespace GnollHackX.Pages.MainScreen
                                 + (GHApp.DebugLogMessages ? " See App Log for details." : ""),
                                 "OK");
                         }
-                        UpdateRecordings();
+                        await UpdateRecordings();
                     }
                 }
             }
@@ -1123,7 +1152,7 @@ namespace GnollHackX.Pages.MainScreen
                                 Directory.Delete(filePath, true);
                             else
                                 GHApp.DeleteReplay(filePath);
-                            UpdateRecordings();
+                            await UpdateRecordings();
                         }
                         catch (Exception ex)
                         {
@@ -1156,7 +1185,7 @@ namespace GnollHackX.Pages.MainScreen
             UpdateRecordingsLabel();
         }
 
-        private async void UpdateServerRecordings()
+        private async Task UpdateServerRecordings()
         {
             BlobServiceClient client = GHApp.GetBlobServiceClient();
             if (client == null)
@@ -1384,9 +1413,9 @@ namespace GnollHackX.Pages.MainScreen
             UpdateRecordingsLabel();
         }
 
-        private object _uploadDownloadLock = new object();
-        private bool _uploadDownloadCancelled = false;
-        public bool UploadDownloadCancelled { get { lock (_uploadDownloadLock) { return _uploadDownloadCancelled; } } set { lock (_uploadDownloadLock) { _uploadDownloadCancelled = value; } } }
+        //private readonly object _uploadDownloadLock = new object();
+        private int _uploadDownloadCancelled = 0;
+        public bool UploadDownloadCancelled { get { return Interlocked.CompareExchange(ref _uploadDownloadCancelled, 0, 0) != 0; } set { Interlocked.Exchange(ref _uploadDownloadCancelled, value ? 1 : 0); } }
         private CancellationTokenSource _uploadDownloadCts = null;
 
         private async void UploadButton_Clicked(object sender, EventArgs e)
@@ -1473,6 +1502,7 @@ namespace GnollHackX.Pages.MainScreen
                                     fileIdx++;
                                     UploadDownloadFileLabel.Text = fileName;
                                     UploadDownloadStatusLabel.Text = "Main replay file " + fileIdx + " of " + noValidFiles;
+                                    GHApp.MaybeWriteGHLog("UploadButton_Clicked: UploadFromFileAsync, " + fileName + ", " + UploadDownloadStatusLabel.Text);
                                     await GHApp.UploadFromFileAsync(blobContainerClient, prefix, filePath, _uploadDownloadCts.Token);
                                     recfile.Uploaded = true;
                                     if (UploadDownloadCancelled)
@@ -1520,6 +1550,7 @@ namespace GnollHackX.Pages.MainScreen
                                                         {
                                                             UploadDownloadFileLabel.Text = contFI.Name;
                                                             UploadDownloadStatusLabel.Text = "Continuation " + subFileIdx + " of " + noSubFiles + " for file " + fileIdx + " of " + noValidFiles;
+                                                            GHApp.MaybeWriteGHLog("UploadButton_Clicked: UploadFromFileAsync, cont, " + contFI.Name + ", " + UploadDownloadStatusLabel.Text);
                                                             await GHApp.UploadFromFileAsync(blobContainerClient, prefix, file, _uploadDownloadCts.Token);
                                                         }
                                                     }
@@ -1647,6 +1678,11 @@ namespace GnollHackX.Pages.MainScreen
         }
 
         private async void DownloadButton_Clicked(object sender, EventArgs e)
+        {
+            await DoDownload();
+        }
+
+        private async Task DoDownload()
         {
             SelectButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
@@ -1833,8 +1869,8 @@ namespace GnollHackX.Pages.MainScreen
             UploadDownloadStatusLabel.Text = "";
             UploadDownloadGrid.IsVisible = false;
             UploadButton.IsEnabled = true;
-            PopupCancelButton_Clicked(sender, e);
-            UpdateRecordings();
+            PopupCancelButton_Clicked(this, EventArgs.Empty);
+            await UpdateRecordings();
         }
 
         private async void ServerButton_Clicked(object sender, EventArgs e)
@@ -1868,16 +1904,57 @@ namespace GnollHackX.Pages.MainScreen
             UploadDownloadGrid.IsVisible = false;
         }
 
-        private void ServerSwitch_Toggled(object sender, ToggledEventArgs e)
+        private async void ServerSwitch_Toggled(object sender, ToggledEventArgs e)
         {
-            UpdateLocalOrServerRecordings(e.Value);
+            await UpdateLocalOrServerRecordings(e.Value);
             UpdateButtons();
         }
 
-        private void FolderPicker_SelectedIndexChanged(object sender, EventArgs e)
+        private async void FolderPicker_SelectedIndexChanged(object sender, EventArgs e)
         {
-            UpdateLocalOrServerRecordings(IsCloud);
+            await UpdateLocalOrServerRecordings(IsCloud);
             UpdateButtons();
+        }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (UploadDownloadGrid.IsVisible)
+                        {
+                            if (UploadDownloadCancelButton.IsEnabled)
+                            {
+                                UploadDownloadCancelButton_Clicked(UploadDownloadCancelButton, EventArgs.Empty);
+                            }
+                        }
+                        else if (PopupGrid.IsVisible)
+                        {
+                            if (PopupCancelButton.IsEnabled)
+                            {
+                                PopupCancelButton_Clicked(PopupCancelButton, EventArgs.Empty);
+                            }
+                        }
+                        else
+                        {
+                            if (CloseButton.IsEnabled)
+                                await ClosePageAsync(true);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
         }
     }
 

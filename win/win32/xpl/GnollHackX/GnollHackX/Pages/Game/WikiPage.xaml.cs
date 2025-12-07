@@ -23,7 +23,7 @@ namespace GnollHackX.Pages.Game
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class WikiPage : ContentPage
+    public partial class WikiPage : ContentPage, ICloseablePage
     {
 #if GNH_MAUI
         IDispatcherTimer _timer = null;
@@ -120,10 +120,41 @@ namespace GnollHackX.Pages.Game
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        private async Task ClosePageAsync(bool playClickSound)
+        {
             CloseButton.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
+            _backPressed = true;
+            if (playClickSound)
+                GHApp.PlayButtonClickedSound();
             var page = await GHApp.Navigation.PopModalAsync();
             GHApp.DisconnectIViewHandlers(page);
+        }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (CloseButton.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
         }
 
         private void BackButton_Clicked(object sender, EventArgs e)
@@ -149,5 +180,28 @@ namespace GnollHackX.Pages.Game
                 UpdateNavigationButtons();
             }
         }
+
+        private bool _backPressed = false;
+        private async Task<bool> BackButtonPressed(object sender, EventArgs e)
+        {
+            if (!_backPressed)
+            {
+                await ClosePageAsync(false);
+            }
+            return false;
+        }
+
+        private void ContentPage_Appearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed += BackButtonPressed;
+        }
+        private void ContentPage_Disappearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed -= BackButtonPressed;
+        }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
     }
 }

@@ -216,9 +216,10 @@ struct obj *otmp;
 }
 
 struct obj *
-mkobj_at_with_flags(let, x, y, artif, material, param1, param2, mkflags)
+mkobj_at_with_flags(let, x, y, init, artif, material, param1, param2, mkflags)
 char let;
 int x, y;
+boolean init;
 boolean artif;
 uchar material;
 int64_t param1, param2;
@@ -229,7 +230,7 @@ uint64_t mkflags;
 
     struct obj *otmp;
 
-    otmp = mkobj_with_flags(let, artif, FALSE, (struct monst*)0, material, param1, param2, mkflags);
+    otmp = mkobj_with_flags(let, init, artif, FALSE, (struct monst*)0, material, param1, param2, mkflags);
     if (otmp)
     {
         place_object(otmp, x, y);
@@ -248,7 +249,7 @@ char let;
 int x, y;
 boolean artif;
 {
-    return mkobj_at_with_flags(let, x, y, artif, MAT_NONE, 0L, 0L, 0UL);
+    return mkobj_at_with_flags(let, x, y, TRUE, artif, MAT_NONE, 0L, 0L, 0UL);
 }
 
 struct obj *
@@ -320,12 +321,13 @@ char oclass;
 boolean artif;
 int mkobj_type;
 {
-    return mkobj_with_flags(oclass, artif, mkobj_type, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
+    return mkobj_with_flags(oclass, TRUE, artif, mkobj_type, (struct monst*)0, MAT_NONE, 0L, 0L, 0UL);
 }
 
 struct obj *
-mkobj_with_flags(oclass, artif, mkobj_type, mowner, material, param1, param2, mkflags)
+mkobj_with_flags(oclass, init, artif, mkobj_type, mowner, material, param1, param2, mkflags)
 char oclass;
+boolean init;
 boolean artif;
 int mkobj_type;
 struct monst* mowner;
@@ -358,7 +360,7 @@ uint64_t mkflags;
         else
             break;
     }
-    return mksobj_with_flags(i, TRUE, artif, mkobj_type, mowner, material, param1, param2, mkflags);
+    return mksobj_with_flags(i, init, artif, mkobj_type, mowner, material, param1, param2, mkflags);
 }
 
 int
@@ -380,7 +382,8 @@ uint64_t rndflags;
     if (oclass == SPBOOK_CLASS && !(rndflags & MKOBJ_FLAGS_NORMAL_SPELLBOOK))
         return random_spellbook_objectid(mowner, rndflags);
 
-    for (int tryct = 0; tryct < 50; tryct++)
+    int tryct;
+    for (tryct = 0; tryct < 50; tryct++)
     {
         int prob = rnd(1000);
         i = bases[(int)oclass];
@@ -432,6 +435,58 @@ uint64_t rndflags;
                     continue;
             }
         }
+        break;
+    }
+    if (tryct >= 50)
+    {
+        switch ((int)oclass)
+        {
+        case SPBOOK_CLASS:
+            i = SPE_LIGHT;
+            break;
+        case WAND_CLASS:
+            i = WAN_LIGHT;
+            break;
+        case SCROLL_CLASS:
+            i = SCR_LIGHT;
+            break;
+        case POTION_CLASS:
+            i = POT_ENLIGHTENMENT;
+            break;
+        case WEAPON_CLASS:
+            i = LONG_SWORD;
+            break;
+        case ARMOR_CLASS:
+            i = CHAIN_MAIL;
+            break;
+        case RING_CLASS:
+            i = RIN_ADORNMENT;
+            break;
+        case AMULET_CLASS:
+            i = AMULET_VERSUS_POISON;
+            break;
+        case TOOL_CLASS:
+            i = TALLOW_CANDLE;
+            break;
+        case FOOD_CLASS:
+            i = FOOD_RATION;
+            break;
+        case GEM_CLASS:
+            i = WORTHLESS_PIECE_OF_WHITE_GLASS;
+            break;
+        case MISCELLANEOUS_CLASS:
+            i = LEATHER_BELT;
+            break;
+        case ART_CLASS:
+            i = BANNER;
+            break;
+        case ROCK_CLASS:
+            i = BOULDER;
+            break;
+        default:
+            i = bases[(int)oclass];
+            break;
+        }
     }
 
     return i;
@@ -460,7 +515,7 @@ uint64_t rndflags;
         knownspellschools = 0xFFFFFFFFUL;
 
     boolean flex_first_school = rn2(2);
-    uchar acceptable[MAXSPELL] = { 0 };
+    uchar acceptable[SPE_BLANK_PAPER - FIRST_SPELL] = { 0 };
     int round;
     int cnt = 0;
     for (round = 0; round < 5; round++)
@@ -469,7 +524,7 @@ uint64_t rndflags;
         memset(&acceptable, 0, siz);
         cnt = 0;
         int i;
-        for (i = FIRST_SPELL; i < FIRST_SPELL + MAXSPELL; i++)
+        for (i = FIRST_SPELL; i < SPE_BLANK_PAPER; i++)
         {
             boolean mon_knows_spell_school = is_known_spell_school(knownspellschools, objects[i].oc_skill);
             if ((objects[i].oc_spell_level >= min_spell_level || round >= 3)
@@ -501,7 +556,7 @@ uint64_t rndflags;
         goto random_spellbook_here;
     else if (cnt == 1)
     {
-        for (id = 0; id < MAXSPELL; id++)
+        for (id = 0; id < SPE_BLANK_PAPER - FIRST_SPELL; id++)
         {
             if (acceptable[id])
             {
@@ -517,7 +572,7 @@ uint64_t rndflags;
     {
         int nofound = -1;
         int noselected = rn2(cnt);
-        for (id = 0; id < MAXSPELL; id++)
+        for (id = 0; id < SPE_BLANK_PAPER - FIRST_SPELL; id++)
         {
             if (acceptable[id])
             {
@@ -534,7 +589,7 @@ uint64_t rndflags;
     }
 
     int totalprob = 0;
-    for (id = 0; id < MAXSPELL; id++)
+    for (id = 0; id < SPE_BLANK_PAPER - FIRST_SPELL; id++)
     {
         if (acceptable[id])
             totalprob += (int)objects[FIRST_SPELL + id].oc_prob * (int)acceptable[id];
@@ -544,7 +599,7 @@ uint64_t rndflags;
         goto random_spellbook_here;
 
     int roll = rn2(totalprob);
-    for (id = 0; id < MAXSPELL; id++)
+    for (id = 0; id < SPE_BLANK_PAPER - FIRST_SPELL; id++)
     {
         if (acceptable[id])
         {
@@ -730,11 +785,13 @@ struct obj *box;
                 } 
                 else
                 {
-                    while (otmp->otyp == WAN_CANCELLATION || otmp->otyp == WAN_DISJUNCTION)
+                    while (otmp->otyp == WAN_CANCELLATION)
                     {
                         otmp->otyp = rnd_class(WAN_LIGHT, WAN_LIGHTNING);
                         otmp->material = objects[otmp->otyp].oc_material;
                     }
+                    if (otmp->otyp == WAN_DISJUNCTION) /* We can't replace disjunction because it is an artifact, so it has zero charges instead */
+                        otmp->charges = 0;
                 }
             }
         }
@@ -925,7 +982,7 @@ struct obj *obj;
     case OBJ_FREE:
     case OBJ_FLOOR:
     case OBJ_ONBILL:
-    case OBJ_HEROMEMORY:
+    case OBJ_MEMORY:
     case OBJ_MIGRATING:
     case OBJ_BURIED:
     default:
@@ -977,6 +1034,8 @@ struct obj *obj;
     }
     /* if we have both parent and child, try to merge them;
        if successful, return the combined stack, otherwise return null */
+    if(oparent && ochild)
+        Sprintf(priority_debug_buf_3, "unsplitobj: %d", ochild->otyp);
     return (oparent && ochild && merged(&oparent, &ochild)) ? oparent : 0;
 }
 
@@ -1035,7 +1094,7 @@ struct obj *otmp;
         extract_nobj(obj, &fobj);
         extract_nexthere(obj, &level.objects[obj->ox][obj->oy]);
         break;
-    case OBJ_HEROMEMORY:
+    case OBJ_MEMORY:
         otmp->nobj = obj->nobj;
         otmp->nexthere = obj->nexthere;
         otmp->ox = obj->ox;
@@ -1151,6 +1210,12 @@ register struct obj* otmp;
     dummy->timed = 0;
     dummy->lamplit = 0;
     dummy->makingsound = 0;
+    if (otmp->lamplit)
+        dummy->item_flags |= ITEM_FLAGS_MEMORY_OBJECT_LAMPLIT;
+    /* Insurance not to copy insane bits */
+    dummy->in_use = 0;
+    dummy->bypass = 0;
+    dummy->nomerge = 0;
     copy_oextra(dummy, otmp);
     if (has_omid(dummy))
         free_omid(dummy); /* only one association with m_id*/
@@ -1208,6 +1273,10 @@ struct obj* memory_obj, *orig_obj;
         if (!dummy->o_id)
             dummy->o_id = context.ident++; /* ident overflowed */
         dummy->timed = 0;
+        dummy->lamplit = 0;
+        dummy->makingsound = 0;
+        if (otmp->lamplit)
+            dummy->item_flags |= ITEM_FLAGS_MEMORY_OBJECT_LAMPLIT;
         copy_oextra(dummy, otmp);
         if (has_omid(dummy))
             free_omid(dummy); /* only one association with m_id*/
@@ -1261,7 +1330,7 @@ struct obj* obj;
     }
     //obj->nobj = memoryobjs;
     //memoryobjs = obj;
-    obj->where = OBJ_HEROMEMORY;
+    obj->where = OBJ_MEMORY;
 }
 
 void
@@ -1269,6 +1338,8 @@ clear_memoryobjs()
 {
     struct obj* obj; // , * contained_obj;
     Strcpy(debug_buf_2, "clear_memoryobjs");
+    Strcpy(priority_debug_buf_4, "clear_memoryobjs");
+    //context.suppress_container_deletion_warning = 1;
     while ((obj = memoryobjs) != 0) {
         obj_extract_self(obj);
         //while ((contained_obj = obj->cobj) != 0) {
@@ -1277,6 +1348,7 @@ clear_memoryobjs()
         //}
         obfree(obj, (struct obj*)0);
     }
+    //context.suppress_container_deletion_warning = 0;
     memoryobjs = 0;
     lastmemoryobj = 0;
 }
@@ -1295,6 +1367,8 @@ int x, y;
         level.locations[x][y].hero_memory_layers.o_id = 0;
 
         Strcpy(debug_buf_2, "clear_hero_object_memory_at");
+        Strcpy(priority_debug_buf_4, "clear_hero_object_memory_at");
+        //context.suppress_container_deletion_warning = 1;
 
         /* Clear actual memory objects */
         struct obj* obj; // , * contained_obj;
@@ -1307,6 +1381,7 @@ int x, y;
             //}
             obfree(obj, (struct obj*)0);
         }
+        //context.suppress_container_deletion_warning = 0;
     }
 }
 
@@ -1441,6 +1516,9 @@ struct monst* mtmp;
     else if (alignment == A_CHAOTIC)
         mkflags |= MKOBJ_FLAGS_OWNER_IS_CHAOTIC;
 
+    if (is_demon(mtmp->data))
+        mkflags |= MKOBJ_FLAGS_OWNER_IS_DEMON;
+
     return mkflags;
 }
 
@@ -1503,7 +1581,7 @@ uint64_t mkflags;
     {
         mkflags |= mkobj_ownerflags(mowner);
     }
-
+    boolean no_celestial_or_primordial = (mkflags & MKOBJ_FLAGS_OWNER_IS_DEMON) != 0;
     otmp = newobj();
     *otmp = zeroobj;
     otmp->age = monstermoves;
@@ -1554,30 +1632,30 @@ uint64_t mkflags;
 
     int leveldiff = level_difficulty();
     /* Change type before init if need be*/
-    if (mkobj_type == MKOBJ_TYPE_NORMAL && (In_mines(&u.uz) || leveldiff < 10))
+    if (mkobj_type == MKOBJ_TYPE_NORMAL && (In_mines(&u.uz) || leveldiff < 10) && !Reflecting && Luck > -5)
     {
-        if (otyp == FROST_HORN || otyp == FIRE_HORN)
+        if ((otyp == FROST_HORN && !Cold_immunity && !Improved_cold_resistance) || (otyp == FIRE_HORN && !Fire_immunity && !Improved_fire_resistance))
         {
             otmp->otyp = !rn2(3) ? HORN_OF_CHAOS : !rn2(2) ? BRASS_HORN : TOOLED_HORN;
             otmp->material = objects[otmp->otyp].oc_material;
         }
-        else if (otmp->otyp == WAN_COLD || otmp->otyp == WAN_FIRE || otmp->otyp == WAN_LIGHTNING)
+        else if ((otmp->otyp == WAN_COLD && !Cold_immunity && !Improved_cold_resistance) || (otmp->otyp == WAN_FIRE && !Fire_immunity && !Improved_fire_resistance) || (otmp->otyp == WAN_LIGHTNING && !Shock_immunity && !Improved_shock_resistance))
         {
             otmp->otyp = !rn2(3) ? WAN_STRIKING : !rn2(2) ? WAN_DIGGING : WAN_SPEED_MONSTER;
             otmp->material = objects[otmp->otyp].oc_material;
         }
     }
     
-    if (mkobj_type == MKOBJ_TYPE_NORMAL && !Inhell) /* No instadeath wands on floor ever, except in Gehennom */
+    if (mkobj_type == MKOBJ_TYPE_NORMAL && !Inhell && !Reflecting && Luck > -5) /* No instadeath wands on floor ever, except in Gehennom, with bad luck, or with reflection and appropriate resistances */
     {
-        if (otmp->otyp == WAN_DEATH || otmp->otyp == WAN_DISINTEGRATION || otmp->otyp == WAN_PETRIFICATION)
+        if ((otmp->otyp == WAN_DEATH && !Death_resistance) || (otmp->otyp == WAN_DISINTEGRATION && !Disint_resistance) || (otmp->otyp == WAN_PETRIFICATION && !Stone_resistance))
         {
             otmp->otyp = !rn2(2) ? WAN_LIGHTNING : WAN_FIRE;
             otmp->material = objects[otmp->otyp].oc_material;
         }
     }
 
-    if ((mkobj_type == MKOBJ_TYPE_INITIAL && !discover) || ((mkobj_type == MKOBJ_TYPE_NORMAL || mkobj_type == MKOBJ_TYPE_CONTAINER) && (depth(&u.uz) == 1 || depth(&u.uz) == 2 || leveldiff < 5)))
+    if ((mkobj_type == MKOBJ_TYPE_INITIAL && !discover) || ((mkobj_type == MKOBJ_TYPE_NORMAL || mkobj_type == MKOBJ_TYPE_CONTAINER) && (depth(&u.uz) == 1 || depth(&u.uz) == 2 || leveldiff < 5) && Luck < 5))
     {
         if (otmp->otyp == WAN_WISHING)
         {
@@ -1606,7 +1684,7 @@ uint64_t mkflags;
 
         switch (let) {
         case WEAPON_CLASS:
-            otmp->quan = get_multigen_quan(objects[otmp->otyp].oc_multigen_type);// is_multigen(otmp) ? (int64_t) rn1(6, 6) : 1L;
+            //otmp->quan = get_multigen_quan(objects[otmp->otyp].oc_multigen_type);// is_multigen(otmp) ? (int64_t) rn1(6, 6) : 1L;
             if (!rn2(11) && !is_cursed_magic_item(otmp))
             {
                 otmp->enchantment = rne(3);
@@ -1691,7 +1769,7 @@ uint64_t mkflags;
                     for (tryct = 200; tryct > 0; --tryct) 
                     {
                         mndx = undead_to_corpse(rndmonnum());
-                        if (mons[mndx].cnutrit
+                        if (mndx >= LOW_PM && mons[mndx].cnutrit
                             && !(mvitals[mndx].mvflags & MV_NOCORPSE))
                         {
                             otmp->corpsenm = mndx;
@@ -1706,7 +1784,7 @@ uint64_t mkflags;
                 flags.made_fruit = TRUE;
                 break;
             case KELP_FROND:
-                otmp->quan = (int64_t) rnd(2);
+                //otmp->quan = (int64_t) rnd(2);
                 break;
             }
             if (Is_pudding(otmp)) 
@@ -1716,27 +1794,31 @@ uint64_t mkflags;
                 otmp->corpsenm = PM_GRAY_OOZE
                                  + (otmp->otyp - GLOB_OF_GRAY_OOZE);
             } 
-            else 
-            {
-                if (otmp->otyp != CORPSE && otmp->otyp != MEAT_RING
-                    && otmp->otyp != KELP_FROND && !rn2(6)) 
-                {
-                    otmp->quan = 2L;
-                }
-            }
+            //else 
+            //{
+            //    if (otmp->otyp != CORPSE && otmp->otyp != MEAT_RING
+            //        && otmp->otyp != KELP_FROND && !rn2(6))
+            //    {
+            //        otmp->quan = 2L;
+            //    }
+            //}
             break;
         case GEM_CLASS:
             otmp->corpsenm = 0; /* LOADSTONE hack */
-            if (is_rock(otmp))
-                otmp->quan = (int64_t) rn1(6, 6);
-            else if (otmp->otyp == FLINT)
-                otmp->quan = (int64_t)rnd(30);
-            else if (is_ore(otmp) && Inhell)
-                otmp->quan = (int64_t)rnd(6);
-            else if (otmp->otyp != LUCKSTONE && !rn2(6))
-                otmp->quan = 2L;
-            else
-                otmp->quan = 1L;
+            //if (objects[otmp->otyp].oc_merge && !is_obj_unique(otmp))
+            //{
+                /* NetHack override of quantities */
+                //if (is_rock(otmp))
+                //    otmp->quan = (int64_t)rn1(6, 6);
+                //else if (otmp->otyp == FLINT)
+                //    otmp->quan = (int64_t)rnd(30);
+                //else if (is_ore(otmp) && Inhell)
+                //    otmp->quan = (int64_t)rnd(6); /* Replace the single generation */
+                //else if (otmp->otyp != LUCKSTONE && otmp->otyp != TOUCHSTONE && !rn2(6))
+                //    otmp->quan = 2L;
+                //else
+                //    otmp->quan = 1L;
+            //}
             break;
         case TOOL_CLASS:
             /* Primary initialization */
@@ -1746,13 +1828,13 @@ uint64_t mkflags;
             case WAX_CANDLE:
                 otmp->special_quality = SPEQUAL_LIGHT_SOURCE_FUNCTIONAL;
                 otmp->age = candle_starting_burn_time(otmp);
-                otmp->quan = 1L + (int64_t) (rn2(2) ? rn2(7) : 0);
+                //otmp->quan = 1L + (int64_t) (rn2(2) ? rn2(7) : 0);
                 blessorcurse(otmp, 5);
                 break;
             case TORCH:
                 otmp->special_quality = SPEQUAL_LIGHT_SOURCE_FUNCTIONAL;
                 otmp->age = torch_starting_burn_time(otmp);
-                otmp->quan = 1L;
+                //otmp->quan = 1L;
                 blessorcurse(otmp, 5);
                 break;
             case LARGE_FIVE_BRANCHED_CANDELABRUM:
@@ -2145,9 +2227,9 @@ uint64_t mkflags;
             boolean iswand = otmp->oclass == WAND_CLASS || (otmp->oclass == TOOL_CLASS && is_spelltool(otmp));
             boolean halfchance = !!(objects[otmp->otyp].oc_flags5 & O5_HALF_EXCEPTIONALITY_CHANCE);
             boolean doublechance = !!(objects[otmp->otyp].oc_flags5 & O5_DOUBLE_EXCEPTIONALITY_CHANCE);
-            uchar ownerimpliedexcep = (mkflags & MKOBJ_FLAGS_OWNER_IS_LAWFUL) ? EXCEPTIONALITY_CELESTIAL :
-                (mkflags & MKOBJ_FLAGS_OWNER_IS_NEUTRAL) ? EXCEPTIONALITY_PRIMORDIAL : (mkflags & MKOBJ_FLAGS_OWNER_IS_LAWFUL) ? EXCEPTIONALITY_INFERNAL : 
-                (mkflags & MKOBJ_FLAGS_OWNER_IS_NONALIGNED) ? EXCEPTIONALITY_ELITE : 0;
+            uchar ownerimpliedexcep = (mkflags & MKOBJ_FLAGS_OWNER_IS_LAWFUL) != 0 && !no_celestial_or_primordial ? EXCEPTIONALITY_CELESTIAL :
+                (mkflags & MKOBJ_FLAGS_OWNER_IS_NEUTRAL) != 0 && !no_celestial_or_primordial ? EXCEPTIONALITY_PRIMORDIAL : (mkflags & MKOBJ_FLAGS_OWNER_IS_CHAOTIC) != 0 ? EXCEPTIONALITY_INFERNAL :
+                (mkflags & MKOBJ_FLAGS_OWNER_IS_NONALIGNED) != 0 ? EXCEPTIONALITY_ELITE : 0;
             if (In_endgame(&u.uz))
             {
                 if (!iswand && (doublechance || !rn2(halfchance ? 4 : 2)))
@@ -2907,6 +2989,18 @@ uchar multigen_index;
     case MULTIGEN_1D4_4:
         quan = rnd(4) + 4;
         break;
+    case MULTIGEN_1D30:
+        quan = rnd(30);
+        break;
+    case MULTIGEN_1_OR_1D6_IN_HELL:
+        quan = Inhell ? rnd(6) : 1;
+        break;
+    case MULTIGEN_1_OR_2:
+        quan = !rn2(6) ? 2 : 1;
+        break;
+    case MULTIGEN_CANDLE:
+        quan = 1 + (rn2(2) ? rn2(7) : 0);
+        break;
     default:
         break;
     }
@@ -2998,7 +3092,7 @@ struct obj *body;
 #define ROT_AGE (250L)         /* age when corpses rot away */
 
     /* lizards and lichen don't rot */
-    if (!nonrotting_corpse(body->corpsenm))
+    if (body->corpsenm < LOW_PM || !nonrotting_corpse(body->corpsenm))
     { 
         action = ROT_CORPSE;             /* default action: rot away */
         rot_adjust = in_mklev ? 25 : 10; /* give some variation */
@@ -3010,7 +3104,7 @@ struct obj *body;
         when += (int64_t)(rnz(rot_adjust) - rot_adjust);
     }
 
-    if (is_reviver(&mons[body->corpsenm]))
+    if (body->corpsenm >= LOW_PM && is_reviver(&mons[body->corpsenm]))
     {
         if (is_rider(&mons[body->corpsenm]))
         {
@@ -3821,7 +3915,7 @@ int x, y;
     otmp->ox = x;
     otmp->oy = y;
 
-    otmp->where = OBJ_HEROMEMORY;
+    otmp->where = OBJ_MEMORY;
 
     /* add to memory chain */
     if (!memoryobjs)
@@ -3843,7 +3937,7 @@ register struct obj* otmp;
     xchar x = otmp->ox;
     xchar y = otmp->oy;
 
-    if (otmp->where != OBJ_HEROMEMORY)
+    if (otmp->where != OBJ_MEMORY)
     {
         panic("remove_memory_object: obj not in hero memory: otyp=%d, where=%d", otmp->otyp, otmp->where);
         return;
@@ -4017,7 +4111,7 @@ struct monst *mtmp;
     struct obj *otmp, *mwep = MON_WEP(mtmp);
     boolean keeping_mon = (!DEADMONSTER(mtmp));
     Strcpy(debug_buf_2, "discard_minvent");
-
+    //context.suppress_container_deletion_warning = 1;
     while ((otmp = mtmp->minvent) != 0) {
         /* this has now become very similar to m_useupall()... */
         obj_extract_self(otmp);
@@ -4039,8 +4133,10 @@ struct monst *mtmp;
         if (otmp->oartifact)
             artifact_taken_away(otmp->oartifact);
 
+        Sprintf(priority_debug_buf_4, "discard_minvent: %d", otmp->otyp);
         obfree(otmp, (struct obj *) 0); /* dealloc_obj() isn't sufficient */
     }
+    //context.suppress_container_deletion_warning = 0;
 }
 
 /*
@@ -4057,13 +4153,13 @@ struct monst *mtmp;
  *      OBJ_MIGRATING   migrating chain
  *      OBJ_BURIED      level.buriedobjs chain
  *      OBJ_ONBILL      on billobjs chain
- *      OBJ_HEROMEMORY  on memoryobjs chain
+ *      OBJ_MEMORY      on memoryobjs chain
  */
 void
 obj_extract_self(obj)
 struct obj *obj;
 {
-    Sprintf(debug_buf_3, "obj_extract_self: otyp=%d, where=%d", obj->otyp, obj->where);
+    Sprintf(debug_buf_3, "obj_extract_self: otyp=%d, where=%d, oid=%u", obj->otyp, obj->where, obj->o_id);
     *debug_buf_4 = 0;
     switch (obj->where) {
     case OBJ_FREE:
@@ -4092,14 +4188,14 @@ struct obj *obj;
     case OBJ_ONBILL:
         extract_nobj(obj, &billobjs);
         break;
-    case OBJ_HEROMEMORY:
+    case OBJ_MEMORY:
         remove_memory_object(obj);
         break;
     case OBJ_MAGIC:
         extract_nobj(obj, &magic_objs);
         break;
     default:
-        panic("obj_extract_self: otyp=%d, where=%d", obj->otyp, obj->where);
+        panic("obj_extract_self: otyp=%d, where=%d, oid=%u", obj->otyp, obj->where, obj->o_id);
         break;
     }
 }
@@ -4123,7 +4219,7 @@ struct obj *obj, **head_ptr;
     }
     if (!curr)
     {
-        panic("extract_nobj: object lost, otyp=%d, where=%d, buf1=%s, buf2=%s, buf3=%s, buf4=%s", !obj ? -1 : obj->otyp, !obj ? -1 : obj->where, debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
+        panic("extract_nobj: object lost, otyp=%d, where=%d, oid=%u, buf1=%s, buf2=%s, buf3=%s, buf4=%s", !obj ? -1 : obj->otyp, !obj ? -1 : obj->where, !obj ? 0 : obj->o_id, debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
         return;
     }
     obj->where = OBJ_FREE;
@@ -4178,6 +4274,7 @@ struct obj *obj;
         return 0;
     }
     /* merge if possible */
+    Sprintf(priority_debug_buf_3, "add_to_minv: %d", obj->otyp);
     for (otmp = mon->minvent; otmp; otmp = otmp->nobj)
         if (merged(&otmp, &obj))
             return 1; /* obj merged and then free'd */
@@ -4208,6 +4305,7 @@ struct obj *container, *obj;
         obj_no_longer_held(obj);
 
     /* merge if possible */
+    Sprintf(priority_debug_buf_3, "add_to_container: %d", obj->otyp);
     for (otmp = container->cobj; otmp; otmp = otmp->nobj)
         if (merged(&otmp, &obj))
             return otmp;
@@ -4253,6 +4351,7 @@ struct obj* obj;
         maybe_reset_pick(obj);
 
     /* merge if possible */
+    Sprintf(priority_debug_buf_3, "add_to_magic_chest: %d", obj->otyp);
     struct obj* otmp;
     for (otmp = magic_objs; otmp; otmp = otmp->nobj)
         if (merged(&otmp, &obj))
@@ -4302,11 +4401,11 @@ dealloc_obj(obj)
 struct obj *obj;
 {
     if (obj->where != OBJ_FREE)
-        panic("dealloc_obj: obj not free");
+        panic("dealloc_obj: obj not free: otyp=%d, where=%d, ox=%d, oy=%d", obj->otyp, obj->where, obj->ox, obj->oy);
     if (obj->nobj)
-        panic("dealloc_obj with nobj");
+        panic("dealloc_obj with nobj: otyp=%d, where=%d, ox=%d, oy=%d", obj->otyp, obj->where, obj->ox, obj->oy);
     if (obj->cobj)
-        panic("dealloc_obj with cobj");
+        panic("dealloc_obj with cobj: otyp=%d, where=%d, ox=%d, oy=%d", obj->otyp, obj->where, obj->ox, obj->oy);
 
     /* free up any timers attached to the object */
     if (obj->timed)
@@ -4320,7 +4419,7 @@ struct obj *obj;
      * list must track all objects that can have a light source
      * attached to it (and also requires lamplit to be set).
      */
-    Strcpy(debug_buf_4, "dealloc_obj");
+    Sprintf(debug_buf_4, "dealloc_obj: %d", obj->otyp);
     if (obj_sheds_light(obj))
         del_light_source(LS_OBJECT, obj_to_any(obj));
 
@@ -4331,6 +4430,11 @@ struct obj *obj;
         thrownobj = 0;
     if (obj == kickedobj)
         kickedobj = 0;
+    if (obj == trackedobj)
+    {
+        trackedobj = 0;
+        trackedobj_gone = TRUE;
+    }
 
     if (obj->oextra)
         dealloc_oextra(obj);
@@ -4403,7 +4507,7 @@ boolean tipping; /* caller emptying entire contents; affects shop handling */
                                            || levl[u.ux][u.uy].typ >= ICE)
                                           ? "Oops!  %s away from you!"
                                           : "Oops!  %s to the floor!",
-                                      The(aobjnam(obj, "slip")), (char *) 0);
+                                      The(aobjnam(obj, "slip")), (char *) 0, TRUE);
             nhUse(obj);
         } 
         else
@@ -4478,7 +4582,7 @@ obj_sanity_check(VOID_ARGS)
     objlist_sanity(migrating_objs, OBJ_MIGRATING, "migrating sanity");
     objlist_sanity(level.buriedobjlist, OBJ_BURIED, "buried sanity");
     objlist_sanity(billobjs, OBJ_ONBILL, "bill sanity");
-    objlist_sanity(memoryobjs, OBJ_HEROMEMORY, "memoryobjs sanity");
+    objlist_sanity(memoryobjs, OBJ_MEMORY, "memoryobjs sanity");
 
     mon_obj_sanity(fmon, "minvent sanity");
     mon_obj_sanity(migrating_mons, "migrating minvent sanity");
@@ -4597,7 +4701,7 @@ struct monst* mon;
 
     o_in_use = obj->in_use;
     o_bypass = obj->bypass;
-    o_nomerge = obj->nomerge && !(obj->speflags & (SPEFLAGS_MINES_PRIZE | SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2));
+    o_nomerge = obj->nomerge;
 
     if (o_in_use || o_bypass || o_nomerge) {
         char infobuf[QBUFSZ];
@@ -5052,6 +5156,7 @@ struct obj **obj1, **obj2;
             Strcpy(debug_buf_2, "obj_absorb");
             obj_extract_self(otmp2);
             newsym(otmp2->ox, otmp2->oy); /* in case of floor */
+            Sprintf(priority_debug_buf_4, "obj_absorb: %d", otmp2->otyp);
             obfree(otmp2, (struct obj*)0);
             //dealloc_obj(otmp2);
             *obj2 = (struct obj *) 0;

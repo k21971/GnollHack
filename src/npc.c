@@ -112,7 +112,7 @@ struct npc_subtype_definition npc_subtype_definitions[MAX_NPC_SUBTYPES] =
         0, 0,
         1, 100, 5,
         TRUE, CMAP_GNOMISH_MINES,
-        NPC_SERVICE_GIVE_ORCISH_QUESTS | NPC_SERVICE_TEACH_SPECIAL_SPELLS | NPC_SERVICE_TEACH_WIZARD_SPELLS,
+        NPC_SERVICE_GIVE_ORCISH_QUESTS | NPC_SERVICE_TEACH_SPECIAL_SPELLS | NPC_SERVICE_TEACH_WIZARD_SPELLS | NPC_SERVICE_IDENTIFY_ITEMS,
         NPC_FLAGS_NO_GENERATION | NPC_FLAGS_DISPLAY_NAME_ONLY | NPC_FLAGS_LIGHTS_ON | NPC_FLAGS_NO_ADVICE | NPC_FLAGS_NO_ITEMS | NPC_FLAGS_COMMENTS_ON_REVIVAL | NPC_FLAGS_HAS_STANDARD_DISTANT_SOUNDS
     },
     {
@@ -529,13 +529,19 @@ int mtype;
                 mongets(npc, rnd_class(FIRST_GEM, LAST_GEM));
             }
 
+            /* Manual */
             struct obj* otmp = mksobj_with_flags(SPE_MANUAL, TRUE, FALSE, MKOBJ_TYPE_NPC_SELLING, npc,  MAT_NONE, MANUAL_CATALOGUE_OF_GEMS_AND_STONES, 0L, MKOBJ_FLAGS_PARAM_IS_TITLE);
             if (otmp)
                 (void)mpickobj(npc, otmp);
 
+            /* Pick-axe */
+            otmp = mksobj(PICK_AXE, FALSE, FALSE, MKOBJ_TYPE_NORMAL);
+            if (otmp)
+                (void)mpickobj(npc, otmp);
+
             /* Sling bullets */
-            mongets_with_material(npc, SLING_BULLET, MAT_LEAD);
-            mongets(npc, SLING_BULLET);
+            (void) mongets_with_material(npc, SLING_BULLET, MAT_LEAD);
+            (void) mongets(npc, SLING_BULLET);
             for (i = 0; i < 3; i++)
             {
                 if(!rn2(2))
@@ -673,6 +679,17 @@ int mtype;
             if (otmp)
                 (void)mpickobj(npc, otmp);
 
+            otmp = mksobj_with_flags(RIN_INCREASE_ACCURACY, TRUE, FALSE, MKOBJ_TYPE_NPC_SELLING, npc, MAT_NONE, 0L, 0L, 0UL);
+            if (otmp)
+            {
+                if (otmp->enchantment < 5)
+                    otmp->enchantment = 5 + rn2(3);
+                if (otmp->cursed)
+                    uncurse(otmp);
+                otmp = uoname(otmp, "Xanbane");
+                if (otmp)
+                    (void)mpickobj(npc, otmp);
+            }
             break;
         }
         case NPC_HERMIT3:
@@ -703,8 +720,20 @@ int mtype;
             if (otmp)
                 (void)mpickobj(npc, otmp);
 
-            mongets(npc, GNOMISH_FELT_HAT);
-            cnt = 2 + rnd(2);
+            otmp = mksobj_with_flags(RIN_INCREASE_ACCURACY, TRUE, FALSE, MKOBJ_TYPE_NPC_SELLING, npc, MAT_NONE, 0L, 0L, 0UL);
+            if (otmp)
+            {
+                if (otmp->enchantment < 5)
+                    otmp->enchantment = 5 + rn2(3);
+                if (otmp->cursed)
+                    uncurse(otmp);
+                otmp = uoname(otmp, "Xanbane");
+                if (otmp)
+                    (void)mpickobj(npc, otmp);
+            }
+
+            (void) mongets(npc, GNOMISH_FELT_HAT);
+            cnt = rn2(3);
             for (i = 0; i < cnt; i++)
             {
                 otmp = mksobj_with_flags(GNOMISH_FELT_HAT, TRUE, FALSE, MKOBJ_TYPE_NPC_SELLING, npc, MAT_NONE, 0L, 0L, MKOBJ_FLAGS_FORCE_MYTHIC_OR_LEGENDARY);

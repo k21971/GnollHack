@@ -45,7 +45,7 @@ namespace GnollHackX.Pages.Game
             Appearing += ContentPage_Loaded;
 #endif
             ValidationExpression = new Regex(@"^[A-Za-z0-9_]{1,31}$");
-            _currentGame = gamePage.CurrentGame;
+            _currentGame = GHApp.CurrentGHGame;
             _gamePage = gamePage;
             _replayEnteredName = replayEnteredPlayerName;
 
@@ -86,6 +86,11 @@ namespace GnollHackX.Pages.Game
         }
 
         private async void btnOK_Clicked(object sender, EventArgs e)
+        {
+            await DoPressOk();
+        }
+
+        private async Task DoPressOk()
         {
             btnOK.IsEnabled = false;
             btnCancel.IsEnabled = false;
@@ -208,9 +213,26 @@ namespace GnollHackX.Pages.Game
             await DoPressCancel();
         }
 
-        public async void PressCancel()
+        public void PressCancel()
         {
-            await DoPressCancel();
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        await DoPressCancel();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
         }
 
         public async Task DoPressCancel()
@@ -224,11 +246,50 @@ namespace GnollHackX.Pages.Game
             GHApp.DisconnectIViewHandlers(page);
         }
 
-        private void eName_Completed(object sender, EventArgs e)
+        public bool HandleSpecialKeyPress(GHSpecialKey key, bool isCtrl, bool isMeta, bool isShift)
+        {
+            bool handled = false;
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (key == GHSpecialKey.Escape)
+                        {
+                            if (btnCancel.IsEnabled)
+                            {
+                                await DoPressCancel();
+                                handled = true;
+                            }
+                        }
+                        else if (key == GHSpecialKey.Enter)
+                        {
+                            if (btnOK.IsEnabled)
+                            {
+                                await DoPressOk();
+                                handled = true;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+            return handled;
+        }
+
+        private async void eName_Completed(object sender, EventArgs e)
         {
             if (btnOK.IsEnabled)
             {
-                btnOK_Clicked(sender, e);
+                await DoPressOk();
             }
         }
 

@@ -234,8 +234,12 @@ int x, y;
                 retvalu = 0;
             }
         }
-    } else
-        obfree(obj, (struct obj *) 0);
+    }
+    else
+    {
+        Sprintf(priority_debug_buf_4, "drop_throw: %d", obj->otyp);
+        obfree(obj, (struct obj*)0);
+    }
     return retvalu;
 }
 
@@ -694,7 +698,7 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
             }
         }
 
-        if (otmp->otyp == EGG && touch_petrifies(&mons[otmp->corpsenm])) 
+        if (otmp->otyp == EGG && otmp->corpsenm >= LOW_PM && touch_petrifies(&mons[otmp->corpsenm]))
         {
             if (check_magic_cancellation_success(mtmp, 0) || resists_ston(mtmp))
             {
@@ -816,6 +820,8 @@ struct obj *obj;         /* missile (or stack providing it) */
     }
 
     singleobj->owornmask = 0; /* threw one of multiple weapons in hand? */
+    singleobj->item_flags |= ITEM_FLAGS_FIRED_BY_MONSTER;
+    singleobj->firing_m_id = mon->m_id;
 
     if ((singleobj->cursed || singleobj->greased) && (dx || dy) && !rn2(7)) {
         if (canseemon(mon) && flags.verbose) {
@@ -878,7 +884,7 @@ struct obj *obj;         /* missile (or stack providing it) */
                     (void) hold_another_object(singleobj,
                                                "You catch, but drop, %s.",
                                                xname(singleobj),
-                                               "You catch:");
+                                               "You catch:", TRUE);
                 }
                 break;
             }
@@ -895,7 +901,7 @@ struct obj *obj;         /* missile (or stack providing it) */
 
             switch (singleobj->otyp) {
             case EGG:
-                if (!touch_petrifies(&mons[singleobj->corpsenm])) {
+                if (singleobj->corpsenm < LOW_PM || !touch_petrifies(&mons[singleobj->corpsenm])) {
                     impossible("monster throwing egg type %d",
                                singleobj->corpsenm);
                     hitu = 0;
@@ -1220,7 +1226,8 @@ struct attack *mattk;
 
             /* If this is a pet, it'll get hungry. Minions and
              * spell beings won't hunger */
-            if (mtmp->mtame && !mtmp->isminion) {
+            if (mtmp->mtame && !mtmp->isminion && has_edog(mtmp)) 
+            {
                 struct edog *dog = EDOG(mtmp);
 
                 /* Hunger effects will catch up next move */
@@ -1281,7 +1288,7 @@ struct attack  *mattk;
 
                 /* If this is a pet, it'll get hungry. Minions and
                  * spell beings won't hunger */
-                if (mtmp->mtame && !mtmp->isminion) 
+                if (mtmp->mtame && !mtmp->isminion && has_edog(mtmp)) 
                 {
                     struct edog *dog = EDOG(mtmp);
 
@@ -1405,7 +1412,7 @@ struct attack* mattk;
 
                 /* If this is a pet, it'll get hungry. Minions and
                  * spell beings won't hunger */
-                if (mtmp->mtame && !mtmp->isminion)
+                if (mtmp->mtame && !mtmp->isminion && has_edog(mtmp))
                 {
                     struct edog* dog = EDOG(mtmp);
 
@@ -1604,6 +1611,7 @@ struct obj *obj;
         if (mon == u.usteed && obj->otyp == SADDLE)
             dismount_steed(DISMOUNT_FELL);
     }
+    Sprintf(priority_debug_buf_4, "m_useupall: %d", obj->otyp);
     obfree(obj, (struct obj *) 0);
 }
 
@@ -1753,32 +1761,37 @@ struct attack *mattk;
             otmp = mksobj(ACID_VENOM, TRUE, FALSE, FALSE);
             break;
         }
-        if (otmp && !rn2(max(1, M_SHOOT_CHANCE_RANGE
-                 - distmin(mtmp->mx, mtmp->my, mtmp->mux, mtmp->muy))))
+
+        if (otmp)
         {
-            boolean action_taken = FALSE;
-            if (canseemon(mtmp))
+            if (!rn2(max(1, M_SHOOT_CHANCE_RANGE
+                - distmin(mtmp->mx, mtmp->my, mtmp->mux, mtmp->muy))))
             {
-                action_taken = TRUE;
-                update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_FIRE);
-            }
-            play_monster_simple_weapon_sound(mtmp, get_pm_attack_index(mtmp->data, mattk), (struct obj*)0, OBJECT_SOUND_TYPE_FIRE);
-            if (action_taken)
-                m_wait_until_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_FIRE);
-            if (canseemon(mtmp))
-                pline("%s spits venom!", Monnam(mtmp));
-            m_throw(mtmp, mtmp->mx, mtmp->my, sgn(tbx), sgn(tby),
+                boolean action_taken = FALSE;
+                if (canseemon(mtmp))
+                {
+                    action_taken = TRUE;
+                    update_m_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_FIRE);
+                }
+                play_monster_simple_weapon_sound(mtmp, get_pm_attack_index(mtmp->data, mattk), (struct obj*)0, OBJECT_SOUND_TYPE_FIRE);
+                if (action_taken)
+                    m_wait_until_action(mtmp, mattk->action_tile ? mattk->action_tile : ACTION_TILE_FIRE);
+                if (canseemon(mtmp))
+                    pline("%s spits venom!", Monnam(mtmp));
+                m_throw(mtmp, mtmp->mx, mtmp->my, sgn(tbx), sgn(tby),
                     distmin(mtmp->mx, mtmp->my, mtmp->mux, mtmp->muy), otmp);
-            nomul(0);
-            if (action_taken)
-                update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
-            return 0;
-        }
-        else 
-        {
-            Strcpy(debug_buf_2, "spitmu");
-            obj_extract_self(otmp);
-            obfree(otmp, (struct obj *) 0);
+                nomul(0);
+                if (action_taken)
+                    update_m_action_revert(mtmp, ACTION_TILE_NO_ACTION);
+                return 0;
+            }
+            else
+            {
+                Strcpy(debug_buf_2, "spitmu");
+                obj_extract_self(otmp);
+                Sprintf(priority_debug_buf_4, "spitmu: %d", otmp->otyp);
+                obfree(otmp, (struct obj*)0);
+            }
         }
     }
     return 0;
@@ -2149,17 +2162,17 @@ int whodidit;   /* 1==hero, 0=other, -1==just check whether it'll pass thru */
             hits = (objects[obj_type].oc_armor_category != ARM_GLOVES);
             break;
         case TOOL_CLASS:
-            hits = (obj_type != SKELETON_KEY && obj_type != LOCK_PICK
+            hits = (obj_type != SKELETON_KEY && obj_type != MASTER_KEY && obj_type != LOCK_PICK
                     && obj_type != CREDIT_CARD && obj_type != TALLOW_CANDLE
                     && obj_type != WAX_CANDLE && obj_type != MAGIC_CANDLE
                     && obj_type != TIN_WHISTLE && obj_type != MAGIC_WHISTLE);
             break;
         case ROCK_CLASS: /* includes boulder */
-            if (obj_type != STATUE || mons[otmp->corpsenm].msize > MZ_TINY)
+            if (obj_type != STATUE || (otmp->corpsenm >= LOW_PM && mons[otmp->corpsenm].msize > MZ_TINY))
                 hits = TRUE;
             break;
         case FOOD_CLASS:
-            if (obj_type == CORPSE && mons[otmp->corpsenm].msize > MZ_TINY)
+            if (obj_type == CORPSE && otmp->corpsenm >= LOW_PM && mons[otmp->corpsenm].msize > MZ_TINY)
                 hits = TRUE;
             else
                 hits = (obj_type == MEAT_STICK

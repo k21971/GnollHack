@@ -590,6 +590,7 @@ register struct monst *magr, *mdef;
                                 )
                             )
                         {
+                            Sprintf(priority_debug_buf_4, "mattackm: %d", omonwep->otyp);
                             if (omonwep->where == OBJ_MINVENT)
                                 m_useup(magr, omonwep);
                             else if (omonwep->where == OBJ_FREE)
@@ -1397,7 +1398,7 @@ register struct obj* omonwep;
         {
             if (otmp) 
             {
-                if (otmp->otyp == CORPSE
+                if (otmp->otyp == CORPSE && otmp->corpsenm >= LOW_PM
                     && touch_petrifies(&mons[otmp->corpsenm]))
                     goto do_stone;
                 //damage += weapon_dmg_value(otmp, mdef,magr);
@@ -1878,7 +1879,7 @@ register struct obj* omonwep;
                 damage = (double)mdef->mhp + 1;
             else
                 mdef->m_lev--;
-
+            update_all_mon_statistics(mdef, TRUE);
             /* Automatic kill if drained past level 0 */
         }
         break;
@@ -2477,7 +2478,7 @@ int mdead;
     }
 
     if (mddat->mattk[i].damn > 0 || mddat->mattk[i].damd > 0)
-        basedmg = max(0, d(mddat->mattk[i].damn > 0 ? mddat->mattk[i].damn : mddat->mlevel / 2 + 2, mddat->mattk[i].damd > 0 ? mddat->mattk[i].damd : 6) + (int)mddat->mattk[i].damp);
+        basedmg = max(0, d(mddat->mattk[i].damn > 0 ? mddat->mattk[i].damn : (int)mddat->mlevel / 2 + 2, mddat->mattk[i].damd > 0 ? mddat->mattk[i].damd : 6) + (int)mddat->mattk[i].damp);
     else
         basedmg = max(0, mddat->mattk[i].damp);
 

@@ -823,6 +823,7 @@ struct obj **potmp, **pobj;
             return 1;
         }
 
+        Sprintf(priority_debug_buf_4, "merged: %d", obj->otyp);
         obfree(obj, otmp); /* free(obj), bill->otmp */
         return 1;
     }
@@ -850,7 +851,7 @@ struct obj *obj;
     } 
     else if (obj->otyp == AMULET_OF_YENDOR) 
     {
-        if (u.uhave.amulet)
+        if (u.uhave.amulet && no_wizard_or_debug)
             impossible("already have amulet?");
         u.uhave.amulet = 1;
         if (flags.showscore && !u.uachieve.amulet)
@@ -876,7 +877,7 @@ struct obj *obj;
     }
     else if (obj->otyp == CANDELABRUM_OF_INVOCATION) 
     {
-        if (u.uhave.menorah)
+        if (u.uhave.menorah && no_wizard_or_debug)
             impossible("already have candelabrum?");
         u.uhave.menorah = 1;
         if (flags.showscore && !u.uachieve.menorah)
@@ -891,7 +892,7 @@ struct obj *obj;
     }
     else if (obj->otyp == BELL_OF_OPENING)
     {
-        if (u.uhave.bell)
+        if (u.uhave.bell && no_wizard_or_debug)
             impossible("already have silver bell?");
         u.uhave.bell = 1;
         if (flags.showscore && !u.uachieve.bell)
@@ -906,7 +907,7 @@ struct obj *obj;
     }
     else if (obj->otyp == SPE_BOOK_OF_THE_DEAD)
     {
-        if (u.uhave.book)
+        if (u.uhave.book && no_wizard_or_debug)
             impossible("already have the book?");
         u.uhave.book = 1;
         if (flags.showscore && !u.uachieve.book)
@@ -923,14 +924,14 @@ struct obj *obj;
     {
         if (is_quest_artifact(obj)) 
         {
-            if (u.uhave.questart)
+            if (u.uhave.questart && no_wizard_or_debug)
                 impossible("already have quest artifact?");
             u.uhave.questart = 1;
             artitouch(obj);
         }
         else if (obj->otyp == SPE_BOOK_OF_MODRON)
         {
-            if (u.uhave.prime_codex)
+            if (u.uhave.prime_codex && no_wizard_or_debug)
                 impossible("already have Prime Codex?");
             u.uhave.prime_codex = 1;
             if (flags.showscore && !u.uachieve.prime_codex)
@@ -998,7 +999,7 @@ struct obj *obj;
         }
         u.uachieve.mines_luckstone = 1;
         obj->speflags &= ~(SPEFLAGS_MINES_PRIZE);
-        obj->nomerge = 0;
+        //obj->nomerge = 0;
     }
     else if (is_soko_prize(obj)) 
     {
@@ -1011,7 +1012,7 @@ struct obj *obj;
         }
         u.uachieve.finish_sokoban = 1;
         obj->speflags &= ~(SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2);
-        obj->nomerge = 0;
+        //obj->nomerge = 0;
     }
     else if (obj->otyp == GRAIL_OF_HEALING && Role_if(PM_KNIGHT)) // Holy Grail
     {
@@ -1106,6 +1107,7 @@ boolean verbose;
     boolean was_telepathic = Telepat;
     boolean was_blind_telepathic = Blind_telepat;
     boolean had_xray_vision = XRay_vision;
+    boolean had_exray_vision = Extended_XRay_vision;
     boolean had_magical_breathing = Magical_breathing;
     boolean had_warning = Warning;
     boolean had_warning_of_mon = Warning;
@@ -1404,13 +1406,23 @@ boolean verbose;
     }
 
     /* X-ray vision */
-    if ((XRay_vision && !had_xray_vision)
-        || (!XRay_vision && had_xray_vision)
+    if (!Extended_XRay_vision && ((XRay_vision && !had_xray_vision)
+        || (!XRay_vision && had_xray_vision))
         )
     {
         vision_full_recalc = 1;
         see_monsters();
         if (XRay_vision)
+            check_bosses = TRUE;
+    }
+
+    if ((Extended_XRay_vision && !had_exray_vision)
+        || (!Extended_XRay_vision && had_exray_vision)
+        )
+    {
+        vision_full_recalc = 1;
+        see_monsters();
+        if (Extended_XRay_vision)
             check_bosses = TRUE;
     }
 
@@ -1723,12 +1735,15 @@ struct obj *obj;
     obj->speflags &= ~(SPEFLAGS_GRABBED_FROM_YOU | SPEFLAGS_CAUGHT_IN_LEAVES | SPEFLAGS_PREVIOUSLY_WIELDED | SPEFLAGS_NO_PREVIOUS_WEAPON); /* You got it back / Not in leaves / Not previously held if was not in inventory */
     obj_clear_found(obj); /* Not relevant in inventory */
     obj->speflags |= SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO; /* Has been owned by the hero */
+    obj->item_flags &= ~ITEM_FLAGS_FIRED_BY_MONSTER;
+    obj->firing_m_id = 0;
 
     addinv_core1(obj);
 
     /* merge with quiver in preference to any other inventory slot
        in case quiver and wielded weapon are both eligible; adding
        extra to quivered stack is more useful than to wielded one */
+    Sprintf(priority_debug_buf_3, "addinv: %d", obj->otyp);
     if (uquiver && merged(&uquiver, &obj)) {
         obj = uquiver;
         if (!obj)
@@ -1857,9 +1872,10 @@ struct obj *obj;
  * touch_artifact will print its own messages if they are warranted.
  */
 struct obj *
-hold_another_object(obj, drop_fmt, drop_arg, hold_msg)
+hold_another_object(obj, drop_fmt, drop_arg, hold_msg, doprinv)
 struct obj *obj;
 const char *drop_fmt, *drop_arg, *hold_msg;
+boolean doprinv;
 {
     char buf[BUFSZ];
 
@@ -1928,7 +1944,7 @@ const char *drop_fmt, *drop_arg, *hold_msg;
                 && (is_missile(obj) || ammo_and_launcher(obj, uwep)
                     || ammo_and_launcher(obj, uswapwep)))
                 setuqwep(obj);
-            if (hold_msg || drop_fmt)
+            if (doprinv) // (hold_msg || drop_fmt)
                 prinvc(hold_msg, obj, oquan);
         }
     }
@@ -1956,6 +1972,7 @@ struct obj *obj;
 {
     setnotworn(obj);
     freeinv(obj);
+    Sprintf(priority_debug_buf_4, "useupall: %d", obj->otyp);
     obfree(obj, (struct obj *) 0); /* deletes contents also */
 }
 
@@ -1971,6 +1988,7 @@ register struct obj *obj;
         obj->owt = weight(obj);
         update_inventory();
     } else {
+        Sprintf(priority_debug_buf_3, "useup: %d", obj->otyp);
         useupall(obj);
     }
 }
@@ -2006,25 +2024,25 @@ struct obj *obj;
     } 
     else if (obj->otyp == AMULET_OF_YENDOR) 
     {
-        if (!u.uhave.amulet)
+        if (!u.uhave.amulet && no_wizard_or_debug)
             impossible("don't have amulet?");
         u.uhave.amulet = 0;
     }
     else if (obj->otyp == CANDELABRUM_OF_INVOCATION) 
     {
-        if (!u.uhave.menorah)
+        if (!u.uhave.menorah && no_wizard_or_debug)
             impossible("don't have candelabrum?");
         u.uhave.menorah = 0;
     }
     else if (obj->otyp == BELL_OF_OPENING)
     {
-        if (!u.uhave.bell)
+        if (!u.uhave.bell && no_wizard_or_debug)
             impossible("don't have silver bell?");
         u.uhave.bell = 0;
     } 
     else if (obj->otyp == SPE_BOOK_OF_THE_DEAD)
     {
-        if (!u.uhave.book)
+        if (!u.uhave.book && no_wizard_or_debug)
             impossible("don't have the book?");
         u.uhave.book = 0;
     } 
@@ -2032,13 +2050,13 @@ struct obj *obj;
     {
         if (is_quest_artifact(obj)) 
         {
-            if (!u.uhave.questart)
+            if (!u.uhave.questart && no_wizard_or_debug)
                 impossible("don't have quest artifact?");
             u.uhave.questart = 0;
         }
         else if (obj->otyp == SPE_BOOK_OF_MODRON)
         {
-            if (!u.uhave.prime_codex)
+            if (!u.uhave.prime_codex && no_wizard_or_debug)
                 impossible("don't have Prime Codex?");
             u.uhave.prime_codex = 0;
         }
@@ -2082,6 +2100,8 @@ delallobj(x, y)
 int x, y;
 {
     struct obj *otmp, *otmp2;
+    Strcpy(priority_debug_buf_2, "delallobj");
+    Strcpy(priority_debug_buf_3, "delallobj");
 
     for (otmp = level.objects[x][y]; otmp; otmp = otmp2) {
         if (otmp == uball)
@@ -2122,10 +2142,11 @@ uint64_t newsym_flags;
         return;
     }
     update_map = (obj->where == OBJ_FLOOR);
-    Strcpy(debug_buf_2, "delobj_with_flags");
+    Sprintf(debug_buf_2, "delobj_with_flags: %d, %u", obj->otyp, obj->o_id);
     obj_extract_self(obj);
     if (update_map)
         newsym_with_flags(obj->ox, obj->oy, newsym_flags);
+    Sprintf(priority_debug_buf_4, "delobj_with_flags: %d, %u", obj->otyp, obj->o_id);
     obfree(obj, (struct obj *) 0); /* frees contents also */
 }
 
@@ -2165,25 +2186,36 @@ any_obj_at(otyp, x, y)
 int otyp;
 int x, y;
 {
+    if (!isok(x, y))
+        return (struct obj*)0;
+
     register struct obj* otmp;
 
-#if 0
     /* Memory objects first */
     for (otmp = level.locations[x][y].hero_memory_layers.memory_objchn; otmp; otmp = otmp->nexthere)
+    {
         if (otmp->otyp == otyp)
             return otmp;
-#endif
+        else if (Is_proper_container(otmp))
+        {
+            struct obj* otmp2 = otyp_in_objchn(otyp, otmp->cobj);
+            if (otmp2)
+                return otmp2;
+        }
+    }
 
     /* Then actual */
     for (otmp = level.objects[x][y]; otmp; otmp = otmp->nexthere)
+    {
         if (otmp->otyp == otyp)
             return otmp;
-        else if (Is_container(otmp))
+        else if (Is_proper_container(otmp))
         {
-            struct obj* otmp2 = (struct obj*)0;
-            if ((otmp2 = otyp_in_objchn(otyp, otmp->cobj)) != 0)
+            struct obj* otmp2 = otyp_in_objchn(otyp, otmp->cobj);
+            if (otmp2)
                 return otmp2;
         }
+    }
 
     /* Then buried, note that you have to check x and y here */
     for (otmp = level.buriedobjlist; otmp; otmp = otmp->nobj)
@@ -2191,10 +2223,10 @@ int x, y;
         {
             if(otmp->otyp == otyp)
                 return otmp;
-            else if (Is_container(otmp))
+            else if (Is_proper_container(otmp))
             {
-                struct obj* otmp2 = (struct obj*)0;
-                if ((otmp2 = otyp_in_objchn(otyp, otmp->cobj)) != 0)
+                struct obj* otmp2 = otyp_in_objchn(otyp, otmp->cobj);
+                if (otmp2)
                     return otmp2;
             }
         }
@@ -2210,14 +2242,16 @@ struct obj* objchn;
 {
     struct obj* otmp;
     for (otmp = objchn; otmp; otmp = otmp->nobj)
+    {
         if (otmp->otyp == otyp)
             return otmp;
-        else if (Is_container(otmp))
+        else if (Is_proper_container(otmp))
         {
-            struct obj* otmp2 = (struct obj*)0;
-            if ((otmp2 = otyp_in_objchn(otyp, otmp->cobj)) != 0)
+            struct obj* otmp2 = otyp_in_objchn(otyp, otmp->cobj);
+            if (otmp2)
                 return otmp2;
         }
+    }
 
     return (struct obj*)0;
 }
@@ -2590,15 +2624,17 @@ register const char* let, * word;
 int show_weights;
 const char* headertext;
 {
-    return getobj_ex(let, word, show_weights, headertext, (boolean (*)(struct obj*))0);
+    return getobj_ex(let, word, show_weights, headertext, (boolean (*)(struct obj*))0, (int64_t)0, 0U);
 }
 
 struct obj *
-getobj_ex(let, word, show_weights, headertext, validitemfunc)
+getobj_ex(let, word, show_weights, headertext, validitemfunc, cost, getobjflags)
 register const char *let, *word;
 int show_weights;
 const char* headertext;
 boolean (*validitemfunc)(struct obj*);
+int64_t cost;
+unsigned int getobjflags; /* 1 = cost is specified; 2 = header text is about cost */
 {
     register struct obj *otmp;
     register char ilet = 0;
@@ -2618,6 +2654,12 @@ boolean (*validitemfunc)(struct obj*);
     boolean oneloop = FALSE;
     //int64_t dummymask;
     //Loot *sortedinvent, *srtinv;
+#ifndef GNH_MOBILE
+    if ((getobjflags & 3U) == 3U) /* On legacy versions, if the header text also is about cost and cost is separately specified, keep just the cost in the title */
+    {
+        headertext = "";
+    }
+#endif
 
     construct_getobj_letters(let, word, validitemfunc, lets, altlets, buf, sizeof lets, sizeof altlets, sizeof buf, &foo, &foox, &bp, &allowcnt, &usegold, &allowall, &allownone, &useboulder, getobj_autoselect_obj);
     if (getobj_autoselect_obj)
@@ -2918,13 +2960,17 @@ boolean (*validitemfunc)(struct obj*);
     }
     
 
-    if (!iflags.force_invmenu && strcmp(headertext, "") != 0)
+    if (!iflags.force_invmenu && headertext && strcmp(headertext, "") != 0)
         pline("%s", headertext);
 
     for (;;) {
         cnt = 0;
         cntgiven = FALSE;
         Sprintf(qbuf, "What do you want to %s?", word);
+        if ((getobjflags & 1) != 0 && !(headertext && strcmp(headertext, "") && (getobjflags & 2) != 0))  /* On modern versions, if the header text also is about cost and cost is separately specified, keep just the header text */
+        {
+            Sprintf(eos(qbuf), " (%lld %s)", (long long)cost, currency(cost));
+        }
         if (in_doagain)
             ilet = readchar();
         else if (iflags.force_invmenu) {
@@ -2993,6 +3039,9 @@ boolean (*validitemfunc)(struct obj*);
             menuquery[0] = qbuf[0] = '\0';
             if (iflags.force_invmenu)
                 Sprintf(menuquery, "What do you want to %s?", word);
+            if ((getobjflags & 1) != 0 && !(headertext && strcmp(headertext, "") && (getobjflags & 2) != 0))  /* On modern versions, if header text also is about cost, keep just the headertext */
+                Sprintf(eos(menuquery), " (%lld %s)", (long long)cost, currency(cost));
+
             if (!strcmp(word, "grease"))
                 Sprintf(qbuf, "your %s", makeplural(body_part(FINGER)));
             else if (!strcmp(word, "write with"))
@@ -3903,6 +3952,7 @@ int FDECL((*fn), (OBJ_P)), FDECL((*ckfn), (OBJ_P));
                     otmp = 0; /* and return */
                 } else if (otmp && otmp != otmpo) {
                     /* split occurred, merge again */
+                    Sprintf(priority_debug_buf_3, "askchain: %d", otmp->otyp);
                     (void) merged(&otmpo, &otmp);
                 }
                 goto ret;
@@ -4392,6 +4442,7 @@ ddoinv()
         }
     } while (return_to_inv);
     issue_gui_command(GUI_CMD_TOGGLE_MENU_POSITION_SAVING, GHMENU_STYLE_INVENTORY, 0, (char*)0);
+    issue_gui_command(GUI_CMD_COLLECT_GARBAGE, 1, 0, (char*)0);
     return 0;
 }
 
@@ -4429,6 +4480,7 @@ doseeworn()
                 }
         }
     } while (return_to_inv);
+    issue_gui_command(GUI_CMD_COLLECT_GARBAGE, 1, 0, (char*)0);
     return 0;
 }
 
@@ -4691,11 +4743,25 @@ boolean* return_to_inv_ptr;
         if (extcmdlist[selected_action].ef_funct && pickcnt != 0)
         {
             struct obj* otmpsplit = 0;
+            boolean autoobjgone = FALSE;
+            trackedobj_gone = FALSE;
             if (pickcnt <= -1 || pickcnt >= otmp->quan)
                 getobj_autoselect_obj = otmp;
             else
             {
                 otmpsplit = splitobj(otmp, pickcnt);
+                if (otmpsplit)
+                {
+                    Strcpy(debug_buf_2, "display_item_command_menu");
+                    obj_extract_self(otmpsplit); /* free from inv */
+                    otmpsplit->nomerge = 1;
+                    otmpsplit = hold_another_object(otmpsplit, "Oops!  %s out of your grasp!", The(aobjnam(otmpsplit, "slip")), (const char*)0, FALSE);
+                    if (otmpsplit)
+                        otmpsplit->nomerge = 0;
+                    else
+                        return 1;
+                }
+
                 getobj_autoselect_obj = otmpsplit;
             }
 
@@ -4707,13 +4773,23 @@ boolean* return_to_inv_ptr;
                 savech(invlet);
             }
 
+            trackedobj = getobj_autoselect_obj;
             res = (extcmdlist[selected_action].ef_funct)();
             getobj_autoselect_obj = (struct obj*)0;
+            trackedobj = (struct obj*)0;
+            autoobjgone = trackedobj_gone;
+            trackedobj_gone = FALSE;
             repeatmenu = (boolean)((extcmdlist[selected_action].flags & ALLOW_RETURN_TO_CMD_MENU) != 0) && !res;
             returntoinv = (boolean)((extcmdlist[selected_action].flags & ALLOW_RETURN_TO_INVENTORY) != 0) && !res;
 
-            if ((repeatmenu || returntoinv) && otmpsplit && otmpsplit != otmp)
-                (void)merged(&otmp, &otmpsplit); /* Merge the split object back to the original */
+            if (!autoobjgone) /* otmp or otmpsplit may have been deallocated, e.g., scrolls */
+            {
+                if ((repeatmenu || returntoinv) && otmpsplit && otmpsplit != otmp && otmpsplit->where == OBJ_INVENT && otmp->where == OBJ_INVENT)
+                {
+                    Sprintf(priority_debug_buf_3, "display_item_command_menu: %d, %d", otmp->otyp, otmpsplit->otyp);
+                    (void)merged(&otmp, &otmpsplit); /* Merge the split object back to the original */
+                }
+            }
 
             if (return_to_inv_ptr)
                 *return_to_inv_ptr = returntoinv;
@@ -4742,8 +4818,9 @@ dolastpickeditem()
     if (selobj)
     {
         int ret = display_item_command_menu(selobj, -1, (boolean*)0);
-//        if (ret)
-            context.last_picked_obj_show_duration_left++;
+        context.last_picked_obj_show_duration_left++;
+        if(!ret) /* Nothing happened, so presumably the window is closing without further action, so good time to collect garbage */
+            issue_gui_command(GUI_CMD_COLLECT_GARBAGE, 1, 0, (char*)0);
         return ret;
     }
     else
@@ -5018,7 +5095,7 @@ boolean addinventoryheader, wornonly;
     }
 
 #if !defined(GNH_MOBILE)
-   if(strcmp(headertext, "") != 0)
+   if(headertext && strcmp(headertext, "") != 0)
    {
        add_menu(win, NO_GLYPH, &any, ' ', 0, ATR_NONE, NO_COLOR,
            headertext, MENU_UNSELECTED);
@@ -6835,7 +6912,7 @@ struct obj *otmp;
 boolean force_touch;
 {
     if ((Blind || force_touch) && !uarmg && !Stone_resistance
-        && (otmp->otyp == CORPSE && touch_petrifies(&mons[otmp->corpsenm])))
+        && (otmp->otyp == CORPSE && otmp->corpsenm >= LOW_PM && touch_petrifies(&mons[otmp->corpsenm])))
         return TRUE;
     return FALSE;
 }
@@ -6873,6 +6950,7 @@ struct obj *obj;
     if (!obj || !isok(obj->ox, obj->oy))
         return;
 
+    Sprintf(priority_debug_buf_3, "stackobj: %d", obj->otyp);
     for (otmp = level.objects[obj->ox][obj->oy]; otmp; otmp = otmp->nexthere)
         if (otmp != obj && merged(&obj, &otmp))
             break;
@@ -6888,8 +6966,11 @@ register struct obj *otmp, *obj;
 
     /* fail if already the same object, if different types, if either is
        explicitly marked to prevent merge, or if not mergable in general */
-    if (obj == otmp || obj->otyp != otmp->otyp
-        || obj->nomerge || otmp->nomerge || !objects[obj->otyp].oc_merge)
+    if (obj == otmp || obj->otyp != otmp->otyp || !objects[obj->otyp].oc_merge
+        || obj->item_flags != otmp->item_flags
+        || obj->nomerge || otmp->nomerge
+        || (obj->speflags & (SPEFLAGS_MINES_PRIZE | SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2)) != 0
+        || (otmp->speflags & (SPEFLAGS_MINES_PRIZE | SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2)) != 0)
         return FALSE;
 
     /* coins of the same kind will always merge */
@@ -6960,19 +7041,15 @@ register struct obj *otmp, *obj;
     /* if they have true names, make sure they're the same */
     objnamelth = strlen(safe_oname(obj));
     otmpnamelth = strlen(safe_oname(otmp));
-    if ((objnamelth != otmpnamelth
-         && ((objnamelth && otmpnamelth) || obj->otyp == CORPSE))
-        || (objnamelth && otmpnamelth
-            && strncmp(ONAME(obj), ONAME(otmp), objnamelth)))
+    if (objnamelth != otmpnamelth
+         || (objnamelth && otmpnamelth && strncmp(ONAME(obj), ONAME(otmp), objnamelth)))
         return FALSE;
 
     /* if they have user-specified names, make sure they're the same */
     objnamelth = strlen(safe_uoname(obj));
     otmpnamelth = strlen(safe_uoname(otmp));
-    if ((objnamelth != otmpnamelth
-        && ((objnamelth && otmpnamelth) || obj->otyp == CORPSE))
-        || (objnamelth && otmpnamelth
-            && strncmp(UONAME(obj), UONAME(otmp), objnamelth)))
+    if (objnamelth != otmpnamelth
+        || (objnamelth && otmpnamelth && strncmp(UONAME(obj), UONAME(otmp), objnamelth)))
         return FALSE;
 
     /* for the moment, any additional information is incompatible */
@@ -7241,6 +7318,7 @@ uint64_t newsym_flags;
         else
             (void) stolen_value(otmp, otmp->ox, otmp->oy, FALSE, FALSE);
     }
+    Sprintf(priority_debug_buf_3, "useupf_with_flags: %d", otmp->otyp);
     delobj_with_flags(otmp, newsym_flags);
     if (at_u && u.uundetected && hides_under(youmonst.data))
         (void) hideunder(&youmonst);
@@ -7523,6 +7601,7 @@ doorganize() /* inventory organizer by Del Lamb */
                but splitting to same slot is not */
             || (splitting && let == obj->invlet)) {
  noadjust:
+            Sprintf(priority_debug_buf_3, "doorganize: %d", obj->otyp);
             if (splitting)
                 (void) merged(&splitting, &obj);
             if (!ever_mind)
@@ -7567,6 +7646,7 @@ doorganize() /* inventory organizer by Del Lamb */
                with compatible named ones; we only want that if it is
                the 'from' stack (obj) with a name and candidate (otmp)
                without one, not unnamed 'from' with named candidate. */
+            Sprintf(priority_debug_buf_3, "doorganize2: %d", otmp->otyp);
             otmpname = has_oname(otmp) ? ONAME(otmp) : (char *) 0;
             uotmpname = has_uoname(otmp) ? UONAME(otmp) : (char*)0;
             if ((!otmpname || (objname && !strcmp(objname, otmpname)))
@@ -7599,11 +7679,13 @@ doorganize() /* inventory organizer by Del Lamb */
                         free((genericptr_t) objname), objname = 0;
                 }
 
+                Sprintf(priority_debug_buf_3, "doorganize3: %d", obj->otyp);
                 if (merged(&otmp, &obj)) {
                     adj_type = "Splitting and merging:";
                     obj = otmp;
                     extract_nobj(obj, &invent);
                 } else if (inv_cnt(FALSE) >= 52) {
+                    Sprintf(priority_debug_buf_3, "doorganize4: %d", obj->otyp);
                     (void) merged(&splitting, &obj); /* undo split */
                     /* "inventory cannot accommodate any more items" */
                     Your("pack is too full.");

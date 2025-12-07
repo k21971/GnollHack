@@ -102,6 +102,7 @@
     <None Remove="Assets\UI\commands.png" />
     <None Remove="Assets\UI\conduct.png" />
     <None Remove="Assets\UI\count.png" />
+    <None Remove="Assets\UI\delphi.png" />
     <None Remove="Assets\UI\dig.png" />
     <None Remove="Assets\UI\dip.png" />
     <None Remove="Assets\UI\discoveries.png" />
@@ -169,6 +170,7 @@
     <None Remove="Assets\UI\no.png" />
     <None Remove="Assets\UI\offer.png" />
     <None Remove="Assets\UI\open.png" />
+    <None Remove="Assets\UI\oracle.png" />
     <None Remove="Assets\UI\orb_border.png" />
     <None Remove="Assets\UI\orb_fill.png" />
     <None Remove="Assets\UI\orb_glass.png" />
@@ -248,7 +250,11 @@
     <None Remove="Assets\UI\stone-altmap-on.png" />
     <None Remove="Assets\UI\stone-autocenter-off.png" />
     <None Remove="Assets\UI\stone-autocenter-on.png" />
+    <None Remove="Assets\UI\stone-autodig-off.png" />
+    <None Remove="Assets\UI\stone-autodig-on.png" />
     <None Remove="Assets\UI\stone-cancel.png" />
+    <None Remove="Assets\UI\stone-ignore-off.png" />
+    <None Remove="Assets\UI\stone-ignore-on.png" />
     <None Remove="Assets\UI\stone-look-off.png" />
     <None Remove="Assets\UI\stone-look-on.png" />
     <None Remove="Assets\UI\stone-menu.png" />
@@ -263,6 +269,7 @@
     <None Remove="Assets\UI\symbol-damage.png" />
     <None Remove="Assets\UI\symbol-food.png" />
     <None Remove="Assets\UI\symbol-mana.png" />
+    <None Remove="Assets\UI\symbol-gold.png" />
     <None Remove="Assets\UI\symbol-spell-abjuration.png" />
     <None Remove="Assets\UI\symbol-spell-arcane.png" />
     <None Remove="Assets\UI\symbol-spell-celestial.png" />
@@ -330,6 +337,7 @@
     <EmbeddedResource Include="Assets\UI\background-darkmarble.png" />
     <EmbeddedResource Include="Assets\UI\battery-frame.png" />
     <EmbeddedResource Include="Assets\UI\catalogue.png" />
+    <EmbeddedResource Include="Assets\UI\delphi.png" />
     <EmbeddedResource Include="Assets\UI\fps.png" />
     <EmbeddedResource Include="Assets\UI\frame-darkmode-horizontal.png" />
     <EmbeddedResource Include="Assets\UI\frame-darkmode-topleft-small.png" />
@@ -362,6 +370,7 @@
     <EmbeddedResource Include="Assets\UI\droptypes.png" />
     <EmbeddedResource Include="Assets\UI\load.png" />
     <EmbeddedResource Include="Assets\UI\music.png" />
+    <EmbeddedResource Include="Assets\UI\oracle.png" />
     <EmbeddedResource Include="Assets\UI\page-next.png" />
     <EmbeddedResource Include="Assets\UI\page-previous.png" />
     <EmbeddedResource Include="Assets\UI\picktobag.png" />
@@ -387,6 +396,10 @@
     <EmbeddedResource Include="Assets\UI\status-stats-str.png" />
     <EmbeddedResource Include="Assets\UI\status-stats-wis.png" />
     <EmbeddedResource Include="Assets\UI\status-xp-points.png" />
+    <EmbeddedResource Include="Assets\UI\stone-autodig-off.png" />
+    <EmbeddedResource Include="Assets\UI\stone-autodig-on.png" />
+    <EmbeddedResource Include="Assets\UI\stone-ignore-off.png" />
+    <EmbeddedResource Include="Assets\UI\stone-ignore-on.png" />
     <EmbeddedResource Include="Assets\UI\symbol-damage.png" />
     <EmbeddedResource Include="Assets\UI\unwield.png" />
     <EmbeddedResource Include="Assets\Lato-Bold.ttf" />
@@ -524,6 +537,7 @@
     <EmbeddedResource Include="Assets\UI\symbol-cooldown.png" />
     <EmbeddedResource Include="Assets\UI\symbol-food.png" />
     <EmbeddedResource Include="Assets\UI\symbol-mana.png" />
+    <EmbeddedResource Include="Assets\UI\symbol-gold.png" />
     <EmbeddedResource Include="Assets\UI\symbol-spell-abjuration.png" />
     <EmbeddedResource Include="Assets\UI\symbol-spell-arcane.png" />
     <EmbeddedResource Include="Assets\UI\symbol-spell-celestial.png" />
@@ -623,6 +637,9 @@
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Pages\MainScreen\LibraryPage.xaml">
+      <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Pages\MainScreen\OraclePage.xaml">
       <Generator>MSBuild:UpdateDesignTimeXaml</Generator>
     </EmbeddedResource>
     <EmbeddedResource Update="Pages\MainScreen\MusicPage.xaml">

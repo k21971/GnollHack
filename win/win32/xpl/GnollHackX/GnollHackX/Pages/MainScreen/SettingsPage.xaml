@@ -39,12 +39,12 @@
                                 <Picker Grid.Column="1" x:Name="GraphicsPicker"
                                             Title="Select graphics style"
                                             FontFamily="Underwood" 
-                                            FontSize="17"
+                                            FontSize="16"
                                             TextColor="Black"
                                             TitleColor="Black"
                                             HorizontalTextAlignment="End"
                                             BackgroundColor="Transparent"
-                                            WidthRequest="150"
+                                            WidthRequest="175"
                                             VerticalOptions="Center"
                                             HorizontalOptions="End" >
                                     <Picker.ItemsSource>
@@ -64,14 +64,34 @@
                                 <Picker Grid.Column="1" x:Name="RefreshRatePicker"
                                             Title="Select refresh rate"
                                             FontFamily="Underwood" 
-                                            FontSize="17"
+                                            FontSize="16"
                                             TextColor="Black"
                                             TitleColor="Black"
                                             HorizontalTextAlignment="End"
-                                            WidthRequest="150"
+                                            WidthRequest="175"
                                             BackgroundColor="Transparent"
                                             VerticalOptions="Center"
                                             HorizontalOptions="End" >
+                                </Picker>
+                            </Grid>
+                            <Grid x:Name="ScreenResolutionGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Screen Resolution"
+                                            FontFamily="Underwood" TextColor="Black"
+                                            FontSize="16"
+                                            VerticalOptions="Center" 
+                                            HorizontalOptions="Start" />
+                                <Picker Grid.Column="1" x:Name="ScreenResolutionPicker"
+                                            Title="Select resolution"
+                                            FontFamily="Underwood" 
+                                            FontSize="15"
+                                            TextColor="Black"
+                                            TitleColor="Black"
+                                            HorizontalTextAlignment="End"
+                                            BackgroundColor="Transparent"
+                                            WidthRequest="175"
+                                            VerticalOptions="Center"
+                                            HorizontalOptions="End"
+                                            SelectedIndexChanged="ScreenResolutionPicker_SelectedIndexChanged">
                                 </Picker>
                             </Grid>
                             <Grid x:Name="ScreenScaleGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
@@ -83,12 +103,12 @@
                                 <Picker Grid.Column="1" x:Name="ScreenScalePicker"
                                             Title="Select scale"
                                             FontFamily="Underwood" 
-                                            FontSize="17"
+                                            FontSize="16"
                                             TextColor="Black"
                                             TitleColor="Black"
                                             HorizontalTextAlignment="End"
                                             BackgroundColor="Transparent"
-                                            WidthRequest="150"
+                                            WidthRequest="175"
                                             VerticalOptions="Center"
                                             HorizontalOptions="End" >
                                 </Picker>
@@ -102,11 +122,11 @@
                                 <Picker Grid.Column="1" x:Name="CursorPicker"
                                             Title="Select cursor style"
                                             FontFamily="Underwood" 
-                                            FontSize="17"
+                                            FontSize="16"
                                             TextColor="Black"
                                             TitleColor="Black"
                                             HorizontalTextAlignment="End"
-                                            WidthRequest="150"
+                                            WidthRequest="175"
                                             BackgroundColor="Transparent"
                                             VerticalOptions="Center"
                                             HorizontalOptions="End" >
@@ -230,6 +250,38 @@
                                 <Switch Grid.Column="1" x:Name="SimpleCmdLayoutSwitch" HorizontalOptions="End" VerticalOptions="Center" Toggled="SimpleCmdLayoutSwitch_Toggled" />
                             </Grid>
                             <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Alternative Zoom Button"
+                                            FontFamily="Underwood" TextColor="Black"
+                                            FontSize="15"
+                                            VerticalOptions="Center" 
+                                            HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="ShowAltZoomButtonSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Travel Mode Button"
+                                            FontFamily="Underwood" TextColor="Black"
+                                            FontSize="15"
+                                            VerticalOptions="Center" 
+                                            HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="ShowTravelModeButtonSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Auto-Dig Button"
+                                            FontFamily="Underwood" TextColor="Black"
+                                            FontSize="15"
+                                            VerticalOptions="Center" 
+                                            HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="ShowAutoDigButtonSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Ignore Stopping Button"
+                                            FontFamily="Underwood" TextColor="Black"
+                                            FontSize="15"
+                                            VerticalOptions="Center" 
+                                            HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="ShowIgnoreStoppingButtonSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label x:Name="DesktopButtonsLabel"
                                             Text="Desktop Buttons"
                                             FontFamily="Underwood" TextColor="Black"
@@ -301,6 +353,50 @@
                                             VerticalOptions="Center"
                                             HorizontalOptions="Start" />
                                 <Switch Grid.Column="1" x:Name="GridSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid x:Name="GridOpacityGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Grid Opacity"
+                                            FontFamily="Underwood" TextColor="Black"
+                                            FontSize="15"
+                                            VerticalOptions="Center" 
+                                            HorizontalOptions="Start" />
+                                <Picker Grid.Column="1" x:Name="GridOpacityPicker"
+                                            Title="Select opacity"
+                                            FontFamily="Underwood" 
+                                            FontSize="16"
+                                            TextColor="Black"
+                                            TitleColor="Black"
+                                            HorizontalTextAlignment="End"
+                                            BackgroundColor="Transparent"
+                                            WidthRequest="175"
+                                            VerticalOptions="Center"
+                                            HorizontalOptions="End" >
+                                    <Picker.ItemsSource>
+                                        <x:Array Type="{x:Type x:String}">
+                                            <x:String>Default (100%)</x:String>
+                                            <x:String>5%</x:String>
+                                            <x:String>10%</x:String>
+                                            <x:String>15%</x:String>
+                                            <x:String>20%</x:String>
+                                            <x:String>25%</x:String>
+                                            <x:String>30%</x:String>
+                                            <x:String>35%</x:String>
+                                            <x:String>40%</x:String>
+                                            <x:String>45%</x:String>
+                                            <x:String>50%</x:String>
+                                            <x:String>55%</x:String>
+                                            <x:String>60%</x:String>
+                                            <x:String>65%</x:String>
+                                            <x:String>70%</x:String>
+                                            <x:String>75%</x:String>
+                                            <x:String>80%</x:String>
+                                            <x:String>85%</x:String>
+                                            <x:String>90%</x:String>
+                                            <x:String>95%</x:String>
+                                            <x:String>100%</x:String>
+                                        </x:Array>
+                                    </Picker.ItemsSource>
+                                </Picker>
                             </Grid>
                             <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label Text="Hit Point Bars"
@@ -543,6 +639,22 @@
                                     VerticalOptions="Center" 
                                     HorizontalOptions="Start" />
                                 <Switch Grid.Column="1" x:Name="GetPositionArrowsSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Auto-Dig"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="AutoDigSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Ignore Stopping"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="IgnoreStoppingSwitch" HorizontalOptions="End" VerticalOptions="Center" />
                             </Grid>
                             <Grid x:Name="RightMouseButtonGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label Text="Right Mouse Button"
@@ -1023,23 +1135,23 @@
                                         Text="  Webhook Link"
                                         FontFamily="Underwood" TextColor="Black"
                                         FontSize="15"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="Start" />
                                 <StackLayout Grid.Column="1" Spacing="6" Orientation="Horizontal" HeightRequest="40" HorizontalOptions="End">
                                     <Label x:Name="CustomLinkLabel"
                                         Text="Default"
                                         FontFamily="Underwood" TextColor="Blue"
                                         FontSize="14"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                     <controls:CustomImageButton Grid.Column="1" x:Name="CustomLinkButton" Text="Edit" FontSize="13" WidthRequest="80" HeightRequest="35" FontFamily="Diablo"
                                         BackgroundColor="Transparent" TextColor="White"
                                         Clicked="CustomLinkButton_Clicked"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                 </StackLayout>
                             </Grid>
-                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                            <Grid x:Name="PostDiagnosticDataGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label Text="Post Diagnostic Data"
                                        x:Name="PostDiagnosticDataLabel"
                                        FontFamily="Underwood" TextColor="Black"
@@ -1070,12 +1182,12 @@
                                         Text="Account"
                                         FontFamily="Underwood" TextColor="Black"
                                         FontSize="15"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="Start" />
                                     <controls:CustomImageButton x:Name="XlogAccountButton" Text="Setup" FontSize="13" WidthRequest="90" HeightRequest="35" FontFamily="Diablo"
                                         BackgroundColor="Transparent" TextColor="White"
                                         Clicked="XlogAccountButton_Clicked"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="Start" />
                                 </StackLayout>
                                 <StackLayout Grid.Column="1" Orientation="Horizontal" Spacing="12" HeightRequest="40" HorizontalOptions="End">
@@ -1083,12 +1195,12 @@
                                         Text="Default"
                                         FontFamily="Underwood" TextColor="Blue"
                                         FontSize="14"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                     <controls:CustomImageButton x:Name="CustomXlogAccountButton" Text="Link" FontSize="13" WidthRequest="80" HeightRequest="35" FontFamily="Diablo"
                                         BackgroundColor="Transparent" TextColor="White"
                                         Clicked="CustomXlogAccountButton_Clicked"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                 </StackLayout>
                             </Grid>
@@ -1118,12 +1230,12 @@
                                         Text="Posting"
                                         FontFamily="Underwood" TextColor="Black"
                                         FontSize="15"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="Start" />
                                     <controls:CustomImageButton x:Name="XlogTestButton" Text="Test" FontSize="13" WidthRequest="90" HeightRequest="35" FontFamily="Diablo"
                                         BackgroundColor="Transparent" TextColor="White"
                                         Clicked="XlogTestButton_Clicked"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="Start" />
                                 </StackLayout>
                                 <StackLayout Grid.Column="1" Spacing="12" Orientation="Horizontal" HeightRequest="40" HorizontalOptions="End">
@@ -1131,12 +1243,12 @@
                                         Text="Default"
                                         FontFamily="Underwood" TextColor="Blue"
                                         FontSize="14"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                     <controls:CustomImageButton x:Name="CustomXlogPostButton" Text="Link" FontSize="13" WidthRequest="80" HeightRequest="35" FontFamily="Diablo"
                                         BackgroundColor="Transparent" TextColor="White"
                                         Clicked="CustomXlogPostButton_Clicked"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                 </StackLayout>
                             </Grid>
@@ -1245,19 +1357,19 @@
                                         Text="Cloud Storage"
                                         FontFamily="Underwood" TextColor="Black"
                                         FontSize="15"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="Start" />
                                 <StackLayout Grid.Column="1" Spacing="6" Orientation="Horizontal" HeightRequest="40" HorizontalOptions="End">
                                     <Label x:Name="CustomCloudStorageLabel"
                                         Text="Default"
                                         FontFamily="Underwood" TextColor="Blue"
                                         FontSize="14"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                     <controls:CustomImageButton x:Name="CustomCloudStorageButton" Text="Edit" FontSize="13" WidthRequest="80" HeightRequest="35" FontFamily="Diablo"
                                         BackgroundColor="Transparent" TextColor="White"
                                         Clicked="CustomCloudStorageButton_Clicked"
-                                        VerticalOptions="CenterAndExpand" 
+                                        VerticalOptions="Center" 
                                         HorizontalOptions="End" />
                                 </StackLayout>
                             </Grid>
@@ -1279,6 +1391,24 @@
                                     VerticalOptions="Center" 
                                     HorizontalOptions="Start" />
                                 <Switch Grid.Column="1" x:Name="LogMessageSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="  Low-Level Logging"
+                                    x:Name="LowLevelLogLabel"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="LowLevelLogSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Debug Post Channel"
+                                    x:Name="DebugPostChannelLabel"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="DebugPostChannelSwitch" HorizontalOptions="End" VerticalOptions="Center" Toggled="DebugPostChannelSwitch_Toggled" />
                             </Grid>
                             <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label Text="Show Memory"
@@ -1369,6 +1499,15 @@
                                 </Label>
                                 <Switch Grid.Column="1" x:Name="GZipSwitch" Toggled="GZipSwitch_Toggled" HorizontalOptions="End" VerticalOptions="Center" />
                             </Grid>
+                            <Grid x:Name="PlatformRenderLoopGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Platform Render Loop"
+                                    x:Name="PlatformRenderLoopLabel"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="PlatformRenderLoopSwitch" Toggled="PlatformRenderLoopSwitch_Toggled" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
                             <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label Text="GL Only on Map"
                                     x:Name="DisableAuxGPULabel"
@@ -1395,6 +1534,23 @@
                                     VerticalOptions="Center" 
                                     HorizontalOptions="Start" />
                                 <Switch Grid.Column="1" x:Name="FixRectsSwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid x:Name="DisableWindowsKeyGrid" ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40" IsVisible="False">
+                                <Label Text="Disable Windows Key"
+                                    x:Name="DisableWindowsKeyLabel"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="DisableWindowsKeySwitch" HorizontalOptions="End" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
+                                <Label Text="Default Vi-Keys"
+                                    FontFamily="Underwood" TextColor="Black"
+                                    FontSize="15"
+                                    VerticalOptions="Center" 
+                                    HorizontalOptions="Start" />
+                                <Switch Grid.Column="1" x:Name="DefaultVIKeysSwitch" HorizontalOptions="End" VerticalOptions="Center" />
                             </Grid>
                             <Grid ColumnSpacing="6" ColumnDefinitions="*,Auto" HorizontalOptions="Fill" HeightRequest="40">
                                 <Label 
@@ -1474,10 +1630,10 @@
                 <Grid WidthRequest  ="440" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,50,0,10" >
                     <Frame x:Name="TextFrame" BackgroundColor="#66000000" BorderColor="Black" CornerRadius="10" HorizontalOptions="Fill" VerticalOptions="Center">
                         <StackLayout x:Name="TextLayout" Spacing="6" HorizontalOptions="Fill" VerticalOptions="Center">
-                            <Label x:Name="TextCaption" Text="" FontFamily="Immortal" FontSize="20" HorizontalOptions="CenterAndExpand" TextColor="White" />
+                            <Label x:Name="TextCaption" Text="" FontFamily="Immortal" FontSize="20" HorizontalOptions="Center" TextColor="White" />
                             <Entry x:Name="TextEntry" WidthRequest="320" HorizontalOptions="Center" Placeholder="Enter the link here" PlaceholderColor="Gray" TextColor="White" BackgroundColor="#40000000"
                                        Keyboard="Plain" HorizontalTextAlignment="Center" FontSize="20" FontFamily="LatoRegular" Completed="TextEntry_Completed" />
-                            <Grid ColumnSpacing="6" WidthRequest="360" HorizontalOptions="Center" VerticalOptions="CenterAndExpand">
+                            <Grid ColumnSpacing="6" WidthRequest="360" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="65" />
                                 </Grid.RowDefinitions>
@@ -1524,6 +1680,9 @@
             <AbsoluteLayout x:Name="WaitLayout" IsVisible="False" HorizontalOptions="Fill" VerticalOptions="Fill" BackgroundColor="#AA000000">
                 <Label Text="Please Wait..." FontFamily="Immortal" FontSize="30" TextColor="White"
                                        VerticalTextAlignment="Center" HorizontalOptions="Center" AbsoluteLayout.LayoutBounds="0.5, 0.5, 1, 1" AbsoluteLayout.LayoutFlags="All" />
+                <AbsoluteLayout.GestureRecognizers>
+                    <TapGestureRecognizer />
+                </AbsoluteLayout.GestureRecognizers>
             </AbsoluteLayout>
         </Grid>
     </ContentPage.Content>

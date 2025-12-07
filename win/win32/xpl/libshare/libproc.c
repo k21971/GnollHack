@@ -19,8 +19,8 @@ struct window_procs lib_procs = {
     WC2_HITPOINTBAR | WC2_FLUSH_STATUS | WC2_RESET_STATUS | WC2_HILITE_STATUS |
 #endif
     WC2_SELECTSAVED | WC2_STATUSLINES | WC2_HEREWINDOW | WC2_SCREEN_TEXT |
-    WC2_ANIMATIONS | WC2_SPECIAL_SYMBOLS | WC2_MENU_SUFFIXES |
-    WC2_FADING_ANIMATIONS | WC2_MENU_SHOWS_OK_CANCEL,
+    WC2_ANIMATIONS | WC2_LIBRARY | WC2_SPECIAL_SYMBOLS | WC2_MENU_SUFFIXES |
+    WC2_FADING_ANIMATIONS | WC2_MENU_SHOWS_OK_CANCEL | WC2_MENU_IS_FULL_SCREEN | WC2_MENU_PROPER_SUBTITLE,
     lib_init_nhwindows, lib_player_selection, lib_askname,
     lib_get_nh_event, lib_exit_nhwindows, lib_suspend_nhwindows,
     lib_resume_nhwindows, lib_create_nhwindow_ex, lib_clear_nhwindow,
@@ -546,7 +546,7 @@ void lib_print_glyph(winid wid, XCHAR_P x, XCHAR_P y, struct layer_info layers)
             /* A possible mimic has been added to memory objects */
             otmp = level.locations[x][y].hero_memory_layers.memory_objchn;
             use_nexthere = TRUE;
-            basewhere = OBJ_HEROMEMORY;
+            basewhere = OBJ_MEMORY;
             break;
         }
 
@@ -670,6 +670,8 @@ void lib_issue_gui_command(int cmd_id, int cmd_param, int cmd_param2, const char
     }
     case GUI_CMD_REPORT_PLAY_TIME:
     {
+        if (!context.game_started)
+            break;
         int64_t timePassed = urealtime.finish_time - urealtime.start_timing;
         int64_t realtime = urealtime.realtime;
         lib_callbacks.callback_report_play_time(timePassed, realtime);
@@ -735,7 +737,7 @@ char lib_yn_function_ex(int style, int attr, int color, int glyph, const char* t
     if (introline)
         write_text2buf_utf8(ibuf, UTF8IBUFSZ, introline);
     char defs[2] = { 0,0 };
-    defs[0] = def;
+    defs[0] = (char)def;
     int res = lib_callbacks.callback_yn_function_ex(style, attr, color, glyph, title ? tbuf : 0, question ? buf : 0, choices, defs, resp_desc, introline ? ibuf : 0, ynflags);
     return convert_gnhch(res);
 }
@@ -911,7 +913,7 @@ void lib_putmsghistory_ex(const char* msg, const char* attrs, const char* colors
     if (msg)
         write_text2buf_utf8(buf, sizeof(buf), msg);
 
-    lib_callbacks.callback_putmsghistory(buf, attrs, colors, (uchar)is_restoring);
+    lib_callbacks.callback_putmsghistory(msg ? buf : 0, attrs, colors, (uchar)is_restoring);
 }
 
 

@@ -21,6 +21,8 @@
 #define NATTK 8             /* Maximum number of attacks per monster */
 #define MAXNASTIES 10    /* more than this can be created */
 #define WARNCOUNT 7         /* number of different warning levels */
+#define COST_OF_SLING_BULLET 3
+#define SILVER_COST_MULTIPIER 2.0
 
 /* types of calls to bhit() */
 enum bhit_call_types {
@@ -600,6 +602,7 @@ enum context_menu_styles {
 #define MKOBJ_FLAGS_PARAM_IS_SPECIAL_QUALITY           0x00008000
 #define MKOBJ_FLAGS_PARAM_IS_MNUM                      0x00010000
 #define MKOBJ_FLAGS_FOUND_THIS_TURN                    0x00020000
+#define MKOBJ_FLAGS_OWNER_IS_DEMON                     0x00040000
 
 #define MONDEAD_FLAGS_NONE                             0x00000000
 #define MONDEAD_FLAGS_NO_DEATH_ACTION                  0x00000001
@@ -616,6 +619,7 @@ enum context_menu_styles {
 #define DONAME_LIT_IN_FRONT                 0x0020
 #define DONAME_HIDE_REMAINING_LIT_TURNS     0x0040
 #define DONAME_COMPARISON                   0x0080
+#define DONAME_NO_LIBRARY                   0x0100
 
 /* Moved from shk.c */
 #define NOTANGRY(mon) ((mon)->mpeaceful)
@@ -698,6 +702,11 @@ enum gui_command_types {
     GUI_CMD_TOGGLE_GETPOS_ARROWS,
     GUI_CMD_DELETE_TRACKING_FILE,
     GUI_CMD_KEYBOARD_FOCUS,
+    GUI_CMD_ORACLE_MAJOR_CONSULTATION,
+    GUI_CMD_TOGGLE_AUTODIG,
+    GUI_CMD_TOGGLE_IGNORE_STOPPING,
+    GUI_CMD_EXIT_APP_ON_MAIN_SCREEN,
+    GUI_CMD_BREADCRUMB,
 };
 
 enum game_status_types
@@ -736,8 +745,10 @@ enum diagnostic_data_attachment_types
 enum debug_log_types
 {
     DEBUGLOG_GENERAL = 0,
+    DEBUGLOG_PRIORITY,
     DEBUGLOG_DEBUG_ONLY,
     DEBUGLOG_FILE_DESCRIPTOR,
+    DEBUGLOG_PANIC,
 };
 
 

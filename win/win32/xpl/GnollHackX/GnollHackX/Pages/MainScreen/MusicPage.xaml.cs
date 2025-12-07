@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
@@ -16,12 +17,13 @@ using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
 using GnollHackX.Controls;
+using Xamarin.Essentials;
 
 namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class MusicPage : ContentPage
+    public partial class MusicPage : ContentPage, ICloseablePage
     {
         public MusicPage()
         {
@@ -37,9 +39,9 @@ namespace GnollHackX.Pages.MainScreen
                 EmptyLabel.TextColor = GHColors.White;
             }
             AddDiscoveredSoundTracks();
-            GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
+            GHApp.FmodService.StopAllUISounds();
             GHApp.FmodService.LoadBanks(sound_bank_loading_type.Music);
-            GHApp.FmodService.PlayMusic(GHConstants.MusicGHSound, GHConstants.MusicEventPath, 0, 0.3f, 1.0f);
+            GHApp.FmodService.PlayUIMusic(GHConstants.MusicGHSound, GHConstants.MusicEventPath, 0, 0.3f, 1.0f);
         }
 
         private class DiscoveredSoundTrackItem
@@ -123,7 +125,12 @@ namespace GnollHackX.Pages.MainScreen
                 discoCount++;
             }
 
-            lblSubtitle.Text = "Found " + discoCount + " of " + GHSoundTrack.GnollHackSoundTracks.Count + " sound tracks";
+            int soundTrackCount = 0;
+            foreach (var track in GHSoundTrack.GnollHackSoundTracks)
+                if (track?.GameAppearanceList?.Count > 0)
+                    soundTrackCount++;
+
+            lblSubtitle.Text = "Found " + discoCount + " of " + soundTrackCount + " sound tracks";
             if (discoCount == 0)
                 EmptyLabel.IsVisible = true;
         }
@@ -142,14 +149,14 @@ namespace GnollHackX.Pages.MainScreen
                 else if (ghst.GHSoundList.Count > 0)
                     ghsound = ghst.GHSoundList[0];
 
-                GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
+                GHApp.FmodService?.StopAllUISounds();
                 if (ghsound >= 0)
                 {
-                    string eventPath = GHApp.GnollHackService.GetEventPathForGHSound(ghsound);
-                    float volume = GHApp.GnollHackService.GetVolumeForGHSound(ghsound);
+                    string eventPath = GHApp.GnollHackService?.GetEventPathForGHSound(ghsound) ?? null;
+                    float volume = GHApp.GnollHackService?.GetVolumeForGHSound(ghsound) ?? 0.0f;
                     if (!string.IsNullOrWhiteSpace(eventPath) && volume > 0)
                     {
-                        GHApp.FmodService.PlayMusic(ghsound, eventPath, 0, Math.Min(1.0f, volume * GHConstants.IntroMusicVolume / GHConstants.BackgroundMusicVolume), 1.0f);
+                        GHApp.FmodService?.PlayUIMusic(ghsound, eventPath, 0, Math.Min(1.0f, volume * GHConstants.IntroMusicVolume / GHConstants.BackgroundMusicVolume), 1.0f);
                     }
                 }
             }
@@ -158,14 +165,46 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void Button_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        private async Task ClosePageAsync(bool playClickedSound)
+        {
             CloseButton.IsEnabled = false;
-            GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
-            GHApp.PlayButtonClickedSound();
+            _backPressed = true;
+            GHApp.FmodService.StopAllUISounds();
+            if (playClickedSound)
+                GHApp.PlayButtonClickedSound();
             var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
+            GHApp.FmodService.PlayUIMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
             GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Music);
             GHApp.DisconnectIViewHandlers(page);
         }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (CloseButton.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
 
 
         private double _currentPageWidth = 0;
@@ -189,12 +228,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             if (!_backPressed)
             {
-                _backPressed = true;
-                GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
-                var page = await GHApp.Navigation.PopModalAsync();
-                GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
-                GHApp.FmodService.UnloadBanks(sound_bank_loading_type.Music);
-                GHApp.DisconnectIViewHandlers(page);
+                await ClosePageAsync(false);
             }
             return false;
         }
@@ -207,11 +241,16 @@ namespace GnollHackX.Pages.MainScreen
         {
             GHApp.BackButtonPressed -= BackButtonPressed;
         }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
+
 
         private void TapGestureRecognizer_Tapped(object sender, EventArgs e)
         {
             lblHeader.IsEnabled = false;
-            GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0);
+            GHApp.FmodService.StopAllUISounds();
             lblHeader.IsEnabled = true;
         }
     }

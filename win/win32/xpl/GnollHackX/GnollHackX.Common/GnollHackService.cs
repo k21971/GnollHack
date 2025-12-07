@@ -13,6 +13,7 @@ using Xamarin.Essentials;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using GnollHackX;
+using System.Diagnostics;
 
 #if __IOS__
 using Foundation;
@@ -176,6 +177,8 @@ namespace GnollHackX.Unknown
         );
 
         [DllImport(PlatformConstants.dll)]
+        public static extern int LibInitializeTileData();
+        [DllImport(PlatformConstants.dll)]
         public static extern int GetGlyph2Tile(out IntPtr array_ptr, out int size);
         [DllImport(PlatformConstants.dll)]
         public static extern int GetGlyphTileFlags(out IntPtr array_ptr, out int size);
@@ -292,6 +295,8 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern int LibGetNumCatalogues();
         [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetMaxMajorConsultations(string filename);
+        [DllImport(PlatformConstants.dll)]
         public static extern int LibIsDebug();
         [DllImport(PlatformConstants.dll)]
         public static extern int LibValidateSaveFile(string filename, [MarshalAs(UnmanagedType.LPArray), Out] byte[] out_buffer);
@@ -316,6 +321,10 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetDiceAsRanges(int new_value);
         [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetAutoDig(int new_value);
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetIgnoreStopping(int new_value);
+        [DllImport(PlatformConstants.dll)]
         public static extern int LibGetMouseCommand(int is_middle);
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetMouseCommand(int new_value, int is_middle);
@@ -325,6 +334,11 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern float LibGetVolumeForGHSound(int ghsound);
 
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetExitHack(int newValue);
+
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibExitGnhThread();
 
         private void LoadNativeLibrary(string libName)
         {
@@ -829,18 +843,25 @@ namespace GnollHackX.Unknown
                         {
                             long curlength = curfile.Length;
                             long used_length = GHApp.IsDesktop ? sfile.length_desktop : sfile.length_mobile;
-                            if (curlength == used_length)
+                            try
                             {
-                                Preferences.Set("Verify_" + sfile.id + "_Version", sfile.version);
-                                Preferences.Set("Verify_" + sfile.id + "_LastWriteTime", curfile.LastWriteTimeUtc);
+                                if (curlength == used_length)
+                                {
+                                    Preferences.Set("Verify_" + sfile.id + "_Version", sfile.version);
+                                    Preferences.Set("Verify_" + sfile.id + "_LastWriteTime", curfile.LastWriteTimeUtc);
+                                }
+                                else
+                                {
+                                    File.Delete(fulltargetpath);
+                                    if (Preferences.ContainsKey("Verify_" + sfile.id + "_Version"))
+                                        Preferences.Remove("Verify_" + sfile.id + "_Version");
+                                    if (Preferences.ContainsKey("Verify_" + sfile.id + "_LastWriteTime"))
+                                        Preferences.Remove("Verify_" + sfile.id + "_LastWriteTime");
+                                }
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                File.Delete(fulltargetpath);
-                                if (Preferences.ContainsKey("Verify_" + sfile.id + "_Version"))
-                                    Preferences.Remove("Verify_" + sfile.id + "_Version");
-                                if (Preferences.ContainsKey("Verify_" + sfile.id + "_LastWriteTime"))
-                                    Preferences.Remove("Verify_" + sfile.id + "_LastWriteTime");
+                                System.Diagnostics.Debug.WriteLine(ex);
                             }
                             //}
                         }
@@ -868,6 +889,11 @@ namespace GnollHackX.Unknown
                     await Task.Delay(5);
                 }
             }            
+        }
+
+        public void InitializeTileData()
+        {
+            LibInitializeTileData();
         }
 
         public void GetGlyphArrays(out IntPtr gl2ti, out int size1, out IntPtr gltifl, out int gltifl_size)
@@ -1076,6 +1102,12 @@ namespace GnollHackX.Unknown
             return LibGetMaxManuals();
         }
 
+        public int GetMaxMajorConsultations()
+        {
+            string filesdir = GetGnollHackPath();
+            return LibGetMaxMajorConsultations(filesdir);
+        }
+
         public int GetFirstCatalogue()
         {
             return LibGetFirstCatalogue();
@@ -1094,8 +1126,18 @@ namespace GnollHackX.Unknown
         public bool ValidateSaveFile(string filename, out string res_str)
         {
             byte[] buffer = new byte[256 * 4];
+            Array.Clear(buffer, 0, buffer.Length);
             int res = LibValidateSaveFile(filename, buffer);
-            res_str = Encoding.UTF8.GetString(buffer);
+            if (buffer[0] == 0)
+                res_str = "";
+            else
+                res_str = Encoding.UTF8.GetString(buffer);
+            if (!string.IsNullOrEmpty(res_str))
+            {
+                int index = res_str.IndexOf('\0');
+                if (index >= 0)
+                    res_str = res_str.Remove(index); 
+            }
             return res != 0;
         }
 
@@ -1145,6 +1187,14 @@ namespace GnollHackX.Unknown
         {
             LibSetDiceAsRanges(newValue ? 1 : 0);
         }
+        public void SetAutoDig(bool newValue)
+        {
+            LibSetAutoDig(newValue ? 1 : 0);
+        }
+        public void SetIgnoreStopping(bool newValue)
+        {
+            LibSetIgnoreStopping(newValue ? 1 : 0);
+        }
 
         public int GetMouseCommand(bool isMiddle)
         {
@@ -1168,6 +1218,15 @@ namespace GnollHackX.Unknown
             return LibGetVolumeForGHSound(ghsound);
         }
 
+        public void SetExitHack(int newValue)
+        {
+            LibSetExitHack(newValue);
+        }
+        public void ExitGnhThread()
+        {
+            LibExitGnhThread();
+        }
+
         public int StartGnollHack(GHGame ghGame)
         {
             GHApp.SetMirroredOptionsToDefaults();
@@ -1177,6 +1236,9 @@ namespace GnollHackX.Unknown
             bool getposarrows = GHApp.GetPositionArrows;
             bool characterclickaction = GHApp.MirroredCharacterClickAction;
             bool diceasranges = GHApp.MirroredDiceAsRanges;
+            bool autodig = GHApp.MirroredAutoDig;
+            bool ignorestopping = GHApp.MirroredIgnoreStopping;
+            bool defaultvikeys = GHApp.DefaultVIKeys;
             ulong rightmouse = (ulong)GHApp.MirroredRightMouseCommand << GHConstants.RightMouseBitIndex;
             ulong middlemouse = (ulong)GHApp.MirroredMiddleMouseCommand << GHConstants.MiddleMouseBitIndex;
             ulong runflags = (ulong)(ghGame.WizardMode ? RunGnollHackFlags.WizardMode : 0) |
@@ -1193,6 +1255,9 @@ namespace GnollHackX.Unknown
                 (ulong)(getposarrows ? RunGnollHackFlags.GetPositionArrows : 0) | /* Set the iflag to right value */
                 (ulong)(characterclickaction ? RunGnollHackFlags.CharacterClickAction : 0) | /* Use the default; GHApp.CharacterClickAction may contain the option value from the last game */
                 (ulong)(diceasranges ? RunGnollHackFlags.DiceAsRanges : 0) | /* Use the default; GHApp.DiceAsRanges may contain the option value from the last game */
+                (ulong)(autodig ? RunGnollHackFlags.AutoDig : 0) | /* Use the default; GHApp.AutoDig may contain the option value from the last game */
+                (ulong)(ignorestopping ? RunGnollHackFlags.IgnoreStopping : 0) | /* Use the default; GHApp.IgnoreStopping may contain the option value from the last game */
+                (ulong)(defaultvikeys ? RunGnollHackFlags.DefaultVIKeys : 0) | /* Use the default */
                 rightmouse | middlemouse | (ulong)ghGame.StartFlags;
             ulong foundManuals = GHApp.FoundManuals;
             string lastusedplname = GHApp.TournamentMode && !ghGame.PlayingReplay ? GHApp.LastUsedTournamentPlayerName : GHApp.LastUsedPlayerName;

@@ -26,7 +26,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-	public partial class ImportExportPage : ContentPage
+	public partial class ImportExportPage : ContentPage, ICloseablePage
 	{
 		public ImportExportPage ()
 		{
@@ -135,8 +135,8 @@ namespace GnollHackX.Pages.MainScreen
                                                     System.IO.File.Delete(finalname);
                                                 System.IO.File.Move(filestr, finalname);
                                                 nextracted++;
-                                                if (!string.IsNullOrWhiteSpace(out_str) && GHApp.DebugLogMessages)
-                                                    await GHApp.DisplayMessageBox(this, "ValidateSaveFile Message", out_str, "OK");
+                                                if (!string.IsNullOrWhiteSpace(out_str))
+                                                    GHApp.MaybeWriteGHLog("ValidateSaveFile Message: " + out_str);
                                             }
                                             else
                                             {
@@ -385,21 +385,50 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        private async Task ClosePageAsync(bool playClickedSound)
+        {
             ImportExportGrid.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
+            _backPressed = true;
+            if (playClickedSound)
+                GHApp.PlayButtonClickedSound();
             var page = await GHApp.Navigation.PopModalAsync();
             GHApp.DisconnectIViewHandlers(page);
         }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (ImportExportGrid.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
 
         private bool _backPressed = false;
         private async Task<bool> BackButtonPressed(object sender, EventArgs e)
         {
             if (!_backPressed)
             {
-                _backPressed = true;
-                ImportExportGrid.IsEnabled = false;
-                var page = await GHApp.Navigation.PopModalAsync();
-                GHApp.DisconnectIViewHandlers(page);
+                await ClosePageAsync(false);
             }
             return false;
         }
@@ -413,6 +442,11 @@ namespace GnollHackX.Pages.MainScreen
         {
             GHApp.BackButtonPressed -= BackButtonPressed;
         }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
+
 
         private double _currentPageWidth = 0;
         private double _currentPageHeight = 0;

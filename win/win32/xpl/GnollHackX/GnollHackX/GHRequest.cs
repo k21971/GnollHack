@@ -98,6 +98,12 @@ namespace GnollHackX
         UpdateGHWindow,
         UpdateGHWindowVisibility,
         KeyboardFocus,
+        SetAutoDig,
+        SetIgnoreStopping,
+        StopAllGameSounds,
+        SetVolume,
+        RestartGameUponPageDestruction,
+        StopWaitAndExitThread,
     }
 
     public struct AddContextMenuData
@@ -163,7 +169,7 @@ namespace GnollHackX
         public ulong fflags;
     }
 
-    public class GHRequest
+    public sealed class GHRequest
     {
         public GHGame RequestingGame { get; }
         public GHRequestType RequestType { get; set; }
@@ -188,7 +194,7 @@ namespace GnollHackX
         public int RequestNhColor { get; set; }
         public int RequestGlyph { get; set; }
         public ulong RequestFlags { get; set; }
-        public GHMsgHistoryItem[] MessageHistory { get; set; } = null;
+        public GHMsgHistorySpan MessageHistory { get; set; } = null;
         public GHMsgHistoryItem MessageHistoryItem { get; set; } = null;
         public string Responses { get; set; }
         public string ResponseDescriptions { get; set; }
@@ -389,7 +395,7 @@ namespace GnollHackX
             RequestString = requeststring;
             RequestStringAttributes = attributes;
         }
-        public GHRequest(GHGame ghGame, GHRequestType requesttype, GHMsgHistoryItem[] msgHistory)
+        public GHRequest(GHGame ghGame, GHRequestType requesttype, GHMsgHistorySpan msgHistory)
         {
             RequestingGame = ghGame;
             RequestType = requesttype;

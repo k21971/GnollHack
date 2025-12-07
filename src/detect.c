@@ -27,8 +27,6 @@ STATIC_DCL void FDECL(show_map_spot, (int, int));
 STATIC_PTR void FDECL(findone, (int, int, genericptr_t));
 STATIC_PTR void FDECL(openone, (int, int, genericptr_t));
 STATIC_DCL int FDECL(mfind0, (struct monst *, BOOLEAN_P));
-STATIC_DCL int FDECL(reveal_terrain_getglyph, (int, int, int,
-                                               BOOLEAN_P, int, int));
 
 /* bring hero out from underwater or underground or being engulfed;
    return True iff any change occurred */
@@ -237,7 +235,7 @@ unsigned material;
                                || ((mtmp = m_at(x, y)) != 0 && mtmp->minvent));
         } else {
             if (material
-                && objects[glyph_to_obj(glyph)].oc_material == material) {
+                && objects[glyph_to_otyp(glyph)].oc_material == material) {
                 /* object shown here is of interest because material matches */
                 for (otmp = level.objects[x][y]; otmp; otmp = otmp->nexthere)
                     if (o_material(otmp, MAT_GOLD))
@@ -251,7 +249,7 @@ unsigned material;
                 /* detection indicates removal of this object from the map */
                 return TRUE;
             }
-            if (oclass && objects[glyph_to_obj(glyph)].oc_class == oclass) {
+            if (oclass && objects[glyph_to_otyp(glyph)].oc_class == oclass) {
                 /* obj shown here is of interest because its class matches */
                 for (otmp = level.objects[x][y]; otmp; otmp = otmp->nexthere)
                     if (o_in(otmp, oclass))
@@ -1270,6 +1268,7 @@ struct obj **optr;
             play_special_effect_at(SPECIAL_EFFECT_SMALL_FIERY_EXPLOSION, 0, u.ux, u.uy, FALSE);
             special_effect_wait_until_action(0);
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s!", Tobjnam(obj, "explode"));
+            Sprintf(priority_debug_buf_2, "use_crystal_ball: %d", obj->otyp);
             useup(obj);
             *optr = obj = 0; /* it's gone */
             /* physical damage cause by the shards and force */
@@ -2206,7 +2205,7 @@ sokoban_detect()
     }
 }
 
-STATIC_DCL int
+int
 reveal_terrain_getglyph(x, y, full, swallowed, default_glyph, which_subset)
 int x, y, full;
 boolean swallowed;
@@ -2308,7 +2307,7 @@ dump_map()
     int x, y, glyph, skippedrows, lastnonblank;
     int subset = TER_MAP | TER_TRP | TER_OBJ | TER_MON;
     int default_glyph = base_cmap_to_glyph(level.flags.arboreal ? S_tree : S_unexplored);
-    char buf[BUFSZ * 2];
+    char buf[BUFSZ * 2] = "";
     char* bp;
     boolean blankrow, toprow;
 
@@ -2329,9 +2328,9 @@ dump_map()
         lastnonblank = -1; /* buf[] index rather than map's x */
         for (x = 1; x < COLNO; x++) 
         {
-            nhsym ch;
-            int color, sym;
-            uint64_t special;
+            nhsym ch = 0;
+            int color = NO_COLOR, sym = 0;
+            uint64_t special = 0;
 
             glyph = reveal_terrain_getglyph(x, y, FALSE, u.uswallow,
                                             default_glyph, subset);

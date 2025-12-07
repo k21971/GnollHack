@@ -251,7 +251,8 @@ struct attack *mattk;
               ? could_seduce(mtmp, &youmonst, mattk) : 0);
     Monst_name = Monnam(mtmp);
 
-    if (is_blinded(mtmp) || (Invis && !has_see_invisible(mtmp))) {
+    if (m_cannotsenseu(mtmp)) 
+    {
         const char *swings = (mattk->aatyp == AT_BITE) ? "snaps"
                              : (mattk->aatyp == AT_KICK) ? "kicks"
                              : (mattk->aatyp == AT_RAMS) ? "rams"
@@ -284,7 +285,9 @@ struct attack *mattk;
                 break;
             }
 
-    } else if (Displaced) {
+    } 
+    else if (Displaced)
+    {
         /* give 'displaced' message even if hero is Blind */
         if (compat)
             pline("%s smiles %s at your %sdisplaced image...", Monst_name,
@@ -297,7 +300,9 @@ struct attack *mattk;
                    * image, since the displaced image is also invisible. */
                   Monst_name, mattk->aatyp == AT_RAMS ? "rams" : "strikes", Invis ? "invisible " : "");
 
-    } else if (Underwater) {
+    }
+    else if (Underwater) 
+    {
         /* monsters may miss especially on water level where
            bubbles shake the player here and there */
         if (compat)
@@ -306,7 +311,8 @@ struct attack *mattk;
             pline("%s is fooled by water reflections and misses!",
                   Monst_name);
 
-    } else
+    } 
+    else
         impossible("%s attacks you without knowing your location?",
                    Monst_name);
 }
@@ -436,7 +442,7 @@ struct attack *alt_attk_buf;
                && !(mptr->mattk[1].aatyp == AT_WEAP
                     && mptr->mattk[1].adtyp == AD_PHYS)
                && (is_cancelled(magr)
-                   || (weap && ((weap->otyp == CORPSE
+                   || (weap && ((weap->otyp == CORPSE && weap->corpsenm >= LOW_PM
                                  && touch_petrifies(&mons[weap->corpsenm]))
                                 || weap->oartifact == ART_STORMBRINGER || weap->oartifact == ART_MOURNBLADE
                                 || weap->oartifact == ART_VORPAL_BLADE)))) {
@@ -674,7 +680,7 @@ register struct monst *mtmp;
             Sprintf(buf, "You appear to be %s again.",
                     Upolyd ? (const char *) an(mon_monster_name(&youmonst))
                            : (const char *) "yourself");
-            unmul(buf); /* immediately stop mimicking */
+            unmul_ex(ATR_NONE, CLR_MSG_ATTENTION, buf); /* immediately stop mimicking */
         }
         return 0;
     }
@@ -1321,6 +1327,8 @@ register struct monst *mtmp;
             if (u.usleep && u.usleep < monstermoves && !rn2(10)) {
                 multi = -1;
                 nomovemsg = "The combat suddenly awakens you.";
+                nomovemsg_attr = ATR_NONE;
+                nomovemsg_color = CLR_MSG_ATTENTION;
             }
         }
 
@@ -1955,7 +1963,7 @@ register struct obj* omonwep;
 
             if (mattk->aatyp == AT_WEAP && otmp)
             {
-                if (otmp->otyp == CORPSE && touch_petrifies(&mons[otmp->corpsenm]))
+                if (otmp->otyp == CORPSE && otmp->corpsenm >= LOW_PM && touch_petrifies(&mons[otmp->corpsenm]))
                 {
                     damage = 1;
                     pline("%s hits you with the %s corpse.", Monnam(mtmp), corpse_monster_name(otmp));
@@ -3284,11 +3292,13 @@ register struct obj* omonwep;
         )
     ))
     {
+        Sprintf(priority_debug_buf_4, "hitmu: %d", omonwep->otyp);
         if(omonwep->where == OBJ_MINVENT)
             m_useup(mtmp, omonwep);
         else if (omonwep->where == OBJ_FLOOR)
         {
             int x = omonwep->ox, y = omonwep->oy;
+            Sprintf(priority_debug_buf_3, "hitmu: %d", omonwep->otyp);
             delobj(omonwep);
             newsym(x, y);
         }
@@ -4618,7 +4628,7 @@ struct attack *mattk;
 
     if (oldu_mattk->damd > 0 || oldu_mattk->damn > 0)
         damage = adjust_damage(
-            max(0, d(oldu_mattk->damn > 0 ? oldu_mattk->damn : olduasmon->mlevel / 2 + 2, oldu_mattk->damd > 0 ? oldu_mattk->damd : 6) + oldu_mattk->damp), 
+            max(0, d(oldu_mattk->damn > 0 ? oldu_mattk->damn : (int)olduasmon->mlevel / 2 + 2, oldu_mattk->damd > 0 ? oldu_mattk->damd : 6) + oldu_mattk->damp),
             &youmonst, mtmp, mattk->adtyp, ADFLAGS_NONE);
     else
         damage = max(0, oldu_mattk->damp);
@@ -4778,7 +4788,7 @@ struct attack *mattk;
             if (u.mh - u.mhmax > 0)
                 u.basemhmax += u.mh - u.mhmax;
             updatemaxhp();
-            if (u.mhmax > ((youmonst.data->mlevel + 1) * 8))
+            if (u.mhmax > (((int)youmonst.data->mlevel + 1) * 8))
                 (void) split_mon(&youmonst, mtmp);
             break;
         case AD_STUN: /* Yellow mold */
@@ -4874,7 +4884,7 @@ cloneu()
     mon = christen_monst(mon, plname);
     mon->u_know_mname = TRUE;
     initedog(mon, TRUE);
-    mon->m_lev = youmonst.data->mlevel;
+    mon->m_lev = (uchar)youmonst.data->mlevel;
     //mon might need mbasehpmax stat
     mon->mbasehpmax = u.basemhmax;
     mon->mbasehpdrain = u.basemhdrain;

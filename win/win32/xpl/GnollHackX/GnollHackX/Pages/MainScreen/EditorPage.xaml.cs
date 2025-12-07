@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+
 #if GNH_MAUI
 using GnollHackX;
 using Microsoft.Maui.Controls.PlatformConfiguration;
@@ -16,12 +17,13 @@ using Xamarin.Forms;
 using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Xaml;
+using Xamarin.Essentials;
 
 namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class EditorPage : ContentPage
+    public partial class EditorPage : ContentPage, ICloseablePage
     {
         private string _fileName;
         private MainPage _mainPage;
@@ -62,6 +64,9 @@ namespace GnollHackX.Pages.MainScreen
         private async void OKButton_Clicked(object sender, EventArgs e)
         {
             OKButton.IsEnabled = false;
+            CancelButton.IsEnabled = false;
+            ResetButton.IsEnabled = false;
+            _backPressed = true;
             GHApp.PlayButtonClickedSound();
             if (_textChanged)
             {
@@ -94,6 +99,9 @@ namespace GnollHackX.Pages.MainScreen
                 else
                 {
                     OKButton.IsEnabled = true;
+                    CancelButton.IsEnabled = true;
+                    ResetButton.IsEnabled = true;
+                    _backPressed = false;
                 }
             }
             else
@@ -107,8 +115,41 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void CancelButton_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (CancelButton.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
+        private async Task ClosePageAsync(bool playClickedSound)
+        {
+            OKButton.IsEnabled = false;
             CancelButton.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
+            ResetButton.IsEnabled = false;
+            _backPressed = true;
+            if (playClickedSound)
+                GHApp.PlayButtonClickedSound();
             if (_textChanged)
             {
                 bool answer = await GHApp.DisplayMessageBox(this, "Close without Saving?", "Are you sure to close without saving changes?", "Yes", "No");
@@ -119,9 +160,12 @@ namespace GnollHackX.Pages.MainScreen
                     var page = await GHApp.Navigation.PopModalAsync();
                     GHApp.DisconnectIViewHandlers(page);
                 }
-                else 
+                else
                 {
+                    OKButton.IsEnabled = true;
                     CancelButton.IsEnabled = true;
+                    ResetButton.IsEnabled = true;
+                    _backPressed = false;
                 }
             }
             else
@@ -132,16 +176,36 @@ namespace GnollHackX.Pages.MainScreen
                 GHApp.DisconnectIViewHandlers(page);
             }
         }
-
-        public void ClosePage()
+        private bool _backPressed = false;
+        private async Task<bool> BackButtonPressed(object sender, EventArgs e)
         {
-            if (CancelButton.IsEnabled)
-                CancelButton_Clicked(this, EventArgs.Empty);
+            if (!_backPressed)
+            {
+                await ClosePageAsync(false);
+            }
+            return false;
         }
+
+        private void ContentPage_Appearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed += BackButtonPressed;
+        }
+        private void ContentPage_Disappearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed -= BackButtonPressed;
+        }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
+
 
         private async void ResetButton_Clicked(object sender, EventArgs e)
         {
+            OKButton.IsEnabled = false;
+            CancelButton.IsEnabled = false;
             ResetButton.IsEnabled = false;
+            _backPressed = true;
             GHApp.PlayButtonClickedSound();
             bool answer = await GHApp.DisplayMessageBox(this, "Reset Options File?", "Are you sure to reset the options file?", "Yes", "No");
             if(answer)
@@ -154,7 +218,10 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
+                OKButton.IsEnabled = true;
+                CancelButton.IsEnabled = true;
                 ResetButton.IsEnabled = true;
+                _backPressed = false;
             }
         }
 

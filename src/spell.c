@@ -204,6 +204,7 @@ struct obj *spellbook;
         if (!objects[spellbook->otyp].oc_name_known
             && !objects[spellbook->otyp].oc_uname)
             docall(spellbook, dcbuf);
+        Sprintf(priority_debug_buf_2, "confused_book: %d", spellbook->otyp);
         useup(spellbook);
         gone = TRUE;
     } else {
@@ -431,6 +432,8 @@ learn(VOID_ARGS)
         nomul(context.spbook.delay); /* remaining delay is uninterrupted */
         multi_reason = "reading a book";
         nomovemsg = 0;
+        nomovemsg_attr = ATR_NONE;
+        nomovemsg_color = NO_COLOR;
         context.spbook.delay = 0;
         return 0;
 #endif
@@ -488,6 +491,7 @@ learn(VOID_ARGS)
             if (!objects[book->otyp].oc_name_known
                 && !objects[book->otyp].oc_uname)
                 docall(book, (char*)0);
+            Sprintf(priority_debug_buf_2, "learn: %d", book->otyp);
             useup(book);
         }
         else
@@ -620,6 +624,7 @@ learn(VOID_ARGS)
     { /* maybe a demon cursed it */
         if (cursed_book(book)) 
         {
+            Sprintf(priority_debug_buf_2, "learn2: %d", book->otyp);
             useup(book);
             gone = TRUE;
             context.spbook.book = 0;
@@ -634,6 +639,7 @@ learn(VOID_ARGS)
     {
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "spellbook crumbles to dust.");
+        Sprintf(priority_debug_buf_2, "learn3: %d", book->otyp);
         useup(book);
         gone = TRUE;
     }
@@ -943,6 +949,8 @@ register struct obj *spellbook;
             nomul(context.spbook.delay); /* study time */
             multi_reason = "reading a book";
             nomovemsg = 0;
+            nomovemsg_attr = ATR_NONE;
+            nomovemsg_color = NO_COLOR;
             context.spbook.delay = 0;
             if (gone || !rn2(2)) {
                 if (!gone)
@@ -967,6 +975,8 @@ register struct obj *spellbook;
             nomul(context.spbook.delay);
             multi_reason = "reading a book";
             nomovemsg = 0;
+            nomovemsg_attr = ATR_NONE;
+            nomovemsg_color = NO_COLOR;
             context.spbook.delay = 0;
             return 1;
 #endif
@@ -987,7 +997,7 @@ register struct obj *spellbook;
     if (context.spbook.book)
         context.spbook.o_id = context.spbook.book->o_id;
 
-    set_occupation(learn, "studying", objects[spellbook->otyp].oc_soundset, OCCUPATION_STUDYING, resume ? OCCUPATION_SOUND_TYPE_RESUME : OCCUPATION_SOUND_TYPE_START, 0);
+    set_occupation(learn, "studying", ATR_NONE, CLR_MSG_ATTENTION, objects[spellbook->otyp].oc_soundset, OCCUPATION_STUDYING, resume ? OCCUPATION_SOUND_TYPE_RESUME : OCCUPATION_SOUND_TYPE_START, 0);
     return 1;
 }
 
@@ -1225,6 +1235,7 @@ int* spell_no;
                 if (OBJ_ITEM_DESC(spellid(splnum)))
                 {
                     Strcpy(descbuf, OBJ_ITEM_DESC(spellid(splnum)));
+                    convert_dice_to_ranges(descbuf);
                     char* p;
                     for (p = descbuf; *p; p++)
                     {
@@ -1335,8 +1346,7 @@ int* spell_no;
             }
         }
 
-#ifdef GNH_MOBILE
-        if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && (splaction == SPELLMENU_PREPARE || splaction == SPELLMENU_CAST))
+        if ((windowprocs.wincap2 & WC2_MENU_PROPER_SUBTITLE) != 0 && (windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && (splaction == SPELLMENU_PREPARE || splaction == SPELLMENU_CAST))
         {
             char subbuf[BUFSZ];
             if (splaction == SPELLMENU_CAST)
@@ -1354,9 +1364,6 @@ int* spell_no;
         {
             end_menu(tmpwin, prompt);
         }
-#else 
-        end_menu(tmpwin, prompt);
-#endif
 
         //Show menu
         n = select_menu(tmpwin, how, &selected);
@@ -1667,7 +1674,7 @@ int skill;
     case P_NECROMANCY_SPELL:
         return "necromancy";
     default:
-        impossible("Unknown spell skill, %d;", skill);
+        impossible("spelltypemnemonic: Unknown spell skill, %d;", skill);
         return empty_string;
     }
 }
@@ -1704,7 +1711,7 @@ int skill;
         case P_NECROMANCY_SPELL:
             return "&spnec;";
         default:
-            impossible("Unknown spell skill, %d;", skill);
+            impossible("spelltypesymbol (special symbols): unknown spell skill, %d;", skill);
             return empty_string;
         }
     }
@@ -1736,7 +1743,7 @@ int skill;
         case P_NECROMANCY_SPELL:
             return "Nec";
         default:
-            impossible("Unknown spell skill, %d;", skill);
+            impossible("spelltypesymbol: unknown spell skill, %d;", skill);
             return empty_string;
         }
     }
@@ -2470,6 +2477,7 @@ int spell, booktype;
         //putstr(datawin, 0, buf);
         char descbuf[8 * BUFSZ];
         Strcpy(descbuf, OBJ_ITEM_DESC(booktype));
+        convert_dice_to_ranges(descbuf);
         char* bp = descbuf;
         char* ebp;
         while (bp && *bp)
@@ -4012,6 +4020,7 @@ int *spell_no;
     winid tmpwin;
     int i, n, how, splnum;
     char buf[BUFSZ], descbuf[BUFSZ], fmt[BUFSZ];
+    char fulldesc[BUFSZ * 8];
     //char* colorbufs[MAXSPELL];
     //int colorbufcnt = 0;
     //const char *fmt;
@@ -4058,9 +4067,15 @@ int *spell_no;
             int desclen = 0;
             splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             if (OBJ_ITEM_DESC(spellid(splnum)))
-                desclen = (int)strlen(OBJ_ITEM_DESC(spellid(splnum)));
+            {
+                Strcpy(fulldesc, OBJ_ITEM_DESC(spellid(splnum)));
+                convert_dice_to_ranges(fulldesc);
+                desclen = (int)strlen(fulldesc);
+            }
             else
+            {
                 desclen = (int)strlen(nodesc);
+            }
             if (desclen > maxlen)
                 maxlen = desclen;
 
@@ -4085,7 +4100,8 @@ int *spell_no;
         for (i = 0; i < extraspaces; i++)
             Strcat(spacebuf, " ");
 
-        if (!iflags.menu_tab_sep) {
+        if (!iflags.menu_tab_sep) 
+        {
 #if defined (GNH_MOBILE)
             Sprintf(fmt, "%%-%ds  #  Description    %%s", namelength);
 #else
@@ -4101,7 +4117,8 @@ int *spell_no;
             MENU_UNSELECTED, menu_heading_info());
 
 
-        for (i = 0; i < MAXSPELL /*min(MAXSPELL, 52)*/ && spellid(i) != NO_SPELL; i++) {
+        for (i = 0; i < MAXSPELL /*min(MAXSPELL, 52)*/ && spellid(i) != NO_SPELL; i++) 
+        {
             splnum = !flags.spellorder ? i : (int)spl_orderindx[i];
             char shortenedname[BUFSZ] = "";
             char fullname[BUFSZ] = "";
@@ -4126,8 +4143,8 @@ int *spell_no;
             if(OBJ_ITEM_DESC(spellid(splnum)))
             {
                 char shorteneddesc[BUFSZ] = "";
-                char fulldesc[BUFSZ * 8];
                 Strcpy(fulldesc, OBJ_ITEM_DESC(spellid(splnum)));
+                convert_dice_to_ranges(fulldesc);
                 char* p;
                 for (p = fulldesc; *p; p++)
                 {
@@ -4518,6 +4535,7 @@ int splaction;
     {
         char fulldescbuf[BUFSZ * 8];
         Strcpy(fulldescbuf, OBJ_ITEM_DESC(spellid(splnum)));
+        convert_dice_to_ranges(fulldescbuf);
         char* p;
         for (p = fulldescbuf; *p; p++)
         {
@@ -4588,6 +4606,10 @@ int splaction;
         else if ((double)u.uen + (double)u.uen_fraction / 10000 < spellmanacost)
         {
             mcolor = CLR_BLUE;
+        }
+        else if (percent < 100)
+        {
+            mcolor = CLR_YELLOW;
         }
     }
 
@@ -4836,6 +4858,10 @@ boolean usehotkey;
         {
             mcolor = CLR_BLUE;
         }
+        else if (percent < 100)
+        {
+            mcolor = CLR_YELLOW;
+        }
     }
 
     add_menu(tmpwin, NO_GLYPH, &any, letter, 0, mattr, mcolor, buf,
@@ -5037,6 +5063,9 @@ int
 forgetspell(spell)
 int spell;
 {
+    if (spell < 0 || spell >= MAXSPELL || spellid(spell) == NO_SPELL)
+        return 0;
+
     char qbuf[BUFSZ] = "";
     char spellnamebuf[BUFSZ] = "";
     Strcpy(spellnamebuf, spellname(spell));
@@ -5045,6 +5074,8 @@ int spell;
     if (yn_query_ex(ATR_NONE, CLR_MSG_WARNING, (char*)0, qbuf) == 'y')
     {
         struct spell empty_spell = { 0 };
+
+        /* Remove spell first from spl_book */
         int n;
         for (n = spell + 1; n <= MAXSPELL; n++)
         {
@@ -5057,17 +5088,45 @@ int spell;
                     break;
             }
         }
-        if (context.quick_cast_spell_no == spell)
+
+        /* Next we have to update the spell sorting order */
+        int i = 0;
+        while (i < MAXSPELL)
+        {
+            if (spl_orderindx[i] == spell)
+            {
+                /* Remove the spell from order index by moving */
+                for (n = i + 1; n < MAXSPELL; n++)
+                {
+                    spl_orderindx[n - 1] = spl_orderindx[n];
+                }
+                spl_orderindx[MAXSPELL - 1] = NO_SPELL;
+                break;
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        /* Spells after the spell's index have moved earlier in the list */
+        for (n = 0; n < MAXSPELL; n++)
+        {
+            if (spl_orderindx[n] > spell)
+                spl_orderindx[n]--;
+        }
+
+        /* Handle quick cast spells */
+        if (context.quick_cast_spell_no == spell) /* Make empty */
         {
             context.quick_cast_spell_set = FALSE;
             issue_gui_command(GUI_CMD_TOGGLE_QUICK_CAST_SPELL, NO_GLYPH, 0, "");
         }
-        else if (context.quick_cast_spell_no > spell)
+        else if (context.quick_cast_spell_no > spell) /* Has moved earlier in the list */
             context.quick_cast_spell_no--;
-        sortspells();
-        char buf[BUFSZ] = "";
+
         int multicolors[1] = { CLR_MSG_HINT };
-        pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, buf, "You removed \'%s\' from your memory permanently.", spellnamebuf);
+        pline_multi_ex(ATR_NONE, NO_COLOR, no_multiattrs, multicolors, "You removed \'%s\' from your memory permanently.", spellnamebuf);
     }
 
     return 0;
@@ -5622,6 +5681,9 @@ int spell;
             int used_amount = (failure ? 1 : selected_multiplier) * mc->amount;
             if(otmp->quan >= used_amount)
             {
+                Sprintf(priority_debug_buf_2, "domaterialcomponentsmenu: %d", otmp->otyp);
+                Strcpy(priority_debug_buf_3, "domaterialcomponentsmenu");
+                Strcpy(priority_debug_buf_4, "domaterialcomponentsmenu");
                 for (i = 0; i < used_amount; i++)
                     useup(otmp);
 
@@ -5630,6 +5692,7 @@ int spell;
             else
             {
                 impossible("There should always be enough material components at this stage");
+                Sprintf(priority_debug_buf_3, "domaterialcomponentsmenu: %d", otmp->otyp);
                 useupall(otmp);
                 failure = TRUE;
             }
@@ -5765,27 +5828,29 @@ struct materialcomponent* mc;
 struct obj* otmp;
 boolean also_possible;
 {
-    boolean acceptable = FALSE;
-    if (is_acceptable_component_object_type(mc, otmp->otyp))
-        acceptable = TRUE;
+    boolean acceptable = is_acceptable_component_object_type(mc, otmp->otyp);
+    boolean buc_acceptable = TRUE;
 
-    if ((mc->flags & MATCOMP_BLESSED_REQUIRED) && !otmp->blessed)
-        acceptable = otmp->bknown || !also_possible ? FALSE : 2;
-
-    if ((mc->flags & MATCOMP_CURSED_REQUIRED) && !otmp->cursed)
-        acceptable = otmp->bknown || !also_possible ? FALSE : 2;
-
-    if ((mc->flags & MATCOMP_NOT_CURSED) && otmp->cursed)
-        acceptable = otmp->bknown || !also_possible ? FALSE : 2;
-
-    if ((mc->flags & MATCOMP_DEATH_ENCHANTMENT_REQUIRED) && otmp->elemental_enchantment != DEATH_ENCHANTMENT)
+    if (acceptable && (mc->flags & MATCOMP_DEATH_ENCHANTMENT_REQUIRED) != 0 && otmp->elemental_enchantment != DEATH_ENCHANTMENT)
         acceptable = FALSE;
 
-    if ((is_acceptable_component_object_type(mc, CORPSE) || is_acceptable_component_object_type(mc, TIN) || is_acceptable_component_object_type(mc, EGG))
+    if (acceptable && (is_acceptable_component_object_type(mc, CORPSE) || is_acceptable_component_object_type(mc, TIN) || is_acceptable_component_object_type(mc, EGG))
         && mc->monsterid[0] >= 0 && !is_acceptable_component_monster_type(mc, otmp->corpsenm))
         acceptable = FALSE;
 
-    return acceptable;
+    if (acceptable)
+    {
+        if (buc_acceptable && (mc->flags & MATCOMP_BLESSED_REQUIRED) != 0 && !otmp->blessed)
+            buc_acceptable = otmp->bknown || !also_possible ? FALSE : 2;
+
+        if (buc_acceptable && (mc->flags & MATCOMP_CURSED_REQUIRED) != 0 && !otmp->cursed)
+            buc_acceptable = otmp->bknown || !also_possible ? FALSE : 2;
+
+        if (buc_acceptable && (mc->flags & MATCOMP_NOT_CURSED) != 0 && otmp->cursed)
+            buc_acceptable = otmp->bknown || !also_possible ? FALSE : 2;
+    }
+
+    return acceptable ? buc_acceptable : 0;
 }
 
 uchar
@@ -5930,12 +5995,12 @@ int splidx;
         return;
 
     int i;
-    for (i = 0; i < MAXSPELL && spl_orderindx[i] != NO_SPELL; i++)
+    for (i = 0; i < MAXSPELL; i++)
     {
         if (spl_orderindx[i] == splidx)
             break;
     }
-    if (i >= MAXSPELL || spl_book[i].sp_id == NO_SPELL)
+    if (i >= MAXSPELL)
         return;
 
     int j;
@@ -5957,23 +6022,27 @@ int splidx;
         return;
 
     int i;
-    for (i = 0; i < MAXSPELL && spl_book[i].sp_id != NO_SPELL; i++)
+    for (i = 0; i < MAXSPELL; i++)
     {
         if (spl_orderindx[i] == splidx)
             break;
     }
-    if (i >= MAXSPELL || spl_orderindx[i] == NO_SPELL)
+    if (i >= MAXSPELL)
         return;
 
-    if (i == MAXSPELL - 1 || spl_book[i + 1].sp_id == NO_SPELL)
+    int cnt;
+    for (cnt = 0; cnt < MAXSPELL && spl_book[cnt].sp_id != NO_SPELL; cnt++)
+        ;
+
+    if (i == MAXSPELL - 1 || i == cnt - 1 || cnt == 0)
         return;
 
     int j;
-    for (j = i + 1; j < MAXSPELL && spl_book[j].sp_id != NO_SPELL; j++)
+    for (j = i + 1; j < MAXSPELL && j < cnt; j++)
     {
         spl_orderindx[j - 1] = spl_orderindx[j];
     }
-    spl_orderindx[j - 1] = splidx;
+    spl_orderindx[cnt - 1] = splidx;
 
     flags.spellorder = SORTBY_CURRENT; /* sorting needs to be turned off */
     sortspells();

@@ -302,7 +302,7 @@ int *attk_count, *role_roll_penalty;
     {
         if (weapon && nonmelee_throwing_weapon(weapon))
         {
-            pline_ex(ATR_NONE, CLR_MSG_HINT, "It is complicated to hit with %s in melee combat.", the(cxname(weapon)));
+            pline_ex(ATR_NONE, CLR_MSG_WARNING, "It is complicated to hit with %s in melee combat.", the(cxname(weapon)));
             tmp -= THROWING_WEAPON_TO_HIT_MELEE_PENALTY_WHEN_USED_AS_MELEE_WEAPON;
         }
 
@@ -1232,6 +1232,7 @@ boolean* obj_destroyed;
                         else if (obj == uarms)
                             uwep2gone(); /* set unweapon */
                     }
+                    Sprintf(priority_debug_buf_2, "hmon_hitmon: %d", obj->otyp);
                     useup(obj);
                     if (!more_than_1)
                         obj = (struct obj*) 0;
@@ -1417,6 +1418,7 @@ boolean* obj_destroyed;
                         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_BREAK);
                         You_ex(ATR_NONE, CLR_MSG_WARNING, "break %s.  That's bad luck!", ysimple_name(obj));
                         change_luck(-2, TRUE);
+                        Sprintf(priority_debug_buf_2, "hmon_hitmon2: %d", obj->otyp);
                         useup(obj);
                         obj = (struct obj*) 0;
                         unarmed = FALSE; /* avoid obj==0 confusion */
@@ -1437,6 +1439,7 @@ boolean* obj_destroyed;
                     You_ex(ATR_NONE, CLR_MSG_WARNING, "succeed in destroying %s.  Congratulations!",
                         ysimple_name(obj));
                     release_camera_demon(obj, u.ux, u.uy);
+                    Sprintf(priority_debug_buf_2, "hmon_hitmon3: %d", obj->otyp);
                     useup(obj);
                     return TRUE;
                 case CORPSE: /* fixed by polder@cs.vu.nl */
@@ -1482,9 +1485,15 @@ boolean* obj_destroyed;
 #define useup_eggs(o)                    \
     do { \
             if (thrown)                      \
-                obfree(o, (struct obj*) 0); \
+            { \
+                    Sprintf(priority_debug_buf_4, "useup_eggs: %d", (o)->otyp); \
+                    obfree(o, (struct obj*)0); \
+            } \
             else                             \
+            {\
+                Sprintf(priority_debug_buf_3, "useup_eggs: %d", (o)->otyp); \
                 useupall(o);                 \
+            }\
             o = (struct obj*) 0;            \
     } while (0) /* now gone */
                 case EGG: 
@@ -1623,9 +1632,15 @@ boolean* obj_destroyed;
                         setmangry(mon, TRUE);
                     }
                     if (thrown)
-                        obfree(obj, (struct obj*) 0);
+                    {
+                        Sprintf(priority_debug_buf_4, "hmon_hitmon: %d", obj->otyp);
+                        obfree(obj, (struct obj*)0);
+                    }
                     else
+                    {
+                        Sprintf(priority_debug_buf_2, "hmon_hitmon4: %d", obj->otyp);
                         useup(obj);
+                    }
                     hittxt = TRUE;
                     get_dmg_bonus = FALSE;
                     damage = 0;
@@ -1645,6 +1660,8 @@ boolean* obj_destroyed;
                         extratmp = weapon_extra_dmg_value(obj, mon, &youmonst, basedmg);
                         damage += adjust_damage(extratmp, &youmonst, mon, objects[obj->otyp].oc_extra_damagetype, ADFLAGS_NONE);
                     }
+                    Sprintf(priority_debug_buf_4, "hmon_hitmon2: %d", obj->otyp);
+                    Sprintf(priority_debug_buf_2, "hmon_hitmon5: %d", obj->otyp);
                     if (thrown)
                         obfree(obj, (struct obj*) 0);
                     else
@@ -1958,6 +1975,7 @@ boolean* obj_destroyed;
             if (obj == uarms)
                 uwep2gone(); /* set unweapon */
             /* minor side-effect: broken lance won't split puddings */
+            Sprintf(priority_debug_buf_2, "hmon_hitmon6: %d", obj->otyp);
             useup(obj);
             obj = 0;
         }
@@ -1974,7 +1992,7 @@ boolean* obj_destroyed;
         //Exercise also riding in addtion to thrusting weapon already exercised
         use_skill(P_RIDING, 1);
     }
-    else if (unarmed && damage > 1 && !thrown && !obj && !Upolyd) 
+    else if (unarmed && damage > 1 && !thrown && (!obj || obj == uarmg) && !Upolyd) 
     {
         /* VERY small chance of stunning opponent if unarmed. */
         if (rnd(100) < 2 * adjusted_skill_level(P_MARTIAL_ARTS) && !bigmonst(mdat)
@@ -2478,6 +2496,7 @@ boolean* obj_destroyed;
 
         if (obj->where == OBJ_INVENT)
         {
+            Sprintf(priority_debug_buf_2, "hmon_hitmon7: %d", obj->otyp);
             if (obj->quan > 1)
                 useup(obj);
             else
@@ -2486,6 +2505,7 @@ boolean* obj_destroyed;
                     uwepgone(); /* set unweapon */
                 else if (obj == uarms)
                     uwep2gone(); /* set unweapon */
+                Sprintf(priority_debug_buf_3, "hmon_hitmon: %d", obj->otyp);
                 useupall(obj);
                 obj = 0;
             }
@@ -2495,12 +2515,14 @@ boolean* obj_destroyed;
             /* in case MON_AT+enexto for invisible mon */
             int x = obj->ox, y = obj->oy;
             /* not useupf(), which charges */
+            Sprintf(priority_debug_buf_3, "hmon_hitmon-delobj1: %d", obj->otyp);
             delobj(obj);
             newsym(x, y);
             obj = (struct obj*)0;
         }
         else if (obj->where == OBJ_FREE)
         {
+            Sprintf(priority_debug_buf_4, "hmon_hitmon3: %d", obj->otyp);
             obfree(obj, (struct obj*)0);
             obj = (struct obj*)0;
         }
@@ -2772,7 +2794,7 @@ struct attack *mattk;
         }
         /* give the object to the character */
         otmp = hold_another_object(otmp, "You snatched but dropped %s.",
-                                   doname(otmp), "You steal: ");
+                                   doname(otmp), "You steal: ", TRUE);
         /* might have dropped otmp, and it might have broken or left level */
         if (!otmp || otmp->where != OBJ_INVENT)
             continue;
@@ -2876,8 +2898,8 @@ int specialdmg; /* blessed and/or silver bonus against various things */
         if (is_shade(pd)) 
         {
             damage = 0;
-            if (!specialdmg)
-                impossible("bad shade attack function flow?");
+            //if (!specialdmg)
+            //    impossible("bad shade attack function flow?");
         }
         damage += adjust_damage(specialdmg, &youmonst, mdef, mattk->adtyp, ADFLAGS_NONE);
 
@@ -3679,6 +3701,8 @@ register struct attack *mattk;
                         nomul(-tmp);
                         multi_reason = "digesting something";
                         nomovemsg = msgbuf;
+                        nomovemsg_attr = ATR_NONE;
+                        nomovemsg_color = NO_COLOR;
                     }
                     else
                         pline_ex1(ATR_NONE, CLR_MSG_SUCCESS, msgbuf);
@@ -4680,7 +4704,7 @@ struct monst *mtmp;
         if (glyph_is_cmap_or_cmap_variation(glyph) && (generic_glyph_to_cmap(glyph) == S_hcdoor
                                      || generic_glyph_to_cmap(glyph) == S_vcdoor))
             fmt = "The door actually was %s!";
-        else if (glyph_is_object(glyph) && glyph_to_obj(glyph) == GOLD_PIECE)
+        else if (glyph_is_object(glyph) && glyph_to_otyp(glyph) == GOLD_PIECE)
             fmt = "That gold was %s!";
 
         /* cloned Wiz starts out mimicking some other monster and

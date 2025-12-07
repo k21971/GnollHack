@@ -890,7 +890,7 @@ register struct monst *mdef, *magr;
                 || (adtyp == AD_FIRE && !is_mon_immune_to_fire(magr))
                 || (adtyp == AD_ELEC && !is_mon_immune_to_elec(magr))
                 || adtyp == AD_PHYS) {
-                dmg = max(0, (mdef->data->mattk[i].damn > 0 ? mdef->data->mattk[i].damn : mdef->data->mlevel / 2 + 2) * (mdef->data->mattk[i].damd > 0 ? mdef->data->mattk[i].damd : 6) + mdef->data->mattk[i].damp);
+                dmg = max(0, (mdef->data->mattk[i].damn > 0 ? mdef->data->mattk[i].damn : (int)mdef->data->mlevel / 2 + 2) * (mdef->data->mattk[i].damd > 0 ? mdef->data->mattk[i].damd : 6) + mdef->data->mattk[i].damp);
             } else
                 dmg = 0;
 
@@ -1519,6 +1519,11 @@ STATIC_VAR const short grownups[][2] = {
     { PM_MODRON_TERTIAN, PM_MODRON_SECUNDUS },
     { PM_TREANT, PM_ELDER_TREANT },
     { PM_QUANTUM_MECHANIC, PM_ELDER_QUANTUM_MECHANIC },
+    { PM_GAZER, PM_ELDER_GAZER },
+    { PM_AIR_ELEMENTAL, PM_ELDER_AIR_ELEMENTAL },
+    { PM_EARTH_ELEMENTAL, PM_ELDER_EARTH_ELEMENTAL },
+    { PM_FIRE_ELEMENTAL, PM_ELDER_FIRE_ELEMENTAL },
+    { PM_WATER_ELEMENTAL, PM_ELDER_WATER_ELEMENTAL },
     { NON_PM, NON_PM }
 };
 

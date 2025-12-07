@@ -30,7 +30,7 @@ STATIC_DCL void FDECL(restlevchn, (int));
 STATIC_DCL void FDECL(restdamage, (int, BOOLEAN_P));
 STATIC_DCL void FDECL(restobj, (int, struct obj *));
 STATIC_DCL struct obj *FDECL(restobjchn, (int, BOOLEAN_P, BOOLEAN_P));
-STATIC_OVL void FDECL(restmon, (int, struct monst *));
+STATIC_DCL void FDECL(restmon, (int, struct monst *));
 STATIC_DCL struct monst *FDECL(restmonchn, (int, BOOLEAN_P));
 STATIC_DCL struct fruit *FDECL(loadfruitchn, (int));
 STATIC_DCL void FDECL(freefruitchn, (struct fruit *));
@@ -38,7 +38,7 @@ STATIC_DCL void FDECL(ghostfruit, (struct obj *));
 STATIC_DCL boolean FDECL(restgamestate, (int, unsigned int *, unsigned int *));
 STATIC_DCL void FDECL(restlevelstate, (unsigned int, unsigned int));
 STATIC_DCL int FDECL(restlevelfile, (int, XCHAR_P));
-STATIC_OVL void FDECL(restore_msghistory, (int));
+STATIC_DCL void FDECL(restore_msghistory, (int));
 STATIC_DCL void FDECL(reset_oattached_mids, (BOOLEAN_P));
 STATIC_DCL void FDECL(rest_levl, (int, BOOLEAN_P));
 STATIC_DCL void FDECL(restore_gamelog, (int));
@@ -181,19 +181,19 @@ boolean quietly;
                 )
             {
                 otmp->in_use = 0; /* Likely memory corruption; prevent destruction of any critical items */
+                char dbuf[BUFSZ * 2];
+                Sprintf(dbuf, "A mysterious force prevents finishing off %s...", the(xname(otmp)));
                 if (!quietly)
-                    impossible("Mysterious force prevents finishing off %s...", xname(otmp));
-                else
-                {
-                    char dbuf[BUFSZ * 2];
-                    Sprintf(dbuf, "Mysterious force prevents finishing off %s...", xname(otmp));
-                    issue_debuglog(0, dbuf);
-                }
+                    impossible("%s", dbuf);
+                issue_debuglog_priority(0, dbuf);
             }
             else
             {
                 if (!quietly)
                     pline("Finishing off %s...", xname(otmp));
+                Sprintf(priority_debug_buf_2, "inven_inuse: %d", otmp->otyp);
+                Strcpy(priority_debug_buf_3, "inven_inuse");
+                Strcpy(priority_debug_buf_4, "inven_inuse");
                 useup(otmp);
             }
         }
@@ -400,6 +400,7 @@ boolean ghostly, frozen;
              */
             if ((catcorpse = mksobj(CORPSE, TRUE, FALSE, FALSE)) != 0) {
                 otmp->speflags |= SPEFLAGS_SCHROEDINGERS_BOX;  //otmp->enchantment = 1; /* flag for special SchroedingersBox */
+                catcorpse->speflags |= SPEFLAGS_SCHROEDINGERS_BOX; /* Schroedinger's cat in fact */
                 set_corpsenm(catcorpse, PM_HOUSECAT);
                 (void) stop_timer(ROT_CORPSE, obj_to_any(catcorpse));
                 add_to_container(otmp, catcorpse);
@@ -673,7 +674,7 @@ unsigned int *stuckid, *steedid;
     char timebuf[15];
     uint64_t uid;
     boolean defer_perm_invent;
-    Strcpy(debug_buf_2, "restgamestate");
+    Strcpy(debug_buf_2, "restgamestate1");
     Strcpy(debug_buf_3, "restgamestate");
     Strcpy(debug_buf_4, "restgamestate");
 
@@ -783,10 +784,12 @@ unsigned int *stuckid, *steedid;
     restore_timers(fd, RANGE_GLOBAL, FALSE, 0L);
     restore_light_sources(fd);
     restore_sound_sources(fd);
+    Strcpy(debug_buf_2, "restgamestate2");
     invent = restobjchn(fd, FALSE, FALSE);
     /* tmp_bc only gets set here if the ball & chain were orphaned
        because you were swallowed; otherwise they will be on the floor
        or in your inventory */
+    Strcpy(debug_buf_2, "restgamestate3");
     tmp_bc = restobjchn(fd, FALSE, FALSE);
     if (tmp_bc) {
         for (otmp = tmp_bc; otmp; otmp = otmp->nobj) {
@@ -797,9 +800,13 @@ unsigned int *stuckid, *steedid;
             impossible("restgamestate: lost ball & chain");
     }
 
+    Strcpy(debug_buf_2, "restgamestate4");
     magic_objs = restobjchn(fd, FALSE, FALSE);
+    Strcpy(debug_buf_2, "restgamestate5");
     migrating_objs = restobjchn(fd, FALSE, FALSE);
+    Strcpy(debug_buf_2, "restgamestate6");
     migrating_mons = restmonchn(fd, FALSE);
+    Strcpy(debug_buf_2, "restgamestate7");
     mread(fd, (genericptr_t) mvitals, sizeof(mvitals));
 
     /*
@@ -950,6 +957,7 @@ xchar ltmp;
         nh_terminate(EXIT_SUCCESS);
     }
 #endif /* MFLOPPY */
+    Sprintf(priority_debug_buf_4, "restlevelfile (fd=%d)", nfd);
     bufon(nfd);
     savelev(nfd, ltmp, WRITE_SAVE | FREE_SAVE);
     bclose(nfd);
@@ -1007,10 +1015,18 @@ register int fd;
     Strcpy(debug_buf_4, "dorestore0");
 
     restoring = TRUE;
-    get_plname_from_file(fd, plname);
+    boolean readok = get_plname_from_file(fd, plname, sizeof(plname));
+    if (!readok)
+    {
+        (void)nhclose(fd);
+        (void)delete_savefile();
+        restoring = FALSE;
+        return 0;
+    }
     get_save_game_stats_from_file(fd, &game_stats);
     getlev(fd, 0, (xchar) 0, FALSE);
-    if (!restgamestate(fd, &stuckid, &steedid)) {
+    if (!restgamestate(fd, &stuckid, &steedid)) 
+    {
         display_nhwindow(WIN_MESSAGE, TRUE);
         savelev(-1, 0, FREE_SAVE); /* discard current level */
         (void) nhclose(fd);
@@ -1034,6 +1050,7 @@ register int fd;
 #ifdef INSURANCE
     savestateinlock();
 #endif
+    Sprintf(priority_debug_buf_3, "dorestore0A (fd=%d, ltmp=%d)", fd, (int)ledger_no(&u.uz));
     rtmp = restlevelfile(fd, ledger_no(&u.uz));
     if (rtmp < 2)
         return rtmp; /* dorestore called recursively */
@@ -1089,6 +1106,7 @@ register int fd;
         }
         mark_synch();
 #endif
+        Sprintf(priority_debug_buf_3, "dorestore0B (fd=%d, ltmp=%d)", fd, (int)ltmp);
         rtmp = restlevelfile(fd, ltmp);
         if (rtmp < 2)
             return rtmp; /* dorestore called recursively */
@@ -1114,7 +1132,14 @@ register int fd;
     (void) lseek(fd, (off_t) 0, 0);
 #endif
     (void) validate(fd, (char *) 0); /* skip version and savefile info */
-    get_plname_from_file(fd, plname);
+    readok = get_plname_from_file(fd, plname, sizeof(plname));
+    if (!readok)
+    {
+        (void)nhclose(fd);
+        (void)delete_savefile();
+        restoring = FALSE;
+        return 0;
+    }
     get_save_game_stats_from_file(fd, &dummy_stats);
     n_game_recoveries = dummy_stats.num_recoveries;
 
@@ -1345,9 +1370,9 @@ boolean ghostly;
 #ifdef TOS
     short tlev;
 #endif
-    Strcpy(debug_buf_2, "getlev");
-    Strcpy(debug_buf_3, "getlev");
-    Strcpy(debug_buf_4, "getlev");
+    Sprintf(debug_buf_2, "getlev1: %d", lev);
+    Sprintf(debug_buf_3, "getlev: %d", lev);
+    Sprintf(debug_buf_4, "getlev: %d", lev);
 
     if (ghostly)
         clear_id_mapping();
@@ -1409,6 +1434,7 @@ boolean ghostly;
     restore_timers(fd, RANGE_LEVEL, ghostly, elapsed);
     restore_light_sources(fd);
     restore_sound_sources(fd);
+    Sprintf(debug_buf_2, "getlev2: %d", lev);
     fmon = restmonchn(fd, ghostly);
 
     rest_worm(fd); /* restore worm information */
@@ -1420,13 +1446,18 @@ boolean ghostly;
         ftrap = trap;
     }
     dealloc_trap(trap);
+    Sprintf(debug_buf_2, "getlev3: %d", lev);
     fobj = restobjchn(fd, ghostly, FALSE);
     find_lev_obj();
     /* restobjchn()'s `frozen' argument probably ought to be a callback
        routine so that we can check for objects being buried under ice */
+    Sprintf(debug_buf_2, "getlev4: %d", lev);
     level.buriedobjlist = restobjchn(fd, ghostly, FALSE);
+    Sprintf(debug_buf_2, "getlev5: %d", lev);
     billobjs = restobjchn(fd, ghostly, FALSE);
+    Sprintf(debug_buf_2, "getlev6: %d", lev);
     memoryobjs = restobjchn(fd, ghostly, FALSE);
+    Sprintf(debug_buf_2, "getlev7: %d", lev);
     find_memory_obj();
     rest_engravings(fd);
 
@@ -1533,15 +1564,18 @@ boolean ghostly;
         clear_id_mapping();
 }
 
-void
-get_plname_from_file(fd, plbuf)
+boolean
+get_plname_from_file(fd, plbuf, plbuf_size)
 int fd;
 char *plbuf;
+size_t plbuf_size;
 {
     int pltmpsiz = 0;
     (void) read(fd, (genericptr_t) &pltmpsiz, (readLenType)sizeof(pltmpsiz));
+    if (pltmpsiz < 0 || (size_t)pltmpsiz > plbuf_size)
+        return FALSE;
     (void) read(fd, (genericptr_t) plbuf, (readLenType) pltmpsiz);
-    return;
+    return TRUE; /* Might want to check if the read length is the same as requested */
 }
 
 void
@@ -1592,6 +1626,7 @@ register int fd;
             break;
         if (msgsize > (BUFSZ - 1))
         {
+            program_state.panic_handling = 3; /* Safe to do a full game reset and ok to replace the save file with backup */
             panic("restore_msghistory: msg too big (%d)", msgsize);
             return;
         }
@@ -2103,10 +2138,10 @@ struct save_game_data* saved;
         start_menu_ex(tmpwin, style == 0 ? GHMENU_STYLE_CHOOSE_SAVED_GAME : GHMENU_STYLE_DELETE_SAVED_GAME);
         any = zeroany; /* no selection */
 
-    #ifndef GNH_MOBILE
+#ifndef GNH_MOBILE
         add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR,
             titlestr, MENU_UNSELECTED);
-    #endif
+#endif
 
 #if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS)
         char prefix[8] = "    ";
@@ -2548,17 +2583,37 @@ register size_t len;
             restoreprocs.mread_flags = -2;
             return;
         } else {
-            pline("Read %d instead of %zu bytes.", rlen, len);
-            if (restoring) {
+            char errorbuf[BUFSZ];
+            Sprintf(errorbuf, "Read %d instead of %zu bytes.", rlen, len);
+            raw_print(errorbuf);
+            if (restoring) 
+            {
                 (void) nhclose(fd);
                 (void) delete_tmp_backup_savefile();
                 (void) ask_delete_invalid_savefile("corrupted", TRUE);
                 error("Error restoring old game.");
             }
+            /* No need for panic handling, since it is mostly relevant only in restoring and ask_delete_invalid_savefile handles backups above */
             panic("Error reading level file: buf1=%s, buf2=%s, buf3=%s, buf4=%s", debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
             return;
         }
     }
+}
+
+void
+reset_restore(VOID_ARGS)
+{
+    clear_id_mapping();
+    freefruitchn(oldfruit), oldfruit = 0;
+    omoves = 0;
+
+#ifdef ZEROCOMP
+    *inbuf = 0;
+    inbufp = 0;
+    inbufsz = 0;
+    inrunlength = -1;
+    mreadfd = 0;
+#endif
 }
 
 /*restore.c*/

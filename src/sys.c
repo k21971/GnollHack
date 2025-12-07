@@ -304,6 +304,10 @@ reset_global_variables(VOID_ARGS)
     (void)get_colorless_multicolor_buffer();
     reset_item_global_variables();
 
+    /* Reset these here once more in the case nh_terminate wasn't called properly when exiting the game previously */
+    reset_save();
+    reset_restore();
+
     /* This needs to be setup already here early due to tiledata processing */
     int i;
     for (i = 0; i < NUM_OBJECTS; i++)
@@ -351,6 +355,9 @@ reset_item_global_variables(VOID_ARGS)
     current_wand = 0;  /* wand currently zapped/applied */
     thrownobj = 0;     /* object in flight due to throwing */
     kickedobj = 0;     /* object in flight due to kicking */
+    trackedobj = 0;
+    trackedobj_gone = FALSE;
+    getobj_autoselect_obj = (struct obj*)0;
 }
 
 /*sys.c*/

@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 #if GNH_MAUI
 namespace GnollHackM
@@ -108,9 +109,9 @@ namespace GnollHackX.Controls
         private bool _isHoveringEnabled = false;
         private bool _isHovering = false;
 #endif
-        private readonly object _isPressedLock = new object();
-        private bool _isPressed = false;
-        private bool IsPressed { get { lock (_isPressedLock) { return _isPressed; } } set { lock (_isPressedLock) { _isPressed = value; } } }
+        //private readonly object _isPressedLock = new object();
+        private int _isPressed = 0;
+        private bool IsPressed { get { return Interlocked.CompareExchange(ref _isPressed, 0, 0) != 0; } set { Interlocked.Exchange(ref _isPressed, value ? 1 : 0); } }
 
         public event EventHandler Clicked;
 
@@ -244,8 +245,8 @@ namespace GnollHackX.Controls
             SKImageInfo info = e.Info;
             SKSurface surface = e.Surface;
             SKCanvas canvas = surface.Canvas;
-            float canvaswidth = customCanvasView.CanvasSize.Width;
-            float canvasheight = customCanvasView.CanvasSize.Height;
+            float canvaswidth = info.Width; // customCanvasView.CanvasSize.Width;
+            float canvasheight = info.Height; // customCanvasView.CanvasSize.Height;
 #if WINDOWS
             SKImage targetBitmap = !UseVaryingBackgroundImages ? GHApp.ButtonNormalBitmap : IsPressed && IsEnabled ? GHApp.ButtonSelectedBitmap : _isHovering && IsEnabled ? GHApp.ButtonNormalBitmap : GHApp.ButtonDisabledBitmap;
 #else

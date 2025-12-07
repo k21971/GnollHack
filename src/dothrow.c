@@ -93,7 +93,7 @@ boolean firing;
         return 0;
     }
     u_wipe_engr(2);
-    if (!uarmg && obj->otyp == CORPSE && touch_petrifies(&mons[obj->corpsenm])
+    if (!uarmg && obj->otyp == CORPSE && obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm])
         && !Stone_resistance) {
         You("throw %s with your bare %s.",
             corpse_xname(obj, (const char *) 0, CXN_PFX_THE),
@@ -1096,6 +1096,8 @@ boolean verbose;
     nomul(-range);
     multi_reason = "moving through the air";
     nomovemsg = ""; /* it just happens */
+    nomovemsg_attr = ATR_NONE;
+    nomovemsg_color = NO_COLOR;
     if (verbose)
         You_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in the opposite direction.", range > 1 ? "hurtle" : "float");
     /* if we're in the midst of shooting multiple projectiles, stop */
@@ -1198,7 +1200,7 @@ boolean hitsroof;
     const char *action;
     boolean isinstakill = FALSE;
     boolean petrifier = ((obj->otyp == EGG || obj->otyp == CORPSE)
-                         && touch_petrifies(&mons[obj->corpsenm]));
+                          && obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]));
     /* note: obj->quan == 1 */
 
     if (!has_ceiling(&u.uz))
@@ -1932,7 +1934,7 @@ uchar* hitres_ptr;
                     break;
                 }
                 if(!context.hide_melee_range_warning)
-                    You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit with %s at melee range.", acxname(uwep));
+                    You_ex(ATR_NONE, CLR_MSG_WARNING, "find it very hard to hit with %s at melee range.", acxname(uwep));
 
                 context.hide_melee_range_warning = TRUE;
         }
@@ -1940,7 +1942,7 @@ uchar* hitres_ptr;
         {
             tmp -= THROWN_WEAPON_TO_HIT_MELEE_PENALTY;
             if (!context.hide_melee_range_warning && !is_obj_normally_edible(obj))
-                You_ex(ATR_NONE, CLR_MSG_HINT, "find it very hard to hit by throwing %s at melee range.", acxname(obj));
+                You_ex(ATR_NONE, CLR_MSG_WARNING, "find it very hard to hit by throwing %s at melee range.", acxname(obj));
 
             context.hide_melee_range_warning = TRUE;
         }
@@ -2151,6 +2153,7 @@ uchar* hitres_ptr;
                 {
                     if (*u.ushops || obj->unpaid)
                         check_shop_obj(obj, bhitpos.x, bhitpos.y, TRUE, FALSE);
+                    Sprintf(priority_debug_buf_4, "thitmonst: %d", obj->otyp);
                     obfree(obj, (struct obj *) 0);
                     return 1;
                 }
@@ -2258,7 +2261,7 @@ uchar* hitres_ptr;
         if (hitres_ptr)
             *hitres_ptr = 1;
         wakeup(mon, TRUE);
-        if (obj->otyp == CORPSE && touch_petrifies(&mons[obj->corpsenm])) 
+        if (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]))
         {
             if (is_animal(u.ustuck->data)) 
             {
@@ -2268,6 +2271,7 @@ uchar* hitres_ptr;
                 /* Don't leave a cockatrice corpse available in a statue */
                 if (!u.uswallow) 
                 {
+                    Sprintf(priority_debug_buf_3, "thitmonst: %d", obj->otyp);
                     delobj(obj);
                     return 1;
                 }
@@ -2408,6 +2412,12 @@ boolean from_invent; /* thrown or dropped by player; maybe on shop bill */
 
     if (!breaktest(obj))
         return 0;
+    if (obj->owornmask && obj->where == OBJ_INVENT && obj->cursed && is_obj_worn(obj) && !cursed_items_are_positive_mon(&youmonst) && !Curse_resistance)
+    {
+        play_sfx_sound(SFX_MALIGNANT_AURA_SURROUNDS);
+        pline_ex(ATR_NONE, CLR_MSG_WARNING, "A malignant force momentarily surrounds %s, preventing you from breaking %s.", yname(obj), is_plural(obj) ? "them" : "it");
+        return 0;
+    }
     breakmsg(obj, x, y, in_view);
     breakobj(obj, x, y, TRUE, from_invent);
     return 1;
@@ -2543,7 +2553,28 @@ boolean from_invent;
         }
     }
     if (!fracture)
-        delobj(obj);
+    {
+        Sprintf(priority_debug_buf_3, "breakobj: %d", obj->otyp);
+        if (obj->where == OBJ_INVENT)
+        {
+            if (obj->owornmask)
+                remove_worn_item(obj, FALSE);
+            useupall(obj);
+        }
+        else if (obj->where == OBJ_MINVENT)
+        {
+            struct monst* mon = obj->ocarry;
+            if (obj->owornmask && mon && MON_WEP(mon) == obj)
+                setmnotwielded(mon, obj);
+            delobj(obj);
+            if (mon)
+                update_all_mon_statistics(mon, TRUE);
+        }
+        else
+        {
+            delobj(obj);
+        }
+    }
 }
 
 /*
@@ -2554,7 +2585,7 @@ boolean
 breaktest(obj)
 struct obj *obj;
 {
-    if (obj_resists(obj, 1, 99))
+    if (!obj || is_obj_indestructible(obj) || obj_resists(obj, 1, 99))
         return 0;
     if (is_fragile(obj) && !obj->oartifact) /* Removed glass gems from not breaking; why not? */
         return 1;

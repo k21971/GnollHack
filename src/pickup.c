@@ -314,7 +314,7 @@ struct obj *obj;
 boolean remotely;
 {
     if (uarmg || remotely || obj->otyp != CORPSE
-        || !touch_petrifies(&mons[obj->corpsenm]) || Stone_resistance)
+        || (obj->corpsenm >= LOW_PM && !touch_petrifies(&mons[obj->corpsenm])) || Stone_resistance)
         return FALSE;
 
     if (poly_when_stoned(youmonst.data) && polymon(PM_STONE_GOLEM)) {
@@ -363,12 +363,15 @@ boolean picked_some;
     }
 
     /* If there are objects here, take a look. */
-    if (ct) {
-        if (context.run)
+    if (ct) 
+    {
+        if (context.run && !(context.run == RUNCONTEXT_TRAVEL && flags.ignore_stopping))
             nomul(0);
         flush_screen(1);
         (void) look_here(ct, picked_some, FALSE);
-    } else {
+    }
+    else
+    {
         read_engr_at(u.ux, u.uy);
     }
 }
@@ -653,8 +656,7 @@ boolean do_auto_in_bag;
         }
 
         /* if there's anything here, stop running */
-        if (OBJ_AT(u.ux, u.uy) && context.run && context.run != 8
-            && !context.nopick)
+        if (OBJ_AT(u.ux, u.uy) && context.run && context.run != RUNCONTEXT_TRAVEL && !context.nopick)
             nomul(0);
     }
 
@@ -860,7 +862,7 @@ uchar noncoin_nonmergeable_found;
     {
         if (*used_container_ptr)
         {
-            if (!stash_obj_in_container(obj, *used_container_ptr))
+            if (stash_obj_in_container(obj, *used_container_ptr) <= 0) /* -1 if BoH blew up, 0 if couldn't do; stop in both cases */
                 return -1;
         }
         else if (i < n - 1 && inv_cnt(FALSE) >= 52)
@@ -878,14 +880,15 @@ uchar noncoin_nonmergeable_found;
                     {
                     default:
                     case 'a':
-                        (void)auto_bag_in(invent, obj, FALSE);
                         *do_auto_in_bag_ptr = TRUE;
+                        if (auto_bag_in(invent, obj, FALSE) <= 0) /* -1 if BoH blew up, 0 if couldn't do; stop in both cases */
+                            return -1;
                         break;
                     case 'y':
                         *used_container_ptr = select_other_container(invent, (struct obj*)0, FALSE);
                         if (*used_container_ptr)
                         {
-                            if (!stash_obj_in_container(obj, *used_container_ptr))
+                            if (stash_obj_in_container(obj, *used_container_ptr) <= 0) /* -1 if BoH blew up, 0 if couldn't do; stop in both cases */
                                 return -1;
                         }
                         else
@@ -895,10 +898,6 @@ uchar noncoin_nonmergeable_found;
                         return -1;
                     case 'q':
                         return -1;
-                    }
-                    if (ans == 'a')
-                    {
-                        *do_auto_in_bag_ptr = TRUE;
                     }
                 }
                 else
@@ -1919,6 +1918,7 @@ uchar* obj_gone_ptr; /* 1 = merged, 2 = put in bag, 3 = gone */
             if (!(objects[SCR_SCARE_MONSTER].oc_name_known)
                 && !(objects[SCR_SCARE_MONSTER].oc_uname))
                 docall(obj, dcbuf);
+            Sprintf(priority_debug_buf_2, "pickup_object: %d", obj->otyp);
             useupf(obj, obj->quan);
             if (obj_gone_ptr) /* gone */
                 *obj_gone_ptr = 3;
@@ -1973,27 +1973,29 @@ boolean bynexthere;
     struct obj* bag_of_treasure_hauling = 0;
     struct obj* bag_of_wizardry = 0;
     struct obj* normal_bag = 0;
+    /* Note: If you know cancellation, then you know all other similar wands such as Rod of Disjunction / wand of disjunction */
+    boolean maybe_cancellation = (objects[obj->otyp].oc_name_known || objects[WAN_CANCELLATION].oc_name_known ? (objects[obj->otyp].oc_flags5 & O5_MBAG_DESTROYING_ITEM) != 0 : obj->oclass == WAND_CLASS);
 
     for (curr = objchn_container; curr; curr = (bynexthere ? curr->nexthere : curr->nobj))
     {
         if (objects[curr->otyp].oc_name_known && curr != obj && !curr->olocked)
         {
-            if (curr->otyp == BAG_OF_HOLDING && curr->bknown && !curr->cursed && obj->oclass != WAND_CLASS)
+            if (curr->otyp == BAG_OF_HOLDING && curr->bknown && !curr->cursed && !maybe_cancellation)
             {
                 if (!bag_of_holding || (curr->blessed && !bag_of_holding->blessed))
                     bag_of_holding = curr;
             }
-            else if (curr->otyp == BAG_OF_THE_GLUTTON && curr->bknown && !curr->cursed)
+            else if (curr->otyp == BAG_OF_THE_GLUTTON && curr->bknown && !curr->cursed && !maybe_cancellation)
             {
                 if (!bag_of_the_glutton || (curr->blessed && !bag_of_the_glutton->blessed))
                     bag_of_the_glutton = curr;
             }
-            else if (curr->otyp == BAG_OF_TREASURE_HAULING && curr->bknown && !curr->cursed)
+            else if (curr->otyp == BAG_OF_TREASURE_HAULING && curr->bknown && !curr->cursed && !maybe_cancellation)
             {
                 if (!bag_of_treasure_hauling || (curr->blessed && !bag_of_treasure_hauling->blessed))
                     bag_of_treasure_hauling = curr;
             }
-            else if (curr->otyp == BAG_OF_WIZARDRY && curr->bknown && !curr->cursed)
+            else if (curr->otyp == BAG_OF_WIZARDRY && curr->bknown && !curr->cursed && !maybe_cancellation)
             {
                 if (!bag_of_wizardry || (curr->blessed && !bag_of_wizardry->blessed))
                     bag_of_wizardry = curr;
@@ -2023,28 +2025,27 @@ boolean bynexthere;
     if (!num_choices)
         return 0;
 
-    boolean maybe_cancellation = (objects[obj->otyp].oc_name_known || objects[WAN_CANCELLATION].oc_name_known ? (objects[obj->otyp].oc_flags5 & O5_MBAG_DESTROYING_ITEM) != 0 : obj->oclass == WAND_CLASS);
     switch (flags.auto_bag_in_style)
     {
     case 0:
     default:
     {
         struct obj* used_container = 0;
-        if (!used_container && bag_of_treasure_hauling && is_obj_weight_reduced_by_treasure_hauling(obj) && !maybe_cancellation)
+        if (!used_container && bag_of_treasure_hauling && is_obj_weight_reduced_by_treasure_hauling(obj))
             used_container = bag_of_treasure_hauling;
-        if (!used_container && bag_of_wizardry && is_obj_weight_reduced_by_wizardry(obj) && !maybe_cancellation)
+        if (!used_container && bag_of_wizardry && is_obj_weight_reduced_by_wizardry(obj))
             used_container = bag_of_wizardry;
-        if (!used_container && bag_of_the_glutton && is_obj_weight_reduced_by_the_glutton(obj) && !maybe_cancellation)
+        if (!used_container && bag_of_the_glutton && is_obj_weight_reduced_by_the_glutton(obj))
             used_container = bag_of_the_glutton;
-        if (!used_container && bag_of_holding && !maybe_cancellation)
+        if (!used_container && bag_of_holding)
             used_container = bag_of_holding;
         if (!used_container && normal_bag)
             used_container = normal_bag;
-        if (!used_container && bag_of_treasure_hauling && !maybe_cancellation)
+        if (!used_container && bag_of_treasure_hauling)
             used_container = bag_of_treasure_hauling;
-        if (!used_container && bag_of_wizardry && !maybe_cancellation)
+        if (!used_container && bag_of_wizardry)
             used_container = bag_of_wizardry;
-        if (!used_container && bag_of_the_glutton && !maybe_cancellation)
+        if (!used_container && bag_of_the_glutton)
             used_container = bag_of_the_glutton;
         if (used_container)
             return stash_obj_in_container(obj, used_container);
@@ -2070,7 +2071,7 @@ boolean bynexthere_container, bynexthere_obj;
         if (!Is_container(curr) && !unfit_for_container(curr))
         {
             fitcnt++;
-            if (!(objects[curr->otyp].oc_name_known ? (objects[curr->otyp].oc_flags5 & O5_MBAG_DESTROYING_ITEM) != 0 : curr->oclass == WAND_CLASS))
+            if (!(objects[curr->otyp].oc_name_known || objects[WAN_CANCELLATION].oc_name_known ? (objects[curr->otyp].oc_flags5 & O5_MBAG_DESTROYING_ITEM) != 0 : curr->oclass == WAND_CLASS))
                 no_cancellation_cnt++;
         }
     }
@@ -2103,6 +2104,11 @@ boolean bynexthere_container, bynexthere_obj;
             {
                 cnt++;
             }
+        }
+        else if (curr->cknown && Is_proper_container(curr) && curr->bknown && !curr->cursed && no_cancellation_cnt > 0 && (objects[curr->otyp].oc_flags4 & (O4_CONTAINER_ACCEPTS_ONLY_SCROLLS_AND_BOOKS | O4_CONTAINER_ACCEPTS_ONLY_WEAPONS)) == 0)
+        {
+            /* Is a real container based on contents, but it may or may not be a magic bag, so we need to know that it is not cursed */
+            cnt++;
         }
     }
     return cnt;
@@ -2366,8 +2372,11 @@ int cindex, ccount, applymode; /* index of this container (1..N), number of them
     }
     else if (cobj->otyp == POUCH_OF_ENDLESS_BOLTS || cobj->otyp == QUIVER_OF_INFINITE_ARROWS || cobj->otyp == BAG_OF_INFINITE_SLING_BULLETS) {
         You("carefully open %s...", the(xname(cobj)));
-        if(cobj->cooldownleft > 0)
+        if (cobj->cooldownleft > 0)
+        {
+            play_sfx_sound(SFX_GENERAL_THAT_DID_NOTHING);
             You("find nothing but void inside.");
+        }
         else
             (void)endlessarrows(cobj, (cobj->otyp == BAG_OF_INFINITE_SLING_BULLETS ? SLING_BULLET : cobj->otyp == POUCH_OF_ENDLESS_BOLTS ? CROSSBOW_BOLT : ARROW), rnd(10) + 10);
         abort_looting = TRUE;
@@ -2517,7 +2526,7 @@ boolean* got_something_ptr;
                 Strcpy(debug_buf_2, "loot_decoration");
                 obj_extract_self(newobj);
                 newobj = hold_another_object(newobj, "Oops!  %s out of your grasp!",
-                    The(aobjnam(newobj, "slip")), (const char*)0);
+                    The(aobjnam(newobj, "slip")), (const char*)0, TRUE);
             }
         }
     }
@@ -2537,7 +2546,7 @@ boolean* got_something_ptr;
                 *got_something_ptr = TRUE;
                 play_simple_object_sound_at_location(newobj, u.ux, u.uy, OBJECT_SOUND_TYPE_PICK_UP);
                 newobj = hold_another_object(newobj, "Oops!  %s out of your grasp!",
-                    The(aobjnam(newobj, "slip")), (const char*)0);
+                    The(aobjnam(newobj, "slip")), (const char*)0, TRUE);
             }
         }
     }
@@ -2547,19 +2556,22 @@ boolean* got_something_ptr;
 int
 doloot(VOID_ARGS)
 {
-    return doloot_core(0);
+    int res = doloot_core(0);
+    return res;
 }
 
 int
 dolootout(VOID_ARGS)
 {
-    return doloot_core(1);
+    int res = doloot_core(1);
+    return res;
 }
 
 int
 dolootin(VOID_ARGS)
 {
-    return doloot_core(2);
+    int res = doloot_core(2);
+    return res;
 }
 
 STATIC_OVL int
@@ -2573,7 +2585,7 @@ int applymode;
     boolean underfoot = TRUE;
     const char *dont_find_anything = "don't find anything";
     struct monst *mtmp;
-    char qbuf[BUFSZ];
+    char qbuf[QBUFSZ];
     int prev_inquiry = 0;
     boolean prev_loot = FALSE;
     int num_conts = 0;
@@ -3100,7 +3112,7 @@ boolean do_auto_in_bag;
 
             }
             otmp = hold_another_object(otmp, "You drop %s!", doname(otmp),
-                                       (const char *) 0);
+                                       (const char *) 0, TRUE);
             nhUse(otmp);
             timepassed = rnd(3);
             if (prev_loot)
@@ -3191,6 +3203,9 @@ int
 stash_obj_in_container(obj, container)
 struct obj* obj, *container;
 {
+    if (!obj || !container)
+        return -1;
+
     struct obj* saved_container = current_container;
     current_container = container;
     int res = in_container(obj);
@@ -3245,7 +3260,16 @@ boolean dobot;
             pline_ex(ATR_NONE, CLR_MSG_FAIL, "Putting %s into itself would be an interesting topological exercise.", thecxname(obj));
         goto default_incontainer_end_here;
     }
-    else if (obj->owornmask & (W_ARMOR | W_ACCESSORY)) 
+    else if (unfit_for_container(obj))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        if (dobot)
+            pline_ex(ATR_NONE, CLR_MSG_FAIL, "That does not fit into %s.", thecxname(current_container));
+        else
+            You_cant_ex(ATR_NONE, CLR_MSG_FAIL, "put %s into %s; it is too big.", thecxname(obj), thecxname(current_container));
+        goto default_incontainer_end_here;
+    }
+    else if (obj->owornmask & (W_ARMOR | W_ACCESSORY))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         if (dobot)
@@ -3354,7 +3378,7 @@ boolean dobot;
 
     /* boxes, boulders, and big statues can't fit into any container */
     if (obj->otyp == ICE_BOX || obj->otyp == BOOKSHELF || Is_box(obj) || obj->otyp == BOULDER
-        || (obj->otyp == STATUE && bigmonst(&mons[obj->corpsenm]))) 
+        || (obj->otyp == STATUE && obj->corpsenm >= LOW_PM && bigmonst(&mons[obj->corpsenm])))
     {
         /*
          *  xname() uses a static result array.  Save obj's name
@@ -3428,7 +3452,11 @@ boolean dobot;
 
         boolean destroyobj = !(is_obj_indestructible(obj) || obj->oartifact);
         if (destroyobj)
-            obfree(obj, (struct obj *) 0);
+        {
+            Sprintf(priority_debug_buf_4, "in_container_core1: %d, %d", current_container->otyp, obj->otyp);
+            obfree(obj, (struct obj*)0);
+            obj = 0;
+        }
 
         /* if carried, shop goods will be flagged 'unpaid' and obfree() will
            handle bill issues, but if on floor, we need to put them on bill
@@ -3456,21 +3484,27 @@ boolean dobot;
         }
 
         /* The artifact flies out last */
-        if (!destroyobj)
+        if (!destroyobj && obj)
         {
             dropy(obj);
             (void)scatter(obj->ox, obj->oy, 3, VIS_EFFECTS | MAY_HIT | MAY_DESTROY | MAY_FRACTURE, obj);
         }
 
+        Sprintf(priority_debug_buf_2, "in_container_core2: %d, %d", current_container->otyp, saved_otyp);
+        Sprintf(priority_debug_buf_3, "in_container_core2: %d, %d", current_container->otyp, saved_otyp);
+        Sprintf(priority_debug_buf_4, "in_container_core2: %d, %d", current_container->otyp, saved_otyp);
+        //context.suppress_container_deletion_warning = 1;
         if (!floor_container)
             useup(current_container);
         else if (obj_here(current_container, u.ux, u.uy))
             useupf(current_container, current_container->quan);
         else
         {
+            //context.suppress_container_deletion_warning = 0;
             panic("in_container:  bag not found.");
             return 0;
         }
+        //context.suppress_container_deletion_warning = 0;
 
         losehp(adjust_damage(d(6, 6), (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_SPELL_DAMAGE), "magical explosion", KILLED_BY_AN);
         current_container = 0; /* baggone = TRUE; */
@@ -3478,7 +3512,7 @@ boolean dobot;
         standard_hint("Putting a wand of cancellation into a magical bag will typically cause it to explode. To avoid doing this accidently, put unidentified wands into a non-magical bag.", &u.uhint.bag_destroyed_by_cancellation);
     }
 
-    if (current_container) 
+    if (current_container && obj) 
     {
         Strcpy(buf, the(xname(current_container)));
         You("put %s into %s.", doname(obj), buf);
@@ -3487,6 +3521,8 @@ boolean dobot;
             play_object_container_in_sound(obj, current_container);
             delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
         }
+
+        obj->bypass = 0; /* It will now leave the inventory */
 
         /* gold in container always needs to be added to credit */
         if (floor_container && obj->oclass == COIN_CLASS)
@@ -3815,6 +3851,7 @@ struct obj *item;
             loss = stolen_value(item, u.ux, u.uy, is_peaceful(shkp),
                                 TRUE);
     }
+    Sprintf(priority_debug_buf_4, "mbag_item_gone: %d", item->otyp);
     obfree(item, (struct obj *) 0);
     return loss;
 }
@@ -3849,6 +3886,7 @@ boolean makecat, givemsg;
         if (livecat) 
         {
             livecat->mpeaceful = 1;
+            livecat->mon_flags |= MON_FLAGS_SCHROEDINGERS_CAT;
             set_mhostility(livecat);
             if (givemsg) 
             {
@@ -3865,6 +3903,7 @@ boolean makecat, givemsg;
             {
                 Strcpy(debug_buf_2, "observe_quantum_cat");
                 obj_extract_self(deadcat);
+                Sprintf(priority_debug_buf_4, "observe_quantum_cat: %d", deadcat->otyp);
                 obfree(deadcat, (struct obj *) 0), deadcat = 0;
             }
             box->owt = weight(box);
@@ -3882,6 +3921,7 @@ boolean makecat, givemsg;
             deadcat->age = monstermoves;
             set_corpsenm(deadcat, PM_HOUSECAT);
             deadcat = oname(deadcat, sc);
+            deadcat->nknown = 1;
         }
         if (givemsg)
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s inside the box is dead!",
@@ -3988,6 +4028,7 @@ int applymode; /* 0 = normal, 1 = take out items, 2 = put in items */
     }
     else if (obj->olocked)
     {
+        play_simple_container_sound(obj, CONTAINER_SOUND_TYPE_TRY_LOCKED);
         pline("%s locked.", Tobjnam(obj, "are"));
         if (held)
             You("must put it down to unlock.");
@@ -4008,6 +4049,8 @@ int applymode; /* 0 = normal, 1 = take out items, 2 = put in items */
             nomul(-1);
             multi_reason = "opening a container";
             nomovemsg = "";
+            nomovemsg_attr = ATR_NONE;
+            nomovemsg_color = NO_COLOR;
         }
         abort_looting = TRUE;
         return 1;
@@ -4173,6 +4216,7 @@ int applymode; /* 0 = normal, 1 = take out items, 2 = put in items */
     {
         if (!Has_contained_contents(current_container)) 
         {
+            play_sfx_sound(SFX_GENERAL_THAT_DID_NOTHING);
             pline1(emptymsg); /* <whatever> is empty. */
             if (!current_container->cknown)
                 used = 1;
@@ -4257,6 +4301,7 @@ int applymode; /* 0 = normal, 1 = take out items, 2 = put in items */
     {
         if (!Has_contained_contents(current_container)) 
         {
+            play_sfx_sound(SFX_GENERAL_THAT_DID_NOTHING);
             pline1(emptymsg); /* <whatever> is empty. */
             if (!current_container->cknown)
                 used = 1;
@@ -4739,6 +4784,7 @@ int applymode;
                     else if (otmp && otmp != pick_list[i].item.a_obj) 
                     {
                         /* split occurred, merge again */
+                        Sprintf(priority_debug_buf_3, "menu_loot: %d", otmp->otyp);
                         (void) merged(&pick_list[i].item.a_obj, &otmp);
                     }
                     break;
@@ -4937,7 +4983,7 @@ dotip()
     struct obj *cobj, *nobj;
     coord cc;
     int boxes;
-    char c, buf[BUFSZ], qbuf[BUFSZ];
+    char c, buf[BUFSZ], qbuf[QBUFSZ];
     const char *spillage = 0;
 
     /*
@@ -5128,6 +5174,8 @@ struct obj *box; /* or bag */
             nomul(-1);
             multi_reason = "tipping a container";
             nomovemsg = "";
+            nomovemsg_attr = ATR_NONE;
+            nomovemsg_color = NO_COLOR;
         }
     } else if (box->otyp == BAG_OF_TRICKS || box->otyp == HORN_OF_PLENTY) {
         boolean bag = box->otyp == BAG_OF_TRICKS;
@@ -5318,7 +5366,7 @@ dostash()
         return 0;
     }
 
-    if (!stash_obj_in_container(otmp, container))
+    if (!stash_obj_in_container(otmp, container))  /* Do not unsplit with -1 if BoH blew up; both obj and container maybe gone */
     {
         /* couldn't put selected item into container for some
            reason; might need to undo splitobj() */
@@ -5361,7 +5409,7 @@ dostashfloor()
         return 0;
     }
 
-    if (!stash_obj_in_container(otmp, container))
+    if (!stash_obj_in_container(otmp, container)) /* Do not unsplit with -1 if BoH blew up; both obj and container maybe gone */
     {
         /* couldn't put selected item into container for some
            reason; might need to undo splitobj() */

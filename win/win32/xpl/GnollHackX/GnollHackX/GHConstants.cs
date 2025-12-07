@@ -10,6 +10,28 @@ namespace GnollHackM
 namespace GnollHackX
 #endif
 {
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class ThreadSafeAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class UIThreadOnlyAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class GameThreadOnlyAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class GameThreadIfExistsElseUIThreadAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class RenderThreadOnlyAttribute : Attribute { }
+
+    [Flags]
+    public enum ReplayVersionFlags : ulong
+    {
+        None = 0UL,
+        HasOffsetData = 1UL,
+    }
+
     /* Colors */
     public enum NhColor
     {
@@ -173,9 +195,11 @@ namespace GnollHackX
         MapFPS30,
         MapFPS40,
         MapFPS60,
+        MapFPS72,
         MapFPS80,
         MapFPS90,
         MapFPS120,
+        MapFPS144,
     }
 
     public enum GHMapMode
@@ -244,6 +268,9 @@ namespace GnollHackX
         SaveFileTrackingSupported = 0x00004000UL, /* Save file tracking is supported (always on modern version) */
         SaveFileTrackingNeeded = 0x00008000UL, /* Save file tracking is needed (= is desktop) */
         SaveFileTrackingOn =    0x00010000UL, /* Save file tracking is switched on */
+        AutoDig =               0x00020000UL, /* Set autodig to true by default */
+        IgnoreStopping =        0x00040000UL, /* Set ignore_stopping to true by default */
+        DefaultVIKeys =         0x00080000UL, /* VI Keys are default instead of number pad movement */
 
         RightMouseButtonBit1 =  0x00400000UL, 
         RightMouseButtonBit2 =  0x00800000UL, 
@@ -1124,7 +1151,7 @@ namespace GnollHackX
         public int tile_height;
         public short special_quality;
         public short max_charges;
-        public byte nh_color;
+        public byte semitransparent;
 
         public byte lamplit;
         public byte poisoned;
@@ -1141,6 +1168,9 @@ namespace GnollHackX
         public byte is_uball;
         public sbyte obj_loc_x;
         public sbyte obj_loc_y;
+
+        public byte reserved_1;
+        public byte reserved_2;
     }
 
     public enum obj_class_types
@@ -1180,7 +1210,7 @@ namespace GnollHackX
         OBJ_MIGRATING = 5, /* object sent off to another level */
         OBJ_BURIED = 6,    /* object buried */
         OBJ_ONBILL = 7,    /* object on shk bill */
-        OBJ_HEROMEMORY = 8,/* object remembered by hero */
+        OBJ_MEMORY = 8,    /* object remembered by hero */
         OBJ_MAGIC = 9,     /* object in a magic chest */
         NOBJ_STATES = 10
     }
@@ -1281,27 +1311,27 @@ namespace GnollHackX
     [Flags]
     public enum objdata_flags : ulong
     {
-        None = 0x00000000U,
-        OBJDATA_FLAGS_DRAWN_IN_FRONT =  0x00000001U,
-        OBJDATA_FLAGS_HALLUCINATION =   0x00000002U,
-        OBJDATA_FLAGS_UCHAIN =          0x00000004U,
-        OBJDATA_FLAGS_UBALL =           0x00000008U,
-        OBJDATA_FLAGS_UWEP =            0x00000010U,
-        OBJDATA_FLAGS_UWEP2 =           0x00000020U,
-        OBJDATA_FLAGS_UQUIVER =         0x00000040U,
-        OBJDATA_FLAGS_OUT_OF_AMMO1 =    0x00000080U,
-        OBJDATA_FLAGS_WRONG_AMMO_TYPE1 =0x00000100U,
-        OBJDATA_FLAGS_NOT_BEING_USED1 = 0x00000200U,
-        OBJDATA_FLAGS_NOT_WEAPON1 =     0x00000400U,
-        OBJDATA_FLAGS_OUT_OF_AMMO2 =    0x00000800U,
-        OBJDATA_FLAGS_WRONG_AMMO_TYPE2 =0x00001000U,
-        OBJDATA_FLAGS_NOT_BEING_USED2 = 0x00002000U,
-        OBJDATA_FLAGS_NOT_WEAPON2 =     0x00004000U,
-        OBJDATA_FLAGS_FOUND_THIS_TURN = 0x00008000U,
-        OBJDATA_FLAGS_IS_AMMO =         0x00010000U, /* is_ammo is TRUE */
-        OBJDATA_FLAGS_THROWING_WEAPON = 0x00020000U, /* throwing_weapon is TRUE */
-        OBJDATA_FLAGS_PREV_WEP_FOUND =  0x00040000U,
-        OBJDATA_FLAGS_PREV_UNWIELD =    0x00080000U,
+        None = 0x00000000UL,
+        OBJDATA_FLAGS_DRAWN_IN_FRONT =  0x00000001UL,
+        OBJDATA_FLAGS_HALLUCINATION =   0x00000002UL,
+        OBJDATA_FLAGS_UCHAIN =          0x00000004UL,
+        OBJDATA_FLAGS_UBALL =           0x00000008UL,
+        OBJDATA_FLAGS_UWEP =            0x00000010UL,
+        OBJDATA_FLAGS_UWEP2 =           0x00000020UL,
+        OBJDATA_FLAGS_UQUIVER =         0x00000040UL,
+        OBJDATA_FLAGS_OUT_OF_AMMO1 =    0x00000080UL,
+        OBJDATA_FLAGS_WRONG_AMMO_TYPE1 =0x00000100UL,
+        OBJDATA_FLAGS_NOT_BEING_USED1 = 0x00000200UL,
+        OBJDATA_FLAGS_NOT_WEAPON1 =     0x00000400UL,
+        OBJDATA_FLAGS_OUT_OF_AMMO2 =    0x00000800UL,
+        OBJDATA_FLAGS_WRONG_AMMO_TYPE2 =0x00001000UL,
+        OBJDATA_FLAGS_NOT_BEING_USED2 = 0x00002000UL,
+        OBJDATA_FLAGS_NOT_WEAPON2 =     0x00004000UL,
+        OBJDATA_FLAGS_FOUND_THIS_TURN = 0x00008000UL,
+        OBJDATA_FLAGS_IS_AMMO =         0x00010000UL, /* is_ammo is TRUE */
+        OBJDATA_FLAGS_THROWING_WEAPON = 0x00020000UL, /* throwing_weapon is TRUE */
+        OBJDATA_FLAGS_PREV_WEP_FOUND =  0x00040000UL,
+        OBJDATA_FLAGS_PREV_UNWIELD =    0x00080000UL,
     }
 
     [Flags]
@@ -1396,6 +1426,11 @@ namespace GnollHackX
         GUI_CMD_TOGGLE_GETPOS_ARROWS,
         GUI_CMD_DELETE_TRACKING_FILE,
         GUI_CMD_KEYBOARD_FOCUS,
+        GUI_CMD_ORACLE_MAJOR_CONSULTATION,
+        GUI_CMD_TOGGLE_AUTODIG,
+        GUI_CMD_TOGGLE_IGNORE_STOPPING,
+        GUI_CMD_EXIT_APP_ON_MAIN_SCREEN,
+        GUI_CMD_BREADCRUMB,
     }
 
     public enum game_status_types
@@ -1435,8 +1470,10 @@ namespace GnollHackX
     public enum debug_log_types
     {
         DEBUGLOG_GENERAL = 0,
+        DEBUGLOG_PRIORITY,
         DEBUGLOG_DEBUG_ONLY,
         DEBUGLOG_FILE_DESCRIPTOR,
+        DEBUGLOG_PANIC,
     }
 
     public enum popup_text_types
@@ -1649,6 +1686,8 @@ namespace GnollHackX
         public const float StatusBarRowMargin = 5.0f;
         public const float StatusBarShieldFontSize = StatusBarBaseFontSize * 32f / 42f;
         public const float StatusBarDifFontSize = StatusBarBaseFontSize * 24f / 42f;
+        public const float StatusScreenWidthThresholdMultiplierPortrait = 0.675f;
+        public const float StatusScreenWidthThresholdMultiplierLandscape = 0.55f;
         public const float SkillButtonBaseFontSize = 9.5f;
         public const float ContextButtonBottomStartMargin = 30.0f;
         public const double ContextButtonSpacing = 10.0;
@@ -1738,10 +1777,12 @@ namespace GnollHackX
 #if DEBUG
         public const bool DefaultDeveloperMode = true;
         public const bool DefaultLogMessages = true;
+        public const bool DefaultDebugPostChannel = true;
         public const bool DefaultPosting = true;
 #else
         public const bool DefaultDeveloperMode = false;
         public const bool DefaultLogMessages = false;
+        public const bool DefaultDebugPostChannel = false;
         public const bool DefaultPosting = false;
 #endif
         public const int NUM_ZAP_SOURCE_BASE_DIRS = 8;
@@ -1761,16 +1802,19 @@ namespace GnollHackX
         public const bool AreMenuFadeEffectsDefault = true;
         public const string GnollHackGitHubPage = "https://github.com/hyvanmielenpelit/GnollHack";
         public const string GnollHackWebPage = "https://gnollhack.com";
-        public const string GnollHackWikiPage = "https://github.com/hyvanmielenpelit/GnollHack/wiki";
+        public const string GnollHackWikiPage = "https://wiki.gnollhack.com"; /* Old page on GitHub: "https://github.com/hyvanmielenpelit/GnollHack/wiki" */
         public const string GnollHackSponsorPage = "https://hyvanmielenpelit.fi/tule-mukaan/pienkannatusjaseneksi/in-english";
-        public const string GnollHackGeneralDowngradePage = "https://github.com/hyvanmielenpelit/GnollHack/wiki#download";
-        public const string GnollHackAndroidDowngradePage = "https://github.com/hyvanmielenpelit/GnollHack/wiki/Android-Releases";
-        public const string GnollHackiOSDowngradePage = "https://github.com/hyvanmielenpelit/GnollHack/wiki/iOS-Releases";
+        public const string GnollHackGeneralDowngradePage = GnollHackWikiPage + "/Download";
+        public const string GnollHackAndroidDowngradePage = GnollHackWikiPage + "/Android-Releases";
+        public const string GnollHackiOSDowngradePage = GnollHackWikiPage + "/iOS-Releases";
+        public const string GnollHackiGitHubApiPage = "https://api.github.com/repos/hyvanmielenpelit/GnollHack";
+        public const string GnollHackGitHubStarPage = GnollHackWikiPage + "/Give-Us-a-Star-on-GitHub";
         public const string GHSettingsResourcePath = ".Assets.ghsettings.json";
         public const string GHSecretsResourcePath = ".Assets.ghsecrets.sjson";
         public const int MaxRefreshRate = 120;
         public const int PollingFrequency = 60;
         public const int PollingInterval = 15;
+        public const int SavePollingTimeoutCount = 2000;
         public const double DefaultTextWindowMaxWidth = 600.0;
         public const double WindowHideIntervals = 5.0;
         public const uint MainCanvasAnimationTime = 2500000;
@@ -1794,6 +1838,15 @@ namespace GnollHackX
         public const long StoreReviewRequestNumberOfGames = 4L;
         public const long StoreReviewRequestTotalPlayTime = 60L * 60L * 2L;
 #endif
+        public const bool EventAskForStarGazers = false;
+#if DEBUG
+        public const long StarGazerRequestNumberOfGames = 0L;
+        public const long StarGazerRequestTotalPlayTime = 0L;
+#else
+        public const long StarGazerRequestNumberOfGames = 6L;
+        public const long StarGazerRequestTotalPlayTime = 60L * 60L * 3L;
+#endif
+
         public const bool DefaultHTMLDumpLogs = true;
         public const bool DefaultUseSingleDumpLog = true;
         public const int DefaultRightMouseCommand = (int)NhGetPosMods.DefClickRole;
@@ -1820,6 +1873,7 @@ namespace GnollHackX
         public const string GenericZipFileNameSuffix = ".zip";
         public const string SavedGameSharedZipFileNameSuffix = ".zip";
         public const string ManualFilePrefix = "manual_id_";
+        public const string OracleMajorConsultationFilePrefix = "major_consultation_id_";
         public const bool DefaultReadStreamingBankToMemory = false;
         public const ulong AndroidBanksToMemoryThreshold = 3500000000UL;
         public const bool DefaultCopyStreamingBankToDisk = false;
@@ -1883,6 +1937,7 @@ namespace GnollHackX
         //public const GHlong GPUResourceCacheSize = 800000000L;
         public const string AssetsTilesetDirectory = "tileset";
         public const string AssetsBanksDirectory = "banks";
+        public const double StartUpTimeOut = 8.0;
 
 #if GNH_MAUI
         public const string PortName = "GnollHackM";
@@ -1896,20 +1951,31 @@ namespace GnollHackX
         public const double NonHoveringColorMultiplier = 0.88;
 #endif
 #if WINDOWS
-        public const bool DefaultCharacterClickAction = true;
         public const bool DefaultSimpleCmdLayout = false;
         public const int FadeFromBlackDurationAtStart = 700;
         public const double FadeFromBlackAtStartExtraDelaySecs = 0.25;
 #else
-        public const bool DefaultCharacterClickAction = false;
         public const bool DefaultSimpleCmdLayout = true;
         public const int FadeFromBlackDurationAtStart = 700;
         public const double FadeFromBlackAtStartExtraDelaySecs = 0.15;
 #endif
+        public const bool DefaultCharacterClickAction = false;
         public const bool DefaultDiceAsRanges = true;
+        public const bool DefaultAutoDig = true;
+        public const bool DefaultIgnoreStopping = false; /* Since travel is also used for normal movement in the modern version */
         public const long MapDataLockTimeOutTicks = 100L;
         public const long EffectLockTimeOutTicks = 50L;
         public const long MessageLockTimeOutTicks = 50L;
+        public const uint TargetDesktopScreenWidth = 1920;
+        public const double WideLandscapeThreshold = 1.96; /* Does not yet capture 16:9 display + window title bar above + Windows system bar below  */
+#if GNH_MAUI && (WINDOWS || ANDROID || IOS)
+        public const bool IsPlatformRenderLoopDefault = true;
+#else
+        public const bool IsPlatformRenderLoopDefault = false;
+#endif
+        public const bool AllowRestartGameUponActivityDestruction = false;
+        public const string SentryGnollHackGeneralCategoryName = "GnollHack Information";
+        public const string SentryGnollHackLibraryCategoryName = "GnollHack Library";
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -2158,6 +2224,19 @@ namespace GnollHackX
         Escape,
         Enter,
         Space,
+        Tab,
+        F1,
+        F2,
+        F3,
+        F4,
+        F5,
+        F6,
+        F7,
+        F8,
+        F9,
+        F10,
+        F11,
+        F12,
         Add,
         Subtract,
         Multiply,

@@ -24,7 +24,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class ResetPage : ContentPage
+    public partial class ResetPage : ContentPage, ICloseablePage
     {
         private MainPage _mainPage;
         public ResetPage(MainPage mainPage)
@@ -221,17 +221,42 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void Button_Clicked(object sender, EventArgs e)
         {
-            ResetGrid.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
-            GHApp.CurrentMainPage?.InvalidateCarousel();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await ClosePageAsync(true);
         }
 
         public void ClosePage()
         {
-            if (ResetGrid.IsEnabled)
-                Button_Clicked(this, EventArgs.Empty);
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (ResetGrid.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
+        private async Task ClosePageAsync(bool playClickedSound)
+        {
+            ResetGrid.IsEnabled = false;
+            _backPressed = true;
+            if (playClickedSound)
+                GHApp.PlayButtonClickedSound();
+            GHApp.CurrentMainPage?.InvalidateCarousel();
+            var page = await GHApp.Navigation.PopModalAsync();
+            GHApp.DisconnectIViewHandlers(page);
         }
 
 
@@ -240,11 +265,7 @@ namespace GnollHackX.Pages.MainScreen
         {
             if (!_backPressed)
             {
-                _backPressed = true;
-                ResetGrid.IsEnabled = false;
-                GHApp.CurrentMainPage?.InvalidateCarousel();
-                var page = await GHApp.Navigation.PopModalAsync();
-                GHApp.DisconnectIViewHandlers(page);
+                await ClosePageAsync(false);
             }
             return false;
         }
@@ -258,6 +279,11 @@ namespace GnollHackX.Pages.MainScreen
         {
             GHApp.BackButtonPressed -= BackButtonPressed;
         }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
+
 
         private double _currentPageWidth = 0;
         private double _currentPageHeight = 0;

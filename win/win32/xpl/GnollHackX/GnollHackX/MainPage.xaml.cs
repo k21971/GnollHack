@@ -18,6 +18,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Text.Json;
+
+
 
 #if GNH_MAUI
 using GnollHackX;
@@ -42,40 +45,50 @@ using GnollHackX.Pages.MainScreen;
 using Xamarin.Essentials;
 using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
-using Azure.Storage.Blobs;
 
 namespace GnollHackX
 #endif
 {
     public partial class MainPage : ContentPage
     {
-        private object _gameStartedLock = new object();
-        private bool _gameStarted = false;
-        public bool GameStarted { get { lock (_gameStartedLock) { return _gameStarted; } } set { lock (_gameStartedLock) { _gameStarted = value; } } }
+        //private readonly object _generalTimerLock = new object();
+        private int _generaTimerIsOn = 0;
+        public bool GeneralTimerIsOn { get { return Interlocked.CompareExchange(ref _generaTimerIsOn, 0, 0) != 0; } set { Interlocked.Exchange(ref _generaTimerIsOn, value ? 1 : 0); } }
+        public bool CheckAndSetGeneralTimerIsOn { get { return Interlocked.Exchange(ref _generaTimerIsOn, 1) != 0; } } // { get { lock (_generalTimerLock) { bool oldval = _generaTimerIsOn; _generaTimerIsOn = true; return oldval; } } }
 
-        private object _generalTimerLock = new object();
-        private bool _generaTimerIsOn = false;
-        public bool GeneralTimerIsOn { get { lock (_generalTimerLock) { return _generaTimerIsOn; } } set { lock (_generalTimerLock) { _generaTimerIsOn = value; } } }
-        public bool CheckAndSetGeneralTimerIsOn { get { lock (_generalTimerLock) { bool oldval = _generaTimerIsOn; _generaTimerIsOn = true; return oldval; } } }
+        //private readonly object _generalTimerWorkOnTasksLock = new object();
+        private int _generaTimerWorkOnTasks = 0;
+        public bool GeneralTimerWorkOnTasks { get { return Interlocked.CompareExchange(ref _generaTimerWorkOnTasks, 0, 0) != 0; } set { Interlocked.Exchange(ref _generaTimerWorkOnTasks, value ? 1 : 0); } }
+        public bool CheckAndSetGeneralTimerWorkOnTasks { get { return Interlocked.Exchange(ref _generaTimerWorkOnTasks, 1) != 0; } }
 
-        private object _generalTimerWorkOnTasksLock = new object();
-        private bool _generaTimerWorkOnTasks = false;
-        public bool GeneralTimerWorkOnTasks { get { lock (_generalTimerWorkOnTasksLock) { return _generaTimerWorkOnTasks; } } set { lock (_generalTimerWorkOnTasksLock) { _generaTimerWorkOnTasks = value; } } }
-        public bool CheckAndSetGeneralTimerWorkOnTasks { get { lock (_generalTimerWorkOnTasksLock) { bool oldval = _generaTimerWorkOnTasks; _generaTimerWorkOnTasks = true; return oldval; } } }
-
-        private object _stopGeneralTimerLock = new object();
-        private bool _stopGeneraTimerIsOn = false;
-        public bool StopGeneralTimer { get { lock (_stopGeneralTimerLock) { return _stopGeneraTimerIsOn; } } set { lock (_stopGeneralTimerLock) { _stopGeneraTimerIsOn = value; } } }
+        //private readonly object _stopGeneralTimerLock = new object();
+        private int _stopGeneraTimerIsOn = 0;
+        public bool StopGeneralTimer { get { return Interlocked.CompareExchange(ref _stopGeneraTimerIsOn, 0, 0) != 0; } set { Interlocked.Exchange(ref _stopGeneraTimerIsOn, value ? 1 : 0); } }
 #if GNH_MAUI
         IDispatcherTimer _generalTimer;
 #endif
 
         public MainPage()
         {
+            GHApp.MaybeWriteGHLog("MainPage constructor.", true, GHConstants.SentryGnollHackGeneralCategoryName);
             InitializeComponent();
             GHApp.CurrentMainPage = this;
+            GamePage gamePage = GHApp.CurrentGamePage;
+            if (gamePage != null) /* Might be non-null and stale after a restart */
+            {
+                gamePage.StopCanvasAnimations();
+                gamePage.ShutDownCanvasViews();
+                GHApp.DisconnectIViewHandlers(gamePage);
+                GHApp.CurrentGamePage = null;
+            }
+            GHApp.IncrementMainConstructorRunNumber();
             On<iOS>().SetUseSafeArea(true);
             UIUtils.SetPageThemeOnHandler(this, GHApp.DarkMode);
+            if (GHApp.CurrentGHGame != null)
+            {
+                WaitLabel.Text = "Please Wait...";
+                WaitLayout.IsVisible = true;
+            }
 #if WINDOWS
             classicModeGrid.HeightRequest = 40;
             casualModeGrid.HeightRequest = 40;
@@ -113,7 +126,15 @@ namespace GnollHackX
             _generalTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
             _generalTimer.Interval = TimeSpan.FromSeconds(GHConstants.MainScreenGeneralCounterIntervalInSeconds);
             _generalTimer.IsRepeating = true;
-            _generalTimer.Tick += (s, e) => { if (!DoGeneralTimerTick()) _generalTimer.Stop(); };
+            _generalTimer.Tick += (s, e) => 
+            { 
+                bool res = DoGeneralTimerTick();
+                if (!res) 
+                    _generalTimer.Stop(); 
+            };
+
+            FinishedLogoFadeIn = false;
+            StartStartUpTimer();
 
             HandlerChanged += (s, e) => {
                 GHApp.DisplayRefreshRate = Math.Max(60.0f, DeviceDisplay.Current.MainDisplayInfo.RefreshRate);
@@ -132,20 +153,34 @@ namespace GnollHackX
             if (!CheckAndSetGeneralTimerIsOn)
             {
                 GeneralTimerTasks();
-#if GNH_MAUI
-                _generalTimer.Start();
-#else
-                Device.StartTimer(TimeSpan.FromSeconds(GHConstants.MainScreenGeneralCounterIntervalInSeconds), () =>
-                {
-                    return DoGeneralTimerTick();
-                });
-#endif
+                StartTimerCore();
             }
+        }
+
+        public async Task StartGeneralTimerAsync()
+        {
+            if (!CheckAndSetGeneralTimerIsOn)
+            {
+                await GeneralTimerTasksAsync();
+                StartTimerCore();
+            }
+        }
+
+        private void StartTimerCore()
+        {
+#if GNH_MAUI
+            _generalTimer.Start();
+#else
+            Device.StartTimer(TimeSpan.FromSeconds(GHConstants.MainScreenGeneralCounterIntervalInSeconds), () =>
+            {
+                return DoGeneralTimerTick();
+            });
+#endif
         }
 
         private bool DoGeneralTimerTick()
         {
-            if (GameStarted || StopGeneralTimer)
+            if (GHApp.GameStarted || StopGeneralTimer)
             {
                 GeneralTimerIsOn = false;
                 StopGeneralTimer = false;
@@ -155,23 +190,45 @@ namespace GnollHackX
             return true;
         }
 
-        private async void GeneralTimerTasks()
+        //private async Task<bool> DoGeneralTimerTickAsync()
+        //{
+        //    if (GameStarted || StopGeneralTimer)
+        //    {
+        //        GeneralTimerIsOn = false;
+        //        StopGeneralTimer = false;
+        //        return false;
+        //    }
+        //    await GeneralTimerTasksAsync();
+        //    return true;
+        //}
+
+        private void GeneralTimerTasks()
         {
-            await GeneralTimerTasksAsync();
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        await GeneralTimerTasksAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
         }
 
-        private readonly object _pendingGeneralTimerTasksLock = new object();
         private int _pendingGeneralTimerTasks = 0;
         private int PendingGeneralTimerTasks
         {
-            get
-            {
-                lock (_pendingGeneralTimerTasksLock) { return _pendingGeneralTimerTasks; }
-            }
-            set
-            {
-                lock (_pendingGeneralTimerTasksLock) { _pendingGeneralTimerTasks = value; }
-            }
+            get { return Interlocked.CompareExchange(ref _pendingGeneralTimerTasks, 0, 0); }
+            set { Interlocked.Exchange(ref _pendingGeneralTimerTasks, value); }
         }
 
         private async Task GeneralTimerTasksAsync()
@@ -205,7 +262,7 @@ namespace GnollHackX
                         && (GHApp.XlogUserNameVerified || missingorincorrectcredentials || (!GHApp.PostingXlogEntries && !dopostbones && !dopostreplays))
                         && (!has_files || !GHApp.PostingGameStatus)
                         && (!has_files2 || !GHApp.PostingXlogEntries || missingorincorrectcredentials)
-                        && (!has_files3 || !dopostbones || GameStarted || missingorincorrectcredentials)
+                        && (!has_files3 || !dopostbones || GHApp.GameStarted || missingorincorrectcredentials)
                         && (!has_files4 || !dopostreplays || incorrectcredentials)
                         )
                     {
@@ -215,7 +272,7 @@ namespace GnollHackX
                     {
                         if (_postingQueue.Count > 0)
                         {
-                            ProcessPostingQueue(); //Saves now posts first to disk in the case app is switched off very quickly before sending is finished
+                            ProcessPostingQueue(); /* Saves now posts first to disk in the case app is switched off very quickly before sending is finished */
                             has_files = Directory.Exists(directory) && Directory.GetFiles(directory)?.Length > 0;
                             has_files2 = Directory.Exists(directory2) && Directory.GetFiles(directory2)?.Length > 0;
                             has_files3 = Directory.Exists(directory3) && Directory.GetFiles(directory3)?.Length > 0;
@@ -242,7 +299,7 @@ namespace GnollHackX
                             UpdateGeneralTimerTasksLabel(false);
                         }
 
-                        if (hasinternet && has_files3 && dopostbones && !GameStarted && !missingorincorrectcredentials) // Do not fetch bones files while the game is on
+                        if (hasinternet && has_files3 && dopostbones && !GHApp.GameStarted && !missingorincorrectcredentials) // Do not fetch bones files while the game is on
                         {
                             await ProcessSavedPosts(2, directory3, GHConstants.BonesPostFileNamePrefix);
                             PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
@@ -288,7 +345,7 @@ namespace GnollHackX
             //int tasks2 = hasinternet && !GHApp.XlogUserNameVerified && (GHApp.PostingXlogEntries || dopostbones || dopostreplays) && !missingorincorrectcredentials ? 1 : 0;
             int tasks3 = hasinternet && has_files && GHApp.PostingGameStatus ? Directory.GetFiles(directory).Length : 0;
             int tasks4 = hasinternet && has_files2 && GHApp.PostingXlogEntries && !missingorincorrectcredentials ? Directory.GetFiles(directory2).Length : 0;
-            int tasks5 = hasinternet && has_files3 && dopostbones && !GameStarted && !missingorincorrectcredentials ? Directory.GetFiles(directory3).Length : 0;
+            int tasks5 = hasinternet && has_files3 && dopostbones && !GHApp.GameStarted && !missingorincorrectcredentials ? Directory.GetFiles(directory3).Length : 0;
             int tasks6 = hasinternet && has_files4 && dopostreplays && !incorrectcredentials ? Directory.GetFiles(directory4).Length : 0;
 
             return tasks1 + /* tasks2 + */ tasks3 + tasks4 + tasks5 + tasks6;
@@ -434,23 +491,37 @@ namespace GnollHackX
         {
             if (force || PendingTasksGrid.IsVisible)
             {
-                MainThread.BeginInvokeOnMainThread(() =>
+                try
                 {
-                    int tasks = PendingGeneralTimerTasks;
-                    PendingTasksLabel.Text = "There " + (tasks == 1 ? "is" : "are") + " " + tasks + " task" + (tasks == 1 ? "" : "s") + " pending.";
-                    if (tasks <= 0)
+                    MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        PendingTasksGrid.IsEnabled = false;
-                        PendingTasksGrid.IsVisible = false;
-                    }
-                });
-                MainThread.BeginInvokeOnMainThread(async () =>
+                        int tasks = PendingGeneralTimerTasks;
+                        PendingTasksLabel.Text = "There " + (tasks == 1 ? "is" : "are") + " " + tasks + " task" + (tasks == 1 ? "" : "s") + " pending.";
+                        if (tasks <= 0)
+                        {
+                            PendingTasksGrid.IsEnabled = false;
+                            PendingTasksGrid.IsVisible = false;
+                        }
+                    });
+                    MainThread.BeginInvokeOnMainThread(async () =>
+                    {
+                        try
+                        {
+                            if (PendingGeneralTimerTasks <= 0)
+                            {
+                                await CloseApp();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex);
+                        }
+                    });
+                }
+                catch (Exception ex)
                 {
-                    if (PendingGeneralTimerTasks <= 0)
-                    {
-                        await CloseApp();
-                    }
-                });
+                    Debug.WriteLine(ex);
+                }
             }
         }
 
@@ -619,6 +690,11 @@ namespace GnollHackX
 
         private async void StartLocalGameButton_Clicked(object sender, EventArgs e)
         {
+            await StartLocalGame();
+        }
+
+        public async Task StartLocalGame()
+        {
             try
             {
                 StartLocalGrid.IsEnabled = false;
@@ -626,18 +702,7 @@ namespace GnollHackX
 
                 if (GHApp.TournamentMode)
                 {
-                    if (!GHApp.XlogUserNameVerified)
-                    {
-                        _popupStyle = popup_style.GeneralDialog;
-                        PopupCheckBoxLayout.IsVisible = false;
-                        PopupTitleLabel.TextColor = GHColors.Orange;
-                        PopupTitleLabel.Text = "Tournament Verification Failed";
-                        PopupLabel.Text = "User name and password for Server Posting have not been verified. Please set and verify these in Settings in the Server Posting section.";
-                        PopupGrid.IsVisible = true;
-                        StartLocalGrid.IsEnabled = true;
-                        return;
-                    }
-                    else if (!GHApp.HasInternetAccess)
+                    if (!GHApp.HasInternetAccess)
                     {
                         _popupStyle = popup_style.GeneralDialog;
                         PopupCheckBoxLayout.IsVisible = false;
@@ -648,21 +713,53 @@ namespace GnollHackX
                         StartLocalGrid.IsEnabled = true;
                         return;
                     }
+
+                    if (!GHApp.XlogUserNameVerified)
+                    {
+                        bool missingcredentials = string.IsNullOrEmpty(GHApp.XlogUserName);
+                        bool incorrectcredentials = GHApp.XlogCredentialsIncorrect;
+                        bool missingorincorrectcredentials = missingcredentials || incorrectcredentials;
+                        if (!missingorincorrectcredentials)
+                        {
+                            DisplayAlertGrid("Credentials Verification", "Verifying credentials... Please wait.", "OK", GHColors.TitleGoldColor);
+                            await GHApp.TryVerifyXlogUserNameAsync();
+                            AlertGrid.IsVisible = false;
+                        }
+                        if (!GHApp.XlogUserNameVerified)
+                        {
+                            _popupStyle = popup_style.GeneralDialog;
+                            PopupCheckBoxLayout.IsVisible = false;
+                            PopupTitleLabel.TextColor = GHColors.Orange;
+                            PopupTitleLabel.Text = "Tournament Verification Failed";
+                            PopupLabel.Text = "User name and password for Server Posting have not been verified. Please set and verify these in Settings in the Server Posting section.";
+                            PopupGrid.IsVisible = true;
+                            StartLocalGrid.IsEnabled = true;
+                            return;
+                        }
+                    }
                 }
 
                 StartLocalGameButton.TextColor = GHColors.Gray;
-                carouselView.Stop();
+                //carouselView.Stop();
+                carouselView.ShutDown();
 
-                long numberofgames = Preferences.Get("NumberOfGames", 0L);
-                Preferences.Set("NumberOfGames", numberofgames + 1L);
+                //GHGame curGame = GHApp.CurrentGHGame;
+                //if (curGame != null)
+                //{
+                //    await DoShowGamePageForExistingGameAsync(curGame);
+                //}
+                //else
+                {
+                    long numberofgames = Preferences.Get("NumberOfGames", 0L);
+                    Preferences.Set("NumberOfGames", numberofgames + 1L);
 
-                var gamePage = new GamePage(this);
-                GHApp.CurrentGamePage = gamePage;
-                gamePage.EnableWizardMode = wizardModeSwitch.IsToggled;
-                gamePage.EnableCasualMode = casualModeSwitch.IsToggled;
-                gamePage.EnableModernMode = !classicModeSwitch.IsToggled;
-                await GHApp.Navigation.PushModalAsync(gamePage);
-                gamePage.StartNewGame();
+                    var gamePage = new GamePage(this);
+                    gamePage.EnableWizardMode = wizardModeSwitch.IsToggled;
+                    gamePage.EnableCasualMode = casualModeSwitch.IsToggled;
+                    gamePage.EnableModernMode = !classicModeSwitch.IsToggled;
+                    await GHApp.Navigation.PushModalAsync(gamePage);
+                    await gamePage.StartNewGame();
+                }
             }
             catch (Exception ex)
             {
@@ -670,12 +767,11 @@ namespace GnollHackX
 #if SENTRY
                 SentrySdk.CaptureException(ex);
 #endif
-                await DisplayAlertOrGrid("Error", "Error occurred when starting the game: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("Error", "Error occurred when starting the game: " + ex.Message, "OK", GHColors.Red);
             }
         }
 
         private bool _firsttime = true;
-        private bool _mainScreenMusicStarted = false;
 
         public void UpdateLayout()
         {
@@ -696,21 +792,147 @@ namespace GnollHackX
             UpdateMobileVersionLabel();
         }
 
+        private async Task<bool> BackButtonPressed(object sender, EventArgs e)
+        {
+            if (ExitButton.IsEnabled && ExitButton.IsVisible && StartButtonLayout.IsVisible)
+                await ExitApp();
+            return false;
+        }
+
+        private async Task DoShowGamePageForExistingGameAsync()
+        {
+            GHGame curGame = GHApp.CurrentGHGame;
+            if (curGame != null) 
+            {
+                //carouselView.Stop();
+                carouselView.ShutDown();
+                var gamePage = new GamePage(this);
+                gamePage.EnableWizardMode = curGame.WizardMode;
+                gamePage.EnableCasualMode = curGame.CasualMode;
+                gamePage.EnableModernMode = curGame.ModernMode;
+                GHGame game = GHApp.CurrentGHGame;
+                bool wenttosleep = false;
+                try
+                {
+                    wenttosleep = Preferences.Get("WentToSleepWithGameOn", false);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                }
+                if (GHApp.IsAutoSaveUponSwitchingAppsOn
+                    && game != null && !game.PlayingReplay
+                    && wenttosleep && (GHApp.GameSaved || GHApp.SavingGame))
+                {
+                    GHApp.CancelSaveGame = true;
+                    game.FullRestart = true;
+                    game.StopWaitAndResumeSavedGame(); //Calls gamePage.RestartGameAfterPageDestruction, which handles Navigation.PushModalAsync when the time is right
+                }
+                else
+                {
+                    await GHApp.Navigation.PushModalAsync(gamePage, false);
+                    gamePage.StartExistingGame();
+                    curGame.ReactivateGame();
+                }
+                await Task.Delay(500);
+            }
+            WaitLayout.IsVisible = false;
+        }
+
+        private bool AllowStartExistingGame {  get { return GHConstants.AllowRestartGameUponActivityDestruction && GHApp.GameStarted; } }
+
         private async void ContentPage_Appearing(object sender, EventArgs e)
         {
+            GHApp.BackButtonPressed += BackButtonPressed;
             UpdateLayout();
-            if (_firsttime)
+            GHGame curGame = GHApp.CurrentGHGame;
+            if (_firsttime && (curGame != null || GHApp.MainPageConstructorRunNumber > 1)) // Restart
             {
-                GHApp.DebugWriteProfilingStopwatchTimeAndRestart("MainPage First Time");
                 _firsttime = false;
-                if (GHApp.PlatformService != null)
+                GHApp.SetWindowFocus();
+                GnollHackLabel.Text = "GnollHack";
+                FinishedLogoFadeIn = true;
+                StartLogoImage.Opacity = 0.0; /* To make sure */
+                StartLogoImage.IsVisible = false;
+                FmodLogoImage.Opacity = 0.0; /* To make sure */
+                FmodLogoImage.IsVisible = false;
+
+                carouselView.Init();
+                carouselView.IsVisible = true;
+                carouselView.InvalidateSurface();
+                carouselView.Opacity = 1.0; /* To make sure */
+                UpperButtonGrid.IsVisible = true;
+                UpperButtonGrid.Opacity = 1.0;  /* To make sure */
+                StartButtonLayout.IsVisible = true;
+                StartButtonLayout.Opacity = 1.0;  /* To make sure */
+                LogoGrid.IsVisible = true;
+                LogoGrid.Opacity = 1.0;  /* To make sure */
+
+                if (curGame != null)
                 {
+                    StartLocalGameButton.TextColor = GHColors.Gray;
+                    StartLocalGameButton.IsEnabled = false;
+                    WaitLayout.IsVisible = false;
+
+                    if (AllowStartExistingGame)
+                    {
+                        DisplayAlertGrid(GHApp.IsAndroid ? "Android Activity Restart" : "Game Screen Restart",
+                            "Android destroyed GnollHack's " + (GHApp.IsAndroid ? "activity" : "game screen") + " when backgrounded. Please press OK to return to your game.",
+                                "OK", GHColors.Orange, 5);
+                    }
+                    else
+                    {
+                        carouselView.Play();
+
+                        ///* Game has been successfully loaded, so need to save first */
+                        //if (GHApp.IsAutoSaveUponSwitchingAppsOn)
+                        //{
+                        //    curGame.SaveGameAndWaitForResume();
+                        //    await Task.Delay(2000);
+                        //}
+                        Preferences.Set("WentToSleepWithGameOn", false);
+                        Preferences.Set("GameSaveResult", 0);
+
+                        if (GHApp.IsAndroid)
+                        {
+                            DisplayAlertGrid("Android Activity Restart",
+                                "Android destroyed GnollHack's activity when backgrounded, which may lead to unstable performance. Please press OK to exit the app and then restart GnollHack.",
+                                    "OK", GHColors.Orange, 4);
+                        }
+                        else
+                        {
+                            DisplayAlertGrid("Unexpected App Restart",
+                                "GnollHack experienced an unexpected app window restart, which may lead to unstable performance. Please press OK to exit the app and then restart GnollHack.",
+                                    "OK", GHColors.Orange, 4);
+                        }
+                    }
+
+                    return;
+                }
+                else
+                {
+                    GHApp.FmodService?.StopAllUISounds();
+                    PlayMainScreenVideoAndMusic();
+                }
+            }
+            else if (_firsttime)
+            {
+                _firsttime = false;
+                GHApp.DebugWriteProfilingStopwatchTimeAndRestart("MainPage First Time");
+                GHApp.InitializeConnectivity();
+                GHApp.SetWindowFocus();
+
+                if (GHApp.IsAndroid && !GHApp.UsePlatformRenderLoop && GHApp.PlatformService != null)
+                {
+                    string animationSettingName = GHApp.OneUIAnimationSettingName;
                     bool removeanimationson = GHApp.PlatformService.IsRemoveAnimationsOn();
                     if (removeanimationson)
                     {
-                        await GHApp.DisplayMessageBox(this, "Invalid Animator Duration Scale",
-                            "GnollHack has detected invalid animator settings. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting must be set to Off. If your device does not have this setting, please manually adjust the value of \"Animator duration scale\" to 1x under Settings -> Developer Options -> Animator duration scale. ", "OK");
-                        await CloseApp();
+                        DisplayAlertGrid(GHApp.IsSamsung ? animationSettingName + " is On" : "Invalid Animator Duration Scale",
+                            "GnollHack has detected invalid animation settings." 
+                            + (GHApp.IsPlatformRenderLoopAvailable ? " You can either turn on Platform Render Loop in GnollHack settings or adjust your device animation settings." : "") 
+                            + (GHApp.IsSamsung ? " In the Android Settings app, please switch off \"" + animationSettingName + "\" under Accessibility > Visibility Enhancements." : " In the Android settings app, please adjust the value of \"Animator duration scale\" to 1x under Developer Options > Animator duration scale."),
+                            "OK", GHColors.Orange, GHApp.IsPlatformRenderLoopAvailable ? 0 : 2);
                     }
                     else
                     {
@@ -719,12 +941,17 @@ namespace GnollHackX
                         if (scalecurrent == 0.0f)
                         {
                             if (scalesetting == 0.0f)
-                                await GHApp.DisplayMessageBox(this, "Invalid Animator Duration Scale",
-                                    "GnollHack failed to automatically adjust Animator Duration Scale and it remains set to Off. Please manually adjust the value to 1x under Settings -> Developer Options -> Animator duration scale. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting needs to be disabled, too.", "OK");
+                                DisplayAlertGrid("Invalid Animator Duration Scale",
+                                    "GnollHack failed to automatically adjust Animator Duration Scale and it remains switched off." 
+                                    + (GHApp.IsPlatformRenderLoopAvailable ? " You can either turn on Platform Render Loop in GnollHack settings or adjust your device animation settings." : "") 
+                                    + (GHApp.IsAndroid ? " In the Android Settings app, please adjust the value to 1x under Developer Options > Animator duration scale. If your device has a setting named \"" + animationSettingName + "\" under Accessibility > Visibility Enhancements, this setting needs to be disabled, too." : ""),
+                                    "OK", GHColors.Orange, GHApp.IsPlatformRenderLoopAvailable ? 0 : 3);
                             else
-                                await GHApp.DisplayMessageBox(this, "Invalid Animator Duration Scale",
-                                    "GnollHack failed to automatically adjust Animator Duration Scale and it has become turned Off. Please check that the value is 1x under Settings -> Developer Options -> Animator duration scale. If your device has a setting named \"Remove Animations\" under Settings -> Accessibility -> Visibility Enhancements, this setting needs to be disabled, too.", "OK");
-                            await CloseApp();
+                                DisplayAlertGrid("Invalid Animator Duration Scale",
+                                    "GnollHack failed to automatically adjust Animator Duration Scale and it has become turned off." 
+                                    + (GHApp.IsPlatformRenderLoopAvailable ? " You can either turn on Platform Render Loop in GnollHack settings or adjust your device animation settings." : "") 
+                                    + (GHApp.IsAndroid ? " In the Android Settings app, please check that the value is 1x under Developer Options > Animator duration scale. If your device has a setting named \"" + animationSettingName + "\" under Accessibility > Visibility Enhancements, this setting needs to be disabled, too." : ""),
+                                    "OK", GHColors.Orange, GHApp.IsPlatformRenderLoopAvailable ? 0 : 3);
                         }
                         else if (scalecurrent == -1.0f)
                         {
@@ -743,88 +970,154 @@ namespace GnollHackX
                 if (GHApp.InformAboutGameTermination && (GHApp.DebugLogMessages || GHApp.GameSaveStatus == 0))
                 {
                     GHApp.InformAboutGameTermination = false;
-                    await DisplayAlertOrGrid("Unexpected Game Termination", "GnollHack was unexpectedly terminated when running on background. This may have been instructed by the operating system or the user." + (GHApp.GameSaveStatus == 0 ? " Your game may be recoverable from the crash." : " Your game was saved before the termination."), "OK", GHColors.Orange);
+                    DisplayAlertGrid("Unexpected Game Termination", "GnollHack was unexpectedly terminated when running on background. This may have been instructed by the operating system or the user." + (GHApp.GameSaveStatus == 0 ? " Your game may be recoverable from the crash." : " Your game was saved before the termination."), "OK", GHColors.Orange);
                     previousInformationShown = true;
                 }
                 if (GHApp.InformAboutIncompatibleSavedGames)
                 {
                     GHApp.InformAboutIncompatibleSavedGames = false;
-                    await DisplayAlertOrGrid("Incompatible Saved Games", "GnollHack has been updated to a newer version, for which your existing saved games are incompatible.", "OK", GHColors.Orange); // To downgrade back to the earlier version, back up first your save files using About -> Export Saved Games and then follow the instructions at About -> Downgrade.
+                    DisplayAlertGrid("Incompatible Saved Games", "GnollHack has been updated to a newer version, for which your existing saved games are incompatible.", "OK", GHColors.Orange); // To downgrade back to the earlier version, back up first your save files using About -> Export Saved Games and then follow the instructions at About -> Downgrade.
                     previousInformationShown = true;
                 }
                 if (GHApp.InformAboutSlowSounds)
                 {
-                    await DisplayAlertOrGrid("Slow Sounds", "GnollHack is running on Android in Debug Mode using the APK format, which causes sounds to play slow. Please switch Streaming Banks to Memory on in Settings.", "OK", GHColors.Orange);
+                    DisplayAlertGrid("Slow Sounds", "GnollHack is running on Android in Debug Mode using the APK format, which causes sounds to play slow. Please switch Streaming Banks to Memory on in Settings.", "OK", GHColors.Orange);
                     previousInformationShown = true;
                 }
                 if (GHApp.InformAboutGPU)
                 {
                     if (GHApp.IsSteam)
                     {
-                        await DisplayAlertOrGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add Desktop App > the .exe file under C:\\Program Files (x86)\\Steam\\steamapps\\common\\GnollHack.", "OK", GHColors.Orange);
+                        DisplayAlertGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add Desktop App > the .exe file under C:\\Program Files (x86)\\Steam\\steamapps\\common\\GnollHack.", "OK", GHColors.Orange);
                     }
                     else
                     {
-                        await DisplayAlertOrGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add App > Microsoft Store App > Options.", "OK", GHColors.Orange);
+                        DisplayAlertGrid("Multiple GPUs", "GnollHack is currently not using a high-performance GPU, which may impact performance. Please switch to a high performance graphics preference in Windows Settings App at System > Display > Graphics > Add App > Microsoft Store App > Options.", "OK", GHColors.Orange);
                     }
                     GHApp.HasInformedAboutGPU = true;
                     previousInformationShown = true;
                 }
                 if (GHApp.InformAboutRecordingSetOff)
                 {
-                    await DisplayAlertOrGrid("Recording Switched Off", string.Format("You are are running low on free disk space ({0:0.00} GB). Game recording has been switched off in Settings." + (GHApp.InformAboutFreeDiskSpace ? " Please consider freeing disk space on your device." : ""), (double)GHConstants.LowFreeDiskSpaceThresholdInBytes / (1024 * 1024 * 1024)), "OK", GHColors.Orange);
+                    DisplayAlertGrid("Recording Switched Off", string.Format("You are are running low on free disk space ({0:0.00} GB). Game recording has been switched off in Settings." + (GHApp.InformAboutFreeDiskSpace ? " Please consider freeing disk space on your device." : ""), (double)GHConstants.LowFreeDiskSpaceThresholdInBytes / (1024 * 1024 * 1024)), "OK", GHColors.Orange);
                     previousInformationShown = true;
                 }
                 else if (GHApp.InformAboutFreeDiskSpace)
                 {
-                    await DisplayAlertOrGrid("Very Low Free Disk Space", string.Format("You are are running very low on free disk space ({0:0.00} GB). Please consider freeing disk space on your device.", (double)GHConstants.VeryLowFreeDiskSpaceThresholdInBytes / (1024 * 1024 * 1024)), "OK", GHColors.Orange);
+                    DisplayAlertGrid("Very Low Free Disk Space", string.Format("You are are running very low on free disk space ({0:0.00} GB). Please consider freeing disk space on your device.", (double)GHConstants.VeryLowFreeDiskSpaceThresholdInBytes / (1024 * 1024 * 1024)), "OK", GHColors.Orange);
                     previousInformationShown = true;
                 }
-                if (!previousInformationShown)
+                if (!previousInformationShown && GHConstants.EventAskForStarGazers && GHApp.HasInternetAccess)
                 {
-                    bool ReviewRequested = Preferences.Get("StoreReviewRequested", false);
-                    long NumberOfGames = Preferences.Get("NumberOfGames", 0L);
-                    long TotalPlayTime = GHApp.RealPlayTime;
-
-                    if (!ReviewRequested && ((NumberOfGames >= GHConstants.StoreReviewRequestNumberOfGames && TotalPlayTime >= GHConstants.StoreReviewRequestTotalPlayTime) || GHApp.DeveloperMode))
+                    bool showStarGazers = false;
+                    int star_gazers = 0;
+                    try
                     {
-                        Preferences.Set("StoreReviewRequested", true);
-                        UpperButtonGrid.IsEnabled = true; /* Just in case of a hangup */
-                        LogoGrid.IsEnabled = true; /* Just in case of a hangup */
-                        GHApp.PlatformService?.RequestAppReview(this); /* Platform implementation is async, so this should return immediately */
+                        bool StarGazersRequested = Preferences.Get("StarGazersRequested", false);
+                        long NumberOfGames = Preferences.Get("NumberOfGames", 0L);
+                        long TotalPlayTime = GHApp.RealPlayTime;
+
+                        if (!StarGazersRequested && ((NumberOfGames >= GHConstants.StarGazerRequestNumberOfGames && TotalPlayTime >= GHConstants.StarGazerRequestTotalPlayTime) || GHApp.DeveloperMode))
+                        {
+                            using (HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
+                            {
+                                client.DefaultRequestHeaders.Add("User-Agent", "GnollHack");
+                                HttpResponseMessage message = await client.GetAsync(new Uri(GHConstants.GnollHackiGitHubApiPage));
+                                if (message != null && message.IsSuccessStatusCode && message.Content != null)
+                                {
+                                    string content = await message.Content.ReadAsStringAsync();
+                                    if (!string.IsNullOrWhiteSpace(content))
+                                    {
+                                        using (JsonDocument doc = JsonDocument.Parse(content))
+                                        {
+                                            JsonElement root = doc.RootElement;
+                                            star_gazers = root.GetProperty("stargazers_count").GetInt32();
+                                            if (star_gazers > 0)
+                                            {
+                                                Preferences.Set("StarGazersRequested", true);
+                                                if (star_gazers < 500)
+                                                {
+                                                    showStarGazers = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
+                    }
+                    if (showStarGazers)
+                    {
+                        DisplayEventGrid("Give Us a Star on GitHub", 
+                            "You can help our GitHub wiki to gain more search engine visibility by starring the GnollHack repository! When we reach 500 stars, search engines are allowed to index the wiki.\n\nWe have currently " + star_gazers + " stars.",
+                            "Give Star", "Later", 1);
+                    }
+                }
+
+                /* This last, since the store review may not show up */
+                if (!previousInformationShown && GHApp.HasInternetAccess)
+                {
+                    try
+                    {
+                        bool ReviewRequested = Preferences.Get("StoreReviewRequested", false);
+                        long NumberOfGames = Preferences.Get("NumberOfGames", 0L);
+                        long TotalPlayTime = GHApp.RealPlayTime;
+
+                        if (!ReviewRequested && ((NumberOfGames >= GHConstants.StoreReviewRequestNumberOfGames && TotalPlayTime >= GHConstants.StoreReviewRequestTotalPlayTime) || GHApp.DeveloperMode))
+                        {
+                            previousInformationShown = true;
+                            Preferences.Set("StoreReviewRequested", true);
+                            UpperButtonGrid.IsEnabled = true; /* Just in case of a hangup */
+                            LogoGrid.IsEnabled = true; /* Just in case of a hangup */
+                            await GHApp.PlatformService?.RequestAppReview(this); /* Platform implementation is async, so this should return immediately */
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
                     }
                 }
             }
-            else if (!GameStarted)
+            else if (!GHApp.GameStarted)
             {
-                if ((!_mainScreenMusicStarted))
+                if ((!GHApp.MainScreenMusicStarted))
                     PlayMainScreenVideoAndMusic();
             }
 
             UpperButtonGrid.IsEnabled = true;
             LogoGrid.IsEnabled = true;
 
-            GHApp.InitializeConnectivity();
-            StartGeneralTimer();
+            await StartGeneralTimerAsync();
         }
 
         public async Task InitializeServices()
         {
-            bool resetFiles = Preferences.Get("ResetAtStart", true);
-            if (resetFiles)
+            try
             {
-                GHApp.GnollHackService.ClearFiles();
-                Preferences.Set("ResetAtStart", false);
-                Preferences.Set("ResetExternalFiles", true);
+                bool resetFiles = Preferences.Get("ResetAtStart", true);
+                if (resetFiles)
+                {
+                    GHApp.GnollHackService.ClearFiles();
+                    Preferences.Set("ResetAtStart", false);
+                    Preferences.Set("ResetExternalFiles", true);
+                }
+                GHApp.ResetAcquiredFiles();
             }
-            GHApp.ResetAcquiredFiles();
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
 
             await TryInitializeGnollHack();
             await TryInitializeSecrets();
-            await TryInitializeFMOD();
+            TryInitializeFMOD();
         }
 
-        public async Task TryReadSecrets()
+        public void TryReadSecrets()
         {
             try
             {
@@ -833,7 +1126,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await DisplayAlertOrGrid("Reading Secrets File Failed", "GnollHack failed to read secrets file: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("Reading Secrets File Failed", "GnollHack failed to read secrets file: " + ex.Message, "OK", GHColors.Red);
             }
             try
             {
@@ -841,7 +1134,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await DisplayAlertOrGrid("Reading User Secrets File Failed", "GnollHack failed to read user secrets file: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("Reading User Secrets File Failed", "GnollHack failed to read user secrets file: " + ex.Message, "OK", GHColors.Red);
             }
         }
 
@@ -853,7 +1146,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await DisplayAlertOrGrid("GnollHack Initialization Failed", "Initializing GnollHack failed: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("GnollHack Initialization Failed", "Initializing GnollHack failed: " + ex.Message, "OK", GHColors.Red);
             }
         }
         public async Task TryInitializeSecrets()
@@ -864,11 +1157,11 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await DisplayAlertOrGrid("Secrets Initialization Failed", "Initializing secrets failed: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("Secrets Initialization Failed", "Initializing secrets failed: " + ex.Message, "OK", GHColors.Red);
             }
         }
 
-        public async Task TryInitializeFMOD()
+        public void TryInitializeFMOD()
         {
             try
             {
@@ -876,11 +1169,11 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await DisplayAlertOrGrid("FMOD Initialization Failed", "Initializing FMOD failed: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("FMOD Initialization Failed", "Initializing FMOD failed: " + ex.Message, "OK", GHColors.Red);
             }
         }
 
-        public async Task TryClearCoreFiles()
+        public void TryClearCoreFiles()
         {
             try
             {
@@ -888,7 +1181,7 @@ namespace GnollHackX
             }
             catch (Exception ex)
             {
-                await DisplayAlertOrGrid("File Clearing Failure", "GnollHack failed to clear core files: " + ex.Message, "OK", GHColors.Orange);
+                DisplayAlertGrid("File Clearing Failure", "GnollHack failed to clear core files: " + ex.Message, "OK", GHColors.Orange);
             }
         }
 
@@ -896,7 +1189,7 @@ namespace GnollHackX
         {
             GHApp.InitFileDescriptors();
 
-            await TryReadSecrets();
+            TryReadSecrets();
             await InitializeServices();
 
             GHApp.InitAdditionalTypefaces();
@@ -1001,21 +1294,28 @@ namespace GnollHackX
             //VersionLabel.Text = verid;
             GnollHackLabel.Text = "GnollHack";
 
-            string prev_version = Preferences.Get("VersionId", "");
-            ulong prev_vernum = (ulong)Preferences.Get("VersionNumber", 0L);
-            GHApp.GHPreviousVersionNumber = prev_vernum;
-
-            if (prev_version != verid || prev_vernum != vernum)
+            try
             {
-                await TryClearCoreFiles();
-                await TryInitializeGnollHack();
-                await TryInitializeSecrets();
-            }
-            if (prev_vernum > 0 && prev_vernum < vercompat)
-                GHApp.CheckForIncompatibleSavedGames();
+                string prev_version = Preferences.Get("VersionId", "");
+                ulong prev_vernum = (ulong)Preferences.Get("VersionNumber", 0L);
+                GHApp.GHPreviousVersionNumber = prev_vernum;
 
-            Preferences.Set("VersionId", verid);
-            Preferences.Set("VersionNumber", (long)vernum);
+                if (prev_version != verid || prev_vernum != vernum)
+                {
+                    TryClearCoreFiles();
+                    await TryInitializeGnollHack();
+                    await TryInitializeSecrets();
+                }
+                if (prev_vernum > 0 && prev_vernum < vercompat)
+                    GHApp.CheckForIncompatibleSavedGames();
+
+                Preferences.Set("VersionId", verid);
+                Preferences.Set("VersionNumber", (long)vernum);
+            }
+            catch (Exception ex)
+            { 
+                Debug.WriteLine(ex.Message); 
+            }
 
             try
             {
@@ -1039,18 +1339,30 @@ namespace GnollHackX
                 GHApp.FmodService.LoadBanks(sound_bank_loading_type.Preliminary);
             }
 
-            float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume;
+            float generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, uiVolume;
             generalVolume = Preferences.Get("GeneralVolume", GHConstants.DefaultGeneralVolume);
             musicVolume = Preferences.Get("MusicVolume", GHConstants.DefaultMusicVolume);
             ambientVolume = Preferences.Get("AmbientVolume", GHConstants.DefaultAmbientVolume);
             dialogueVolume = Preferences.Get("DialogueVolume", GHConstants.DefaultDialogueVolume);
             effectsVolume = Preferences.Get("EffectsVolume", GHConstants.DefaultEffectsVolume);
-            UIVolume = Preferences.Get("UIVolume", GHConstants.DefaultUIVolume);
+            uiVolume = Preferences.Get("UIVolume", GHConstants.DefaultUIVolume);
             try
             {
-                GHApp.FmodService.AdjustVolumes(generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, UIVolume);
+                /* Adjust first UI volumes */
+                GHApp.FmodService?.AdjustUIVolumes(generalVolume, musicVolume, uiVolume);
+                GHGame curGame = GHApp.CurrentGHGame;
+                if (curGame != null)
+                {
+                    /* Game is ongoing, so ask GHGame to handle this */
+                    curGame.ResponseQueue.Enqueue(new GHResponse(curGame, GHRequestType.SetVolume, generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, uiVolume));
+                }
+                else
+                {
+                    /* Adjust directly, since there's no game thread */
+                    GHApp.FmodService?.AdjustGameVolumes(generalVolume, musicVolume, ambientVolume, dialogueVolume, effectsVolume, uiVolume);
+                }
                 if (GHApp.LoadBanks)
-                    GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
+                    GHApp.FmodService?.PlayUIMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
 
                 /* Check silent mode; this also mutes everything if need be */
                 GHApp.SilentMode = Preferences.Get("SilentMode", false);
@@ -1114,8 +1426,8 @@ namespace GnollHackX
 
             try
             {
-                GHApp.FmodService.PlayMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
-                _mainScreenMusicStarted = true;
+                GHApp.FmodService?.PlayUIMusic(GHConstants.IntroGHSound, GHConstants.IntroEventPath, GHConstants.IntroBankId, GHConstants.IntroMusicVolume, 1.0f);
+                GHApp.MainScreenMusicStarted = true;
             }
             catch (Exception ex)
             {
@@ -1123,14 +1435,55 @@ namespace GnollHackX
             }
         }
 
+        //private readonly object _startUpLock = new object();
+        private int _finishedLogoFadeIn = 0;
+        private bool FinishedLogoFadeIn { get { return Interlocked.CompareExchange(ref _finishedLogoFadeIn, 0, 0) != 0; } set { Interlocked.Exchange(ref _finishedLogoFadeIn, value ? 1 : 0); } }
+#if GNH_MAUI
+        IDispatcherTimer _startUpTimer;
+#endif
+
         private async Task StartFadeLogoIn()
         {
             await StartLogoImage.FadeTo(1, 250);
             StartLogoImage.Opacity = 1.0; /* To make sure */
             await FmodLogoImage.FadeTo(1, 250);
             FmodLogoImage.Opacity = 1.0; /* To make sure */
+            FinishedLogoFadeIn = true;
+
             //List<Task> tasklist = new List<Task> { t1, t2 };
             //await Task.WhenAll(tasklist);
+        }
+
+        private void StartStartUpTimer()
+        {
+#if GNH_MAUI
+            _startUpTimer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
+            _startUpTimer.Interval = TimeSpan.FromSeconds(GHConstants.StartUpTimeOut);
+            _startUpTimer.IsRepeating = false;
+            _startUpTimer.Tick += (s, e) =>
+            {
+                if (!FinishedLogoFadeIn)
+                    ShowStartUpTimeOutAlert();
+            };
+            _startUpTimer.Start();
+#else
+            Device.StartTimer(TimeSpan.FromSeconds(GHConstants.StartUpTimeOut), () =>
+            {
+                if (!FinishedLogoFadeIn)
+                    ShowStartUpTimeOutAlert();
+                return false;
+            });
+#endif
+        }
+
+        private void ShowStartUpTimeOutAlert()
+        {
+            DisplayAlertGrid("Startup Timeout", 
+                "GnollHack has exceeded its startup timeout limit, possibly due to animations being turned off." 
+                    + (GHApp.IsAndroid && GHApp.IsSamsung ? " In Android Settings, please switch off Accessibility > Visual Enhancements > " 
+                    + GHApp.OneUIAnimationSettingName + "." 
+                : " Please check your device animation settings."), 
+                "OK", GHColors.Orange, 1);
         }
 
         private async Task StartFadeIn()
@@ -1165,14 +1518,21 @@ namespace GnollHackX
 
         private async void ExitAppButton_Clicked(object sender, EventArgs e)
         {
+            GHApp.AddSentryBreadcrumb("Exit button clicked.", GHConstants.SentryGnollHackGeneralCategoryName);
+            await ExitApp();
+        }
+
+        private async Task ExitApp()
+        {
+            GHApp.AddSentryBreadcrumb("ExitApp", GHConstants.SentryGnollHackGeneralCategoryName);
             UpperButtonGrid.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
             ExitButton.IsEnabled = false;
             ExitButton.TextColor = GHColors.Red;
+            GHApp.PlayButtonClickedSound();
 
             bool hideautoupdatealert = Preferences.Get("HideAutoUpdateAlert", false);
             bool isfromgoogleplay = true;
-            if (!hideautoupdatealert)
+            if (!hideautoupdatealert && !GHApp.IsNoStore)
             {
                 _popupStyle = popup_style.DisableAutoUpdate;
                 PopupCheckBoxLayout.IsVisible = true;
@@ -1184,11 +1544,11 @@ namespace GnollHackX
                     PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates by toggling off App Updates under App Store section in the Settings app, and manually apply updates when you have no saved games.";
                 else if (GHApp.IsWindows)
                 {
-                    if(GHApp.IsPackaged)
+                    if (GHApp.IsPackaged)
                         PopupLabel.Text = "Updating GnollHack may cause your saved games to become invalid. We recommend that you disable automatic updates by toggling off App Updates under Profile > Settings in the Microsoft Store app, and manually apply updates when you have no saved games.";
                     else
                     {
-                        if(GHApp.IsSteam)
+                        if (GHApp.IsSteam)
                         {
                             PopupLabel.Text = "Some updates of GnollHack may be incompatible with your saved games. In such a case, you can revert to an old version of the game by going to the Betas tab under GnollHack Properties and activating a compatible version therein.";
                         }
@@ -1208,12 +1568,23 @@ namespace GnollHackX
             }
         }
 
+        public void ForceCloseApp()
+        {
+            _popupStyle = popup_style.ForceCloseApp;
+            PopupCheckBoxLayout.IsVisible = false;
+            PopupTitleLabel.TextColor = GHColors.Red;
+            PopupTitleLabel.Text = "GnollHack Needs to Close";
+            PopupLabel.Text = "A panic occurred during loading a saved game, and the app state may have become unstable. Restarting GnollHack is required.";
+            PopupGrid.IsVisible = true;
+        }
+
         private async Task CheckPendingTasksAndExit()
         {
+            GHApp.AddSentryBreadcrumb("CheckPendingTasksAndExit", GHConstants.SentryGnollHackGeneralCategoryName);
             PendingGeneralTimerTasks = CalculatePendingGeneralTimerTasks();
             if (PendingGeneralTimerTasks > 0)
             {
-                StartGeneralTimer();
+                await StartGeneralTimerAsync();
                 UpdateGeneralTimerTasksLabel(true);
                 PendingTasksGrid.IsEnabled = true;
                 PendingTasksGrid.IsVisible = true;
@@ -1227,24 +1598,29 @@ namespace GnollHackX
             }
         }
 
-        private readonly object _closingAppLock = new object();
-        private bool _closingApp = false;
-        private bool CheckCloseAndSetTrue { get { lock (_closingAppLock) { bool oldvalue = _closingApp; _closingApp = true; return oldvalue; } } }
+        //private readonly object _closingAppLock = new object();
+        private int _closingApp = 0;
+        private bool CheckCloseAndSetTrue { get { return Interlocked.Exchange(ref _closingApp, 1) != 0; } }
 
         private async Task CloseApp()
         {
             if (CheckCloseAndSetTrue)
                 return;
 
+            GHApp.AddSentryBreadcrumb("CloseApp", GHConstants.SentryGnollHackGeneralCategoryName);
             StopGeneralTimer = true; /* Stop timer */
+            GHApp.CheckCloseGnhThread(); /* Close GnhThread if a game is still ongoing for some reason */
             Task t1 = GeneralTimerTasksAsync(); /* Make sure outstanding queues are processed before closing application */
             Task t2 = Task.Delay(1000); /* Give 1 second to close at maximum */
             await Task.WhenAny(t1, t2);
             carouselView.Stop();
-            GHApp.FmodService.StopAllSounds((uint)StopSoundFlags.All, 0U);
-            await Task.Delay(200);
+            GHApp.FmodService?.StopAllGameSounds((uint)StopSoundFlags.All, 0U);
+            await Task.Delay(100);
+            GHApp.FmodService?.StopAllUISounds();
+            await Task.Delay(100);
             GHApp.BeforeExitApp();
-            GHApp.PlatformService.CloseApplication();
+            GHApp.PlatformService?.CloseApplication();
+            GHApp.AddSentryBreadcrumb("Post CloseApplication", GHConstants.SentryGnollHackGeneralCategoryName);
 
 #if !GNH_MAUI
             await Task.Delay(100);
@@ -1271,6 +1647,11 @@ namespace GnollHackX
 
         private async void ResetButton_Clicked(object sender, EventArgs e)
         {
+            await OpenResetPage();
+        }
+
+        private async Task OpenResetPage()
+        {
             UpperButtonGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             carouselView.Stop();
@@ -1278,11 +1659,16 @@ namespace GnollHackX
             var resetPage = new ResetPage(this);
             await GHApp.Navigation.PushModalAsync(resetPage);
             StopGeneralTimer = false;
-            StartGeneralTimer();
+            await StartGeneralTimerAsync();
             UpperButtonGrid.IsEnabled = true;
         }
 
         private async void SettingsButton_Clicked(object sender, EventArgs e)
+        {
+            await OpenSettingsPage();
+        }
+
+        public async Task OpenSettingsPage()
         {
             UpperButtonGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
@@ -1293,6 +1679,11 @@ namespace GnollHackX
         }
 
         private async void OptionsButton_Clicked(object sender, EventArgs e)
+        {
+            await OpenOptionsPage();
+        }
+
+        public async Task OpenOptionsPage()
         {
             UpperButtonGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
@@ -1307,12 +1698,17 @@ namespace GnollHackX
             catch (Exception ex)
             {
                 editorPage.ClearTextEditor();
-                await DisplayAlertOrGrid("Reading Options File Failed", "GnollHack failed to read the options file: " + ex.Message, "OK", GHColors.Red);
+                DisplayAlertGrid("Reading Options File Failed", "GnollHack failed to read the options file: " + ex.Message, "OK", GHColors.Red);
             }
             UpperButtonGrid.IsEnabled = true;
         }
 
         private async void CreditsButton_Clicked(object sender, EventArgs e)
+        {
+            await OpenAboutPage();
+        }
+
+        private async Task OpenAboutPage()
         {
             UpperButtonGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
@@ -1321,13 +1717,19 @@ namespace GnollHackX
             var aboutPage = new AboutPage(this);
             await GHApp.Navigation.PushModalAsync(aboutPage);
             StopGeneralTimer = false;
-            StartGeneralTimer();
+            await StartGeneralTimerAsync();
             UpperButtonGrid.IsEnabled = true;
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
+            GHApp.BackButtonPressed -= BackButtonPressed;
             carouselView.Stop();
+        }
+
+        protected override bool OnBackButtonPressed()
+        {
+            return true;
         }
 
         private double _currentPageWidth = 0;
@@ -1355,6 +1757,11 @@ namespace GnollHackX
         }
 
         private async void VaultButton_Clicked(object sender, EventArgs e)
+        {
+            await OpenVaultPage();
+        }
+
+        private async Task OpenVaultPage()
         {
             UpperButtonGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
@@ -1395,13 +1802,19 @@ namespace GnollHackX
         private enum popup_style
         {
             GeneralDialog = 0,
-            DisableAutoUpdate
+            DisableAutoUpdate,
+            ForceCloseApp,
         }
 
         private string _popupViewUrl = string.Empty;
         private string _popupViewTitle = string.Empty;
         private popup_style _popupStyle = popup_style.GeneralDialog;
         private async void PopupOkButton_Clicked(object sender, EventArgs e)
+        {
+            await ClosePopup();
+        }
+
+        private async Task ClosePopup()
         {
             PopupOkButton.IsEnabled = false;
             PopupOkButton2.IsEnabled = false;
@@ -1417,6 +1830,10 @@ namespace GnollHackX
                     await Task.Delay(50);
                 }
 
+                await CheckPendingTasksAndExit();
+            }
+            else if (_popupStyle == popup_style.ForceCloseApp)
+            {
                 await CheckPendingTasksAndExit();
             }
             PopupOkButton.IsEnabled = true;
@@ -1477,7 +1894,7 @@ namespace GnollHackX
             }
             StopGeneralTimer = false;
             StartGeneralTimer();
-            DoKeyboardFocus();
+            //DoKeyboardFocus();
         }
 
         public void DoKeyboardFocus()
@@ -1492,6 +1909,11 @@ namespace GnollHackX
         }
 
         private async void PendingTasksOkButton_Clicked(object sender, EventArgs e)
+        {
+            await PendingTasksOk();
+        }
+
+        private async Task PendingTasksOk()
         {
             PendingTasksGrid.IsEnabled = false;
             await CloseApp();
@@ -1527,10 +1949,10 @@ namespace GnollHackX
 
         private void KeyboardFocusButton_Clicked(object sender, EventArgs e)
         {
-            if (GHApp.CurrentGamePage != null)
-            {
-                GHApp.CurrentGamePage.SendEnterPressed();
-            }
+            //if (GHApp.CurrentGamePage != null)
+            //{
+            //    GHApp.CurrentGamePage.SendEnterPressed();
+            //}
         }
 
         private async void PopupViewButton_Clicked(object sender, EventArgs e)
@@ -1538,128 +1960,271 @@ namespace GnollHackX
             if (!string.IsNullOrWhiteSpace(_popupViewUrl) && Uri.IsWellFormedUriString(_popupViewUrl, UriKind.Absolute))
                 await GHApp.OpenBrowser(this, _popupViewTitle, new Uri(_popupViewUrl));
             else
-                await DisplayAlertOrGrid("Malformed URL", "The URL was malformed: " + _popupViewUrl, "OK", GHColors.Orange);
+                DisplayAlertGrid("Malformed URL", "The URL was malformed: " + _popupViewUrl, "OK", GHColors.Orange);
         }
 
-        private void AlertOkButton_Clicked(object sender, EventArgs e)
+        private async void AlertOkButton_Clicked(object sender, EventArgs e)
         {
             AlertOkButton.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             AlertGrid.IsVisible = false;
+            if ((_alertGridCloseAppStyle == 1 && !FinishedLogoFadeIn)
+                || (_alertGridCloseAppStyle == 2 && (!FinishedLogoFadeIn || (GHApp.PlatformService?.IsRemoveAnimationsOn() ?? true)))
+                || (_alertGridCloseAppStyle == 3 && (!FinishedLogoFadeIn || ((GHApp.PlatformService?.GetCurrentAnimatorDurationScale() ?? -1.0f) <= 0.0f)))
+                || _alertGridCloseAppStyle == 4)
+            {
+                WaitLabel.Text = "Exiting...";
+                WaitLayout.IsVisible = true;
+                await CloseApp();
+            }
+            else if (_alertGridCloseAppStyle == 5)
+            {
+                await DoShowGamePageForExistingGameAsync();
+            }
             AlertOkButton.IsEnabled = true;
+            DisplayNewAlert(); //Show next alert if there are more in the queue
         }
 
-        private void DisplayAlertGrid(string title, string message, string buttonText, Color titleColor)
+        private class DisplayAlertGridItem
         {
-            AlertTitleLabel.Text = title;
-            AlertTitleLabel.TextColor = titleColor;
-            AlertLabel.Text = message;
-            AlertOkButton.Text = buttonText;
-            AlertGrid.IsVisible = true;
+            public DisplayAlertGridItem()
+            {
+
+            }
+            public DisplayAlertGridItem(string title, string message, string buttonText, Color titleColor, int closeAppStyle = 0)
+            {
+                Title = title;
+                Message = message;
+                ButtonText = buttonText;
+                TitleColor = titleColor;
+                CloseAppStyle = closeAppStyle;
+            }
+            public string Title;
+            public string Message;
+            public string ButtonText;
+            public Color TitleColor;
+            public int CloseAppStyle;
         }
 
-        private async Task DisplayAlertOrGrid(string title, string message, string buttonText, Color titleColor)
+        private readonly Queue<DisplayAlertGridItem> _alertQueue = new Queue<DisplayAlertGridItem>();
+        private int _alertGridCloseAppStyle = 0;
+
+        private void DisplayAlertGrid(string title, string message, string buttonText, Color titleColor, int closeAppStyle = 0)
         {
-            if (AlertGrid.IsVisible)
-                await GHApp.DisplayMessageBox(this, title, message, buttonText);
-            else
-                DisplayAlertGrid(title, message, buttonText, titleColor);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _alertQueue.Enqueue(new DisplayAlertGridItem(title, message, buttonText, titleColor, closeAppStyle));
+                if (!AlertGrid.IsVisible)
+                    DisplayNewAlert();
+            });
         }
 
-        public bool HandleMainPageSpecialKeyPress(GHSpecialKey key, bool isCtrl, bool isMeta, bool isShift)
+        private void DisplayNewAlert()
+        {
+            if (_alertQueue.Count > 0)
+            {
+                try
+                {
+                    DisplayAlertGridItem alert = _alertQueue.Dequeue();
+                    if (alert != null)
+                    {
+                        _alertGridCloseAppStyle = alert.CloseAppStyle;
+                        AlertTitleLabel.Text = alert.Title;
+                        AlertTitleLabel.TextColor = alert.TitleColor;
+                        AlertLabel.Text = alert.Message;
+                        AlertOkButton.Text = alert.ButtonText;
+                        AlertGrid.IsVisible = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                }
+            }
+        }
+
+        //private async Task DisplayAlertOrGrid(string title, string message, string buttonText, Color titleColor)
+        //{
+        //    if (AlertGrid.IsVisible)
+        //        await GHApp.DisplayMessageBox(this, title, message, buttonText);
+        //    else
+        //        DisplayAlertGrid(title, message, buttonText, titleColor);
+        //}
+
+        public bool HandleSpecialKeyPress(GHSpecialKey key, bool isCtrl, bool isMeta, bool isShift)
         {
             bool handled = false;
-            if (key == GHSpecialKey.Escape || key == GHSpecialKey.Enter || key == GHSpecialKey.Space)
+            try
             {
-                if (AlertGrid.IsVisible && AlertOkButton.IsEnabled)
+                MainThread.BeginInvokeOnMainThread(async () =>
                 {
-                    AlertOkButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                }
-                else if (PopupGrid.IsVisible && ((PopupOkButton.IsVisible && PopupOkButton.IsEnabled) || (PopupButtonGrid.IsVisible && PopupOkButton2.IsVisible && PopupOkButton2.IsEnabled)))
-                {
-                    PopupOkButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                }
-                else if (PendingTasksGrid.IsVisible && key == GHSpecialKey.Escape && PendingTasksCancelButton.IsVisible && PendingTasksCancelButton.IsEnabled)
-                {
-                    PendingTasksCancelButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                }
-                else if (PendingTasksGrid.IsVisible && (key == GHSpecialKey.Enter || key == GHSpecialKey.Space) && PendingTasksOkButton.IsVisible && PendingTasksOkButton.IsEnabled)
-                {
-                    PendingTasksOkButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                }
+                    try
+                    {
+                        if (key == GHSpecialKey.Escape || key == GHSpecialKey.Enter || key == GHSpecialKey.Space)
+                        {
+                            if (AlertGrid.IsVisible && AlertOkButton.IsEnabled)
+                            {
+                                AlertOkButton_Clicked(this, EventArgs.Empty);
+                                handled = true;
+                            }
+                            else if (PopupGrid.IsVisible && ((PopupOkButton.IsVisible && PopupOkButton.IsEnabled) || (PopupButtonGrid.IsVisible && PopupOkButton2.IsVisible && PopupOkButton2.IsEnabled)))
+                            {
+                                await ClosePopup();
+                                handled = true;
+                            }
+                            else if (PendingTasksGrid.IsVisible && key == GHSpecialKey.Escape && PendingTasksCancelButton.IsVisible && PendingTasksCancelButton.IsEnabled)
+                            {
+                                PendingTasksCancelButton_Clicked(this, EventArgs.Empty);
+                                handled = true;
+                            }
+                            else if (PendingTasksGrid.IsVisible && (key == GHSpecialKey.Enter || key == GHSpecialKey.Space) && PendingTasksOkButton.IsVisible && PendingTasksOkButton.IsEnabled)
+                            {
+                                await PendingTasksOk();
+                                handled = true;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
             }
             return handled;
         }
 
-        public bool HandleMainPageKeyPress(int key, bool isCtrl, bool isMeta)
+        public bool HandleKeyPress(int key, bool isCtrl, bool isMeta)
         {
             bool handled = false;
             if (AlertGrid.IsVisible || PopupGrid.IsVisible || PendingTasksGrid.IsVisible)
                 return false;
 
-            switch (key)
+            try
             {
-                case (int)'p':
-                    if(StartLocalGameButton.IsEnabled && StartLocalGrid.IsEnabled && StartLocalGameButton.IsVisible && StartLocalGrid.IsVisible && UpperButtonGrid.IsVisible)
-                        StartLocalGameButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                    break;
-                case (int)'s':
-                    if (SettingsButton.IsEnabled && SettingsButton.IsVisible && UpperButtonGrid.IsVisible)
-                        SettingsButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                    break;
-                case (int)'o':
-                    if (OptionsButton.IsEnabled && OptionsButton.IsVisible && UpperButtonGrid.IsVisible)
-                        OptionsButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                    break;
-                case (int)'r':
-                    if (ResetButton.IsEnabled && ResetButton.IsVisible && UpperButtonGrid.IsVisible)
-                        ResetButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                    break;
-                case (int)'a':
-                    if (AboutButton.IsEnabled && AboutButton.IsVisible && UpperButtonGrid.IsVisible)
-                        CreditsButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                    break;
-                case (int)'v':
-                    if (VaultButton.IsEnabled && VaultButton.IsVisible && UpperButtonGrid.IsVisible)
-                        VaultButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
-                    break;
-                case (int)'w': //Wizard mode
-                    if (wizardModeSwitch.IsEnabled && wizardModeGrid.IsVisible && StartButtonLayout.IsVisible)
-                        wizardModeSwitch.IsToggled = !wizardModeSwitch.IsToggled;
-                    handled = true;
-                    break;
-                case (int)'c': //Classic mode
-                    if (classicModeSwitch.IsEnabled && classicModeGrid.IsVisible && StartButtonLayout.IsVisible)
-                        classicModeSwitch.IsToggled = !classicModeSwitch.IsToggled;
-                    handled = true;
-                    break;
-                case (int)'C': //Casual mode
-                    if (casualModeSwitch.IsEnabled && casualModeGrid.IsVisible && StartButtonLayout.IsVisible)
-                        casualModeSwitch.IsToggled = !casualModeSwitch.IsToggled;
-                    handled = true;
-                    break;
-                case (int)'e':
-                case (int)'x':
-                case (int)'q':
-                    if(ExitButton.IsEnabled && ExitButton.IsVisible && StartButtonLayout.IsVisible)
-                        ExitAppButton_Clicked(this, EventArgs.Empty);
-                    handled = true;
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        switch (key)
+                        {
+                            case (int)'p':
+                                if (StartLocalGameButton.IsEnabled && StartLocalGrid.IsEnabled && StartLocalGameButton.IsVisible && StartLocalGrid.IsVisible && UpperButtonGrid.IsVisible)
+                                    await StartLocalGame();
+                                handled = true;
+                                break;
+                            case (int)'s':
+                                if (SettingsButton.IsEnabled && SettingsButton.IsVisible && UpperButtonGrid.IsVisible)
+                                    await OpenSettingsPage();
+                                handled = true;
+                                break;
+                            case (int)'o':
+                                if (OptionsButton.IsEnabled && OptionsButton.IsVisible && UpperButtonGrid.IsVisible)
+                                    await OpenOptionsPage();
+                                handled = true;
+                                break;
+                            case (int)'r':
+                                if (ResetButton.IsEnabled && ResetButton.IsVisible && UpperButtonGrid.IsVisible)
+                                    await OpenResetPage();
+                                handled = true;
+                                break;
+                            case (int)'a':
+                                if (AboutButton.IsEnabled && AboutButton.IsVisible && UpperButtonGrid.IsVisible)
+                                    await OpenAboutPage();
+                                handled = true;
+                                break;
+                            case (int)'v':
+                                if (VaultButton.IsEnabled && VaultButton.IsVisible && UpperButtonGrid.IsVisible)
+                                    await OpenVaultPage();
+                                handled = true;
+                                break;
+                            case (int)'w': //Wizard mode
+                                if (wizardModeSwitch.IsEnabled && wizardModeGrid.IsVisible && StartButtonLayout.IsVisible)
+                                    wizardModeSwitch.IsToggled = !wizardModeSwitch.IsToggled;
+                                handled = true;
+                                break;
+                            case (int)'c': //Classic mode
+                                if (classicModeSwitch.IsEnabled && classicModeGrid.IsVisible && StartButtonLayout.IsVisible)
+                                    classicModeSwitch.IsToggled = !classicModeSwitch.IsToggled;
+                                handled = true;
+                                break;
+                            case (int)'C': //Casual mode
+                                if (casualModeSwitch.IsEnabled && casualModeGrid.IsVisible && StartButtonLayout.IsVisible)
+                                    casualModeSwitch.IsToggled = !casualModeSwitch.IsToggled;
+                                handled = true;
+                                break;
+                            case (int)'e':
+                            case (int)'x':
+                            case (int)'q':
+                                if (ExitButton.IsEnabled && ExitButton.IsVisible && StartButtonLayout.IsVisible)
+                                    await ExitApp();
+                                handled = true;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
+            return handled;
+        }
+
+        private async void EventOkButton_Clicked(object sender, EventArgs e)
+        {
+            GHApp.PlayButtonClickedSound();
+            EventButtonGrid.IsEnabled = false;
+            EventGrid.IsVisible = false;
+            switch (_eventStyle)
+            {
+                case 1:
+                    await GHApp.OpenBrowser(this, "Give Us a Star on GitHub", new Uri(GHConstants.GnollHackGitHubStarPage), true);
                     break;
                 default:
                     break;
             }
-            return handled;
+        }
+
+        private void EventCancelButton_Clicked(object sender, EventArgs e)
+        {
+            GHApp.PlayButtonClickedSound();
+            EventButtonGrid.IsEnabled = false;
+            EventGrid.IsVisible = false;
+        }
+
+        private int _eventStyle = 0;
+
+        private void DisplayEventGrid(string title, string text, string ok, string cancel, int eventStyle)
+        {
+            EventTitleLabel.Text = title;
+            EventLabel.Text = text;
+            EventOkButton.Text = ok;
+            EventCancelButton.Text = cancel;
+            _eventStyle = eventStyle;
+            switch (eventStyle)
+            {
+                case 1:
+                    EventTitleLabel.TextColor = GHColors.TitleGoldColor;
+                    EventOkButton.TextColor = GHColors.Yellow;
+                    break;
+                default:
+                    EventTitleLabel.TextColor = GHColors.White;
+                    EventOkButton.TextColor = GHColors.White;
+                    break;
+            }
+
+            EventButtonGrid.IsEnabled = true;
+            EventGrid.IsVisible = true;
         }
     }
-
 }

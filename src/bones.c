@@ -72,7 +72,9 @@ boolean restore;
         
         if (otmp->in_use) 
         {
-            Strcpy(debug_buf_2, "resetobjs");
+            Sprintf(debug_buf_2, "resetobjs: %d", otmp->otyp);
+            Sprintf(debug_buf_3, "resetobjs: %d", otmp->otyp);
+            Sprintf(debug_buf_4, "resetobjs: %d", otmp->otyp);
             obj_extract_self(otmp);
             dealloc_obj(otmp);
             continue;
@@ -206,15 +208,13 @@ boolean restore;
             if (otmp->otyp == SLIME_MOLD)
             {
                 goodfruit(otmp->special_quality);
-#ifdef MAIL
             }
             else if (otmp->otyp == SCR_MAIL)
             {
                 /* 0: delivered in-game via external event;
-                   1: from bones or wishing; 2: written with marker */
+                   1: from bones; 2: written with marker; 3: from wishing; 4: from polymorph */
                 if (otmp->special_quality == 0)
-                    otmp->special_quality = SPEQUAL_MAIL_FROM_BONES_OR_WISHING;
-#endif
+                    otmp->special_quality = SPEQUAL_MAIL_FROM_BONES;
             } 
             else if (otmp->otyp == EGG) 
             {
@@ -521,7 +521,7 @@ make_bones:
     unleash_all();
     /* in case these characters are not in their home bases */
     int minmlev = 0, maxmlev = 0;
-    get_generated_monster_minmax_levels(0, &minmlev, &maxmlev, 0);
+    get_generated_monster_minmax_levels(0, &minmlev, &maxmlev, 0, MONRNDTYPE_NORMAL);
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
         if (DEADMONSTER(mtmp))
             continue;
@@ -763,15 +763,26 @@ getbones(VOID_ARGS)
     if (fd < 0)
         return 0;
 
-    if (validate(fd, bones) != 0) {
+    if (validate(fd, bones) != 0) 
+    {
         if (!wizard)
-            pline("Discarding unuseable bones; no need to panic...");
+        {
+#ifdef GNH_MOBILE
+            issue_debuglog(0, "Discarding unuseable bones; no need to panic...");
+#else
+            pline1("Discarding unuseable bones; no need to panic...");
+#endif
+        }
         ok = FALSE;
         (void)nhclose(fd);
-    } else {
+    } 
+    else 
+    {
         ok = TRUE;
-        if (wizard) {
-            if (yn_query("Get bones?") == 'n') {
+        if (wizard) 
+        {
+            if (yn_query("Get bones?") == 'n') 
+            {
                 (void) nhclose(fd);
                 compress_bonesfile();
                 return 0;
@@ -791,18 +802,22 @@ getbones(VOID_ARGS)
                (we don't try to make this conditional upon the value of
                VERSION_COMPATIBILITY because then we'd need patchlevel.h) */
             && (strlen(bonesid) <= 2
-                || strcmp(bonesid + 2, oldbonesid) != 0)) {
+                || strcmp(bonesid + 2, oldbonesid) != 0)) 
+        {
             char errbuf[BUFSZ];
 
             Sprintf(errbuf, "This is bones level '%s', not '%s'!", oldbonesid,
                     bonesid);
-            if (wizard) {
+            if (wizard) 
+            {
                 pline1(errbuf);
                 ok = FALSE; /* won't die of trickery */
             }
             (void)nhclose(fd);
             trickery(errbuf);
-        } else {
+        }
+        else 
+        {
             register struct monst *mtmp;
 
             getlev(fd, 0, 0, TRUE);
@@ -814,18 +829,22 @@ getbones(VOID_ARGS)
              * subject to genocide, their mhpmax will be
              * set to the magic DEFUNCT_MONSTER cookie value.
              */
-            for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
+            for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) 
+            {
                 if (has_mname(mtmp))
                     sanitize_name(MNAME(mtmp));
                 if (has_umname(mtmp))
                     sanitize_name(UMNAME(mtmp));
-                if (mtmp->mbasehpmax == DEFUNCT_MONSTER) {
-                    if (wizard) {
+                if (mtmp->mbasehpmax == DEFUNCT_MONSTER) 
+                {
+                    if (wizard) 
+                    {
                         debugpline1("Removing defunct monster %s from bones.",
                                     mon_monster_name(mtmp));
                     }
                     mongone(mtmp);
-                } else
+                } 
+                else
                     /* to correctly reset named artifacts on the level */
                     resetobjs(mtmp->minvent, TRUE);
             }
@@ -837,13 +856,16 @@ getbones(VOID_ARGS)
     sanitize_engravings();
     u.uroleplay.numbones++;
 
-    if (wizard) {
-        if (yn_query("Unlink bones?") == 'n') {
+    if (wizard) 
+    {
+        if (yn_query("Unlink bones?") == 'n') 
+        {
             compress_bonesfile();
             return ok;
         }
     }
-    if (!delete_bonesfile(&u.uz)) {
+    if (!delete_bonesfile(&u.uz)) 
+    {
         /* When N games try to simultaneously restore the same
          * bones file, N-1 of them will fail to delete it
          * (the first N-1 under AmigaDOS, the last N-1 under UNIX).

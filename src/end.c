@@ -86,6 +86,9 @@ STATIC_DCL char FDECL(special_yn_query, (const char*, const char*));
 #define NH_abort NH_abort_
 #endif
 
+#ifdef GNH_MOBILE
+#define NH_abort_() gnollhack_exit(EXIT_FAILURE)
+#else
 #ifdef AMIGA
 #define NH_abort_() Abort(0)
 #else
@@ -99,6 +102,7 @@ STATIC_DCL char FDECL(special_yn_query, (const char*, const char*));
 #endif
 #endif /* !SYSV */
 #endif /* !AMIGA */
+#endif /* GNH_MOBILE */
 
 #ifdef PANICTRACE
 #include <errno.h>
@@ -712,6 +716,15 @@ int how;
 #define NOTIFY_GNOLLHACK_BUGS
 #endif
 
+void
+set_panic_handling(handling, require_restoring)
+int handling;
+boolean require_restoring;
+{
+    if (!require_restoring || restoring)
+        program_state.panic_handling = handling;
+}
+
 /*VARARGS1*/
 void panic
 VA_DECL(const char *, str)
@@ -777,7 +790,15 @@ VA_DECL(const char *, str)
         Vsprintf(buf, str, VA_ARGS);
         raw_print(buf);
         paniclog("panic", buf);
+
 #ifdef GNOLLHACK_MAIN_PROGRAM
+        if (issue_gui_command)
+        {
+            char dbufs[BUFSZ * 18];
+            Sprintf(dbufs, "%s|P1:%s, P2:%s, P3:%s, P4:%s, B1:%s, B2:%s, B3:%s, B4:%s", buf, priority_debug_buf_1, priority_debug_buf_2, priority_debug_buf_3, priority_debug_buf_4, debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
+            issue_debuglog_panic(0, dbufs);
+        }
+
         if (open_special_view)
         {
             /* Add mode to posted panic */
@@ -795,7 +816,7 @@ VA_DECL(const char *, str)
         //    issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, 0, buf);
 #endif
     }
-#ifdef WIN32
+#if defined(WIN32) && !defined(GNH_MOBILE)
     interject(INTERJECT_PANIC);
 #endif
 
@@ -1178,6 +1199,7 @@ int how;
     }
 
     nomovemsg = "You survived that attempt on your life.";
+    nomovemsg_attr = ATR_NONE;
     nomovemsg_color = CLR_MSG_SUCCESS;
     context.move = 0;
     if (multi > 0)
@@ -1639,6 +1661,7 @@ int how;
                 bless(potion);
                 (void) peffects(potion); /* always -1 for restore ability */
                 /* not useup(); we haven't put this potion into inventory */
+                Sprintf(priority_debug_buf_4, "done: %d", potion->otyp);
                 obfree(potion, (struct obj *) 0);
             }
             killer.name[0] = '\0';
@@ -1703,11 +1726,14 @@ int how;
                 play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
                 pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "medallion crumbles to dust!");
                 if (uamul)
+                {
+                    Sprintf(priority_debug_buf_2, "done: %d", uamul->otyp);
                     useup(uamul);
+                }
             }
             else
             {
-                struct obj* lifesaver = what_gives(LIFESAVED);
+                struct obj* lifesaver = what_gives(LIFESAVED, FALSE);
                 if (lifesaver)
                 {
                     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s!", Yname2(lifesaver), !Blind ? "begins to glow" : "feels warm");
@@ -1717,7 +1743,10 @@ int how;
                     play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
                     pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s crumbles to dust!", cxname(lifesaver));
                     if (lifesaver)
+                    {
+                        Sprintf(priority_debug_buf_2, "done2: %d", lifesaver->otyp);
                         useup(lifesaver);
+                    }
                 }
             }
             special_effect_wait_until_end(0);
@@ -1749,6 +1778,7 @@ int how;
             survive = TRUE;
             boolean teleinstead = FALSE;
             incr_itimeout(&HInvulnerable, 2);
+            HConflict &= ~TIMEOUT;
             refresh_u_tile_gui_info(TRUE);
             if (!In_endgame(&u.uz))
             {
@@ -1885,7 +1915,7 @@ int how;
         break;
     case PANICKED:
         endtext = "Panic!";
-        endinfotext = "The cause has been recorded in the paniclog.";
+        endinfotext = restoring ? "A panic has occurred during restoring a saved game, and the game cannot be loaded. The cause has been recorded in the paniclog." : "The cause has been recorded in the paniclog.";
         screentextstyle = SCREEN_TEXT_SPECIAL_END;
         clr = CLR_RED;
         break;
@@ -1935,9 +1965,15 @@ int how;
     /* maybe not on object lists; if an active light source, would cause
        big trouble (`obj_is_local' panic) for savebones() -> savelev() */
     if (thrownobj && thrownobj->where == OBJ_FREE)
+    {
+        Sprintf(priority_debug_buf_4, "really_done: %d", thrownobj->otyp);
         obfree(thrownobj, (struct obj*)0);
+    }
     if (kickedobj && kickedobj->where == OBJ_FREE)
+    {
+        Sprintf(priority_debug_buf_4, "really_done2: %d", kickedobj->otyp);
         obfree(kickedobj, (struct obj*)0);
+    }
 
     /* remember time of death here instead of having bones, rip, and
        topten figure it out separately and possibly getting different
@@ -2108,7 +2144,7 @@ int how;
             endinfotext ? " " : "", 
             endinfotext ? endinfotext : "", 
             has_existing_save_file ? " " : "", 
-            has_existing_save_file ? "You can load the game from the point at which you last saved the game." : "");
+            has_existing_save_file && !(how == PANICKED && restoring) ? "You can load the game from the point at which you last saved the game." : "");
         display_popup_text(ebuf, "Game Over", POPUP_TEXT_MESSAGE, ATR_NONE, clr, NO_GLYPH, POPUP_FLAGS_NONE);
     }
 
@@ -2117,9 +2153,9 @@ int how;
        be done even sooner, but we need it to come after dump_everything()
        so that any accompanying pets are still on the map during dump) */
     if (how == ESCAPED)
-        keepdogs(TRUE, TRUE); /* Just nearby pets following to the ground level */
+        move_monsters_to_mydogs(TRUE, TRUE); /* Just nearby pets following to the ground level */
     else if (how == ASCENDED)
-        keepdogs(TRUE, FALSE); /* All pets surviving to the point of ascension */
+        move_monsters_to_mydogs(TRUE, FALSE); /* All pets surviving to the point of ascension */
 
     /* calculate score, before creating bones [container gold] */
     {
@@ -2758,7 +2794,23 @@ int status;
     //    dlb_cleanup();
     //}
 
-    reset_game();
+    if (program_state.panicking && restoring)
+    {
+        if (sysopt.make_backup_savefiles && (program_state.panic_handling & 2) != 0 && check_has_backup_savefile())
+        {
+            char res = special_yn_query("Replace Save File with Backup", "Your save file appears corrupted. Do you want to replace it with its backup?");
+            if (res == 'y')
+            {
+                (void)restore_backup_savefile(TRUE);
+            }
+        }
+        if (program_state.panic_handling & 1)
+            reset_game();
+        else
+            issue_simple_gui_command(GUI_CMD_EXIT_APP_ON_MAIN_SCREEN);
+    }
+    else
+        reset_game();
 
     /*
      *  This is liable to draw a warning if compiled with gcc, but it's
@@ -4102,8 +4154,10 @@ reset_remaining_static_variables(VOID_ARGS)
     reset_polyself();
     reset_potion();
     reset_read();
+    reset_restore();
     reset_throw();
     reset_traps();
+    reset_save();
     reset_shk();
     reset_spells();
     reset_splev();
@@ -4156,9 +4210,8 @@ void
 tally_realtime(VOID_ARGS)
 {
     if (!context.game_started)
-    {
         return;
-    }
+
     urealtime.finish_time = getnow();
     urealtime.realtime += (urealtime.finish_time - urealtime.start_timing);
     issue_simple_gui_command(GUI_CMD_REPORT_PLAY_TIME);

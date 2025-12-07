@@ -456,12 +456,12 @@ struct monst *mtmp;
     /* since unicorn horns don't get used up, the monster would look
      * silly trying to use the same cursed horn round after round
      */
-    if (is_confused(mtmp) || is_stunned(mtmp) || is_blinded(mtmp))
+    if (is_confused(mtmp) || is_stunned(mtmp) || is_blinded(mtmp) || is_hallucinating(mtmp) || is_sick(mtmp) || is_food_poisoned(mtmp) || is_mummy_rotted(mtmp) || has_vomiting(mtmp))
     {
         if (!is_unicorn(mtmp->data) && can_operate_objects(mtmp->data)) 
         {
             for (obj = mtmp->minvent; obj; obj = obj->nobj)
-                if (obj->otyp == UNICORN_HORN && !obj->cursed)
+                if (obj->otyp == UNICORN_HORN && !obj->cursed && obj->charges > 0)
                     break;
         }
         if (obj || is_unicorn(mtmp->data)) 
@@ -874,23 +874,58 @@ struct monst *mtmp;
 
     switch (m.has_defense) {
     case MUSE_UNICORN_HORN:
-        play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_APPLY);
+    {
+        int maxcures = 1;
+        int cures = 0;
+        if (otmp)
+        {
+            play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_APPLY);
+            if (otmp->blessed)
+                maxcures++;
+            if (otmp->charges > 0)
+                otmp->charges--;
+        }
         if (vismon) {
             if (otmp)
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s uses a unicorn horn!", Monnam(mtmp));
             else
                 pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "tip of %s's horn glows!", mon_nam(mtmp));
         }
-        if (is_blinded(mtmp)) {
+        if (cures < maxcures && is_sick(mtmp)) {
+            (void)set_mon_property_b(mtmp, SICK, 0, vismon);
+            cures++;
+        }
+        if (cures < maxcures && is_food_poisoned(mtmp)) {
+            (void)set_mon_property_b(mtmp, FOOD_POISONED, 0, vismon);
+            cures++;
+        }
+        if (cures < maxcures && is_mummy_rotted(mtmp)) {
+            (void)set_mon_property_b(mtmp, MUMMY_ROT, -3, vismon);
+            cures++;
+        }
+        if (cures < maxcures && has_vomiting(mtmp)) {
+            (void)set_mon_property_b(mtmp, VOMITING, 0, vismon);
+            cures++;
+        }
+        if (cures < maxcures && is_hallucinating(mtmp)) {
+            (void)set_mon_property_b(mtmp, HALLUC, 0, vismon);
+            cures++;
+        }
+        if (cures < maxcures && is_blinded(mtmp)) {
             mcureblindness(mtmp, vismon);
-        } else if (is_confused(mtmp) || is_stunned(mtmp)) {
+            cures++;
+        }
+        if (cures < maxcures && (is_confused(mtmp) || is_stunned(mtmp))) {
             mtmp->mprops[CONFUSION] = 0;
             mtmp->mprops[STUNNED] = 0;
             if (vismon)
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s seems steadier now.", Monnam(mtmp));
-        } else
+            cures++;
+        }
+        if (!cures)
             impossible("No need for unicorn horn?");
         return 2;
+    }
     case MUSE_BUGLE:
         if (!otmp)
             return 2;
@@ -2154,6 +2189,7 @@ struct monst *mtmp;
 #define MUSE_POT_SHOCK_IMMUNITY 31
 #define MUSE_POT_MAGIC_RESISTANCE 32
 #define MUSE_WAN_WISHING 33
+#define MUSE_POT_RESTORE_ABILITY 34
 
 boolean
 set_misc_potion(mtmp, obj)
@@ -2257,6 +2293,9 @@ struct obj* obj;
         break;
     case POT_MAGIC_RESISTANCE:
         m.has_misc = MUSE_POT_MAGIC_RESISTANCE;
+        break;
+    case POT_RESTORE_ABILITY:
+        m.has_misc = MUSE_POT_RESTORE_ABILITY;
         break;
     default:
         break;
@@ -2562,6 +2601,12 @@ struct monst *mtmp;
             //m.misc = obj;
             //m.has_misc = MUSE_POT_MAGIC_RESISTANCE;
         }
+        nomore(MUSE_POT_RESTORE_ABILITY);
+        if (obj->otyp == MUSE_POT_RESTORE_ABILITY)
+        {
+            //m.misc = obj;
+            //m.has_misc = MUSE_POT_RESTORE_ABILITY;
+        }
         nomore(MUSE_POT_SEE_INVISIBLE);
         if (obj->otyp == POT_SEE_INVISIBLE && !is_peaceful(mtmp) && Invis && !has_see_invisible(mtmp) 
             && isok(mtmp->mux, mtmp->muy) && m_cansee(mtmp, mtmp->mux, mtmp->muy)) 
@@ -2588,7 +2633,7 @@ struct monst *mon;
         else if (is_dragon_mail(m_armr))
             return Dragon_mail_to_pm(m_armr);
     }
-    return rndmonst();
+    return rndmonst_for_polymon(mon);
 }
 
 int
@@ -2598,7 +2643,7 @@ struct monst *mtmp;
     if (!mtmp)
         return 0;
 
-    int i;
+    int i, ii, lim;
     struct obj *otmp = m.misc;
     boolean vis, vismon, oseen;
     char nambuf[BUFSZ];
@@ -2843,6 +2888,76 @@ struct monst *mtmp;
         mtmp->mclericultimate_used = 0;
         m_useup(mtmp, otmp);
         return 2;
+    case MUSE_POT_RESTORE_ABILITY:
+    {
+        if (!otmp)
+            return 2;
+        mquaffmsg(mtmp, otmp);
+
+        if (otmp->cursed)
+        {
+            if (oseen)
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "That seemed to make %s feel mediocre!", mon_nam(mtmp));
+            break;
+        }
+        else 
+        {
+            /* unlike unicorn horn, overrides Fixed_abil */
+            if (oseen)
+            {
+                play_special_effect_at(SPECIAL_EFFECT_GENERIC_SPELL, 0, mtmp->mx, mtmp->my, FALSE);
+                play_sfx_sound(SFX_RESTORE_ABILITY);
+                special_effect_wait_until_action(0);
+                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "That seemed to make %s feel %s!", mon_nam(mtmp), otmp->blessed ? "great" : "good");
+            }
+            i = rn2(A_MAX); /* start at a random point */
+            for (ii = 0; ii < A_MAX; ii++) 
+            {
+                lim = M_AMAX(mtmp, i);
+                /* this used to adjust 'lim' for A_STR when u.uhs was
+                   WEAK or worse, but that's handled via ATEMP(A_STR) now */
+                if (M_ABASE(mtmp, i) < lim) 
+                {
+                    M_ABASE(mtmp, i) = lim;
+                    /* only first found if not blessed */
+                    if (!otmp->blessed || isdiluted)
+                        break;
+                }
+                if (++i >= A_MAX)
+                    i = 0;
+            }
+
+            if (mtmp->m_lev < mtmp->data->mlevel) 
+            {
+                do
+                {
+                    mtmp->m_lev++;
+                } while (mtmp->m_lev < mtmp->data->mlevel && otmp->blessed);
+            }
+            if (mtmp->mbasehpdrain < 0) 
+            {
+                if (otmp->blessed)
+                    mtmp->mbasehpdrain = 0;
+                else
+                    mtmp->mbasehpdrain += min(4, -mtmp->mbasehpdrain);
+            }
+            if (mtmp->mbaseendrain < 0) 
+            {
+                if (otmp->blessed)
+                    mtmp->mbaseendrain = 0;
+                else
+                    mtmp->mbaseendrain += min(4, -mtmp->mbaseendrain);
+            }
+            update_all_mon_statistics(mtmp, TRUE);
+            if (oseen)
+            {
+                special_effect_wait_until_end(0);
+            }
+        }
+
+        m_useup(mtmp, otmp);
+        return 2;
+    }
     case MUSE_WAN_POLYMORPH:
         if (!otmp)
             return 2;
@@ -3001,6 +3116,8 @@ struct monst *mtmp;
     if (unconscious()) {
         multi = -1;
         nomovemsg = "Aggravated, you are jolted into full consciousness.";
+        nomovemsg_attr = ATR_NONE;
+        nomovemsg_color = CLR_MSG_ATTENTION;
     }
     newsym(mtmp->mx, mtmp->my);
     if (!canspotmon(mtmp))
@@ -3125,7 +3242,7 @@ struct obj *obj;
     case FOOD_CLASS:
         if (typ == CORPSE)
             return (boolean) (((mon->worn_item_flags & W_ARMG) != 0L
-                               && touch_petrifies(&mons[obj->corpsenm]))
+                               && obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]))
                               || (!resists_ston(mon)
                                   && cures_stoning(mon, obj, FALSE)));
         if (typ == TIN)
@@ -3133,7 +3250,7 @@ struct obj *obj;
                               && (!resists_ston(mon)
                                   && cures_stoning(mon, obj, TRUE)));
         if (typ == EGG)
-            return (boolean) touch_petrifies(&mons[obj->corpsenm]);
+            return (boolean)(obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]));
         break;
     default:
         break;
@@ -3221,7 +3338,7 @@ int prop_index;
 
     for (struct obj* otmp = (mon == &youmonst ? invent : mon->minvent); otmp; otmp = otmp->nobj)
     {
-        if(item_is_giving_monster_power(mon, otmp, prop_index))
+        if(item_is_giving_monster_power(mon, otmp, prop_index, FALSE))
             return otmp;
     }
 
@@ -3379,7 +3496,7 @@ const char *fmt, *str;
         struct obj* selobj = (struct obj*)0;
         for (struct obj* otmp = invent; otmp; otmp = otmp->nobj)
         {
-            if (carried_item_is_giving_monster_power(&youmonst, otmp, REFLECTING))
+            if (carried_base_item_is_giving_monster_power(&youmonst, otmp, REFLECTING, FALSE))
             {
                 selobj = otmp;
                 break;
@@ -3542,7 +3659,7 @@ boolean stoning; /* True: stop petrification, False: cure stun && confusion */
     boolean vis = canseemon(mon), tinned = obj->otyp == TIN,
             food = obj->otyp == CORPSE || tinned,
             acid = obj->otyp == POT_ACID
-                   || (food && has_acidic_corpse(&mons[obj->corpsenm])),
+                   || (food && obj->corpsenm >= LOW_PM && has_acidic_corpse(&mons[obj->corpsenm])),
             lizard = food && obj->corpsenm == PM_LIZARD;
     boolean dragonfruit = (obj->otyp == DRAGON_FRUIT);
     int nutrit = food || dragonfruit ? dog_nutrition(mon, obj) : 0; /* also sets meating */
@@ -3582,20 +3699,23 @@ boolean stoning; /* True: stop petrification, False: cure stun && confusion */
             return;
         }
     }
-    if (stoning && vis) {
+    if (stoning && vis) 
+    {
         if (Hallucination)
             pline("What a pity - %s just ruined a future piece of art!",
                   mon_nam(mon));
         else
             pline("%s seems limber!", Monnam(mon));
     }
-    if (lizard && (is_confused(mon) || is_stunned(mon))) {
+    if (lizard && (is_confused(mon) || is_stunned(mon))) 
+    {
         mon->mprops[CONFUSION]  = 0;
         mon->mprops[STUNNED] = 0;
         if (vis && !is_bat(mon->data) && mon->data != &mons[PM_STALKER])
             pline("%s seems steadier now.", Monnam(mon));
     }
-    if (mon->mtame && !mon->isminion && nutrit > 0) {
+    if (mon->mtame && !mon->isminion && nutrit > 0 && has_edog(mon))
+    {
         struct edog *edog = EDOG(mon);
 
         if (edog->hungrytime < monstermoves)
@@ -3625,7 +3745,7 @@ boolean tinok;
         return FALSE;
     /* corpse, or tin that mon can open */
     return (boolean) (obj->corpsenm == PM_LIZARD
-                      || (has_acidic_corpse(&mons[obj->corpsenm])
+                      || (obj->corpsenm >= LOW_PM && has_acidic_corpse(&mons[obj->corpsenm])
                           && (obj->corpsenm != PM_GREEN_SLIME
                               || resists_slime(mon))));
 }
@@ -4105,7 +4225,7 @@ struct monst* mon;
         }
         break;
     case 12:
-        if (!is_fast(mon) && !is_very_fast(mon) && !is_ultra_fast(mon) && !is_super_fast(mon) && !is_lightning_fast(mon) && feet_fit_boots(mon->data)) {
+        if (!is_fast(mon) && !is_very_fast(mon) && !is_ultra_fast(mon) && !is_super_fast(mon) && !is_lightning_fast(mon) && mon_can_wear_boots_itself(mon)) {
             otmp = mksobj(SPEED_BOOTS, FALSE, FALSE, MKOBJ_TYPE_WISHING);
             if (otmp)
             {

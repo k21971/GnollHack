@@ -106,12 +106,16 @@ namespace GnollHackX.iOS
 
         public void CloseApplication()
         {
-            RevertAnimatorDuration(true);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                GHApp.AddSentryBreadcrumb("CloseApplication", GHConstants.SentryGnollHackGeneralCategoryName);
+                RevertAnimatorDuration(true);
 #if GNH_MAUI
-            Environment.Exit(0);
+                Environment.Exit(0);
 #else
-            /* Do nothing; fall back to Xamarin.Forms termination after this call */
+                /* Do nothing; fall back to Xamarin.Forms termination after this call */
 #endif
+            });
         }
 
         public Task<Stream> GetPlatformAssetsStreamAsync(string directory, string fileName)
@@ -175,7 +179,7 @@ namespace GnollHackX.iOS
 
         }
 
-        public async void RequestAppReview(ContentPage page)
+        public async Task RequestAppReview(ContentPage page)
         {
             try
             {

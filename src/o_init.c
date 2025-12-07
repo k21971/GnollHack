@@ -106,7 +106,7 @@ const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     0, -1, 0, 0, 0, 0, NO_POWER, NO_POWER, 4, 3, -5,
     0UL, 0UL, 0UL, O4_DOUBLE_MYTHIC_CHANCE, O5_DOUBLE_EXCEPTIONALITY_CHANCE, 0UL },
 {"silver",      "silver",      "silvery",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "silver",        "silvery",            HI_SILVER,
-    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.0, 25.0,
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, SILVER_COST_MULTIPIER, 25.0,
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     0, 0, 0, 0, 0, 0, NO_POWER, NO_POWER, 1, 1, -5,
@@ -133,13 +133,13 @@ const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     {5, 4, 4, 4, 4, 0, 0, 0, 4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 1.0, 1.0, 2.5, 100.0,
     { DISINTEGRATION_RESISTANCE, DISINTEGRATION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { BISECTION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
-    0, 6, 0, 0, 6, 0, NO_POWER, NO_POWER, 5, 4, 20,
+    0, 3, 1, 0, 3, 1, NO_POWER, NO_POWER, 5, 4, 20,
     O1_INDESTRUCTIBLE | O1_DISINTEGRATION_RESISTANT, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"mithril",     "mithril",     "mithril",     PHASE_SOLID,    HIT_SURFACE_METAL,      FLOOR_SURFACE_METAL,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, TRUE, FALSE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  TRUE,        "metal",         "silvery",            HI_SILVER,
     {3, 2, 2, 2, 2, 0, 0, 0, 2}, {3, 1, 1, 1, 1 ,0 ,0 ,0 ,1}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.9, 0.5, 2.5, 100.0,
     { BISECTION_RESISTANCE, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
-    0, 3, 0, 0, 3, 0, NO_POWER, NO_POWER, 4, 3, 15,
+    0, 2, 0, 0, 2, 0, NO_POWER, NO_POWER, 4, 3, 15,
     0UL, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"plastic",     "plastic",     "plastic",     PHASE_SOLID,    HIT_SURFACE_LEATHER,    FLOOR_SURFACE_CARPET,   TRUE,  FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE,   FALSE, TRUE,  TRUE,  FALSE,        "plastic",       (char*)0,       CLR_WHITE,
     {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 1.0, 0.0,
@@ -163,7 +163,7 @@ const struct material_definition material_definitions[MAX_MATERIAL_TYPES] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {-1.0, 0, 0, 0, 0 ,0 ,0 ,0 ,0}, 0.2, 1.0, 2.0, 100.0,
     { REFLECTING, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
     { NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER, NO_POWER }, 
-    0, 3, 0, 0, 2, 0, NO_POWER, NO_POWER, 4, 3, 5,
+    0, 1, 1, 0, 1, 1, NO_POWER, NO_POWER, 4, 3, 5,
     0UL, 0UL, 0UL, O4_VERY_RARE, O5_HALF_EXCEPTIONALITY_CHANCE, 0UL },
 {"gemstone",    "gemstone",    "gemstone",    PHASE_SOLID,    HIT_SURFACE_GLASS,      FLOOR_SURFACE_STONE,    FALSE, FALSE, FALSE, FALSE,   FALSE, FALSE, FALSE, FALSE, FALSE,   TRUE,  FALSE, FALSE, FALSE,   FALSE, FALSE, TRUE,  FALSE,       "gemstone",      (char*)0,         CLR_BRIGHT_GREEN,
     {4, 3, 3, 3, 3, 0, 0, 0, 3}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, 1.0, 1.0, 2.0, 100.0,
@@ -1471,7 +1471,7 @@ uchar *prefix_ptr, *suffix_ptr;
         int ok_cnt[2] = { 0, 0 };
         for (int j = 0; j <= 1; j++)
         {
-            uchar max_mythic = (j == 0 ? MAX_MYTHIC_PREFIXES : MAX_MYTHIC_SUFFIXES);
+            uchar max_mythic = (j == 0 ? (uchar)MAX_MYTHIC_PREFIXES : (uchar)MAX_MYTHIC_SUFFIXES);
             for (uchar i = 1; i < max_mythic; i++)
             {
                 if (!is_mythic_affix_ok(j, i, obj, is_wish))
@@ -1512,7 +1512,7 @@ uchar *prefix_ptr, *suffix_ptr;
     {
         const struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
         uchar* eligible = (j == 0 ? eligible_prefix : eligible_suffix);
-        uchar max_mythic = (j == 0 ? MAX_MYTHIC_PREFIXES : MAX_MYTHIC_SUFFIXES);
+        uchar max_mythic = (j == 0 ? (uchar)MAX_MYTHIC_PREFIXES : (uchar)MAX_MYTHIC_SUFFIXES);
         uchar* affix_ptr = (j == 0 ? prefix_ptr : suffix_ptr);
 
         int cnt = 0;
@@ -1634,7 +1634,7 @@ struct monst* mattacker UNUSED;
 
         const struct mythic_power_definition* mythic_powers = (j == 0 ? mythic_prefix_powers : mythic_suffix_powers);
         const struct mythic_definition* mythic_definitions = (j == 0 ? mythic_prefix_qualities : mythic_suffix_qualities);
-        uchar max_mythic_powers = (j == 0 ? MAX_MYTHIC_PREFIX_POWERS : MAX_MYTHIC_SUFFIX_POWERS);
+        uchar max_mythic_powers = (j == 0 ? (uchar)MAX_MYTHIC_PREFIX_POWERS : (uchar)MAX_MYTHIC_SUFFIX_POWERS);
 
         for (uchar i = 0; i < max_mythic_powers; i++)
         {

@@ -191,7 +191,9 @@ enum prop_types {
     TOTTERING         = 168,
     MARTIAL_PROWESS   = 169,
     POLYMORPH_RESISTANCE = 170, /* Different from unchanging in that it only protects against magical polymorph, not sliming etc., nor does it prevent one from reverting back from polymorph */
-    RESERVED_PROP_2   = 171,
+    EXTENDED_XRAY_VISION = 171,
+    PROTECTION_FROM_ARMOR_DESTRUCTION = 172,
+    RESERVED_PROP_3   = 173,
     RESERVED_PROP_24  = 193,  /* Keep this - 1 divisible by 24 so MAX_BUFF_TILES is exactly an integer */
     MAX_PROPS         = 194   /* Keep this - 2 divisible by 24 so MAX_BUFF_TILES is exactly an integer */
 };

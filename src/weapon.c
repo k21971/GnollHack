@@ -189,7 +189,7 @@ struct obj *obj;
     case P_BARE_HANDED_COMBAT:
     case P_MARTIAL_ARTS:
         /* not a weapon or weptool: use item class name;
-           override class name "food" for corpses, tins, and eggs,
+           override class name "fosod" for corpses, tins, and eggs,
            "large rock" for statues and boulders, and "tool" for towels */
         descr = (obj->otyp == CORPSE || obj->otyp == TIN || obj->otyp == EGG
                  || obj->otyp == STATUE || obj->otyp == BOULDER
@@ -2713,7 +2713,7 @@ int skill_id;
             {
                 int successbonus = spell_skill_base_success_bonus(lvl);
                 double levelsuccessbonus = spell_skill_ulevel_success_bonus_per_level(lvl);
-                int costdiscount = (int)((spell_skill_mana_cost_multiplier(lvl) - 1.0) * 100.0);
+                int costdiscount = (int)(spell_skill_mana_cost_multiplier(lvl) * 100) - 100;
                 int savingthrowmodifier = get_spell_skill_level_saving_throw_adjustment(lvl);
                 Sprintf(succbuf, "%s%d%%", successbonus >= 0 ? "+" : "", successbonus);
                 Sprintf(lvlsuccbuf, "%s%.2f%%", levelsuccessbonus >= 0 ? "+" : "", levelsuccessbonus);
@@ -3430,7 +3430,7 @@ enhance_weapon_skill()
                     else if (i >= P_FIRST_SPELL && i <= P_LAST_SPELL)
                     {
                         int successbonus = spell_skill_base_success_bonus(P_SKILL_LEVEL(i));
-                        int costdiscount = (int)((spell_skill_mana_cost_multiplier(P_SKILL_LEVEL(i)) - 1.0) * 100.0);
+                        int costdiscount = (int)(spell_skill_mana_cost_multiplier(P_SKILL_LEVEL(i)) * 100) - 100;
                         char sbuf[BUFSZ] = "";
                         char cbuf[BUFSZ] = "";
                         Sprintf(sbuf, "%s%d%%", successbonus >= 0 ? "+" : "", successbonus);
@@ -3440,7 +3440,7 @@ enhance_weapon_skill()
                         {
                             int nextlevel = min(P_MAX_SKILL_LEVEL(i), P_SKILL_LEVEL(i) + 1);
                             int successbonus2 = spell_skill_base_success_bonus(nextlevel);
-                            int costdiscount2 = (int)((spell_skill_mana_cost_multiplier(nextlevel) - 1.0) * 100.0);
+                            int costdiscount2 = (int)(spell_skill_mana_cost_multiplier(nextlevel) * 100) - 100;
                             char sbuf2[BUFSZ] = "";
                             char cbuf2[BUFSZ] = "";
                             Sprintf(sbuf2, "%s%d%%", successbonus2 >= 0 ? "+" : "", successbonus2);
@@ -3484,8 +3484,7 @@ enhance_weapon_skill()
         Strcpy(buf, (to_advance > 0) ? "Pick a skill to advance"
                                      : "Current skills");
 
-#ifdef GNH_MOBILE
-        if (!speedy)
+        if ((windowprocs.wincap2 & WC2_MENU_PROPER_SUBTITLE) != 0 && !speedy)
         {
             char subbuf[BUFSZ] = "";
             Sprintf(subbuf, "%d skill slot%s available", u.weapon_slots, plur(u.weapon_slots));
@@ -3495,9 +3494,6 @@ enhance_weapon_skill()
         {
             end_menu(win, buf);
         }
-#else
-            end_menu(win, buf);
-#endif
         n = select_menu(win, to_advance ? PICK_ONE : PICK_NONE, &selected);
         destroy_nhwindow(win);
         if (n > 0) 
@@ -3859,7 +3855,7 @@ uchar apply_extra_bonuses; /* 1 = normal bonus and extra bonuses, 2 = Just the e
     {
         int skill = min(P_MAX_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT) + (nextlevel ? 1 : 0));
         int wep_skill = min(P_MAX_SKILL_LEVEL(wep_type), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(wep_type) + (nextlevel ? 1 : 0));
-        if (wep_type != P_NONE && wep_skill < skill)
+        if (wep_type != P_NONE && wep_skill < skill && type != P_DUAL_WEAPON_COMBAT)
             skill = wep_skill;
         switch (skill) 
         {
@@ -4076,7 +4072,7 @@ uchar apply_extra_bonuses; /* 1 = normal bonus and extra bonuses, 2 = Just the e
     {
         int skill = min(P_MAX_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(P_DUAL_WEAPON_COMBAT) + (nextlevel ? 1 : 0));
         int wep_skill = min(P_MAX_SKILL_LEVEL(wep_type), use_this_level > 0 ? use_this_level : P_SKILL_LEVEL(wep_type) + (nextlevel ? 1 : 0));
-        if (wep_type != P_NONE && wep_skill < skill)
+        if (wep_type != P_NONE && wep_skill < skill && type != P_DUAL_WEAPON_COMBAT)
             skill = wep_skill;
         switch (skill) 
         {

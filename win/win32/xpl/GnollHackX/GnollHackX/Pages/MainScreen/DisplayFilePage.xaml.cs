@@ -23,7 +23,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class DisplayFilePage : ContentPage
+    public partial class DisplayFilePage : ContentPage, ICloseablePage
     {
         private string _fileName;
         private int _fixedWidth;
@@ -72,11 +72,62 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        private async Task ClosePageAsync(bool playClickSound)
+        {
             CloseButton.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
+            _backPressed = true;
+            if (playClickSound)
+                GHApp.PlayButtonClickedSound();
             var page = await GHApp.Navigation.PopModalAsync();
             GHApp.DisconnectIViewHandlers(page);
         }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (CloseButton.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
+        private bool _backPressed = false;
+        private async Task<bool> BackButtonPressed(object sender, EventArgs e)
+        {
+            if (!_backPressed)
+            {
+                await ClosePageAsync(false);
+            }
+            return false;
+        }
+
+        private void ContentPage_Disappearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed -= BackButtonPressed;
+        }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
+
 
         public bool ReadFile(out string errorMessage)
         {
@@ -213,6 +264,7 @@ namespace GnollHackX.Pages.MainScreen
 
         private void ContentPage_Appearing(object sender, EventArgs e)
         {
+            GHApp.BackButtonPressed += BackButtonPressed;
             if (GHApp.IsiOS && _isHtml)
             {
 #if GNH_MAUI
@@ -233,12 +285,26 @@ namespace GnollHackX.Pages.MainScreen
 
         private void DoiOSShowGrid()
         {
-            MainThread.InvokeOnMainThreadAsync(async () =>
+            try
             {
-                await DisplayWebView.FadeTo(1.0, 512);
-                //Animation displayFileAnimation = new Animation(v => DisplayWebView.Opacity = (double)v, 0.01, 1.00);
-                //displayFileAnimation.Commit(MainGrid, "DisplayFileShowAnimation", length: 512, rate: 16, repeat: () => false);
-            });
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        await DisplayWebView.FadeTo(1.0, 512);
+                        //Animation displayFileAnimation = new Animation(v => DisplayWebView.Opacity = (double)v, 0.01, 1.00);
+                        //displayFileAnimation.Commit(MainGrid, "DisplayFileShowAnimation", length: 512, rate: 16, repeat: () => false);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
         }
     }
  }

@@ -91,7 +91,13 @@ static struct Bool_Opt {
     { "asksavedisk", "prompt for saving to a disk", (boolean *) 0, FALSE, SET_IN_FILE },
 #endif
     { "autodescribe", "describe terrain under cursor", &iflags.autodescribe, TRUE, SET_IN_GAME },
-    { "autodig", "dig if moving and wielding a digging tool", &flags.autodig, FALSE, SET_IN_GAME },
+    { "autodig", "dig if moving and wielding a digging tool", &flags.autodig, 
+#ifdef GNH_MOBILE
+    TRUE,
+#else
+    FALSE,
+#endif
+    SET_IN_GAME },
 #ifdef ANDROID
     {"autokick", "walking into a door attempts to kick it", &flags.autokick, TRUE, SET_IN_GAME},
 #endif
@@ -161,7 +167,7 @@ static struct Bool_Opt {
 #else
     { "flush", "use flush on Amiga", (boolean *) 0, FALSE, SET_IN_FILE },
 #endif
-#ifdef ANDROID
+#if defined(ANDROID) || defined(GNH_MOBILE)
     { "force_invmenu", "commands asking for inventory item show a menu", &iflags.force_invmenu, TRUE, SET_IN_GAME },
 #else
     { "force_invmenu", "commands asking for inventory item show a menu", &iflags.force_invmenu, FALSE, SET_IN_GAME },
@@ -183,9 +189,22 @@ static struct Bool_Opt {
 #else
     { "ignintr", "ignore interrupt signals", (boolean *) 0, FALSE, SET_IN_FILE },
 #endif
+    { "ignore_stopping", "travelling is not interrupted by items, doors, or engravings", &flags.ignore_stopping, 
+#ifdef GNH_MOBILE
+        FALSE, /* Travelling is used also for normal movement; this option is overrideable by the GUI settings */
+#else
+        TRUE,
+#endif
+        SET_IN_GAME },
     { "implicit_uncursed", "omit \"uncursed\" from inventory", &iflags.implicit_uncursed, TRUE, SET_IN_GAME },
     { "inventory_obj_cmd", "display a command menu upon selecting an object in inventory", &flags.inventory_obj_cmd, TRUE, SET_IN_GAME},
-    { "inventory_weights_last", "display object weights in parentheses after object name", &flags.inventory_weights_last, FALSE, SET_IN_GAME},
+    { "inventory_weights_last", "display object weights in parentheses after object name", &flags.inventory_weights_last, 
+#if GNH_MOBILE
+        TRUE,
+#else
+        FALSE, 
+#endif
+        SET_IN_GAME},
     { "knapsack_prompt", "prompt for an action when inventory is full", &flags.knapsack_prompt, TRUE, SET_IN_GAME},
     { "large_font", "obsolete: use large font", &iflags.obsolete, FALSE, SET_IN_FILE}, /* OBSOLETE */
     { "legacy", "show introductory message", &flags.legacy, TRUE, DISP_IN_GAME },
@@ -260,7 +279,13 @@ static struct Bool_Opt {
         SET_IN_WIZGAME },
     { "search_box_traps", "search command searches boxes for traps first", &flags.search_box_traps, TRUE, SET_IN_GAME },
     { "selectsaved", "select a saved game at program start", &iflags.wc2_selectsaved, TRUE, DISP_IN_GAME}, /*WC*/
-    { "self_click_action", "clicking the player character executes an action", &flags.self_click_action, TRUE, SET_IN_GAME},
+    { "self_click_action", "clicking the player character executes an action", &flags.self_click_action, 
+#ifdef GNH_MOBILE
+    FALSE,
+#else
+    TRUE,
+#endif
+    SET_IN_GAME},
     { "showexp", "show experience points in status line", &flags.showexp, TRUE, SET_IN_GAME},
     { "showmove", "show current movement speed in status line", &flags.showmove, TRUE, SET_IN_GAME },
     { "showrace", "show your character by race rather than role", &flags.showrace, FALSE, SET_IN_GAME },
@@ -283,11 +308,23 @@ static struct Bool_Opt {
     { "show_weapon_style", "show used weapon type in status line", &flags.show_weapon_style, TRUE, SET_IN_GAME },
     { "show_weight_summary", "show total weight at the end of inventory", &flags.show_weight_summary, TRUE, SET_IN_GAME },
     { "silent", "don't use terminal bell", &flags.silent, TRUE, SET_IN_GAME },
-    { "skill_table_format", "show skills in a table format rather than a list",  &iflags.skill_table_format, TRUE, SET_IN_GAME},
+    { "skill_table_format", "show skills in a table format rather than a list",  &iflags.skill_table_format, 
+#ifdef GNH_MOBILE
+    FALSE,
+#else
+    TRUE, 
+#endif
+    SET_IN_GAME},
     { "softkeyboard", "soft keyboard", &iflags.wc2_softkeyboard, FALSE, SET_IN_FILE}, /*WC2*/
     { "sortpack", "group inventory items by type", &flags.sortpack, TRUE, SET_IN_GAME },
     { "sparkle", "display sparkly effect when resisting magic", &flags.sparkle, TRUE, SET_IN_GAME },
-    { "spell_table_format", "show spells in a table format rather than a list", &iflags.spell_table_format, TRUE, SET_IN_GAME },
+    { "spell_table_format", "show spells in a table format rather than a list", &iflags.spell_table_format, 
+#ifdef GNH_MOBILE
+    FALSE,
+#else
+    TRUE,
+#endif
+        SET_IN_GAME },
     { "splash_screen", "show splash screen", &iflags.wc_splash_screen, TRUE, DISP_IN_GAME}, /*WC*/
     { "standout", "use standout for --more--", &flags.standout, FALSE, SET_IN_GAME },
     { "stash_on_autopickup", "stash items into a container on autopickup (but no thrown if pick_thrown is on)", &flags.stash_on_autopickup, FALSE, SET_IN_GAME },
@@ -983,6 +1020,28 @@ init_options()
 
     if (initial_flags.dice_as_ranges_set)
         iflags.show_dice_as_ranges = initial_flags.dice_as_ranges_value;
+
+    if (initial_flags.autodig_set)
+        flags.autodig = initial_flags.autodig_value;
+
+    if (initial_flags.ignore_stopping_set)
+        flags.ignore_stopping = initial_flags.ignore_stopping_value;
+
+    if (initial_flags.vi_keys_set)
+    {
+        if (initial_flags.vi_keys_value)
+        {
+            iflags.num_pad = FALSE;
+            iflags.num_pad_mode = 0;
+        }
+        else
+        {
+            iflags.num_pad = TRUE;
+            iflags.num_pad_mode = 1;
+        }
+        reset_commands(FALSE);
+        number_pad(iflags.num_pad ? 1 : 0);
+    }
 
     if (initial_flags.getpos_arrows_set)
         iflags.getpos_arrows = initial_flags.getpos_arrows_value;
@@ -5393,6 +5452,14 @@ boolean tinitial, tfrom_file;
             else if (boolopt[i].addr == &iflags.show_dice_as_ranges)
             {
                 issue_boolean_gui_command(GUI_CMD_TOGGLE_DICE_AS_RANGES, iflags.show_dice_as_ranges);
+            }
+            else if (boolopt[i].addr == &flags.autodig)
+            {
+                issue_boolean_gui_command(GUI_CMD_TOGGLE_AUTODIG, flags.autodig);
+            }
+            else if (boolopt[i].addr == &flags.ignore_stopping)
+            {
+                issue_boolean_gui_command(GUI_CMD_TOGGLE_IGNORE_STOPPING, flags.ignore_stopping);
             }
             else if (boolopt[i].addr == &flags.classic_statue_symbol || boolopt[i].addr == &flags.classic_colors || boolopt[i].addr == &flags.show_decorations)
             {

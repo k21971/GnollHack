@@ -251,12 +251,13 @@ struct flag {
     boolean stash_on_autopickup;
     boolean save_file_tracking_migrated; /* 1 = save file tracking in use (if 0, migrate to save file tracking) */
     uchar save_file_tracking_value; /* this is the track value when tracking is supported and needed (desktop) */
-    uchar reserved_uchar4;
+    boolean ignore_stopping;
     uchar reserved_uchar5;
     uchar reserved_uchar6;
 
+    uint64_t version_number_at_start;
+
     /* Emergency reserved variables to make non-save-game-breaking changes */
-    uint64_t reserved_ulong1;
     uint64_t reserved_ulong2;
     int reserved_int1;
     int reserved_int2;
@@ -789,6 +790,12 @@ struct startup_flags {
     uchar middle_click_action;
     boolean dice_as_ranges_set;
     boolean dice_as_ranges_value;
+    boolean autodig_set;
+    boolean autodig_value;
+    boolean ignore_stopping_set;
+    boolean ignore_stopping_value;
+    boolean vi_keys_set;
+    boolean vi_keys_value;
     boolean getpos_arrows_set;
     boolean getpos_arrows_value;
     boolean save_file_tracking_supported_set;

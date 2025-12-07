@@ -16661,7 +16661,7 @@ enum climbing_types climbingid;
         if (is_flyer(mtmp->data) || Flying)
         {
             sound_type = OBJECT_SOUND_TYPE_FLY;
-            struct obj* otmp = what_gives(FLYING);
+            struct obj* otmp = what_gives(FLYING, FALSE);
             if (otmp)
             {
                 enum object_soundset_types oss2 = objects[otmp->otyp].oc_soundset;
@@ -16679,7 +16679,7 @@ enum climbing_types climbingid;
         else if (is_floater(mtmp->data) || Levitation)
         {
             sound_type = OBJECT_SOUND_TYPE_LEVITATION;
-            struct obj* otmp = what_gives(LEVITATION);
+            struct obj* otmp = what_gives(LEVITATION, FALSE);
             if (otmp)
             {
                 enum object_soundset_types oss2 = objects[otmp->otyp].oc_soundset;
@@ -16697,7 +16697,7 @@ enum climbing_types climbingid;
         else if ((is_swimmer(mtmp->data) || amphibious(mtmp->data) || Swimming) && floorid == FLOOR_SURFACE_LIQUID)
         {
             sound_type = OBJECT_SOUND_TYPE_SWIM;
-            struct obj* otmp = what_gives(SWIMMING);
+            struct obj* otmp = what_gives(SWIMMING, FALSE);
             if (otmp)
             {
                 enum object_soundset_types oss2 = objects[otmp->otyp].oc_soundset;
@@ -17626,7 +17626,7 @@ unsigned int play_flags;
     immediateinfo.dialogue_mid = mon->m_id;
     immediateinfo.play_flags = play_flags;
 
-    if (soundid > GHSOUND_NONE && immediateinfo.volume > GENERAL_SOUND_CUTOFF_VOLUME)
+    if (soundid > GHSOUND_NONE && immediateinfo.volume > MONSTER_SOUND_CUTOFF_VOLUME)
         play_immediate_ghsound(immediateinfo);
 
 }
@@ -17698,7 +17698,7 @@ enum object_sound_types sound_type;
     immediateinfo.sound_type = IMMEDIATE_SOUND_SFX;
     immediateinfo.play_group = SOUND_PLAY_GROUP_NORMAL;
 
-    if (soundid > GHSOUND_NONE && immediateinfo.volume > GENERAL_SOUND_CUTOFF_VOLUME)
+    if (soundid > GHSOUND_NONE && immediateinfo.volume > MONSTER_SOUND_CUTOFF_VOLUME)
         play_immediate_ghsound(immediateinfo);
 
 }
@@ -17763,7 +17763,7 @@ enum object_sound_types sound_type;
     immediateinfo.sound_type = IMMEDIATE_SOUND_SFX;
     immediateinfo.play_group = SOUND_PLAY_GROUP_NORMAL;
 
-    if (soundid > GHSOUND_NONE && immediateinfo.volume > GENERAL_SOUND_CUTOFF_VOLUME)
+    if (soundid > GHSOUND_NONE && immediateinfo.volume > MONSTER_SOUND_CUTOFF_VOLUME)
         play_immediate_ghsound(immediateinfo);
 }
 
@@ -20529,6 +20529,20 @@ stop_all_long_immediate_sounds()
     info.stop_flags = STOP_SOUNDS_FLAGS_IMMEDIATE_LONG;
     stop_all_sounds(info);
 }
+
+void
+stop_all_dialogue_of_mon_on_mobile(mon)
+#ifdef GNH_MOBILE
+struct monst* mon;
+{
+    stop_all_dialogue_of_mon(mon);
+}
+#else
+struct monst* mon UNUSED;
+{
+    //Nothing
+}
+#endif
 
 void
 stop_all_dialogue_of_mon(mon)

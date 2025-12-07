@@ -34,8 +34,8 @@ STATIC_DCL void FDECL(savemon, (int, struct monst *));
 STATIC_DCL void FDECL(savemonchn, (int, struct monst *, int));
 STATIC_DCL void FDECL(savetrapchn, (int, struct trap *, int));
 STATIC_DCL void FDECL(savegamestate, (int, int, int64_t));
-STATIC_OVL void FDECL(save_msghistory, (int, int));
-STATIC_OVL void FDECL(save_gamelog, (int, int));
+STATIC_DCL void FDECL(save_msghistory, (int, int));
+STATIC_DCL void FDECL(save_gamelog, (int, int));
 #ifdef MFLOPPY
 STATIC_DCL void FDECL(savelev0, (int, XCHAR_P, int));
 STATIC_DCL boolean NDECL(swapout_oldest);
@@ -552,12 +552,13 @@ char *whynot;
     return FALSE;
 }
 
+STATIC_VAR boolean havestate = TRUE;
+
 #ifdef INSURANCE
 void
 savestateinlock()
 {
     int fd, hpid;
-    static boolean havestate = TRUE;
     char whynot[BUFSZ];
 
     /* When checkpointing is on, the full state needs to be written
@@ -865,10 +866,16 @@ int fd;
 #ifdef UNIX
     if (bw_fd != fd) {
         if (bw_fd >= 0)
-            panic("double buffering unexpected");
+        {
+            program_state.panic_handling = 1;
+            panic("double buffering unexpected: bw_fd=%d, fd=%d", bw_fd, fd);
+        }
         bw_fd = fd;
         if ((bw_FILE = fdopen(fd, "w")) == 0)
+        {
+            program_state.panic_handling = 1;
             panic("buffering of file %d failed", fd);
+        }
     }
 #endif
     buffering = TRUE;
@@ -1480,6 +1487,7 @@ int fd;
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t) &plsiztmp, sizeof(plsiztmp));
     bwrite(fd, (genericptr_t) plname, plsiztmp);
+    Sprintf(priority_debug_buf_4, "store_plname_in_file (fd=%d)", fd);
     bufon(fd);
     return;
 }
@@ -1527,6 +1535,7 @@ int64_t time_stamp;
     bufoff(fd);
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t)&gamestats, sizeof gamestats);
+    Sprintf(priority_debug_buf_4, "store_save_game_stats_in_file (fd=%d)", fd);
     bufon(fd);
     return;
 }
@@ -1583,6 +1592,7 @@ int fd;
     bufoff(fd);
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t) &sfsaveinfo, sizeof sfsaveinfo);
+    Sprintf(priority_debug_buf_4, "store_savefileinfo (fd=%d)", fd);
     bufon(fd);
     return;
 }
@@ -1756,6 +1766,37 @@ freedynamicdata(VOID_ARGS)
 
     free_dynamic_data_C();
     return;
+}
+
+void
+reset_save(VOID_ARGS)
+{
+    havestate = TRUE;
+
+    bw_fd = -1;
+    bw_FILE = 0;
+    buffering = FALSE;
+
+    ustuck_id = 0;
+    usteed_id = 0;
+
+#ifdef MFLOPPY
+    bytes_counted = 0;
+    count_only = 0;
+#endif
+
+#ifdef MICRO
+    dotcnt = 0;
+    dotrow = 0; /* also used in restore */
+#endif
+
+#ifdef ZEROCOMP
+    *outbuf = 0;
+    outbufp = 0;
+    outrunlength = -1;
+    bwritefd = 0;
+    compressing = FALSE;
+#endif
 }
 
 #ifdef MFLOPPY

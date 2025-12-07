@@ -28,7 +28,7 @@ namespace GnollHackM
 
         public MEMORYSTATUSEX()
         {
-            dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            dwLength = Convert.ToUInt32(Marshal.SizeOf(typeof(MEMORYSTATUSEX)));
         }
     }
 
@@ -129,15 +129,19 @@ namespace GnollHackM
 
         public void CloseApplication()
         {
-            RevertAnimatorDuration(true);
-            GHApp.SaveWindowPosition();
-            if (GHApp.WindowsApp != null)
+            MainThread.BeginInvokeOnMainThread(() =>
             {
-                GHApp.WindowsApp?.Exit();
-                GHApp.WindowsApp = null;
-            }
-            Application.Current?.Quit();
-            Environment.Exit(0);
+                GHApp.AddSentryBreadcrumb("CloseApplication", GHConstants.SentryGnollHackGeneralCategoryName);
+                RevertAnimatorDuration(true);
+                GHApp.SaveWindowPosition();
+                if (GHApp.WindowsApp != null)
+                {
+                    GHApp.WindowsApp?.Exit();
+                    GHApp.WindowsApp = null;
+                }
+                Application.Current?.Quit();
+                //Environment.Exit(0);
+            });
         }
 
         public Task<Stream> GetPlatformAssetsStreamAsync(string directory, string fileName)
@@ -192,9 +196,9 @@ namespace GnollHackM
 
         }
 
-        public async void RequestAppReview(ContentPage page)
+        public async Task RequestAppReview(ContentPage page)
         {
-            if (GHApp.IsPackaged) /* Microsoft Store */
+            if (GHApp.IsPackaged && !GHApp.IsSteam && !GHApp.IsNoStore) /* Microsoft Store */
             {
                 try
                 {

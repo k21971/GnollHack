@@ -9,6 +9,7 @@
 #define OBJ_H
 
 #include "general.h"
+#include "mondata.h"
 #include "objclass.h"
 
 /* #define obj obj_nh */ /* uncomment for SCO UNIX, which has a conflicting
@@ -25,11 +26,11 @@ union vptrs {
  **    (see the note at the bottom of this file before adding oextra fields)
  */
 struct oextra {
-    char *oname;          /* ptr to name of object */
-    char* uoname;          /* ptr to name of object */
+    char *oname;          /* ptr to the true name of object */
+    char *uoname;         /* ptr to a user-specified name of object */
     struct monst *omonst; /* ptr to attached monst struct */
-    unsigned *omid;       /* ptr to m_id */
-    int64_t *olong;          /* ptr to misc int64_t (temporary gold object) */
+    unsigned *omid;       /* ptr to m_id -- JG: note that the pointer uses more bits than the pointed variable itself, so probably it would make sense to change this to a straight variable rather than keeping it as a pointer */
+    int64_t *olong;       /* ptr to misc int64_t (temporary gold object) -- JG: unused at the moment; might make sense to change this into a larger extra struct pointer if such is needed */
     char *omailcmd;       /* response_cmd for mail deliver */
 };
 
@@ -40,17 +41,21 @@ struct obj {
 #define ocontainer v.v_ocontainer
 #define ocarry v.v_ocarry
 
-    struct obj *cobj; /* contents list for containers */
-    unsigned o_id;
-    unsigned owt;
-    short otyp; /* object class number */
-    xchar ox, oy;
-    xchar ox0, oy0;
+    struct obj *cobj;     /* contents list for containers */
+    unsigned o_id;        /* identifier number */
+    unsigned owt;         /* weight */
+    short otyp;           /* class number */
+    xchar ox, oy;         /* x and y coordinates on the map */
+    xchar ox0, oy0;       /* when moving, original x and y coordinates on the map where the object is coming from; used in particular when pushing boulders */
 
-    int64_t quan; /* number of items */
-    int64_t age;               /* creation date */
-    int64_t owornmask;
-    uint64_t item_flags;  /* general purpose object flags, like speflags */
+    int64_t quan;         /* number of items */
+    int64_t age;          /* creation date */
+    int64_t owornmask;    /* flag in which item slot the item is worn */
+    uint64_t item_flags;  /* general purpose object flags, like speflags; different item_flags will prevent merging */
+#define ITEM_FLAGS_GIVEN_BY_HERO               0x00000001UL
+#define ITEM_FLAGS_MEMORY_OBJECT_LAMPLIT       0x00000002UL /* Lamplit for graphics but it does not have an associated light source */
+#define ITEM_FLAGS_FIRED_BY_MONSTER            0x00000004UL
+
     uint64_t speflags;    /* anything else that might be going on with an item, not affected by cancellation */
 
 #define SPEFLAGS_YOURS                         0x00000001UL
@@ -86,23 +91,25 @@ struct obj {
 #define SPEFLAGS_FOUND_THIS_TURN               0x40000000UL
 #define SPEFLAGS_HAS_BEEN_PICKED_UP_BY_HERO    0x80000000UL
 
-    short enchantment; /* Always set to zero by cancellation
-                  quality of weapon, weptool, armor or ring (+ or -);
-                  OBSOLETE (moved to charges): number of charges for wand or charged tool ( >= -1 );
-                  OBSOLETE (moved to special_quality): number of candles attached to candelabrum;
-                  OBSOLETE (moved to special_quality and speflags): marks your eggs, tin variety and spinach tins;
-                  OBSOLETE (moved to special_quality and speflags): Schroedinger's Box (1) or royal coffers for a court (2);
-                  OBSOLETE (moved to special_quality): tells which fruit a fruit is;
-                  OBSOLETE (moved to special_quality): special for uball and amulet;
-                  OBSOLETE (moved to special_quality): scroll of mail (normal==0, bones or wishing==1, written==2);
-                  OBSOLETE (moved to speflags): historic and gender for statues */
-    short charges; /* number of charges for wand or charged tool ( >= -1 ), always set to -1/0 by cancellation */
+    short enchantment;     /* Always set to zero by cancellation
+                              quality of weapon, weptool, armor or ring (+ or -);
+                              OBSOLETE (moved to charges): number of charges for wand or charged tool ( >= -1 );
+                              OBSOLETE (moved to special_quality): number of candles attached to candelabrum;
+                              OBSOLETE (moved to special_quality and speflags): marks your eggs, tin variety and spinach tins;
+                              OBSOLETE (moved to special_quality and speflags): Schroedinger's Box (1) or royal coffers for a court (2);
+                              OBSOLETE (moved to special_quality): tells which fruit a fruit is;
+                              OBSOLETE (moved to special_quality): special for uball and amulet;
+                              OBSOLETE (moved to special_quality): scroll of mail (normal==0, bones or wishing==1, written==2);
+                              OBSOLETE (moved to speflags): historic and gender for statues */
+    short charges;         /* number of charges for wand or charged tool ( >= -1 ), always set to -1/0 by cancellation */
     short special_quality; /* item-specific special quality, e.g., the amount of wetness of a towel, number of candles attached to candelabrum, not affected by cancellation */
 
 #define SPEQUAL_STATUE_HISTORIC                1
 #define SPEQUAL_RULING_RING_INSCRIPTION_READ   1
-#define SPEQUAL_MAIL_FROM_BONES_OR_WISHING     1
+#define SPEQUAL_MAIL_FROM_BONES                1
 #define SPEQUAL_MAIL_FROM_MAGIC_MARKER         2
+#define SPEQUAL_MAIL_FROM_WISHING              3
+#define SPEQUAL_MAIL_FROM_POLYMORPH            4
 #define SPEQUAL_MAGIC_LAMP_CONTAINS_DJINN      1
 #define SPEQUAL_TIN_CONTAINS_SPINACH           1
 #define SPEQUAL_MAGIC_CANDLE_PARTLY_USED       1
@@ -111,59 +118,59 @@ struct obj {
 #define SPEQUAL_UBALL_SPECIAL                  1
 #define SPEQUAL_WILL_TURN_TO_DUST_ON_PICKUP    1
 
-    short oartifact; /* artifact array index */
-    char oclass;    /* object class */
-    char invlet;    /* designation in inventory */
-    uchar mythic_prefix; /* magical quality for a weapon or armor giving additional powers */
+    short oartifact;      /* artifact array index */
+    char oclass;          /* object class */
+    char invlet;          /* designation in inventory */
+    uchar mythic_prefix;  /* magical quality for a weapon or armor giving additional powers */
     uchar mythic_suffix;  /* magical quality for a weapon or armor giving additional powers */
     uchar exceptionality; /* exceptional, elite, etc. weapon, multiplies base damage */
     uchar elemental_enchantment; /* cold, fire, lightning, or deathly */
-    uchar material; /* specific material of this object */
-    char recharged; /* number of times it's been recharged */
+    uchar material;       /* specific material of this object */
+    char recharged;       /* number of times it's been recharged */
 #define RECHARGE_LIMIT 100
 
-    xchar where;        /* where the object thinks it is */
-#define OBJ_FREE 0      /* object not attached to anything */
-#define OBJ_FLOOR 1     /* object on floor */
-#define OBJ_CONTAINED 2 /* object in a container */
-#define OBJ_INVENT 3    /* object in the hero's inventory */
-#define OBJ_MINVENT 4   /* object in a monster inventory */
-#define OBJ_MIGRATING 5 /* object sent off to another level */
-#define OBJ_BURIED 6    /* object buried */
-#define OBJ_ONBILL 7    /* object on shk bill */
-#define OBJ_HEROMEMORY 8  /* object remembered by hero */
-#define OBJ_MAGIC 9     /* object is in a magic chest */
+    xchar where;          /* where the object thinks it is */
+#define OBJ_FREE 0        /* object not attached to anything */
+#define OBJ_FLOOR 1       /* object on floor */
+#define OBJ_CONTAINED 2   /* object in a container */
+#define OBJ_INVENT 3      /* object in the hero's inventory */
+#define OBJ_MINVENT 4     /* object in a monster inventory */
+#define OBJ_MIGRATING 5   /* object sent off to another level */
+#define OBJ_BURIED 6      /* object buried */
+#define OBJ_ONBILL 7      /* object on shk bill */
+#define OBJ_MEMORY 8      /* object remembered by hero */
+#define OBJ_MAGIC 9       /* object is in a magic chest */
 #define NOBJ_STATES 10
-    xchar timed; /* # of fuses (timers) attached to this obj */
+    xchar timed;                    /* # of fuses (timers) attached to this obj */
 
-    int corpsenm;         /* type of corpse is mons[corpsenm] */
-#define leashmon corpsenm /* gets m_id of attached pet */
-#define appearanceidx corpsenm /* index for alternative appearance */
-#define novelidx special_quality /* 3.6 tribute - the index of the novel title */
-#define manualidx special_quality /* the index of the manual title */
-#define keyotyp corpsenm  /* otyp of the key capable of locking / unlocking the chest (0 = SKELETON_KEY). Special_quality additionally defines the type of the key (its matching special_quality) */
-    int usecount;           /* overloaded for various things that tally */
-#define spestudied usecount /* # of times a spellbook has been studied */
+    int corpsenm;                   /* type of corpse is mons[corpsenm] */
+#define leashmon corpsenm           /* gets m_id of attached pet */
+#define appearanceidx corpsenm      /* index for alternative appearance */
+#define novelidx special_quality    /* 3.6 tribute - the index of the novel title */
+#define manualidx special_quality   /* the index of the manual title */
+#define keyotyp corpsenm            /* otyp of the key capable of locking / unlocking the chest (0 = SKELETON_KEY). Special_quality additionally defines the type of the key (its matching special_quality) */
+    int usecount;                   /* overloaded for various things that tally */
+#define spestudied usecount         /* # of times a spellbook has been studied */
 #define ring_text_appeared usecount /* the round the text of Ruling Ring of Yendor appeared */
-    unsigned oeaten;        /* nutrition left in food, if partly eaten */
+    unsigned oeaten;                /* nutrition left in food, if partly eaten */
 
     Bitfield(cursed, 1);
     Bitfield(blessed, 1);
-    Bitfield(unpaid, 1);    /* on some bill */
-    Bitfield(no_charge, 1); /* if shk shouldn't charge for this */
-    Bitfield(known, 1);     /* exact nature & enchantment & charges known */
-    Bitfield(dknown, 1);    /* description = color or text known */
-    Bitfield(bknown, 1);    /* blessing or curse known */
-    Bitfield(rknown, 1);    /* rustproof or not known */
-    Bitfield(oeroded, 2);  /* rusted/burnt weapon/armor */
+    Bitfield(unpaid, 1);      /* on some bill */
+    Bitfield(no_charge, 1);   /* if shk shouldn't charge for this */
+    Bitfield(known, 1);       /* exact nature & enchantment & charges known */
+    Bitfield(dknown, 1);      /* description = color or text known */
+    Bitfield(bknown, 1);      /* blessing or curse known */
+    Bitfield(rknown, 1);      /* rustproof or not known */
+    Bitfield(oeroded, 2);     /* rusted/burnt weapon/armor */
 
-    Bitfield(oeroded2, 2); /* corroded/rotted weapon/armor */
+    Bitfield(oeroded2, 2);    /* corroded/rotted weapon/armor */
 #define greatest_erosion(otmp)                                 \
     (int)((otmp)->oeroded > (otmp)->oeroded2 ? (otmp)->oeroded \
                                              : (otmp)->oeroded2)
 #define MAX_ERODE 3
-#define orotten oeroded  /* rotten food */
-#define odiluted oeroded /* diluted potions */
+#define orotten oeroded       /* rotten food */
+#define odiluted oeroded      /* diluted potions */
 #define norevive oeroded2
     Bitfield(oerodeproof, 1); /* erodeproof weapon/armor */
     Bitfield(olocked, 1);     /* object is locked */
@@ -171,41 +178,41 @@ struct obj {
 #define degraded_horn obroken /* unicorn horn will poly to non-magic */
     Bitfield(otrapped, 1);    /* container is trapped */
 /* or accidental tripped rolling boulder trap */
-#define opoisoned otrapped /* object (weapon) is coated with poison */
-    Bitfield(lamplit, 1);   /* a light-source -- can be lit */
-    Bitfield(makingsound, 1);   /* a sound-source -- can be turned on to make noise */
-    Bitfield(globby, 1);    /* combines with like types on adjacent squares */
-    Bitfield(greased, 1);    /* covered with grease */
+#define opoisoned otrapped    /* object (weapon) is coated with poison */
+    Bitfield(lamplit, 1);     /* a light-source -- can be lit */
+    Bitfield(makingsound, 1); /* a sound-source -- can be turned on to make noise */
+    Bitfield(globby, 1);      /* combines with like types on adjacent squares */
+    Bitfield(greased, 1);     /* covered with grease */
 
-    Bitfield(nomerge, 1);    /* set temporarily to prevent merging */
-    Bitfield(was_thrown, 1); /* thrown by hero since last picked up */
-    Bitfield(has_special_tileset, 1); /* thrown by hero since last picked up */
-    Bitfield(in_use, 1); /* for magic items before useup items */
-    Bitfield(bypass, 1); /* mark this as an object to be skipped by bhito() */
-    Bitfield(cknown, 1); /* contents of container assumed to be known */
-    Bitfield(lknown, 1); /* locked/unlocked status is known */
-    Bitfield(tknown, 1); /* trapped status of a container is known */
-    Bitfield(nknown, 1); /* artifact's true name is known */
-    Bitfield(aknown, 1); /* artifact status is known; if set, the artifact will be termed "the Artifact" instead of "item named Artifact" */
-    Bitfield(mknown, 1); /* mythic quality is known */
-    Bitfield(rotknown, 1); /* rotting status is known */
+    Bitfield(nomerge, 1);     /* set temporarily to prevent merging */
+    Bitfield(was_thrown, 1);  /* thrown by hero since last picked up */
+    Bitfield(has_special_tileset, 1); /* the object uses a dungeon-specific tileset defined in special_tileset; in particular, applies to boulders */
+    Bitfield(in_use, 1);      /* for magic items before useup items */
+    Bitfield(bypass, 1);      /* mark this as an object to be skipped by bhito() */
+    Bitfield(cknown, 1);      /* contents of container assumed to be known */
+    Bitfield(lknown, 1);      /* locked/unlocked status is known */
+    Bitfield(tknown, 1);      /* trapped status of a container is known */
+    Bitfield(nknown, 1);      /* artifact's true name is known */
+    Bitfield(aknown, 1);      /* artifact status is known; if set, the artifact will be termed "the Artifact" instead of "item named Artifact" */
+    Bitfield(mknown, 1);      /* mythic quality is known */
+    Bitfield(rotknown, 1);    /* rotting status is known */
 
-    unsigned reserved;  /* reserved for, e.g., more bitfields */
+    unsigned firing_m_id;     /* m_id for monster that fired this object (for picking up back) */
 
-    unsigned o_id_memory;  /* This is a memory object of this o_id */
-    unsigned m_id_memory;  /* This is a memory object of this mimic m_id */
+    unsigned o_id_memory;     /* This is a memory object of this o_id */
+    unsigned m_id_memory;     /* This is a memory object of this mimic m_id */
 
     short cooldownleft;       /* item cooldown left before it can be used again*/
-    short repowerleft;       /* artifact cooldown left before its invoke ability can be used again*/
-    short detectioncount;    /* monsters detected for WARN_ORC and other similar properties */
-    short invokeleft;      /* the counter for artifact's invoke ability remaining on */
-    boolean invokeon;      /* the object's / artifact's invoked ability is on */
+    short repowerleft;        /* artifact cooldown left before its invoke ability can be used again*/
+    short detectioncount;     /* monsters detected for WARN_ORC and other similar properties */
+    short invokeleft;         /* the counter for artifact's invoke ability remaining on */
+    boolean invokeon;         /* the object's / artifact's invoked ability is on */
 
     uchar special_tileset;
     int glyph;
     int gui_glyph;
 
-    struct oextra *oextra; /* pointer to oextra struct */
+    struct oextra *oextra;    /* pointer to oextra struct */
 };
 
 enum elemental_enchantments {
@@ -274,11 +281,6 @@ enum elemental_enchantments {
 #define is_otyp_indestructible(otyp) ((objects[(otyp)].oc_flags & O1_INDESTRUCTIBLE) != 0)
 #define is_obj_indestructible(o) ((get_obj_oc_flags(o) & O1_INDESTRUCTIBLE) != 0 || ((o)->speflags & SPEFLAGS_INDESTRUCTIBLE) != 0 \
                                   || ((o)->oartifact > 0 && (artilist[(o)->oartifact].aflags2 & AF2_INDESTRUCTIBLE) != 0))
-#define is_obj_unremovable_from_the_game(o) ((o)->otyp == AMULET_OF_YENDOR \
-    || (o)->otyp == SPE_BOOK_OF_THE_DEAD \
-    || (o)->otyp == CANDELABRUM_OF_INVOCATION \
-    || (o)->otyp == BELL_OF_OPENING \
-    || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && is_rider(&mons[(o)->corpsenm])))
 
 #define is_otyp_no_pickup(otyp) ((objects[(otyp)].oc_flags3 & O3_NO_PICKUP) != 0)
 #define is_obj_no_pickup(o) (is_otyp_no_pickup((o)->otyp) || ((o)->speflags & SPEFLAGS_NO_PICKUP) != 0)
@@ -672,6 +674,14 @@ enum elemental_enchantments {
     (is_key(obj) || (obj)->otyp == LOCK_PICK || (obj)->otyp == CREDIT_CARD)
 #define is_locking_tool(obj)                                 \
     (is_key(obj) || (obj)->otyp == LOCK_PICK)
+#define is_special_key(obj)                                 \
+    (is_key(obj) && is_otyp_indestructible((obj)->otyp))
+#define is_obj_unremovable_from_the_game(o) ((o)->otyp == AMULET_OF_YENDOR \
+    || (o)->otyp == SPE_BOOK_OF_THE_DEAD \
+    || (o)->otyp == CANDELABRUM_OF_INVOCATION \
+    || (o)->otyp == BELL_OF_OPENING \
+    || is_special_key(o) \
+    || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && is_rider(&mons[(o)->corpsenm])))
 
 /* misc helpers, simple enough to be macros */
 #define is_flimsy(otmp) \
@@ -797,7 +807,7 @@ enum elemental_enchantments {
     ((o)->oclass == POTION_CLASS || is_obj_normally_edible(o))
 
 #define unfit_for_container(o) \
-    ((o)->otyp == ICE_BOX || (o)->otyp == BOOKSHELF || Is_box(o) || (o)->otyp == BOULDER \
+    ((o)->otyp == ICE_BOX || (o)->otyp == BOOKSHELF || (o)->otyp == COFFIN || (o)->otyp == SARCOPHAGUS || Is_box(o) || (o)->otyp == BOULDER \
     || ((o)->otyp == STATUE && (o)->corpsenm >= LOW_PM && bigmonst(&mons[(o)->corpsenm])))
 
 /* 'PRIZE' values override obj->corpsenm so prizes mustn't be object types
@@ -1168,28 +1178,28 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 
 #define oresist_disintegration(o)                                       \
     ((get_obj_oc_flags(o) & O1_DISINTEGRATION_RESISTANT) != 0 || is_obj_indestructible(o) \
-     || ((o)->otyp == CORPSE && pm_resists_disint(&mons[(o)->corpsenm])) \
+     || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && pm_resists_disint(&mons[(o)->corpsenm])) \
      || obj_resists(o, 2, 50) \
      || is_quest_artifact(o) )
 
 #define oresist_fire(o)                                       \
     ((get_obj_oc_flags(o) & O1_FIRE_RESISTANT) != 0 || is_obj_indestructible(o) \
      || has_obj_mythic_fire_resistance(o) \
-     || ((o)->otyp == CORPSE && pm_resists_fire(&mons[(o)->corpsenm])) \
+     || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && pm_resists_fire(&mons[(o)->corpsenm])) \
      || obj_resists(o, 0, 0) \
      || is_quest_artifact(o) )
 
 #define oresist_cold(o)                                       \
     ((get_obj_oc_flags(o) & O1_COLD_RESISTANT) != 0 || is_obj_indestructible(o) \
      || has_obj_mythic_cold_resistance(o) \
-     || ((o)->otyp == CORPSE && pm_resists_cold(&mons[(o)->corpsenm])) \
+     || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && pm_resists_cold(&mons[(o)->corpsenm])) \
      || obj_resists(o, 0, 0) \
      || is_quest_artifact(o) )
 
 #define oresist_elec(o)                                       \
     ((get_obj_oc_flags(o) & O1_LIGHTNING_RESISTANT) != 0 || is_obj_indestructible(o) \
      || has_obj_mythic_shock_resistance(o) \
-     || ((o)->otyp == CORPSE && pm_resists_elec(&mons[(o)->corpsenm])) \
+     || ((o)->otyp == CORPSE && (o)->corpsenm >= LOW_PM && pm_resists_elec(&mons[(o)->corpsenm])) \
      || obj_resists(o, 0, 0) \
      || is_quest_artifact(o) )
 

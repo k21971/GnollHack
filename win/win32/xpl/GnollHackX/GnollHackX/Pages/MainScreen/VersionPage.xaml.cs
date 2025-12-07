@@ -27,7 +27,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class VersionPage : ContentPage
+    public partial class VersionPage : ContentPage, ICloseablePage
     {
         private GamePage _gamePage = null;
         public VersionPage(GamePage gamePage)
@@ -58,10 +58,12 @@ namespace GnollHackX.Pages.MainScreen
 
             string compatstr = GHApp.GHVersionCompatibilityString;
             string manufacturer = DeviceInfo.Manufacturer;
-            if (manufacturer.Length > 0)
+            if (manufacturer?.Length > 0)
                 manufacturer = manufacturer.Substring(0, 1).ToUpper() + manufacturer.Substring(1);
 
             ulong TotalMemInBytes = GHApp.PlatformService.GetDeviceMemoryInBytes();
+            long UsedMemInBytes = GHApp.GetUsedMemoryInBytes();
+            long UsedMemInMB = UsedMemInBytes == -1 ? -1 : UsedMemInBytes / (1024 * 1024);
             ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
             ulong FreeDiskSpaceInBytes = GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes();
             ulong FreeDiskSpaceInGB = ((FreeDiskSpaceInBytes / 1024) / 1024) / 1024;
@@ -78,15 +80,16 @@ namespace GnollHackX.Pages.MainScreen
             long CurrentPlayMinutes = (CurrentPlayTime % 3600) / 60;
             long CurrentPlaySeconds = CurrentPlayTime - CurrentPlayHours * 3600 - CurrentPlayMinutes * 60;
 
-            if (_gamePage != null && _gamePage.CurrentGame != null)
+            var curGame = GHApp.CurrentGHGame;
+            if (curGame != null)
             {
-                long GameDurationTime = _gamePage.CurrentGame.GamePlayTime;
+                long GameDurationTime = curGame.GamePlayTime;
                 long GameDurationHours = GameDurationTime / 3600;
                 long GameDurationMinutes = (GameDurationTime % 3600) / 60;
                 long GameDurationSeconds = GameDurationTime - GameDurationHours * 3600 - GameDurationMinutes * 60;
                 GameDurationLabel.Text = GameDurationHours + " h " + GameDurationMinutes + " min " + GameDurationSeconds + " s";
 
-                long SessionPlayTime = _gamePage.CurrentGame.SessionPlayTime;
+                long SessionPlayTime = curGame.SessionPlayTime;
                 long SessionPlayHours = SessionPlayTime / 3600;
                 long SessionPlayMinutes = (SessionPlayTime % 3600) / 60;
                 long SessionPlaySeconds = SessionPlayTime - SessionPlayHours * 3600 - SessionPlayMinutes * 60;
@@ -192,7 +195,8 @@ namespace GnollHackX.Pages.MainScreen
             string winSDKAssemblyVersion = GetAssemblyInformationalVersion(typeof(Windows.UI.Color));
             WinSDKLabel.Text = !string.IsNullOrEmpty(winSDKAssemblyVersion) ? winSDKAssemblyVersion : "?";
 
-            string winAppSDKAssemblyVersion = typeof(Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap)?.Assembly?.GetName()?.Version?.ToString();
+            //string winAppSDKAssemblyVersion = typeof(Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap)?.Assembly?.GetName()?.Version?.ToString();
+            string winAppSDKAssemblyVersion = Microsoft.Windows.ApplicationModel.WindowsAppRuntime.ReleaseInfo.AsString;
             WinAppSDKLabel.Text = !string.IsNullOrEmpty(winAppSDKAssemblyVersion) ? winAppSDKAssemblyVersion : "?";
 
             if (GHApp.DeviceGPUs.Count > 1)
@@ -248,11 +252,6 @@ namespace GnollHackX.Pages.MainScreen
 
             PortVersionLabel.Text = GHApp.GetPortVersionString();
             PortBuildLabel.Text = GHApp.GetPortBuildString();
-#if GNH_MAUI
-            UIFrameworkVersionLabel.Text = ".NET MAUI " + GHApp.UIFrameworkVersionString;
-#else
-            UIFrameworkVersionLabel.Text = "XF " + GHApp.UIFrameworkVersionString;
-#endif
             PortVersionTitleLabel.Text = GHApp.RuntimePlatform + " Port Version:";
             PortBuildTitleLabel.Text = GHApp.RuntimePlatform + " Port Build:";
             PortConfigurationTitleLabel.Text ="Port Configuration:";
@@ -271,10 +270,12 @@ namespace GnollHackX.Pages.MainScreen
             FMODVersionLabel.Text = GHApp.FMODVersionString;
             SkiaVersionLabel.Text = GHApp.SkiaVersionString + " (# " + GHApp.SkiaSharpVersionString + ")";
             FrameworkVersionLabel.Text = GHApp.FrameworkVersionString;
+            UIFrameworkVersionLabel.Text = (GHApp.IsMaui ? ".NET MAUI " : "XF ") + GHApp.UIFrameworkVersionString;
+            CompilerLabel.Text = GHApp.IsLLVM ? "LLVM" : GHApp.IsiOS ? "Clang" : GHApp.IsWindows ? "Standard" : "Mono AOT";
             RuntimeVersionLabel.Text = GHApp.RuntimeVersionString;
             PlatformLabel.Text = DeviceInfo.Platform + " " + DeviceInfo.VersionString;
             DeviceLabel.Text = manufacturer + " " + DeviceInfo.Model;
-            TotalMemoryLabel.Text = TotalMemInMB + " MB";
+            TotalMemoryLabel.Text = (UsedMemInMB >= 0 ? (UsedMemInMB+ " MB / ") : "") +  TotalMemInMB + " MB";
             DiskSpaceLabel.Text = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
             TotalPlayTimeLabel.Text = TotalPlayHours + " h " + TotalPlayMinutes + " min " + TotalPlaySeconds + " s";
             CurrentPlayTimeLabel.Text = CurrentPlayHours + " h " + CurrentPlayMinutes + " min " + CurrentPlaySeconds + " s";
@@ -284,11 +285,65 @@ namespace GnollHackX.Pages.MainScreen
 
         private async void CloseButton_Clicked(object sender, EventArgs e)
         {
+            await ClosePageAsync(true);
+        }
+
+        public void ClosePage()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (CloseButton.IsEnabled)
+                            await ClosePageAsync(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ex);
+                    }
+
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
+        private async Task ClosePageAsync(bool playClickSound)
+        {
             CloseButton.IsEnabled = false;
-            GHApp.PlayButtonClickedSound();
+            _backPressed = true;
+            if (playClickSound)
+                GHApp.PlayButtonClickedSound();
             var page = await GHApp.Navigation.PopModalAsync();
             GHApp.DisconnectIViewHandlers(page);
         }
+
+        private bool _backPressed = false;
+        private async Task<bool> BackButtonPressed(object sender, EventArgs e)
+        {
+            if (!_backPressed)
+            {
+                await ClosePageAsync(false);
+            }
+            return false;
+        }
+
+        private void ContentPage_Appearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed += BackButtonPressed;
+        }
+        private void ContentPage_Disappearing(object sender, EventArgs e)
+        {
+            GHApp.BackButtonPressed -= BackButtonPressed;
+        }
+        //protected override bool OnBackButtonPressed()
+        //{
+        //    return true;
+        //}
 
         private double _currentPageWidth = 0;
         private double _currentPageHeight = 0;

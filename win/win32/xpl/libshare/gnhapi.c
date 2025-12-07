@@ -17,6 +17,15 @@
 extern int FDECL(GnollHackMain, (int, char**));
 extern void FDECL(set_wincaps, (uint64_t, uint64_t));
 
+
+DLLEXPORT void LibInitializeTileData(VOID_ARGS)
+{
+    init_tiledata();
+#ifdef USE_TILES
+    process_tiledata(1, (const char*)0, glyph2tile, glyphtileflags);
+#endif
+}
+
 DLLEXPORT void GetGlyph2Tile(int** gl2ti_ptr, int* size_ptr)
 {
     if (!gl2ti_ptr || !size_ptr)
@@ -449,6 +458,19 @@ LibGetMaxManuals(VOID_ARGS)
 }
 
 DLLEXPORT int
+LibGetMaxMajorConsultations(gnhdir)
+const char* gnhdir;
+{
+    int res = chdir(gnhdir);
+    if (res != 0)
+    {
+        /* Failed to change to right directory */
+        return 0;
+    }
+    return get_number_of_oracle_major_consultations();
+}
+
+DLLEXPORT int
 LibGetFirstCatalogue()
 {
     return FIRST_CATALOGUE;
@@ -490,17 +512,48 @@ enum autodraw_types* autodraw_ptr;
 }
 
 
-char gnhapi_putstr_buffer[BUFSZ * 4];
+char gnhapi_putstr_buffer[BUFSZ * 4] = "";
 
 DLLEXPORT void gnhapi_raw_print(const char* text)
 {
-    char buf[UTF8BUFSZ] = "";
     if (text)
     {
-        write_text2buf_utf8(buf, UTF8BUFSZ, text);
-        if (*gnhapi_putstr_buffer)
-            Strcat(gnhapi_putstr_buffer, "\n");
-        Strcpy(eos(gnhapi_putstr_buffer), buf);
+        size_t len = strlen(text);
+        size_t buflen = strlen(gnhapi_putstr_buffer);
+        size_t lflen = *gnhapi_putstr_buffer ? 1 : 0;
+
+        if (buflen + len + lflen + 1 > sizeof(gnhapi_putstr_buffer))
+        {
+            int bufleft = (int)sizeof(gnhapi_putstr_buffer) - 1 - (int)buflen;
+            if (bufleft > 0)
+            {
+                if (*gnhapi_putstr_buffer)
+                {
+                    Strcat(gnhapi_putstr_buffer, "\n");
+                    bufleft--;
+                }
+                if (bufleft > 0)
+                {
+                    if ((int)len > bufleft)
+                    {
+                        Strncpy(gnhapi_putstr_buffer + buflen + lflen, text, bufleft);
+                        gnhapi_putstr_buffer[sizeof(gnhapi_putstr_buffer) - 1] = 0;
+                    }
+                    else
+                    {
+                        /* This really should be Strcat but knowing the lengths, this is faster */
+                        Strcpy(gnhapi_putstr_buffer + buflen + lflen, text);
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (*gnhapi_putstr_buffer)
+                Strcat(gnhapi_putstr_buffer, "\n");
+            /* This really should be Strcat but knowing the lengths, this is faster */
+            Strcpy(gnhapi_putstr_buffer + buflen + lflen, text);
+        }
     }
 }
 
@@ -541,12 +594,8 @@ LibValidateSaveFile(const char* filename, char* output_str)
     windowprocs.win_raw_print = gnhapi_raw_print;
     windowprocs.win_issue_gui_command = gnhapi_issue_gui_command;
 
-    Strcpy(SAVEF, filename);
-#ifdef COMPRESS_EXTENSION
-    SAVEF[strlen(SAVEF) - strlen(COMPRESS_EXTENSION)] = '\0';
-#endif
-    nh_uncompress(SAVEF);
-    if ((fd = open_savefile()) >= 0) 
+    nh_uncompress(filename);
+    if ((fd = open_savefilepath(filename)) >= 0)
     {
         if (validate(fd, filename) == 0) 
         {
@@ -554,7 +603,7 @@ LibValidateSaveFile(const char* filename, char* output_str)
         }
         (void)nhclose(fd);
     }
-    nh_compress(SAVEF);
+    nh_compress(filename);
     windowprocs = oldprocs;
 
     if (output_str && *gnhapi_putstr_buffer)
@@ -631,6 +680,18 @@ LibSetDiceAsRanges(int new_value)
     iflags.show_dice_as_ranges = new_value != 0;
 }
 
+DLLEXPORT void
+LibSetAutoDig(int new_value)
+{
+    flags.autodig = new_value != 0;
+}
+
+DLLEXPORT void
+LibSetIgnoreStopping(int new_value)
+{
+    flags.ignore_stopping = new_value != 0;
+}
+
 DLLEXPORT int
 LibGetDiceAsRanges(VOID_ARGS)
 {
@@ -673,6 +734,18 @@ LibGetVolumeForGHSound(int ghsound)
     return ghsound2event[ghsound].volume;
 }
 
+DLLEXPORT void
+LibSetExitHack(int newValue)
+{
+    exit_hack_code = newValue;
+}
+
+DLLEXPORT void
+LibExitGnhThread()
+{
+    exit_hack_code = -1; // ExitHack does nothing
+    gnollhack_exit(EXIT_SUCCESS);
+}
 
 DLLEXPORT int GnollHackStart(cmdlineargs)
 char* cmdlineargs;
@@ -914,6 +987,12 @@ DLLEXPORT int RunGnollHack(
     initial_flags.getpos_arrows_value = (runflags & GHRUNFLAGS_GETPOS_ARROWS) != 0;
     initial_flags.dice_as_ranges_set = TRUE;
     initial_flags.dice_as_ranges_value = (runflags & GHRUNFLAGS_DICE_AS_RANGES) != 0;
+    initial_flags.autodig_set = TRUE;
+    initial_flags.autodig_value = (runflags & GHRUNFLAGS_AUTO_DIG) != 0;
+    initial_flags.ignore_stopping_set = TRUE;
+    initial_flags.ignore_stopping_value = (runflags & GHRUNFLAGS_IGNORE_STOPPING) != 0;
+    initial_flags.vi_keys_set = TRUE;
+    initial_flags.vi_keys_value = (runflags & GHRUNFLAGS_VI_KEYS) != 0;
     initial_flags.save_file_tracking_supported_set = TRUE;
     initial_flags.save_file_tracking_supported_value = (runflags & GHRUNFLAGS_SAVE_FILE_TRACKING_SUPPORTED) != 0;
     initial_flags.save_file_tracking_needed_set = TRUE;
